@@ -1,3 +1,7 @@
 spring:
   application:
-    name: asignacion-aulas
+    name: classroom-allocation
+
+server:
+  servlet:
+    context-path: /api
