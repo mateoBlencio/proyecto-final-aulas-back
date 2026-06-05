@@ -21,7 +21,8 @@
 
 	<properties>
 		<java.version>21</java.version>
-		<ortools.version>9.15.6755</ortools.version>
+		<timefold-solver-core.version>2.1.0</timefold-solver-core.version>
+		<timefold-solver-test.version>1.33.0</timefold-solver-test.version>
 	</properties>
 
 	<dependencies>
@@ -104,11 +105,19 @@
 		</dependency>
 
 		<dependency>
-			<groupId>com.google.ortools</groupId>
-			<artifactId>ortools-java</artifactId>
-			<version>${ortools.version}</version>
+			<groupId>ai.timefold.solver</groupId>
+			<artifactId>timefold-solver-core</artifactId>
+			<version>${timefold-solver-core.version}</version>
 			<scope>compile</scope>
 		</dependency>
+
+		<dependency>
+			<groupId>ai.timefold.solver</groupId>
+			<artifactId>timefold-solver-test</artifactId>
+			<version>${timefold-solver-test.version}</version>
+			<scope>test</scope>
+		</dependency>
+
 
 	</dependencies>
 

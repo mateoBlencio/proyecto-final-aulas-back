@@ -1,4 +1,4 @@
-package PF.asignacion_aulas;
+package PF.classroom_allocation;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
