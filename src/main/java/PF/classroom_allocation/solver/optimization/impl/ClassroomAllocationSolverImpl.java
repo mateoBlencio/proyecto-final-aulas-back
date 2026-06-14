@@ -1,83 +1,81 @@
 package PF.classroom_allocation.solver.optimization.impl;
 
+import PF.classroom_allocation.solver.exception.SchedulingException;
 import PF.classroom_allocation.solver.model.Classroom;
 import PF.classroom_allocation.solver.model.Event;
 import PF.classroom_allocation.solver.optimization.ClassroomAllocationSolver;
-import PF.classroom_allocation.solver.optimization.SolverInput;
-import PF.classroom_allocation.solver.optimization.SolverOutput;
-import ai.timefold.solver.core.api.solver.SolverJob;
-import ai.timefold.solver.core.api.solver.SolverManager;
-import lombok.AccessLevel;
-import lombok.RequiredArgsConstructor;
-import lombok.experimental.FieldDefaults;
+import PF.classroom_allocation.solver.model.ConflictPair;
+import ai.timefold.solver.core.api.solver.Solver;
+import ai.timefold.solver.core.api.solver.SolverFactory;
+import ai.timefold.solver.core.config.solver.termination.TerminationConfig;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
-@RequiredArgsConstructor
-@FieldDefaults(level = AccessLevel.PRIVATE)
 public class ClassroomAllocationSolverImpl implements ClassroomAllocationSolver {
 
-    final SolverManager<ScheduleSolution> solverManager;
-    final AtomicLong jobIdCounter = new AtomicLong();
-
     @Override
-    public SolverOutput solve(SolverInput input) {
-        ScheduleSolution problem  = buildProblem(input);
-        ScheduleSolution solution = runSolver(problem);
-        return mapToOutput(solution);
+    public ScheduleSolution solve(List<Event> events,
+                                  List<Classroom> classrooms,
+                                  Set<ConflictPair> conflicts,
+                                  Map<String, List<Classroom>> candidatesByEventId,
+                                  int timeLimitSeconds) {
+        ScheduleSolution problem = buildProblem(events, classrooms, conflicts, candidatesByEventId);
+        return runSolver(problem, timeLimitSeconds);
     }
 
-    private ScheduleSolution buildProblem(SolverInput input) {
-        List<ClassAssignment> assignments = input.getEvents().stream()
-                .map(event -> buildAssignment(event, input)).toList();
-
-        return new ScheduleSolution(input.getClassrooms(), assignments, null);
+    private ScheduleSolution buildProblem(List<Event> events,
+                                          List<Classroom> classrooms,
+                                          Set<ConflictPair> conflicts,
+                                          Map<String, List<Classroom>> candidatesByEventId) {
+        List<ClassAssignment> assignments = events.stream()
+                .map(event -> buildAssignment(event, classrooms, conflicts, candidatesByEventId))
+                .toList();
+        return new ScheduleSolution(classrooms, assignments, null);
     }
 
-    private ClassAssignment buildAssignment(Event event, SolverInput input) {
-        Set<String> conflictingIds = input.getConflicts().stream()
+    private ClassAssignment buildAssignment(Event event,
+                                            List<Classroom> classrooms,
+                                            Set<ConflictPair> conflicts,
+                                            Map<String, List<Classroom>> candidatesByEventId) {
+        Set<String> conflictingIds = conflicts.stream()
                 .filter(p -> p.involves(event.getId()))
                 .map(p -> p.otherEventId(event.getId()))
                 .collect(Collectors.toSet());
 
-        List<Classroom> candidates = input.getCandidatesByEventId()
-                .getOrDefault(event.getId(), input.getClassrooms());
+        List<Classroom> candidates = candidatesByEventId.getOrDefault(event.getId(), classrooms);
 
         return new ClassAssignment(event, candidates, conflictingIds);
     }
 
-    private ScheduleSolution runSolver(ScheduleSolution problem) {
-        SolverJob<ScheduleSolution> job =
-                solverManager.solve(jobIdCounter.incrementAndGet(), problem);
+    private ScheduleSolution runSolver(ScheduleSolution problem, int timeLimitSeconds) {
+        String jobId = UUID.randomUUID().toString();
+        log.info("Solver job {} starting, limit {}s", jobId, timeLimitSeconds);
+
+        ai.timefold.solver.core.config.solver.SolverConfig config =
+                new ai.timefold.solver.core.config.solver.SolverConfig()
+                        .withSolutionClass(ScheduleSolution.class)
+                        .withEntityClasses(ClassAssignment.class)
+                        .withConstraintProviderClass(ClassroomConstraintProvider.class)
+                        .withTerminationConfig(new TerminationConfig()
+                                .withSecondsSpentLimit((long) timeLimitSeconds));
+
+        SolverFactory<ScheduleSolution> factory = SolverFactory.create(config);
+        Solver<ScheduleSolution> solver = factory.buildSolver();
         try {
-            return job.getFinalBestSolution();
-        } catch (ExecutionException | InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Error during optimization", e);
+            ScheduleSolution solution = solver.solve(problem);
+            log.info("Solver job {} finished, score {}", jobId, solution.getScore());
+            return solution;
+        } catch (Exception e) {
+            log.error("Solver job {} failed", jobId, e);
+            throw new SchedulingException("Error during optimization: " + e.getMessage(), e);
         }
-    }
-
-    private SolverOutput mapToOutput(ScheduleSolution solution) {
-        List<SolverOutput.Assignment> assignments = solution.getAssignments().stream()
-                .map(a -> new SolverOutput.Assignment(
-                        a.getEvent().getId(),
-                        a.getClassroom() != null ? a.getClassroom().getId() : null,
-                        a.getOvercrowding(),
-                        a.getUnusedCapacity()
-                ))
-                .toList();
-
-        var score = solution.getScore();
-        return SolverOutput.builder()
-                .assignments(assignments)
-                .hardScore(score != null ? (int) score.hardScore() : Integer.MIN_VALUE)
-                .softScore(score != null ? (int) score.softScore() : Integer.MIN_VALUE)
-                .build();
     }
 }

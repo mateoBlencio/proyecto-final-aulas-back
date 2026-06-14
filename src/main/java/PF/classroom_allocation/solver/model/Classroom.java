@@ -19,11 +19,15 @@ public class Classroom {
     String name;
     float surfaceM2;
 
+    public int capacity() {
+        return (int) surfaceM2;
+    }
+
     public int overcrowding(int enrolled) {
-        return (int) Math.max(0, enrolled - surfaceM2);
+        return Math.max(0, enrolled - capacity());
     }
 
     public int undercrowding(int enrolled) {
-        return (int) Math.max(0, surfaceM2 - enrolled);
+        return Math.max(0, capacity() - enrolled);
     }
 }

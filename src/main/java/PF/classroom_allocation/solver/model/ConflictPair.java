@@ -1,4 +1,4 @@
-package PF.classroom_allocation.solver.optimization;
+package PF.classroom_allocation.solver.model;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
