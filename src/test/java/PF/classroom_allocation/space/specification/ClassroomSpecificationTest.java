@@ -1,8 +1,7 @@
-package PF.classroom_allocation.space;
+package PF.classroom_allocation.space.specification;
 
 import PF.classroom_allocation.space.dto.ClassroomFilter;
 import PF.classroom_allocation.space.model.Classroom;
-import PF.classroom_allocation.space.specification.ClassroomSpecification;
 import jakarta.persistence.criteria.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -203,5 +202,133 @@ class ClassroomSpecificationTest {
         verify(cb).and(predicatesCaptor.capture());
         Predicate[] predicates = predicatesCaptor.getValue();
         assertTrue(predicates.length >= 2);
+    }
+
+    @Test
+    void withFilter_shouldIgnoreBlankRoomNumber() {
+        Path deletedPath = mockPath("deleted");
+        Predicate deletedPredicate = mock(Predicate.class);
+        when(cb.isFalse(deletedPath)).thenReturn(deletedPredicate);
+        when(cb.and(any(Predicate[].class))).thenReturn(mock(Predicate.class));
+
+        var filter = new ClassroomFilter("   ", null, null, null, null, null, null);
+        Specification<Classroom> spec = ClassroomSpecification.withFilter(filter);
+        spec.toPredicate(root, query, cb);
+
+        verify(cb).and(predicatesCaptor.capture());
+        Predicate[] predicates = predicatesCaptor.getValue();
+        assertEquals(1, predicates.length);
+    }
+
+    @Test
+    void withFilter_shouldFilterByCapacityExactRange() {
+        Path deletedPath = mockPath("deleted");
+        Predicate deletedPredicate = mock(Predicate.class);
+        when(cb.isFalse(deletedPath)).thenReturn(deletedPredicate);
+
+        Path capacityPath = mockPath("capacity");
+        Predicate gePredicate = mock(Predicate.class);
+        Predicate lePredicate = mock(Predicate.class);
+        when(cb.greaterThanOrEqualTo(capacityPath, 30)).thenReturn(gePredicate);
+        when(cb.lessThanOrEqualTo(capacityPath, 30)).thenReturn(lePredicate);
+        when(cb.and(any(Predicate[].class))).thenReturn(mock(Predicate.class));
+
+        var filter = new ClassroomFilter(null, null, null, 30, 30, null, null);
+        Specification<Classroom> spec = ClassroomSpecification.withFilter(filter);
+        spec.toPredicate(root, query, cb);
+
+        verify(cb).and(predicatesCaptor.capture());
+        Predicate[] predicates = predicatesCaptor.getValue();
+        assertTrue(predicates.length >= 3);
+    }
+
+    @Test
+    void withFilter_shouldCombineThreeOrMorePredicates() {
+        Path deletedPath = mockPath("deleted");
+        Predicate deletedPredicate = mock(Predicate.class);
+        when(cb.isFalse(deletedPath)).thenReturn(deletedPredicate);
+
+        Path roomNumberPath = mockPath("roomNumber");
+        Predicate likePredicate = mock(Predicate.class);
+        when(cb.lower(roomNumberPath)).thenReturn(roomNumberPath);
+        when(cb.like(roomNumberPath, "%101%")).thenReturn(likePredicate);
+
+        Path buildingPath = mock(Path.class);
+        when(root.get("building")).thenReturn(buildingPath);
+        Path buildingIdPath = mock(Path.class);
+        when(buildingPath.get("id")).thenReturn(buildingIdPath);
+        Predicate buildingPredicate = mock(Predicate.class);
+        when(cb.equal(buildingIdPath, 1)).thenReturn(buildingPredicate);
+
+        Path floorPath = mockPath("floor");
+        Predicate floorPredicate = mock(Predicate.class);
+        when(cb.equal(floorPath, 2)).thenReturn(floorPredicate);
+
+        Path capacityPath = mockPath("capacity");
+        Predicate gePredicate = mock(Predicate.class);
+        when(cb.greaterThanOrEqualTo(capacityPath, 20)).thenReturn(gePredicate);
+
+        Predicate andPredicate = mock(Predicate.class);
+        when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
+
+        var filter = new ClassroomFilter("101", 1, null, 20, null, 2, null);
+        Specification<Classroom> spec = ClassroomSpecification.withFilter(filter);
+        spec.toPredicate(root, query, cb);
+
+        verify(cb).and(predicatesCaptor.capture());
+        Predicate[] predicates = predicatesCaptor.getValue();
+        assertTrue(predicates.length >= 4);
+    }
+
+    @Test
+    void withFilter_shouldHandleAllFiltersSimultaneously() {
+        Path deletedPath = mockPath("deleted");
+        Predicate deletedPredicate = mock(Predicate.class);
+        when(cb.isFalse(deletedPath)).thenReturn(deletedPredicate);
+
+        Path roomNumberPath = mockPath("roomNumber");
+        Predicate likePredicate = mock(Predicate.class);
+        when(cb.lower(roomNumberPath)).thenReturn(roomNumberPath);
+        when(cb.like(roomNumberPath, "%101%")).thenReturn(likePredicate);
+
+        Path buildingPath = mock(Path.class);
+        when(root.get("building")).thenReturn(buildingPath);
+        Path buildingIdPath = mock(Path.class);
+        when(buildingPath.get("id")).thenReturn(buildingIdPath);
+        Predicate buildingPredicate = mock(Predicate.class);
+        when(cb.equal(buildingIdPath, 1)).thenReturn(buildingPredicate);
+
+        Path typePath = mock(Path.class);
+        when(root.get("classroomType")).thenReturn(typePath);
+        Path typeIdPath = mock(Path.class);
+        when(typePath.get("id")).thenReturn(typeIdPath);
+        Predicate typePredicate = mock(Predicate.class);
+        when(cb.equal(typeIdPath, 2)).thenReturn(typePredicate);
+
+        Path capacityPath = mockPath("capacity");
+        Predicate gePredicate = mock(Predicate.class);
+        when(cb.greaterThanOrEqualTo(capacityPath, 20)).thenReturn(gePredicate);
+
+        Predicate lePredicate = mock(Predicate.class);
+        when(cb.lessThanOrEqualTo(capacityPath, 50)).thenReturn(lePredicate);
+
+        Path floorPath = mockPath("floor");
+        Predicate floorPredicate = mock(Predicate.class);
+        when(cb.equal(floorPath, 2)).thenReturn(floorPredicate);
+
+        Path availablePath = mockPath("available");
+        Predicate availablePredicate = mock(Predicate.class);
+        when(cb.equal(availablePath, true)).thenReturn(availablePredicate);
+
+        Predicate andPredicate = mock(Predicate.class);
+        when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
+
+        var filter = new ClassroomFilter("101", 1, 2, 20, 50, 2, true);
+        Specification<Classroom> spec = ClassroomSpecification.withFilter(filter);
+        spec.toPredicate(root, query, cb);
+
+        verify(cb).and(predicatesCaptor.capture());
+        Predicate[] predicates = predicatesCaptor.getValue();
+        assertEquals(8, predicates.length);
     }
 }

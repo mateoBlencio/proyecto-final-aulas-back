@@ -1,9 +1,8 @@
-package PF.classroom_allocation.space;
+package PF.classroom_allocation.space.service.impl;
 
 import PF.classroom_allocation.space.exception.ResourceNotFoundException;
 import PF.classroom_allocation.space.model.Building;
 import PF.classroom_allocation.space.repository.BuildingRepository;
-import PF.classroom_allocation.space.service.impl.BuildingServiceImpl;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.mockito.ArgumentMatchers.anyInt;
 import org.mockito.Mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -70,4 +70,14 @@ class BuildingServiceImplTest {
         var ex = assertThrows(ResourceNotFoundException.class, () -> buildingService.findById(999));
         assertTrue(ex.getMessage().contains("Building not found"));
     }
+
+    @Test
+    void findById_shouldCallRepositoryWithCorrectId() {
+        when(buildingRepository.findByIdAndDeletedFalse(1)).thenReturn(Optional.of(activeBuilding));
+
+        buildingService.findById(1);
+
+        verify(buildingRepository).findByIdAndDeletedFalse(1);
+    }
+
 }

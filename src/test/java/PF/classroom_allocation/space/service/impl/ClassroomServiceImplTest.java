@@ -1,8 +1,8 @@
-package PF.classroom_allocation.space;
+package PF.classroom_allocation.space.service.impl;
 
 import PF.classroom_allocation.space.dto.ClassroomFilter;
-import PF.classroom_allocation.space.dto.ClassroomRequestDTO;
-import PF.classroom_allocation.space.dto.ClassroomResponseDTO;
+import PF.classroom_allocation.space.dto.request.ClassroomRequestDTO;
+import PF.classroom_allocation.space.dto.response.ClassroomResponseDTO;
 import PF.classroom_allocation.space.exception.ResourceNotFoundException;
 import PF.classroom_allocation.space.exception.SpaceDomainException;
 import PF.classroom_allocation.space.mapper.ClassroomMapper;
@@ -12,7 +12,6 @@ import PF.classroom_allocation.space.model.ClassroomType;
 import PF.classroom_allocation.space.repository.ClassroomRepository;
 import PF.classroom_allocation.space.service.BuildingService;
 import PF.classroom_allocation.space.service.ClassroomTypeService;
-import PF.classroom_allocation.space.service.impl.ClassroomServiceImpl;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -166,6 +165,81 @@ class ClassroomServiceImplTest {
     }
 
     @Test
+    void create_shouldSucceedWhenFloorEqualsBuildingFloorCount() {
+        var dto = new ClassroomRequestDTO("102", 30, 5, 1, true, 1);
+        when(buildingService.findById(dto.buildingId())).thenReturn(building);
+        when(classroomTypeService.findById(dto.classroomTypeId())).thenReturn(classroomType);
+        when(classroomRepository.findByRoomNumberAndDeletedFalse("102")).thenReturn(Optional.empty());
+
+        Classroom saved = new Classroom();
+        saved.setId(2);
+        saved.setRoomNumber("102");
+        saved.setCapacity(30);
+        saved.setFloor(5);
+        saved.setClassroomType(classroomType);
+        saved.setAvailable(true);
+        saved.setDeleted(false);
+        saved.setBuilding(building);
+
+        when(classroomRepository.save(any(Classroom.class))).thenReturn(saved);
+
+        ClassroomResponseDTO result = classroomService.create(dto);
+
+        assertNotNull(result);
+        assertEquals(5, result.getFloor());
+    }
+
+    @Test
+    void create_shouldSucceedWhenFloorIsZero() {
+        var dto = new ClassroomRequestDTO("103", 30, 0, 1, true, 1);
+        when(buildingService.findById(dto.buildingId())).thenReturn(building);
+        when(classroomTypeService.findById(dto.classroomTypeId())).thenReturn(classroomType);
+        when(classroomRepository.findByRoomNumberAndDeletedFalse("103")).thenReturn(Optional.empty());
+
+        Classroom saved = new Classroom();
+        saved.setId(3);
+        saved.setRoomNumber("103");
+        saved.setCapacity(30);
+        saved.setFloor(0);
+        saved.setClassroomType(classroomType);
+        saved.setAvailable(true);
+        saved.setDeleted(false);
+        saved.setBuilding(building);
+
+        when(classroomRepository.save(any(Classroom.class))).thenReturn(saved);
+
+        ClassroomResponseDTO result = classroomService.create(dto);
+
+        assertNotNull(result);
+        assertEquals(0, result.getFloor());
+    }
+
+    @Test
+    void create_shouldSucceedWhenCapacityIsOne() {
+        var dto = new ClassroomRequestDTO("104", 1, 2, 1, true, 1);
+        when(buildingService.findById(dto.buildingId())).thenReturn(building);
+        when(classroomTypeService.findById(dto.classroomTypeId())).thenReturn(classroomType);
+        when(classroomRepository.findByRoomNumberAndDeletedFalse("104")).thenReturn(Optional.empty());
+
+        Classroom saved = new Classroom();
+        saved.setId(4);
+        saved.setRoomNumber("104");
+        saved.setCapacity(1);
+        saved.setFloor(2);
+        saved.setClassroomType(classroomType);
+        saved.setAvailable(true);
+        saved.setDeleted(false);
+        saved.setBuilding(building);
+
+        when(classroomRepository.save(any(Classroom.class))).thenReturn(saved);
+
+        ClassroomResponseDTO result = classroomService.create(dto);
+
+        assertNotNull(result);
+        assertEquals(1, result.getCapacity());
+    }
+
+    @Test
     void findById_shouldThrowWhenNotFound() {
         when(classroomRepository.findByIdAndDeletedFalse(999)).thenReturn(Optional.empty());
 
@@ -188,6 +262,24 @@ class ClassroomServiceImplTest {
         assertNotNull(result);
         assertEquals(1, result.getId());
         assertEquals(building.getId(), result.getBuildingId());
+    }
+
+    @Test
+    void findById_shouldReturnFullResponseDto() {
+        when(classroomRepository.findByIdAndDeletedFalse(1)).thenReturn(Optional.of(existingClassroom));
+
+        ClassroomResponseDTO result = classroomService.findById(1);
+
+        assertNotNull(result);
+        assertEquals(1, result.getId());
+        assertEquals("101", result.getRoomNumber());
+        assertEquals(30, result.getCapacity());
+        assertEquals(2, result.getFloor());
+        assertTrue(result.getAvailable());
+        assertEquals(1, result.getBuildingId());
+        assertEquals("Pabellon A", result.getBuildingName());
+        assertEquals(1, result.getClassroomTypeId());
+        assertEquals("CLASSROOM", result.getClassroomTypeDescription());
     }
 
     @Test
@@ -214,6 +306,34 @@ class ClassroomServiceImplTest {
 
         Page<ClassroomResponseDTO> result = classroomService.findAll(filter, pageable);
 
+        assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void findAll_shouldReturnEmptyPageWhenNoResults() {
+        ClassroomFilter filter = new ClassroomFilter(null, null, null, null, null, null, null);
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<Classroom> emptyPage = new PageImpl<>(List.of(), pageable, 0);
+
+        when(classroomRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(emptyPage);
+
+        Page<ClassroomResponseDTO> result = classroomService.findAll(filter, pageable);
+
+        assertEquals(0, result.getTotalElements());
+        assertTrue(result.getContent().isEmpty());
+    }
+
+    @Test
+    void findAll_shouldApplyFullFilterCombination() {
+        ClassroomFilter filter = new ClassroomFilter("101", 1, 1, 20, 50, 2, true);
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Classroom> page = new PageImpl<>(List.of(existingClassroom), pageable, 1);
+
+        when(classroomRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+
+        Page<ClassroomResponseDTO> result = classroomService.findAll(filter, pageable);
+
+        assertNotNull(result);
         assertEquals(1, result.getTotalElements());
     }
 
@@ -279,6 +399,107 @@ class ClassroomServiceImplTest {
     }
 
     @Test
+    void update_shouldSucceedWhenKeepingSameBuilding() {
+        var updateDto = new ClassroomRequestDTO("101", 35, 2, 1, true, 1);
+
+        when(classroomRepository.findByIdAndDeletedFalse(1)).thenReturn(Optional.of(existingClassroom));
+        when(buildingService.findById(1)).thenReturn(building);
+        when(classroomTypeService.findById(1)).thenReturn(classroomType);
+
+        Classroom updated = new Classroom();
+        updated.setId(1);
+        updated.setRoomNumber("101");
+        updated.setCapacity(35);
+        updated.setFloor(2);
+        updated.setClassroomType(classroomType);
+        updated.setAvailable(true);
+        updated.setDeleted(false);
+        updated.setBuilding(building);
+
+        when(classroomRepository.save(any(Classroom.class))).thenReturn(updated);
+
+        ClassroomResponseDTO result = classroomService.update(1, updateDto);
+
+        assertNotNull(result);
+        assertEquals(1, result.getBuildingId());
+    }
+
+    @Test
+    void update_shouldSucceedWhenFloorEqualsNewBuildingFloorCount() {
+        var twoFloorBuilding = Building.builder()
+                .name("TwoFloor")
+                .floorCount(2)
+                .id(4)
+                .build();
+
+        var updateDto = new ClassroomRequestDTO("101", 30, 2, 1, true, 4);
+
+        when(classroomRepository.findByIdAndDeletedFalse(1)).thenReturn(Optional.of(existingClassroom));
+        when(buildingService.findById(4)).thenReturn(twoFloorBuilding);
+        when(classroomTypeService.findById(1)).thenReturn(classroomType);
+
+        Classroom updated = new Classroom();
+        updated.setId(1);
+        updated.setRoomNumber("101");
+        updated.setCapacity(30);
+        updated.setFloor(2);
+        updated.setClassroomType(classroomType);
+        updated.setAvailable(true);
+        updated.setDeleted(false);
+        updated.setBuilding(twoFloorBuilding);
+
+        when(classroomRepository.save(any(Classroom.class))).thenReturn(updated);
+
+        ClassroomResponseDTO result = classroomService.update(1, updateDto);
+
+        assertNotNull(result);
+        assertEquals(2, result.getFloor());
+    }
+
+    @Test
+    void update_shouldUpdateAllFieldsCorrectly() {
+        var newBuilding = Building.builder()
+                .name("New Building")
+                .floorCount(10)
+                .id(5)
+                .build();
+
+        var anotherType = new ClassroomType();
+        anotherType.setId(2);
+        anotherType.setDescription("LAB");
+
+        var updateDto = new ClassroomRequestDTO("999", 50, 3, 2, false, 5);
+
+        when(classroomRepository.findByIdAndDeletedFalse(1)).thenReturn(Optional.of(existingClassroom));
+        when(buildingService.findById(5)).thenReturn(newBuilding);
+        when(classroomTypeService.findById(2)).thenReturn(anotherType);
+
+        Classroom updated = new Classroom();
+        updated.setId(1);
+        updated.setRoomNumber("999");
+        updated.setCapacity(50);
+        updated.setFloor(3);
+        updated.setClassroomType(anotherType);
+        updated.setAvailable(false);
+        updated.setDeleted(false);
+        updated.setBuilding(newBuilding);
+
+        when(classroomRepository.save(any(Classroom.class))).thenReturn(updated);
+
+        ClassroomResponseDTO result = classroomService.update(1, updateDto);
+
+        assertNotNull(result);
+        assertEquals("999", result.getRoomNumber());
+        assertEquals(50, result.getCapacity());
+        assertEquals(3, result.getFloor());
+        assertFalse(result.getAvailable());
+        assertEquals(5, result.getBuildingId());
+        assertEquals("New Building", result.getBuildingName());
+        assertEquals(2, result.getClassroomTypeId());
+        assertEquals("LAB", result.getClassroomTypeDescription());
+    }
+
+    @Test
     void delete_shouldSetDeletedTrueWhenExists() {
         when(classroomRepository.findByIdAndDeletedFalse(1)).thenReturn(Optional.of(existingClassroom));
         when(classroomRepository.save(any(Classroom.class))).thenReturn(existingClassroom);
@@ -296,5 +517,4 @@ class ClassroomServiceImplTest {
 
         assertThrows(ResourceNotFoundException.class, () -> classroomService.delete(2));
     }
-
 }

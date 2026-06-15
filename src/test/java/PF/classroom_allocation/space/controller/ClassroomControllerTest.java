@@ -1,9 +1,8 @@
-package PF.classroom_allocation.space;
+package PF.classroom_allocation.space.controller;
 
-import PF.classroom_allocation.space.controller.ClassroomController;
 import PF.classroom_allocation.space.dto.ClassroomFilter;
-import PF.classroom_allocation.space.dto.ClassroomRequestDTO;
-import PF.classroom_allocation.space.dto.ClassroomResponseDTO;
+import PF.classroom_allocation.space.dto.request.ClassroomRequestDTO;
+import PF.classroom_allocation.space.dto.response.ClassroomResponseDTO;
 import PF.classroom_allocation.space.exception.GlobalExceptionHandler;
 import PF.classroom_allocation.space.exception.ResourceNotFoundException;
 import PF.classroom_allocation.space.exception.SpaceDomainException;
@@ -64,7 +63,7 @@ class ClassroomControllerTest {
 
         when(classroomService.create(any(ClassroomRequestDTO.class))).thenReturn(response);
 
-        mockMvc.perform(post("/classrooms/v1")
+        mockMvc.perform(post("/v1/classrooms")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"roomNumber":"101","capacity":30,"floor":2,"classroomTypeId":1,"available":true,"buildingId":1}
@@ -76,7 +75,7 @@ class ClassroomControllerTest {
 
     @Test
     void create_shouldReturn400WhenInvalid() throws Exception {
-        mockMvc.perform(post("/classrooms/v1")
+        mockMvc.perform(post("/v1/classrooms")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"roomNumber":"","capacity":0,"classroomTypeId":null,"buildingId":null}
@@ -94,7 +93,7 @@ class ClassroomControllerTest {
 
         when(classroomService.findById(1)).thenReturn(response);
 
-        mockMvc.perform(get("/classrooms/v1/1"))
+        mockMvc.perform(get("/v1/classrooms/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.roomNumber").value("101"));
@@ -104,7 +103,7 @@ class ClassroomControllerTest {
     void findById_shouldReturn404WhenNotFound() throws Exception {
         when(classroomService.findById(999)).thenThrow(new ResourceNotFoundException("Classroom not found"));
 
-        mockMvc.perform(get("/classrooms/v1/999"))
+        mockMvc.perform(get("/v1/classrooms/999"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("Classroom not found"))
                 .andExpect(jsonPath("$.status").value(404));
@@ -122,7 +121,7 @@ class ClassroomControllerTest {
 
         when(classroomService.findAll(any(ClassroomFilter.class), any())).thenReturn(page);
 
-        mockMvc.perform(get("/classrooms/v1"))
+        mockMvc.perform(get("/v1/classrooms"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray())
                 .andExpect(jsonPath("$.totalElements").value(1))
@@ -141,7 +140,7 @@ class ClassroomControllerTest {
 
         when(classroomService.findAll(any(ClassroomFilter.class), any())).thenReturn(page);
 
-        mockMvc.perform(get("/classrooms/v1")
+        mockMvc.perform(get("/v1/classrooms")
                         .param("roomNumber", "10")
                         .param("buildingId", "1")
                         .param("capacityMin", "20")
@@ -160,7 +159,7 @@ class ClassroomControllerTest {
 
         when(classroomService.update(eq(1), any(ClassroomRequestDTO.class))).thenReturn(response);
 
-        mockMvc.perform(put("/classrooms/v1/1")
+        mockMvc.perform(put("/v1/classrooms/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"roomNumber":"101","capacity":40,"floor":2,"classroomTypeId":1,"available":false,"buildingId":1}
@@ -173,7 +172,7 @@ class ClassroomControllerTest {
         when(classroomService.update(eq(999), any(ClassroomRequestDTO.class)))
                 .thenThrow(new ResourceNotFoundException("Classroom not found"));
 
-        mockMvc.perform(put("/classrooms/v1/999")
+        mockMvc.perform(put("/v1/classrooms/999")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"roomNumber":"101","capacity":40,"floor":2,"classroomTypeId":1,"available":false,"buildingId":1}
@@ -185,7 +184,7 @@ class ClassroomControllerTest {
     void delete_shouldReturn204() throws Exception {
         doNothing().when(classroomService).delete(1);
 
-        mockMvc.perform(delete("/classrooms/v1/1"))
+        mockMvc.perform(delete("/v1/classrooms/1"))
                 .andExpect(status().isNoContent());
     }
 
@@ -193,7 +192,7 @@ class ClassroomControllerTest {
     void delete_shouldReturn404WhenNotFound() throws Exception {
         doThrow(new ResourceNotFoundException("Classroom not found")).when(classroomService).delete(999);
 
-        mockMvc.perform(delete("/classrooms/v1/999"))
+        mockMvc.perform(delete("/v1/classrooms/999"))
                 .andExpect(status().isNotFound());
     }
 
@@ -201,7 +200,90 @@ class ClassroomControllerTest {
     void handleDomainException_shouldReturn400() throws Exception {
         when(classroomService.findById(1)).thenThrow(new SpaceDomainException("Domain error"));
 
-        mockMvc.perform(get("/classrooms/v1/1"))
+        mockMvc.perform(get("/v1/classrooms/1"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void create_shouldReturn400WhenRoomNumberBlank() throws Exception {
+        mockMvc.perform(post("/v1/classrooms")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"roomNumber":"","capacity":30,"floor":2,"classroomTypeId":1,"available":true,"buildingId":1}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void create_shouldReturn400WhenCapacityNull() throws Exception {
+        mockMvc.perform(post("/v1/classrooms")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"roomNumber":"101","capacity":null,"floor":2,"classroomTypeId":1,"available":true,"buildingId":1}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void create_shouldReturn400WhenBuildingIdNull() throws Exception {
+        mockMvc.perform(post("/v1/classrooms")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"roomNumber":"101","capacity":30,"floor":2,"classroomTypeId":1,"available":true,"buildingId":null}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void create_shouldReturn201WithFullResponseCheck() throws Exception {
+        var response = ClassroomResponseDTO.builder()
+                .id(1).roomNumber("101").capacity(30).floor(2).available(true)
+                .buildingId(1).buildingName("Edificio A")
+                .classroomTypeId(1).classroomTypeDescription("CLASSROOM")
+                .build();
+
+        when(classroomService.create(any(ClassroomRequestDTO.class))).thenReturn(response);
+
+        mockMvc.perform(post("/v1/classrooms")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"roomNumber":"101","capacity":30,"floor":2,"classroomTypeId":1,"available":true,"buildingId":1}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.roomNumber").value("101"))
+                .andExpect(jsonPath("$.capacity").value(30))
+                .andExpect(jsonPath("$.floor").value(2))
+                .andExpect(jsonPath("$.available").value(true))
+                .andExpect(jsonPath("$.buildingId").value(1))
+                .andExpect(jsonPath("$.buildingName").value("Edificio A"))
+                .andExpect(jsonPath("$.classroomTypeId").value(1))
+                .andExpect(jsonPath("$.classroomTypeDescription").value("CLASSROOM"));
+    }
+
+    @Test
+    void findAll_shouldReturn200WithDefaultPageable() throws Exception {
+        var response = ClassroomResponseDTO.builder()
+                .id(1).roomNumber("101").capacity(30).floor(2).available(true)
+                .buildingId(1).buildingName("Edificio A")
+                .classroomTypeId(1).classroomTypeDescription("CLASSROOM")
+                .build();
+        Page<ClassroomResponseDTO> page = new PageImpl<>(
+                List.of(response), PageRequest.of(0, 20, Sort.by("id")), 1);
+
+        when(classroomService.findAll(any(ClassroomFilter.class), any())).thenReturn(page);
+
+        mockMvc.perform(get("/v1/classrooms"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    void delete_shouldReturn400WhenDomainException() throws Exception {
+        doThrow(new SpaceDomainException("Cannot delete")).when(classroomService).delete(1);
+
+        mockMvc.perform(delete("/v1/classrooms/1"))
                 .andExpect(status().isBadRequest());
     }
 }

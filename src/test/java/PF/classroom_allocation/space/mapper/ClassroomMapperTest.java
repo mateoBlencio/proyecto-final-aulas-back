@@ -1,8 +1,7 @@
-package PF.classroom_allocation.space;
+package PF.classroom_allocation.space.mapper;
 
-import PF.classroom_allocation.space.dto.ClassroomRequestDTO;
-import PF.classroom_allocation.space.dto.ClassroomResponseDTO;
-import PF.classroom_allocation.space.mapper.ClassroomMapper;
+import PF.classroom_allocation.space.dto.request.ClassroomRequestDTO;
+import PF.classroom_allocation.space.dto.response.ClassroomResponseDTO;
 import PF.classroom_allocation.space.model.Building;
 import PF.classroom_allocation.space.model.Classroom;
 import PF.classroom_allocation.space.model.ClassroomType;
@@ -77,6 +76,75 @@ class ClassroomMapperTest {
 
         assertNull(dto.getClassroomTypeId());
         assertNull(dto.getClassroomTypeDescription());
+    }
+
+    @Test
+    void toResponseDto_shouldHandleBuildingWithNullName() {
+        Building building = Building.builder().id(1).name(null).build();
+
+        ClassroomType type = new ClassroomType();
+        type.setId(1);
+        type.setDescription("CLASSROOM");
+
+        Classroom entity = new Classroom();
+        entity.setId(1);
+        entity.setRoomNumber("101");
+        entity.setCapacity(30);
+        entity.setFloor(1);
+        entity.setAvailable(true);
+        entity.setBuilding(building);
+        entity.setClassroomType(type);
+
+        ClassroomResponseDTO dto = mapper.toResponseDto(entity);
+
+        assertEquals(1, dto.getBuildingId());
+        assertNull(dto.getBuildingName());
+    }
+
+    @Test
+    void toResponseDto_shouldHandleTypeWithNullDescription() {
+        Building building = Building.builder().id(1).name("Edificio A").build();
+
+        ClassroomType type = new ClassroomType();
+        type.setId(1);
+        type.setDescription(null);
+
+        Classroom entity = new Classroom();
+        entity.setId(1);
+        entity.setRoomNumber("101");
+        entity.setCapacity(30);
+        entity.setFloor(1);
+        entity.setAvailable(true);
+        entity.setBuilding(building);
+        entity.setClassroomType(type);
+
+        ClassroomResponseDTO dto = mapper.toResponseDto(entity);
+
+        assertEquals(1, dto.getClassroomTypeId());
+        assertNull(dto.getClassroomTypeDescription());
+    }
+
+    @Test
+    void toResponseDto_shouldHandleNegativeValues() {
+        Building building = Building.builder().id(1).name("Edificio A").build();
+
+        ClassroomType type = new ClassroomType();
+        type.setId(1);
+        type.setDescription("CLASSROOM");
+
+        Classroom entity = new Classroom();
+        entity.setId(1);
+        entity.setRoomNumber("101");
+        entity.setCapacity(-1);
+        entity.setFloor(-5);
+        entity.setAvailable(true);
+        entity.setBuilding(building);
+        entity.setClassroomType(type);
+
+        ClassroomResponseDTO dto = mapper.toResponseDto(entity);
+
+        assertEquals(-1, dto.getCapacity());
+        assertEquals(-5, dto.getFloor());
     }
 
     @Test
