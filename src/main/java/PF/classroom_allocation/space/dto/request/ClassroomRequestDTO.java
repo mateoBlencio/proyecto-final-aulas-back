@@ -1,4 +1,4 @@
-package PF.classroom_allocation.space.dto;
+package PF.classroom_allocation.space.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

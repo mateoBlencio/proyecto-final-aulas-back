@@ -1,7 +1,7 @@
 package PF.classroom_allocation.space.mapper;
 
-import PF.classroom_allocation.space.dto.ClassroomRequestDTO;
-import PF.classroom_allocation.space.dto.ClassroomResponseDTO;
+import PF.classroom_allocation.space.dto.request.ClassroomRequestDTO;
+import PF.classroom_allocation.space.dto.response.ClassroomResponseDTO;
 import PF.classroom_allocation.space.model.Classroom;
 import org.springframework.stereotype.Component;
 

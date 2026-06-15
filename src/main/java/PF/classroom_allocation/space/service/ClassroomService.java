@@ -1,8 +1,8 @@
 package PF.classroom_allocation.space.service;
 
 import PF.classroom_allocation.space.dto.ClassroomFilter;
-import PF.classroom_allocation.space.dto.ClassroomRequestDTO;
-import PF.classroom_allocation.space.dto.ClassroomResponseDTO;
+import PF.classroom_allocation.space.dto.request.ClassroomRequestDTO;
+import PF.classroom_allocation.space.dto.response.ClassroomResponseDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 

@@ -1,8 +1,8 @@
 package PF.classroom_allocation.space.service.impl;
 
 import PF.classroom_allocation.space.dto.ClassroomFilter;
-import PF.classroom_allocation.space.dto.ClassroomRequestDTO;
-import PF.classroom_allocation.space.dto.ClassroomResponseDTO;
+import PF.classroom_allocation.space.dto.request.ClassroomRequestDTO;
+import PF.classroom_allocation.space.dto.response.ClassroomResponseDTO;
 import PF.classroom_allocation.space.exception.ResourceNotFoundException;
 import PF.classroom_allocation.space.exception.SpaceDomainException;
 import PF.classroom_allocation.space.mapper.ClassroomMapper;
@@ -14,7 +14,6 @@ import PF.classroom_allocation.space.service.BuildingService;
 import PF.classroom_allocation.space.service.ClassroomService;
 import PF.classroom_allocation.space.service.ClassroomTypeService;
 import PF.classroom_allocation.space.specification.ClassroomSpecification;
-import java.util.List;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;

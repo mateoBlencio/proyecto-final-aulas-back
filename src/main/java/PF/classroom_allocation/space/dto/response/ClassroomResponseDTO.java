@@ -1,4 +1,4 @@
-package PF.classroom_allocation.space.dto;
+package PF.classroom_allocation.space.dto.response;
 
 import lombok.Builder;
 import lombok.Getter;

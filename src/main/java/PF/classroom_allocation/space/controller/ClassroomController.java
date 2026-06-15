@@ -1,8 +1,8 @@
 package PF.classroom_allocation.space.controller;
 
 import PF.classroom_allocation.space.dto.ClassroomFilter;
-import PF.classroom_allocation.space.dto.ClassroomRequestDTO;
-import PF.classroom_allocation.space.dto.ClassroomResponseDTO;
+import PF.classroom_allocation.space.dto.request.ClassroomRequestDTO;
+import PF.classroom_allocation.space.dto.response.ClassroomResponseDTO;
 import PF.classroom_allocation.space.service.ClassroomService;
 import jakarta.validation.Valid;
 
@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/classrooms/v1")
+@RequestMapping("/v1/classrooms")
 @RequiredArgsConstructor
 public class ClassroomController {
 
