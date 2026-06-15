@@ -149,9 +149,9 @@ class ClassroomControllerIntegrationTest {
         assertThat(parsed.get("floor")).isEqualTo(2);
         assertThat(parsed.get("available")).isEqualTo(true);
         assertThat(parsed.get("buildingId")).isEqualTo(1);
-        assertThat(parsed.get("buildingName")).isEqualTo("Pabellon A");
+        assertThat(parsed.get("buildingName")).isEqualTo("Central");
         assertThat(parsed.get("classroomTypeId")).isEqualTo(1);
-        assertThat(parsed.get("classroomTypeDescription")).isEqualTo("CLASSROOM");
+        assertThat(parsed.get("classroomTypeDescription")).isEqualTo("aula");
     }
 
     @Test
@@ -202,9 +202,9 @@ class ClassroomControllerIntegrationTest {
         assertThat(fetched.get("floor")).isEqualTo(3);
         assertThat(fetched.get("available")).isEqualTo(false);
         assertThat(fetched.get("buildingId")).isEqualTo(2);
-        assertThat(fetched.get("buildingName")).isEqualTo("Pabellon B");
+        assertThat(fetched.get("buildingName")).isEqualTo("Possetto");
         assertThat(fetched.get("classroomTypeId")).isEqualTo(2);
-        assertThat(fetched.get("classroomTypeDescription")).isEqualTo("LABORATORIO");
+        assertThat(fetched.get("classroomTypeDescription")).isEqualTo("laboratorio");
     }
 
     @Test

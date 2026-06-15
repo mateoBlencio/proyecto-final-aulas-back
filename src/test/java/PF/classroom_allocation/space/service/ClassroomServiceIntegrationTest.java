@@ -37,9 +37,9 @@ class ClassroomServiceIntegrationTest {
         assertThat(result.getFloor()).isEqualTo(3);
         assertThat(result.getAvailable()).isTrue();
         assertThat(result.getBuildingId()).isEqualTo(1);
-        assertThat(result.getBuildingName()).isEqualTo("Pabellon A");
+        assertThat(result.getBuildingName()).isEqualTo("Central");
         assertThat(result.getClassroomTypeId()).isEqualTo(1);
-        assertThat(result.getClassroomTypeDescription()).isEqualTo("CLASSROOM");
+        assertThat(result.getClassroomTypeDescription()).isEqualTo("aula");
     }
 
     @Test
