@@ -1,13 +1,13 @@
-package PF.asignacion_aulas;
+package PF.classroom_allocation;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class AsignacionAulasApplication {
+public class ClassroomAllocationApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(AsignacionAulasApplication.class, args);
+		SpringApplication.run(ClassroomAllocationApplication.class, args);
 	}
 
 }
