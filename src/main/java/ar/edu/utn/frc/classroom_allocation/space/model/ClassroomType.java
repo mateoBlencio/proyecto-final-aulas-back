@@ -23,10 +23,10 @@ public class ClassroomType {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id_tipo")
+    @Column(name = "id_tipo_aula")
     private Integer id;
 
-    @Column(name = "desc_tipo", nullable = false, length = 50)
+    @Column(name = "descripcion", nullable = false, length = 50)
     private String description;
 
     @Builder.Default

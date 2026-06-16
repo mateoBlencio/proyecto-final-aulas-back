@@ -5,9 +5,9 @@ VALUES (1, 'Central', 5, true, false);
 INSERT INTO edificio (id_edificio, nombre, cantidad_pisos, activo, eliminado)
 VALUES (2, 'Possetto', 3, true, false);
 
-INSERT INTO tipo_aula (id_tipo, desc_tipo, eliminado)
+INSERT INTO tipo_aula (id_tipo_aula, descripcion, eliminado)
 VALUES (1, 'aula', false);
-INSERT INTO tipo_aula (id_tipo, desc_tipo, eliminado)
+INSERT INTO tipo_aula (id_tipo_aula, descripcion, eliminado)
 VALUES (2, 'laboratorio', false);
 
 INSERT INTO aula (id_aula, num_aula, piso, capacidad, disponible, eliminado, id_edificio, id_tipo_aula)
@@ -19,5 +19,5 @@ INSERT INTO aula (id_aula, num_aula, piso, capacidad, disponible, eliminado, id_
 VALUES (3, '201', 1, 20, false, true, 2, 2);
 
 SELECT setval('edificio_id_edificio_seq', 2);
-SELECT setval('tipo_aula_id_tipo_seq', 2);
+SELECT setval('tipo_aula_id_tipo_aula_seq', 2);
 SELECT setval('aula_id_aula_seq', 3);
