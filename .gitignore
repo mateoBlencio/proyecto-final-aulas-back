@@ -183,3 +183,6 @@ buildNumber.properties
 # Mateo
 plans/
 AGENTS.md
+
+# Claude
+.claude

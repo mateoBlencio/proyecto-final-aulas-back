@@ -1,7 +1,20 @@
 spring:
   application:
     name: classroom-allocation
+  profiles:
+    active: dev
+  jpa:
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
 
 server:
   servlet:
     context-path: /api
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
