@@ -23,7 +23,7 @@ import org.springframework.web.client.RestTemplate;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
+@ActiveProfiles("integration")
 @Sql(scripts = "/space/integration/setup-classroom.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(scripts = "/space/integration/cleanup.sql", executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 class ClassroomControllerIntegrationTest {
@@ -119,7 +119,7 @@ class ClassroomControllerIntegrationTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
 
         Map<String, Object> parsed = parseMap(response);
-        assertThat((String) parsed.get("error")).contains("already exists");
+        assertThat((String) parsed.get("detail")).contains("already exists");
     }
 
     @Test
@@ -132,7 +132,7 @@ class ClassroomControllerIntegrationTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
 
         Map<String, Object> parsed = parseMap(response);
-        assertThat((String) parsed.get("error")).contains("exceeds");
+        assertThat((String) parsed.get("detail")).contains("exceeds");
     }
 
     // ─── FIND BY ID ───────────────────────────────────────────────────────────
