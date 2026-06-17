@@ -16,11 +16,13 @@ import ar.edu.utn.frc.classroom_allocation.space.service.ClassroomTypeService;
 import ar.edu.utn.frc.classroom_allocation.space.specification.ClassroomSpecification;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ClassroomServiceImpl implements ClassroomService {
@@ -33,11 +35,14 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Override
     @Transactional
     public ClassroomResponseDTO create(ClassroomRequestDTO dto) {
-        Building building = buildingService.findById(dto.buildingId());
+        log.debug("Creating classroom: roomNumber={}, buildingId={}, classroomTypeId={}",
+                dto.roomNumber(), dto.buildingId(), dto.classroomTypeId());
 
+        Building building = buildingService.findById(dto.buildingId());
         ClassroomType classroomType = classroomTypeService.findById(dto.classroomTypeId());
 
         if (classroomRepository.findByRoomNumberAndDeletedFalse(dto.roomNumber()).isPresent()) {
+            log.warn("Classroom creation rejected: roomNumber '{}' already exists", dto.roomNumber());
             throw new SpaceDomainException("Classroom roomNumber already exists: " + dto.roomNumber());
         }
 
@@ -49,18 +54,21 @@ public class ClassroomServiceImpl implements ClassroomService {
         entity.setClassroomType(classroomType);
 
         Classroom saved = classroomRepository.save(entity);
+        log.info("Classroom created: id={}, roomNumber={}", saved.getId(), saved.getRoomNumber());
         return classroomMapper.toResponseDto(saved);
     }
 
     @Override
     @Transactional(readOnly = true)
     public ClassroomResponseDTO findById(Integer id) {
+        log.debug("Fetching classroom by id={}", id);
         return classroomMapper.toResponseDto(this.findExistingClassroomById(id));
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<ClassroomResponseDTO> findAll(ClassroomFilter filter, Pageable pageable) {
+        log.debug("Listing classrooms: filter={}, page={}, size={}", filter, pageable.getPageNumber(), pageable.getPageSize());
         return classroomRepository.findAll(ClassroomSpecification.withFilter(filter), pageable)
                 .map(classroomMapper::toResponseDto);
     }
@@ -68,10 +76,10 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Override
     @Transactional
     public ClassroomResponseDTO update(Integer id, ClassroomRequestDTO dto) {
+        log.debug("Updating classroom: id={}, roomNumber={}", id, dto.roomNumber());
+
         Classroom entity = this.findExistingClassroomById(id);
-
         Building building = buildingService.findById(dto.buildingId());
-
         ClassroomType classroomType = classroomTypeService.findById(dto.classroomTypeId());
 
         validateFloor(dto, building);
@@ -82,25 +90,33 @@ public class ClassroomServiceImpl implements ClassroomService {
         entity.setClassroomType(classroomType);
 
         Classroom saved = classroomRepository.save(entity);
+        log.info("Classroom updated: id={}, roomNumber={}", saved.getId(), saved.getRoomNumber());
         return classroomMapper.toResponseDto(saved);
     }
 
     @Override
     @Transactional
     public void delete(Integer id) {
+        log.debug("Soft-deleting classroom: id={}", id);
         Classroom classroom = this.findExistingClassroomById(id);
         classroom.setDeleted(true);
         classroomRepository.save(classroom);
+        log.info("Classroom deleted: id={}", id);
     }
 
     @Transactional(readOnly = true)
     protected Classroom findExistingClassroomById(Integer id) {
         return classroomRepository.findByIdAndDeletedFalse(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Classroom not found with id: " + id));
+                .orElseThrow(() -> {
+                    log.warn("Classroom not found: id={}", id);
+                    return new ResourceNotFoundException("Classroom not found with id: " + id);
+                });
     }
 
     private void validateFloor(ClassroomRequestDTO dto, Building building) {
         if (dto.floor() > building.getFloorCount()) {
+            log.warn("Floor validation failed: floor={} exceeds building floorCount={}, buildingId={}",
+                    dto.floor(), building.getFloorCount(), building.getId());
             throw new SpaceDomainException(
                     "Floor " + dto.floor() + " exceeds building floor count " + building.getFloorCount());
         }
@@ -108,6 +124,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
     private void validateCapacity(ClassroomRequestDTO dto) {
         if (dto.capacity() <= 0) {
+            log.warn("Capacity validation failed: capacity={}", dto.capacity());
             throw new SpaceDomainException("Capacity must be positive");
         }
     }
