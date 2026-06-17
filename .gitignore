@@ -179,6 +179,8 @@ buildNumber.properties
 # MacOS
 .DS-Store
 **/.DS-Store
+.DS_Store
+**/.DS_Store
 
 # Mateo
 plans/

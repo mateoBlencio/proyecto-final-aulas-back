@@ -1,11 +1,10 @@
 package ar.edu.utn.frc.classroom_allocation.solver.exception;
 
+import ar.edu.utn.frc.classroom_allocation.common.exception.ClassroomAllocationAppException;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
 
-@ResponseStatus(HttpStatus.BAD_REQUEST)
-public class InvalidAllocationRequestException extends RuntimeException {
+public class InvalidAllocationRequestException extends ClassroomAllocationAppException {
     public InvalidAllocationRequestException(String message) {
-        super(message);
+        super(HttpStatus.BAD_REQUEST, "Invalid allocation request", message);
     }
 }

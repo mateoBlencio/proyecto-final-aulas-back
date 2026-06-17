@@ -3,7 +3,7 @@ package ar.edu.utn.frc.classroom_allocation.space.controller;
 import ar.edu.utn.frc.classroom_allocation.space.dto.ClassroomFilter;
 import ar.edu.utn.frc.classroom_allocation.space.dto.request.ClassroomRequestDTO;
 import ar.edu.utn.frc.classroom_allocation.space.dto.response.ClassroomResponseDTO;
-import ar.edu.utn.frc.classroom_allocation.space.exception.GlobalExceptionHandler;
+import ar.edu.utn.frc.classroom_allocation.common.exception.GlobalExceptionHandler;
 import ar.edu.utn.frc.classroom_allocation.space.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.classroom_allocation.space.exception.SpaceDomainException;
 import ar.edu.utn.frc.classroom_allocation.space.service.ClassroomService;
@@ -97,7 +97,7 @@ class ClassroomControllerTest {
 
         mockMvc.perform(get("/v1/classrooms/999"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("Classroom not found"))
+                .andExpect(jsonPath("$.detail").value("Classroom not found"))
                 .andExpect(jsonPath("$.status").value(404));
     }
 

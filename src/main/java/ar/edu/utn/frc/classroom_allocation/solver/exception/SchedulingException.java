@@ -1,15 +1,14 @@
 package ar.edu.utn.frc.classroom_allocation.solver.exception;
 
+import ar.edu.utn.frc.classroom_allocation.common.exception.ClassroomAllocationAppException;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
 
-@ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-public class SchedulingException extends RuntimeException {
+public class SchedulingException extends ClassroomAllocationAppException {
     public SchedulingException(String message) {
-        super(message);
+        super(HttpStatus.INTERNAL_SERVER_ERROR, "Solver error", message);
     }
 
     public SchedulingException(String message, Throwable cause) {
-        super(message, cause);
+        super(HttpStatus.INTERNAL_SERVER_ERROR, "Solver error", message, cause);
     }
 }

@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+
+springdoc:
+  swagger-ui:
+    enabled: true
+
+  api-docs:
+    enabled: true
+
+management:
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    ar.edu.utn.frc.classroom_allocation: INFO

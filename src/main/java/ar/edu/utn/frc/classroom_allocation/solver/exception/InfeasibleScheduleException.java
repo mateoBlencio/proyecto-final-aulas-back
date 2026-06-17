@@ -1,11 +1,10 @@
 package ar.edu.utn.frc.classroom_allocation.solver.exception;
 
+import ar.edu.utn.frc.classroom_allocation.common.exception.ClassroomAllocationAppException;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
 
-@ResponseStatus(HttpStatus.UNPROCESSABLE_CONTENT)
-public class InfeasibleScheduleException extends RuntimeException {
+public class InfeasibleScheduleException extends ClassroomAllocationAppException {
     public InfeasibleScheduleException(String message) {
-        super(message);
+        super(HttpStatus.UNPROCESSABLE_ENTITY, "Infeasible schedule", message);
     }
 }

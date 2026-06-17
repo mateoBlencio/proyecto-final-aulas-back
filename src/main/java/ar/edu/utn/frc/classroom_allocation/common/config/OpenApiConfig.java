@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.classroom_allocation.solver.config;
+package ar.edu.utn.frc.classroom_allocation.common.config;
 
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.info.Contact;

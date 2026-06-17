@@ -5,9 +5,11 @@ import ar.edu.utn.frc.classroom_allocation.space.model.ClassroomType;
 import ar.edu.utn.frc.classroom_allocation.space.repository.ClassroomTypeRepository;
 import ar.edu.utn.frc.classroom_allocation.space.service.ClassroomTypeService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ClassroomTypeServiceImpl implements ClassroomTypeService {
@@ -16,13 +18,17 @@ public class ClassroomTypeServiceImpl implements ClassroomTypeService {
 
     @Override
     public ClassroomType findById(Integer id) {
+        log.debug("Fetching classroom type: id={}", id);
         return findExistingById(id);
     }
 
     @Transactional(readOnly = true)
     protected ClassroomType findExistingById(Integer id) {
         return classroomTypeRepository.findByIdAndDeletedFalse(id)
-                .orElseThrow(() -> new ResourceNotFoundException("ClassroomType not found with id: " + id));
+                .orElseThrow(() -> {
+                    log.warn("ClassroomType not found: id={}", id);
+                    return new ResourceNotFoundException("ClassroomType not found with id: " + id);
+                });
     }
 
 }
