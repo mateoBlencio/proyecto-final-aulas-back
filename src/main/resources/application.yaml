@@ -4,18 +4,26 @@ spring:
   profiles:
     active: dev
   datasource:
-    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?currentSchema=public
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+
   jpa:
     hibernate:
       ddl-auto: validate
+    show-sql: false
     properties:
       hibernate:
         jdbc:
           time_zone: UTC
     database-platform: org.hibernate.dialect.PostgreSQLDialect
+
   docker:
     compose:
       enabled: false
@@ -26,6 +34,24 @@ server:
 
 springdoc:
   swagger-ui:
+    enabled: false
     path: /swagger-ui.html
+
   api-docs:
+    enabled: false
     path: /v3/api-docs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: WARN
+    ar.edu.utn.frc.classroom_allocation: INFO
