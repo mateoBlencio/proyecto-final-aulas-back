@@ -9,6 +9,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface TimeSlotRepository extends JpaRepository<TimeSlot, Long> {
 
-    Optional<TimeSlot> findByDiaSemanaAndHoraInicioAndHoraFin(
-            String diaSemana, LocalTime horaInicio, LocalTime horaFin);
+    Optional<TimeSlot> findByDayOfWeekAndStartTimeAndEndTime(
+            String dayOfWeek, LocalTime startTime, LocalTime endTime);
 }

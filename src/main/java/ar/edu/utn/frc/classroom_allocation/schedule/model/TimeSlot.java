@@ -24,18 +24,18 @@ public class TimeSlot {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id_franja_horaria")
+    @Column(name = "id_franja")
     private Long id;
 
     @Column(name = "dia_semana", nullable = false)
-    private String diaSemana;
+    private String dayOfWeek;
 
     @Column(name = "hora_inicio", nullable = false)
-    private LocalTime horaInicio;
+    private LocalTime startTime;
 
     @Column(name = "hora_fin", nullable = false)
-    private LocalTime horaFin;
+    private LocalTime endTime;
 
     @Column(name = "duracion_minutos")
-    private Integer duracionMinutos;
+    private Integer durationMinutes;
 }
