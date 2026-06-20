@@ -4,11 +4,14 @@ import ar.edu.utn.frc.classroom_allocation.allocation.dto.request.AssignFromDate
 import ar.edu.utn.frc.classroom_allocation.allocation.dto.request.AssignOccurrenceRequestDto;
 import ar.edu.utn.frc.classroom_allocation.allocation.dto.response.AllocationResponseDto;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface AllocationService {
+    AllocationResponseDto findById(Long allocationId);
     AllocationResponseDto assign(Long occurrenceId, AssignOccurrenceRequestDto dto);
     AllocationResponseDto reassign(Long allocationId, AssignOccurrenceRequestDto dto);
     void cancel(Long allocationId);
     List<AllocationResponseDto> assignFromDate(AssignFromDateRequestDto dto);
+    List<AllocationResponseDto> findByDateAndBuilding(LocalDate date, Integer buildingId);
 }

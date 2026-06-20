@@ -10,15 +10,28 @@ import java.time.LocalTime;
 @Value
 @Builder
 public class AllocationResponseDto {
+    // Asignación
     Long id;
-    Long occurrenceId;
-    Long eventId;
-    LocalDate occurrenceDate;
-    LocalTime startTime;
-    LocalTime endTime;
-    Integer classroomId;
-    String classroomNumber;
     String assignedBy;
     LocalDateTime createdAt;
     String observation;
+    // Ocurrencia
+    Long occurrenceId;
+    LocalDate occurrenceDate;
+    // Evento
+    Long eventId;
+    LocalTime startTime;
+    LocalTime endTime;
+    Integer enrolled;
+    String subject;        // RecurringEvent: materia; null para UniqueEvent
+    String section;        // RecurringEvent: comisión; null para UniqueEvent
+    String eventDescription; // UniqueEvent: descripción; null para RecurringEvent
+    // Aula
+    Integer classroomId;
+    String classroomNumber;
+    Integer floor;
+    Integer capacity;
+    Integer buildingId;
+    String buildingName;
+    String classroomType;
 }

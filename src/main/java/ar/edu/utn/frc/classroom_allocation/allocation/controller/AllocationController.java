@@ -8,15 +8,20 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDate;
 
 import java.util.List;
 
@@ -27,6 +32,22 @@ import java.util.List;
 public class AllocationController {
 
     private final AllocationService allocationService;
+
+    @GetMapping
+    @Operation(summary = "Listar asignaciones por fecha y edificio",
+               description = "Devuelve todas las asignaciones del día indicado para un edificio.")
+    public ResponseEntity<List<AllocationResponseDto>> findByDateAndBuilding(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam Integer buildingId) {
+        return ResponseEntity.ok(allocationService.findByDateAndBuilding(date, buildingId));
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Obtener asignación por ID",
+               description = "Devuelve los datos de una asignación existente.")
+    public ResponseEntity<AllocationResponseDto> findById(@PathVariable Long id) {
+        return ResponseEntity.ok(allocationService.findById(id));
+    }
 
     @PostMapping("/occurrences/{occurrenceId}")
     @Operation(summary = "Asignar aula a ocurrencia",

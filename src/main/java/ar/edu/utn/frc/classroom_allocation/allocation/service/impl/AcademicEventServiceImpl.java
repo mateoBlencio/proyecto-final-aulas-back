@@ -3,6 +3,8 @@ package ar.edu.utn.frc.classroom_allocation.allocation.service.impl;
 import ar.edu.utn.frc.classroom_allocation.allocation.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.classroom_allocation.allocation.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.classroom_allocation.allocation.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.classroom_allocation.allocation.dto.response.OccurrenceResponseDto;
+import ar.edu.utn.frc.classroom_allocation.allocation.exception.AcademicEventNotFoundException;
 import ar.edu.utn.frc.classroom_allocation.allocation.mapper.AcademicEventMapper;
 import ar.edu.utn.frc.classroom_allocation.allocation.model.AcademicEvent;
 import ar.edu.utn.frc.classroom_allocation.allocation.model.Occurrence;
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -27,6 +30,31 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     private final AcademicEventRepository eventRepository;
     private final OccurrenceRepository occurrenceRepository;
     private final AcademicEventMapper mapper;
+
+    @Override
+    @Transactional(readOnly = true)
+    public AcademicEventResponseDto findById(Long eventId) {
+        return mapper.toDto(eventRepository.findById(eventId)
+                .orElseThrow(() -> new AcademicEventNotFoundException(eventId)));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OccurrenceResponseDto> findOccurrencesByEventId(Long eventId) {
+        if (!eventRepository.existsById(eventId)) {
+            throw new AcademicEventNotFoundException(eventId);
+        }
+        return occurrenceRepository.findByEvent_Id(eventId).stream()
+                .map(o -> OccurrenceResponseDto.builder()
+                        .id(o.getId())
+                        .eventId(eventId)
+                        .date(o.getDate())
+                        .status(o.getStatus())
+                        .startTime(o.startTime())
+                        .endTime(o.endTime())
+                        .build())
+                .collect(Collectors.toList());
+    }
 
     @Override
     @Transactional

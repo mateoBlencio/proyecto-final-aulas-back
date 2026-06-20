@@ -40,6 +40,12 @@ public class AllocationServiceImpl implements AllocationService {
     private final AllocationMapper mapper;
 
     @Override
+    @Transactional(readOnly = true)
+    public AllocationResponseDto findById(Long allocationId) {
+        return mapper.toDto(findAllocation(allocationId));
+    }
+
+    @Override
     @Transactional
     public AllocationResponseDto assign(Long occurrenceId, AssignOccurrenceRequestDto dto) {
         log.debug("Assigning occurrence={} to classroom={}", occurrenceId, dto.classroomId());
@@ -136,6 +142,16 @@ public class AllocationServiceImpl implements AllocationService {
 
         log.info("assignFromDate complete: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), results.size());
         return results;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AllocationResponseDto> findByDateAndBuilding(LocalDate date, Integer buildingId) {
+        log.debug("findByDateAndBuilding: date={}, buildingId={}", date, buildingId);
+        return allocationRepository.findByOccurrence_DateAndClassroom_Building_Id(date, buildingId)
+                .stream()
+                .map(mapper::toDto)
+                .toList();
     }
 
     private Occurrence findOccurrence(Long id) {
