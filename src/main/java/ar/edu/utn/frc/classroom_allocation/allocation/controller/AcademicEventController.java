@@ -18,14 +18,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/v1/events")
 @RequiredArgsConstructor
-@Tag(name = "Academic Events", description = "Create and manage academic events and their occurrences")
+@Tag(name = "Eventos Académicos", description = "Creación y gestión de eventos académicos y sus ocurrencias")
 public class AcademicEventController {
 
     private final AcademicEventService academicEventService;
 
     @PostMapping("/recurring")
-    @Operation(summary = "Create recurring event",
-               description = "Creates a weekly recurring event and generates all its occurrences.")
+    @Operation(summary = "Crear evento recurrente",
+               description = "Crea un evento recurrente semanal y genera todas sus ocurrencias.")
     public ResponseEntity<AcademicEventResponseDto> createRecurring(
             @Valid @RequestBody CreateRecurringEventRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED)

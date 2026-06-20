@@ -23,14 +23,14 @@ import java.util.List;
 @RestController
 @RequestMapping("/v1/allocations")
 @RequiredArgsConstructor
-@Tag(name = "Allocations", description = "Manual classroom assignment for specific occurrences")
+@Tag(name = "Asignaciones", description = "Asignación manual de aulas para ocurrencias específicas")
 public class AllocationController {
 
     private final AllocationService allocationService;
 
     @PostMapping("/occurrences/{occurrenceId}")
-    @Operation(summary = "Assign classroom to occurrence",
-               description = "Manually assigns a classroom to a specific occurrence. Fails if the occurrence already has an allocation or has already taken place.")
+    @Operation(summary = "Asignar aula a ocurrencia",
+               description = "Asigna manualmente un aula a una ocurrencia específica. Falla si la ocurrencia ya tiene asignación o si ya ocurrió.")
     public ResponseEntity<AllocationResponseDto> assign(
             @PathVariable Long occurrenceId,
             @Valid @RequestBody AssignOccurrenceRequestDto dto) {
@@ -39,8 +39,8 @@ public class AllocationController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Reassign classroom",
-               description = "Changes the classroom for an existing allocation. Fails if the occurrence has already taken place.")
+    @Operation(summary = "Reasignar aula",
+               description = "Cambia el aula de una asignación existente. Falla si la ocurrencia ya ocurrió.")
     public ResponseEntity<AllocationResponseDto> reassign(
             @PathVariable Long id,
             @Valid @RequestBody AssignOccurrenceRequestDto dto) {
@@ -48,16 +48,16 @@ public class AllocationController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Cancel allocation",
-               description = "Removes a classroom assignment for a specific occurrence. The occurrence itself remains scheduled.")
+    @Operation(summary = "Cancelar asignación",
+               description = "Elimina la asignación de aula para una ocurrencia específica. La ocurrencia en sí queda programada.")
     public ResponseEntity<Void> cancel(@PathVariable Long id) {
         allocationService.cancel(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/from-date")
-    @Operation(summary = "Assign classroom from date",
-               description = "Assigns a classroom to all future occurrences of a recurring event starting from the given date. Creates new allocations or updates existing ones.")
+    @Operation(summary = "Asignar aula desde una fecha",
+               description = "Asigna un aula a todas las ocurrencias futuras de un evento recurrente a partir de la fecha indicada. Crea nuevas asignaciones o actualiza las existentes.")
     public ResponseEntity<List<AllocationResponseDto>> assignFromDate(
             @Valid @RequestBody AssignFromDateRequestDto dto) {
         return ResponseEntity.ok(allocationService.assignFromDate(dto));
