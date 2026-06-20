@@ -27,15 +27,15 @@ public class StudyPlan {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id_plan_estudio")
+    @Column(name = "id_plan")
     private Long id;
 
     @Column(name = "codigo_plan", nullable = false)
-    private Integer codigoPlan;
+    private Integer planCode;
 
     @ManyToOne
     @JoinColumn(name = "id_especialidad", nullable = false)
-    private Specialty especialidad;
+    private Specialty specialty;
 
     @Column(name = "eliminado")
     @Builder.Default

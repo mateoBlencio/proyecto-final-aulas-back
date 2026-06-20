@@ -9,5 +9,5 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface SubjectRepository extends JpaRepository<Subject, Long> {
 
-    Optional<Subject> findByCodigoMateriaAndPlanAndDeletedFalse(Integer codigoMateria, StudyPlan plan);
+    Optional<Subject> findByCodeAndStudyPlanAndDeletedFalse(Integer code, StudyPlan studyPlan);
 }

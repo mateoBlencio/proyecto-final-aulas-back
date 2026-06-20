@@ -7,6 +7,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface SpecialtyRepository extends JpaRepository<Specialty, Long> {
-
-    Optional<Specialty> findByCodigoEspecialidadAndDeletedFalse(Integer codigoEspecialidad);
+    Optional<Specialty> findBySpecialtyCodeAndDeletedFalse(Integer specialtyCode);
 }

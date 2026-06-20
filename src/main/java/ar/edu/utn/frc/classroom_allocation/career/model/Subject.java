@@ -31,17 +31,17 @@ public class Subject {
     private Long id;
 
     @Column(name = "codigo_materia", nullable = false)
-    private Integer codigoMateria;
+    private Integer code;
 
     @Column(name = "nombre", nullable = false)
-    private String nombre;
+    private String name;
 
     @ManyToOne
     @JoinColumn(name = "id_plan", nullable = false)
-    private StudyPlan plan;
+    private StudyPlan studyPlan;
 
     @Column(name = "dictado")
-    private String dictado;
+    private String term;
 
     @Column(name = "eliminado")
     @Builder.Default

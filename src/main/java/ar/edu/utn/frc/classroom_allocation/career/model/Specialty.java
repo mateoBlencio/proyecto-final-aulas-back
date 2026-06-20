@@ -27,10 +27,10 @@ public class Specialty {
     private Long id;
 
     @Column(name = "codigo_especialidad", unique = true, nullable = false)
-    private Integer codigoEspecialidad;
+    private Integer specialtyCode;
 
     @Column(name = "nombre", nullable = false)
-    private String nombre;
+    private String name;
 
     @Column(name = "eliminado")
     @Builder.Default
