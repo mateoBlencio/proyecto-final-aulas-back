@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.classroom_allocation.space.service.impl;
 
-import ar.edu.utn.frc.classroom_allocation.space.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.classroom_allocation.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.classroom_allocation.space.model.Building;
 import ar.edu.utn.frc.classroom_allocation.space.repository.BuildingRepository;
 import ar.edu.utn.frc.classroom_allocation.space.service.BuildingService;
@@ -9,8 +9,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+
 @Slf4j
 @Service
+@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class BuildingServiceImpl implements BuildingService {
 
@@ -27,7 +29,15 @@ public class BuildingServiceImpl implements BuildingService {
         return building;
     }
 
-    @Transactional(readOnly = true)
+    @Override
+    public Building findByName(String buildingName) {
+        return buildingRepository.findByNameAndDeletedFalse(buildingName)
+                .orElseThrow(() -> {
+                    log.warn("Building not found: name={}", buildingName);
+                    return new ResourceNotFoundException("Building not found with name: " + buildingName);
+                });
+    }
+
     protected Building findExistingById(Integer id) {
         return buildingRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> {
@@ -35,5 +45,4 @@ public class BuildingServiceImpl implements BuildingService {
                     return new ResourceNotFoundException("Building not found with id: " + id);
                 });
     }
-
 }
