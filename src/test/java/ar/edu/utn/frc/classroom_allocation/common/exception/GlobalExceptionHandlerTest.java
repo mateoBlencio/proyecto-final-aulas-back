@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.classroom_allocation.common.exception;
 
-import ar.edu.utn.frc.classroom_allocation.space.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.classroom_allocation.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.classroom_allocation.space.exception.SpaceDomainException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.classroom_allocation.space.service.impl;
 
-import ar.edu.utn.frc.classroom_allocation.space.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.classroom_allocation.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.classroom_allocation.space.model.ClassroomType;
 import ar.edu.utn.frc.classroom_allocation.space.repository.ClassroomTypeRepository;
 import java.util.Optional;
