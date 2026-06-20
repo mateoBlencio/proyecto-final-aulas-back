@@ -8,4 +8,8 @@ public class ExcelImportException extends ClassroomAllocationAppException {
     public ExcelImportException(String message) {
         super(HttpStatus.UNPROCESSABLE_ENTITY, "Import error", message);
     }
+
+    public ExcelImportException(String message, Throwable cause) {
+        super(HttpStatus.UNPROCESSABLE_ENTITY, "Import error", message, cause);
+    }
 }
