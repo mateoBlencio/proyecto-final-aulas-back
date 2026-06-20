@@ -10,4 +10,6 @@ public interface BuildingRepository extends JpaRepository<Building, Integer> {
 
     Optional<Building> findByIdAndDeletedFalse(Integer id);
 
+    Optional<Building> findByNameAndDeletedFalse(String name);
+
 }
