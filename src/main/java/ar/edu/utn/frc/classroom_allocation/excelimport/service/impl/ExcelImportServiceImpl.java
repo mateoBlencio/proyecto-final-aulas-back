@@ -66,7 +66,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     @Override
     @Transactional
     public ImportResultDto importExcel(MultipartFile file) {
-        log.info("Iniciando importación Excel: {} - {} bytes", file.getName(), file.getSize());
+        log.info("Starting Excel import: {} - {} bytes", file.getName(), file.getSize());
 
         Workbook workbook = validator.validate(file);
         Sheet sheet = workbook.getSheet("Hoja1");
@@ -132,7 +132,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             ClassroomAssignment assignment = getOrCreateAssignment(
                 subjectCommission, classroom, timeSlot);
             if (assignment == null) {
-                log.info("Creando ClassroomAssignment: sc={}, aula={}, timeSlot={}",
+                log.info("Creating ClassroomAssignment: sc={}, classroom={}, timeSlot={}",
                     subjectCommission.getId(), classroom.getId(), timeSlot.getId());
                 assignmentService.save(
                     ClassroomAssignment.builder()
@@ -150,11 +150,11 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             }
 
             processedRows++;
-            log.info("Fila {}: materia={}, comisión={}, aula={}",
+            log.info("Row {}: subject={}, commission={}, classroom={}",
                 rowNum, subject.getName(), commission.getCommissionNumber(), dto.roomNumber());
         }
 
-        log.info("Importación completada: {} filas, {} asignaciones creadas, {} reutilizadas",
+        log.info("Import completed: {} rows, {} assignments created, {} reused",
             processedRows, assignmentsCreated, assignmentsReused);
 
         return new ImportResultDto(processedRows, assignmentsCreated,

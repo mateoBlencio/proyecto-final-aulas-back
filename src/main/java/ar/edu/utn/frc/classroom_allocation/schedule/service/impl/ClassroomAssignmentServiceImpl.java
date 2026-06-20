@@ -8,9 +8,11 @@ import ar.edu.utn.frc.classroom_allocation.schedule.service.ClassroomAssignmentS
 import ar.edu.utn.frc.classroom_allocation.space.model.Classroom;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
@@ -21,6 +23,8 @@ public class ClassroomAssignmentServiceImpl implements ClassroomAssignmentServic
     @Override
     public Optional<ClassroomAssignment> findBySubjectCommissionAndClassroomAndTimeSlot(
             SubjectCommission subjectCommission, Classroom classroom, TimeSlot timeSlot) {
+        log.debug("Finding ClassroomAssignment: scId={}, classroomId={}, timeSlotId={}",
+                subjectCommission.getId(), classroom.getId(), timeSlot.getId());
         return assignmentRepository.findBySubjectCommissionAndClassroomAndTimeSlot(
                 subjectCommission, classroom, timeSlot);
     }
@@ -28,6 +32,10 @@ public class ClassroomAssignmentServiceImpl implements ClassroomAssignmentServic
     @Override
     @Transactional
     public ClassroomAssignment save(ClassroomAssignment assignment) {
-        return assignmentRepository.save(assignment);
+        log.debug("Saving ClassroomAssignment: scId={}, classroomId={}",
+                assignment.getSubjectCommission().getId(), assignment.getClassroom().getId());
+        ClassroomAssignment saved = assignmentRepository.save(assignment);
+        log.info("ClassroomAssignment saved: id={}", saved.getId());
+        return saved;
     }
 }

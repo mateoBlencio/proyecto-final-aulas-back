@@ -6,9 +6,11 @@ import ar.edu.utn.frc.classroom_allocation.schedule.service.TimeSlotService;
 import java.time.LocalTime;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
@@ -19,12 +21,17 @@ public class TimeSlotServiceImpl implements TimeSlotService {
     @Override
     public Optional<TimeSlot> findByDayOfWeekAndStartTimeAndEndTime(
             String dayOfWeek, LocalTime startTime, LocalTime endTime) {
+        log.debug("Finding TimeSlot: day={}, start={}, end={}", dayOfWeek, startTime, endTime);
         return timeSlotRepository.findByDayOfWeekAndStartTimeAndEndTime(dayOfWeek, startTime, endTime);
     }
 
     @Override
     @Transactional
     public TimeSlot save(TimeSlot timeSlot) {
-        return timeSlotRepository.save(timeSlot);
+        log.debug("Saving TimeSlot: day={}, start={}, end={}",
+                timeSlot.getDayOfWeek(), timeSlot.getStartTime(), timeSlot.getEndTime());
+        TimeSlot saved = timeSlotRepository.save(timeSlot);
+        log.info("TimeSlot saved: id={}", saved.getId());
+        return saved;
     }
 }

@@ -6,9 +6,11 @@ import ar.edu.utn.frc.classroom_allocation.course.repository.CommissionRepositor
 import ar.edu.utn.frc.classroom_allocation.course.service.CommissionService;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
@@ -19,6 +21,8 @@ public class CommissionServiceImpl implements CommissionService {
     @Override
     public Optional<Commission> findByCourseCodeAndCommissionNumberAndPeriodAndDeletedFalse(
             String courseCode, Integer commissionNumber, AcademicPeriod period) {
+        log.debug("Finding commission: courseCode={}, commissionNumber={}, periodId={}",
+                courseCode, commissionNumber, period.getId());
         return commissionRepository.findByCourseCodeAndCommissionNumberAndAcademicPeriodAndDeletedFalse(
                 courseCode, commissionNumber, period);
     }
@@ -26,6 +30,10 @@ public class CommissionServiceImpl implements CommissionService {
     @Override
     @Transactional
     public Commission save(Commission commission) {
-        return commissionRepository.save(commission);
+        log.debug("Saving commission: courseCode={}, commissionNumber={}",
+                commission.getCourseCode(), commission.getCommissionNumber());
+        Commission saved = commissionRepository.save(commission);
+        log.info("Commission saved: id={}", saved.getId());
+        return saved;
     }
 }
