@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.classroom_allocation.solver.optimization.impl;
+package ar.edu.utn.frc.classroom_allocation.solver.optimization;
 
 import ai.timefold.solver.core.api.score.HardSoftScore;
 import ai.timefold.solver.core.api.score.stream.Constraint;

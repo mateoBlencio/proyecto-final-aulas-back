@@ -33,8 +33,8 @@ public class AcademicEventController {
     }
 
     @PostMapping("/unique")
-    @Operation(summary = "Create unique event",
-               description = "Creates a one-time event and generates its single occurrence.")
+    @Operation(summary = "Crea un evento único",
+               description = "Crea un evento que ocurre una única vez y genera una única ocurrencia.")
     public ResponseEntity<AcademicEventResponseDto> createUnique(
             @Valid @RequestBody CreateUniqueEventRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED)

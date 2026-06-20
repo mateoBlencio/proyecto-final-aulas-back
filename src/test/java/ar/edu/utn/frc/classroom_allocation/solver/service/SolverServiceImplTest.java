@@ -12,7 +12,6 @@ import ar.edu.utn.frc.classroom_allocation.solver.model.ConflictPair;
 import ar.edu.utn.frc.classroom_allocation.allocation.model.AcademicEvent;
 import ar.edu.utn.frc.classroom_allocation.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.classroom_allocation.allocation.model.UniqueEvent;
-import ar.edu.utn.frc.classroom_allocation.solver.optimization.ClassroomAllocationSolver;
 import ar.edu.utn.frc.classroom_allocation.solver.service.impl.SolverServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,7 +35,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @ExtendWith(MockitoExtension.class)
 class SolverServiceImplTest {
 
-    @Mock ClassroomAllocationSolver solver;
     @Mock AllocationRequestMapper requestMapper;
     @Mock AllocationResponseMapper responseMapper;
     @InjectMocks SolverServiceImpl service;

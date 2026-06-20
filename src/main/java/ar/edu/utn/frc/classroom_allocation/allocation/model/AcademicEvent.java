@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.classroom_allocation.allocation.model;
 
-import ar.edu.utn.frc.classroom_allocation.allocation.model.converter.DurationMinutesConverter;
+import ar.edu.utn.frc.classroom_allocation.common.converter.DurationMinutesConverter;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.DiscriminatorColumn;

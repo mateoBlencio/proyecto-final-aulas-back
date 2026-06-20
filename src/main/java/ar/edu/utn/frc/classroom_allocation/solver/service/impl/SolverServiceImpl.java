@@ -5,15 +5,20 @@ import ar.edu.utn.frc.classroom_allocation.solver.dto.request.AllocationRequestD
 import ar.edu.utn.frc.classroom_allocation.solver.dto.request.PinnedAssignmentDto;
 import ar.edu.utn.frc.classroom_allocation.solver.dto.response.AllocationPreviewResponseDto;
 import ar.edu.utn.frc.classroom_allocation.solver.exception.InvalidAllocationRequestException;
+import ar.edu.utn.frc.classroom_allocation.solver.exception.SchedulingException;
 import ar.edu.utn.frc.classroom_allocation.solver.mapper.AllocationRequestMapper;
 import ar.edu.utn.frc.classroom_allocation.solver.mapper.AllocationResponseMapper;
-import ar.edu.utn.frc.classroom_allocation.space.model.Classroom;
 import ar.edu.utn.frc.classroom_allocation.solver.model.ConflictPair;
+import ar.edu.utn.frc.classroom_allocation.solver.optimization.ClassAssignment;
+import ar.edu.utn.frc.classroom_allocation.solver.optimization.ClassroomConstraintProvider;
+import ar.edu.utn.frc.classroom_allocation.solver.optimization.ScheduleSolution;
+import ar.edu.utn.frc.classroom_allocation.solver.service.SolverService;
 import ar.edu.utn.frc.classroom_allocation.allocation.model.AcademicEvent;
 import ar.edu.utn.frc.classroom_allocation.allocation.model.Occurrence;
-import ar.edu.utn.frc.classroom_allocation.solver.optimization.ClassroomAllocationSolver;
-import ar.edu.utn.frc.classroom_allocation.solver.optimization.impl.ScheduleSolution;
-import ar.edu.utn.frc.classroom_allocation.solver.service.SolverService;
+import ar.edu.utn.frc.classroom_allocation.space.model.Classroom;
+import ai.timefold.solver.core.api.solver.Solver;
+import ai.timefold.solver.core.api.solver.SolverFactory;
+import ai.timefold.solver.core.config.solver.termination.TerminationConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -31,7 +37,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SolverServiceImpl implements SolverService {
 
-    private final ClassroomAllocationSolver solver;
     private final AllocationRequestMapper requestMapper;
     private final AllocationResponseMapper responseMapper;
 
@@ -51,12 +56,60 @@ public class SolverServiceImpl implements SolverService {
                 events.size(), classrooms.size(), params.getTimeLimitSeconds());
 
         long start = System.currentTimeMillis();
-        ScheduleSolution solution = solver.solve(events, classrooms, conflicts, candidates, params.getTimeLimitSeconds());
+        ScheduleSolution solution = solve(events, classrooms, conflicts, candidates, params.getTimeLimitSeconds());
         long durationMs = System.currentTimeMillis() - start;
 
         log.info("Solver preview completed in {}ms, score {}", durationMs, solution.getScore());
 
         return responseMapper.toPreviewResponse(solution, request, durationMs);
+    }
+
+    private ScheduleSolution solve(List<AcademicEvent> events,
+                                   List<Classroom> classrooms,
+                                   Set<ConflictPair> conflicts,
+                                   Map<String, List<Classroom>> candidatesByEventId,
+                                   int timeLimitSeconds) {
+        List<ClassAssignment> assignments = events.stream()
+                .map(event -> buildAssignment(event, classrooms, conflicts, candidatesByEventId))
+                .toList();
+        ScheduleSolution problem = new ScheduleSolution(classrooms, assignments, null);
+        return runSolver(problem, timeLimitSeconds);
+    }
+
+    private ClassAssignment buildAssignment(AcademicEvent event,
+                                            List<Classroom> classrooms,
+                                            Set<ConflictPair> conflicts,
+                                            Map<String, List<Classroom>> candidatesByEventId) {
+        Set<String> conflictingIds = conflicts.stream()
+                .filter(p -> p.involves(event.getPlanningId()))
+                .map(p -> p.otherEventId(event.getPlanningId()))
+                .collect(Collectors.toSet());
+        List<Classroom> candidates = candidatesByEventId.getOrDefault(event.getPlanningId(), classrooms);
+        return new ClassAssignment(event, candidates, conflictingIds);
+    }
+
+    private ScheduleSolution runSolver(ScheduleSolution problem, int timeLimitSeconds) {
+        String jobId = UUID.randomUUID().toString();
+        log.info("Solver job {} starting, limit {}s", jobId, timeLimitSeconds);
+
+        ai.timefold.solver.core.config.solver.SolverConfig config =
+                new ai.timefold.solver.core.config.solver.SolverConfig()
+                        .withSolutionClass(ScheduleSolution.class)
+                        .withEntityClasses(ClassAssignment.class)
+                        .withConstraintProviderClass(ClassroomConstraintProvider.class)
+                        .withTerminationConfig(new TerminationConfig()
+                                .withSecondsSpentLimit((long) timeLimitSeconds));
+
+        SolverFactory<ScheduleSolution> factory = SolverFactory.create(config);
+        Solver<ScheduleSolution> solver = factory.buildSolver();
+        try {
+            ScheduleSolution solution = solver.solve(problem);
+            log.info("Solver job {} finished, score {}", jobId, solution.getScore());
+            return solution;
+        } catch (Exception e) {
+            log.error("Solver job {} failed", jobId, e);
+            throw new SchedulingException("Error during optimization: " + e.getMessage(), e);
+        }
     }
 
     private Set<ConflictPair> computeConflicts(List<AcademicEvent> events) {

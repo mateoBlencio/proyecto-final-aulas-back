@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.classroom_allocation.allocation.model.converter;
+package ar.edu.utn.frc.classroom_allocation.common.converter;
 
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;

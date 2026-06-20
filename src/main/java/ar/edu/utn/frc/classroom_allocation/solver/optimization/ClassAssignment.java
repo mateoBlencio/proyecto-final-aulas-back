@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.classroom_allocation.solver.optimization.impl;
+package ar.edu.utn.frc.classroom_allocation.solver.optimization;
 
 import ar.edu.utn.frc.classroom_allocation.space.model.Classroom;
 import ar.edu.utn.frc.classroom_allocation.allocation.model.AcademicEvent;

@@ -10,8 +10,8 @@ import ar.edu.utn.frc.classroom_allocation.solver.dto.response.QualityDetailDto;
 import ar.edu.utn.frc.classroom_allocation.solver.dto.response.WarningDto;
 import ar.edu.utn.frc.classroom_allocation.allocation.model.AllocationQuality;
 import ar.edu.utn.frc.classroom_allocation.allocation.model.AllocationStatus;
-import ar.edu.utn.frc.classroom_allocation.solver.optimization.impl.ClassAssignment;
-import ar.edu.utn.frc.classroom_allocation.solver.optimization.impl.ScheduleSolution;
+import ar.edu.utn.frc.classroom_allocation.solver.optimization.ClassAssignment;
+import ar.edu.utn.frc.classroom_allocation.solver.optimization.ScheduleSolution;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

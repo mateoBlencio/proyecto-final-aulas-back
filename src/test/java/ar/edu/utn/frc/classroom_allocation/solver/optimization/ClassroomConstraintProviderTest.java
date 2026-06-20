@@ -2,7 +2,7 @@ package ar.edu.utn.frc.classroom_allocation.solver.optimization;
 
 import ar.edu.utn.frc.classroom_allocation.space.model.Classroom;
 import ar.edu.utn.frc.classroom_allocation.allocation.model.UniqueEvent;
-import ar.edu.utn.frc.classroom_allocation.solver.optimization.impl.ClassAssignment;
+import ar.edu.utn.frc.classroom_allocation.solver.optimization.ClassAssignment;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
