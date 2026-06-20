@@ -15,5 +15,4 @@ public interface ClassroomRepository extends JpaRepository<Classroom, Integer>, 
     Optional<Classroom> findByRoomNumberAndDeletedFalse(String roomNumber);
 
     Optional<Classroom> findByRoomNumberAndBuildingAndDeletedFalse(String roomNumber, Building building);
-
 }
