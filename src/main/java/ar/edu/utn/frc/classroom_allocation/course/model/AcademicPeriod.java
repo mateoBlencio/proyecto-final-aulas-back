@@ -26,22 +26,22 @@ public class AcademicPeriod {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id_periodo_academico")
+    @Column(name = "id_periodo")
     private Long id;
 
     @Column(name = "anio", nullable = false)
-    private Integer anio;
+    private Integer year;
 
     @Column(name = "cuatrimestre", nullable = false)
-    private Integer cuatrimestre;
+    private Integer semester;
 
     @Column(name = "fecha_inicio")
-    private LocalDate fechaInicio;
+    private LocalDate startDate;
 
     @Column(name = "fecha_fin")
-    private LocalDate fechaFin;
+    private LocalDate endDate;
 
     @Column(name = "activo")
     @Builder.Default
-    private Boolean activo = true;
+    private Boolean active = true;
 }

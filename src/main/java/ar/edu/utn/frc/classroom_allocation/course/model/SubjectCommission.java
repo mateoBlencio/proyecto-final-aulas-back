@@ -33,28 +33,28 @@ public class SubjectCommission {
 
     @ManyToOne
     @JoinColumn(name = "id_materia", nullable = false)
-    private Subject materia;
+    private Subject subject;
 
     @ManyToOne
     @JoinColumn(name = "id_comision", nullable = false)
-    private Commission comision;
+    private Commission commission;
 
     @Column(name = "cantidad_inscriptos", nullable = false)
-    private Integer cantidadInscriptos;
+    private Integer enrolledCount;
 
     @Column(name = "cantidad_estimada")
-    private Integer cantidadEstimada;
+    private Integer estimatedCount;
 
     @Column(name = "modalidad")
-    private String modalidad;
+    private String modality;
 
     @Column(name = "requiere_laboratorio")
     @Builder.Default
-    private Boolean requiereLaboratorio = false;
+    private Boolean requiresLaboratory = false;
 
     @Column(name = "permite_superposicion")
     @Builder.Default
-    private Boolean permiteSuperposicion = false;
+    private Boolean allowsOverlap = false;
 
     @Column(name = "eliminado")
     @Builder.Default

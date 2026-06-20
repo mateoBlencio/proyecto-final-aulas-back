@@ -29,17 +29,17 @@ public class Commission {
     private Long id;
 
     @Column(name = "codigo_curso", nullable = false)
-    private String codigoCurso;
+    private String courseCode;
 
     @Column(name = "numero_comision", nullable = false)
-    private Integer numeroComision;
+    private Integer commissionNumber;
 
     @Column(name = "anio_nivel")
-    private Integer anioNivel;
+    private Integer yearLevel;
 
     @ManyToOne
     @JoinColumn(name = "id_periodo", nullable = false)
-    private AcademicPeriod periodo;
+    private AcademicPeriod academicPeriod;
 
     @Column(name = "eliminado")
     @Builder.Default
