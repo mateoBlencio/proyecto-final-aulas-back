@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.classroom_allocation.solver.dto.response;
 
-import ar.edu.utn.frc.classroom_allocation.solver.model.AllocationStatus;
+import ar.edu.utn.frc.classroom_allocation.allocation.model.AllocationStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Value;

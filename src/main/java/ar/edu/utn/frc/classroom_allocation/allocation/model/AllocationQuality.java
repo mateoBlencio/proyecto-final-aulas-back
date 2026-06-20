@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.classroom_allocation.solver.model;
+package ar.edu.utn.frc.classroom_allocation.allocation.model;
 
 /**
  * Calidad de una asignación aula-evento.

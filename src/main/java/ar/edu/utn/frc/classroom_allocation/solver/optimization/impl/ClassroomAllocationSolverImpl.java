@@ -2,7 +2,7 @@ package ar.edu.utn.frc.classroom_allocation.solver.optimization.impl;
 
 import ar.edu.utn.frc.classroom_allocation.solver.exception.SchedulingException;
 import ar.edu.utn.frc.classroom_allocation.space.model.Classroom;
-import ar.edu.utn.frc.classroom_allocation.solver.model.Event;
+import ar.edu.utn.frc.classroom_allocation.allocation.model.AcademicEvent;
 import ar.edu.utn.frc.classroom_allocation.solver.optimization.ClassroomAllocationSolver;
 import ar.edu.utn.frc.classroom_allocation.solver.model.ConflictPair;
 import ai.timefold.solver.core.api.solver.Solver;
@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 public class ClassroomAllocationSolverImpl implements ClassroomAllocationSolver {
 
     @Override
-    public ScheduleSolution solve(List<Event> events,
+    public ScheduleSolution solve(List<AcademicEvent> events,
                                   List<Classroom> classrooms,
                                   Set<ConflictPair> conflicts,
                                   Map<String, List<Classroom>> candidatesByEventId,
@@ -31,7 +31,7 @@ public class ClassroomAllocationSolverImpl implements ClassroomAllocationSolver 
         return runSolver(problem, timeLimitSeconds);
     }
 
-    private ScheduleSolution buildProblem(List<Event> events,
+    private ScheduleSolution buildProblem(List<AcademicEvent> events,
                                           List<Classroom> classrooms,
                                           Set<ConflictPair> conflicts,
                                           Map<String, List<Classroom>> candidatesByEventId) {
@@ -41,16 +41,16 @@ public class ClassroomAllocationSolverImpl implements ClassroomAllocationSolver 
         return new ScheduleSolution(classrooms, assignments, null);
     }
 
-    private ClassAssignment buildAssignment(Event event,
+    private ClassAssignment buildAssignment(AcademicEvent event,
                                             List<Classroom> classrooms,
                                             Set<ConflictPair> conflicts,
                                             Map<String, List<Classroom>> candidatesByEventId) {
         Set<String> conflictingIds = conflicts.stream()
-                .filter(p -> p.involves(event.getId()))
-                .map(p -> p.otherEventId(event.getId()))
+                .filter(p -> p.involves(event.getPlanningId()))
+                .map(p -> p.otherEventId(event.getPlanningId()))
                 .collect(Collectors.toSet());
 
-        List<Classroom> candidates = candidatesByEventId.getOrDefault(event.getId(), classrooms);
+        List<Classroom> candidates = candidatesByEventId.getOrDefault(event.getPlanningId(), classrooms);
 
         return new ClassAssignment(event, candidates, conflictingIds);
     }

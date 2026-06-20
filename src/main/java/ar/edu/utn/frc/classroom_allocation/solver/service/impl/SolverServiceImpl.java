@@ -9,10 +9,11 @@ import ar.edu.utn.frc.classroom_allocation.solver.mapper.AllocationRequestMapper
 import ar.edu.utn.frc.classroom_allocation.solver.mapper.AllocationResponseMapper;
 import ar.edu.utn.frc.classroom_allocation.space.model.Classroom;
 import ar.edu.utn.frc.classroom_allocation.solver.model.ConflictPair;
-import ar.edu.utn.frc.classroom_allocation.solver.model.Event;
+import ar.edu.utn.frc.classroom_allocation.allocation.model.AcademicEvent;
+import ar.edu.utn.frc.classroom_allocation.allocation.model.Occurrence;
 import ar.edu.utn.frc.classroom_allocation.solver.optimization.ClassroomAllocationSolver;
 import ar.edu.utn.frc.classroom_allocation.solver.optimization.impl.ScheduleSolution;
-import ar.edu.utn.frc.classroom_allocation.solver.service.AllocationService;
+import ar.edu.utn.frc.classroom_allocation.solver.service.SolverService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,7 +29,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class AllocationServiceImpl implements AllocationService {
+public class SolverServiceImpl implements SolverService {
 
     private final ClassroomAllocationSolver solver;
     private final AllocationRequestMapper requestMapper;
@@ -41,40 +42,42 @@ public class AllocationServiceImpl implements AllocationService {
 
         validateBusinessRules(request, params);
 
-        List<Event> events = requestMapper.toEvents(request.getEvents());
+        List<AcademicEvent> events = requestMapper.toEvents(request.getEvents());
         List<Classroom> classrooms = requestMapper.toClassrooms(request.getClassrooms(), params);
         Set<ConflictPair> conflicts = computeConflicts(events);
         Map<String, List<Classroom>> candidates = buildCandidates(events, classrooms, params);
 
-        log.info("Starting allocation preview: {} events, {} classrooms, limit {}s",
+        log.info("Starting solver preview: {} events, {} classrooms, limit {}s",
                 events.size(), classrooms.size(), params.getTimeLimitSeconds());
 
         long start = System.currentTimeMillis();
         ScheduleSolution solution = solver.solve(events, classrooms, conflicts, candidates, params.getTimeLimitSeconds());
         long durationMs = System.currentTimeMillis() - start;
 
-        log.info("Allocation preview completed in {}ms, score {}", durationMs, solution.getScore());
+        log.info("Solver preview completed in {}ms, score {}", durationMs, solution.getScore());
 
         return responseMapper.toPreviewResponse(solution, request, durationMs);
     }
 
-    private Set<ConflictPair> computeConflicts(List<Event> events) {
+    private Set<ConflictPair> computeConflicts(List<AcademicEvent> events) {
         Set<ConflictPair> conflicts = new HashSet<>();
         for (int i = 0; i < events.size(); i++) {
             for (int j = i + 1; j < events.size(); j++) {
-                Event a = events.get(i);
-                Event b = events.get(j);
+                AcademicEvent a = events.get(i);
+                AcademicEvent b = events.get(j);
                 if (!timesOverlap(a, b)) continue;
-                Set<LocalDate> datesA = new HashSet<>(a.occurrences());
-                if (b.occurrences().stream().anyMatch(datesA::contains)) {
-                    conflicts.add(new ConflictPair(a.getId(), b.getId()));
+                Set<LocalDate> datesA = a.toOccurrences().stream()
+                        .map(Occurrence::getDate)
+                        .collect(Collectors.toSet());
+                if (b.toOccurrences().stream().map(Occurrence::getDate).anyMatch(datesA::contains)) {
+                    conflicts.add(new ConflictPair(a.getPlanningId(), b.getPlanningId()));
                 }
             }
         }
         return conflicts;
     }
 
-    private Map<String, List<Classroom>> buildCandidates(List<Event> events,
+    private Map<String, List<Classroom>> buildCandidates(List<AcademicEvent> events,
                                                           List<Classroom> classrooms,
                                                           AllocationParametersDto params) {
         Map<Integer, Classroom> classroomById = classrooms.stream()
@@ -88,18 +91,18 @@ public class AllocationServiceImpl implements AllocationService {
         }
 
         Map<String, List<Classroom>> candidates = new HashMap<>();
-        for (Event event : events) {
-            Integer pinnedId = pinnedMap.get(event.getId());
+        for (AcademicEvent event : events) {
+            Integer pinnedId = pinnedMap.get(event.getPlanningId());
             if (pinnedId != null && classroomById.containsKey(pinnedId)) {
-                candidates.put(event.getId(), List.of(classroomById.get(pinnedId)));
+                candidates.put(event.getPlanningId(), List.of(classroomById.get(pinnedId)));
             } else {
-                candidates.put(event.getId(), classrooms);
+                candidates.put(event.getPlanningId(), classrooms);
             }
         }
         return candidates;
     }
 
-    private boolean timesOverlap(Event a, Event b) {
+    private boolean timesOverlap(AcademicEvent a, AcademicEvent b) {
         return a.getStartTime().isBefore(b.endTime())
                 && b.getStartTime().isBefore(a.endTime());
     }
