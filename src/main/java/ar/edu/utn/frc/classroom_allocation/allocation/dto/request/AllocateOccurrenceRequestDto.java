@@ -1,10 +1,10 @@
 package ar.edu.utn.frc.classroom_allocation.allocation.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
+import ar.edu.utn.frc.classroom_allocation.allocation.model.AllocationSource;
 import jakarta.validation.constraints.NotNull;
 
-public record AssignOccurrenceRequestDto(
+public record AllocateOccurrenceRequestDto(
         @NotNull Integer classroomId,
-        @NotBlank String assignedBy,
+        @NotNull AllocationSource source,
         String observation
 ) {}

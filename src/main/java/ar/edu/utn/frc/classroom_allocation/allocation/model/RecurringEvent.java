@@ -1,8 +1,11 @@
 package ar.edu.utn.frc.classroom_allocation.allocation.model;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -20,7 +23,7 @@ import java.util.List;
 @DiscriminatorValue("RECURRING")
 @Getter
 @SuperBuilder
-@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RecurringEvent extends AcademicEvent {
 
     @Column(name = "dia_semana", nullable = false)
@@ -38,17 +41,25 @@ public class RecurringEvent extends AcademicEvent {
     @Column(name = "comision")
     private String section;
 
+    @ElementCollection
+    @CollectionTable(name = "evento_recurrente_fecha_excluida", joinColumns = @JoinColumn(name = "id_evento"))
+    @Column(name = "fecha_excluida")
+    List<LocalDate> excludedDates;
+
     @Override
     public List<Occurrence> toOccurrences() {
         List<Occurrence> result = new ArrayList<>();
         LocalDate end = endDate != null ? endDate : startDate.plusYears(1);
         LocalDate current = startDate.with(TemporalAdjusters.nextOrSame(dayOfWeek));
+        List<LocalDate> excluded = excludedDates != null ? excludedDates : List.of();
         while (!current.isAfter(end)) {
-            result.add(Occurrence.builder()
-                    .event(this)
-                    .date(current)
-                    .status(OccurrenceStatus.SCHEDULED)
-                    .build());
+            if (!excluded.contains(current)) {
+                result.add(Occurrence.builder()
+                        .event(this)
+                        .date(current)
+                        .status(OccurrenceStatus.SCHEDULED)
+                        .build());
+            }
             current = current.plusWeeks(1);
         }
         return result;

@@ -1,7 +1,7 @@
 package ar.edu.utn.frc.classroom_allocation.allocation.service.impl;
 
-import ar.edu.utn.frc.classroom_allocation.allocation.dto.request.AssignFromDateRequestDto;
-import ar.edu.utn.frc.classroom_allocation.allocation.dto.request.AssignOccurrenceRequestDto;
+import ar.edu.utn.frc.classroom_allocation.allocation.dto.request.AllocateFromDateRequestDto;
+import ar.edu.utn.frc.classroom_allocation.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.classroom_allocation.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.classroom_allocation.allocation.exception.AcademicEventNotFoundException;
 import ar.edu.utn.frc.classroom_allocation.allocation.exception.AllocationDomainException;
@@ -47,7 +47,7 @@ public class AllocationServiceImpl implements AllocationService {
 
     @Override
     @Transactional
-    public AllocationResponseDto assign(Long occurrenceId, AssignOccurrenceRequestDto dto) {
+    public AllocationResponseDto assign(Long occurrenceId, AllocateOccurrenceRequestDto dto) {
         log.debug("Assigning occurrence={} to classroom={}", occurrenceId, dto.classroomId());
 
         Occurrence occurrence = findOccurrence(occurrenceId);
@@ -62,7 +62,7 @@ public class AllocationServiceImpl implements AllocationService {
         Allocation saved = allocationRepository.save(Allocation.builder()
                 .occurrence(occurrence)
                 .classroom(classroom)
-                .assignedBy(dto.assignedBy())
+                .source(dto.source())
                 .createdAt(LocalDateTime.now())
                 .observation(dto.observation())
                 .build());
@@ -73,14 +73,14 @@ public class AllocationServiceImpl implements AllocationService {
 
     @Override
     @Transactional
-    public AllocationResponseDto reassign(Long allocationId, AssignOccurrenceRequestDto dto) {
+    public AllocationResponseDto reassign(Long allocationId, AllocateOccurrenceRequestDto dto) {
         log.debug("Reassigning allocation={} to classroom={}", allocationId, dto.classroomId());
 
         Allocation allocation = findAllocation(allocationId);
         validateNotPast(allocation.getOccurrence());
 
         allocation.setClassroom(findClassroom(dto.classroomId()));
-        allocation.setAssignedBy(dto.assignedBy());
+        allocation.setSource(dto.source());
         allocation.setObservation(dto.observation());
 
         Allocation saved = allocationRepository.save(allocation);
@@ -102,7 +102,7 @@ public class AllocationServiceImpl implements AllocationService {
 
     @Override
     @Transactional
-    public List<AllocationResponseDto> assignFromDate(AssignFromDateRequestDto dto) {
+    public List<AllocationResponseDto> assignFromDate(AllocateFromDateRequestDto dto) {
         log.debug("assignFromDate: event={}, fromDate={}, classroom={}", dto.recurringEventId(), dto.fromDate(), dto.classroomId());
 
         AcademicEvent event = eventRepository.findById(dto.recurringEventId())
@@ -125,14 +125,14 @@ public class AllocationServiceImpl implements AllocationService {
             Allocation allocation = allocationRepository.findByOccurrence_Id(occurrence.getId())
                     .map(existing -> {
                         existing.setClassroom(classroom);
-                        existing.setAssignedBy(dto.assignedBy());
+                        existing.setSource(dto.source());
                         existing.setObservation(dto.observation());
                         return existing;
                     })
                     .orElseGet(() -> Allocation.builder()
                             .occurrence(occurrence)
                             .classroom(classroom)
-                            .assignedBy(dto.assignedBy())
+                            .source(dto.source())
                             .createdAt(LocalDateTime.now())
                             .observation(dto.observation())
                             .build());

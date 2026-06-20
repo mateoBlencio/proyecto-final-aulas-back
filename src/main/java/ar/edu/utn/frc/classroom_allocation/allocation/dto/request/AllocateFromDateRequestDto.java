@@ -1,14 +1,14 @@
 package ar.edu.utn.frc.classroom_allocation.allocation.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
+import ar.edu.utn.frc.classroom_allocation.allocation.model.AllocationSource;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDate;
 
-public record AssignFromDateRequestDto(
+public record AllocateFromDateRequestDto(
         @NotNull Long recurringEventId,
         @NotNull LocalDate fromDate,
         @NotNull Integer classroomId,
-        @NotBlank String assignedBy,
+        @NotNull AllocationSource source,
         String observation
 ) {}

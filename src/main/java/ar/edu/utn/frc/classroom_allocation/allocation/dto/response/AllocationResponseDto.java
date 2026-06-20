@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.classroom_allocation.allocation.dto.response;
 
+import ar.edu.utn.frc.classroom_allocation.allocation.model.AllocationSource;
 import lombok.Builder;
 import lombok.Value;
 
@@ -12,7 +13,7 @@ import java.time.LocalTime;
 public class AllocationResponseDto {
     // Asignación
     Long id;
-    String assignedBy;
+    AllocationSource source;
     LocalDateTime createdAt;
     String observation;
     // Ocurrencia

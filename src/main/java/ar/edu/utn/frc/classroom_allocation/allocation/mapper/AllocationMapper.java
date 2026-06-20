@@ -21,7 +21,7 @@ public class AllocationMapper {
 
         return AllocationResponseDto.builder()
                 .id(allocation.getId())
-                .assignedBy(allocation.getAssignedBy())
+                .source(allocation.getSource())
                 .createdAt(allocation.getCreatedAt())
                 .observation(allocation.getObservation())
                 .occurrenceId(allocation.getOccurrence().getId())

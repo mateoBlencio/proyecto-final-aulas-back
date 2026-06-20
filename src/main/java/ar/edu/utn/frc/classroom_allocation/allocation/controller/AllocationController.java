@@ -1,7 +1,7 @@
 package ar.edu.utn.frc.classroom_allocation.allocation.controller;
 
-import ar.edu.utn.frc.classroom_allocation.allocation.dto.request.AssignFromDateRequestDto;
-import ar.edu.utn.frc.classroom_allocation.allocation.dto.request.AssignOccurrenceRequestDto;
+import ar.edu.utn.frc.classroom_allocation.allocation.dto.request.AllocateFromDateRequestDto;
+import ar.edu.utn.frc.classroom_allocation.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.classroom_allocation.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.classroom_allocation.allocation.service.AllocationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -54,7 +54,7 @@ public class AllocationController {
                description = "Asigna manualmente un aula a una ocurrencia específica. Falla si la ocurrencia ya tiene asignación o si ya ocurrió.")
     public ResponseEntity<AllocationResponseDto> assign(
             @PathVariable Long occurrenceId,
-            @Valid @RequestBody AssignOccurrenceRequestDto dto) {
+            @Valid @RequestBody AllocateOccurrenceRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(allocationService.assign(occurrenceId, dto));
     }
@@ -64,7 +64,7 @@ public class AllocationController {
                description = "Cambia el aula de una asignación existente. Falla si la ocurrencia ya ocurrió.")
     public ResponseEntity<AllocationResponseDto> reassign(
             @PathVariable Long id,
-            @Valid @RequestBody AssignOccurrenceRequestDto dto) {
+            @Valid @RequestBody AllocateOccurrenceRequestDto dto) {
         return ResponseEntity.ok(allocationService.reassign(id, dto));
     }
 
@@ -80,7 +80,7 @@ public class AllocationController {
     @Operation(summary = "Asignar aula desde una fecha",
                description = "Asigna un aula a todas las ocurrencias futuras de un evento recurrente a partir de la fecha indicada. Crea nuevas asignaciones o actualiza las existentes.")
     public ResponseEntity<List<AllocationResponseDto>> assignFromDate(
-            @Valid @RequestBody AssignFromDateRequestDto dto) {
+            @Valid @RequestBody AllocateFromDateRequestDto dto) {
         return ResponseEntity.ok(allocationService.assignFromDate(dto));
     }
 }

@@ -3,6 +3,8 @@ package ar.edu.utn.frc.classroom_allocation.allocation.model;
 import ar.edu.utn.frc.classroom_allocation.space.model.Classroom;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -44,8 +46,9 @@ public class Allocation {
     @JoinColumn(name = "id_aula", nullable = false)
     private Classroom classroom;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "asignado_por", nullable = false)
-    private String assignedBy;
+    private AllocationSource source;
 
     @Column(name = "creado_en", nullable = false)
     private LocalDateTime createdAt;
