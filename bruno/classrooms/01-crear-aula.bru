@@ -1,0 +1,22 @@
+meta {
+  name: Crear aula
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/classrooms
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "roomNumber": "513",
+    "capacity": 80,
+    "floor": 5,
+    "classroomTypeId": 1,
+    "available": true,
+    "buildingId": 1
+  }
+}

@@ -10,6 +10,7 @@ import ar.edu.utn.frc.classroom_allocation.allocation.exception.OccurrenceNotFou
 import ar.edu.utn.frc.classroom_allocation.allocation.mapper.AllocationMapper;
 import ar.edu.utn.frc.classroom_allocation.allocation.model.AcademicEvent;
 import ar.edu.utn.frc.classroom_allocation.allocation.model.Allocation;
+import ar.edu.utn.frc.classroom_allocation.allocation.model.AllocationSource;
 import ar.edu.utn.frc.classroom_allocation.allocation.model.Occurrence;
 import ar.edu.utn.frc.classroom_allocation.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.classroom_allocation.allocation.repository.AcademicEventRepository;
@@ -62,7 +63,7 @@ public class AllocationServiceImpl implements AllocationService {
         Allocation saved = allocationRepository.save(Allocation.builder()
                 .occurrence(occurrence)
                 .classroom(classroom)
-                .source(dto.source())
+                .source(AllocationSource.MANUAL)
                 .createdAt(LocalDateTime.now())
                 .observation(dto.observation())
                 .build());
@@ -80,7 +81,7 @@ public class AllocationServiceImpl implements AllocationService {
         validateNotPast(allocation.getOccurrence());
 
         allocation.setClassroom(findClassroom(dto.classroomId()));
-        allocation.setSource(dto.source());
+        allocation.setSource(AllocationSource.MANUAL);
         allocation.setObservation(dto.observation());
 
         Allocation saved = allocationRepository.save(allocation);
@@ -125,14 +126,14 @@ public class AllocationServiceImpl implements AllocationService {
             Allocation allocation = allocationRepository.findByOccurrence_Id(occurrence.getId())
                     .map(existing -> {
                         existing.setClassroom(classroom);
-                        existing.setSource(dto.source());
+                        existing.setSource(AllocationSource.MANUAL);
                         existing.setObservation(dto.observation());
                         return existing;
                     })
                     .orElseGet(() -> Allocation.builder()
                             .occurrence(occurrence)
                             .classroom(classroom)
-                            .source(dto.source())
+                            .source(AllocationSource.MANUAL)
                             .createdAt(LocalDateTime.now())
                             .observation(dto.observation())
                             .build());
