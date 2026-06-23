@@ -1,0 +1,15 @@
+{
+  "version": "1",
+  "name": "Classroom Allocation API",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ],
+  "size": 0.0017042160034179688,
+  "filesCount": 8,
+  "presets": {
+    "requestType": "http",
+    "requestUrl": "http://localhost:8080"
+  }
+}

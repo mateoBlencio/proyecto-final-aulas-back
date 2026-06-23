@@ -1,0 +1,16 @@
+meta {
+  name: Listar asignaciones por fecha y edificio
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/allocations
+  body: none
+  auth: none
+}
+
+params:query {
+  date: 2026-06-20
+  buildingId: 1
+}

@@ -1,8 +1,8 @@
 package ar.edu.utn.frc.classroom_allocation.solver.optimization;
 
 import ar.edu.utn.frc.classroom_allocation.space.model.Classroom;
-import ar.edu.utn.frc.classroom_allocation.solver.model.UniqueEvent;
-import ar.edu.utn.frc.classroom_allocation.solver.optimization.impl.ClassAssignment;
+import ar.edu.utn.frc.classroom_allocation.allocation.model.UniqueEvent;
+import ar.edu.utn.frc.classroom_allocation.solver.optimization.ClassAssignment;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -24,7 +24,7 @@ class ClassroomConstraintProviderTest {
     private ClassAssignment assigned(String eventId, int enrolled, Classroom classroom,
                                      Set<String> conflictingIds) {
         UniqueEvent event = UniqueEvent.builder()
-                .id(eventId).enrolled(enrolled)
+                .planningId(eventId).enrolled(enrolled)
                 .startTime(LocalTime.of(8, 0))
                 .duration(Duration.ofMinutes(90))
                 .date(LocalDate.of(2024, 1, 1))
@@ -36,7 +36,7 @@ class ClassroomConstraintProviderTest {
 
     private ClassAssignment unassigned(String eventId, int enrolled, Classroom candidate) {
         UniqueEvent event = UniqueEvent.builder()
-                .id(eventId).enrolled(enrolled)
+                .planningId(eventId).enrolled(enrolled)
                 .startTime(LocalTime.of(8, 0))
                 .duration(Duration.ofMinutes(90))
                 .date(LocalDate.of(2024, 1, 1))
@@ -53,7 +53,7 @@ class ClassroomConstraintProviderTest {
         ClassAssignment a2 = assigned("e2", 50, room, Set.of("e1"));
 
         assertThat(a1.getClassroom()).isEqualTo(a2.getClassroom());
-        assertThat(a1.conflictsWith(a2.getEvent().getId())).isTrue();
+        assertThat(a1.conflictsWith(a2.getEvent().getPlanningId())).isTrue();
     }
 
     @Test
@@ -62,8 +62,8 @@ class ClassroomConstraintProviderTest {
         ClassAssignment a1 = assigned("e1", 50, room, Set.of());
         ClassAssignment a2 = assigned("e2", 50, room, Set.of());
 
-        assertThat(a1.conflictsWith(a2.getEvent().getId())).isFalse();
-        assertThat(a2.conflictsWith(a1.getEvent().getId())).isFalse();
+        assertThat(a1.conflictsWith(a2.getEvent().getPlanningId())).isFalse();
+        assertThat(a2.conflictsWith(a1.getEvent().getPlanningId())).isFalse();
     }
 
     @Test
@@ -82,7 +82,7 @@ class ClassroomConstraintProviderTest {
         ClassAssignment a1 = assigned("e1", 50, room, Set.of());
         ClassAssignment a2 = assigned("e2", 50, room, Set.of());
 
-        assertThat(a1.conflictsWith(a2.getEvent().getId())).isFalse();
+        assertThat(a1.conflictsWith(a2.getEvent().getPlanningId())).isFalse();
     }
 
     @Test

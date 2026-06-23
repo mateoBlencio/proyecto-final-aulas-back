@@ -1,0 +1,22 @@
+meta {
+  name: Actualizar aula
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/v1/classrooms/1
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "roomNumber": "513",
+    "capacity": 90,
+    "floor": 5,
+    "classroomTypeId": 1,
+    "available": true,
+    "buildingId": 1
+  }
+}

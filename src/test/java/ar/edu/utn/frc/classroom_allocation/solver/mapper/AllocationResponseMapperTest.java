@@ -1,14 +1,13 @@
 package ar.edu.utn.frc.classroom_allocation.solver.mapper;
 
 import ar.edu.utn.frc.classroom_allocation.space.model.Classroom;
-import ar.edu.utn.frc.classroom_allocation.solver.model.AllocationStatus;
-import ar.edu.utn.frc.classroom_allocation.solver.model.UniqueEvent;
-import ar.edu.utn.frc.classroom_allocation.solver.optimization.impl.ClassAssignment;
-import ar.edu.utn.frc.classroom_allocation.solver.optimization.impl.ScheduleSolution;
+import ar.edu.utn.frc.classroom_allocation.allocation.model.AllocationStatus;
+import ar.edu.utn.frc.classroom_allocation.allocation.model.UniqueEvent;
+import ar.edu.utn.frc.classroom_allocation.solver.optimization.ClassAssignment;
+import ar.edu.utn.frc.classroom_allocation.solver.optimization.ScheduleSolution;
 import ai.timefold.solver.core.api.score.HardSoftScore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.lang.reflect.Method;
 import java.time.Duration;
@@ -54,7 +53,7 @@ class AllocationResponseMapperTest {
 
     private ClassAssignment assignmentWith(int enrolled, int capacity) {
         UniqueEvent event = UniqueEvent.builder()
-                .id("e1").enrolled(enrolled)
+                .planningId("e1").enrolled(enrolled)
                 .startTime(LocalTime.of(8, 0))
                 .duration(Duration.ofMinutes(90))
                 .date(LocalDate.of(2024, 1, 1))

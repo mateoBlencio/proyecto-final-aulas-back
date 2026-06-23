@@ -4,7 +4,7 @@ import ar.edu.utn.frc.classroom_allocation.space.dto.response.ClassroomResponseD
 import ar.edu.utn.frc.classroom_allocation.space.model.Classroom;
 import ar.edu.utn.frc.classroom_allocation.solver.dto.request.AllocationParametersDto;
 import ar.edu.utn.frc.classroom_allocation.solver.dto.request.EventRequestDto;
-import ar.edu.utn.frc.classroom_allocation.solver.model.Event;
+import ar.edu.utn.frc.classroom_allocation.allocation.model.AcademicEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -18,7 +18,7 @@ public class AllocationRequestMapper {
 
     private final EventMapper eventMapper;
 
-    public List<Event> toEvents(List<EventRequestDto> dtos) {
+    public List<AcademicEvent> toEvents(List<EventRequestDto> dtos) {
         return eventMapper.toEvents(dtos);
     }
 

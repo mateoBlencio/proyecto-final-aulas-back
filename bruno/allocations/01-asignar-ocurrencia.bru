@@ -1,0 +1,19 @@
+meta {
+  name: Asignar aula a ocurrencia
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/v1/allocations/occurrences/1
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "classroomId": 1,
+    "source": "MANUAL",
+    "observation": "Aula asignada manualmente para Análisis Matemático I - 1C1"
+  }
+}

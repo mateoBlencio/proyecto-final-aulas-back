@@ -8,10 +8,10 @@ import ar.edu.utn.frc.classroom_allocation.solver.dto.response.AllocationSummary
 import ar.edu.utn.frc.classroom_allocation.solver.dto.response.AssignmentResultDto;
 import ar.edu.utn.frc.classroom_allocation.solver.dto.response.QualityDetailDto;
 import ar.edu.utn.frc.classroom_allocation.solver.dto.response.WarningDto;
-import ar.edu.utn.frc.classroom_allocation.solver.model.AllocationQuality;
-import ar.edu.utn.frc.classroom_allocation.solver.model.AllocationStatus;
-import ar.edu.utn.frc.classroom_allocation.solver.optimization.impl.ClassAssignment;
-import ar.edu.utn.frc.classroom_allocation.solver.optimization.impl.ScheduleSolution;
+import ar.edu.utn.frc.classroom_allocation.allocation.model.AllocationQuality;
+import ar.edu.utn.frc.classroom_allocation.allocation.model.AllocationStatus;
+import ar.edu.utn.frc.classroom_allocation.solver.optimization.ClassAssignment;
+import ar.edu.utn.frc.classroom_allocation.solver.optimization.ScheduleSolution;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -40,7 +40,7 @@ public class AllocationResponseMapper {
         List<WarningDto> warnings = new ArrayList<>();
 
         for (ClassAssignment a : solution.getAssignments()) {
-            EventRequestDto eventDto = eventsById.get(a.getEvent().getId());
+            EventRequestDto eventDto = eventsById.get(a.getEvent().getPlanningId());
             ClassroomResponseDTO classroomDto = a.getClassroom() != null
                     ? classroomsById.get(a.getClassroom().getId()) : null;
 
@@ -57,7 +57,7 @@ public class AllocationResponseMapper {
             if (quality == AllocationQuality.UNASSIGNED) {
                 warnings.add(WarningDto.builder()
                         .code("NO_CLASSROOM_AVAILABLE")
-                        .eventId(a.getEvent().getId())
+                        .eventId(a.getEvent().getPlanningId())
                         .message("No hay aulas disponibles sin conflicto para este evento.")
                         .build());
             }

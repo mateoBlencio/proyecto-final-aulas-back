@@ -1,0 +1,136 @@
+meta {
+  name: Preview asignación óptima (solver)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/solver/preview
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "events": [
+      {
+        "id": "AMAT1-1C1",
+        "type": "RECURRING",
+        "subject": "Análisis Matemático I",
+        "section": "1C1",
+        "enrolled": 80,
+        "startTime": "18:15",
+        "durationMinutes": 135,
+        "dayOfWeek": "MONDAY",
+        "startDate": "2026-03-09",
+        "endDate": "2026-07-11",
+        "date": "2026-06-23"
+      },
+      {
+        "id": "ALG-1C1",
+        "type": "RECURRING",
+        "subject": "Álgebra y Geometría Analítica",
+        "section": "1C1",
+        "enrolled": 66,
+        "startTime": "20:40",
+        "durationMinutes": 135,
+        "dayOfWeek": "MONDAY",
+        "startDate": "2026-03-09",
+        "endDate": "2026-07-11",
+        "date": "2026-06-23"
+      },
+      {
+        "id": "FIS1-1C1",
+        "type": "RECURRING",
+        "subject": "Física I",
+        "section": "1C1",
+        "enrolled": 68,
+        "startTime": "19:00",
+        "durationMinutes": 135,
+        "dayOfWeek": "THURSDAY",
+        "startDate": "2026-03-09",
+        "endDate": "2026-07-11",
+        "date": "2026-06-26"
+      },
+      {
+        "id": "QUIM-1C2",
+        "type": "RECURRING",
+        "subject": "Química General",
+        "section": "1C2",
+        "enrolled": 122,
+        "startTime": "08:00",
+        "durationMinutes": 135,
+        "dayOfWeek": "WEDNESDAY",
+        "startDate": "2026-03-09",
+        "endDate": "2026-07-11",
+        "date": "2026-06-25"
+      },
+      {
+        "id": "INFO1-1D1",
+        "type": "UNIQUE",
+        "subject": "Informática I",
+        "section": "1D1",
+        "enrolled": 139,
+        "startTime": "08:00",
+        "durationMinutes": 135,
+        "dayOfWeek": "THURSDAY",
+        "startDate": "2026-06-26",
+        "endDate": "2026-06-26",
+        "date": "2026-06-26"
+      }
+    ],
+    "classrooms": [
+      {
+        "id": 1,
+        "roomNumber": "513",
+        "floor": 5,
+        "capacity": 80,
+        "available": true,
+        "buildingId": 1,
+        "buildingName": "Edif. Dr. Gallardo"
+      },
+      {
+        "id": 2,
+        "roomNumber": "229",
+        "floor": 2,
+        "capacity": 160,
+        "available": true,
+        "buildingId": 2,
+        "buildingName": "Edif. Central"
+      },
+      {
+        "id": 3,
+        "roomNumber": "401",
+        "floor": 4,
+        "capacity": 170,
+        "available": true,
+        "buildingId": 3,
+        "buildingName": "Edif. Ing. Inchaurrondo"
+      },
+      {
+        "id": 4,
+        "roomNumber": "227",
+        "floor": 2,
+        "capacity": 145,
+        "available": true,
+        "buildingId": 2,
+        "buildingName": "Edif. Central"
+      },
+      {
+        "id": 5,
+        "roomNumber": "220",
+        "floor": 2,
+        "capacity": 95,
+        "available": true,
+        "buildingId": 2,
+        "buildingName": "Edif. Central"
+      }
+    ],
+    "parameters": {
+      "timeLimitSeconds": 30,
+      "pinnedAssignments": [],
+      "excludedClassroomIds": [],
+      "excludedBuildingNames": []
+    }
+  }
+}

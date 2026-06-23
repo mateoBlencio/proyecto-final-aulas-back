@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.classroom_allocation.solver.model;
 
+import ar.edu.utn.frc.classroom_allocation.allocation.model.AllocationQuality;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
