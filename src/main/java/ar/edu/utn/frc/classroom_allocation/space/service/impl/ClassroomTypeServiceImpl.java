@@ -22,6 +22,16 @@ public class ClassroomTypeServiceImpl implements ClassroomTypeService {
         return findExistingById(id);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public ClassroomType findDefault() {
+        return classroomTypeRepository.findFirstByDeletedFalse()
+                .orElseThrow(() -> {
+                    log.warn("No ClassroomType found in database");
+                    return new ResourceNotFoundException("No ClassroomType found");
+                });
+    }
+
     @Transactional(readOnly = true)
     protected ClassroomType findExistingById(Integer id) {
         return classroomTypeRepository.findByIdAndDeletedFalse(id)

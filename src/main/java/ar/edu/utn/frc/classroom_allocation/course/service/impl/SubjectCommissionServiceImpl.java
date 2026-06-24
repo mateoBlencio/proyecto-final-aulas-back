@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.classroom_allocation.course.service.impl;
 
 import ar.edu.utn.frc.classroom_allocation.career.model.Subject;
+import ar.edu.utn.frc.classroom_allocation.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.classroom_allocation.course.model.Commission;
 import ar.edu.utn.frc.classroom_allocation.course.model.SubjectCommission;
 import ar.edu.utn.frc.classroom_allocation.course.repository.SubjectCommissionRepository;
@@ -34,5 +35,25 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
         SubjectCommission saved = subjectCommissionRepository.save(subjectCommission);
         log.info("SubjectCommission saved: id={}", saved.getId());
         return saved;
+    }
+
+    @Override
+    @Transactional
+    public FindOrCreateResult<SubjectCommission> findOrCreate(Subject subject, Commission commission,
+            Integer enrolledCount) {
+        return subjectCommissionRepository.findBySubjectAndCommissionAndDeletedFalse(subject, commission)
+            .map(found -> new FindOrCreateResult<>(found, false))
+            .orElseGet(() -> {
+                log.info("Creando SubjectCommission: subject={}, commission={}",
+                    subject.getId(), commission.getId());
+                SubjectCommission created = subjectCommissionRepository.save(
+                    SubjectCommission.builder()
+                        .subject(subject)
+                        .commission(commission)
+                        .enrolledCount(enrolledCount)
+                        .build()
+                );
+                return new FindOrCreateResult<>(created, true);
+            });
     }
 }

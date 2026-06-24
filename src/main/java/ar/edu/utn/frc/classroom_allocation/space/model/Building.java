@@ -30,14 +30,14 @@ public class Building {
     @Column(name = "id_edificio")
     private Integer id;
 
-    @Column(name = "nombre", unique = true, nullable = false, length = 100)
+    @Column(name = "nombre", nullable = false, length = 100)
     private String name;
 
-    @Column(name = "cantidad_pisos", nullable = false)
+    @Column(name = "cantidad_pisos")
     private Integer floorCount;
 
     @Builder.Default
-    @Column(name = "activo", nullable = false)
+    @Column(name = "activo")
     private Boolean active = true;
 
     @Builder.Default

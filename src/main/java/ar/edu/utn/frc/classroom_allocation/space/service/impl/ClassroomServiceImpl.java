@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.classroom_allocation.space.service.impl;
 
+import ar.edu.utn.frc.classroom_allocation.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.classroom_allocation.space.dto.ClassroomFilter;
 import ar.edu.utn.frc.classroom_allocation.space.dto.request.ClassroomRequestDTO;
 import ar.edu.utn.frc.classroom_allocation.space.dto.response.ClassroomResponseDTO;
@@ -128,6 +129,27 @@ public class ClassroomServiceImpl implements ClassroomService {
             throw new SpaceDomainException(
                     "Floor " + dto.floor() + " exceeds building floor count " + building.getFloorCount());
         }
+    }
+
+    @Override
+    @Transactional
+    public FindOrCreateResult<Classroom> findOrCreate(String roomNumber, Building building, Integer enrolledCount) {
+        return classroomRepository.findByRoomNumberAndBuildingAndDeletedFalse(roomNumber, building)
+                .map(found -> new FindOrCreateResult<>(found, false))
+                .orElseGet(() -> {
+                    log.warn("Creando Classroom con datos provisionales: roomNumber={}, buildingId={}",
+                        roomNumber, building.getId());
+                    Classroom created = classroomRepository.save(
+                        Classroom.builder()
+                            .roomNumber(roomNumber)
+                            .building(building)
+                            .floor(0)
+                            .capacity(enrolledCount != null && enrolledCount > 0 ? enrolledCount : 1)
+                            .classroomType(classroomTypeService.findDefault())
+                            .build()
+                    );
+                    return new FindOrCreateResult<>(created, true);
+                });
     }
 
     private void validateCapacity(ClassroomRequestDTO dto) {

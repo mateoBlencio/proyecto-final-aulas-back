@@ -4,6 +4,7 @@ import ar.edu.utn.frc.classroom_allocation.career.model.Specialty;
 import ar.edu.utn.frc.classroom_allocation.career.model.StudyPlan;
 import ar.edu.utn.frc.classroom_allocation.career.repository.StudyPlanRepository;
 import ar.edu.utn.frc.classroom_allocation.career.service.StudyPlanService;
+import ar.edu.utn.frc.classroom_allocation.common.dto.FindOrCreateResult;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,5 +32,22 @@ public class StudyPlanServiceImpl implements StudyPlanService {
         StudyPlan saved = studyPlanRepository.save(studyPlan);
         log.info("StudyPlan saved: id={}", saved.getId());
         return saved;
+    }
+
+    @Override
+    @Transactional
+    public FindOrCreateResult<StudyPlan> findOrCreate(Integer planCode, Specialty specialty) {
+        return studyPlanRepository.findByPlanCodeAndSpecialtyAndDeletedFalse(planCode, specialty)
+            .map(found -> new FindOrCreateResult<>(found, false))
+            .orElseGet(() -> {
+                log.info("Creando StudyPlan: code={}, specialty={}", planCode, specialty.getId());
+                StudyPlan created = studyPlanRepository.save(
+                    StudyPlan.builder()
+                        .planCode(planCode)
+                        .specialty(specialty)
+                        .build()
+                );
+                return new FindOrCreateResult<>(created, true);
+            });
     }
 }

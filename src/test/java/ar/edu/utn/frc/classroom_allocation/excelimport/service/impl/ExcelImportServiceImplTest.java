@@ -1,11 +1,16 @@
 package ar.edu.utn.frc.classroom_allocation.excelimport.service.impl;
 
+import ar.edu.utn.frc.classroom_allocation.allocation.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.classroom_allocation.allocation.model.EventType;
+import ar.edu.utn.frc.classroom_allocation.allocation.service.AcademicEventService;
+import ar.edu.utn.frc.classroom_allocation.allocation.service.AllocationService;
 import ar.edu.utn.frc.classroom_allocation.career.model.Specialty;
 import ar.edu.utn.frc.classroom_allocation.career.model.StudyPlan;
 import ar.edu.utn.frc.classroom_allocation.career.model.Subject;
 import ar.edu.utn.frc.classroom_allocation.career.service.SpecialtyService;
 import ar.edu.utn.frc.classroom_allocation.career.service.StudyPlanService;
 import ar.edu.utn.frc.classroom_allocation.career.service.SubjectService;
+import ar.edu.utn.frc.classroom_allocation.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.classroom_allocation.course.model.AcademicPeriod;
 import ar.edu.utn.frc.classroom_allocation.course.model.Commission;
 import ar.edu.utn.frc.classroom_allocation.course.model.SubjectCommission;
@@ -17,20 +22,14 @@ import ar.edu.utn.frc.classroom_allocation.excelimport.dto.ImportResultDto;
 import ar.edu.utn.frc.classroom_allocation.excelimport.exception.ExcelImportException;
 import ar.edu.utn.frc.classroom_allocation.excelimport.mapper.ExcelRowMapper;
 import ar.edu.utn.frc.classroom_allocation.excelimport.validator.ExcelTemplateValidator;
-import ar.edu.utn.frc.classroom_allocation.schedule.model.ClassroomAssignment;
-import ar.edu.utn.frc.classroom_allocation.schedule.model.TimeSlot;
-import ar.edu.utn.frc.classroom_allocation.schedule.service.ClassroomAssignmentService;
-import ar.edu.utn.frc.classroom_allocation.schedule.service.TimeSlotService;
 import ar.edu.utn.frc.classroom_allocation.space.model.Building;
 import ar.edu.utn.frc.classroom_allocation.space.model.Classroom;
-import ar.edu.utn.frc.classroom_allocation.space.repository.BuildingRepository;
-import ar.edu.utn.frc.classroom_allocation.space.repository.ClassroomRepository;
+import ar.edu.utn.frc.classroom_allocation.space.service.BuildingService;
+import ar.edu.utn.frc.classroom_allocation.space.service.ClassroomService;
 import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-import java.time.LocalDate;
+import java.time.DayOfWeek;
 import java.time.LocalTime;
-import java.util.Optional;
-import static org.assertj.core.api.Assertions.assertThat;
+import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -42,8 +41,8 @@ import org.mockito.quality.Strictness;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import org.mockito.Mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -61,10 +60,10 @@ class ExcelImportServiceImplTest {
     @Mock private AcademicPeriodService academicPeriodService;
     @Mock private CommissionService commissionService;
     @Mock private SubjectCommissionService subjectCommissionService;
-    @Mock private TimeSlotService timeSlotService;
-    @Mock private ClassroomAssignmentService assignmentService;
-    @Mock private BuildingRepository buildingRepository;
-    @Mock private ClassroomRepository classroomRepository;
+    @Mock private AcademicEventService academicEventService;
+    @Mock private AllocationService allocationService;
+    @Mock private BuildingService buildingService;
+    @Mock private ClassroomService classroomService;
 
     private ExcelImportServiceImpl service;
     private MultipartFile file;
@@ -76,7 +75,7 @@ class ExcelImportServiceImplTest {
         service = new ExcelImportServiceImpl(validator, rowMapper,
             specialtyService, studyPlanService, subjectService,
             academicPeriodService, commissionService, subjectCommissionService,
-            timeSlotService, assignmentService, buildingRepository, classroomRepository);
+            academicEventService, allocationService, buildingService, classroomService);
 
         file = org.mockito.Mockito.mock(MultipartFile.class);
         workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
@@ -126,11 +125,50 @@ class ExcelImportServiceImplTest {
     }
 
     private ExcelRowDto createDto(String curso, int comision, String aula, String edificio,
-                                   String dia, String dictado, int start, int end,
+                                   DayOfWeek dia, String dictado,
+                                   LocalTime start, LocalTime end,
                                    int especialidad, int plan, int materia,
                                    String nombreMateria, int cantidad) {
         return new ExcelRowDto(curso, comision, aula, edificio, dia, dictado,
             start, end, 90, especialidad, plan, materia, nombreMateria, cantidad);
+    }
+
+    private void setupAllCareerMocksAsExisting() {
+        Specialty specialty = Specialty.builder().id(1L).build();
+        StudyPlan studyPlan = StudyPlan.builder().id(1L).build();
+        Subject subject = Subject.builder().id(1L).name("Ing Civil I").build();
+        AcademicPeriod period = AcademicPeriod.builder().id(1L).build();
+        Commission commission = Commission.builder().id(1L).commissionNumber(10).build();
+        SubjectCommission subjectCommission = SubjectCommission.builder().id(1L).build();
+
+        when(specialtyService.findOrCreate(any()))
+            .thenReturn(new FindOrCreateResult<>(specialty, false));
+        when(studyPlanService.findOrCreate(any(), any()))
+            .thenReturn(new FindOrCreateResult<>(studyPlan, false));
+        when(subjectService.findOrCreate(any(), any(), any(), any()))
+            .thenReturn(new FindOrCreateResult<>(subject, false));
+        when(academicPeriodService.findOrCreate(any(), any()))
+            .thenReturn(new FindOrCreateResult<>(period, false));
+        when(commissionService.findOrCreate(any(), any(), any(), any()))
+            .thenReturn(new FindOrCreateResult<>(commission, false));
+        when(subjectCommissionService.findOrCreate(any(), any(), any()))
+            .thenReturn(new FindOrCreateResult<>(subjectCommission, false));
+    }
+
+    private void setupBuildingAndClassroom() {
+        Building building = Building.builder().id(1).name("Edif. Dr. Gallardo").build();
+        Classroom classroom = Classroom.builder().id(1).roomNumber("513").building(building).build();
+
+        when(buildingService.findOrCreate("Edif. Dr. Gallardo"))
+            .thenReturn(new FindOrCreateResult<>(building, false));
+        when(classroomService.findOrCreate(eq("513"), eq(building), any()))
+            .thenReturn(new FindOrCreateResult<>(classroom, false));
+    }
+
+    private void setupAllocationMocks() {
+        when(academicEventService.createRecurringEvent(any()))
+            .thenReturn(AcademicEventResponseDto.builder().id(1L).type(EventType.RECURRING).build());
+        when(allocationService.assignFromDate(any())).thenReturn(List.of());
     }
 
     // ─── TEST: importExcel_shouldReturnCorrectCounters ─────────────────────
@@ -142,82 +180,29 @@ class ExcelImportServiceImplTest {
         addDataRow(6, "1C1", 10, 513, "Edif. Dr. Gallardo", "Jueves",
             "1 Cuat.", 800, 1540, 31, 2023, 104, "Ing Civil I", 45);
 
-        when(file.isEmpty()).thenReturn(false);
-        when(file.getOriginalFilename()).thenReturn("test.xlsx");
         when(file.getInputStream()).thenReturn(new ByteArrayInputStream(workbookToBytes()));
         when(validator.validate(any())).thenReturn(workbook);
+        when(validator.extractYear(any())).thenReturn(2026);
+        when(rowMapper.map(any(), anyInt())).thenReturn(
+            createDto("1C1", 10, "513", "Edif. Dr. Gallardo",
+                DayOfWeek.THURSDAY, "1 Cuat.",
+                LocalTime.of(8, 0), LocalTime.of(15, 40),
+                31, 2023, 104, "Ing Civil I", 45));
 
-        ExcelRowDto dto = createDto("1C1", 10, "513", "Edif. Dr. Gallardo",
-            "Jueves", "1 Cuat.", 800, 1540, 31, 2023, 104, "Ing Civil I", 45);
-
-        when(rowMapper.map(any(), anyInt())).thenReturn(dto);
-
-        when(specialtyService.findBySpecialtyCodeAndDeletedFalse(31))
-            .thenReturn(Optional.empty());
-        when(specialtyService.save(any())).thenAnswer(invocation -> {
-            Specialty s = invocation.getArgument(0);
-            s.setId(1L);
-            return s;
-        });
-
-        when(studyPlanService.findByPlanCodeAndSpecialtyAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.empty());
-        when(studyPlanService.save(any())).thenAnswer(invocation -> {
-            StudyPlan sp = invocation.getArgument(0);
-            sp.setId(1L);
-            return sp;
-        });
-
-        when(subjectService.findByCodeAndStudyPlanAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.empty());
-        when(subjectService.save(any())).thenAnswer(invocation -> {
-            Subject s = invocation.getArgument(0);
-            s.setId(1L);
-            return s;
-        });
-
-        when(academicPeriodService.findByYearAndSemester(any(), any()))
-            .thenReturn(Optional.empty());
-        when(academicPeriodService.save(any())).thenAnswer(invocation -> {
-            AcademicPeriod ap = invocation.getArgument(0);
-            ap.setId(1L);
-            return ap;
-        });
-
-        when(commissionService.findByCourseCodeAndCommissionNumberAndPeriodAndDeletedFalse(
-            any(), any(), any())).thenReturn(Optional.empty());
-        when(commissionService.save(any())).thenAnswer(invocation -> {
-            Commission c = invocation.getArgument(0);
-            c.setId(1L);
-            return c;
-        });
-
-        when(subjectCommissionService.findBySubjectAndCommissionAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.empty());
-        when(subjectCommissionService.save(any())).thenAnswer(invocation -> {
-            SubjectCommission sc = invocation.getArgument(0);
-            sc.setId(1L);
-            return sc;
-        });
-
-        when(timeSlotService.findByDayOfWeekAndStartTimeAndEndTime(any(), any(), any()))
-            .thenReturn(Optional.empty());
-        when(timeSlotService.save(any())).thenAnswer(invocation -> {
-            TimeSlot ts = invocation.getArgument(0);
-            ts.setId(1L);
-            return ts;
-        });
-
-        Building building = Building.builder().id(1).name("Edif. Dr. Gallardo").build();
-        when(buildingRepository.findByNameAndDeletedFalse("Edif. Dr. Gallardo"))
-            .thenReturn(Optional.of(building));
-
-        Classroom classroom = Classroom.builder().id(1).roomNumber("513").building(building).build();
-        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedFalse("513", building))
-            .thenReturn(Optional.of(classroom));
-
-        when(assignmentService.findBySubjectCommissionAndClassroomAndTimeSlot(any(), any(), any()))
-            .thenReturn(Optional.empty());
+        when(specialtyService.findOrCreate(31))
+            .thenReturn(new FindOrCreateResult<>(Specialty.builder().id(1L).build(), true));
+        when(studyPlanService.findOrCreate(any(), any()))
+            .thenReturn(new FindOrCreateResult<>(StudyPlan.builder().id(1L).build(), true));
+        when(subjectService.findOrCreate(any(), any(), any(), any()))
+            .thenReturn(new FindOrCreateResult<>(Subject.builder().id(1L).name("Ing Civil I").build(), true));
+        when(academicPeriodService.findOrCreate(any(), any()))
+            .thenReturn(new FindOrCreateResult<>(AcademicPeriod.builder().id(1L).build(), true));
+        when(commissionService.findOrCreate(any(), any(), any(), any()))
+            .thenReturn(new FindOrCreateResult<>(Commission.builder().id(1L).commissionNumber(10).build(), true));
+        when(subjectCommissionService.findOrCreate(any(), any(), any()))
+            .thenReturn(new FindOrCreateResult<>(SubjectCommission.builder().id(1L).build(), true));
+        setupBuildingAndClassroom();
+        setupAllocationMocks();
 
         ImportResultDto result = service.importExcel(file);
 
@@ -239,76 +224,66 @@ class ExcelImportServiceImplTest {
 
         when(file.getInputStream()).thenReturn(new ByteArrayInputStream(workbookToBytes()));
         when(validator.validate(any())).thenReturn(workbook);
+        when(validator.extractYear(any())).thenReturn(2026);
         when(rowMapper.map(any(), anyInt())).thenReturn(
-            createDto("1C1", 10, "513", "Edif. Dr. Gallardo", "Jueves",
-                "1 Cuat.", 800, 1540, 99, 2023, 104, "Materia", 30));
+            createDto("1C1", 10, "513", "Edif. Dr. Gallardo",
+                DayOfWeek.THURSDAY, "1 Cuat.",
+                LocalTime.of(8, 0), LocalTime.of(15, 40),
+                99, 2023, 104, "Materia", 30));
 
-        when(specialtyService.findBySpecialtyCodeAndDeletedFalse(99))
-            .thenReturn(Optional.empty());
-        when(specialtyService.save(any())).thenAnswer(invocation -> {
-            Specialty s = invocation.getArgument(0);
-            s.setId(1L);
-            return s;
-        });
-
-        when(studyPlanService.findByPlanCodeAndSpecialtyAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(StudyPlan.builder().id(1L).build()));
-        when(subjectService.findByCodeAndStudyPlanAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(Subject.builder().id(1L).build()));
-        when(academicPeriodService.findByYearAndSemester(any(), any()))
-            .thenReturn(Optional.of(AcademicPeriod.builder().id(1L).build()));
-        when(commissionService.findByCourseCodeAndCommissionNumberAndPeriodAndDeletedFalse(
-            any(), any(), any())).thenReturn(Optional.of(Commission.builder().id(1L).build()));
-        when(subjectCommissionService.findBySubjectAndCommissionAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(SubjectCommission.builder().id(1L).build()));
-        when(timeSlotService.findByDayOfWeekAndStartTimeAndEndTime(any(), any(), any()))
-            .thenReturn(Optional.of(TimeSlot.builder().id(1L).build()));
-        when(buildingRepository.findByNameAndDeletedFalse(any()))
-            .thenReturn(Optional.of(Building.builder().id(1).build()));
-        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(Classroom.builder().id(1).build()));
-        when(assignmentService.findBySubjectCommissionAndClassroomAndTimeSlot(any(), any(), any()))
-            .thenReturn(Optional.of(ClassroomAssignment.builder().id(1L).build()));
+        when(specialtyService.findOrCreate(99))
+            .thenReturn(new FindOrCreateResult<>(Specialty.builder().id(1L).build(), true));
+        when(studyPlanService.findOrCreate(any(), any()))
+            .thenReturn(new FindOrCreateResult<>(StudyPlan.builder().id(1L).build(), false));
+        when(subjectService.findOrCreate(any(), any(), any(), any()))
+            .thenReturn(new FindOrCreateResult<>(Subject.builder().id(1L).name("Materia").build(), false));
+        when(academicPeriodService.findOrCreate(any(), any()))
+            .thenReturn(new FindOrCreateResult<>(AcademicPeriod.builder().id(1L).build(), false));
+        when(commissionService.findOrCreate(any(), any(), any(), any()))
+            .thenReturn(new FindOrCreateResult<>(Commission.builder().id(1L).commissionNumber(10).build(), false));
+        when(subjectCommissionService.findOrCreate(any(), any(), any()))
+            .thenReturn(new FindOrCreateResult<>(SubjectCommission.builder().id(1L).build(), false));
+        setupBuildingAndClassroom();
+        setupAllocationMocks();
 
         ImportResultDto result = service.importExcel(file);
 
-        verify(specialtyService).save(any());
+        verify(specialtyService).findOrCreate(99);
         assertEquals(1, result.entitiesCreated());
     }
 
-    // ─── TEST: importExcel_shouldThrowWhenBuildingNotFound ────────────────
+    // ─── TEST: importExcel_shouldCreateBuildingWhenNotFound ───────────────
 
     @Test
-    void importExcel_shouldThrowWhenBuildingNotFound() throws Exception {
+    void importExcel_shouldCreateBuildingWhenNotFound() throws Exception {
         setupYearRow();
         setupHeaderRow();
-        addDataRow(6, "1C1", 10, 513, "Edif. Inexistente", "Jueves",
+        addDataRow(6, "1C1", 10, 513, "Edificio Nuevo", "Jueves",
             "1 Cuat.", 800, 1540, 31, 2023, 104, "Materia", 30);
 
         when(file.getInputStream()).thenReturn(new ByteArrayInputStream(workbookToBytes()));
         when(validator.validate(any())).thenReturn(workbook);
+        when(validator.extractYear(any())).thenReturn(2026);
         when(rowMapper.map(any(), anyInt())).thenReturn(
-            createDto("1C1", 10, "513", "Edif. Inexistente", "Jueves",
-                "1 Cuat.", 800, 1540, 31, 2023, 104, "Materia", 30));
+            createDto("1C1", 10, "513", "Edificio Nuevo",
+                DayOfWeek.THURSDAY, "1 Cuat.",
+                LocalTime.of(8, 0), LocalTime.of(15, 40),
+                31, 2023, 104, "Materia", 30));
 
-        when(specialtyService.findBySpecialtyCodeAndDeletedFalse(any()))
-            .thenReturn(Optional.of(Specialty.builder().id(1L).build()));
-        when(studyPlanService.findByPlanCodeAndSpecialtyAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(StudyPlan.builder().id(1L).build()));
-        when(subjectService.findByCodeAndStudyPlanAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(Subject.builder().id(1L).build()));
-        when(academicPeriodService.findByYearAndSemester(any(), any()))
-            .thenReturn(Optional.of(AcademicPeriod.builder().id(1L).build()));
-        when(commissionService.findByCourseCodeAndCommissionNumberAndPeriodAndDeletedFalse(
-            any(), any(), any())).thenReturn(Optional.of(Commission.builder().id(1L).build()));
-        when(subjectCommissionService.findBySubjectAndCommissionAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(SubjectCommission.builder().id(1L).build()));
-        when(timeSlotService.findByDayOfWeekAndStartTimeAndEndTime(any(), any(), any()))
-            .thenReturn(Optional.of(TimeSlot.builder().id(1L).build()));
-        when(buildingRepository.findByNameAndDeletedFalse("Edif. Inexistente"))
-            .thenReturn(Optional.empty());
+        setupAllCareerMocksAsExisting();
 
-        assertThrows(ExcelImportException.class, () -> service.importExcel(file));
+        Building newBuilding = Building.builder().id(2).name("Edificio Nuevo").build();
+        Classroom newClassroom = Classroom.builder().id(2).roomNumber("513").building(newBuilding).build();
+        when(buildingService.findOrCreate("Edificio Nuevo"))
+            .thenReturn(new FindOrCreateResult<>(newBuilding, true));
+        when(classroomService.findOrCreate(eq("513"), eq(newBuilding), any()))
+            .thenReturn(new FindOrCreateResult<>(newClassroom, false));
+        setupAllocationMocks();
+
+        ImportResultDto result = service.importExcel(file);
+
+        verify(buildingService).findOrCreate("Edificio Nuevo");
+        assertEquals(1, result.entitiesCreated());
     }
 
     // ─── TEST: importExcel_shouldThrowWhenTermTypeIsUnrecognized ──────────
@@ -322,24 +297,20 @@ class ExcelImportServiceImplTest {
 
         when(file.getInputStream()).thenReturn(new ByteArrayInputStream(workbookToBytes()));
         when(validator.validate(any())).thenReturn(workbook);
+        when(validator.extractYear(any())).thenReturn(2026);
         when(rowMapper.map(any(), anyInt())).thenReturn(
-            createDto("1C1", 10, "513", "Edif. Dr. Gallardo", "Jueves",
-                "Verano", 800, 1540, 31, 2023, 104, "Materia", 30));
-
-        when(specialtyService.findBySpecialtyCodeAndDeletedFalse(any()))
-            .thenReturn(Optional.of(Specialty.builder().id(1L).build()));
-        when(studyPlanService.findByPlanCodeAndSpecialtyAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(StudyPlan.builder().id(1L).build()));
-        when(subjectService.findByCodeAndStudyPlanAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(Subject.builder().id(1L).build()));
+            createDto("1C1", 10, "513", "Edif. Dr. Gallardo",
+                DayOfWeek.THURSDAY, "Verano",
+                LocalTime.of(8, 0), LocalTime.of(15, 40),
+                31, 2023, 104, "Materia", 30));
 
         assertThrows(ExcelImportException.class, () -> service.importExcel(file));
     }
 
-    // ─── TEST: importExcel_shouldReuseAssignmentWhenAlreadyExists ─────────
+    // ─── TEST: importExcel_shouldCallCreateRecurringEventWithCorrectSubjectAndSection ──
 
     @Test
-    void importExcel_shouldReuseAssignmentWhenAlreadyExists() throws Exception {
+    void importExcel_shouldCallCreateRecurringEventWithCorrectSubjectAndSection() throws Exception {
         setupYearRow();
         setupHeaderRow();
         addDataRow(6, "1C1", 10, 513, "Edif. Dr. Gallardo", "Jueves",
@@ -347,41 +318,28 @@ class ExcelImportServiceImplTest {
 
         when(file.getInputStream()).thenReturn(new ByteArrayInputStream(workbookToBytes()));
         when(validator.validate(any())).thenReturn(workbook);
+        when(validator.extractYear(any())).thenReturn(2026);
         when(rowMapper.map(any(), anyInt())).thenReturn(
-            createDto("1C1", 10, "513", "Edif. Dr. Gallardo", "Jueves",
-                "1 Cuat.", 800, 1540, 31, 2023, 104, "Materia", 30));
+            createDto("1C1", 10, "513", "Edif. Dr. Gallardo",
+                DayOfWeek.THURSDAY, "1 Cuat.",
+                LocalTime.of(8, 0), LocalTime.of(15, 40),
+                31, 2023, 104, "Materia", 30));
 
-        when(specialtyService.findBySpecialtyCodeAndDeletedFalse(any()))
-            .thenReturn(Optional.of(Specialty.builder().id(1L).build()));
-        when(studyPlanService.findByPlanCodeAndSpecialtyAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(StudyPlan.builder().id(1L).build()));
-        when(subjectService.findByCodeAndStudyPlanAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(Subject.builder().id(1L).build()));
-        when(academicPeriodService.findByYearAndSemester(any(), any()))
-            .thenReturn(Optional.of(AcademicPeriod.builder().id(1L).build()));
-        when(commissionService.findByCourseCodeAndCommissionNumberAndPeriodAndDeletedFalse(
-            any(), any(), any())).thenReturn(Optional.of(Commission.builder().id(1L).build()));
-        when(subjectCommissionService.findBySubjectAndCommissionAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(SubjectCommission.builder().id(1L).build()));
-        when(timeSlotService.findByDayOfWeekAndStartTimeAndEndTime(any(), any(), any()))
-            .thenReturn(Optional.of(TimeSlot.builder().id(1L).build()));
-        when(buildingRepository.findByNameAndDeletedFalse(any()))
-            .thenReturn(Optional.of(Building.builder().id(1).build()));
-        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(Classroom.builder().id(1).build()));
-        when(assignmentService.findBySubjectCommissionAndClassroomAndTimeSlot(any(), any(), any()))
-            .thenReturn(Optional.of(ClassroomAssignment.builder().id(1L).build()));
+        setupAllCareerMocksAsExisting();
+        setupBuildingAndClassroom();
+        setupAllocationMocks();
 
-        ImportResultDto result = service.importExcel(file);
+        service.importExcel(file);
 
-        assertEquals(1, result.assignmentsReused());
-        assertEquals(0, result.assignmentsCreated());
+        verify(academicEventService).createRecurringEvent(argThat(dto ->
+            "Ing Civil I".equals(dto.subject()) && "10".equals(dto.section())
+        ));
     }
 
-    // ─── TEST: importExcel_shouldCreateAssignmentWithExcelMetadata ─────────
+    // ─── TEST: importExcel_shouldCallAssignFromDateAfterCreatingEvent ──────
 
     @Test
-    void importExcel_shouldCreateAssignmentWithExcelMetadata() throws Exception {
+    void importExcel_shouldCallAssignFromDateAfterCreatingEvent() throws Exception {
         setupYearRow();
         setupHeaderRow();
         addDataRow(6, "1C1", 10, 513, "Edif. Dr. Gallardo", "Jueves",
@@ -389,33 +347,26 @@ class ExcelImportServiceImplTest {
 
         when(file.getInputStream()).thenReturn(new ByteArrayInputStream(workbookToBytes()));
         when(validator.validate(any())).thenReturn(workbook);
+        when(validator.extractYear(any())).thenReturn(2026);
         when(rowMapper.map(any(), anyInt())).thenReturn(
-            createDto("1C1", 10, "513", "Edif. Dr. Gallardo", "Jueves",
-                "1 Cuat.", 800, 1540, 31, 2023, 104, "Materia", 30));
+            createDto("1C1", 10, "513", "Edif. Dr. Gallardo",
+                DayOfWeek.THURSDAY, "1 Cuat.",
+                LocalTime.of(8, 0), LocalTime.of(15, 40),
+                31, 2023, 104, "Materia", 30));
 
-        when(specialtyService.findBySpecialtyCodeAndDeletedFalse(any()))
-            .thenReturn(Optional.of(Specialty.builder().id(1L).build()));
-        when(studyPlanService.findByPlanCodeAndSpecialtyAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(StudyPlan.builder().id(1L).build()));
-        when(subjectService.findByCodeAndStudyPlanAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(Subject.builder().id(1L).build()));
-        when(academicPeriodService.findByYearAndSemester(any(), any()))
-            .thenReturn(Optional.of(AcademicPeriod.builder().id(1L).build()));
-        when(commissionService.findByCourseCodeAndCommissionNumberAndPeriodAndDeletedFalse(
-            any(), any(), any())).thenReturn(Optional.of(Commission.builder().id(1L).build()));
-        when(subjectCommissionService.findBySubjectAndCommissionAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(SubjectCommission.builder().id(1L).build()));
-        when(timeSlotService.findByDayOfWeekAndStartTimeAndEndTime(any(), any(), any()))
-            .thenReturn(Optional.of(TimeSlot.builder().id(1L).build()));
-        when(buildingRepository.findByNameAndDeletedFalse(any()))
-            .thenReturn(Optional.of(Building.builder().id(1).build()));
-        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(Classroom.builder().id(1).build()));
-        when(assignmentService.findBySubjectCommissionAndClassroomAndTimeSlot(any(), any(), any()))
-            .thenReturn(Optional.empty());
+        setupAllCareerMocksAsExisting();
+        setupBuildingAndClassroom();
+        when(academicEventService.createRecurringEvent(any()))
+            .thenReturn(AcademicEventResponseDto.builder().id(42L).type(EventType.RECURRING).build());
+        when(allocationService.assignFromDate(any())).thenReturn(List.of());
 
         ImportResultDto result = service.importExcel(file);
 
+        verify(allocationService).assignFromDate(argThat(dto ->
+            dto.recurringEventId().equals(42L)
+                && "Importado de Excel".equals(dto.observation())
+                && dto.classroomId().equals(1)
+        ));
         assertEquals(1, result.assignmentsCreated());
     }
 
@@ -430,40 +381,31 @@ class ExcelImportServiceImplTest {
 
         when(file.getInputStream()).thenReturn(new ByteArrayInputStream(workbookToBytes()));
         when(validator.validate(any())).thenReturn(workbook);
+        when(validator.extractYear(any())).thenReturn(2026);
         when(rowMapper.map(any(), anyInt())).thenReturn(
-            createDto("3C2", 10, "513", "Edif. Dr. Gallardo", "Jueves",
-                "1 Cuat.", 800, 1540, 31, 2023, 104, "Materia", 30));
+            createDto("3C2", 10, "513", "Edif. Dr. Gallardo",
+                DayOfWeek.THURSDAY, "1 Cuat.",
+                LocalTime.of(8, 0), LocalTime.of(15, 40),
+                31, 2023, 104, "Materia", 30));
 
-        when(specialtyService.findBySpecialtyCodeAndDeletedFalse(any()))
-            .thenReturn(Optional.of(Specialty.builder().id(1L).build()));
-        when(studyPlanService.findByPlanCodeAndSpecialtyAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(StudyPlan.builder().id(1L).build()));
-        when(subjectService.findByCodeAndStudyPlanAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(Subject.builder().id(1L).build()));
-        when(academicPeriodService.findByYearAndSemester(any(), any()))
-            .thenReturn(Optional.of(AcademicPeriod.builder().id(1L).build()));
-        when(commissionService.findByCourseCodeAndCommissionNumberAndPeriodAndDeletedFalse(
-            any(), any(), any())).thenReturn(Optional.empty());
-        when(commissionService.save(any())).thenAnswer(invocation -> {
-            Commission c = invocation.getArgument(0);
-            c.setId(1L);
-            return c;
-        });
-        when(subjectCommissionService.findBySubjectAndCommissionAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(SubjectCommission.builder().id(1L).build()));
-        when(timeSlotService.findByDayOfWeekAndStartTimeAndEndTime(any(), any(), any()))
-            .thenReturn(Optional.of(TimeSlot.builder().id(1L).build()));
-        when(buildingRepository.findByNameAndDeletedFalse(any()))
-            .thenReturn(Optional.of(Building.builder().id(1).build()));
-        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(Classroom.builder().id(1).build()));
-        when(assignmentService.findBySubjectCommissionAndClassroomAndTimeSlot(any(), any(), any()))
-            .thenReturn(Optional.of(ClassroomAssignment.builder().id(1L).build()));
+        when(specialtyService.findOrCreate(any()))
+            .thenReturn(new FindOrCreateResult<>(Specialty.builder().id(1L).build(), false));
+        when(studyPlanService.findOrCreate(any(), any()))
+            .thenReturn(new FindOrCreateResult<>(StudyPlan.builder().id(1L).build(), false));
+        when(subjectService.findOrCreate(any(), any(), any(), any()))
+            .thenReturn(new FindOrCreateResult<>(Subject.builder().id(1L).name("Materia").build(), false));
+        when(academicPeriodService.findOrCreate(any(), any()))
+            .thenReturn(new FindOrCreateResult<>(AcademicPeriod.builder().id(1L).build(), false));
+        when(commissionService.findOrCreate(any(), any(), any(), any()))
+            .thenReturn(new FindOrCreateResult<>(Commission.builder().id(1L).commissionNumber(10).build(), true));
+        when(subjectCommissionService.findOrCreate(any(), any(), any()))
+            .thenReturn(new FindOrCreateResult<>(SubjectCommission.builder().id(1L).build(), false));
+        setupBuildingAndClassroom();
+        setupAllocationMocks();
 
         service.importExcel(file);
 
-        verify(commissionService).save(argThat(
-            c -> c.getYearLevel() != null && c.getYearLevel() == 3));
+        verify(commissionService).findOrCreate(any(), any(), eq(3), any());
     }
 
     // ─── TEST: importExcel_shouldAcceptZeroCantidadInscriptos ─────────────
@@ -477,35 +419,16 @@ class ExcelImportServiceImplTest {
 
         when(file.getInputStream()).thenReturn(new ByteArrayInputStream(workbookToBytes()));
         when(validator.validate(any())).thenReturn(workbook);
+        when(validator.extractYear(any())).thenReturn(2026);
         when(rowMapper.map(any(), anyInt())).thenReturn(
-            createDto("1C1", 10, "513", "Edif. Dr. Gallardo", "Jueves",
-                "1 Cuat.", 800, 1540, 31, 2023, 104, "Materia", 0));
+            createDto("1C1", 10, "513", "Edif. Dr. Gallardo",
+                DayOfWeek.THURSDAY, "1 Cuat.",
+                LocalTime.of(8, 0), LocalTime.of(15, 40),
+                31, 2023, 104, "Materia", 0));
 
-        when(specialtyService.findBySpecialtyCodeAndDeletedFalse(any()))
-            .thenReturn(Optional.of(Specialty.builder().id(1L).build()));
-        when(studyPlanService.findByPlanCodeAndSpecialtyAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(StudyPlan.builder().id(1L).build()));
-        when(subjectService.findByCodeAndStudyPlanAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(Subject.builder().id(1L).build()));
-        when(academicPeriodService.findByYearAndSemester(any(), any()))
-            .thenReturn(Optional.of(AcademicPeriod.builder().id(1L).build()));
-        when(commissionService.findByCourseCodeAndCommissionNumberAndPeriodAndDeletedFalse(
-            any(), any(), any())).thenReturn(Optional.of(Commission.builder().id(1L).build()));
-        when(subjectCommissionService.findBySubjectAndCommissionAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.empty());
-        when(subjectCommissionService.save(any())).thenAnswer(invocation -> {
-            SubjectCommission sc = invocation.getArgument(0);
-            sc.setId(1L);
-            return sc;
-        });
-        when(timeSlotService.findByDayOfWeekAndStartTimeAndEndTime(any(), any(), any()))
-            .thenReturn(Optional.of(TimeSlot.builder().id(1L).build()));
-        when(buildingRepository.findByNameAndDeletedFalse(any()))
-            .thenReturn(Optional.of(Building.builder().id(1).build()));
-        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedFalse(any(), any()))
-            .thenReturn(Optional.of(Classroom.builder().id(1).build()));
-        when(assignmentService.findBySubjectCommissionAndClassroomAndTimeSlot(any(), any(), any()))
-            .thenReturn(Optional.of(ClassroomAssignment.builder().id(1L).build()));
+        setupAllCareerMocksAsExisting();
+        setupBuildingAndClassroom();
+        setupAllocationMocks();
 
         ImportResultDto result = service.importExcel(file);
 

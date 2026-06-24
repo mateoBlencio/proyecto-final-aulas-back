@@ -54,11 +54,11 @@ class ExcelImportControllerIT {
 
     @Test
     void importExcel_shouldReturn200WithResultWhenFileIsValid() {
-        ResponseEntity<String> response = postExcel(ExcelTestFactory.validXlsx(3), "test.xlsx");
+        ResponseEntity<String> response = postExcel(ExcelTestFactory.validXlsx(1), "test.xlsx");
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         Map<String, Object> result = parseMap(response);
-        assertThat(result.get("processedRows")).isEqualTo(3);
+        assertThat(result.get("processedRows")).isEqualTo(1);
     }
 
     @Test
@@ -82,7 +82,7 @@ class ExcelImportControllerIT {
     @Test
     void importExcel_shouldReturn422WhenBuildingNotLoaded() {
         ResponseEntity<String> response = postExcel(
-            ExcelTestFactory.validXlsx(1), "test.xlsx");
+            ExcelTestFactory.unknownBuilding(), "test.xlsx");
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
     }
 

@@ -29,7 +29,7 @@ public class Specialty {
     @Column(name = "codigo_especialidad", unique = true, nullable = false)
     private Integer specialtyCode;
 
-    @Column(name = "nombre", nullable = false)
+    @Column(name = "nombre")
     private String name;
 
     @Column(name = "eliminado")

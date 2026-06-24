@@ -6,7 +6,8 @@ import ar.edu.utn.frc.classroom_allocation.career.model.Subject;
 import ar.edu.utn.frc.classroom_allocation.course.model.AcademicPeriod;
 import ar.edu.utn.frc.classroom_allocation.course.model.Commission;
 import ar.edu.utn.frc.classroom_allocation.course.model.SubjectCommission;
-import ar.edu.utn.frc.classroom_allocation.schedule.model.TimeSlot;
+import ar.edu.utn.frc.classroom_allocation.space.model.Building;
+import ar.edu.utn.frc.classroom_allocation.space.model.Classroom;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -19,11 +20,8 @@ class ImportCache {
     private final Map<String, AcademicPeriod> periods = new HashMap<>();
     private final Map<String, Commission> commissions = new HashMap<>();
     private final Map<String, SubjectCommission> subjectCommissions = new HashMap<>();
-    private final Map<String, TimeSlot> timeSlots = new HashMap<>();
-
-    <T> T getOrFetch(Map<String, T> cache, String key, Supplier<T> loader) {
-        return cache.computeIfAbsent(key, k -> loader.get());
-    }
+    private final Map<String, Building> buildings = new HashMap<>();
+    private final Map<String, Classroom> classrooms = new HashMap<>();
 
     Specialty getSpecialty(Integer code, Supplier<Specialty> loader) {
         return specialties.computeIfAbsent(code, k -> loader.get());
@@ -49,7 +47,11 @@ class ImportCache {
         return subjectCommissions.computeIfAbsent(key, k -> loader.get());
     }
 
-    TimeSlot getTimeSlot(String key, Supplier<TimeSlot> loader) {
-        return timeSlots.computeIfAbsent(key, k -> loader.get());
+    Building getBuilding(String key, Supplier<Building> loader) {
+        return buildings.computeIfAbsent(key, k -> loader.get());
+    }
+
+    Classroom getClassroom(String key, Supplier<Classroom> loader) {
+        return classrooms.computeIfAbsent(key, k -> loader.get());
     }
 }

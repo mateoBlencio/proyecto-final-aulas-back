@@ -48,11 +48,11 @@ public class SubjectCommission {
     @Column(name = "modalidad")
     private String modality;
 
-    @Column(name = "requiere_laboratorio")
+    @Column(name = "requiere_laboratorio", nullable = false)
     @Builder.Default
     private Boolean requiresLaboratory = false;
 
-    @Column(name = "permite_superposicion")
+    @Column(name = "permite_superposicion", nullable = false)
     @Builder.Default
     private Boolean allowsOverlap = false;
 

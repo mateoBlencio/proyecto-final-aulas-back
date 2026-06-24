@@ -4,6 +4,7 @@ import ar.edu.utn.frc.classroom_allocation.career.model.StudyPlan;
 import ar.edu.utn.frc.classroom_allocation.career.model.Subject;
 import ar.edu.utn.frc.classroom_allocation.career.repository.SubjectRepository;
 import ar.edu.utn.frc.classroom_allocation.career.service.SubjectService;
+import ar.edu.utn.frc.classroom_allocation.common.dto.FindOrCreateResult;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,5 +32,24 @@ public class SubjectServiceImpl implements SubjectService {
         Subject saved = subjectRepository.save(subject);
         log.info("Subject saved: id={}", saved.getId());
         return saved;
+    }
+
+    @Override
+    @Transactional
+    public FindOrCreateResult<Subject> findOrCreate(Integer code, String name, StudyPlan studyPlan, String term) {
+        return subjectRepository.findByCodeAndStudyPlanAndDeletedFalse(code, studyPlan)
+            .map(found -> new FindOrCreateResult<>(found, false))
+            .orElseGet(() -> {
+                log.info("Creando Subject: code={}, plan={}", code, studyPlan.getId());
+                Subject created = subjectRepository.save(
+                    Subject.builder()
+                        .code(code)
+                        .name(name)
+                        .studyPlan(studyPlan)
+                        .term(term)
+                        .build()
+                );
+                return new FindOrCreateResult<>(created, true);
+            });
     }
 }

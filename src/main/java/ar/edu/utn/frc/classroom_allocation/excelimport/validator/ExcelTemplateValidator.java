@@ -5,10 +5,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
+import java.time.Year;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.EmptyFileException;
 import org.apache.poi.openxml4j.exceptions.NotOfficeXmlFileException;
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -105,6 +109,15 @@ public class ExcelTemplateValidator {
         }
 
         return workbook;
+    }
+
+    public int extractYear(Sheet sheet) {
+        Row row = sheet.getRow(3);
+        if (row == null) return Year.now().getValue();
+        Cell cell = row.getCell(0);
+        if (cell == null || cell.getCellType() != CellType.STRING) return Year.now().getValue();
+        Matcher m = Pattern.compile("Año=(\\d{4})").matcher(cell.getStringCellValue());
+        return m.find() ? Integer.parseInt(m.group(1)) : Year.now().getValue();
     }
 
     private boolean isRowEmpty(Row row) {

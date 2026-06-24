@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.classroom_allocation.course.service.impl;
 
+import ar.edu.utn.frc.classroom_allocation.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.classroom_allocation.course.model.AcademicPeriod;
 import ar.edu.utn.frc.classroom_allocation.course.model.Commission;
 import ar.edu.utn.frc.classroom_allocation.course.repository.CommissionRepository;
@@ -35,5 +36,27 @@ public class CommissionServiceImpl implements CommissionService {
         Commission saved = commissionRepository.save(commission);
         log.info("Commission saved: id={}", saved.getId());
         return saved;
+    }
+
+    @Override
+    @Transactional
+    public FindOrCreateResult<Commission> findOrCreate(String courseCode, Integer commissionNumber,
+            Integer yearLevel, AcademicPeriod period) {
+        return commissionRepository.findByCourseCodeAndCommissionNumberAndAcademicPeriodAndDeletedFalse(
+                courseCode, commissionNumber, period)
+            .map(found -> new FindOrCreateResult<>(found, false))
+            .orElseGet(() -> {
+                log.info("Creando Commission: course={}, commission={}, period={}",
+                    courseCode, commissionNumber, period.getId());
+                Commission created = commissionRepository.save(
+                    Commission.builder()
+                        .courseCode(courseCode)
+                        .commissionNumber(commissionNumber)
+                        .yearLevel(yearLevel)
+                        .academicPeriod(period)
+                        .build()
+                );
+                return new FindOrCreateResult<>(created, true);
+            });
     }
 }

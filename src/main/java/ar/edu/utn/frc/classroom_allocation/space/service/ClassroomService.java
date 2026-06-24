@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.classroom_allocation.space.service;
 
+import ar.edu.utn.frc.classroom_allocation.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.classroom_allocation.space.dto.ClassroomFilter;
 import ar.edu.utn.frc.classroom_allocation.space.dto.request.ClassroomRequestDTO;
 import ar.edu.utn.frc.classroom_allocation.space.dto.response.ClassroomResponseDTO;
@@ -21,4 +22,6 @@ public interface ClassroomService {
     ClassroomResponseDTO update(Integer id, ClassroomRequestDTO dto);
 
     void delete(Integer id);
+
+    FindOrCreateResult<Classroom> findOrCreate(String roomNumber, Building building, Integer enrolledCount);
 }

@@ -41,7 +41,7 @@ public class AcademicPeriod {
     @Column(name = "fecha_fin")
     private LocalDate endDate;
 
-    @Column(name = "activo")
+    @Column(name = "activo", nullable = false)
     @Builder.Default
     private Boolean active = true;
 }

@@ -70,6 +70,17 @@ public class ExcelTestFactory {
         return toBytes(wb);
     }
 
+    public static byte[] unknownBuilding() {
+        XSSFWorkbook wb = new XSSFWorkbook();
+        Sheet sheet = wb.createSheet("Hoja1");
+        createAñoRow(sheet);
+        createHeaderRow(sheet);
+        Row row = sheet.createRow(6);
+        createValidDataRow(row, "1C1", 10, 513, "Edificio Inexistente",
+            "Jueves", "1 Cuat.", 800, 1540, 90, 31, 2023, 104, "Materia", 30);
+        return toBytes(wb);
+    }
+
     public static byte[] noDataRows() {
         XSSFWorkbook wb = new XSSFWorkbook();
         Sheet sheet = wb.createSheet("Hoja1");

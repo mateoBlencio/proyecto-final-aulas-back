@@ -1,39 +1,35 @@
 package ar.edu.utn.frc.classroom_allocation.excelimport.service.impl;
 
+import ar.edu.utn.frc.classroom_allocation.allocation.dto.request.AllocateFromDateRequestDto;
+import ar.edu.utn.frc.classroom_allocation.allocation.dto.request.CreateRecurringEventRequestDto;
+import ar.edu.utn.frc.classroom_allocation.allocation.service.AcademicEventService;
+import ar.edu.utn.frc.classroom_allocation.allocation.service.AllocationService;
 import ar.edu.utn.frc.classroom_allocation.career.model.Specialty;
 import ar.edu.utn.frc.classroom_allocation.career.model.StudyPlan;
 import ar.edu.utn.frc.classroom_allocation.career.model.Subject;
 import ar.edu.utn.frc.classroom_allocation.career.service.SpecialtyService;
 import ar.edu.utn.frc.classroom_allocation.career.service.StudyPlanService;
 import ar.edu.utn.frc.classroom_allocation.career.service.SubjectService;
-import ar.edu.utn.frc.classroom_allocation.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.classroom_allocation.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.classroom_allocation.course.model.AcademicPeriod;
 import ar.edu.utn.frc.classroom_allocation.course.model.Commission;
 import ar.edu.utn.frc.classroom_allocation.course.model.SubjectCommission;
+import ar.edu.utn.frc.classroom_allocation.course.model.TermType;
 import ar.edu.utn.frc.classroom_allocation.course.service.AcademicPeriodService;
 import ar.edu.utn.frc.classroom_allocation.course.service.CommissionService;
 import ar.edu.utn.frc.classroom_allocation.course.service.SubjectCommissionService;
 import ar.edu.utn.frc.classroom_allocation.excelimport.dto.ExcelRowDto;
 import ar.edu.utn.frc.classroom_allocation.excelimport.dto.ImportResultDto;
 import ar.edu.utn.frc.classroom_allocation.excelimport.exception.ExcelImportException;
-import ar.edu.utn.frc.classroom_allocation.excelimport.service.ExcelImportService;
 import ar.edu.utn.frc.classroom_allocation.excelimport.mapper.ExcelRowMapper;
+import ar.edu.utn.frc.classroom_allocation.excelimport.service.ExcelImportService;
 import ar.edu.utn.frc.classroom_allocation.excelimport.validator.ExcelTemplateValidator;
-import ar.edu.utn.frc.classroom_allocation.schedule.model.ClassroomAssignment;
-import ar.edu.utn.frc.classroom_allocation.schedule.model.TimeSlot;
-import ar.edu.utn.frc.classroom_allocation.schedule.service.ClassroomAssignmentService;
-import ar.edu.utn.frc.classroom_allocation.schedule.service.TimeSlotService;
 import ar.edu.utn.frc.classroom_allocation.space.model.Building;
 import ar.edu.utn.frc.classroom_allocation.space.model.Classroom;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.Year;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import ar.edu.utn.frc.classroom_allocation.space.service.BuildingService;
 import ar.edu.utn.frc.classroom_allocation.space.service.ClassroomService;
+import java.time.LocalDate;
+import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
@@ -58,10 +54,10 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     private final AcademicPeriodService academicPeriodService;
     private final CommissionService commissionService;
     private final SubjectCommissionService subjectCommissionService;
-    private final TimeSlotService timeSlotService;
-    private final ClassroomAssignmentService assignmentService;
-    private final ClassroomService classroomService;
+    private final AcademicEventService academicEventService;
+    private final AllocationService allocationService;
     private final BuildingService buildingService;
+    private final ClassroomService classroomService;
 
     @Override
     @Transactional
@@ -71,7 +67,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         Workbook workbook = validator.validate(file);
         Sheet sheet = workbook.getSheet("Hoja1");
 
-        int year = extractYear(sheet);
+        int year = validator.extractYear(sheet);
         ImportCache cache = new ImportCache();
 
         int processedRows = 0;
@@ -82,312 +78,112 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
         for (int rowIndex = 6; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
             Row row = sheet.getRow(rowIndex);
-            if (isRowEmpty(row)) {
-                break;
-            }
+            if (isRowEmpty(row)) break;
 
             int rowNum = rowIndex + 1;
             ExcelRowDto dto = rowMapper.map(row, rowNum);
 
-            Specialty specialty = getOrCreateSpecialty(dto.specialtyCode(), cache,
-                entitiesCreated, entitiesReused);
-            StudyPlan studyPlan = getOrCreateStudyPlan(dto.studyPlanCode(), specialty, cache,
-                entitiesCreated, entitiesReused);
-            Subject subject = getOrCreateSubject(dto.subjectCode(), dto.subjectName(),
-                studyPlan, dto.termType(), cache, entitiesCreated, entitiesReused);
+            TermType termType = TermType.fromLabel(dto.termType())
+                .orElseThrow(() -> new ExcelImportException(
+                    "Unknown term type: '" + dto.termType() + "', row " + rowNum));
+            LocalDate startDate = termType.startDate(year);
+            LocalDate endDate = termType.endDate(year);
 
-            Integer semester = parseTermType(dto.termType(), rowNum);
-            AcademicPeriod period = getOrCreateAcademicPeriod(year, semester, cache,
-                entitiesCreated, entitiesReused);
+            Specialty specialty = cache.getSpecialty(dto.specialtyCode(), () -> {
+                FindOrCreateResult<Specialty> r = specialtyService.findOrCreate(dto.specialtyCode());
+                count(r, entitiesCreated, entitiesReused);
+                return r.entity();
+            });
+
+            StudyPlan studyPlan = cache.getStudyPlan(dto.studyPlanCode() + "-" + specialty.getId(), () -> {
+                FindOrCreateResult<StudyPlan> r = studyPlanService.findOrCreate(dto.studyPlanCode(), specialty);
+                count(r, entitiesCreated, entitiesReused);
+                return r.entity();
+            });
+
+            Subject subject = cache.getSubject(dto.subjectCode() + "-" + studyPlan.getId(), () -> {
+                FindOrCreateResult<Subject> r = subjectService.findOrCreate(
+                    dto.subjectCode(), dto.subjectName(), studyPlan, dto.termType());
+                count(r, entitiesCreated, entitiesReused);
+                return r.entity();
+            });
+
+            AcademicPeriod period = cache.getPeriod(year + "-" + termType.getSemester(), () -> {
+                FindOrCreateResult<AcademicPeriod> r = academicPeriodService.findOrCreate(year, termType);
+                count(r, entitiesCreated, entitiesReused);
+                return r.entity();
+            });
 
             int yearLevel = Character.getNumericValue(dto.courseCode().charAt(0));
-            Commission commission = getOrCreateCommission(dto.courseCode(),
-                dto.commissionNumber(), yearLevel, period, cache,
-                entitiesCreated, entitiesReused);
+            Commission commission = cache.getCommission(
+                dto.courseCode() + "-" + dto.commissionNumber() + "-" + period.getId(), () -> {
+                    FindOrCreateResult<Commission> r = commissionService.findOrCreate(
+                        dto.courseCode(), dto.commissionNumber(), yearLevel, period);
+                    count(r, entitiesCreated, entitiesReused);
+                    return r.entity();
+                });
 
-            SubjectCommission subjectCommission = getOrCreateSubjectCommission(
-                subject, commission, dto.enrolledCount(), cache,
-                entitiesCreated, entitiesReused);
+            cache.getSubjectCommission(subject.getId() + "-" + commission.getId(), () -> {
+                FindOrCreateResult<SubjectCommission> r = subjectCommissionService.findOrCreate(
+                    subject, commission, dto.enrolledCount());
+                count(r, entitiesCreated, entitiesReused);
+                return r.entity();
+            });
 
-            LocalTime startTime = parseHHMM(dto.startTime());
-            LocalTime endTime = parseHHMM(dto.endTime());
-            TimeSlot timeSlot = getOrCreateTimeSlot(dto.dayOfWeek(),
-                startTime, endTime, dto.durationMinutes(), cache,
-                entitiesCreated, entitiesReused);
+            Building building = cache.getBuilding(dto.buildingName(), () -> {
+                FindOrCreateResult<Building> r = buildingService.findOrCreate(dto.buildingName());
+                count(r, entitiesCreated, entitiesReused);
+                return r.entity();
+            });
 
-            Building building;
-            try {
-                building = buildingService.findByName(dto.buildingName());
-            } catch (ResourceNotFoundException e) {
-                throw new ExcelImportException("Row " + rowNum + ": " + e.getMessage(), e);
-            }
+            Classroom classroom = cache.getClassroom(dto.roomNumber() + "-" + building.getId(), () -> {
+                FindOrCreateResult<Classroom> r = classroomService.findOrCreate(
+                    dto.roomNumber(), building, dto.enrolledCount());
+                count(r, entitiesCreated, entitiesReused);
+                return r.entity();
+            });
 
-            Classroom classroom;
-            try {
-                classroom = classroomService.findByRoomNumberAndBuilding(dto.roomNumber(), building);
-            } catch (ResourceNotFoundException e) {
-                throw new ExcelImportException("Row " + rowNum + ": " + e.getMessage(), e);
-            }
+            int durationMinutes = dto.durationMinutes() != null
+                ? dto.durationMinutes()
+                : (int) java.time.Duration.between(dto.startTime(), dto.endTime()).toMinutes();
 
-            ClassroomAssignment assignment = getOrCreateAssignment(
-                subjectCommission, classroom, timeSlot);
-            if (assignment == null) {
-                log.info("Creating ClassroomAssignment: sc={}, classroom={}, timeSlot={}",
-                    subjectCommission.getId(), classroom.getId(), timeSlot.getId());
-                assignmentService.save(
-                    ClassroomAssignment.builder()
-                        .subjectCommission(subjectCommission)
-                        .classroom(classroom)
-                        .timeSlot(timeSlot)
-                        .assignmentType("EXCEL")
-                        .status("ACTIVA")
-                        .createdAt(LocalDateTime.now())
-                        .build()
-                );
-                assignmentsCreated++;
-            } else {
-                assignmentsReused++;
-            }
+            var event = academicEventService.createRecurringEvent(
+                new CreateRecurringEventRequestDto(
+                    dto.enrolledCount(),
+                    dto.startTime(),
+                    durationMinutes,
+                    dto.dayOfWeek(),
+                    startDate,
+                    endDate,
+                    subject.getName(),
+                    String.valueOf(commission.getCommissionNumber())
+                )
+            );
 
+            allocationService.assignFromDate(
+                new AllocateFromDateRequestDto(
+                    event.getId(),
+                    startDate,
+                    classroom.getId(),
+                    "Importado de Excel"
+                )
+            );
+
+            assignmentsCreated++;
             processedRows++;
             log.info("Row {}: subject={}, commission={}, classroom={}",
                 rowNum, subject.getName(), commission.getCommissionNumber(), dto.roomNumber());
         }
 
-        log.info("Import completed: {} rows, {} assignments created, {} reused",
-            processedRows, assignmentsCreated, assignmentsReused);
+        log.info("Import completed: {} rows, {} events created", processedRows, assignmentsCreated);
 
         return new ImportResultDto(processedRows, assignmentsCreated,
             assignmentsReused, entitiesCreated.get(), entitiesReused.get());
     }
 
-    private Specialty getOrCreateSpecialty(Integer codigo, ImportCache cache,
-                                            AtomicInteger created, AtomicInteger reused) {
-        return cache.getSpecialty(codigo, () -> {
-            log.debug("Cache miss for Specialty: {}", codigo);
-            return specialtyService.findBySpecialtyCodeAndDeletedFalse(codigo)
-                .map(found -> {
-                    log.debug("Reusando Specialty: id={}", found.getId());
-                    reused.incrementAndGet();
-                    return found;
-                })
-                .orElseGet(() -> {
-                    log.warn("Creando Specialty con nombre provisional: codigo={}", codigo);
-                    created.incrementAndGet();
-                    return specialtyService.save(
-                        Specialty.builder()
-                            .specialtyCode(codigo)
-                            .name(String.valueOf(codigo))
-                            .build()
-                    );
-                });
-        });
-    }
-
-    private StudyPlan getOrCreateStudyPlan(Integer planCode, Specialty specialty,
-                                             ImportCache cache,
-                                             AtomicInteger created, AtomicInteger reused) {
-        String key = planCode + "-" + specialty.getId();
-        return cache.getStudyPlan(key, () -> {
-            log.debug("Cache miss for StudyPlan: {}", key);
-            return studyPlanService
-                .findByPlanCodeAndSpecialtyAndDeletedFalse(planCode, specialty)
-                .map(found -> {
-                    log.debug("Reusando StudyPlan: id={}", found.getId());
-                    reused.incrementAndGet();
-                    return found;
-                })
-                .orElseGet(() -> {
-                    log.info("Creando StudyPlan: code={}, specialty={}",
-                        planCode, specialty.getId());
-                    created.incrementAndGet();
-                    return studyPlanService.save(
-                        StudyPlan.builder()
-                            .planCode(planCode)
-                            .specialty(specialty)
-                            .build()
-                    );
-                });
-        });
-    }
-
-    private Subject getOrCreateSubject(Integer code, String name,
-                                        StudyPlan studyPlan, String term,
-                                        ImportCache cache,
-                                        AtomicInteger created, AtomicInteger reused) {
-        String key = code + "-" + studyPlan.getId();
-        return cache.getSubject(key, () -> {
-            log.debug("Cache miss for Subject: {}", key);
-            return subjectService.findByCodeAndStudyPlanAndDeletedFalse(code, studyPlan)
-                .map(found -> {
-                    log.debug("Reusando Subject: id={}", found.getId());
-                    reused.incrementAndGet();
-                    return found;
-                })
-                .orElseGet(() -> {
-                    log.info("Creando Subject: code={}, plan={}", code, studyPlan.getId());
-                    created.incrementAndGet();
-                    return subjectService.save(
-                        Subject.builder()
-                            .code(code)
-                            .name(name)
-                            .studyPlan(studyPlan)
-                            .term(term)
-                            .build()
-                    );
-                });
-        });
-    }
-
-    private AcademicPeriod getOrCreateAcademicPeriod(Integer year, Integer semester,
-                                                       ImportCache cache,
-                                                       AtomicInteger created,
-                                                       AtomicInteger reused) {
-        String key = year + "-" + semester;
-        return cache.getPeriod(key, () -> {
-            log.debug("Cache miss for AcademicPeriod: {}", key);
-            return academicPeriodService.findByYearAndSemester(year, semester)
-                .map(found -> {
-                    log.debug("Reusando AcademicPeriod: id={}", found.getId());
-                    reused.incrementAndGet();
-                    return found;
-                })
-                .orElseGet(() -> {
-                    log.info("Creando AcademicPeriod: year={}, semester={}",
-                        year, semester);
-                    created.incrementAndGet();
-                    return academicPeriodService.save(
-                        AcademicPeriod.builder()
-                            .year(year)
-                            .semester(semester)
-                            .build()
-                    );
-                });
-        });
-    }
-
-    private Commission getOrCreateCommission(String courseCode, Integer commissionNumber,
-                                              Integer yearLevel, AcademicPeriod period,
-                                              ImportCache cache,
-                                              AtomicInteger created, AtomicInteger reused) {
-        String key = courseCode + "-" + commissionNumber + "-" + period.getId();
-        return cache.getCommission(key, () -> {
-            log.debug("Cache miss for Commission: {}", key);
-            return commissionService
-                .findByCourseCodeAndCommissionNumberAndPeriodAndDeletedFalse(
-                    courseCode, commissionNumber, period)
-                .map(found -> {
-                    log.debug("Reusando Commission: id={}", found.getId());
-                    reused.incrementAndGet();
-                    return found;
-                })
-                .orElseGet(() -> {
-                    log.info("Creando Commission: course={}, commission={}, period={}",
-                        courseCode, commissionNumber, period.getId());
-                    created.incrementAndGet();
-                    return commissionService.save(
-                        Commission.builder()
-                                .courseCode(courseCode)
-                                .commissionNumber(commissionNumber)
-                                .yearLevel(yearLevel)
-                                .academicPeriod(period)
-                                .build()
-                    );
-                });
-        });
-    }
-
-    private SubjectCommission getOrCreateSubjectCommission(Subject subject, Commission commission,
-                                                            Integer enrolledCount,
-                                                            ImportCache cache,
-                                                            AtomicInteger created,
-                                                            AtomicInteger reused) {
-        String key = subject.getId() + "-" + commission.getId();
-        return cache.getSubjectCommission(key, () -> {
-            log.debug("Cache miss for SubjectCommission: {}", key);
-            return subjectCommissionService
-                .findBySubjectAndCommissionAndDeletedFalse(subject, commission)
-                .map(found -> {
-                    log.debug("Reusando SubjectCommission: id={}", found.getId());
-                    reused.incrementAndGet();
-                    return found;
-                })
-                .orElseGet(() -> {
-                    log.info("Creando SubjectCommission: subject={}, commission={}",
-                        subject.getId(), commission.getId());
-                    created.incrementAndGet();
-                    return subjectCommissionService.save(
-                        SubjectCommission.builder()
-                            .subject(subject)
-                            .commission(commission)
-                            .enrolledCount(enrolledCount)
-                            .build()
-                    );
-                });
-        });
-    }
-
-    private TimeSlot getOrCreateTimeSlot(String dayOfWeek, LocalTime startTime,
-                                          LocalTime endTime, Integer durationMinutes,
-                                          ImportCache cache,
-                                          AtomicInteger created, AtomicInteger reused) {
-        String key = dayOfWeek + "-" + startTime + "-" + endTime;
-        return cache.getTimeSlot(key, () -> {
-            log.debug("Cache miss for TimeSlot: {}", key);
-            return timeSlotService
-                .findByDayOfWeekAndStartTimeAndEndTime(dayOfWeek, startTime, endTime)
-                .map(found -> {
-                    log.debug("Reusando TimeSlot: id={}", found.getId());
-                    reused.incrementAndGet();
-                    return found;
-                })
-                .orElseGet(() -> {
-                    log.info("Creando TimeSlot: day={}, start={}, end={}",
-                        dayOfWeek, startTime, endTime);
-                    created.incrementAndGet();
-                    return timeSlotService.save(
-                        TimeSlot.builder()
-                            .dayOfWeek(dayOfWeek)
-                            .startTime(startTime)
-                            .endTime(endTime)
-                            .durationMinutes(durationMinutes)
-                            .build()
-                    );
-                });
-        });
-    }
-
-    private ClassroomAssignment getOrCreateAssignment(SubjectCommission sc,
-                                                       Classroom classroom,
-                                                       TimeSlot slot) {
-        return assignmentService
-            .findBySubjectCommissionAndClassroomAndTimeSlot(sc, classroom, slot)
-            .orElse(null);
-    }
-
-    private Integer parseTermType(String termType, int rowNum) {
-        return switch (termType) {
-            case "Anual" -> 0;
-            case "1 Cuat." -> 1;
-            case "2 Cuat." -> 2;
-            default -> throw new ExcelImportException(
-                "Unknown term type: '" + termType + "', row " + rowNum);
-        };
-    }
-
-    private LocalTime parseHHMM(int hhmm) {
-        int hh = hhmm / 100;
-        int mm = hhmm % 100;
-        return LocalTime.of(hh, mm);
-    }
-
-    private int extractYear(Sheet sheet) {
-        Row row = sheet.getRow(3);
-        if (row == null) return Year.now().getValue();
-        Cell cell = row.getCell(0);
-        if (cell == null || cell.getCellType() != CellType.STRING) return Year.now().getValue();
-        Matcher m = Pattern.compile("Año=(\\d{4})").matcher(cell.getStringCellValue());
-        return m.find() ? Integer.parseInt(m.group(1)) : Year.now().getValue();
+    private <T> void count(FindOrCreateResult<T> result, AtomicInteger created, AtomicInteger reused) {
+        if (result.created()) created.incrementAndGet();
+        else reused.incrementAndGet();
     }
 
     private boolean isRowEmpty(Row row) {

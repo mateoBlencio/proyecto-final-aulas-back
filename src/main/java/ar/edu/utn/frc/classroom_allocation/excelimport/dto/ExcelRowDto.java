@@ -1,14 +1,17 @@
 package ar.edu.utn.frc.classroom_allocation.excelimport.dto;
 
+import java.time.DayOfWeek;
+import java.time.LocalTime;
+
 public record ExcelRowDto(
     String courseCode,
     Integer commissionNumber,
     String roomNumber,
     String buildingName,
-    String dayOfWeek,
+    DayOfWeek dayOfWeek,
     String termType,
-    Integer startTime,
-    Integer endTime,
+    LocalTime startTime,
+    LocalTime endTime,
     Integer durationMinutes,
     Integer specialtyCode,
     Integer studyPlanCode,

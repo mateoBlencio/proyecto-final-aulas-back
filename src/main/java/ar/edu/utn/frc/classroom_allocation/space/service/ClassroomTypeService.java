@@ -6,4 +6,6 @@ public interface ClassroomTypeService {
 
     ClassroomType findById(Integer id);
 
+    ClassroomType findDefault();
+
 }

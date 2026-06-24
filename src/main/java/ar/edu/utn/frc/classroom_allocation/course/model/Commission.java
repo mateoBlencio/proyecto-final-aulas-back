@@ -1,13 +1,6 @@
 package ar.edu.utn.frc.classroom_allocation.course.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -15,7 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "comision")
+@Table(name = "comision", uniqueConstraints = @UniqueConstraint(columnNames = {"id_periodo", "codigo_curso", "numero_comision"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -31,7 +24,7 @@ public class Commission {
     @Column(name = "codigo_curso", nullable = false)
     private String courseCode;
 
-    @Column(name = "numero_comision", nullable = false)
+    @Column(name = "numero_comision")
     private Integer commissionNumber;
 
     @Column(name = "anio_nivel")
