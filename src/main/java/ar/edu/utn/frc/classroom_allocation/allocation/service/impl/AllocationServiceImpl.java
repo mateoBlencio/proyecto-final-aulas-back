@@ -21,6 +21,7 @@ import ar.edu.utn.frc.classroom_allocation.space.model.Classroom;
 import ar.edu.utn.frc.classroom_allocation.space.repository.ClassroomRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -109,7 +110,7 @@ public class AllocationServiceImpl implements AllocationService {
         AcademicEvent event = eventRepository.findById(dto.recurringEventId())
                 .orElseThrow(() -> new AcademicEventNotFoundException(dto.recurringEventId()));
 
-        if (!(event instanceof RecurringEvent)) {
+        if (!(Hibernate.unproxy(event) instanceof RecurringEvent)) {
             throw new AllocationDomainException("assignFromDate is only supported for recurring events");
         }
 

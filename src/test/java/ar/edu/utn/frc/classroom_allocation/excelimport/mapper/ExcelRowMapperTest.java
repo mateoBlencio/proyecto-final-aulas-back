@@ -13,6 +13,9 @@ import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
+import java.time.DayOfWeek;
+import java.time.LocalTime;
+
 class ExcelRowMapperTest {
 
     private ExcelRowMapper mapper;
@@ -52,10 +55,10 @@ class ExcelRowMapperTest {
             () -> assertEquals(10, dto.commissionNumber()),
             () -> assertEquals("513", dto.roomNumber()),
             () -> assertEquals("Edif. Dr. Gallardo", dto.buildingName()),
-            () -> assertEquals("Jueves", dto.dayOfWeek()),
+            () -> assertEquals(DayOfWeek.THURSDAY, dto.dayOfWeek()),
             () -> assertEquals("1 Cuat.", dto.termType()),
-            () -> assertEquals(800, dto.startTime()),
-            () -> assertEquals(1540, dto.endTime()),
+            () -> assertEquals(LocalTime.of(8, 0), dto.startTime()),
+            () -> assertEquals(LocalTime.of(15, 40), dto.endTime()),
             () -> assertEquals(90, dto.durationMinutes()),
             () -> assertEquals(31, dto.specialtyCode()),
             () -> assertEquals(2023, dto.studyPlanCode()),
@@ -106,8 +109,8 @@ class ExcelRowMapperTest {
 
         ExcelRowDto dto = mapper.map(row, 7);
 
-        assertEquals(800, dto.startTime());
-        assertEquals(1720, dto.endTime());
+        assertEquals(LocalTime.of(8, 0), dto.startTime());
+        assertEquals(LocalTime.of(17, 20), dto.endTime());
     }
 
     @Test
@@ -343,7 +346,7 @@ class ExcelRowMapperTest {
 
         ExcelRowDto dto = mapper.map(row, 7);
 
-        assertEquals(800, dto.startTime());
+        assertEquals(LocalTime.of(8, 0), dto.startTime());
     }
 
     @Test
@@ -365,7 +368,7 @@ class ExcelRowMapperTest {
 
         ExcelRowDto dto = mapper.map(row, 7);
 
-        assertEquals(800, dto.startTime());
-        assertEquals(900, dto.endTime());
+        assertEquals(LocalTime.of(8, 0), dto.startTime());
+        assertEquals(LocalTime.of(9, 0), dto.endTime());
     }
 }

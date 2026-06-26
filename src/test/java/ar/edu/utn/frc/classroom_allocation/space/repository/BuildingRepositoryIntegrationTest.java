@@ -35,7 +35,7 @@ class BuildingRepositoryIntegrationTest {
 
     @Test
     void findByNameAndDeletedFalse_shouldReturnEmptyWhenBuildingIsDeleted() {
-        Optional<Building> result = buildingRepository.findByNameAndDeletedFalse("Possetto");
+        Optional<Building> result = buildingRepository.findByNameAndDeletedFalse("Anexo");
         assertThat(result).isEmpty();
     }
 }
