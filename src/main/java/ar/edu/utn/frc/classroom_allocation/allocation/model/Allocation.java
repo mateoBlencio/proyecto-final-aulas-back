@@ -23,7 +23,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "asignacion")
+@Table(name = "asignacion_aula")
 @Getter
 @Setter
 @Builder
@@ -47,12 +47,12 @@ public class Allocation {
     private Classroom classroom;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "asignado_por", nullable = false)
+    @Column(name = "tipo_asignacion", nullable = false)
     private AllocationSource source;
 
-    @Column(name = "creado_en", nullable = false)
+    @Column(name = "fecha_creacion", nullable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "observacion")
+    @Column(name = "observaciones")
     private String observation;
 }

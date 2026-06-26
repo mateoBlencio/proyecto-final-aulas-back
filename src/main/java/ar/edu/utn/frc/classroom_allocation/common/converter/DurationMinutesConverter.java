@@ -6,15 +6,15 @@ import jakarta.persistence.Converter;
 import java.time.Duration;
 
 @Converter(autoApply = true)
-public class DurationMinutesConverter implements AttributeConverter<Duration, Long> {
+public class DurationMinutesConverter implements AttributeConverter<Duration, Integer> {
 
     @Override
-    public Long convertToDatabaseColumn(Duration duration) {
-        return duration == null ? null : duration.toMinutes();
+    public Integer convertToDatabaseColumn(Duration duration) {
+        return duration == null ? null : (int) duration.toMinutes();
     }
 
     @Override
-    public Duration convertToEntityAttribute(Long minutes) {
+    public Duration convertToEntityAttribute(Integer minutes) {
         return minutes == null ? null : Duration.ofMinutes(minutes);
     }
 }
