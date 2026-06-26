@@ -47,7 +47,7 @@ public class Allocation {
     private Classroom classroom;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "asignado_por", nullable = false)
+    @Column(name = "fuente", nullable = false)
     private AllocationSource source;
 
     @Column(name = "creado_en", nullable = false)

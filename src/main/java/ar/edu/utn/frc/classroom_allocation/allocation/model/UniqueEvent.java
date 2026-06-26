@@ -17,7 +17,7 @@ import java.util.List;
 @DiscriminatorValue("UNIQUE")
 @Getter
 @SuperBuilder
-@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public final class UniqueEvent extends AcademicEvent {
 
     @Column(name = "fecha", nullable = false)
