@@ -28,8 +28,6 @@ public class EventMapper {
                     .dayOfWeek(dto.getDayOfWeek())
                     .startDate(dto.getStartDate())
                     .endDate(dto.getEndDate())
-                    .subject(dto.getSubject())
-                    .section(dto.getSection())
                     .build();
             case UNIQUE -> UniqueEvent.builder()
                     .planningId(dto.getId())

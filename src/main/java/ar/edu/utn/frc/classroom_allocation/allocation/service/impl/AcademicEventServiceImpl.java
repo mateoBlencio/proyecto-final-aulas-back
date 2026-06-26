@@ -13,6 +13,11 @@ import ar.edu.utn.frc.classroom_allocation.allocation.model.UniqueEvent;
 import ar.edu.utn.frc.classroom_allocation.allocation.repository.AcademicEventRepository;
 import ar.edu.utn.frc.classroom_allocation.allocation.repository.OccurrenceRepository;
 import ar.edu.utn.frc.classroom_allocation.allocation.service.AcademicEventService;
+import ar.edu.utn.frc.classroom_allocation.career.model.Subject;
+import ar.edu.utn.frc.classroom_allocation.career.repository.SubjectRepository;
+import ar.edu.utn.frc.classroom_allocation.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.classroom_allocation.course.model.Commission;
+import ar.edu.utn.frc.classroom_allocation.course.repository.CommissionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,6 +35,8 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     private final AcademicEventRepository eventRepository;
     private final OccurrenceRepository occurrenceRepository;
     private final AcademicEventMapper mapper;
+    private final SubjectRepository subjectRepository;
+    private final CommissionRepository commissionRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -59,8 +66,13 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     @Override
     @Transactional
     public AcademicEventResponseDto createRecurringEvent(CreateRecurringEventRequestDto dto) {
-        log.debug("Creating recurring event: subject={}, dayOfWeek={}, startDate={}",
-                dto.subject(), dto.dayOfWeek(), dto.startDate());
+        log.debug("Creating recurring event: subjectId={}, commissionId={}, dayOfWeek={}, startDate={}",
+                dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startDate());
+
+        Subject subject = subjectRepository.findById(dto.subjectId())
+                .orElseThrow(() -> new ResourceNotFoundException("Subject not found: " + dto.subjectId()));
+        Commission commission = commissionRepository.findById(dto.commissionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Commission not found: " + dto.commissionId()));
 
         RecurringEvent event = RecurringEvent.builder()
                 .enrolled(dto.enrolled())
@@ -69,8 +81,8 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 .dayOfWeek(dto.dayOfWeek())
                 .startDate(dto.startDate())
                 .endDate(dto.endDate())
-                .subject(dto.subject())
-                .section(dto.section())
+                .subject(subject)
+                .commission(commission)
                 .build();
 
         AcademicEvent saved = eventRepository.save(event);

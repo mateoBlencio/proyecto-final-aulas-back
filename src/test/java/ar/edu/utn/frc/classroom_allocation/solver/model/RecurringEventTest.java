@@ -20,7 +20,6 @@ class RecurringEventTest {
                 .duration(Duration.ofMinutes(90))
                 .dayOfWeek(dow)
                 .startDate(start).endDate(end)
-                .subject("X").section("1C1")
                 .build();
     }
 
@@ -73,7 +72,6 @@ class RecurringEventTest {
                 .dayOfWeek(DayOfWeek.MONDAY)
                 .startDate(LocalDate.of(2024, 3, 4))
                 .endDate(LocalDate.of(2024, 6, 27))
-                .subject("X").section("1C1")
                 .build();
         assertThat(ev.endTime()).isEqualTo(LocalTime.of(20, 30));
     }

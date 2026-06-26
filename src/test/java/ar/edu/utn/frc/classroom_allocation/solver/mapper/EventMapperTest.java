@@ -54,8 +54,6 @@ class EventMapperTest {
         assertThat(rec.getDayOfWeek()).isEqualTo(DayOfWeek.MONDAY);
         assertThat(rec.getStartDate()).isEqualTo(LocalDate.of(2024, 3, 4));
         assertThat(rec.getEndDate()).isEqualTo(LocalDate.of(2024, 6, 30));
-        assertThat(rec.getSubject()).isEqualTo("Física I");
-        assertThat(rec.getSection()).isEqualTo("1C1");
     }
 
     @Test

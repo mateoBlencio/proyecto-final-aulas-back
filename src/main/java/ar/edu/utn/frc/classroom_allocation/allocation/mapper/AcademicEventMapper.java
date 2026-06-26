@@ -18,12 +18,16 @@ public class AcademicEventMapper {
                 .durationMinutes(event.getDuration().toMinutes());
 
         if (event instanceof RecurringEvent r) {
+            var subject = r.getSubject();
+            var commission = r.getCommission();
             builder.type(EventType.RECURRING)
                     .dayOfWeek(r.getDayOfWeek())
                     .startDate(r.getStartDate())
                     .endDate(r.getEndDate())
-                    .subject(r.getSubject())
-                    .section(r.getSection());
+                    .subjectId(subject != null ? subject.getId() : null)
+                    .subjectName(subject != null ? subject.getName() : null)
+                    .commissionId(commission != null ? commission.getId() : null)
+                    .commissionCode(commission != null ? commission.getCourseCode() : null);
         } else if (event instanceof UniqueEvent u) {
             builder.type(EventType.UNIQUE_EVENT)
                     .date(u.getDate())

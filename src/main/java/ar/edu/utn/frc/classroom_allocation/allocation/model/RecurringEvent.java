@@ -1,11 +1,15 @@
 package ar.edu.utn.frc.classroom_allocation.allocation.model;
 
+import ar.edu.utn.frc.classroom_allocation.career.model.Subject;
+import ar.edu.utn.frc.classroom_allocation.course.model.Commission;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -35,11 +39,13 @@ public class RecurringEvent extends AcademicEvent {
     @Column(name = "fecha_fin")
     private LocalDate endDate;
 
-    @Column(name = "materia")
-    private String subject;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_materia")
+    private Subject subject;
 
-    @Column(name = "comision")
-    private String section;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_comision")
+    private Commission commission;
 
     @ElementCollection
     @CollectionTable(name = "evento_recurrente_fecha_excluida", joinColumns = @JoinColumn(name = "id_evento"))

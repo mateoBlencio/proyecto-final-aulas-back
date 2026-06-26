@@ -332,7 +332,7 @@ class ExcelImportServiceImplTest {
         service.importExcel(file);
 
         verify(academicEventService).createRecurringEvent(argThat(dto ->
-            "Ing Civil I".equals(dto.subject()) && "10".equals(dto.section())
+            dto.subjectId().equals(1L) && dto.commissionId().equals(1L)
         ));
     }
 

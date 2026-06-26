@@ -155,8 +155,8 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                     dto.dayOfWeek(),
                     startDate,
                     endDate,
-                    subject.getName(),
-                    String.valueOf(commission.getCommissionNumber())
+                    subject.getId(),
+                    commission.getId()
                 )
             );
 

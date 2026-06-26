@@ -14,6 +14,6 @@ public record CreateRecurringEventRequestDto(
         @NotNull DayOfWeek dayOfWeek,
         @NotNull LocalDate startDate,
         LocalDate endDate,
-        String subject,
-        String section
+        @NotNull Long subjectId,
+        @NotNull Long commissionId
 ) {}
