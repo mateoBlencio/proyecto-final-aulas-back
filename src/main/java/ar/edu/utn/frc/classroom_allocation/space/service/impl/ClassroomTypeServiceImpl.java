@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.classroom_allocation.space.service.impl;
 
-import ar.edu.utn.frc.classroom_allocation.space.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.classroom_allocation.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.classroom_allocation.space.model.ClassroomType;
 import ar.edu.utn.frc.classroom_allocation.space.repository.ClassroomTypeRepository;
 import ar.edu.utn.frc.classroom_allocation.space.service.ClassroomTypeService;
@@ -20,6 +20,16 @@ public class ClassroomTypeServiceImpl implements ClassroomTypeService {
     public ClassroomType findById(Integer id) {
         log.debug("Fetching classroom type: id={}", id);
         return findExistingById(id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ClassroomType findDefault() {
+        return classroomTypeRepository.findFirstByDeletedFalse()
+                .orElseThrow(() -> {
+                    log.warn("No ClassroomType found in database");
+                    return new ResourceNotFoundException("No ClassroomType found");
+                });
     }
 
     @Transactional(readOnly = true)

@@ -5,26 +5,33 @@ import ar.edu.utn.frc.classroom_allocation.allocation.model.AcademicEvent;
 import ar.edu.utn.frc.classroom_allocation.allocation.model.EventType;
 import ar.edu.utn.frc.classroom_allocation.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.classroom_allocation.allocation.model.UniqueEvent;
+import org.hibernate.Hibernate;
 import org.springframework.stereotype.Component;
 
 @Component
 public class AcademicEventMapper {
 
     public AcademicEventResponseDto toDto(AcademicEvent event) {
-        AcademicEventResponseDto.AcademicEventResponseDtoBuilder builder = AcademicEventResponseDto.builder()
-                .id(event.getId())
-                .enrolled(event.getEnrolled())
-                .startTime(event.getStartTime())
-                .durationMinutes(event.getDuration().toMinutes());
+        AcademicEvent realEvent = (AcademicEvent) Hibernate.unproxy(event);
 
-        if (event instanceof RecurringEvent r) {
+        AcademicEventResponseDto.AcademicEventResponseDtoBuilder builder = AcademicEventResponseDto.builder()
+                .id(realEvent.getId())
+                .enrolled(realEvent.getEnrolled())
+                .startTime(realEvent.getStartTime())
+                .durationMinutes(realEvent.getDuration().toMinutes());
+
+        if (realEvent instanceof RecurringEvent r) {
+            var subject = r.getSubject();
+            var commission = r.getCommission();
             builder.type(EventType.RECURRING)
                     .dayOfWeek(r.getDayOfWeek())
                     .startDate(r.getStartDate())
                     .endDate(r.getEndDate())
-                    .subject(r.getSubject())
-                    .section(r.getSection());
-        } else if (event instanceof UniqueEvent u) {
+                    .subjectId(subject != null ? subject.getId() : null)
+                    .subjectName(subject != null ? subject.getName() : null)
+                    .commissionId(commission != null ? commission.getId() : null)
+                    .commissionCode(commission != null ? commission.getCourseCode() : null);
+        } else if (realEvent instanceof UniqueEvent u) {
             builder.type(EventType.UNIQUE_EVENT)
                     .date(u.getDate())
                     .description(u.getDescription());

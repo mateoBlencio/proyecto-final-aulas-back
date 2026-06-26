@@ -4,7 +4,7 @@ import ar.edu.utn.frc.classroom_allocation.space.dto.ClassroomFilter;
 import ar.edu.utn.frc.classroom_allocation.space.dto.request.ClassroomRequestDTO;
 import ar.edu.utn.frc.classroom_allocation.space.dto.response.ClassroomResponseDTO;
 import ar.edu.utn.frc.classroom_allocation.common.exception.GlobalExceptionHandler;
-import ar.edu.utn.frc.classroom_allocation.space.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.classroom_allocation.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.classroom_allocation.space.exception.SpaceDomainException;
 import ar.edu.utn.frc.classroom_allocation.space.service.ClassroomService;
 import org.junit.jupiter.api.BeforeEach;

@@ -1,0 +1,31 @@
+# para ejecutar: SPRING_PROFILES_ACTIVE=compose ./mvnw spring-boot:run
+# despliega base de datos postgress en contenedor local
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/mydatabase
+    username: myuser
+    password: secret
+
+  docker:
+    compose:
+      enabled: true
+
+  sql:
+    init:
+      mode: always
+
+  jpa:
+    defer-datasource-initialization: true
+    hibernate:
+      ddl-auto: create
+    show-sql: true
+
+springdoc:
+  swagger-ui:
+    enabled: true
+  api-docs:
+    enabled: true
+
+logging:
+  level:
+    ar.edu.utn.frc.classroom_allocation: DEBUG

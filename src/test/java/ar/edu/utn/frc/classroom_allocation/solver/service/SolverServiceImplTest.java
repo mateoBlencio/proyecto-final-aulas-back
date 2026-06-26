@@ -120,7 +120,7 @@ class SolverServiceImplTest {
                                      LocalDate from, LocalDate to) {
         return RecurringEvent.builder().planningId(id).enrolled(30).startTime(start)
                 .duration(Duration.ofMinutes(dur)).dayOfWeek(dow)
-                .startDate(from).endDate(to).subject("X").section("1C1").build();
+                .startDate(from).endDate(to).build();
     }
 
     @Test

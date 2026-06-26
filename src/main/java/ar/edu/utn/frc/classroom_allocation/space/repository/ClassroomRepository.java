@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.classroom_allocation.space.repository;
 
+import ar.edu.utn.frc.classroom_allocation.space.model.Building;
 import ar.edu.utn.frc.classroom_allocation.space.model.Classroom;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,4 +14,5 @@ public interface ClassroomRepository extends JpaRepository<Classroom, Integer>, 
 
     Optional<Classroom> findByRoomNumberAndDeletedFalse(String roomNumber);
 
+    Optional<Classroom> findByRoomNumberAndBuildingAndDeletedFalse(String roomNumber, Building building);
 }

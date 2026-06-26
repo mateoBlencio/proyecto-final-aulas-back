@@ -1,6 +1,5 @@
-package ar.edu.utn.frc.classroom_allocation.space.exception;
+package ar.edu.utn.frc.classroom_allocation.common.exception;
 
-import ar.edu.utn.frc.classroom_allocation.common.exception.ClassroomAllocationAppException;
 import org.springframework.http.HttpStatus;
 
 public class ResourceNotFoundException extends ClassroomAllocationAppException {
