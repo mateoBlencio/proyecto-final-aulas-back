@@ -1,3 +1,5 @@
+# para ejecutar: SPRING_PROFILES_ACTIVE=compose ./mvnw spring-boot:run
+# despliega base de datos postgress en contenedor local
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/mydatabase
