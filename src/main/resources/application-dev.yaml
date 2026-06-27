@@ -22,6 +22,10 @@ management:
     health:
       show-details: always
 
+cors:
+  allowed-origins:
+    - http://localhost:5173
+
 logging:
   level:
     ar.edu.utn.frc.classroom_allocation: DEBUG

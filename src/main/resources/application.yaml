@@ -55,6 +55,9 @@ management:
     health:
       show-details: never
 
+cors:
+  allowed-origins: []
+
 logging:
   level:
     root: WARN

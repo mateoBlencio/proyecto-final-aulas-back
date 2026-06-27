@@ -5,6 +5,10 @@ spring:
       minimum-idle: 5
       connection-timeout: 20000
 
+cors:
+  allowed-origins:
+    - http://localhost:5173
+
 logging:
   level:
     root: ERROR
