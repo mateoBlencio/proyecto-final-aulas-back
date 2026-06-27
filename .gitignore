@@ -182,6 +182,9 @@ buildNumber.properties
 .DS_Store
 **/.DS_Store
 
+# Secrets
+.env
+
 # Mateo
 plans/
 AGENTS.md

@@ -13,8 +13,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Entity
-@Table(name = "evento_unico")
-@DiscriminatorValue("UNIQUE")
+@Table(name = "evento_unico_academico")
+@DiscriminatorValue("UNIQUE_EVENT")
 @Getter
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

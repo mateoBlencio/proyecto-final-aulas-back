@@ -38,7 +38,7 @@ public abstract class AcademicEvent {
     @Column(name = "id_evento_academico")
     protected Long id;
 
-    @Column(name = "inscritos", nullable = false)
+    @Column(name = "cantidad_inscriptos", nullable = false)
     protected Integer enrolled;
 
     @Column(name = "hora_inicio", nullable = false)

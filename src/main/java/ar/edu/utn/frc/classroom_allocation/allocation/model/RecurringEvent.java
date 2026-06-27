@@ -7,6 +7,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -30,6 +32,7 @@ import java.util.List;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RecurringEvent extends AcademicEvent {
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "dia_semana", nullable = false)
     private DayOfWeek dayOfWeek;
 
@@ -48,8 +51,8 @@ public class RecurringEvent extends AcademicEvent {
     private Commission commission;
 
     @ElementCollection
-    @CollectionTable(name = "evento_recurrente_fecha_excluida", joinColumns = @JoinColumn(name = "id_evento"))
-    @Column(name = "fecha_excluida")
+    @CollectionTable(name = "evento_recurrente_fecha_excluida", joinColumns = @JoinColumn(name = "id_evento_academico"))
+    @Column(name = "fecha")
     List<LocalDate> excludedDates;
 
     @Override

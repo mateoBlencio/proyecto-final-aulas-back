@@ -39,7 +39,7 @@ public class Allocation {
     private Long id;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_ocurrencia", nullable = false)
+    @JoinColumn(name = "id_ocurrencia")
     private Occurrence occurrence;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -47,7 +47,7 @@ public class Allocation {
     private Classroom classroom;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "fuente", nullable = false)
+    @Column(name = "origen", nullable = false)
     private AllocationSource source;
 
     @Column(name = "fecha_creacion", nullable = false)

@@ -1,0 +1,19 @@
+services:
+  backend-dev:
+    build: .
+    profiles: ["dev"]
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres_dev
+      DB_PORT: 5432
+      DB_NAME: database_dev
+      DB_USERNAME: back_user_dev
+      DB_PASSWORD: ${BACK_USER_DEV_PASSWORD}
+    ports:
+      - "8080:8080"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    external: true
