@@ -2,6 +2,7 @@ services:
   backend-dev:
     build: .
     profiles: ["dev"]
+    restart: always
     environment:
       SPRING_PROFILES_ACTIVE: dev
       DB_HOST: postgres_dev
@@ -17,6 +18,7 @@ services:
   backend-test:
     build: .
     profiles: ["test"]
+    restart: always
     environment:
       SPRING_PROFILES_ACTIVE: test
       DB_HOST: postgres_test
