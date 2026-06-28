@@ -12,9 +12,11 @@ import ar.edu.utn.frc.classroom_allocation.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.classroom_allocation.allocation.model.UniqueEvent;
 import ar.edu.utn.frc.classroom_allocation.allocation.repository.AcademicEventRepository;
 import ar.edu.utn.frc.classroom_allocation.allocation.repository.OccurrenceRepository;
+import ar.edu.utn.frc.classroom_allocation.allocation.repository.RecurringEventRepository;
 import ar.edu.utn.frc.classroom_allocation.allocation.service.AcademicEventService;
 import ar.edu.utn.frc.classroom_allocation.career.model.Subject;
 import ar.edu.utn.frc.classroom_allocation.career.repository.SubjectRepository;
+import ar.edu.utn.frc.classroom_allocation.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.classroom_allocation.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.classroom_allocation.course.model.Commission;
 import ar.edu.utn.frc.classroom_allocation.course.repository.CommissionRepository;
@@ -33,6 +35,7 @@ import java.util.stream.Collectors;
 public class AcademicEventServiceImpl implements AcademicEventService {
 
     private final AcademicEventRepository eventRepository;
+    private final RecurringEventRepository recurringEventRepository;
     private final OccurrenceRepository occurrenceRepository;
     private final AcademicEventMapper mapper;
     private final SubjectRepository subjectRepository;
@@ -100,6 +103,20 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
         log.info("Recurring event created: id={}, occurrences={}", saved.getId(), occurrences.size());
         return mapper.toDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public FindOrCreateResult<AcademicEventResponseDto> findOrCreateRecurringEvent(CreateRecurringEventRequestDto dto) {
+        return recurringEventRepository
+                .findBySubject_IdAndCommission_IdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
+                        dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startTime(),
+                        dto.startDate(), dto.endDate())
+                .map(existing -> {
+                    log.debug("Reusing existing recurring event: id={}", existing.getId());
+                    return new FindOrCreateResult<>(mapper.toDto(existing), false);
+                })
+                .orElseGet(() -> new FindOrCreateResult<>(createRecurringEvent(dto), true));
     }
 
     @Override

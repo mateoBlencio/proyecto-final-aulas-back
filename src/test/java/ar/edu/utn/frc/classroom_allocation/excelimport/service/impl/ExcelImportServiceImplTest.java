@@ -166,8 +166,9 @@ class ExcelImportServiceImplTest {
     }
 
     private void setupAllocationMocks() {
-        when(academicEventService.createRecurringEvent(any()))
-            .thenReturn(AcademicEventResponseDto.builder().id(1L).type(EventType.RECURRING).build());
+        when(academicEventService.findOrCreateRecurringEvent(any()))
+            .thenReturn(new FindOrCreateResult<>(
+                AcademicEventResponseDto.builder().id(1L).type(EventType.RECURRING).build(), true));
         when(allocationService.assignFromDate(any())).thenReturn(List.of());
     }
 
@@ -331,7 +332,7 @@ class ExcelImportServiceImplTest {
 
         service.importExcel(file);
 
-        verify(academicEventService).createRecurringEvent(argThat(dto ->
+        verify(academicEventService).findOrCreateRecurringEvent(argThat(dto ->
             dto.subjectId().equals(1L) && dto.commissionId().equals(1L)
         ));
     }
@@ -356,8 +357,9 @@ class ExcelImportServiceImplTest {
 
         setupAllCareerMocksAsExisting();
         setupBuildingAndClassroom();
-        when(academicEventService.createRecurringEvent(any()))
-            .thenReturn(AcademicEventResponseDto.builder().id(42L).type(EventType.RECURRING).build());
+        when(academicEventService.findOrCreateRecurringEvent(any()))
+            .thenReturn(new FindOrCreateResult<>(
+                AcademicEventResponseDto.builder().id(42L).type(EventType.RECURRING).build(), true));
         when(allocationService.assignFromDate(any())).thenReturn(List.of());
 
         ImportResultDto result = service.importExcel(file);

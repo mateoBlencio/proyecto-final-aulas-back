@@ -147,7 +147,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 ? dto.durationMinutes()
                 : (int) java.time.Duration.between(dto.startTime(), dto.endTime()).toMinutes();
 
-            var event = academicEventService.createRecurringEvent(
+            var eventResult = academicEventService.findOrCreateRecurringEvent(
                 new CreateRecurringEventRequestDto(
                     dto.enrolledCount(),
                     dto.startTime(),
@@ -162,14 +162,15 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
             allocationService.assignFromDate(
                 new AllocateFromDateRequestDto(
-                    event.getId(),
+                    eventResult.entity().getId(),
                     startDate,
                     classroom.getId(),
                     "Importado de Excel"
                 )
             );
 
-            assignmentsCreated++;
+            if (eventResult.created()) assignmentsCreated++;
+            else assignmentsReused++;
             processedRows++;
             log.info("Row {}: subject={}, commission={}, classroom={}",
                 rowNum, subject.getName(), commission.getCommissionNumber(), dto.roomNumber());
