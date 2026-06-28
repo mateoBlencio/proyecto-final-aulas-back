@@ -1,5 +1,5 @@
-# para ejecutar: SPRING_PROFILES_ACTIVE=compose ./mvnw spring-boot:run
-# despliega base de datos postgress en contenedor local
+# para ejecutar: SPRING_PROFILES_ACTIVE=dev-local ./mvnw spring-boot:run
+# levanta un postgres local efímero (datos se pierden al detener la app)
 services:
   postgres:
     image: 'postgres:latest'

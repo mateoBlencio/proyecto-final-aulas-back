@@ -3,7 +3,7 @@ services:
     build: .
     profiles: ["dev"]
     environment:
-      SPRING_PROFILES_ACTIVE: docker
+      SPRING_PROFILES_ACTIVE: dev
       DB_HOST: postgres_dev
       DB_PORT: 5432
       DB_NAME: database_dev
