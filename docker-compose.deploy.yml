@@ -2,8 +2,9 @@ services:
   backend-dev:
     build: .
     profiles: ["dev"]
+    restart: always
     environment:
-      SPRING_PROFILES_ACTIVE: docker
+      SPRING_PROFILES_ACTIVE: dev
       DB_HOST: postgres_dev
       DB_PORT: 5432
       DB_NAME: database_dev
@@ -11,6 +12,22 @@ services:
       DB_PASSWORD: ${BACK_USER_DEV_PASSWORD}
     ports:
       - "8080:8080"
+    networks:
+      - app-network
+
+  backend-test:
+    build: .
+    profiles: ["test"]
+    restart: always
+    environment:
+      SPRING_PROFILES_ACTIVE: test
+      DB_HOST: postgres_test
+      DB_PORT: 5432
+      DB_NAME: database_test
+      DB_USERNAME: back_user_test
+      DB_PASSWORD: ${BACK_USER_TEST_PASSWORD}
+    ports:
+      - "8081:8080"
     networks:
       - app-network
 

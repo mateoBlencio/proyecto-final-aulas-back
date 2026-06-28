@@ -1,21 +1,27 @@
 spring:
+  jpa:
+    show-sql: false
   datasource:
     hikari:
-      maximum-pool-size: 5
-      minimum-idle: 1
+      maximum-pool-size: 10
+      minimum-idle: 2
 
 springdoc:
   swagger-ui:
     enabled: true
-
   api-docs:
     enabled: true
 
 management:
   endpoint:
     health:
-      show-details: when-authorized
+      show-details: always
+
+cors:
+  allowed-origins:
+    - http://localhost:5173
 
 logging:
   level:
-    ar.edu.utn.frc.classroom_allocation: INFO
+    ar.edu.utn.frc.classroom_allocation: DEBUG
+    org.springframework.web: INFO
