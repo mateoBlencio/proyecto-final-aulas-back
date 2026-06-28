@@ -20,10 +20,17 @@ public class AcademicEventResponseDto {
     DayOfWeek dayOfWeek;
     LocalDate startDate;
     LocalDate endDate;
-    Long subjectId;
+    Integer subjectCode;
     String subjectName;
-    Long commissionId;
+    String subjectTerm;
+    Integer studyPlanCode;
+    Integer specialtyCode;
+    String specialtyName;
     String commissionCode;
+    Integer commissionNumber;
+    Integer yearLevel;
+    Integer periodYear;
+    Integer periodSemester;
     // Unique
     LocalDate date;
     String description;

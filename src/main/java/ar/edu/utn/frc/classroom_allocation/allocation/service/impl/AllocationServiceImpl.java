@@ -2,7 +2,9 @@ package ar.edu.utn.frc.classroom_allocation.allocation.service.impl;
 
 import ar.edu.utn.frc.classroom_allocation.allocation.dto.request.AllocateFromDateRequestDto;
 import ar.edu.utn.frc.classroom_allocation.allocation.dto.request.AllocateOccurrenceRequestDto;
+import ar.edu.utn.frc.classroom_allocation.allocation.dto.request.BatchReassignRequestDto;
 import ar.edu.utn.frc.classroom_allocation.allocation.dto.response.AllocationResponseDto;
+import ar.edu.utn.frc.classroom_allocation.allocation.dto.response.AllocationSummaryDto;
 import ar.edu.utn.frc.classroom_allocation.allocation.exception.AcademicEventNotFoundException;
 import ar.edu.utn.frc.classroom_allocation.allocation.exception.AllocationDomainException;
 import ar.edu.utn.frc.classroom_allocation.allocation.exception.AllocationNotFoundException;
@@ -44,7 +46,9 @@ public class AllocationServiceImpl implements AllocationService {
     @Override
     @Transactional(readOnly = true)
     public AllocationResponseDto findById(Long allocationId) {
-        return mapper.toDto(findAllocation(allocationId));
+        Allocation allocation = allocationRepository.findByIdEager(allocationId)
+                .orElseThrow(() -> new AllocationNotFoundException(allocationId));
+        return mapper.toDto(allocation);
     }
 
     @Override
@@ -88,6 +92,22 @@ public class AllocationServiceImpl implements AllocationService {
         Allocation saved = allocationRepository.save(allocation);
         log.info("Allocation reassigned: id={}, classroomId={}", allocationId, dto.classroomId());
         return mapper.toDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public List<AllocationResponseDto> batchReassign(BatchReassignRequestDto dto) {
+        log.debug("batchReassign: moves={}", dto.moves().size());
+        List<AllocationResponseDto> results = new ArrayList<>();
+        for (BatchReassignRequestDto.MoveDto move : dto.moves()) {
+            Allocation allocation = findAllocation(move.allocationId());
+            validateNotPast(allocation.getOccurrence());
+            allocation.setClassroom(findClassroom(move.classroomId()));
+            allocation.setSource(AllocationSource.MANUAL);
+            results.add(mapper.toDto(allocationRepository.save(allocation)));
+        }
+        log.info("batchReassign complete: moved={}", results.size());
+        return results;
     }
 
     @Override
@@ -148,11 +168,11 @@ public class AllocationServiceImpl implements AllocationService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<AllocationResponseDto> findByDateAndBuilding(LocalDate date, Integer buildingId) {
-        log.debug("findByDateAndBuilding: date={}, buildingId={}", date, buildingId);
-        return allocationRepository.findByOccurrence_DateAndClassroom_Building_Id(date, buildingId)
+    public List<AllocationSummaryDto> findByDate(LocalDate date) {
+        log.debug("findByDate: date={}", date);
+        return allocationRepository.findByDateEager(date)
                 .stream()
-                .map(mapper::toDto)
+                .map(mapper::toSummaryDto)
                 .toList();
     }
 

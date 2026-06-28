@@ -1,0 +1,20 @@
+meta {
+  name: Reasignar aulas en lote
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{baseUrl}}/v1/allocations/batch
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "moves": [
+      { "allocationId": 1, "classroomId": 2 },
+      { "allocationId": 2, "classroomId": 3 }
+    ]
+  }
+}

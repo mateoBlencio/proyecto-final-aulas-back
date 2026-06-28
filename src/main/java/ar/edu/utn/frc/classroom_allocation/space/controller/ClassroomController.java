@@ -7,6 +7,7 @@ import ar.edu.utn.frc.classroom_allocation.space.service.ClassroomService;
 import jakarta.validation.Valid;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+@Slf4j
 @RestController
 @RequestMapping("/v1/classrooms")
 @RequiredArgsConstructor
@@ -32,14 +34,16 @@ public class ClassroomController {
 
     @PostMapping
     public ResponseEntity<ClassroomResponseDTO> create(@Valid @RequestBody ClassroomRequestDTO dto) {
+        log.debug("POST /v1/classrooms: roomNumber={}, buildingId={}", dto.roomNumber(), dto.buildingId());
         ClassroomResponseDTO response = classroomService.create(dto);
+        log.info("Classroom created via controller: id={}", response.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ClassroomResponseDTO> findById(@PathVariable Integer id) {
-        ClassroomResponseDTO response = classroomService.findById(id);
-        return ResponseEntity.ok(response);
+        log.debug("GET /v1/classrooms/{}", id);
+        return ResponseEntity.ok(classroomService.findById(id));
     }
 
     @GetMapping
@@ -53,21 +57,28 @@ public class ClassroomController {
             @RequestParam(required = false) Integer floor,
             @RequestParam(required = false) Boolean available) {
 
+        log.debug("GET /v1/classrooms: buildingId={}, page={}", buildingId, pageable.getPageNumber());
         ClassroomFilter filter = new ClassroomFilter(roomNumber, buildingId, classroomTypeId,
                 capacityMin, capacityMax, floor, available);
-        return ResponseEntity.ok(classroomService.findAll(filter, pageable));
+        Page<ClassroomResponseDTO> page = classroomService.findAll(filter, pageable);
+        log.info("Classrooms listed: total={}", page.getTotalElements());
+        return ResponseEntity.ok(page);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<ClassroomResponseDTO> update(@PathVariable Integer id,
                                                         @Valid @RequestBody ClassroomRequestDTO dto) {
+        log.debug("PUT /v1/classrooms/{}: roomNumber={}", id, dto.roomNumber());
         ClassroomResponseDTO response = classroomService.update(id, dto);
+        log.info("Classroom updated via controller: id={}", response.getId());
         return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Integer id) {
+        log.debug("DELETE /v1/classrooms/{}", id);
         classroomService.delete(id);
+        log.info("Classroom deleted via controller: id={}", id);
         return ResponseEntity.noContent().build();
     }
 

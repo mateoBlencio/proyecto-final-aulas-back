@@ -40,6 +40,15 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<AcademicEventResponseDto> findAll() {
+        log.debug("Listing all academic events");
+        return eventRepository.findAll().stream()
+                .map(mapper::toDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public AcademicEventResponseDto findById(Long eventId) {
         return mapper.toDto(eventRepository.findById(eventId)
                 .orElseThrow(() -> new AcademicEventNotFoundException(eventId)));

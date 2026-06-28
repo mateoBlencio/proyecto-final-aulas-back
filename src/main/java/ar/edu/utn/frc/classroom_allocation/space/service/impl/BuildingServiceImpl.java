@@ -2,6 +2,7 @@ package ar.edu.utn.frc.classroom_allocation.space.service.impl;
 
 import ar.edu.utn.frc.classroom_allocation.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.classroom_allocation.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.classroom_allocation.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.classroom_allocation.space.model.Building;
 import ar.edu.utn.frc.classroom_allocation.space.repository.BuildingRepository;
 import ar.edu.utn.frc.classroom_allocation.space.service.BuildingService;
@@ -9,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 
 @Slf4j
@@ -28,6 +31,20 @@ public class BuildingServiceImpl implements BuildingService {
             throw new ResourceNotFoundException("Building not found with id: " + id);
         }
         return building;
+    }
+
+    @Override
+    public List<BuildingResponseDto> findAll() {
+        log.debug("Listing all active buildings");
+        return buildingRepository.findAllByDeletedFalse().stream()
+                .filter(Building::getActive)
+                .map(b -> BuildingResponseDto.builder()
+                        .id(b.getId())
+                        .name(b.getName())
+                        .floorCount(b.getFloorCount())
+                        .active(b.getActive())
+                        .build())
+                .toList();
     }
 
     @Override

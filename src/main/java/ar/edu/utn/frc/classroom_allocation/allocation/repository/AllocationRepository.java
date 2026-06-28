@@ -2,6 +2,8 @@ package ar.edu.utn.frc.classroom_allocation.allocation.repository;
 
 import ar.edu.utn.frc.classroom_allocation.allocation.model.Allocation;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -15,5 +17,19 @@ public interface AllocationRepository extends JpaRepository<Allocation, Long> {
 
     List<Allocation> findByOccurrence_Event_IdAndOccurrence_DateGreaterThanEqual(Long eventId, LocalDate date);
 
-    List<Allocation> findByOccurrence_DateAndClassroom_Building_Id(LocalDate date, Integer buildingId);
+    @Query("SELECT a FROM Allocation a " +
+           "JOIN FETCH a.occurrence o " +
+           "JOIN FETCH o.event e " +
+           "JOIN FETCH a.classroom c " +
+           "JOIN FETCH c.building " +
+           "WHERE o.date = :date")
+    List<Allocation> findByDateEager(@Param("date") LocalDate date);
+
+    @Query("SELECT a FROM Allocation a " +
+           "JOIN FETCH a.occurrence o " +
+           "JOIN FETCH o.event e " +
+           "JOIN FETCH a.classroom c " +
+           "JOIN FETCH c.building " +
+           "WHERE a.id = :id")
+    Optional<Allocation> findByIdEager(@Param("id") Long id);
 }

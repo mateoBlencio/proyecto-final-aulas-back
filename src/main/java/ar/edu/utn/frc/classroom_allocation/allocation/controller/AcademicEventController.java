@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/v1/events")
 @RequiredArgsConstructor
@@ -28,10 +30,21 @@ public class AcademicEventController {
 
     private final AcademicEventService academicEventService;
 
+    @GetMapping
+    @Operation(summary = "Listar eventos académicos",
+               description = "Devuelve todos los eventos académicos registrados.")
+    public ResponseEntity<List<AcademicEventResponseDto>> findAll() {
+        log.debug("GET /v1/events");
+        List<AcademicEventResponseDto> events = academicEventService.findAll();
+        log.info("Events listed: count={}", events.size());
+        return ResponseEntity.ok(events);
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Obtener evento académico por ID",
                description = "Devuelve los datos de un evento académico existente.")
     public ResponseEntity<AcademicEventResponseDto> findById(@PathVariable Long id) {
+        log.debug("GET /v1/events/{}", id);
         return ResponseEntity.ok(academicEventService.findById(id));
     }
 
@@ -39,7 +52,10 @@ public class AcademicEventController {
     @Operation(summary = "Listar ocurrencias de un evento",
                description = "Devuelve todas las ocurrencias generadas para un evento académico.")
     public ResponseEntity<List<OccurrenceResponseDto>> findOccurrences(@PathVariable Long id) {
-        return ResponseEntity.ok(academicEventService.findOccurrencesByEventId(id));
+        log.debug("GET /v1/events/{}/occurrences", id);
+        List<OccurrenceResponseDto> occurrences = academicEventService.findOccurrencesByEventId(id);
+        log.info("Occurrences listed: eventId={}, count={}", id, occurrences.size());
+        return ResponseEntity.ok(occurrences);
     }
 
     @PostMapping("/recurring")
@@ -47,8 +63,10 @@ public class AcademicEventController {
                description = "Crea un evento recurrente semanal y genera todas sus ocurrencias.")
     public ResponseEntity<AcademicEventResponseDto> createRecurring(
             @Valid @RequestBody CreateRecurringEventRequestDto dto) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(academicEventService.createRecurringEvent(dto));
+        log.debug("POST /v1/events/recurring: subjectId={}, commissionId={}", dto.subjectId(), dto.commissionId());
+        AcademicEventResponseDto response = academicEventService.createRecurringEvent(dto);
+        log.info("Recurring event created via controller: id={}", response.getId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PostMapping("/unique")
@@ -56,7 +74,9 @@ public class AcademicEventController {
                description = "Crea un evento que ocurre una única vez y genera una única ocurrencia.")
     public ResponseEntity<AcademicEventResponseDto> createUnique(
             @Valid @RequestBody CreateUniqueEventRequestDto dto) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(academicEventService.createUniqueEvent(dto));
+        log.debug("POST /v1/events/unique: date={}", dto.date());
+        AcademicEventResponseDto response = academicEventService.createUniqueEvent(dto);
+        log.info("Unique event created via controller: id={}", response.getId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }

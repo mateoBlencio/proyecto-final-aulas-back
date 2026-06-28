@@ -1,16 +1,15 @@
 meta {
-  name: Listar asignaciones por fecha y edificio
+  name: Listar asignaciones por fecha
   type: http
   seq: 2
 }
 
 get {
-  url: {{baseUrl}}/v1/allocations?date=2026-06-27&buildingId=1
+  url: {{baseUrl}}/v1/allocations?date=2026-06-27
   body: none
   auth: none
 }
 
 params:query {
   date: 2026-06-27
-  buildingId: 1
 }

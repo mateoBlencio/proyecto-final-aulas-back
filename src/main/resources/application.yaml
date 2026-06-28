@@ -22,10 +22,6 @@ spring:
     hibernate:
       ddl-auto: validate
     show-sql: false
-    properties:
-      hibernate:
-        jdbc:
-          time_zone: UTC
     database-platform: org.hibernate.dialect.PostgreSQLDialect
 
   docker:

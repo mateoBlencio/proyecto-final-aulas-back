@@ -8,6 +8,7 @@ import ar.edu.utn.frc.classroom_allocation.allocation.dto.response.OccurrenceRes
 import java.util.List;
 
 public interface AcademicEventService {
+    List<AcademicEventResponseDto> findAll();
     AcademicEventResponseDto findById(Long eventId);
     List<OccurrenceResponseDto> findOccurrencesByEventId(Long eventId);
     AcademicEventResponseDto createRecurringEvent(CreateRecurringEventRequestDto dto);
