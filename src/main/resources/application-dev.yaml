@@ -20,6 +20,7 @@ management:
 cors:
   allowed-origins:
     - http://localhost:5173
+    - http://100.90.179.1:8082
 
 logging:
   level:
