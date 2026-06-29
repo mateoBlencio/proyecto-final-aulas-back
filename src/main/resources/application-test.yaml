@@ -18,9 +18,7 @@ management:
       show-details: always
 
 cors:
-  allowed-origins:
-    - http://localhost:5173
-    - http://100.90.179.1:8083
+  allowed-origins: http://localhost:5173,http://100.90.179.1:8083
 
 logging:
   level:

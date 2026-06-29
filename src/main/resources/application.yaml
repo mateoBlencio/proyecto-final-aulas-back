@@ -52,7 +52,7 @@ management:
       show-details: never
 
 cors:
-  allowed-origins: []
+  allowed-origins: ""
 
 logging:
   level:
