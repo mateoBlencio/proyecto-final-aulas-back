@@ -1,0 +1,47 @@
+name: CD — test
+
+on:
+  push:
+    branches:
+      - test
+
+jobs:
+  test:
+    name: Tests
+    runs-on: self-hosted
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: testdb
+      DB_USERNAME: test
+      DB_PASSWORD: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Run tests
+        run: ./mvnw test -Dspring.profiles.active=integration
+
+  deploy-test:
+    name: Deploy — backend-test
+    needs: test
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and deploy
+        run: |
+          docker compose -f docker-compose.deploy.yml --profile test \
+            --env-file /home/adminmate/proyecto-aulas/proyecto-final-aulas-back/.env \
+            up -d --build
+
+      - name: Health check
+        run: |
+          sleep 15
+          curl --fail --silent --retry 5 --retry-delay 5 \
+            http://localhost:8081/api/actuator/health
