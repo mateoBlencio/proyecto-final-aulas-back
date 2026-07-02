@@ -22,5 +22,5 @@ cors:
 
 logging:
   level:
-    ar.edu.utn.frc.classroom_allocation: DEBUG
+    ar.edu.utn.frc.siga: DEBUG
     org.springframework.web: INFO

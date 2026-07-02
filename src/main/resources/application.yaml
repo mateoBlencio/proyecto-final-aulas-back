@@ -1,6 +1,6 @@
 spring:
   application:
-    name: classroom-allocation
+    name: siga
 
   servlet:
     multipart:
@@ -57,4 +57,4 @@ cors:
 logging:
   level:
     root: WARN
-    ar.edu.utn.frc.classroom_allocation: INFO
+    ar.edu.utn.frc.siga: INFO
