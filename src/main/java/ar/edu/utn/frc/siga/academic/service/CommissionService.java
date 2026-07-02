@@ -10,6 +10,8 @@ public interface CommissionService {
     Optional<Commission> findByCourseCodeAndCommissionNumberAndPeriodAndDeletedFalse(
             String courseCode, Integer commissionNumber, AcademicPeriod period);
 
+    Optional<Commission> findById(Long id);
+
     Commission save(Commission commission);
 
     FindOrCreateResult<Commission> findOrCreate(String courseCode, Integer commissionNumber,

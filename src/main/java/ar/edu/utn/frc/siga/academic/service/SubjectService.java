@@ -9,6 +9,8 @@ public interface SubjectService {
 
     Optional<Subject> findByCodeAndStudyPlanAndDeletedFalse(Integer code, StudyPlan studyPlan);
 
+    Optional<Subject> findById(Long id);
+
     Subject save(Subject subject);
 
     FindOrCreateResult<Subject> findOrCreate(Integer code, String name, StudyPlan studyPlan, String term);

@@ -19,8 +19,9 @@ import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.service.impl.AllocationServiceImpl;
+import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.space.model.Classroom;
-import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
+import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,14 +51,14 @@ class AllocationServiceImplTest {
     @Mock AllocationRepository allocationRepository;
     @Mock OccurrenceRepository occurrenceRepository;
     @Mock AcademicEventRepository eventRepository;
-    @Mock ClassroomRepository classroomRepository;
+    @Mock ClassroomService classroomService;
     @Mock AllocationMapper mapper;
 
     AllocationServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new AllocationServiceImpl(allocationRepository, occurrenceRepository, eventRepository, classroomRepository, mapper);
+        service = new AllocationServiceImpl(allocationRepository, occurrenceRepository, eventRepository, classroomService, mapper);
     }
 
     private RecurringEvent futureEvent() {
@@ -147,7 +148,7 @@ class AllocationServiceImplTest {
         Occurrence occurrence = futureOccurrence(5L);
         when(occurrenceRepository.findById(5L)).thenReturn(Optional.of(occurrence));
         when(allocationRepository.findByOccurrence_Id(5L)).thenReturn(Optional.empty());
-        when(classroomRepository.findByIdAndDeletedFalse(10)).thenReturn(Optional.empty());
+        when(classroomService.requireById(10)).thenThrow(new ResourceNotFoundException("Classroom not found with id: 10"));
 
         assertThatThrownBy(() -> service.assign(5L, new AllocateOccurrenceRequestDto(10, "obs")))
                 .isInstanceOf(AllocationDomainException.class);
@@ -159,7 +160,7 @@ class AllocationServiceImplTest {
         Classroom classroom = classroom(10);
         when(occurrenceRepository.findById(5L)).thenReturn(Optional.of(occurrence));
         when(allocationRepository.findByOccurrence_Id(5L)).thenReturn(Optional.empty());
-        when(classroomRepository.findByIdAndDeletedFalse(10)).thenReturn(Optional.of(classroom));
+        when(classroomService.requireById(10)).thenReturn(classroom);
         Allocation saved = Allocation.builder().id(1L).build();
         when(allocationRepository.save(any(Allocation.class))).thenReturn(saved);
         AllocationResponseDto dto = AllocationResponseDto.builder().id(1L).build();
@@ -200,7 +201,7 @@ class AllocationServiceImplTest {
                 .source(AllocationSource.AUTOMATIC).build();
         Classroom classroom = classroom(20);
         when(allocationRepository.findById(1L)).thenReturn(Optional.of(allocation));
-        when(classroomRepository.findByIdAndDeletedFalse(20)).thenReturn(Optional.of(classroom));
+        when(classroomService.requireById(20)).thenReturn(classroom);
         when(allocationRepository.save(allocation)).thenReturn(allocation);
         AllocationResponseDto dto = AllocationResponseDto.builder().id(1L).build();
         when(mapper.toDto(allocation)).thenReturn(dto);
@@ -224,8 +225,8 @@ class AllocationServiceImplTest {
 
         when(allocationRepository.findById(1L)).thenReturn(Optional.of(a1));
         when(allocationRepository.findById(2L)).thenReturn(Optional.of(a2));
-        when(classroomRepository.findByIdAndDeletedFalse(10)).thenReturn(Optional.of(c10));
-        when(classroomRepository.findByIdAndDeletedFalse(20)).thenReturn(Optional.of(c20));
+        when(classroomService.requireById(10)).thenReturn(c10);
+        when(classroomService.requireById(20)).thenReturn(c20);
         when(allocationRepository.save(a1)).thenReturn(a1);
         when(allocationRepository.save(a2)).thenReturn(a2);
         when(mapper.toDto(a1)).thenReturn(AllocationResponseDto.builder().id(1L).build());
@@ -293,7 +294,7 @@ class AllocationServiceImplTest {
         RecurringEvent event = futureEvent();
         when(eventRepository.findById(1L)).thenReturn(Optional.of(event));
         Classroom classroom = classroom(10);
-        when(classroomRepository.findByIdAndDeletedFalse(10)).thenReturn(Optional.of(classroom));
+        when(classroomService.requireById(10)).thenReturn(classroom);
 
         Occurrence occ = futureOccurrence(5L);
         when(occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(anyLong(), any())).thenReturn(List.of(occ));
@@ -314,7 +315,7 @@ class AllocationServiceImplTest {
         RecurringEvent event = futureEvent();
         when(eventRepository.findById(1L)).thenReturn(Optional.of(event));
         Classroom classroom = classroom(10);
-        when(classroomRepository.findByIdAndDeletedFalse(10)).thenReturn(Optional.of(classroom));
+        when(classroomService.requireById(10)).thenReturn(classroom);
 
         Occurrence past = pastOccurrence(9L);
         when(occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(anyLong(), any())).thenReturn(List.of(past));

@@ -67,6 +67,12 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     @Override
+    public Classroom requireById(Integer id) {
+        log.debug("Fetching classroom entity by id={}", id);
+        return this.findExistingClassroomById(id);
+    }
+
+    @Override
     public Classroom findByRoomNumberAndBuilding(String roomNumber, Building building) {
         return classroomRepository.findByRoomNumberAndBuildingAndDeletedFalse(roomNumber, building)
                 .orElseThrow(() -> {
@@ -137,7 +143,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         return classroomRepository.findByRoomNumberAndBuildingAndDeletedFalse(roomNumber, building)
                 .map(found -> new FindOrCreateResult<>(found, false))
                 .orElseGet(() -> {
-                    log.warn("Creando Classroom con datos provisionales: roomNumber={}, buildingId={}",
+                    log.warn("Creating Classroom with provisional data: roomNumber={}, buildingId={}",
                         roomNumber, building.getId());
                     Classroom created = classroomRepository.save(
                         Classroom.builder()

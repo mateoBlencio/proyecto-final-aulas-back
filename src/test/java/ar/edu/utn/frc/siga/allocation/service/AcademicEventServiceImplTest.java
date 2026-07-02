@@ -16,11 +16,11 @@ import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.repository.RecurringEventRepository;
 import ar.edu.utn.frc.siga.allocation.service.impl.AcademicEventServiceImpl;
 import ar.edu.utn.frc.siga.academic.model.Subject;
-import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
+import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.academic.model.Commission;
-import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
+import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,15 +48,15 @@ class AcademicEventServiceImplTest {
     @Mock RecurringEventRepository recurringEventRepository;
     @Mock OccurrenceRepository occurrenceRepository;
     @Mock AcademicEventMapper mapper;
-    @Mock SubjectRepository subjectRepository;
-    @Mock CommissionRepository commissionRepository;
+    @Mock SubjectService subjectService;
+    @Mock CommissionService commissionService;
 
     AcademicEventServiceImpl service;
 
     @BeforeEach
     void setUp() {
         service = new AcademicEventServiceImpl(eventRepository, recurringEventRepository,
-                occurrenceRepository, mapper, subjectRepository, commissionRepository);
+                occurrenceRepository, mapper, subjectService, commissionService);
     }
 
     private RecurringEvent recurringEvent() {
@@ -132,7 +132,7 @@ class AcademicEventServiceImplTest {
     void upEs006_createRecurringEvent_subjectNotFound_throws() {
         CreateRecurringEventRequestDto dto = new CreateRecurringEventRequestDto(
                 30, LocalTime.of(8, 0), 90, DayOfWeek.MONDAY, LocalDate.of(2024, 3, 4), null, 1L, 2L);
-        when(subjectRepository.findById(1L)).thenReturn(Optional.empty());
+        when(subjectService.findById(1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.createRecurringEvent(dto))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -142,8 +142,8 @@ class AcademicEventServiceImplTest {
     void upEs007_createRecurringEvent_commissionNotFound_throws() {
         CreateRecurringEventRequestDto dto = new CreateRecurringEventRequestDto(
                 30, LocalTime.of(8, 0), 90, DayOfWeek.MONDAY, LocalDate.of(2024, 3, 4), null, 1L, 2L);
-        when(subjectRepository.findById(1L)).thenReturn(Optional.of(Subject.builder().id(1L).build()));
-        when(commissionRepository.findById(2L)).thenReturn(Optional.empty());
+        when(subjectService.findById(1L)).thenReturn(Optional.of(Subject.builder().id(1L).build()));
+        when(commissionService.findById(2L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.createRecurringEvent(dto))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -156,8 +156,8 @@ class AcademicEventServiceImplTest {
                 LocalDate.of(2024, 3, 18), 1L, 2L);
         Subject subject = Subject.builder().id(1L).build();
         Commission commission = Commission.builder().id(2L).build();
-        when(subjectRepository.findById(1L)).thenReturn(Optional.of(subject));
-        when(commissionRepository.findById(2L)).thenReturn(Optional.of(commission));
+        when(subjectService.findById(1L)).thenReturn(Optional.of(subject));
+        when(commissionService.findById(2L)).thenReturn(Optional.of(commission));
 
         RecurringEvent saved = recurringEvent();
         when(eventRepository.save(any(RecurringEvent.class))).thenReturn(saved);
@@ -197,8 +197,8 @@ class AcademicEventServiceImplTest {
         when(recurringEventRepository.findBySubject_IdAndCommission_IdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
                 1L, 2L, DayOfWeek.MONDAY, LocalTime.of(8, 0), LocalDate.of(2024, 3, 4), null))
                 .thenReturn(Optional.empty());
-        when(subjectRepository.findById(1L)).thenReturn(Optional.of(Subject.builder().id(1L).build()));
-        when(commissionRepository.findById(2L)).thenReturn(Optional.of(Commission.builder().id(2L).build()));
+        when(subjectService.findById(1L)).thenReturn(Optional.of(Subject.builder().id(1L).build()));
+        when(commissionService.findById(2L)).thenReturn(Optional.of(Commission.builder().id(2L).build()));
         RecurringEvent saved = recurringEvent();
         when(eventRepository.save(any(RecurringEvent.class))).thenReturn(saved);
         when(mapper.toDto(saved)).thenReturn(AcademicEventResponseDto.builder().id(1L).build());

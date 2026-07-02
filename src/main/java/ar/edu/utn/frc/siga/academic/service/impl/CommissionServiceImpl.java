@@ -29,6 +29,12 @@ public class CommissionServiceImpl implements CommissionService {
     }
 
     @Override
+    public Optional<Commission> findById(Long id) {
+        log.debug("Finding commission by id={}", id);
+        return commissionRepository.findById(id);
+    }
+
+    @Override
     @Transactional
     public Commission save(Commission commission) {
         log.debug("Saving commission: courseCode={}, commissionNumber={}",
@@ -46,7 +52,7 @@ public class CommissionServiceImpl implements CommissionService {
                 courseCode, commissionNumber, period)
             .map(found -> new FindOrCreateResult<>(found, false))
             .orElseGet(() -> {
-                log.info("Creando Commission: course={}, commission={}, period={}",
+                log.info("Creating Commission: course={}, commission={}, period={}",
                     courseCode, commissionNumber, period.getId());
                 Commission created = commissionRepository.save(
                     Commission.builder()

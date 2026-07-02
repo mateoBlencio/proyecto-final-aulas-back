@@ -15,11 +15,11 @@ import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.repository.RecurringEventRepository;
 import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
 import ar.edu.utn.frc.siga.academic.model.Subject;
-import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
+import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.academic.model.Commission;
-import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
+import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,8 +38,8 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     private final RecurringEventRepository recurringEventRepository;
     private final OccurrenceRepository occurrenceRepository;
     private final AcademicEventMapper mapper;
-    private final SubjectRepository subjectRepository;
-    private final CommissionRepository commissionRepository;
+    private final SubjectService subjectService;
+    private final CommissionService commissionService;
 
     @Override
     @Transactional(readOnly = true)
@@ -81,9 +81,9 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         log.debug("Creating recurring event: subjectId={}, commissionId={}, dayOfWeek={}, startDate={}",
                 dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startDate());
 
-        Subject subject = subjectRepository.findById(dto.subjectId())
+        Subject subject = subjectService.findById(dto.subjectId())
                 .orElseThrow(() -> new ResourceNotFoundException("Subject not found: " + dto.subjectId()));
-        Commission commission = commissionRepository.findById(dto.commissionId())
+        Commission commission = commissionService.findById(dto.commissionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Commission not found: " + dto.commissionId()));
 
         RecurringEvent event = RecurringEvent.builder()

@@ -19,8 +19,9 @@ import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
+import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.space.model.Classroom;
-import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
+import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
@@ -40,7 +41,7 @@ public class AllocationServiceImpl implements AllocationService {
     private final AllocationRepository allocationRepository;
     private final OccurrenceRepository occurrenceRepository;
     private final AcademicEventRepository eventRepository;
-    private final ClassroomRepository classroomRepository;
+    private final ClassroomService classroomService;
     private final AllocationMapper mapper;
 
     @Override
@@ -193,11 +194,12 @@ public class AllocationServiceImpl implements AllocationService {
     }
 
     private Classroom findClassroom(Integer id) {
-        return classroomRepository.findByIdAndDeletedFalse(id)
-                .orElseThrow(() -> {
-                    log.warn("Classroom not found: id={}", id);
-                    return new AllocationDomainException("Classroom not found with id: " + id);
-                });
+        try {
+            return classroomService.requireById(id);
+        } catch (ResourceNotFoundException ex) {
+            log.warn("Classroom not found: id={}", id);
+            throw new AllocationDomainException("Classroom not found with id: " + id);
+        }
     }
 
     private void validateNotPast(Occurrence occurrence) {

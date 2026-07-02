@@ -26,6 +26,12 @@ public class SubjectServiceImpl implements SubjectService {
     }
 
     @Override
+    public Optional<Subject> findById(Long id) {
+        log.debug("Finding Subject by id={}", id);
+        return subjectRepository.findById(id);
+    }
+
+    @Override
     @Transactional
     public Subject save(Subject subject) {
         log.debug("Saving Subject: code={}", subject.getCode());
@@ -40,7 +46,7 @@ public class SubjectServiceImpl implements SubjectService {
         return subjectRepository.findByCodeAndStudyPlanAndDeletedFalse(code, studyPlan)
             .map(found -> new FindOrCreateResult<>(found, false))
             .orElseGet(() -> {
-                log.info("Creando Subject: code={}, plan={}", code, studyPlan.getId());
+                log.info("Creating Subject: code={}, plan={}", code, studyPlan.getId());
                 Subject created = subjectRepository.save(
                     Subject.builder()
                         .code(code)
