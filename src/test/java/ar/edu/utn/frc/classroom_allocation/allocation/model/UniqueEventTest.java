@@ -1,7 +1,5 @@
-package ar.edu.utn.frc.classroom_allocation.solver.model;
+package ar.edu.utn.frc.classroom_allocation.allocation.model;
 
-import ar.edu.utn.frc.classroom_allocation.allocation.model.Occurrence;
-import ar.edu.utn.frc.classroom_allocation.allocation.model.UniqueEvent;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;

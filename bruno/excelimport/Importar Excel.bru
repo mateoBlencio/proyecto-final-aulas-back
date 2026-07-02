@@ -5,13 +5,13 @@ meta {
 }
 
 post {
-  url: http://localhost:8080/api/v1/excelimports
+  url: {{baseUrl}}/v1/excelimports
   body: multipartForm
   auth: inherit
 }
 
 body:multipart-form {
-  file: @file(/Users/mateoblencio/Downloads/planilla-example.xlsx) @contentType(application/vnd.openxmlformats-officedocument.spreadsheetml.sheet)
+  file: @file(H:\Users\Matias\Desktop\planilla-example.xlsx) @contentType(application/vnd.openxmlformats-officedocument.spreadsheetml.sheet)
 }
 
 settings {

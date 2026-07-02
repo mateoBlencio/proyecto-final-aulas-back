@@ -13,9 +13,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("integration")
-class AllocationControllerIT {
+class SolverControllerIT {
 
-    private static final String URL = "/api/v1/allocations/preview";
+    private static final String URL = "/api/v1/solver/preview";
 
     @Autowired
     WebTestClient webTestClient;
