@@ -32,28 +32,31 @@ class ConflictPairTest {
     }
 
     @Test
-    void upCp005_involves_matchA() {
-        assertThat(new ConflictPair("A", "B").involves("A")).isTrue();
+    void upCp005_constructor_normalizesOrder() {
+        ConflictPair pair = new ConflictPair("B", "A");
+        assertThat(pair.eventIdA()).isEqualTo("A");
+        assertThat(pair.eventIdB()).isEqualTo("B");
     }
 
     @Test
-    void upCp006_involves_matchB() {
-        assertThat(new ConflictPair("A", "B").involves("B")).isTrue();
+    void upCp006_constructor_preservesOrderWhenCanonical() {
+        ConflictPair pair = new ConflictPair("A", "B");
+        assertThat(pair.eventIdA()).isEqualTo("A");
+        assertThat(pair.eventIdB()).isEqualTo("B");
     }
 
     @Test
-    void upCp007_involves_noMatch() {
-        assertThat(new ConflictPair("A", "B").involves("C")).isFalse();
+    void upCp007_constructor_sameEvent_throws() {
+        assertThatThrownBy(() -> new ConflictPair("A", "A"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    void upCp008_otherEventId_fromA() {
-        assertThat(new ConflictPair("A", "B").otherEventId("A")).isEqualTo("B");
-    }
-
-    @Test
-    void upCp009_otherEventId_fromB() {
-        assertThat(new ConflictPair("A", "B").otherEventId("B")).isEqualTo("A");
+    void upCp008_constructor_nullEvent_throws() {
+        assertThatThrownBy(() -> new ConflictPair("A", null))
+                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new ConflictPair(null, "B"))
+                .isInstanceOf(NullPointerException.class);
     }
 
     @Test
@@ -61,11 +64,5 @@ class ConflictPairTest {
         Set<ConflictPair> set = new HashSet<>(Set.of(new ConflictPair("A", "B")));
         set.add(new ConflictPair("B", "A"));
         assertThat(set).hasSize(1);
-    }
-
-    @Test
-    void otherEventId_unknownEvent_throws() {
-        assertThatThrownBy(() -> new ConflictPair("A", "B").otherEventId("C"))
-                .isInstanceOf(IllegalArgumentException.class);
     }
 }

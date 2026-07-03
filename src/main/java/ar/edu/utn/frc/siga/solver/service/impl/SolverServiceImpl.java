@@ -22,6 +22,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -47,14 +50,14 @@ public class SolverServiceImpl implements SolverService {
 
         List<SolverEvent> events = requestMapper.toEvents(request.getEvents());
         List<SolverRoom> classrooms = requestMapper.toClassrooms(request.getClassrooms(), params);
-        Set<ConflictPair> conflicts = computeConflicts(events);
+        Map<String, Set<String>> conflictsByEventId = toAdjacency(computeConflicts(events));
         Map<String, List<SolverRoom>> candidates = buildCandidates(events, classrooms, params);
 
         log.info("Starting solver preview: {} events, {} classrooms, limit {}s",
                 events.size(), classrooms.size(), params.getTimeLimitSeconds());
 
         long start = System.currentTimeMillis();
-        ScheduleSolution solution = solve(events, classrooms, conflicts, candidates, params.getTimeLimitSeconds());
+        ScheduleSolution solution = solve(events, classrooms, conflictsByEventId, candidates, params.getTimeLimitSeconds());
         long durationMs = System.currentTimeMillis() - start;
 
         log.info("Solver preview completed in {}ms, score {}", durationMs, solution.getScore());
@@ -64,26 +67,17 @@ public class SolverServiceImpl implements SolverService {
 
     private ScheduleSolution solve(List<SolverEvent> events,
                                    List<SolverRoom> classrooms,
-                                   Set<ConflictPair> conflicts,
+                                   Map<String, Set<String>> conflictsByEventId,
                                    Map<String, List<SolverRoom>> candidatesByEventId,
                                    int timeLimitSeconds) {
         List<ClassAssignment> assignments = events.stream()
-                .map(event -> buildAssignment(event, classrooms, conflicts, candidatesByEventId))
+                .map(event -> new ClassAssignment(
+                        event,
+                        candidatesByEventId.getOrDefault(event.planningId(), classrooms),
+                        conflictsByEventId.getOrDefault(event.planningId(), Set.of())))
                 .toList();
         ScheduleSolution problem = new ScheduleSolution(classrooms, assignments, null);
         return runSolver(problem, timeLimitSeconds);
-    }
-
-    private ClassAssignment buildAssignment(SolverEvent event,
-                                            List<SolverRoom> classrooms,
-                                            Set<ConflictPair> conflicts,
-                                            Map<String, List<SolverRoom>> candidatesByEventId) {
-        Set<String> conflictingIds = conflicts.stream()
-                .filter(p -> p.involves(event.planningId()))
-                .map(p -> p.otherEventId(event.planningId()))
-                .collect(Collectors.toSet());
-        List<SolverRoom> candidates = candidatesByEventId.getOrDefault(event.planningId(), classrooms);
-        return new ClassAssignment(event, candidates, conflictingIds);
     }
 
     private ScheduleSolution runSolver(ScheduleSolution problem, int timeLimitSeconds) {
@@ -110,19 +104,47 @@ public class SolverServiceImpl implements SolverService {
         }
     }
 
+    /**
+     * Agrupa los eventos por fecha de ocurrencia y detecta solapamientos con un barrido
+     * ordenado por hora de inicio dentro de cada fecha. Evita el producto cartesiano
+     * de eventos x eventos con comparación de listas de fechas por par.
+     */
     private Set<ConflictPair> computeConflicts(List<SolverEvent> events) {
+        Map<LocalDate, List<SolverEvent>> eventsByDate = new HashMap<>();
+        for (SolverEvent event : events) {
+            for (LocalDate date : event.occurrenceDates()) {
+                eventsByDate.computeIfAbsent(date, d -> new ArrayList<>()).add(event);
+            }
+        }
+
         Set<ConflictPair> conflicts = new HashSet<>();
-        for (int i = 0; i < events.size(); i++) {
-            for (int j = i + 1; j < events.size(); j++) {
-                SolverEvent a = events.get(i);
-                SolverEvent b = events.get(j);
-                if (!timesOverlap(a, b)) continue;
-                if (b.occurrenceDates().stream().anyMatch(a.occurrenceDates()::contains)) {
-                    conflicts.add(new ConflictPair(a.planningId(), b.planningId()));
+        for (List<SolverEvent> sameDate : eventsByDate.values()) {
+            if (sameDate.size() < 2) continue;
+            sameDate.sort(Comparator.comparing(SolverEvent::startTime));
+            for (int i = 0; i < sameDate.size(); i++) {
+                SolverEvent a = sameDate.get(i);
+                for (int j = i + 1; j < sameDate.size(); j++) {
+                    SolverEvent b = sameDate.get(j);
+                    // Orden ascendente por inicio: si b arranca cuando a ya terminó,
+                    // ningún evento posterior puede solapar con a.
+                    if (!b.startTime().isBefore(a.endTime())) break;
+                    if (a.planningId().equals(b.planningId())) continue;
+                    if (timesOverlap(a, b)) {
+                        conflicts.add(new ConflictPair(a.planningId(), b.planningId()));
+                    }
                 }
             }
         }
         return conflicts;
+    }
+
+    private Map<String, Set<String>> toAdjacency(Set<ConflictPair> conflicts) {
+        Map<String, Set<String>> byEventId = new HashMap<>();
+        for (ConflictPair pair : conflicts) {
+            byEventId.computeIfAbsent(pair.eventIdA(), id -> new HashSet<>()).add(pair.eventIdB());
+            byEventId.computeIfAbsent(pair.eventIdB(), id -> new HashSet<>()).add(pair.eventIdA());
+        }
+        return byEventId;
     }
 
     private Map<String, List<SolverRoom>> buildCandidates(List<SolverEvent> events,

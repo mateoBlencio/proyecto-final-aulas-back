@@ -1,26 +1,23 @@
 package ar.edu.utn.frc.siga.solver.model;
 
+import java.util.Objects;
+
+/**
+ * Par no ordenado de eventos en conflicto horario. El constructor normaliza el orden
+ * (eventIdA <= eventIdB) para que equals/hashCode del record sean simétricos.
+ */
 public record ConflictPair(String eventIdA, String eventIdB) {
 
-    public boolean involves(String eventId) {
-        return eventIdA.equals(eventId) || eventIdB.equals(eventId);
-    }
-
-    public String otherEventId(String eventId) {
-        if (eventIdA.equals(eventId)) return eventIdB;
-        if (eventIdB.equals(eventId)) return eventIdA;
-        throw new IllegalArgumentException("Event not in pair: " + eventId);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (!(o instanceof ConflictPair(String idA, String idB))) return false;
-        return (eventIdA.equals(idA) && eventIdB.equals(idB))
-                || (eventIdA.equals(idB) && eventIdB.equals(idA));
-    }
-
-    @Override
-    public int hashCode() {
-        return eventIdA.hashCode() ^ eventIdB.hashCode();
+    public ConflictPair {
+        Objects.requireNonNull(eventIdA, "eventIdA must not be null");
+        Objects.requireNonNull(eventIdB, "eventIdB must not be null");
+        if (eventIdA.equals(eventIdB)) {
+            throw new IllegalArgumentException("A conflict pair requires two distinct events: " + eventIdA);
+        }
+        if (eventIdA.compareTo(eventIdB) > 0) {
+            String tmp = eventIdA;
+            eventIdA = eventIdB;
+            eventIdB = tmp;
+        }
     }
 }
