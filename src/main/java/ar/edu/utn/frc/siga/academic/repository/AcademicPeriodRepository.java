@@ -7,6 +7,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface AcademicPeriodRepository extends JpaRepository<AcademicPeriod, Long> {
-
     Optional<AcademicPeriod> findByYearAndSemester(Integer year, Integer semester);
 }

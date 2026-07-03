@@ -100,7 +100,6 @@ class AllocationResponseMapperTest {
 
     @Test
     void upRm008_overcrowded_ratioOne() throws Exception {
-        // enrolled=165, capacity=165 (no undercrowding), unused=0 → ratio = 165/165 = 1.0
         assertThat(ratio(assignmentWith(165, 165))).isEqualTo(1.0);
     }
 }

@@ -48,15 +48,6 @@ public class BuildingServiceImpl implements BuildingService {
     }
 
     @Override
-    public Building findByName(String buildingName) {
-        return buildingRepository.findByNameAndDeletedFalse(buildingName)
-                .orElseThrow(() -> {
-                    log.warn("Building not found: name={}", buildingName);
-                    return new ResourceNotFoundException("Building not found with name: " + buildingName);
-                });
-    }
-
-    @Override
     @Transactional
     public FindOrCreateResult<Building> findOrCreate(String name) {
         return buildingRepository.findByNameAndDeletedFalse(name)

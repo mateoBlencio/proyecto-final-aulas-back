@@ -4,7 +4,6 @@ import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
 import ar.edu.utn.frc.siga.academic.service.SpecialtyService;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,12 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class SpecialtyServiceImpl implements SpecialtyService {
 
     private final SpecialtyRepository specialtyRepository;
-
-    @Override
-    public Optional<Specialty> findBySpecialtyCodeAndDeletedFalse(Integer specialtyCode) {
-        log.debug("Finding Specialty: code={}", specialtyCode);
-        return specialtyRepository.findBySpecialtyCodeAndDeletedFalse(specialtyCode);
-    }
 
     @Override
     @Transactional

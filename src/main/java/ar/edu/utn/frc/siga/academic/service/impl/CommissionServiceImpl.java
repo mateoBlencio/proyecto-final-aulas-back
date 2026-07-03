@@ -20,15 +20,6 @@ public class CommissionServiceImpl implements CommissionService {
     private final CommissionRepository commissionRepository;
 
     @Override
-    public Optional<Commission> findByCourseCodeAndCommissionNumberAndPeriodAndDeletedFalse(
-            String courseCode, Integer commissionNumber, AcademicPeriod period) {
-        log.debug("Finding commission: courseCode={}, commissionNumber={}, periodId={}",
-                courseCode, commissionNumber, period.getId());
-        return commissionRepository.findByCourseCodeAndCommissionNumberAndAcademicPeriodAndDeletedFalse(
-                courseCode, commissionNumber, period);
-    }
-
-    @Override
     public Optional<Commission> findById(Long id) {
         log.debug("Finding commission by id={}", id);
         return commissionRepository.findById(id);

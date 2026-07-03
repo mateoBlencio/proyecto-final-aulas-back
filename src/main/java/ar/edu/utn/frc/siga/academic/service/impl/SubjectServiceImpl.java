@@ -20,12 +20,6 @@ public class SubjectServiceImpl implements SubjectService {
     private final SubjectRepository subjectRepository;
 
     @Override
-    public Optional<Subject> findByCodeAndStudyPlanAndDeletedFalse(Integer code, StudyPlan studyPlan) {
-        log.debug("Finding Subject: code={}, studyPlanId={}", code, studyPlan.getId());
-        return subjectRepository.findByCodeAndStudyPlanAndDeletedFalse(code, studyPlan);
-    }
-
-    @Override
     public Optional<Subject> findById(Long id) {
         log.debug("Finding Subject by id={}", id);
         return subjectRepository.findById(id);

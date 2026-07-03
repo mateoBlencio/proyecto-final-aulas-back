@@ -1,7 +1,6 @@
 package ar.edu.utn.frc.siga.solver.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -55,25 +54,4 @@ public class EventRequestDto {
     @Schema(description = "[UNIQUE] Fecha exacta del evento", example = "2026-04-15")
     LocalDate date;
 
-    @AssertTrue(message = "RECURRING events require dayOfWeek, startDate and endDate")
-    @Schema(hidden = true)
-    public boolean isRecurringFieldsPresent() {
-        if (type != EventType.RECURRING) return true;
-        return dayOfWeek != null && startDate != null && endDate != null;
-    }
-
-    @AssertTrue(message = "UNIQUE events require date")
-    @Schema(hidden = true)
-    public boolean isUniqueFieldPresent() {
-        if (type != EventType.UNIQUE) return true;
-        return date != null;
-    }
-
-    @AssertTrue(message = "endDate must be >= startDate for RECURRING events")
-    @Schema(hidden = true)
-    public boolean isDateRangeValid() {
-        if (type != EventType.RECURRING) return true;
-        if (startDate == null || endDate == null) return true;
-        return !endDate.isBefore(startDate);
-    }
 }

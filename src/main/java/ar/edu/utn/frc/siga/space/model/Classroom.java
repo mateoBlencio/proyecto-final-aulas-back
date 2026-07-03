@@ -51,11 +51,4 @@ public class Classroom {
     @JoinColumn(name = "id_tipo_aula")
     private ClassroomType classroomType;
 
-    public int overcrowding(int enrolled) {
-        return Math.max(0, enrolled - capacity);
-    }
-
-    public int undercrowding(int enrolled) {
-        return Math.max(0, capacity - enrolled);
-    }
 }

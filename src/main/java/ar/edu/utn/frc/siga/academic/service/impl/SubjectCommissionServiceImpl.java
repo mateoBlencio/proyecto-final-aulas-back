@@ -6,7 +6,6 @@ import ar.edu.utn.frc.siga.academic.model.Commission;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
 import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,13 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class SubjectCommissionServiceImpl implements SubjectCommissionService {
 
     private final SubjectCommissionRepository subjectCommissionRepository;
-
-    @Override
-    public Optional<SubjectCommission> findBySubjectAndCommissionAndDeletedFalse(Subject subject, Commission commission) {
-        log.debug("Finding SubjectCommission: subjectId={}, commissionId={}",
-                subject.getId(), commission.getId());
-        return subjectCommissionRepository.findBySubjectAndCommissionAndDeletedFalse(subject, commission);
-    }
 
     @Override
     @Transactional

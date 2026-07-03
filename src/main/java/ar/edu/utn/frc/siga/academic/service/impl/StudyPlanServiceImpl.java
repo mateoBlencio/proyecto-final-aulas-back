@@ -5,7 +5,6 @@ import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
 import ar.edu.utn.frc.siga.academic.service.StudyPlanService;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,12 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class StudyPlanServiceImpl implements StudyPlanService {
 
     private final StudyPlanRepository studyPlanRepository;
-
-    @Override
-    public Optional<StudyPlan> findByPlanCodeAndSpecialtyAndDeletedFalse(Integer planCode, Specialty specialty) {
-        log.debug("Finding StudyPlan: planCode={}, specialtyId={}", planCode, specialty.getId());
-        return studyPlanRepository.findByPlanCodeAndSpecialtyAndDeletedFalse(planCode, specialty);
-    }
 
     @Override
     @Transactional

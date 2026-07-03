@@ -2,7 +2,6 @@ package ar.edu.utn.frc.siga.solver.optimization;
 
 import ai.timefold.solver.core.api.domain.common.PlanningId;
 import ai.timefold.solver.core.api.domain.entity.PlanningEntity;
-import ai.timefold.solver.core.api.domain.valuerange.ValueRangeProvider;
 import ai.timefold.solver.core.api.domain.variable.PlanningVariable;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -35,11 +34,6 @@ public class ClassAssignment {
         this.event = event;
         this.candidates = candidates;
         this.conflictingEventIds = conflictingEventIds;
-    }
-
-    @ValueRangeProvider
-    public List<SolverRoom> getCandidates() {
-        return candidates;
     }
 
     public int getOvercrowding() {

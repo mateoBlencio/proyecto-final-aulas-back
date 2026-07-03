@@ -10,9 +10,6 @@ import org.springframework.modulith.NamedInterface;
 @NamedInterface("api")
 public interface CommissionService {
 
-    Optional<Commission> findByCourseCodeAndCommissionNumberAndPeriodAndDeletedFalse(
-            String courseCode, Integer commissionNumber, AcademicPeriod period);
-
     Optional<Commission> findById(Long id);
 
     Commission save(Commission commission);

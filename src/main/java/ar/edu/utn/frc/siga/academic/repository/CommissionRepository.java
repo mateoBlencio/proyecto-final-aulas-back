@@ -8,7 +8,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface CommissionRepository extends JpaRepository<Commission, Long> {
-
     Optional<Commission> findByCourseCodeAndCommissionNumberAndAcademicPeriodAndDeletedFalse(
             String courseCode, Integer commissionNumber, AcademicPeriod academicPeriod);
 }

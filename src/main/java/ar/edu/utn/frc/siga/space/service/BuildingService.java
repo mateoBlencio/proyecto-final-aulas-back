@@ -13,8 +13,6 @@ public interface BuildingService {
 
     Building findById(Integer id);
 
-    Building findByName(String name);
-
     List<BuildingResponseDto> findAll();
 
     FindOrCreateResult<Building> findOrCreate(String name);

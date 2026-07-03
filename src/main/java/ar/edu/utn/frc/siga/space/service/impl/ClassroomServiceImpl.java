@@ -73,16 +73,6 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     @Override
-    public Classroom findByRoomNumberAndBuilding(String roomNumber, Building building) {
-        return classroomRepository.findByRoomNumberAndBuildingAndDeletedFalse(roomNumber, building)
-                .orElseThrow(() -> {
-                    log.warn("Classroom not found: roomNumber={} - buildingName={}", roomNumber, building.getName());
-                    return new
-                            ResourceNotFoundException("Classroom not found with roomNumber: " + roomNumber + " - buildingName:" + building.getName());
-                });
-    }
-
-    @Override
     public Page<ClassroomResponseDTO> findAll(ClassroomFilter filter, Pageable pageable) {
         log.debug("Listing classrooms: filter={}, page={}, size={}", filter, pageable.getPageNumber(), pageable.getPageSize());
         return classroomRepository.findAll(ClassroomSpecification.withFilter(filter), pageable)

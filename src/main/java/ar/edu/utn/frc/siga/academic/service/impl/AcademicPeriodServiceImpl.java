@@ -5,7 +5,6 @@ import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,12 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class AcademicPeriodServiceImpl implements AcademicPeriodService {
 
     private final AcademicPeriodRepository academicPeriodRepository;
-
-    @Override
-    public Optional<AcademicPeriod> findByYearAndSemester(Integer year, Integer semester) {
-        log.debug("Finding AcademicPeriod: year={}, semester={}", year, semester);
-        return academicPeriodRepository.findByYearAndSemester(year, semester);
-    }
 
     @Override
     @Transactional

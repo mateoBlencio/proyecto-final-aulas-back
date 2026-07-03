@@ -6,10 +6,10 @@ import org.springframework.http.HttpStatus;
 public class ExcelImportException extends SigaAppException {
 
     public ExcelImportException(String message) {
-        super(HttpStatus.UNPROCESSABLE_ENTITY, "Import error", message);
+        super(HttpStatus.UNPROCESSABLE_CONTENT, "Import error", message);
     }
 
     public ExcelImportException(String message, Throwable cause) {
-        super(HttpStatus.UNPROCESSABLE_ENTITY, "Import error", message, cause);
+        super(HttpStatus.UNPROCESSABLE_CONTENT, "Import error", message, cause);
     }
 }

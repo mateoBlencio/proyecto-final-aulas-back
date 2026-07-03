@@ -5,13 +5,14 @@ import ai.timefold.solver.core.api.score.stream.Constraint;
 import ai.timefold.solver.core.api.score.stream.ConstraintFactory;
 import ai.timefold.solver.core.api.score.stream.ConstraintProvider;
 import ai.timefold.solver.core.api.score.stream.Joiners;
+import org.jspecify.annotations.NonNull;
 
 public class ClassroomConstraintProvider implements ConstraintProvider {
 
     private static final int OVERCROWDING_WEIGHT = 100_000;
 
     @Override
-    public Constraint[] defineConstraints(ConstraintFactory factory) {
+    public Constraint[] defineConstraints(@NonNull ConstraintFactory factory) {
         return new Constraint[]{
                 noOverlap(factory),
                 minimizeOvercrowding(factory),

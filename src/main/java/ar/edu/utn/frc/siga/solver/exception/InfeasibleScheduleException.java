@@ -5,6 +5,6 @@ import org.springframework.http.HttpStatus;
 
 public class InfeasibleScheduleException extends SigaAppException {
     public InfeasibleScheduleException(String message) {
-        super(HttpStatus.UNPROCESSABLE_ENTITY, "Infeasible schedule", message);
+        super(HttpStatus.UNPROCESSABLE_CONTENT, "Infeasible schedule", message);
     }
 }

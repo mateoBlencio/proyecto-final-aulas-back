@@ -3,8 +3,10 @@ package ar.edu.utn.frc.siga.academic.model;
 import java.time.LocalDate;
 import java.util.Optional;
 
+import lombok.Getter;
 import org.springframework.modulith.NamedInterface;
 
+@Getter
 @NamedInterface("api")
 public enum TermType {
     ANUAL("Anual", 0),
@@ -17,14 +19,6 @@ public enum TermType {
     TermType(String label, int semester) {
         this.label = label;
         this.semester = semester;
-    }
-
-    public String getLabel() {
-        return label;
-    }
-
-    public int getSemester() {
-        return semester;
     }
 
     public LocalDate startDate(int year) {

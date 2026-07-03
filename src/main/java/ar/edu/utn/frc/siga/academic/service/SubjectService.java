@@ -10,8 +10,6 @@ import org.springframework.modulith.NamedInterface;
 @NamedInterface("api")
 public interface SubjectService {
 
-    Optional<Subject> findByCodeAndStudyPlanAndDeletedFalse(Integer code, StudyPlan studyPlan);
-
     Optional<Subject> findById(Long id);
 
     Subject save(Subject subject);

@@ -19,8 +19,6 @@ public interface ClassroomService {
 
     Classroom requireById(Integer id);
 
-    Classroom findByRoomNumberAndBuilding(String roomNumber, Building building);
-
     Page<ClassroomResponseDTO> findAll(ClassroomFilter filter, Pageable pageable);
 
     ClassroomResponseDTO update(Integer id, ClassroomRequestDTO dto);

@@ -10,6 +10,4 @@ public interface ClassroomTypeRepository extends JpaRepository<ClassroomType, In
 
     Optional<ClassroomType> findByIdAndDeletedFalse(Integer id);
 
-    Optional<ClassroomType> findFirstByDeletedFalse();
-
 }

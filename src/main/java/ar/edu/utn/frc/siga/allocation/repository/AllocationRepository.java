@@ -15,8 +15,6 @@ public interface AllocationRepository extends JpaRepository<Allocation, Long> {
 
     Optional<Allocation> findByOccurrence_Id(Long occurrenceId);
 
-    List<Allocation> findByOccurrence_Event_IdAndOccurrence_DateGreaterThanEqual(Long eventId, LocalDate date);
-
     @Query("SELECT a FROM Allocation a " +
            "JOIN FETCH a.occurrence o " +
            "JOIN FETCH o.event e " +
