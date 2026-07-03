@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.solver.optimization;
 
 import ai.timefold.solver.core.api.domain.common.PlanningId;
 import ai.timefold.solver.core.api.domain.entity.PlanningEntity;
+import ai.timefold.solver.core.api.domain.valuerange.ValueRangeProvider;
 import ai.timefold.solver.core.api.domain.variable.PlanningVariable;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -22,7 +23,14 @@ public class ClassAssignment {
     String id;
 
     SolverEvent event;
+
+    /**
+     * Value range por entidad: las aulas que este evento puede recibir
+     * (todas, o solo la fijada si viene pinneado).
+     */
+    @ValueRangeProvider
     List<SolverRoom> candidates;
+
     Set<String> conflictingEventIds;
 
     @Setter

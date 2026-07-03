@@ -5,12 +5,15 @@ import ar.edu.utn.frc.siga.solver.dto.request.AllocationParametersDto;
 import ar.edu.utn.frc.siga.solver.dto.request.AllocationRequestDto;
 import ar.edu.utn.frc.siga.solver.dto.request.EventRequestDto;
 import ar.edu.utn.frc.siga.solver.dto.request.PinnedAssignmentDto;
+import ar.edu.utn.frc.siga.solver.config.SolverProperties;
 import ar.edu.utn.frc.siga.solver.exception.InvalidAllocationRequestException;
 import ar.edu.utn.frc.siga.solver.mapper.AllocationRequestMapper;
 import ar.edu.utn.frc.siga.solver.mapper.AllocationResponseMapper;
 import ar.edu.utn.frc.siga.solver.model.ConflictPair;
+import ar.edu.utn.frc.siga.solver.optimization.ScheduleSolution;
 import ar.edu.utn.frc.siga.solver.optimization.SolverEvent;
 import ar.edu.utn.frc.siga.solver.service.impl.SolverServiceImpl;
+import ai.timefold.solver.core.api.solver.SolverManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,6 +39,8 @@ class SolverServiceImplTest {
 
     @Mock AllocationRequestMapper requestMapper;
     @Mock AllocationResponseMapper responseMapper;
+    @Mock SolverManager<ScheduleSolution> solverManager;
+    @Mock SolverProperties solverProperties;
     @InjectMocks SolverServiceImpl service;
 
     private Method timesOverlap;

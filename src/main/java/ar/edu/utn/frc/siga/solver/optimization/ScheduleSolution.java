@@ -30,4 +30,9 @@ public class ScheduleSolution {
     @Setter
     @PlanningScore
     HardSoftScore score;
+
+    public ScheduleSolution(List<SolverRoom> classrooms, List<ClassAssignment> assignments) {
+        this.classrooms = classrooms;
+        this.assignments = assignments;
+    }
 }

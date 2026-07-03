@@ -54,6 +54,15 @@ management:
 cors:
   allowed-origins: ""
 
+siga:
+  solver:
+    # Solves concurrentes del SolverManager; excedentes se encolan. AUTO = según cores.
+    parallel-solver-count: AUTO
+    # Corta el solve si el mejor score no mejora en N segundos (0 = deshabilitado).
+    unimproved-seconds-limit: 10
+    # PHASE_ASSERT (default Timefold, reproducible); FULL_ASSERT solo para debugging.
+    environment-mode: PHASE_ASSERT
+
 logging:
   level:
     root: WARN

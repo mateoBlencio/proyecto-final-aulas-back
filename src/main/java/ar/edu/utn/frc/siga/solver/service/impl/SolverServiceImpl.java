@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.solver.service.impl;
 
+import ar.edu.utn.frc.siga.solver.config.SolverProperties;
 import ar.edu.utn.frc.siga.solver.dto.request.AllocationParametersDto;
 import ar.edu.utn.frc.siga.solver.dto.request.AllocationRequestDto;
 import ar.edu.utn.frc.siga.solver.dto.request.PinnedAssignmentDto;
@@ -10,13 +11,13 @@ import ar.edu.utn.frc.siga.solver.mapper.AllocationRequestMapper;
 import ar.edu.utn.frc.siga.solver.mapper.AllocationResponseMapper;
 import ar.edu.utn.frc.siga.solver.model.ConflictPair;
 import ar.edu.utn.frc.siga.solver.optimization.ClassAssignment;
-import ar.edu.utn.frc.siga.solver.optimization.ClassroomConstraintProvider;
 import ar.edu.utn.frc.siga.solver.optimization.ScheduleSolution;
 import ar.edu.utn.frc.siga.solver.optimization.SolverEvent;
 import ar.edu.utn.frc.siga.solver.optimization.SolverRoom;
 import ar.edu.utn.frc.siga.solver.service.SolverService;
-import ai.timefold.solver.core.api.solver.Solver;
-import ai.timefold.solver.core.api.solver.SolverFactory;
+import ai.timefold.solver.core.api.solver.SolverConfigOverride;
+import ai.timefold.solver.core.api.solver.SolverJob;
+import ai.timefold.solver.core.api.solver.SolverManager;
 import ai.timefold.solver.core.config.solver.termination.TerminationConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -40,6 +42,8 @@ public class SolverServiceImpl implements SolverService {
 
     private final AllocationRequestMapper requestMapper;
     private final AllocationResponseMapper responseMapper;
+    private final SolverManager<ScheduleSolution> solverManager;
+    private final SolverProperties solverProperties;
 
     @Override
     public AllocationPreviewResponseDto preview(AllocationRequestDto request) {
@@ -76,7 +80,7 @@ public class SolverServiceImpl implements SolverService {
                         candidatesByEventId.getOrDefault(event.planningId(), classrooms),
                         conflictsByEventId.getOrDefault(event.planningId(), Set.of())))
                 .toList();
-        ScheduleSolution problem = new ScheduleSolution(classrooms, assignments, null);
+        ScheduleSolution problem = new ScheduleSolution(classrooms, assignments);
         return runSolver(problem, timeLimitSeconds);
     }
 
@@ -84,24 +88,35 @@ public class SolverServiceImpl implements SolverService {
         String jobId = UUID.randomUUID().toString();
         log.info("Solver job {} starting, limit {}s", jobId, timeLimitSeconds);
 
-        ai.timefold.solver.core.config.solver.SolverConfig config =
-                new ai.timefold.solver.core.config.solver.SolverConfig()
-                        .withSolutionClass(ScheduleSolution.class)
-                        .withEntityClasses(ClassAssignment.class)
-                        .withConstraintProviderClass(ClassroomConstraintProvider.class)
-                        .withTerminationConfig(new TerminationConfig()
-                                .withSecondsSpentLimit((long) timeLimitSeconds));
-
-        SolverFactory<ScheduleSolution> factory = SolverFactory.create(config);
-        Solver<ScheduleSolution> solver = factory.buildSolver();
+        SolverJob<ScheduleSolution> job = solverManager.solveBuilder()
+                .withProblemId(jobId)
+                .withProblem(problem)
+                .withConfigOverride(new SolverConfigOverride()
+                        .withTerminationConfig(buildTermination(timeLimitSeconds)))
+                .run();
         try {
-            ScheduleSolution solution = solver.solve(problem);
+            ScheduleSolution solution = job.getFinalBestSolution();
             log.info("Solver job {} finished, score {}", jobId, solution.getScore());
             return solution;
-        } catch (Exception e) {
-            log.error("Solver job {} failed", jobId, e);
-            throw new SchedulingException("Error during optimization: " + e.getMessage(), e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            job.terminateEarly();
+            throw new SchedulingException("Optimization interrupted", e);
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            log.error("Solver job {} failed", jobId, cause);
+            throw new SchedulingException("Error during optimization: " + cause.getMessage(), cause);
         }
+    }
+
+    private TerminationConfig buildTermination(int timeLimitSeconds) {
+        TerminationConfig termination = new TerminationConfig()
+                .withSecondsSpentLimit((long) timeLimitSeconds);
+        long unimproved = solverProperties.getUnimprovedSecondsLimit();
+        if (unimproved > 0) {
+            termination.setUnimprovedSecondsSpentLimit(unimproved);
+        }
+        return termination;
     }
 
     /**

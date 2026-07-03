@@ -33,7 +33,7 @@ class ComputeConflictsEquivalenceTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        service = new SolverServiceImpl(null, null);
+        service = new SolverServiceImpl(null, null, null, null);
         computeConflicts = SolverServiceImpl.class.getDeclaredMethod("computeConflicts", List.class);
         computeConflicts.setAccessible(true);
     }
