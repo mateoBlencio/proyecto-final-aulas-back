@@ -1,5 +1,5 @@
 @ApplicationModule(allowedDependencies = {
-        "allocation :: model", "space :: model", "space :: dto"
+        "space :: dto"
 })
 package ar.edu.utn.frc.siga.solver;
 

@@ -1,10 +1,10 @@
 package ar.edu.utn.frc.siga.solver.mapper;
 
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDTO;
-import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.solver.dto.request.AllocationParametersDto;
 import ar.edu.utn.frc.siga.solver.dto.request.EventRequestDto;
-import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
+import ar.edu.utn.frc.siga.solver.optimization.SolverEvent;
+import ar.edu.utn.frc.siga.solver.optimization.SolverRoom;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -18,11 +18,11 @@ public class AllocationRequestMapper {
 
     private final EventMapper eventMapper;
 
-    public List<AcademicEvent> toEvents(List<EventRequestDto> dtos) {
+    public List<SolverEvent> toEvents(List<EventRequestDto> dtos) {
         return eventMapper.toEvents(dtos);
     }
 
-    public List<Classroom> toClassrooms(List<ClassroomResponseDTO> dtos, AllocationParametersDto params) {
+    public List<SolverRoom> toClassrooms(List<ClassroomResponseDTO> dtos, AllocationParametersDto params) {
         Set<Integer> excludedIds = params != null
                 ? new HashSet<>(params.getExcludedClassroomIds()) : Set.of();
         Set<String> excludedBuildings = params != null
@@ -35,11 +35,7 @@ public class AllocationRequestMapper {
                 .toList();
     }
 
-    private Classroom toClassroom(ClassroomResponseDTO dto) {
-        return Classroom.builder()
-                .id(dto.getId())
-                .roomNumber(dto.getRoomNumber())
-                .capacity(dto.getCapacity())
-                .build();
+    private SolverRoom toClassroom(ClassroomResponseDTO dto) {
+        return new SolverRoom(dto.getId(), dto.getCapacity());
     }
 }

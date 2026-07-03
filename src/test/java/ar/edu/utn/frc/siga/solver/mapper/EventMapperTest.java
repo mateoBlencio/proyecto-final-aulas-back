@@ -1,9 +1,7 @@
 package ar.edu.utn.frc.siga.solver.mapper;
 
 import ar.edu.utn.frc.siga.solver.dto.request.EventRequestDto;
-import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
-import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
-import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
+import ar.edu.utn.frc.siga.solver.optimization.SolverEvent;
 import org.junit.jupiter.api.Test;
 
 import java.time.DayOfWeek;
@@ -47,33 +45,29 @@ class EventMapperTest {
 
     @Test
     void upEm001_recurring_allFields() {
-        AcademicEvent event = mapper.toEvent(recurringDto("rec-1", 90));
-        assertThat(event).isInstanceOf(RecurringEvent.class);
-        RecurringEvent rec = (RecurringEvent) event;
-        assertThat(rec.getPlanningId()).isEqualTo("rec-1");
-        assertThat(rec.getDayOfWeek()).isEqualTo(DayOfWeek.MONDAY);
-        assertThat(rec.getStartDate()).isEqualTo(LocalDate.of(2024, 3, 4));
-        assertThat(rec.getEndDate()).isEqualTo(LocalDate.of(2024, 6, 30));
+        SolverEvent event = mapper.toEvent(recurringDto("rec-1", 90));
+        assertThat(event.planningId()).isEqualTo("rec-1");
+        assertThat(event.occurrenceDates()).contains(LocalDate.of(2024, 3, 4));
+        assertThat(event.occurrenceDates()).allMatch(d -> d.getDayOfWeek() == DayOfWeek.MONDAY);
+        assertThat(event.occurrenceDates()).noneMatch(d -> d.isAfter(LocalDate.of(2024, 6, 30)));
     }
 
     @Test
     void upEm002_unique_correctDate() {
         LocalDate date = LocalDate.of(2024, 7, 23);
-        AcademicEvent event = mapper.toEvent(uniqueDto("uni-1", date));
-        assertThat(event).isInstanceOf(UniqueEvent.class);
-        UniqueEvent uni = (UniqueEvent) event;
-        assertThat(uni.getDate()).isEqualTo(date);
+        SolverEvent event = mapper.toEvent(uniqueDto("uni-1", date));
+        assertThat(event.occurrenceDates()).containsExactly(date);
     }
 
     @Test
     void upEm003_duration_90min() {
-        AcademicEvent event = mapper.toEvent(recurringDto("e1", 90));
+        SolverEvent event = mapper.toEvent(recurringDto("e1", 90));
         assertThat(event.endTime()).isEqualTo(LocalTime.of(9, 30));
     }
 
     @Test
     void upEm004_duration_225min() {
-        AcademicEvent event = mapper.toEvent(recurringDto("e1", 225));
+        SolverEvent event = mapper.toEvent(recurringDto("e1", 225));
         assertThat(event.endTime()).isEqualTo(LocalTime.of(11, 45));
     }
 
@@ -84,9 +78,9 @@ class EventMapperTest {
                 uniqueDto("u1", LocalDate.of(2024, 7, 1)),
                 recurringDto("r2", 135)
         );
-        List<AcademicEvent> events = mapper.toEvents(dtos);
-        assertThat(events.get(0)).isInstanceOf(RecurringEvent.class);
-        assertThat(events.get(1)).isInstanceOf(UniqueEvent.class);
-        assertThat(events.get(2)).isInstanceOf(RecurringEvent.class);
+        List<SolverEvent> events = mapper.toEvents(dtos);
+        assertThat(events.get(0).planningId()).isEqualTo("r1");
+        assertThat(events.get(1).occurrenceDates()).containsExactly(LocalDate.of(2024, 7, 1));
+        assertThat(events.get(2).planningId()).isEqualTo("r2");
     }
 }

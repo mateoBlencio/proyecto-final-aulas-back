@@ -24,7 +24,7 @@ public class ClassroomConstraintProvider implements ConstraintProvider {
                 .forEachUniquePair(ClassAssignment.class,
                         Joiners.equal(ClassAssignment::getClassroom),
                         Joiners.filtering((a, b) ->
-                                a.conflictsWith(b.getEvent().getPlanningId())))
+                                a.conflictsWith(b.getEvent().planningId())))
                 .penalize(HardSoftScore.ONE_HARD)
                 .asConstraint("Sin solapamiento");
     }

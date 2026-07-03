@@ -1,6 +1,5 @@
 package ar.edu.utn.frc.siga.solver.optimization;
 
-import ar.edu.utn.frc.siga.space.model.Classroom;
 import ai.timefold.solver.core.api.domain.solution.PlanningEntityCollectionProperty;
 import ai.timefold.solver.core.api.domain.solution.PlanningScore;
 import ai.timefold.solver.core.api.domain.solution.PlanningSolution;
@@ -23,7 +22,7 @@ import java.util.List;
 public class ScheduleSolution {
 
     @ProblemFactCollectionProperty
-    List<Classroom> classrooms;
+    List<SolverRoom> classrooms;
 
     @PlanningEntityCollectionProperty
     List<ClassAssignment> assignments;

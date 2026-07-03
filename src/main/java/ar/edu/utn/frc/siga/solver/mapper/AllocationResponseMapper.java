@@ -8,8 +8,8 @@ import ar.edu.utn.frc.siga.solver.dto.response.AllocationSummaryDto;
 import ar.edu.utn.frc.siga.solver.dto.response.AssignmentResultDto;
 import ar.edu.utn.frc.siga.solver.dto.response.QualityDetailDto;
 import ar.edu.utn.frc.siga.solver.dto.response.WarningDto;
-import ar.edu.utn.frc.siga.allocation.model.AllocationQuality;
-import ar.edu.utn.frc.siga.allocation.model.AllocationStatus;
+import ar.edu.utn.frc.siga.solver.dto.response.AllocationQuality;
+import ar.edu.utn.frc.siga.solver.dto.response.AllocationStatus;
 import ar.edu.utn.frc.siga.solver.optimization.ClassAssignment;
 import ar.edu.utn.frc.siga.solver.optimization.ScheduleSolution;
 import lombok.RequiredArgsConstructor;
@@ -40,9 +40,9 @@ public class AllocationResponseMapper {
         List<WarningDto> warnings = new ArrayList<>();
 
         for (ClassAssignment a : solution.getAssignments()) {
-            EventRequestDto eventDto = eventsById.get(a.getEvent().getPlanningId());
+            EventRequestDto eventDto = eventsById.get(a.getEvent().planningId());
             ClassroomResponseDTO classroomDto = a.getClassroom() != null
-                    ? classroomsById.get(a.getClassroom().getId()) : null;
+                    ? classroomsById.get(a.getClassroom().id()) : null;
 
             AllocationQuality quality = computeQuality(a);
             QualityDetailDto qualityDetail = classroomDto != null ? buildQualityDetail(a) : null;
@@ -57,7 +57,7 @@ public class AllocationResponseMapper {
             if (quality == AllocationQuality.UNASSIGNED) {
                 warnings.add(WarningDto.builder()
                         .code("NO_CLASSROOM_AVAILABLE")
-                        .eventId(a.getEvent().getPlanningId())
+                        .eventId(a.getEvent().planningId())
                         .message("No hay aulas disponibles sin conflicto para este evento.")
                         .build());
             }
@@ -99,8 +99,8 @@ public class AllocationResponseMapper {
     }
 
     private double occupancyRatio(ClassAssignment a) {
-        int total = a.getEvent().getEnrolled() + a.getUnusedCapacity();
-        return total > 0 ? (double) a.getEvent().getEnrolled() / total : 0.0;
+        int total = a.getEvent().enrolled() + a.getUnusedCapacity();
+        return total > 0 ? (double) a.getEvent().enrolled() / total : 0.0;
     }
 
     private AllocationStatus resolveStatus(ScheduleSolution solution, long unassignedCount) {

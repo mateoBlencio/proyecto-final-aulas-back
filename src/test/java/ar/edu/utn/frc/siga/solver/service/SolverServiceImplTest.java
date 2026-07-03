@@ -9,9 +9,7 @@ import ar.edu.utn.frc.siga.solver.exception.InvalidAllocationRequestException;
 import ar.edu.utn.frc.siga.solver.mapper.AllocationRequestMapper;
 import ar.edu.utn.frc.siga.solver.mapper.AllocationResponseMapper;
 import ar.edu.utn.frc.siga.solver.model.ConflictPair;
-import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
-import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
-import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
+import ar.edu.utn.frc.siga.solver.optimization.SolverEvent;
 import ar.edu.utn.frc.siga.solver.service.impl.SolverServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,9 +21,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.DayOfWeek;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -45,7 +44,7 @@ class SolverServiceImplTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        timesOverlap = SolverServiceImpl.class.getDeclaredMethod("timesOverlap", AcademicEvent.class, AcademicEvent.class);
+        timesOverlap = SolverServiceImpl.class.getDeclaredMethod("timesOverlap", SolverEvent.class, SolverEvent.class);
         timesOverlap.setAccessible(true);
 
         computeConflicts = SolverServiceImpl.class.getDeclaredMethod("computeConflicts", List.class);
@@ -59,14 +58,14 @@ class SolverServiceImplTest {
     // ─── timesOverlap ───────────────────────────────────────────────────────
 
     private boolean overlap(int startHourA, int startMinA, int durA, int startHourB, int startMinB, int durB) throws Exception {
-        AcademicEvent a = uniqueEvent("a", LocalTime.of(startHourA, startMinA), durA);
-        AcademicEvent b = uniqueEvent("b", LocalTime.of(startHourB, startMinB), durB);
+        SolverEvent a = uniqueEvent("a", LocalTime.of(startHourA, startMinA), durA);
+        SolverEvent b = uniqueEvent("b", LocalTime.of(startHourB, startMinB), durB);
         return (boolean) timesOverlap.invoke(service, a, b);
     }
 
-    private UniqueEvent uniqueEvent(String id, LocalTime start, int dur) {
-        return UniqueEvent.builder().planningId(id).enrolled(30).startTime(start)
-                .duration(Duration.ofMinutes(dur)).date(LocalDate.of(2024, 1, 1)).build();
+    private SolverEvent uniqueEvent(String id, LocalTime start, int dur) {
+        LocalTime end = start.plusMinutes(dur);
+        return new SolverEvent(id, 30, start, end, List.of(LocalDate.of(2024, 1, 1)));
     }
 
     @Test
@@ -112,94 +111,90 @@ class SolverServiceImplTest {
     // ─── computeConflicts ────────────────────────────────────────────────────
 
     @SuppressWarnings("unchecked")
-    private Set<ConflictPair> conflicts(List<AcademicEvent> events) throws Exception {
+    private Set<ConflictPair> conflicts(List<SolverEvent> events) throws Exception {
         return (Set<ConflictPair>) computeConflicts.invoke(service, events);
     }
 
-    private RecurringEvent recurring(String id, DayOfWeek dow, LocalTime start, int dur,
-                                     LocalDate from, LocalDate to) {
-        return RecurringEvent.builder().planningId(id).enrolled(30).startTime(start)
-                .duration(Duration.ofMinutes(dur)).dayOfWeek(dow)
-                .startDate(from).endDate(to).build();
+    private List<LocalDate> weeklyDates(DayOfWeek dow, LocalDate from, LocalDate to) {
+        List<LocalDate> dates = new ArrayList<>();
+        LocalDate current = from.with(TemporalAdjusters.nextOrSame(dow));
+        while (!current.isAfter(to)) {
+            dates.add(current);
+            current = current.plusWeeks(1);
+        }
+        return dates;
+    }
+
+    private SolverEvent recurring(String id, DayOfWeek dow, LocalTime start, int dur,
+                                  LocalDate from, LocalDate to) {
+        return new SolverEvent(id, 30, start, start.plusMinutes(dur), weeklyDates(dow, from, to));
+    }
+
+    private SolverEvent unique(String id, LocalTime start, int dur, LocalDate date) {
+        return new SolverEvent(id, 30, start, start.plusMinutes(dur), List.of(date));
     }
 
     @Test
     void upCc001_twoRecurring_sameSlot_overlappingDates_oneConflict() throws Exception {
-        RecurringEvent a = recurring("A", DayOfWeek.MONDAY, LocalTime.of(8, 0), 90,
+        SolverEvent a = recurring("A", DayOfWeek.MONDAY, LocalTime.of(8, 0), 90,
                 LocalDate.of(2024, 3, 4), LocalDate.of(2024, 6, 30));
-        RecurringEvent b = recurring("B", DayOfWeek.MONDAY, LocalTime.of(8, 0), 90,
+        SolverEvent b = recurring("B", DayOfWeek.MONDAY, LocalTime.of(8, 0), 90,
                 LocalDate.of(2024, 5, 1), LocalDate.of(2024, 7, 31));
         assertThat(conflicts(List.of(a, b))).hasSize(1);
     }
 
     @Test
     void upCc002_twoRecurring_sameSlot_disjointDates_noConflict() throws Exception {
-        RecurringEvent a = recurring("A", DayOfWeek.MONDAY, LocalTime.of(8, 0), 90,
+        SolverEvent a = recurring("A", DayOfWeek.MONDAY, LocalTime.of(8, 0), 90,
                 LocalDate.of(2024, 3, 4), LocalDate.of(2024, 6, 28));
-        RecurringEvent b = recurring("B", DayOfWeek.MONDAY, LocalTime.of(8, 0), 90,
+        SolverEvent b = recurring("B", DayOfWeek.MONDAY, LocalTime.of(8, 0), 90,
                 LocalDate.of(2024, 8, 5), LocalDate.of(2024, 11, 29));
         assertThat(conflicts(List.of(a, b))).isEmpty();
     }
 
     @Test
     void upCc003_twoRecurring_sameDay_adjacentTimes_noConflict() throws Exception {
-        RecurringEvent a = recurring("A", DayOfWeek.MONDAY, LocalTime.of(8, 0), 90,
+        SolverEvent a = recurring("A", DayOfWeek.MONDAY, LocalTime.of(8, 0), 90,
                 LocalDate.of(2024, 3, 4), LocalDate.of(2024, 6, 28));
-        RecurringEvent b = recurring("B", DayOfWeek.MONDAY, LocalTime.of(9, 30), 90,
+        SolverEvent b = recurring("B", DayOfWeek.MONDAY, LocalTime.of(9, 30), 90,
                 LocalDate.of(2024, 3, 4), LocalDate.of(2024, 6, 28));
         assertThat(conflicts(List.of(a, b))).isEmpty();
     }
 
     @Test
     void upCc004_recurring_plus_unique_thursday_inRange_oneConflict() throws Exception {
-        RecurringEvent rec = recurring("REC", DayOfWeek.THURSDAY, LocalTime.of(8, 0), 90,
+        SolverEvent rec = recurring("REC", DayOfWeek.THURSDAY, LocalTime.of(8, 0), 90,
                 LocalDate.of(2024, 3, 7), LocalDate.of(2024, 11, 28));
-        UniqueEvent uni = UniqueEvent.builder().planningId("UNI").enrolled(30)
-                .startTime(LocalTime.of(8, 0)).duration(Duration.ofMinutes(90))
-                .date(LocalDate.of(2024, 5, 9)).build();
+        SolverEvent uni = unique("UNI", LocalTime.of(8, 0), 90, LocalDate.of(2024, 5, 9));
         assertThat(conflicts(List.of(rec, uni))).hasSize(1);
     }
 
     @Test
     void upCc005_recurring_plus_unique_thursday_outsideRange_noConflict() throws Exception {
-        RecurringEvent rec = recurring("REC", DayOfWeek.THURSDAY, LocalTime.of(8, 0), 90,
+        SolverEvent rec = recurring("REC", DayOfWeek.THURSDAY, LocalTime.of(8, 0), 90,
                 LocalDate.of(2024, 3, 7), LocalDate.of(2024, 6, 27));
-        UniqueEvent uni = UniqueEvent.builder().planningId("UNI").enrolled(30)
-                .startTime(LocalTime.of(8, 0)).duration(Duration.ofMinutes(90))
-                .date(LocalDate.of(2024, 8, 15)).build();
+        SolverEvent uni = unique("UNI", LocalTime.of(8, 0), 90, LocalDate.of(2024, 8, 15));
         assertThat(conflicts(List.of(rec, uni))).isEmpty();
     }
 
     @Test
     void upCc006_twoUnique_sameDate_sameTime_oneConflict() throws Exception {
-        UniqueEvent a = UniqueEvent.builder().planningId("A").enrolled(30)
-                .startTime(LocalTime.of(8, 0)).duration(Duration.ofMinutes(90))
-                .date(LocalDate.of(2024, 7, 23)).build();
-        UniqueEvent b = UniqueEvent.builder().planningId("B").enrolled(30)
-                .startTime(LocalTime.of(8, 0)).duration(Duration.ofMinutes(90))
-                .date(LocalDate.of(2024, 7, 23)).build();
+        SolverEvent a = unique("A", LocalTime.of(8, 0), 90, LocalDate.of(2024, 7, 23));
+        SolverEvent b = unique("B", LocalTime.of(8, 0), 90, LocalDate.of(2024, 7, 23));
         assertThat(conflicts(List.of(a, b))).hasSize(1);
     }
 
     @Test
     void upCc007_twoUnique_sameDate_differentTimes_noConflict() throws Exception {
-        UniqueEvent a = UniqueEvent.builder().planningId("A").enrolled(30)
-                .startTime(LocalTime.of(8, 0)).duration(Duration.ofMinutes(90))
-                .date(LocalDate.of(2024, 7, 23)).build();
-        UniqueEvent b = UniqueEvent.builder().planningId("B").enrolled(30)
-                .startTime(LocalTime.of(14, 0)).duration(Duration.ofMinutes(90))
-                .date(LocalDate.of(2024, 7, 23)).build();
+        SolverEvent a = unique("A", LocalTime.of(8, 0), 90, LocalDate.of(2024, 7, 23));
+        SolverEvent b = unique("B", LocalTime.of(14, 0), 90, LocalDate.of(2024, 7, 23));
         assertThat(conflicts(List.of(a, b))).isEmpty();
     }
 
     @Test
     void upCc008_twoUnique_differentDates_sameTime_noConflict() throws Exception {
-        UniqueEvent a = UniqueEvent.builder().planningId("A").enrolled(30)
-                .startTime(LocalTime.of(8, 0)).duration(Duration.ofMinutes(90))
-                .date(LocalDate.of(2024, 7, 23)).build();
-        UniqueEvent b = UniqueEvent.builder().planningId("B").enrolled(30)
-                .startTime(LocalTime.of(8, 0)).duration(Duration.ofMinutes(90))
-                .date(LocalDate.of(2024, 7, 24)).build();
+        SolverEvent a = unique("A", LocalTime.of(8, 0), 90, LocalDate.of(2024, 7, 23));
+        SolverEvent b = unique("B", LocalTime.of(8, 0), 90, LocalDate.of(2024, 7, 24));
         assertThat(conflicts(List.of(a, b))).isEmpty();
     }
 
@@ -207,9 +202,9 @@ class SolverServiceImplTest {
     void upCc009_threeEvents_partialConflicts() throws Exception {
         LocalDate start = LocalDate.of(2024, 3, 4);
         LocalDate end = LocalDate.of(2024, 3, 31);
-        RecurringEvent a = recurring("A", DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, start, end);
-        RecurringEvent b = recurring("B", DayOfWeek.MONDAY, LocalTime.of(9, 0), 90, start, end);
-        RecurringEvent c = recurring("C", DayOfWeek.MONDAY, LocalTime.of(10, 0), 90, start, end);
+        SolverEvent a = recurring("A", DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, start, end);
+        SolverEvent b = recurring("B", DayOfWeek.MONDAY, LocalTime.of(9, 0), 90, start, end);
+        SolverEvent c = recurring("C", DayOfWeek.MONDAY, LocalTime.of(10, 0), 90, start, end);
         Set<ConflictPair> result = conflicts(List.of(a, b, c));
         assertThat(result).hasSize(2);
         assertThat(result).contains(new ConflictPair("A", "B"), new ConflictPair("B", "C"));
@@ -218,7 +213,7 @@ class SolverServiceImplTest {
 
     @Test
     void upCc010_singleEvent_noConflicts() throws Exception {
-        RecurringEvent a = recurring("A", DayOfWeek.MONDAY, LocalTime.of(8, 0), 90,
+        SolverEvent a = recurring("A", DayOfWeek.MONDAY, LocalTime.of(8, 0), 90,
                 LocalDate.of(2024, 3, 4), LocalDate.of(2024, 6, 30));
         assertThat(conflicts(List.of(a))).isEmpty();
     }

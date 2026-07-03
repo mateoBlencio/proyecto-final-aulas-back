@@ -1,7 +1,5 @@
 package ar.edu.utn.frc.siga.solver.optimization;
 
-import ar.edu.utn.frc.siga.space.model.Classroom;
-import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
 import ai.timefold.solver.core.api.domain.common.PlanningId;
 import ai.timefold.solver.core.api.domain.entity.PlanningEntity;
 import ai.timefold.solver.core.api.domain.valuerange.ValueRangeProvider;
@@ -24,34 +22,34 @@ public class ClassAssignment {
     @PlanningId
     String id;
 
-    AcademicEvent event;
-    List<Classroom> candidates;
+    SolverEvent event;
+    List<SolverRoom> candidates;
     Set<String> conflictingEventIds;
 
     @Setter
     @PlanningVariable
-    Classroom classroom;
+    SolverRoom classroom;
 
-    public ClassAssignment(AcademicEvent event, List<Classroom> candidates, Set<String> conflictingEventIds) {
-        this.id = event.getPlanningId();
+    public ClassAssignment(SolverEvent event, List<SolverRoom> candidates, Set<String> conflictingEventIds) {
+        this.id = event.planningId();
         this.event = event;
         this.candidates = candidates;
         this.conflictingEventIds = conflictingEventIds;
     }
 
     @ValueRangeProvider
-    public List<Classroom> getCandidates() {
+    public List<SolverRoom> getCandidates() {
         return candidates;
     }
 
     public int getOvercrowding() {
-        if (classroom == null) return event.getEnrolled();
-        return classroom.overcrowding(event.getEnrolled());
+        if (classroom == null) return event.enrolled();
+        return classroom.overcrowding(event.enrolled());
     }
 
     public int getUnusedCapacity() {
         if (classroom == null) return 0;
-        return classroom.undercrowding(event.getEnrolled());
+        return classroom.undercrowding(event.enrolled());
     }
 
     public boolean conflictsWith(String eventId) {

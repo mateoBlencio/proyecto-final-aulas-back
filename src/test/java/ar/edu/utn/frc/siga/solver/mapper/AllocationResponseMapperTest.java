@@ -1,16 +1,15 @@
 package ar.edu.utn.frc.siga.solver.mapper;
 
-import ar.edu.utn.frc.siga.space.model.Classroom;
-import ar.edu.utn.frc.siga.allocation.model.AllocationStatus;
-import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
+import ar.edu.utn.frc.siga.solver.dto.response.AllocationStatus;
 import ar.edu.utn.frc.siga.solver.optimization.ClassAssignment;
 import ar.edu.utn.frc.siga.solver.optimization.ScheduleSolution;
+import ar.edu.utn.frc.siga.solver.optimization.SolverEvent;
+import ar.edu.utn.frc.siga.solver.optimization.SolverRoom;
 import ai.timefold.solver.core.api.score.HardSoftScore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -52,13 +51,9 @@ class AllocationResponseMapperTest {
     }
 
     private ClassAssignment assignmentWith(int enrolled, int capacity) {
-        UniqueEvent event = UniqueEvent.builder()
-                .planningId("e1").enrolled(enrolled)
-                .startTime(LocalTime.of(8, 0))
-                .duration(Duration.ofMinutes(90))
-                .date(LocalDate.of(2024, 1, 1))
-                .build();
-        Classroom classroom = Classroom.builder().id(1).roomNumber("C1").capacity(capacity).build();
+        SolverEvent event = new SolverEvent("e1", enrolled, LocalTime.of(8, 0), LocalTime.of(9, 30),
+                List.of(LocalDate.of(2024, 1, 1)));
+        SolverRoom classroom = new SolverRoom(1, capacity);
         ClassAssignment a = new ClassAssignment(event, List.of(classroom), Set.of());
         a.setClassroom(classroom);
         return a;

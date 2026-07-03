@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.allocation.model;
+package ar.edu.utn.frc.siga.solver.dto.response;
 
 public enum AllocationStatus {
     SUCCESS,

@@ -1,7 +1,6 @@
 package ar.edu.utn.frc.siga.solver.dto.response;
 
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDTO;
-import ar.edu.utn.frc.siga.allocation.model.AllocationQuality;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Value;

@@ -2,41 +2,42 @@ package ar.edu.utn.frc.siga.solver.mapper;
 
 import ar.edu.utn.frc.siga.solver.dto.request.EventRequestDto;
 import ar.edu.utn.frc.siga.solver.dto.response.EventSummaryDto;
-import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
-import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
-import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
+import ar.edu.utn.frc.siga.solver.optimization.SolverEvent;
 import org.springframework.stereotype.Component;
 
+import java.time.DayOfWeek;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
 public class EventMapper {
 
-    public List<AcademicEvent> toEvents(List<EventRequestDto> dtos) {
+    public List<SolverEvent> toEvents(List<EventRequestDto> dtos) {
         return dtos.stream().map(this::toEvent).toList();
     }
 
-    public AcademicEvent toEvent(EventRequestDto dto) {
-        Duration duration = Duration.ofMinutes(dto.getDurationMinutes());
-        return switch (dto.getType()) {
-            case RECURRING -> RecurringEvent.builder()
-                    .planningId(dto.getId())
-                    .enrolled(dto.getEnrolled())
-                    .startTime(dto.getStartTime())
-                    .duration(duration)
-                    .dayOfWeek(dto.getDayOfWeek())
-                    .startDate(dto.getStartDate())
-                    .endDate(dto.getEndDate())
-                    .build();
-            case UNIQUE -> UniqueEvent.builder()
-                    .planningId(dto.getId())
-                    .enrolled(dto.getEnrolled())
-                    .startTime(dto.getStartTime())
-                    .duration(duration)
-                    .date(dto.getDate())
-                    .build();
+    public SolverEvent toEvent(EventRequestDto dto) {
+        LocalTime endTime = dto.getStartTime().plus(Duration.ofMinutes(dto.getDurationMinutes()));
+        List<LocalDate> occurrenceDates = switch (dto.getType()) {
+            case RECURRING -> recurringDates(dto.getDayOfWeek(), dto.getStartDate(), dto.getEndDate());
+            case UNIQUE -> List.of(dto.getDate());
         };
+        return new SolverEvent(dto.getId(), dto.getEnrolled(), dto.getStartTime(), endTime, occurrenceDates);
+    }
+
+    private List<LocalDate> recurringDates(DayOfWeek dayOfWeek, LocalDate startDate, LocalDate endDate) {
+        List<LocalDate> dates = new ArrayList<>();
+        LocalDate end = endDate != null ? endDate : startDate.plusYears(1);
+        LocalDate current = startDate.with(TemporalAdjusters.nextOrSame(dayOfWeek));
+        while (!current.isAfter(end)) {
+            dates.add(current);
+            current = current.plusWeeks(1);
+        }
+        return dates;
     }
 
     public EventSummaryDto toSummary(EventRequestDto dto) {

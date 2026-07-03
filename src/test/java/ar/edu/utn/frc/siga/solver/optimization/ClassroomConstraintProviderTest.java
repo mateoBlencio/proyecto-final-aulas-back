@@ -1,11 +1,7 @@
 package ar.edu.utn.frc.siga.solver.optimization;
 
-import ar.edu.utn.frc.siga.space.model.Classroom;
-import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
-import ar.edu.utn.frc.siga.solver.optimization.ClassAssignment;
 import org.junit.jupiter.api.Test;
 
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -17,59 +13,52 @@ class ClassroomConstraintProviderTest {
 
     private static final int OVERCROWDING_WEIGHT = 100_000;
 
-    private Classroom room(Integer id, int cap) {
-        return Classroom.builder().id(id).roomNumber("Room " + id).capacity(cap).build();
+    private SolverRoom room(Integer id, int cap) {
+        return new SolverRoom(id, cap);
     }
 
-    private ClassAssignment assigned(String eventId, int enrolled, Classroom classroom,
+    private SolverEvent event(String eventId, int enrolled) {
+        return new SolverEvent(eventId, enrolled, LocalTime.of(8, 0), LocalTime.of(9, 30),
+                List.of(LocalDate.of(2024, 1, 1)));
+    }
+
+    private ClassAssignment assigned(String eventId, int enrolled, SolverRoom classroom,
                                      Set<String> conflictingIds) {
-        UniqueEvent event = UniqueEvent.builder()
-                .planningId(eventId).enrolled(enrolled)
-                .startTime(LocalTime.of(8, 0))
-                .duration(Duration.ofMinutes(90))
-                .date(LocalDate.of(2024, 1, 1))
-                .build();
-        ClassAssignment a = new ClassAssignment(event, List.of(classroom), conflictingIds);
+        ClassAssignment a = new ClassAssignment(event(eventId, enrolled), List.of(classroom), conflictingIds);
         a.setClassroom(classroom);
         return a;
     }
 
-    private ClassAssignment unassigned(String eventId, int enrolled, Classroom candidate) {
-        UniqueEvent event = UniqueEvent.builder()
-                .planningId(eventId).enrolled(enrolled)
-                .startTime(LocalTime.of(8, 0))
-                .duration(Duration.ofMinutes(90))
-                .date(LocalDate.of(2024, 1, 1))
-                .build();
-        return new ClassAssignment(event, List.of(candidate), Set.of());
+    private ClassAssignment unassigned(String eventId, int enrolled, SolverRoom candidate) {
+        return new ClassAssignment(event(eventId, enrolled), List.of(candidate), Set.of());
     }
 
     // ─── noOverlap ───────────────────────────────────────────────────────────
 
     @Test
     void upCn001_sameClassroom_conflictPair_penalizesOne() {
-        Classroom room = room(1, 100);
+        SolverRoom room = room(1, 100);
         ClassAssignment a1 = assigned("e1", 50, room, Set.of("e2"));
         ClassAssignment a2 = assigned("e2", 50, room, Set.of("e1"));
 
         assertThat(a1.getClassroom()).isEqualTo(a2.getClassroom());
-        assertThat(a1.conflictsWith(a2.getEvent().getPlanningId())).isTrue();
+        assertThat(a1.conflictsWith(a2.getEvent().planningId())).isTrue();
     }
 
     @Test
     void upCn002_sameClassroom_noConflictPair_noImpact() {
-        Classroom room = room(1, 100);
+        SolverRoom room = room(1, 100);
         ClassAssignment a1 = assigned("e1", 50, room, Set.of());
         ClassAssignment a2 = assigned("e2", 50, room, Set.of());
 
-        assertThat(a1.conflictsWith(a2.getEvent().getPlanningId())).isFalse();
-        assertThat(a2.conflictsWith(a1.getEvent().getPlanningId())).isFalse();
+        assertThat(a1.conflictsWith(a2.getEvent().planningId())).isFalse();
+        assertThat(a2.conflictsWith(a1.getEvent().planningId())).isFalse();
     }
 
     @Test
     void upCn003_differentClassrooms_conflictPair_noImpact() {
-        Classroom room1 = room(1, 100);
-        Classroom room2 = room(2, 100);
+        SolverRoom room1 = room(1, 100);
+        SolverRoom room2 = room(2, 100);
         ClassAssignment a1 = assigned("e1", 50, room1, Set.of("e2"));
         ClassAssignment a2 = assigned("e2", 50, room2, Set.of("e1"));
 
@@ -78,16 +67,16 @@ class ClassroomConstraintProviderTest {
 
     @Test
     void upCn004_sameClassroom_sameTime_notInConflictIds_noImpact() {
-        Classroom room = room(1, 100);
+        SolverRoom room = room(1, 100);
         ClassAssignment a1 = assigned("e1", 50, room, Set.of());
         ClassAssignment a2 = assigned("e2", 50, room, Set.of());
 
-        assertThat(a1.conflictsWith(a2.getEvent().getPlanningId())).isFalse();
+        assertThat(a1.conflictsWith(a2.getEvent().planningId())).isFalse();
     }
 
     @Test
     void upCn005_singleAssignment_noImpact() {
-        Classroom room = room(1, 100);
+        SolverRoom room = room(1, 100);
         ClassAssignment a1 = assigned("e1", 50, room, Set.of());
 
         assertThat(a1.conflictsWith("e1")).isFalse();
@@ -97,7 +86,7 @@ class ClassroomConstraintProviderTest {
 
     @Test
     void upCn006_noOvercrowding_exact_noImpact() {
-        Classroom room = room(1, 80);
+        SolverRoom room = room(1, 80);
         ClassAssignment a = assigned("e1", 80, room, Set.of());
 
         assertThat(a.getOvercrowding()).isEqualTo(0);
@@ -105,7 +94,7 @@ class ClassroomConstraintProviderTest {
 
     @Test
     void upCn007_overcrowding10_penalty1M() {
-        Classroom room = room(1, 80);
+        SolverRoom room = room(1, 80);
         ClassAssignment a = assigned("e1", 90, room, Set.of());
 
         assertThat((long) a.getOvercrowding() * OVERCROWDING_WEIGHT).isEqualTo(10L * 100_000L);
@@ -113,7 +102,7 @@ class ClassroomConstraintProviderTest {
 
     @Test
     void upCn008_enrolled50_cap80_noOvercrowding() {
-        Classroom room = room(1, 80);
+        SolverRoom room = room(1, 80);
         ClassAssignment a = assigned("e1", 50, room, Set.of());
 
         assertThat(a.getOvercrowding()).isEqualTo(0);
@@ -121,7 +110,7 @@ class ClassroomConstraintProviderTest {
 
     @Test
     void upCn009_overcrowding40_penalty4M() {
-        Classroom room = room(1, 125);
+        SolverRoom room = room(1, 125);
         ClassAssignment a = assigned("e1", 165, room, Set.of());
 
         assertThat((long) a.getOvercrowding() * OVERCROWDING_WEIGHT).isEqualTo(40L * 100_000L);
@@ -129,7 +118,7 @@ class ClassroomConstraintProviderTest {
 
     @Test
     void upCn010_nullClassroom_noImpact() {
-        Classroom room = room(1, 80);
+        SolverRoom room = room(1, 80);
         ClassAssignment a = unassigned("e1", 50, room);
 
         assertThat(a.getClassroom()).isNull();
@@ -139,7 +128,7 @@ class ClassroomConstraintProviderTest {
 
     @Test
     void upCn011_fullCapacity_noImpact() {
-        Classroom room = room(1, 80);
+        SolverRoom room = room(1, 80);
         ClassAssignment a = assigned("e1", 80, room, Set.of());
 
         assertThat(a.getUnusedCapacity()).isEqualTo(0);
@@ -147,7 +136,7 @@ class ClassroomConstraintProviderTest {
 
     @Test
     void upCn012_unused30_penalty30() {
-        Classroom room = room(1, 80);
+        SolverRoom room = room(1, 80);
         ClassAssignment a = assigned("e1", 50, room, Set.of());
 
         assertThat(a.getUnusedCapacity()).isEqualTo(30);
@@ -155,7 +144,7 @@ class ClassroomConstraintProviderTest {
 
     @Test
     void upCn013_overcrowded_unused0_noImpact() {
-        Classroom room = room(1, 80);
+        SolverRoom room = room(1, 80);
         ClassAssignment a = assigned("e1", 90, room, Set.of());
 
         assertThat(a.getUnusedCapacity()).isEqualTo(0);
@@ -163,7 +152,7 @@ class ClassroomConstraintProviderTest {
 
     @Test
     void upCn014_enrolled1_cap160_penalty159() {
-        Classroom room = room(1, 160);
+        SolverRoom room = room(1, 160);
         ClassAssignment a = assigned("e1", 1, room, Set.of());
 
         assertThat(a.getUnusedCapacity()).isEqualTo(159);
@@ -171,7 +160,7 @@ class ClassroomConstraintProviderTest {
 
     @Test
     void upCn015_nullClassroom_noImpact() {
-        Classroom room = room(1, 80);
+        SolverRoom room = room(1, 80);
         ClassAssignment a = unassigned("e1", 50, room);
 
         assertThat(a.getUnusedCapacity()).isEqualTo(0);
