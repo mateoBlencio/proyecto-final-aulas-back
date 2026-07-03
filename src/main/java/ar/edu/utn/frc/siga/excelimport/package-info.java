@@ -1,8 +1,4 @@
-@ApplicationModule(allowedDependencies = {
-        "academic :: service", "academic :: model",
-        "space :: service", "space :: model",
-        "allocation :: service", "allocation :: dto"
-})
+@ApplicationModule(allowedDependencies = { "academic :: api", "space :: api", "allocation :: api" })
 package ar.edu.utn.frc.siga.excelimport;
 
 import org.springframework.modulith.ApplicationModule;

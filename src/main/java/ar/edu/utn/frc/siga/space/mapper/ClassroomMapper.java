@@ -3,8 +3,10 @@ package ar.edu.utn.frc.siga.space.mapper;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDTO;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDTO;
 import ar.edu.utn.frc.siga.space.model.Classroom;
+import org.springframework.modulith.NamedInterface;
 import org.springframework.stereotype.Component;
 
+@NamedInterface("api")
 @Component
 public class ClassroomMapper {
 

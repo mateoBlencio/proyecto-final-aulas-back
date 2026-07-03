@@ -5,6 +5,9 @@ import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
 import ar.edu.utn.frc.siga.academic.model.Commission;
 import java.util.Optional;
 
+import org.springframework.modulith.NamedInterface;
+
+@NamedInterface("api")
 public interface CommissionService {
 
     Optional<Commission> findByCourseCodeAndCommissionNumberAndPeriodAndDeletedFalse(

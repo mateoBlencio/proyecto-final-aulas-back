@@ -5,6 +5,9 @@ import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import java.util.Optional;
 
+import org.springframework.modulith.NamedInterface;
+
+@NamedInterface("api")
 public interface AcademicPeriodService {
 
     Optional<AcademicPeriod> findByYearAndSemester(Integer year, Integer semester);

@@ -9,6 +9,9 @@ import ar.edu.utn.frc.siga.allocation.dto.response.AllocationSummaryDto;
 import java.time.LocalDate;
 import java.util.List;
 
+import org.springframework.modulith.NamedInterface;
+
+@NamedInterface("api")
 public interface AllocationService {
     AllocationResponseDto findById(Long allocationId);
     AllocationResponseDto assign(Long occurrenceId, AllocateOccurrenceRequestDto dto);

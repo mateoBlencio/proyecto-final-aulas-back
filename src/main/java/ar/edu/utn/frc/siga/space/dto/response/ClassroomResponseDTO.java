@@ -2,7 +2,9 @@ package ar.edu.utn.frc.siga.space.dto.response;
 
 import lombok.Builder;
 import lombok.Getter;
+import org.springframework.modulith.NamedInterface;
 
+@NamedInterface("api")
 @Getter
 @Builder
 public class ClassroomResponseDTO {

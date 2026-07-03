@@ -14,7 +14,9 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.springframework.modulith.NamedInterface;
 
+@NamedInterface("api")
 @Entity
 @Table(name = "plan_estudio",
        uniqueConstraints = @UniqueConstraint(columnNames = {"codigo_plan", "id_especialidad"}))

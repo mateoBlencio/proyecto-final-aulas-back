@@ -8,7 +8,9 @@ import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.modulith.NamedInterface;
 
+@NamedInterface("api")
 public interface ClassroomService {
 
     ClassroomResponseDTO create(ClassroomRequestDTO dto);

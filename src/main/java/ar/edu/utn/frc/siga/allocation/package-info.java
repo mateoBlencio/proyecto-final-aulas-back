@@ -1,7 +1,4 @@
-@ApplicationModule(allowedDependencies = {
-        "space :: service", "space :: dto", "space :: model", "space :: mapper",
-        "academic :: service", "academic :: model"
-})
+@ApplicationModule(allowedDependencies = { "space :: api", "academic :: api" })
 package ar.edu.utn.frc.siga.allocation;
 
 import org.springframework.modulith.ApplicationModule;

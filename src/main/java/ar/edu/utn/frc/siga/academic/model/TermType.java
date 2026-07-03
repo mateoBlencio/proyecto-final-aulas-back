@@ -3,6 +3,9 @@ package ar.edu.utn.frc.siga.academic.model;
 import java.time.LocalDate;
 import java.util.Optional;
 
+import org.springframework.modulith.NamedInterface;
+
+@NamedInterface("api")
 public enum TermType {
     ANUAL("Anual", 0),
     PRIMER_CUATRIMESTRE("1 Cuat.", 1),

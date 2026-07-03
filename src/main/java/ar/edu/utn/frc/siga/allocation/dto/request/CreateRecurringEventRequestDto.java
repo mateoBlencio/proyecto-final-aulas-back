@@ -7,6 +7,9 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
+import org.springframework.modulith.NamedInterface;
+
+@NamedInterface("api")
 public record CreateRecurringEventRequestDto(
         @NotNull @Min(1) Integer enrolled,
         @NotNull LocalTime startTime,

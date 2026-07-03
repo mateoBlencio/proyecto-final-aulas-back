@@ -6,8 +6,7 @@ import org.springframework.modulith.docs.Documenter;
 
 class ModularityTests {
 
-    static final ApplicationModules modules =
-            ApplicationModules.of(SigaApplication.class);
+    static final ApplicationModules modules = ApplicationModules.of(SigaApplication.class);
 
     @Test
     void printStructure() {

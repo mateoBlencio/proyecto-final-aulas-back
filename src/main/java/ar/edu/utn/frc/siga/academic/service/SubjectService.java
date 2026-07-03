@@ -5,6 +5,9 @@ import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import java.util.Optional;
 
+import org.springframework.modulith.NamedInterface;
+
+@NamedInterface("api")
 public interface SubjectService {
 
     Optional<Subject> findByCodeAndStudyPlanAndDeletedFalse(Integer code, StudyPlan studyPlan);

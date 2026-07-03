@@ -6,6 +6,9 @@ import ar.edu.utn.frc.siga.space.model.Building;
 
 import java.util.List;
 
+import org.springframework.modulith.NamedInterface;
+
+@NamedInterface("api")
 public interface BuildingService {
 
     Building findById(Integer id);
