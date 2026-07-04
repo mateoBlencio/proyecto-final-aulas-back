@@ -19,7 +19,7 @@ class ClassroomConstraintProviderTest {
 
     private SolverEvent event(String eventId, int enrolled) {
         return new SolverEvent(eventId, enrolled, LocalTime.of(8, 0), LocalTime.of(9, 30),
-                List.of(LocalDate.of(2024, 1, 1)));
+                Set.of(LocalDate.of(2024, 1, 1)));
     }
 
     private ClassAssignment assigned(String eventId, int enrolled, SolverRoom classroom,

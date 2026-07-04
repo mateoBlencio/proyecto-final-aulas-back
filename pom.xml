@@ -21,8 +21,7 @@
 
 	<properties>
 		<java.version>21</java.version>
-		<timefold-solver-core.version>2.1.0</timefold-solver-core.version>
-		<timefold-solver-test.version>1.33.0</timefold-solver-test.version>
+		<timefold-solver.version>2.2.0</timefold-solver.version>
 		<testcontainers.version>1.21.4</testcontainers.version>
 		<spring-modulith.version>2.0.5</spring-modulith.version>
 	</properties>
@@ -112,6 +111,13 @@
 			<scope>test</scope>
 		</dependency>
 
+		<!-- Boot 4 modulariza los test slices: el bean WebTestClient vive acá -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-webtestclient</artifactId>
+			<scope>test</scope>
+		</dependency>
+
 		<dependency>
 			<groupId>org.testcontainers</groupId>
 			<artifactId>postgresql</artifactId>
@@ -129,16 +135,10 @@
 		<dependency>
 			<groupId>ai.timefold.solver</groupId>
 			<artifactId>timefold-solver-core</artifactId>
-			<version>${timefold-solver-core.version}</version>
+			<version>${timefold-solver.version}</version>
 			<scope>compile</scope>
 		</dependency>
 
-		<dependency>
-			<groupId>ai.timefold.solver</groupId>
-			<artifactId>timefold-solver-test</artifactId>
-			<version>${timefold-solver-test.version}</version>
-			<scope>test</scope>
-		</dependency>
 
 		<dependency>
 			<groupId>org.springframework.modulith</groupId>

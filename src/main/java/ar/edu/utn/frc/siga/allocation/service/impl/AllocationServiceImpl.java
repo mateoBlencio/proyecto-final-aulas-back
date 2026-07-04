@@ -141,29 +141,61 @@ public class AllocationServiceImpl implements AllocationService {
         List<Occurrence> occurrences = occurrenceRepository
                 .findByEvent_IdAndDateGreaterThanEqual(dto.recurringEventId(), effectiveFrom);
 
+        List<AllocationResponseDto> results = allocateToOccurrences(
+                occurrences, classroom, dto.observation(), AllocationSource.MANUAL, true);
+
+        log.info("assignFromDate complete: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), results.size());
+        return results;
+    }
+
+    @Override
+    @Transactional
+    public List<AllocationResponseDto> assignAllFromDate(AllocateFromDateRequestDto dto) {
+        log.debug("assignAllFromDate: event={}, fromDate={}, classroom={}", dto.recurringEventId(), dto.fromDate(), dto.classroomId());
+
+        AcademicEvent event = eventRepository.findById(dto.recurringEventId())
+                .orElseThrow(() -> new AcademicEventNotFoundException(dto.recurringEventId()));
+
+        if (!(Hibernate.unproxy(event) instanceof RecurringEvent)) {
+            throw new AllocationDomainException("assignAllFromDate is only supported for recurring events");
+        }
+
+        Classroom classroom = findClassroom(dto.classroomId());
+
+        List<Occurrence> occurrences = occurrenceRepository
+                .findByEvent_IdAndDateGreaterThanEqual(dto.recurringEventId(), dto.fromDate());
+
+        List<AllocationResponseDto> results = allocateToOccurrences(
+                occurrences, classroom, dto.observation(), AllocationSource.IMPORTED, false);
+
+        log.info("assignAllFromDate complete: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), results.size());
+        return results;
+    }
+
+    private List<AllocationResponseDto> allocateToOccurrences(
+            List<Occurrence> occurrences, Classroom classroom, String observation,
+            AllocationSource source, boolean skipPast) {
         List<AllocationResponseDto> results = new ArrayList<>();
         for (Occurrence occurrence : occurrences) {
-            if (occurrence.isPast()) continue;
+            if (skipPast && occurrence.isPast()) continue;
 
             Allocation allocation = allocationRepository.findByOccurrence_Id(occurrence.getId())
                     .map(existing -> {
                         existing.setClassroom(classroom);
-                        existing.setSource(AllocationSource.MANUAL);
-                        existing.setObservation(dto.observation());
+                        existing.setSource(source);
+                        existing.setObservation(observation);
                         return existing;
                     })
                     .orElseGet(() -> Allocation.builder()
                             .occurrence(occurrence)
                             .classroom(classroom)
-                            .source(AllocationSource.MANUAL)
+                            .source(source)
                             .createdAt(LocalDateTime.now())
-                            .observation(dto.observation())
+                            .observation(observation)
                             .build());
 
             results.add(mapper.toDto(allocationRepository.save(allocation)));
         }
-
-        log.info("assignFromDate complete: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), results.size());
         return results;
     }
 

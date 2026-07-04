@@ -52,7 +52,7 @@ class AllocationResponseMapperTest {
 
     private ClassAssignment assignmentWith(int enrolled, int capacity) {
         SolverEvent event = new SolverEvent("e1", enrolled, LocalTime.of(8, 0), LocalTime.of(9, 30),
-                List.of(LocalDate.of(2024, 1, 1)));
+                Set.of(LocalDate.of(2024, 1, 1)));
         SolverRoom classroom = new SolverRoom(1, capacity);
         ClassAssignment a = new ClassAssignment(event, List.of(classroom), Set.of());
         a.setClassroom(classroom);

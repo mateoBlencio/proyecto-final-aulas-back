@@ -19,5 +19,6 @@ public interface AllocationService {
     List<AllocationResponseDto> batchReassign(BatchReassignRequestDto dto);
     void cancel(Long allocationId);
     List<AllocationResponseDto> assignFromDate(AllocateFromDateRequestDto dto);
+    List<AllocationResponseDto> assignAllFromDate(AllocateFromDateRequestDto dto);
     List<AllocationSummaryDto> findByDate(LocalDate date);
 }

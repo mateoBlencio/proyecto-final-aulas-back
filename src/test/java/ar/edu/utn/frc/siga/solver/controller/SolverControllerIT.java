@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.reactive.server.WebTestClient;
@@ -12,6 +13,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureWebTestClient
 @ActiveProfiles("integration")
 class SolverControllerIT {
 
@@ -20,8 +22,9 @@ class SolverControllerIT {
     @Autowired
     WebTestClient webTestClient;
 
-    @Autowired
-    ObjectMapper objectMapper;
+    // Boot 4 autoconfigura Jackson 3 (tools.jackson); acá solo se parsea la respuesta,
+    // alcanza con un ObjectMapper local de Jackson 2.
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     private JsonNode post(String body) throws Exception {
         String responseBody = webTestClient.post()

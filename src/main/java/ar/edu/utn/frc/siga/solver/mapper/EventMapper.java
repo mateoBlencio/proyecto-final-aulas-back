@@ -10,8 +10,9 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Component
 public class EventMapper {
@@ -22,15 +23,15 @@ public class EventMapper {
 
     public SolverEvent toEvent(EventRequestDto dto) {
         LocalTime endTime = dto.getStartTime().plus(Duration.ofMinutes(dto.getDurationMinutes()));
-        List<LocalDate> occurrenceDates = switch (dto.getType()) {
+        Set<LocalDate> occurrenceDates = switch (dto.getType()) {
             case RECURRING -> recurringDates(dto.getDayOfWeek(), dto.getStartDate(), dto.getEndDate());
-            case UNIQUE -> List.of(dto.getDate());
+            case UNIQUE -> Set.of(dto.getDate());
         };
         return new SolverEvent(dto.getId(), dto.getEnrolled(), dto.getStartTime(), endTime, occurrenceDates);
     }
 
-    private List<LocalDate> recurringDates(DayOfWeek dayOfWeek, LocalDate startDate, LocalDate endDate) {
-        List<LocalDate> dates = new ArrayList<>();
+    private Set<LocalDate> recurringDates(DayOfWeek dayOfWeek, LocalDate startDate, LocalDate endDate) {
+        Set<LocalDate> dates = new LinkedHashSet<>();
         LocalDate end = endDate != null ? endDate : startDate.plusYears(1);
         LocalDate current = startDate.with(TemporalAdjusters.nextOrSame(dayOfWeek));
         while (!current.isAfter(end)) {

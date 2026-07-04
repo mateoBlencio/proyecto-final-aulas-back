@@ -160,7 +160,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 )
             );
 
-            allocationService.assignFromDate(
+            allocationService.assignAllFromDate(
                 new AllocateFromDateRequestDto(
                     eventResult.entity().getId(),
                     startDate,

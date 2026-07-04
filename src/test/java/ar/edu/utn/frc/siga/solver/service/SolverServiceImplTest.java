@@ -28,6 +28,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -70,7 +71,7 @@ class SolverServiceImplTest {
 
     private SolverEvent uniqueEvent(String id, LocalTime start, int dur) {
         LocalTime end = start.plusMinutes(dur);
-        return new SolverEvent(id, 30, start, end, List.of(LocalDate.of(2024, 1, 1)));
+        return new SolverEvent(id, 30, start, end, Set.of(LocalDate.of(2024, 1, 1)));
     }
 
     @Test
@@ -120,8 +121,8 @@ class SolverServiceImplTest {
         return (Set<ConflictPair>) computeConflicts.invoke(service, events);
     }
 
-    private List<LocalDate> weeklyDates(DayOfWeek dow, LocalDate from, LocalDate to) {
-        List<LocalDate> dates = new ArrayList<>();
+    private Set<LocalDate> weeklyDates(DayOfWeek dow, LocalDate from, LocalDate to) {
+        Set<LocalDate> dates = new LinkedHashSet<>();
         LocalDate current = from.with(TemporalAdjusters.nextOrSame(dow));
         while (!current.isAfter(to)) {
             dates.add(current);
@@ -136,7 +137,7 @@ class SolverServiceImplTest {
     }
 
     private SolverEvent unique(String id, LocalTime start, int dur, LocalDate date) {
-        return new SolverEvent(id, 30, start, start.plusMinutes(dur), List.of(date));
+        return new SolverEvent(id, 30, start, start.plusMinutes(dur), Set.of(date));
     }
 
     @Test

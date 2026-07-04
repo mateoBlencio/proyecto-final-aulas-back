@@ -31,7 +31,7 @@ class SolverConfigurationTest {
 
             SolverRoom room = new SolverRoom(1, 40);
             SolverEvent event = new SolverEvent("ev-1", 30, LocalTime.of(8, 0), LocalTime.of(9, 30),
-                    List.of(LocalDate.of(2026, 3, 2)));
+                    Set.of(LocalDate.of(2026, 3, 2)));
             ClassAssignment assignment = new ClassAssignment(event, List.of(room), Set.of());
             ScheduleSolution problem = new ScheduleSolution(List.of(room), List.of(assignment));
 

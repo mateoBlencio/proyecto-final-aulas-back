@@ -169,7 +169,7 @@ class ExcelImportServiceImplTest {
         when(academicEventService.findOrCreateRecurringEvent(any()))
             .thenReturn(new FindOrCreateResult<>(
                 AcademicEventResponseDto.builder().id(1L).type(EventType.RECURRING).build(), true));
-        when(allocationService.assignFromDate(any())).thenReturn(List.of());
+        when(allocationService.assignAllFromDate(any())).thenReturn(List.of());
     }
 
     // ─── TEST: importExcel_shouldReturnCorrectCounters ─────────────────────
@@ -360,11 +360,11 @@ class ExcelImportServiceImplTest {
         when(academicEventService.findOrCreateRecurringEvent(any()))
             .thenReturn(new FindOrCreateResult<>(
                 AcademicEventResponseDto.builder().id(42L).type(EventType.RECURRING).build(), true));
-        when(allocationService.assignFromDate(any())).thenReturn(List.of());
+        when(allocationService.assignAllFromDate(any())).thenReturn(List.of());
 
         ImportResultDto result = service.importExcel(file);
 
-        verify(allocationService).assignFromDate(argThat(dto ->
+        verify(allocationService).assignAllFromDate(argThat(dto ->
             dto.recurringEventId().equals(42L)
                 && "Importado de Excel".equals(dto.observation())
                 && dto.classroomId().equals(1)

@@ -13,6 +13,7 @@ import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
@@ -80,7 +81,7 @@ class ComputeConflictsEquivalenceTest {
             LocalDate date = LocalDate.of(2026, 3, 2).plusDays(random.nextInt(120));
             LocalTime start = LocalTime.of(8 + random.nextInt(12), random.nextBoolean() ? 0 : 30);
             events.add(new SolverEvent("uni-" + i, 20 + random.nextInt(60),
-                    start, start.plusMinutes(90), List.of(date)));
+                    start, start.plusMinutes(90), Set.of(date)));
         }
         assertThat(optimized(events)).isEqualTo(naive(events));
     }
@@ -91,13 +92,12 @@ class ComputeConflictsEquivalenceTest {
     }
 
     @Test
-    void duplicateOccurrenceDates_doNotSelfConflictNorDuplicate() throws Exception {
-        // occurrenceDates con fechas repetidas no debe generar par consigo mismo.
+    void sameDateOverlappingEvents_singleCanonicalPair() throws Exception {
         LocalDate date = LocalDate.of(2026, 3, 2);
         SolverEvent a = new SolverEvent("A", 30, LocalTime.of(8, 0), LocalTime.of(9, 30),
-                List.of(date, date));
+                Set.of(date));
         SolverEvent b = new SolverEvent("B", 30, LocalTime.of(8, 0), LocalTime.of(9, 30),
-                List.of(date));
+                Set.of(date));
         assertThat(optimized(List.of(a, b)))
                 .containsExactly(new ConflictPair("A", "B"));
     }
@@ -118,8 +118,8 @@ class ComputeConflictsEquivalenceTest {
         return events;
     }
 
-    private List<LocalDate> weeklyDates(DayOfWeek dow, LocalDate from, LocalDate to) {
-        List<LocalDate> dates = new ArrayList<>();
+    private Set<LocalDate> weeklyDates(DayOfWeek dow, LocalDate from, LocalDate to) {
+        Set<LocalDate> dates = new LinkedHashSet<>();
         LocalDate current = from.with(TemporalAdjusters.nextOrSame(dow));
         while (!current.isAfter(to)) {
             dates.add(current);
