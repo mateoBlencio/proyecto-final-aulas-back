@@ -13,18 +13,30 @@
 	</parent>
 
 	<groupId>ar.edu.utn.frc</groupId>
-	<artifactId>classroom-allocation</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<artifactId>siga</artifactId>
+	<version>0.3.0-SNAPSHOT</version>
 
-	<name>classroom-allocation</name>
-	<description>Classroom Allocation System</description>
+	<name>siga</name>
+	<description>SIGA — Sistema Inteligente de Gestión Áulica</description>
 
 	<properties>
 		<java.version>21</java.version>
-		<timefold-solver-core.version>2.1.0</timefold-solver-core.version>
-		<timefold-solver-test.version>1.33.0</timefold-solver-test.version>
+		<timefold-solver.version>2.2.0</timefold-solver.version>
 		<testcontainers.version>1.21.4</testcontainers.version>
+		<spring-modulith.version>2.0.5</spring-modulith.version>
 	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.modulith</groupId>
+				<artifactId>spring-modulith-bom</artifactId>
+				<version>${spring-modulith.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 
 	<dependencies>
 
@@ -99,6 +111,13 @@
 			<scope>test</scope>
 		</dependency>
 
+		<!-- Boot 4 modulariza los test slices: el bean WebTestClient vive acá -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-webtestclient</artifactId>
+			<scope>test</scope>
+		</dependency>
+
 		<dependency>
 			<groupId>org.testcontainers</groupId>
 			<artifactId>postgresql</artifactId>
@@ -116,17 +135,21 @@
 		<dependency>
 			<groupId>ai.timefold.solver</groupId>
 			<artifactId>timefold-solver-core</artifactId>
-			<version>${timefold-solver-core.version}</version>
+			<version>${timefold-solver.version}</version>
 			<scope>compile</scope>
 		</dependency>
 
+
 		<dependency>
-			<groupId>ai.timefold.solver</groupId>
-			<artifactId>timefold-solver-test</artifactId>
-			<version>${timefold-solver-test.version}</version>
-			<scope>test</scope>
+			<groupId>org.springframework.modulith</groupId>
+			<artifactId>spring-modulith-starter-core</artifactId>
 		</dependency>
 
+		<dependency>
+			<groupId>org.springframework.modulith</groupId>
+			<artifactId>spring-modulith-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
 
 	</dependencies>
 

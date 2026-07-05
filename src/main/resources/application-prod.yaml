@@ -8,4 +8,4 @@ spring:
 logging:
   level:
     root: ERROR
-    ar.edu.utn.frc.classroom_allocation: WARN
+    ar.edu.utn.frc.siga: WARN
