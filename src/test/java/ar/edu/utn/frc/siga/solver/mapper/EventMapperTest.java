@@ -1,7 +1,7 @@
 package ar.edu.utn.frc.siga.solver.mapper;
 
 import ar.edu.utn.frc.siga.solver.dto.request.EventRequestDto;
-import ar.edu.utn.frc.siga.solver.optimization.SolverEvent;
+import ar.edu.utn.frc.siga.solver.model.SolverEvent;
 import org.junit.jupiter.api.Test;
 
 import java.time.DayOfWeek;

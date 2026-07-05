@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.solver.optimization;
+package ar.edu.utn.frc.siga.solver.model;
 
 import java.time.LocalDate;
 import java.time.LocalTime;

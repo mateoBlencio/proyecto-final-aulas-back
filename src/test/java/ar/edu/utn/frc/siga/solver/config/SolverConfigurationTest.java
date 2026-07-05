@@ -2,8 +2,8 @@ package ar.edu.utn.frc.siga.solver.config;
 
 import ar.edu.utn.frc.siga.solver.optimization.ClassAssignment;
 import ar.edu.utn.frc.siga.solver.optimization.ScheduleSolution;
-import ar.edu.utn.frc.siga.solver.optimization.SolverEvent;
-import ar.edu.utn.frc.siga.solver.optimization.SolverRoom;
+import ar.edu.utn.frc.siga.solver.model.SolverEvent;
+import ar.edu.utn.frc.siga.solver.model.SolverRoom;
 import ai.timefold.solver.core.api.solver.SolverConfigOverride;
 import ai.timefold.solver.core.api.solver.SolverFactory;
 import ai.timefold.solver.core.api.solver.SolverManager;

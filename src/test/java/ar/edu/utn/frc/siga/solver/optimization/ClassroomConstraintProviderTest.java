@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.solver.optimization;
 
+import ar.edu.utn.frc.siga.solver.model.SolverEvent;
+import ar.edu.utn.frc.siga.solver.model.SolverRoom;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;

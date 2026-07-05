@@ -5,6 +5,7 @@ import ai.timefold.solver.core.api.domain.solution.PlanningScore;
 import ai.timefold.solver.core.api.domain.solution.PlanningSolution;
 import ai.timefold.solver.core.api.domain.solution.ProblemFactCollectionProperty;
 import ai.timefold.solver.core.api.score.HardSoftScore;
+import ar.edu.utn.frc.siga.solver.model.SolverRoom;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;

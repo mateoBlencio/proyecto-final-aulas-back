@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.solver.optimization;
+package ar.edu.utn.frc.siga.solver.model;
 
 public record SolverRoom(Integer id, Integer capacity) {
     public int overcrowding(int enrolled) {

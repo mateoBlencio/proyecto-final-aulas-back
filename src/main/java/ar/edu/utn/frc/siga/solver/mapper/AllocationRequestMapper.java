@@ -3,8 +3,8 @@ package ar.edu.utn.frc.siga.solver.mapper;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDTO;
 import ar.edu.utn.frc.siga.solver.dto.request.AllocationParametersDto;
 import ar.edu.utn.frc.siga.solver.dto.request.EventRequestDto;
-import ar.edu.utn.frc.siga.solver.optimization.SolverEvent;
-import ar.edu.utn.frc.siga.solver.optimization.SolverRoom;
+import ar.edu.utn.frc.siga.solver.model.SolverEvent;
+import ar.edu.utn.frc.siga.solver.model.SolverRoom;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

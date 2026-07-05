@@ -1,7 +1,7 @@
 package ar.edu.utn.frc.siga.solver.service;
 
 import ar.edu.utn.frc.siga.solver.model.ConflictPair;
-import ar.edu.utn.frc.siga.solver.optimization.SolverEvent;
+import ar.edu.utn.frc.siga.solver.model.SolverEvent;
 import ar.edu.utn.frc.siga.solver.service.impl.SolverServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
