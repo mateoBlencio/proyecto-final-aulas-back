@@ -57,11 +57,11 @@ public class AllocationController {
     @PostMapping("/occurrences/{occurrenceId}")
     @Operation(summary = "Asignar aula a ocurrencia",
                description = "Asigna manualmente un aula a una ocurrencia específica. Falla si la ocurrencia ya tiene asignación o si ya ocurrió.")
-    public ResponseEntity<AllocationResponseDto> assign(
+    public ResponseEntity<AllocationResponseDto> assignManually(
             @PathVariable Long occurrenceId,
             @Valid @RequestBody AllocateOccurrenceRequestDto dto) {
         log.debug("POST /v1/allocations/occurrences/{}: classroomId={}", occurrenceId, dto.classroomId());
-        AllocationResponseDto response = allocationService.assign(occurrenceId, dto);
+        AllocationResponseDto response = allocationService.assignManually(occurrenceId, dto);
         log.info("Allocation created: id={}, occurrenceId={}", response.getId(), occurrenceId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -92,11 +92,11 @@ public class AllocationController {
     @PostMapping("/from-date")
     @Operation(summary = "Asignar aula desde una fecha",
                description = "Asigna un aula a todas las ocurrencias futuras de un evento recurrente a partir de la fecha indicada. Crea nuevas asignaciones o actualiza las existentes.")
-    public ResponseEntity<List<AllocationResponseDto>> assignFromDate(
+    public ResponseEntity<List<AllocationResponseDto>> assignManuallyFromDate(
             @Valid @RequestBody AllocateFromDateRequestDto dto) {
         log.debug("POST /v1/allocations/from-date: recurringEventId={}, classroomId={}, fromDate={}",
                 dto.recurringEventId(), dto.classroomId(), dto.fromDate());
-        List<AllocationResponseDto> response = allocationService.assignFromDate(dto);
+        List<AllocationResponseDto> response = allocationService.assignManuallyFromDate(dto);
         log.info("Allocations assigned from date: recurringEventId={}, count={}", dto.recurringEventId(), response.size());
         return ResponseEntity.ok(response);
     }

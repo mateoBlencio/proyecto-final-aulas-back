@@ -1,0 +1,20 @@
+meta {
+  name: Obtener preview automática por id
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/v1/allocations/auto-preview/{{previewId}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  previewId: prev_00000000
+}
+
+docs {
+  Recupera una preview generada. 410 Gone si expiró (TTL) o no existe.
+  Reemplazá previewId por el devuelto en POST /auto-preview.
+}

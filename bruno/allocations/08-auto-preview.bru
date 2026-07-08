@@ -1,0 +1,24 @@
+meta {
+  name: Preview asignación automática
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/v1/allocations/auto-preview
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "eventIds": [1, 2],
+    "timeLimitSeconds": 30
+  }
+}
+
+docs {
+  Corre el solver con TODAS las aulas disponibles de la BD y la ocupación existente
+  (asignaciones ya hechas) como restricción dura. Devuelve una preview con previewId,
+  sin persistir asignaciones. El confirm es un paso aparte (pendiente).
+}

@@ -51,7 +51,7 @@ public class AllocationServiceImpl implements AllocationService {
 
     @Override
     @Transactional
-    public AllocationResponseDto assign(Long occurrenceId, AllocateOccurrenceRequestDto dto) {
+    public AllocationResponseDto assignManually(Long occurrenceId, AllocateOccurrenceRequestDto dto) {
         log.debug("Assigning occurrence={} to classroom={}", occurrenceId, dto.classroomId());
 
         Occurrence occurrence = findOccurrence(occurrenceId);
@@ -114,30 +114,14 @@ public class AllocationServiceImpl implements AllocationService {
 
     @Override
     @Transactional
-    public void cancel(Long allocationId) {
-        log.debug("Cancelling allocation={}", allocationId);
-
-        Allocation allocation = findAllocation(allocationId);
-        Occurrence occurrence = allocation.getOccurrence();
-        validateNotPast(occurrence);
-
-        occurrence.setStatus(OccurrenceStatus.SCHEDULED);
-        occurrenceRepository.save(occurrence);
-
-        allocationRepository.delete(allocation);
-        log.info("Allocation cancelled: id={}", allocationId);
-    }
-
-    @Override
-    @Transactional
-    public List<AllocationResponseDto> assignFromDate(AllocateFromDateRequestDto dto) {
-        log.debug("assignFromDate: event={}, fromDate={}, classroom={}", dto.recurringEventId(), dto.fromDate(), dto.classroomId());
+    public List<AllocationResponseDto> assignManuallyFromDate(AllocateFromDateRequestDto dto) {
+        log.debug("assignManuallyFromDate: event={}, fromDate={}, classroom={}", dto.recurringEventId(), dto.fromDate(), dto.classroomId());
 
         AcademicEvent event = eventRepository.findById(dto.recurringEventId())
                 .orElseThrow(() -> ResourceNotFoundException.of("AcademicEvent", dto.recurringEventId()));
 
         if (!(Hibernate.unproxy(event) instanceof RecurringEvent)) {
-            throw new AllocationConflictException("assignFromDate is only supported for recurring events");
+            throw new AllocationConflictException("assignManuallyFromDate is only supported for recurring events");
         }
 
         Classroom classroom = findClassroom(dto.classroomId());
@@ -146,23 +130,61 @@ public class AllocationServiceImpl implements AllocationService {
         List<Occurrence> occurrences = occurrenceRepository
                 .findByEvent_IdAndDateGreaterThanEqual(dto.recurringEventId(), effectiveFrom);
 
+        validateNoOverlap(occurrences, classroom, event);
+
         List<AllocationResponseDto> results = allocateToOccurrences(
                 occurrences, classroom, dto.observation(), AllocationSource.MANUAL, true);
 
-        log.info("assignFromDate complete: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), results.size());
+        log.info("assignManuallyFromDate complete: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), results.size());
         return results;
+    }
+
+    /**
+     * Verifica que todas las ocurrencias objetivo puedan asignarse al aula sin solapar
+     * con asignaciones existentes de OTROS eventos. Si alguna choca, corta con 409 y
+     * el detalle de cuáles.
+     */
+    private void validateNoOverlap(List<Occurrence> targets, Classroom classroom, AcademicEvent event) {
+        List<Occurrence> future = targets.stream().filter(o -> !o.isPast()).toList();
+        if (future.isEmpty()) return;
+
+        LocalDate min = future.stream().map(Occurrence::getDate).min(java.util.Comparator.naturalOrder()).orElseThrow();
+        LocalDate max = future.stream().map(Occurrence::getDate).max(java.util.Comparator.naturalOrder()).orElseThrow();
+        java.util.Map<LocalDate, Occurrence> targetByDate = future.stream()
+                .collect(java.util.stream.Collectors.toMap(Occurrence::getDate, o -> o, (a, b) -> a));
+
+        java.time.LocalTime start = event.getStartTime();
+        java.time.LocalTime end = event.endTime();
+
+        List<ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceConflictDto> conflicts = new ArrayList<>();
+        for (Allocation existing : allocationRepository.findOccupancyBetween(min, max)) {
+            if (!existing.getClassroom().getId().equals(classroom.getId())) continue;
+            AcademicEvent occupant = existing.getOccurrence().getEvent();
+            if (occupant.getId().equals(event.getId())) continue; // sus propias asignaciones se reemplazan
+            Occurrence target = targetByDate.get(existing.getOccurrence().getDate());
+            if (target == null) continue;
+            if (start.isBefore(occupant.endTime()) && occupant.getStartTime().isBefore(end)) {
+                conflicts.add(new ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceConflictDto(
+                        target.getId(), target.getDate(), start, end,
+                        classroom.getId(), occupant.getId(), existing.getId()));
+            }
+        }
+
+        if (!conflicts.isEmpty()) {
+            throw new ar.edu.utn.frc.siga.allocation.exception.ReassignConflictException(conflicts);
+        }
     }
 
     @Override
     @Transactional
-    public List<AllocationResponseDto> assignAllFromDate(AllocateFromDateRequestDto dto) {
-        log.debug("assignAllFromDate: event={}, fromDate={}, classroom={}", dto.recurringEventId(), dto.fromDate(), dto.classroomId());
+    public List<AllocationResponseDto> importAssignmentsFromDate(AllocateFromDateRequestDto dto) {
+        log.debug("importAssignmentsFromDate: event={}, fromDate={}, classroom={}", dto.recurringEventId(), dto.fromDate(), dto.classroomId());
 
         AcademicEvent event = eventRepository.findById(dto.recurringEventId())
                 .orElseThrow(() -> ResourceNotFoundException.of("AcademicEvent", dto.recurringEventId()));
 
         if (!(Hibernate.unproxy(event) instanceof RecurringEvent)) {
-            throw new AllocationConflictException("assignAllFromDate is only supported for recurring events");
+            throw new AllocationConflictException("importAssignmentsFromDate is only supported for recurring events");
         }
 
         Classroom classroom = findClassroom(dto.classroomId());
@@ -173,7 +195,7 @@ public class AllocationServiceImpl implements AllocationService {
         List<AllocationResponseDto> results = allocateToOccurrences(
                 occurrences, classroom, dto.observation(), AllocationSource.IMPORTED, false);
 
-        log.info("assignAllFromDate complete: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), results.size());
+        log.info("importAssignmentsFromDate complete: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), results.size());
         return results;
     }
 

@@ -10,12 +10,17 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.modulith.NamedInterface;
 
+import java.util.List;
+
 @NamedInterface("api")
 public interface ClassroomService {
 
     ClassroomResponseDTO create(ClassroomRequestDTO dto);
 
     ClassroomResponseDTO findById(Integer id);
+
+    /** Todas las aulas disponibles (no eliminadas) para la asignación automática. */
+    List<ClassroomResponseDTO> findAllAvailable();
 
     Classroom requireById(Integer id);
 

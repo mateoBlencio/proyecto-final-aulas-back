@@ -1,8 +1,8 @@
 package ar.edu.utn.frc.siga.solver.config;
 
-import ar.edu.utn.frc.siga.solver.optimization.ClassAssignment;
-import ar.edu.utn.frc.siga.solver.optimization.ClassroomConstraintProvider;
-import ar.edu.utn.frc.siga.solver.optimization.ScheduleSolution;
+import ar.edu.utn.frc.siga.solver.model.ClassAssignment;
+import ar.edu.utn.frc.siga.solver.model.ScheduleSolution;
+import ar.edu.utn.frc.siga.solver.service.impl.ClassroomConstraintProvider;
 import ai.timefold.solver.core.api.solver.SolverFactory;
 import ai.timefold.solver.core.api.solver.SolverManager;
 import ai.timefold.solver.core.config.solver.SolverConfig;

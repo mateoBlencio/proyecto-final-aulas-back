@@ -67,6 +67,14 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     @Override
+    public java.util.List<ClassroomResponseDTO> findAllAvailable() {
+        log.debug("Listing all available classrooms");
+        return classroomRepository.findByAvailableTrueAndDeletedFalse().stream()
+                .map(classroomMapper::toResponseDto)
+                .toList();
+    }
+
+    @Override
     public Classroom requireById(Integer id) {
         log.debug("Fetching classroom entity by id={}", id);
         return this.findExistingClassroomById(id);

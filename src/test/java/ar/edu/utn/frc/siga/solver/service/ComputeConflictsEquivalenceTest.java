@@ -1,6 +1,5 @@
 package ar.edu.utn.frc.siga.solver.service;
 
-import ar.edu.utn.frc.siga.solver.model.ConflictPair;
 import ar.edu.utn.frc.siga.solver.model.SolverEvent;
 import ar.edu.utn.frc.siga.solver.service.impl.SolverServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,18 +11,18 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Verifica que el computeConflicts optimizado (bucketing por fecha + barrido temporal)
- * produce exactamente el mismo conjunto de conflictos que la implementación naive
- * original (todos los pares, comparación de listas de fechas), usada acá como oráculo.
+ * Verifica que la adyacencia de conflictos del barrido optimizado es idéntica a la de
+ * una implementación naive O(n²·d²) (todos los pares), usada acá como oráculo.
  */
 class ComputeConflictsEquivalenceTest {
 
@@ -34,19 +33,19 @@ class ComputeConflictsEquivalenceTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        service = new SolverServiceImpl(null, null, null, null);
+        service = new SolverServiceImpl(null, null, null);
         computeConflicts = SolverServiceImpl.class.getDeclaredMethod("computeConflicts", List.class);
         computeConflicts.setAccessible(true);
     }
 
     @SuppressWarnings("unchecked")
-    private Set<ConflictPair> optimized(List<SolverEvent> events) throws Exception {
-        return (Set<ConflictPair>) computeConflicts.invoke(service, events);
+    private Map<String, Set<String>> optimized(List<SolverEvent> events) throws Exception {
+        return (Map<String, Set<String>>) computeConflicts.invoke(service, events);
     }
 
-    /** Implementación original O(n²·d²), conservada como oráculo de referencia. */
-    private Set<ConflictPair> naive(List<SolverEvent> events) {
-        Set<ConflictPair> conflicts = new HashSet<>();
+    /** Adyacencia de referencia O(n²·d²), conservada como oráculo. */
+    private Map<String, Set<String>> naive(List<SolverEvent> events) {
+        Map<String, Set<String>> adjacency = new HashMap<>();
         for (int i = 0; i < events.size(); i++) {
             for (int j = i + 1; j < events.size(); j++) {
                 SolverEvent a = events.get(i);
@@ -55,22 +54,22 @@ class ComputeConflictsEquivalenceTest {
                         && b.startTime().isBefore(a.endTime());
                 if (!timesOverlap) continue;
                 if (b.occurrenceDates().stream().anyMatch(a.occurrenceDates()::contains)) {
-                    conflicts.add(new ConflictPair(a.planningId(), b.planningId()));
+                    adjacency.computeIfAbsent(a.planningId(), id -> new java.util.HashSet<>()).add(b.planningId());
+                    adjacency.computeIfAbsent(b.planningId(), id -> new java.util.HashSet<>()).add(a.planningId());
                 }
             }
         }
-        return conflicts;
+        return adjacency;
     }
 
     @Test
     void largeRandomInstance_sameConflictSetAsNaive() throws Exception {
         List<SolverEvent> events = randomEvents(250);
-        Set<ConflictPair> expected = naive(events);
-        Set<ConflictPair> actual = optimized(events);
+        Map<String, Set<String>> expected = naive(events);
 
         // Sanidad del escenario: tiene que haber conflictos reales que comparar.
         assertThat(expected).isNotEmpty();
-        assertThat(actual).isEqualTo(expected);
+        assertThat(optimized(events)).isEqualTo(expected);
     }
 
     @Test
@@ -80,7 +79,7 @@ class ComputeConflictsEquivalenceTest {
         for (int i = 0; i < 60; i++) {
             LocalDate date = LocalDate.of(2026, 3, 2).plusDays(random.nextInt(120));
             LocalTime start = LocalTime.of(8 + random.nextInt(12), random.nextBoolean() ? 0 : 30);
-            events.add(new SolverEvent("uni-" + i, 20 + random.nextInt(60),
+            events.add(new SolverEvent("uni-" + i, null, 20 + random.nextInt(60),
                     start, start.plusMinutes(90), Set.of(date)));
         }
         assertThat(optimized(events)).isEqualTo(naive(events));
@@ -94,12 +93,10 @@ class ComputeConflictsEquivalenceTest {
     @Test
     void sameDateOverlappingEvents_singleCanonicalPair() throws Exception {
         LocalDate date = LocalDate.of(2026, 3, 2);
-        SolverEvent a = new SolverEvent("A", 30, LocalTime.of(8, 0), LocalTime.of(9, 30),
-                Set.of(date));
-        SolverEvent b = new SolverEvent("B", 30, LocalTime.of(8, 0), LocalTime.of(9, 30),
-                Set.of(date));
+        SolverEvent a = new SolverEvent("A", null, 30, LocalTime.of(8, 0), LocalTime.of(9, 30), Set.of(date));
+        SolverEvent b = new SolverEvent("B", null, 30, LocalTime.of(8, 0), LocalTime.of(9, 30), Set.of(date));
         assertThat(optimized(List.of(a, b)))
-                .containsExactly(new ConflictPair("A", "B"));
+                .isEqualTo(Map.of("A", Set.of("B"), "B", Set.of("A")));
     }
 
     private List<SolverEvent> randomEvents(int count) {
@@ -112,7 +109,7 @@ class ComputeConflictsEquivalenceTest {
             int durationMinutes = 60 + 30 * random.nextInt(4);
             LocalDate from = semesterStart.plusWeeks(random.nextInt(4));
             LocalDate to = from.plusWeeks(8 + random.nextInt(10));
-            events.add(new SolverEvent("rec-" + i, 20 + random.nextInt(60),
+            events.add(new SolverEvent("rec-" + i, null, 20 + random.nextInt(60),
                     start, start.plusMinutes(durationMinutes), weeklyDates(dow, from, to)));
         }
         return events;

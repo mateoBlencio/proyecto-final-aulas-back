@@ -111,7 +111,6 @@
 			<scope>test</scope>
 		</dependency>
 
-		<!-- Boot 4 modulariza los test slices: el bean WebTestClient vive acá -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-webtestclient</artifactId>
@@ -137,6 +136,11 @@
 			<artifactId>timefold-solver-core</artifactId>
 			<version>${timefold-solver.version}</version>
 			<scope>compile</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>com.github.ben-manes.caffeine</groupId>
+			<artifactId>caffeine</artifactId>
 		</dependency>
 
 

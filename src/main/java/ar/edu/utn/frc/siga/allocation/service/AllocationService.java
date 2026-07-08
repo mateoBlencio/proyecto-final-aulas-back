@@ -13,10 +13,10 @@ import org.springframework.modulith.NamedInterface;
 @NamedInterface("api")
 public interface AllocationService {
     AllocationResponseDto findById(Long allocationId);
-    AllocationResponseDto assign(Long occurrenceId, AllocateOccurrenceRequestDto dto);
+    AllocationResponseDto assignManually(Long occurrenceId, AllocateOccurrenceRequestDto dto);
     AllocationResponseDto reassign(Long allocationId, AllocateOccurrenceRequestDto dto);
     List<AllocationResponseDto> batchReassign(BatchReassignRequestDto dto);
-    List<AllocationResponseDto> assignFromDate(AllocateFromDateRequestDto dto);
-    List<AllocationResponseDto> assignAllFromDate(AllocateFromDateRequestDto dto);
+    List<AllocationResponseDto> assignManuallyFromDate(AllocateFromDateRequestDto dto);
+    List<AllocationResponseDto> importAssignmentsFromDate(AllocateFromDateRequestDto dto);
     List<AllocationResponseDto> findByDate(LocalDate date);
 }

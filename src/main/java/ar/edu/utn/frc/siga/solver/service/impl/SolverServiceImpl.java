@@ -1,19 +1,16 @@
 package ar.edu.utn.frc.siga.solver.service.impl;
 
 import ar.edu.utn.frc.siga.solver.config.SolverProperties;
-import ar.edu.utn.frc.siga.solver.dto.request.AllocationParametersDto;
-import ar.edu.utn.frc.siga.solver.dto.request.AllocationRequestDto;
-import ar.edu.utn.frc.siga.solver.dto.request.PinnedAssignmentDto;
-import ar.edu.utn.frc.siga.solver.dto.response.AllocationPreviewResponseDto;
-import ar.edu.utn.frc.siga.solver.exception.InvalidAllocationRequestException;
+import ar.edu.utn.frc.siga.solver.exception.PreviewNotFoundException;
 import ar.edu.utn.frc.siga.solver.exception.SchedulingException;
-import ar.edu.utn.frc.siga.solver.mapper.AllocationRequestMapper;
-import ar.edu.utn.frc.siga.solver.mapper.AllocationResponseMapper;
-import ar.edu.utn.frc.siga.solver.model.ConflictPair;
-import ar.edu.utn.frc.siga.solver.optimization.ClassAssignment;
-import ar.edu.utn.frc.siga.solver.optimization.ScheduleSolution;
+import ar.edu.utn.frc.siga.solver.model.ClassAssignment;
+import ar.edu.utn.frc.siga.solver.model.OccupancyDto;
+import ar.edu.utn.frc.siga.solver.model.ScheduleSolution;
+import ar.edu.utn.frc.siga.solver.model.SolverAssignment;
 import ar.edu.utn.frc.siga.solver.model.SolverEvent;
+import ar.edu.utn.frc.siga.solver.model.SolverPreview;
 import ar.edu.utn.frc.siga.solver.model.SolverRoom;
+import ar.edu.utn.frc.siga.solver.service.PreviewStore;
 import ar.edu.utn.frc.siga.solver.service.SolverService;
 import ai.timefold.solver.core.api.solver.SolverConfigOverride;
 import ai.timefold.solver.core.api.solver.SolverJob;
@@ -40,54 +37,97 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SolverServiceImpl implements SolverService {
 
-    private final AllocationRequestMapper requestMapper;
-    private final AllocationResponseMapper responseMapper;
     private final SolverManager<ScheduleSolution> solverManager;
     private final SolverProperties solverProperties;
+    private final PreviewStore previewStore;
+
+    /** Ocupación existente ya resuelta a un aula concreta del conjunto de candidatas. */
+    private record ExistingOccupancy(SolverEvent event, SolverRoom room) {
+    }
 
     @Override
-    public AllocationPreviewResponseDto preview(AllocationRequestDto request) {
-        AllocationParametersDto params = request.getParameters() != null
-                ? request.getParameters() : new AllocationParametersDto();
+    public SolverPreview preview(List<SolverEvent> events, List<SolverRoom> classrooms,
+                                 List<OccupancyDto> occupancy, int timeLimitSeconds) {
+        Map<Integer, SolverRoom> roomsById = classrooms.stream()
+                .collect(Collectors.toMap(SolverRoom::id, r -> r));
+        List<ExistingOccupancy> existing = buildExistingOccupancy(occupancy, roomsById);
 
-        validateBusinessRules(request, params);
+        // Conflictos calculados sobre nuevos + existentes → adyacencia simétrica que
+        // permite que el noOverlap bloquee un aula ocupada para los eventos nuevos.
+        List<SolverEvent> allEvents = new ArrayList<>(events);
+        existing.forEach(e -> allEvents.add(e.event()));
+        Map<String, Set<String>> conflictsByEventId = computeConflicts(allEvents);
 
-        List<SolverEvent> events = requestMapper.toEvents(request.getEvents());
-        List<SolverRoom> classrooms = requestMapper.toClassrooms(request.getClassrooms(), params);
-        Map<String, Set<String>> conflictsByEventId = toAdjacency(computeConflicts(events));
-        Map<String, List<SolverRoom>> candidates = buildCandidates(events, classrooms, params);
-
-        log.info("Starting solver preview: {} events, {} classrooms, limit {}s",
-                events.size(), classrooms.size(), params.getTimeLimitSeconds());
+        log.info("Starting solver preview: {} events, {} classrooms, {} occupied slots, limit {}s",
+                events.size(), classrooms.size(), existing.size(), timeLimitSeconds);
 
         long start = System.currentTimeMillis();
-        ScheduleSolution solution = solve(events, classrooms, conflictsByEventId, candidates, params.getTimeLimitSeconds());
-        long durationMs = System.currentTimeMillis() - start;
+        ScheduleSolution solution = solve(events, existing, classrooms, conflictsByEventId, timeLimitSeconds);
+        log.info("Solver preview completed in {}ms, score {}",
+                System.currentTimeMillis() - start, solution.getScore());
 
-        log.info("Solver preview completed in {}ms, score {}", durationMs, solution.getScore());
+        SolverPreview preview = toPreview(solution);
+        previewStore.save(preview);
+        return preview;
+    }
 
-        return responseMapper.toPreviewResponse(solution, request, durationMs);
+    @Override
+    public SolverPreview getPreview(String previewId) {
+        return previewStore.get(previewId)
+                .orElseThrow(() -> new PreviewNotFoundException(previewId));
+    }
+
+    private SolverPreview toPreview(ScheduleSolution solution) {
+        List<SolverAssignment> assignments = solution.getAssignments().stream()
+                .filter(a -> !a.isPinned())
+                .map(a -> new SolverAssignment(
+                        a.getEvent().planningId(),
+                        a.getClassroom() != null ? a.getClassroom().id() : null))
+                .toList();
+        String previewId = "prev_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        return new SolverPreview(previewId, assignments);
+    }
+
+    /**
+     * Cada ocupación existente cuya aula sea candidata se vuelve una asignación pinned.
+     * Si el aula ocupada no es candidata (no disponible), no puede colisionar con ningún
+     * evento nuevo y se descarta.
+     */
+    private List<ExistingOccupancy> buildExistingOccupancy(List<OccupancyDto> occupancy,
+                                                           Map<Integer, SolverRoom> roomsById) {
+        if (occupancy == null || occupancy.isEmpty()) return List.of();
+        List<ExistingOccupancy> result = new ArrayList<>();
+        for (OccupancyDto occ : occupancy) {
+            SolverRoom room = roomsById.get(occ.classroomId());
+            if (room == null) continue;
+            String planningId = "occupied:" + occ.classroomId() + ":" + occ.date() + ":" + occ.startTime();
+            SolverEvent event = new SolverEvent(planningId, null, 0,
+                    occ.startTime(), occ.endTime(), Set.of(occ.date()));
+            result.add(new ExistingOccupancy(event, room));
+        }
+        return result;
     }
 
     private ScheduleSolution solve(List<SolverEvent> events,
+                                   List<ExistingOccupancy> existing,
                                    List<SolverRoom> classrooms,
                                    Map<String, Set<String>> conflictsByEventId,
-                                   Map<String, List<SolverRoom>> candidatesByEventId,
                                    int timeLimitSeconds) {
-        List<ClassAssignment> assignments = events.stream()
-                .map(event -> new ClassAssignment(
-                        event,
-                        candidatesByEventId.getOrDefault(event.planningId(), classrooms),
-                        conflictsByEventId.getOrDefault(event.planningId(), Set.of())))
-                .toList();
+        List<ClassAssignment> assignments = new ArrayList<>();
+        for (SolverEvent event : events) {
+            assignments.add(new ClassAssignment(
+                    event, classrooms, conflictsByEventId.getOrDefault(event.planningId(), Set.of())));
+        }
+        for (ExistingOccupancy occ : existing) {
+            assignments.add(ClassAssignment.pinned(
+                    occ.event(), occ.room(), conflictsByEventId.getOrDefault(occ.event().planningId(), Set.of())));
+        }
         ScheduleSolution problem = new ScheduleSolution(classrooms, assignments);
         return runSolver(problem, timeLimitSeconds);
     }
 
     private ScheduleSolution runSolver(ScheduleSolution problem, int timeLimitSeconds) {
         String jobId = UUID.randomUUID().toString();
-        log.info("Solver job {} starting, limit {}s", jobId, timeLimitSeconds);
-
         SolverJob<ScheduleSolution> job = solverManager.solveBuilder()
                 .withProblemId(jobId)
                 .withProblem(problem)
@@ -95,9 +135,7 @@ public class SolverServiceImpl implements SolverService {
                         .withTerminationConfig(buildTermination(timeLimitSeconds)))
                 .run();
         try {
-            ScheduleSolution solution = job.getFinalBestSolution();
-            log.info("Solver job {} finished, score {}", jobId, solution.getScore());
-            return solution;
+            return job.getFinalBestSolution();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             job.terminateEarly();
@@ -120,11 +158,12 @@ public class SolverServiceImpl implements SolverService {
     }
 
     /**
-     * Agrupa los eventos por fecha de ocurrencia y detecta solapamientos con un barrido
-     * ordenado por hora de inicio dentro de cada fecha. Evita el producto cartesiano
-     * de eventos x eventos con comparación de listas de fechas por par.
+     * Construye la adyacencia de conflictos horarios (eventId → eventIds que solapan)
+     * agrupando por fecha de ocurrencia y barriendo ordenado por hora de inicio dentro
+     * de cada fecha. Evita el producto cartesiano; el Set de cada evento deduplica los
+     * pares hallados en múltiples fechas compartidas.
      */
-    private Set<ConflictPair> computeConflicts(List<SolverEvent> events) {
+    private Map<String, Set<String>> computeConflicts(List<SolverEvent> events) {
         Map<LocalDate, List<SolverEvent>> eventsByDate = new HashMap<>();
         for (SolverEvent event : events) {
             for (LocalDate date : event.occurrenceDates()) {
@@ -132,7 +171,7 @@ public class SolverServiceImpl implements SolverService {
             }
         }
 
-        Set<ConflictPair> conflicts = new HashSet<>();
+        Map<String, Set<String>> adjacency = new HashMap<>();
         for (List<SolverEvent> sameDate : eventsByDate.values()) {
             if (sameDate.size() < 2) continue;
             sameDate.sort(Comparator.comparing(SolverEvent::startTime));
@@ -140,93 +179,19 @@ public class SolverServiceImpl implements SolverService {
                 SolverEvent a = sameDate.get(i);
                 for (int j = i + 1; j < sameDate.size(); j++) {
                     SolverEvent b = sameDate.get(j);
-                    // Orden ascendente por inicio: si b arranca cuando a ya terminó,
-                    // ningún evento posterior puede solapar con a.
                     if (!b.startTime().isBefore(a.endTime())) break;
                     if (a.planningId().equals(b.planningId())) continue;
                     if (timesOverlap(a, b)) {
-                        conflicts.add(new ConflictPair(a.planningId(), b.planningId()));
+                        adjacency.computeIfAbsent(a.planningId(), id -> new HashSet<>()).add(b.planningId());
+                        adjacency.computeIfAbsent(b.planningId(), id -> new HashSet<>()).add(a.planningId());
                     }
                 }
             }
         }
-        return conflicts;
-    }
-
-    private Map<String, Set<String>> toAdjacency(Set<ConflictPair> conflicts) {
-        Map<String, Set<String>> byEventId = new HashMap<>();
-        for (ConflictPair pair : conflicts) {
-            byEventId.computeIfAbsent(pair.eventIdA(), id -> new HashSet<>()).add(pair.eventIdB());
-            byEventId.computeIfAbsent(pair.eventIdB(), id -> new HashSet<>()).add(pair.eventIdA());
-        }
-        return byEventId;
-    }
-
-    private Map<String, List<SolverRoom>> buildCandidates(List<SolverEvent> events,
-                                                          List<SolverRoom> classrooms,
-                                                          AllocationParametersDto params) {
-        Map<Integer, SolverRoom> classroomById = classrooms.stream()
-                .collect(Collectors.toMap(SolverRoom::id, c -> c));
-
-        Map<String, Integer> pinnedMap = new HashMap<>();
-        if (params.getPinnedAssignments() != null) {
-            for (PinnedAssignmentDto pin : params.getPinnedAssignments()) {
-                pinnedMap.put(pin.getEventId(), pin.getClassroomId());
-            }
-        }
-
-        Map<String, List<SolverRoom>> candidates = new HashMap<>();
-        for (SolverEvent event : events) {
-            Integer pinnedId = pinnedMap.get(event.planningId());
-            if (pinnedId != null && classroomById.containsKey(pinnedId)) {
-                candidates.put(event.planningId(), List.of(classroomById.get(pinnedId)));
-            } else {
-                candidates.put(event.planningId(), classrooms);
-            }
-        }
-        return candidates;
+        return adjacency;
     }
 
     private boolean timesOverlap(SolverEvent a, SolverEvent b) {
-        return a.startTime().isBefore(b.endTime())
-                && b.startTime().isBefore(a.endTime());
-    }
-
-    private void validateBusinessRules(AllocationRequestDto request, AllocationParametersDto params) {
-        Set<String> eventIds = new HashSet<>();
-        for (var e : request.getEvents()) {
-            if (!eventIds.add(e.getId())) {
-                throw new InvalidAllocationRequestException("Duplicate event id: " + e.getId());
-            }
-        }
-
-        Set<Integer> classroomIds = new HashSet<>();
-        for (var c : request.getClassrooms()) {
-            if (!classroomIds.add(c.getId())) {
-                throw new InvalidAllocationRequestException("Duplicate classroom id: " + c.getId());
-            }
-        }
-
-        for (PinnedAssignmentDto pin : params.getPinnedAssignments()) {
-            if (!eventIds.contains(pin.getEventId())) {
-                throw new InvalidAllocationRequestException(
-                        "Pinned eventId not found in events list: " + pin.getEventId());
-            }
-            if (!classroomIds.contains(pin.getClassroomId())) {
-                throw new InvalidAllocationRequestException(
-                        "Pinned classroomId not found in classrooms list: " + pin.getClassroomId());
-            }
-            if (params.getExcludedClassroomIds().contains(pin.getClassroomId())) {
-                throw new InvalidAllocationRequestException(
-                        "Classroom " + pin.getClassroomId() + " is both pinned and excluded");
-            }
-        }
-
-        long pinnedCount = params.getPinnedAssignments().stream()
-                .map(PinnedAssignmentDto::getEventId)
-                .distinct().count();
-        if (pinnedCount < params.getPinnedAssignments().size()) {
-            throw new InvalidAllocationRequestException("An event appears more than once in pinnedAssignments");
-        }
+        return a.startTime().isBefore(b.endTime()) && b.startTime().isBefore(a.endTime());
     }
 }

@@ -56,15 +56,13 @@ cors:
 
 siga:
   api:
-    # Prefijo de versión de la API. Bump solo ante breaking change de contrato.
     base-path: /v1
   solver:
-    # Solves concurrentes del SolverManager; excedentes se encolan. AUTO = según cores.
     parallel-solver-count: AUTO
-    # Corta el solve si el mejor score no mejora en N segundos (0 = deshabilitado).
     unimproved-seconds-limit: 10
-    # PHASE_ASSERT (default Timefold, reproducible); FULL_ASSERT solo para debugging.
     environment-mode: PHASE_ASSERT
+    preview:
+      ttl-minutes: 30
 
 logging:
   level:

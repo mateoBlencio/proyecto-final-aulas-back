@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.solver.optimization;
 
+import ar.edu.utn.frc.siga.solver.model.ClassAssignment;
 import ar.edu.utn.frc.siga.solver.model.SolverEvent;
 import ar.edu.utn.frc.siga.solver.model.SolverRoom;
 import org.junit.jupiter.api.Test;
@@ -16,11 +17,11 @@ class ClassroomConstraintProviderTest {
     private static final int OVERCROWDING_WEIGHT = 100_000;
 
     private SolverRoom room(Integer id, int cap) {
-        return new SolverRoom(id, cap);
+        return new SolverRoom(id, cap, null);
     }
 
     private SolverEvent event(String eventId, int enrolled) {
-        return new SolverEvent(eventId, enrolled, LocalTime.of(8, 0), LocalTime.of(9, 30),
+        return new SolverEvent(eventId, null, enrolled, LocalTime.of(8, 0), LocalTime.of(9, 30),
                 Set.of(LocalDate.of(2024, 1, 1)));
     }
 

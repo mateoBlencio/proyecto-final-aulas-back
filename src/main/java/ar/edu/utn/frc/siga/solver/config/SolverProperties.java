@@ -28,4 +28,16 @@ public class SolverProperties {
      * TRACKED_FULL_ASSERT para debugging de score corruption (mucho más lento).
      */
     private EnvironmentMode environmentMode = EnvironmentMode.PHASE_ASSERT;
+
+    private Preview preview = new Preview();
+
+    /**
+     * Preview generada y guardada para confirmarla después. El TTL acota la
+     * obsolescencia (bound de staleness), no es eviction por memoria.
+     */
+    @Getter
+    @Setter
+    public static class Preview {
+        private long ttlMinutes = 30;
+    }
 }
