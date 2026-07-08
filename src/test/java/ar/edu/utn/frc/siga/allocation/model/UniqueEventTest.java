@@ -14,7 +14,7 @@ class UniqueEventTest {
     @Test
     void upUe001_occurrences_singleDate() {
         UniqueEvent event = UniqueEvent.builder()
-                .planningId("e1").enrolled(30)
+                .enrolled(30)
                 .startTime(LocalTime.of(8, 0))
                 .duration(Duration.ofMinutes(90))
                 .date(LocalDate.of(2024, 7, 23))
@@ -28,7 +28,7 @@ class UniqueEventTest {
     @Test
     void upUe002_endTime_90min() {
         UniqueEvent event = UniqueEvent.builder()
-                .planningId("e1").enrolled(30)
+                .enrolled(30)
                 .startTime(LocalTime.of(8, 0))
                 .duration(Duration.ofMinutes(90))
                 .date(LocalDate.of(2024, 7, 23))
@@ -40,7 +40,7 @@ class UniqueEventTest {
     @Test
     void upUe003_endTime_lateNight() {
         UniqueEvent event = UniqueEvent.builder()
-                .planningId("e1").enrolled(30)
+                .enrolled(30)
                 .startTime(LocalTime.of(21, 35))
                 .duration(Duration.ofMinutes(90))
                 .date(LocalDate.of(2024, 7, 23))

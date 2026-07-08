@@ -56,6 +56,11 @@ public class RecurringEvent extends AcademicEvent {
     List<LocalDate> excludedDates;
 
     @Override
+    public EventType getType() {
+        return EventType.RECURRING;
+    }
+
+    @Override
     public List<Occurrence> toOccurrences() {
         List<Occurrence> result = new ArrayList<>();
         LocalDate end = endDate != null ? endDate : startDate.plusYears(1);

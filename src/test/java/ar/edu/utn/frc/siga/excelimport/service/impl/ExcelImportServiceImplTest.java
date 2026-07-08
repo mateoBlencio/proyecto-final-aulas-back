@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.siga.excelimport.service.impl;
 
-import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.model.EventType;
 import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
@@ -168,7 +168,7 @@ class ExcelImportServiceImplTest {
     private void setupAllocationMocks() {
         when(academicEventService.findOrCreateRecurringEvent(any()))
             .thenReturn(new FindOrCreateResult<>(
-                AcademicEventResponseDto.builder().id(1L).type(EventType.RECURRING).build(), true));
+                RecurringEventResponseDto.builder().id(1L).type(EventType.RECURRING).build(), true));
         when(allocationService.assignAllFromDate(any())).thenReturn(List.of());
     }
 
@@ -359,7 +359,7 @@ class ExcelImportServiceImplTest {
         setupBuildingAndClassroom();
         when(academicEventService.findOrCreateRecurringEvent(any()))
             .thenReturn(new FindOrCreateResult<>(
-                AcademicEventResponseDto.builder().id(42L).type(EventType.RECURRING).build(), true));
+                RecurringEventResponseDto.builder().id(42L).type(EventType.RECURRING).build(), true));
         when(allocationService.assignAllFromDate(any())).thenReturn(List.of());
 
         ImportResultDto result = service.importExcel(file);

@@ -4,16 +4,13 @@ import ar.edu.utn.frc.siga.allocation.dto.request.AllocateFromDateRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.BatchReassignRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.AllocationSummaryDto;
-import ar.edu.utn.frc.siga.allocation.exception.AcademicEventNotFoundException;
-import ar.edu.utn.frc.siga.allocation.exception.AllocationDomainException;
-import ar.edu.utn.frc.siga.allocation.exception.AllocationNotFoundException;
-import ar.edu.utn.frc.siga.allocation.exception.OccurrenceNotFoundException;
+import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationMapper;
 import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.allocation.model.Occurrence;
+import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
@@ -48,7 +45,7 @@ public class AllocationServiceImpl implements AllocationService {
     @Transactional(readOnly = true)
     public AllocationResponseDto findById(Long allocationId) {
         Allocation allocation = allocationRepository.findByIdEager(allocationId)
-                .orElseThrow(() -> new AllocationNotFoundException(allocationId));
+                .orElseThrow(() -> ResourceNotFoundException.of("Allocation", allocationId));
         return mapper.toDto(allocation);
     }
 
@@ -59,9 +56,10 @@ public class AllocationServiceImpl implements AllocationService {
 
         Occurrence occurrence = findOccurrence(occurrenceId);
         validateNotPast(occurrence);
+        validateAssignable(occurrence);
 
         if (allocationRepository.findByOccurrence_Id(occurrenceId).isPresent()) {
-            throw new AllocationDomainException(
+            throw new AllocationConflictException(
                     "Occurrence " + occurrenceId + " already has an allocation. Use PUT /allocations/{id} to reassign.");
         }
 
@@ -73,6 +71,9 @@ public class AllocationServiceImpl implements AllocationService {
                 .createdAt(LocalDateTime.now())
                 .observation(dto.observation())
                 .build());
+
+        occurrence.setStatus(OccurrenceStatus.ASSIGNED);
+        occurrenceRepository.save(occurrence);
 
         log.info("Allocation created: id={}, occurrenceId={}, classroomId={}", saved.getId(), occurrenceId, dto.classroomId());
         return mapper.toDto(saved);
@@ -117,7 +118,11 @@ public class AllocationServiceImpl implements AllocationService {
         log.debug("Cancelling allocation={}", allocationId);
 
         Allocation allocation = findAllocation(allocationId);
-        validateNotPast(allocation.getOccurrence());
+        Occurrence occurrence = allocation.getOccurrence();
+        validateNotPast(occurrence);
+
+        occurrence.setStatus(OccurrenceStatus.SCHEDULED);
+        occurrenceRepository.save(occurrence);
 
         allocationRepository.delete(allocation);
         log.info("Allocation cancelled: id={}", allocationId);
@@ -129,10 +134,10 @@ public class AllocationServiceImpl implements AllocationService {
         log.debug("assignFromDate: event={}, fromDate={}, classroom={}", dto.recurringEventId(), dto.fromDate(), dto.classroomId());
 
         AcademicEvent event = eventRepository.findById(dto.recurringEventId())
-                .orElseThrow(() -> new AcademicEventNotFoundException(dto.recurringEventId()));
+                .orElseThrow(() -> ResourceNotFoundException.of("AcademicEvent", dto.recurringEventId()));
 
         if (!(Hibernate.unproxy(event) instanceof RecurringEvent)) {
-            throw new AllocationDomainException("assignFromDate is only supported for recurring events");
+            throw new AllocationConflictException("assignFromDate is only supported for recurring events");
         }
 
         Classroom classroom = findClassroom(dto.classroomId());
@@ -154,10 +159,10 @@ public class AllocationServiceImpl implements AllocationService {
         log.debug("assignAllFromDate: event={}, fromDate={}, classroom={}", dto.recurringEventId(), dto.fromDate(), dto.classroomId());
 
         AcademicEvent event = eventRepository.findById(dto.recurringEventId())
-                .orElseThrow(() -> new AcademicEventNotFoundException(dto.recurringEventId()));
+                .orElseThrow(() -> ResourceNotFoundException.of("AcademicEvent", dto.recurringEventId()));
 
         if (!(Hibernate.unproxy(event) instanceof RecurringEvent)) {
-            throw new AllocationDomainException("assignAllFromDate is only supported for recurring events");
+            throw new AllocationConflictException("assignAllFromDate is only supported for recurring events");
         }
 
         Classroom classroom = findClassroom(dto.classroomId());
@@ -178,6 +183,7 @@ public class AllocationServiceImpl implements AllocationService {
         List<AllocationResponseDto> results = new ArrayList<>();
         for (Occurrence occurrence : occurrences) {
             if (skipPast && occurrence.isPast()) continue;
+            if (!isAssignable(occurrence)) continue;
 
             Allocation allocation = allocationRepository.findByOccurrence_Id(occurrence.getId())
                     .map(existing -> {
@@ -195,17 +201,20 @@ public class AllocationServiceImpl implements AllocationService {
                             .build());
 
             results.add(mapper.toDto(allocationRepository.save(allocation)));
+
+            occurrence.setStatus(OccurrenceStatus.ASSIGNED);
+            occurrenceRepository.save(occurrence);
         }
         return results;
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<AllocationSummaryDto> findByDate(LocalDate date) {
+    public List<AllocationResponseDto> findByDate(LocalDate date) {
         log.debug("findByDate: date={}", date);
         return allocationRepository.findByDateEager(date)
                 .stream()
-                .map(mapper::toSummaryDto)
+                .map(mapper::toDto)
                 .toList();
     }
 
@@ -213,7 +222,7 @@ public class AllocationServiceImpl implements AllocationService {
         return occurrenceRepository.findById(id)
                 .orElseThrow(() -> {
                     log.warn("Occurrence not found: id={}", id);
-                    return new OccurrenceNotFoundException(id);
+                    return ResourceNotFoundException.of("Occurrence", id);
                 });
     }
 
@@ -221,7 +230,7 @@ public class AllocationServiceImpl implements AllocationService {
         return allocationRepository.findById(id)
                 .orElseThrow(() -> {
                     log.warn("Allocation not found: id={}", id);
-                    return new AllocationNotFoundException(id);
+                    return ResourceNotFoundException.of("Allocation", id);
                 });
     }
 
@@ -230,14 +239,26 @@ public class AllocationServiceImpl implements AllocationService {
             return classroomService.requireById(id);
         } catch (ResourceNotFoundException ex) {
             log.warn("Classroom not found: id={}", id);
-            throw new AllocationDomainException("Classroom not found with id: " + id);
+            throw new AllocationConflictException("Classroom not found with id: " + id);
         }
     }
 
     private void validateNotPast(Occurrence occurrence) {
         if (occurrence.isPast()) {
-            throw new AllocationDomainException(
+            throw new AllocationConflictException(
                     "Cannot modify allocation: occurrence on " + occurrence.getDate() + " has already taken place.");
         }
+    }
+
+    private void validateAssignable(Occurrence occurrence) {
+        if (!isAssignable(occurrence)) {
+            throw new AllocationConflictException(
+                    "Cannot assign classroom: occurrence " + occurrence.getId() + " is " + occurrence.getStatus() + ".");
+        }
+    }
+
+    private boolean isAssignable(Occurrence occurrence) {
+        return occurrence.getStatus() != OccurrenceStatus.CANCELLED
+                && occurrence.getStatus() != OccurrenceStatus.SUSPENDED;
     }
 }

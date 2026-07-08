@@ -114,7 +114,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         return classroomRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> {
                     log.warn("Classroom not found: id={}", id);
-                    return new ResourceNotFoundException("Classroom not found with id: " + id);
+                    return ResourceNotFoundException.of("Classroom", id);
                 });
     }
 

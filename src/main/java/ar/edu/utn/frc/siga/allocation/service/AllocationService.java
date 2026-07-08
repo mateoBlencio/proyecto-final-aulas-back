@@ -4,7 +4,6 @@ import ar.edu.utn.frc.siga.allocation.dto.request.AllocateFromDateRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.BatchReassignRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.AllocationSummaryDto;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -20,5 +19,5 @@ public interface AllocationService {
     void cancel(Long allocationId);
     List<AllocationResponseDto> assignFromDate(AllocateFromDateRequestDto dto);
     List<AllocationResponseDto> assignAllFromDate(AllocateFromDateRequestDto dto);
-    List<AllocationSummaryDto> findByDate(LocalDate date);
+    List<AllocationResponseDto> findByDate(LocalDate date);
 }

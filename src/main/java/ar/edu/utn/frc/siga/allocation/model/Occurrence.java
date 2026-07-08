@@ -16,6 +16,7 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.AccessLevel;
 
 import java.time.LocalDate;
@@ -44,6 +45,7 @@ public class Occurrence {
     @Column(name = "fecha", nullable = false)
     private LocalDate date;
 
+    @Setter
     @Enumerated(EnumType.STRING)
     @Column(name = "estado", nullable = false)
     private OccurrenceStatus status;

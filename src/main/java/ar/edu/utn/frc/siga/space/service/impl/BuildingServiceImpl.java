@@ -28,7 +28,7 @@ public class BuildingServiceImpl implements BuildingService {
         Building building = findExistingById(id);
         if (!building.getActive()) {
             log.warn("Building lookup rejected: id={} is inactive", id);
-            throw new ResourceNotFoundException("Building not found with id: " + id);
+            throw ResourceNotFoundException.of("Building", id);
         }
         return building;
     }
@@ -68,7 +68,7 @@ public class BuildingServiceImpl implements BuildingService {
         return buildingRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> {
                     log.warn("Building not found: id={}", id);
-                    return new ResourceNotFoundException("Building not found with id: " + id);
+                    return ResourceNotFoundException.of("Building", id);
                 });
     }
 }

@@ -7,4 +7,8 @@ public class ResourceNotFoundException extends SigaAppException {
     public ResourceNotFoundException(String message) {
         super(HttpStatus.NOT_FOUND, "Resource not found", message);
     }
+    
+    public static ResourceNotFoundException of(String resource, Object id) {
+        return new ResourceNotFoundException(resource + " not found with id: " + id);
+    }
 }

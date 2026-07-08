@@ -52,5 +52,7 @@ public abstract class AcademicEvent {
         return startTime.plus(duration);
     }
 
+    public abstract EventType getType();
+
     public abstract List<Occurrence> toOccurrences();
 }

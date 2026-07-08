@@ -1,10 +1,15 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
+import ar.edu.utn.frc.siga.academic.mapper.SubjectMapper;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
+import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SubjectServiceImpl implements SubjectService {
 
     private final SubjectRepository subjectRepository;
+    private final SubjectMapper subjectMapper;
 
     @Override
     public Optional<Subject> findById(Long id) {
@@ -51,5 +57,18 @@ public class SubjectServiceImpl implements SubjectService {
                 );
                 return new FindOrCreateResult<>(created, true);
             });
+    }
+
+    @Override
+    public List<SubjectResponseDto> findDtosByIds(Collection<Long> ids) {
+        return subjectRepository.findAllById(ids).stream()
+                .map(subjectMapper::toDto)
+                .toList();
+    }
+
+    @Override
+    public SubjectResponseDto findDtoById(Long id) {
+        return subjectMapper.toDto(subjectRepository.findById(id)
+                .orElseThrow(() -> ResourceNotFoundException.of("Subject", id)));
     }
 }

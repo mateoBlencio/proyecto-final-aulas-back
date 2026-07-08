@@ -4,7 +4,6 @@ import ar.edu.utn.frc.siga.allocation.dto.request.AllocateFromDateRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.BatchReassignRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.AllocationSummaryDto;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,10 +39,10 @@ public class AllocationController {
     @GetMapping
     @Operation(summary = "Listar asignaciones por fecha",
                description = "Devuelve todas las asignaciones del día indicado.")
-    public ResponseEntity<List<AllocationSummaryDto>> findByDate(
+    public ResponseEntity<List<AllocationResponseDto>> findByDate(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         log.debug("GET /v1/allocations: date={}", date);
-        List<AllocationSummaryDto> allocations = allocationService.findByDate(date);
+        List<AllocationResponseDto> allocations = allocationService.findByDate(date);
         log.info("Allocations listed: date={}, count={}", date, allocations.size());
         return ResponseEntity.ok(allocations);
     }
@@ -89,16 +88,6 @@ public class AllocationController {
         List<AllocationResponseDto> response = allocationService.batchReassign(dto);
         log.info("Batch reassign complete: moved={}", response.size());
         return ResponseEntity.ok(response);
-    }
-
-    @DeleteMapping("/{id}")
-    @Operation(summary = "Cancelar asignación",
-               description = "Elimina la asignación de aula para una ocurrencia específica. La ocurrencia en sí queda programada.")
-    public ResponseEntity<Void> cancel(@PathVariable Long id) {
-        log.debug("DELETE /v1/allocations/{}", id);
-        allocationService.cancel(id);
-        log.info("Allocation cancelled: id={}", id);
-        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/from-date")

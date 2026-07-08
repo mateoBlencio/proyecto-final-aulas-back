@@ -1,6 +1,10 @@
 package ar.edu.utn.frc.siga.allocation.mapper;
 
+import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
+import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.RecurringEventResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.UniqueEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.EventType;
 import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
@@ -11,42 +15,33 @@ import org.springframework.stereotype.Component;
 @Component
 public class AcademicEventMapper {
 
-    public AcademicEventResponseDto toDto(AcademicEvent event) {
+    public AcademicEventResponseDto toDto(AcademicEvent event, SubjectResponseDto subject, CommissionResponseDto commission) {
         AcademicEvent realEvent = (AcademicEvent) Hibernate.unproxy(event);
 
-        AcademicEventResponseDto.AcademicEventResponseDtoBuilder builder = AcademicEventResponseDto.builder()
-                .id(realEvent.getId())
-                .enrolled(realEvent.getEnrolled())
-                .startTime(realEvent.getStartTime())
-                .durationMinutes(realEvent.getDuration().toMinutes());
-
         if (realEvent instanceof RecurringEvent r) {
-            var subject = r.getSubject();
-            var commission = r.getCommission();
-            var studyPlan = subject != null ? subject.getStudyPlan() : null;
-            var specialty = studyPlan != null ? studyPlan.getSpecialty() : null;
-            var period = commission != null ? commission.getAcademicPeriod() : null;
-            builder.type(EventType.RECURRING)
+            return RecurringEventResponseDto.builder()
+                    .id(r.getId())
+                    .type(EventType.RECURRING)
+                    .enrolled(r.getEnrolled())
+                    .startTime(r.getStartTime())
+                    .durationMinutes(r.getDuration().toMinutes())
                     .dayOfWeek(r.getDayOfWeek())
                     .startDate(r.getStartDate())
                     .endDate(r.getEndDate())
-                    .subjectCode(subject != null ? subject.getCode() : null)
-                    .subjectName(subject != null ? subject.getName() : null)
-                    .subjectTerm(subject != null ? subject.getTerm() : null)
-                    .studyPlanCode(studyPlan != null ? studyPlan.getPlanCode() : null)
-                    .specialtyCode(specialty != null ? specialty.getSpecialtyCode() : null)
-                    .specialtyName(specialty != null ? specialty.getName() : null)
-                    .commissionCode(commission != null ? commission.getCourseCode() : null)
-                    .commissionNumber(commission != null ? commission.getCommissionNumber() : null)
-                    .yearLevel(commission != null ? commission.getYearLevel() : null)
-                    .periodYear(period != null ? period.getYear() : null)
-                    .periodSemester(period != null ? period.getSemester() : null);
-        } else if (realEvent instanceof UniqueEvent u) {
-            builder.type(EventType.UNIQUE_EVENT)
-                    .date(u.getDate())
-                    .description(u.getDescription());
+                    .subject(subject)
+                    .commission(commission)
+                    .build();
         }
 
-        return builder.build();
+        UniqueEvent u = (UniqueEvent) realEvent;
+        return UniqueEventResponseDto.builder()
+                .id(u.getId())
+                .type(EventType.UNIQUE_EVENT)
+                .enrolled(u.getEnrolled())
+                .startTime(u.getStartTime())
+                .durationMinutes(u.getDuration().toMinutes())
+                .date(u.getDate())
+                .description(u.getDescription())
+                .build();
     }
 }

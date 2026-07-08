@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceResponseDto;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.modulith.NamedInterface;
@@ -18,4 +19,5 @@ public interface AcademicEventService {
     AcademicEventResponseDto createRecurringEvent(CreateRecurringEventRequestDto dto);
     FindOrCreateResult<AcademicEventResponseDto> findOrCreateRecurringEvent(CreateRecurringEventRequestDto dto);
     AcademicEventResponseDto createUniqueEvent(CreateUniqueEventRequestDto dto);
+    List<AcademicEventResponseDto> findUnassignedEvents(LocalDate from, LocalDate to);
 }

@@ -1,7 +1,7 @@
 package ar.edu.utn.frc.siga.allocation.model;
 
 public enum AllocationSource {
-    MANUAL,
-    AUTOMATIC,
-    IMPORTED
+    MANUAL,     // Asignación manual
+    AUTOMATIC,  // Algoritmo de asignación automática (solver)
+    IMPORTED    // Carga del excel
 }

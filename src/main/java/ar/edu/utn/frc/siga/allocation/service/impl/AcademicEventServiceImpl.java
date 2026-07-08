@@ -4,10 +4,11 @@ import ar.edu.utn.frc.siga.allocation.dto.request.CreateRecurringEventRequestDto
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceResponseDto;
-import ar.edu.utn.frc.siga.allocation.exception.AcademicEventNotFoundException;
-import ar.edu.utn.frc.siga.allocation.mapper.AcademicEventMapper;
+import ar.edu.utn.frc.siga.common.exception.InvalidDateRangeException;
+import ar.edu.utn.frc.siga.allocation.mapper.AcademicEventComposer;
 import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.Occurrence;
+import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
 import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
@@ -26,7 +27,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -37,7 +41,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     private final AcademicEventRepository eventRepository;
     private final RecurringEventRepository recurringEventRepository;
     private final OccurrenceRepository occurrenceRepository;
-    private final AcademicEventMapper mapper;
+    private final AcademicEventComposer composer;
     private final SubjectService subjectService;
     private final CommissionService commissionService;
 
@@ -45,23 +49,21 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     @Transactional(readOnly = true)
     public List<AcademicEventResponseDto> findAll() {
         log.debug("Listing all academic events");
-        return eventRepository.findAll().stream()
-                .map(mapper::toDto)
-                .collect(Collectors.toList());
+        return composer.compose(eventRepository.findAll());
     }
 
     @Override
     @Transactional(readOnly = true)
     public AcademicEventResponseDto findById(Long eventId) {
-        return mapper.toDto(eventRepository.findById(eventId)
-                .orElseThrow(() -> new AcademicEventNotFoundException(eventId)));
+        return composer.compose(eventRepository.findById(eventId)
+                .orElseThrow(() -> ResourceNotFoundException.of("AcademicEvent", eventId)));
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<OccurrenceResponseDto> findOccurrencesByEventId(Long eventId) {
         if (!eventRepository.existsById(eventId)) {
-            throw new AcademicEventNotFoundException(eventId);
+            throw ResourceNotFoundException.of("AcademicEvent", eventId);
         }
         return occurrenceRepository.findByEvent_Id(eventId).stream()
                 .map(o -> OccurrenceResponseDto.builder()
@@ -82,9 +84,9 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startDate());
 
         Subject subject = subjectService.findById(dto.subjectId())
-                .orElseThrow(() -> new ResourceNotFoundException("Subject not found: " + dto.subjectId()));
+                .orElseThrow(() -> ResourceNotFoundException.of("Subject", dto.subjectId()));
         Commission commission = commissionService.findById(dto.commissionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Commission not found: " + dto.commissionId()));
+                .orElseThrow(() -> ResourceNotFoundException.of("Commission", dto.commissionId()));
 
         RecurringEvent event = RecurringEvent.builder()
                 .enrolled(dto.enrolled())
@@ -102,7 +104,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         occurrenceRepository.saveAll(occurrences);
 
         log.info("Recurring event created: id={}, occurrences={}", saved.getId(), occurrences.size());
-        return mapper.toDto(saved);
+        return composer.compose(saved);
     }
 
     @Override
@@ -114,7 +116,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                         dto.startDate(), dto.endDate())
                 .map(existing -> {
                     log.debug("Reusing existing recurring event: id={}", existing.getId());
-                    return new FindOrCreateResult<>(mapper.toDto(existing), false);
+                    return new FindOrCreateResult<>(composer.compose(existing), false);
                 })
                 .orElseGet(() -> new FindOrCreateResult<>(createRecurringEvent(dto), true));
     }
@@ -137,6 +139,30 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         occurrenceRepository.saveAll(occurrences);
 
         log.info("Unique event created: id={}", saved.getId());
-        return mapper.toDto(saved);
+        return composer.compose(saved);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AcademicEventResponseDto> findUnassignedEvents(LocalDate from, LocalDate to) {
+        LocalDate effectiveFrom = from != null ? from : LocalDate.now();
+        if (to != null && to.isBefore(effectiveFrom)) {
+            throw new InvalidDateRangeException(
+                    "'to' (" + to + ") no puede ser anterior a 'from' (" + effectiveFrom + ")");
+        }
+
+        List<Occurrence> occurrences = to != null
+                ? occurrenceRepository.findByStatusAndDateBetweenOrderByEvent_IdAscDateAsc(
+                        OccurrenceStatus.SCHEDULED, effectiveFrom, to)
+                : occurrenceRepository.findByStatusAndDateGreaterThanEqualOrderByEvent_IdAscDateAsc(
+                        OccurrenceStatus.SCHEDULED, effectiveFrom);
+
+        Map<Long, AcademicEvent> eventById = new LinkedHashMap<>();
+        for (Occurrence occurrence : occurrences) {
+            AcademicEvent event = occurrence.getEvent();
+            eventById.putIfAbsent(event.getId(), event);
+        }
+
+        return composer.compose(eventById.values());
     }
 }

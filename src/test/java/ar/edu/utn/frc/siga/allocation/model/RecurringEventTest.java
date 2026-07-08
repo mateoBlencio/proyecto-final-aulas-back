@@ -13,7 +13,7 @@ class RecurringEventTest {
 
     private RecurringEvent recurring(DayOfWeek dow, LocalDate start, LocalDate end) {
         return RecurringEvent.builder()
-                .planningId("e1").enrolled(30)
+                .enrolled(30)
                 .startTime(LocalTime.of(8, 0))
                 .duration(Duration.ofMinutes(90))
                 .dayOfWeek(dow)
@@ -64,7 +64,7 @@ class RecurringEventTest {
     @Test
     void upRe006_endTime() {
         RecurringEvent ev = RecurringEvent.builder()
-                .planningId("e1").enrolled(30)
+                .enrolled(30)
                 .startTime(LocalTime.of(18, 15))
                 .duration(Duration.ofMinutes(135))
                 .dayOfWeek(DayOfWeek.MONDAY)

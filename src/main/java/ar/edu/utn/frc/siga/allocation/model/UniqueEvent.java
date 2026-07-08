@@ -27,6 +27,11 @@ public final class UniqueEvent extends AcademicEvent {
     private String description;
 
     @Override
+    public EventType getType() {
+        return EventType.UNIQUE_EVENT;
+    }
+
+    @Override
     public List<Occurrence> toOccurrences() {
         return List.of(Occurrence.builder()
                 .event(this)

@@ -34,7 +34,7 @@ public class ClassroomTypeServiceImpl implements ClassroomTypeService {
         return classroomTypeRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> {
                     log.warn("ClassroomType not found: id={}", id);
-                    return new ResourceNotFoundException("ClassroomType not found with id: " + id);
+                    return ResourceNotFoundException.of("ClassroomType", id);
                 });
     }
 
