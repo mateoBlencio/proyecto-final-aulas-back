@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,6 +32,7 @@ public class AcademicEventController {
     private final AcademicEventService academicEventService;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','AUXILIAR_AULICO')")
     @Operation(summary = "Listar eventos académicos",
                description = "Devuelve todos los eventos académicos registrados.")
     public ResponseEntity<List<AcademicEventResponseDto>> findAll() {
@@ -41,6 +43,7 @@ public class AcademicEventController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','AUXILIAR_AULICO')")
     @Operation(summary = "Obtener evento académico por ID",
                description = "Devuelve los datos de un evento académico existente.")
     public ResponseEntity<AcademicEventResponseDto> findById(@PathVariable Long id) {
@@ -49,6 +52,7 @@ public class AcademicEventController {
     }
 
     @GetMapping("/{id}/occurrences")
+    @PreAuthorize("hasAnyRole('ADMIN','AUXILIAR_AULICO')")
     @Operation(summary = "Listar ocurrencias de un evento",
                description = "Devuelve todas las ocurrencias generadas para un evento académico.")
     public ResponseEntity<List<OccurrenceResponseDto>> findOccurrences(@PathVariable Long id) {
@@ -59,6 +63,7 @@ public class AcademicEventController {
     }
 
     @PostMapping("/recurring")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Crear evento recurrente",
                description = "Crea un evento recurrente semanal y genera todas sus ocurrencias.")
     public ResponseEntity<AcademicEventResponseDto> createRecurring(
@@ -70,6 +75,7 @@ public class AcademicEventController {
     }
 
     @PostMapping("/unique")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Crea un evento único",
                description = "Crea un evento que ocurre una única vez y genera una única ocurrencia.")
     public ResponseEntity<AcademicEventResponseDto> createUnique(

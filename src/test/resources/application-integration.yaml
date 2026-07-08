@@ -9,3 +9,12 @@ spring:
   docker:
     compose:
       enabled: false
+
+cors:
+  allowed-origins:
+    - http://localhost:5173
+
+siga:
+  jwt:
+    secret: integration-test-fixed-secret-not-for-prod-0123456789
+    refresh-grace-seconds: 10

@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.space.controller;
 
+import ar.edu.utn.frc.siga.support.IntegrationAuthTestSupport;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
@@ -25,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("integration")
 @Sql(scripts = "/space/integration/setup-classroom.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+@Sql(scripts = "/auth/integration/seed-admin.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(scripts = "/space/integration/cleanup.sql", executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 class ClassroomControllerIntegrationTest {
 
@@ -45,6 +47,11 @@ class ClassroomControllerIntegrationTest {
             public boolean hasError(ClientHttpResponse response) {
                 return false;
             }
+        });
+        String token = IntegrationAuthTestSupport.obtainToken(port, "admin.test@frc.utn.edu.ar", "TestPassword123!");
+        restTemplate.getInterceptors().add((request, requestBody, execution) -> {
+            request.getHeaders().setBearerAuth(token);
+            return execution.execute(request, requestBody);
         });
         baseUrl = "http://localhost:" + port + PATH;
     }
