@@ -14,7 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @RestController
-@RequestMapping("/v1/excelimports")
+@RequestMapping("${siga.api.base-path}/excelimports")
 @RequiredArgsConstructor
 public class ExcelImportController {
 

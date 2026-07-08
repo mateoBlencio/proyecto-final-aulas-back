@@ -23,7 +23,7 @@ import java.util.List;
 
 @Slf4j
 @RestController
-@RequestMapping("/v1/events")
+@RequestMapping("${siga.api.base-path}/events")
 @RequiredArgsConstructor
 @Tag(name = "Eventos Académicos", description = "Creación y gestión de eventos académicos y sus ocurrencias")
 public class AcademicEventController {

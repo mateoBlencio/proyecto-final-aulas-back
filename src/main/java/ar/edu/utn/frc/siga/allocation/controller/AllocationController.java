@@ -30,7 +30,7 @@ import java.util.List;
 
 @Slf4j
 @RestController
-@RequestMapping("/v1/allocations")
+@RequestMapping("${siga.api.base-path}/allocations")
 @RequiredArgsConstructor
 @Tag(name = "Asignaciones", description = "Asignación manual de aulas para ocurrencias específicas")
 public class AllocationController {

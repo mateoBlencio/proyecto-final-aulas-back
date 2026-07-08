@@ -15,7 +15,7 @@ import java.util.List;
 
 @Slf4j
 @RestController
-@RequestMapping("/v1/buildings")
+@RequestMapping("${siga.api.base-path}/buildings")
 @RequiredArgsConstructor
 @Tag(name = "Edificios", description = "Consulta de edificios disponibles")
 public class BuildingController {

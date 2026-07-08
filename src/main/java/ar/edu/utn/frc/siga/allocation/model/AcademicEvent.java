@@ -48,9 +48,6 @@ public abstract class AcademicEvent {
     @Column(name = "duracion_minutos", nullable = false)
     protected Duration duration;
 
-    @Transient
-    protected String planningId;
-
     public LocalTime endTime() {
         return startTime.plus(duration);
     }

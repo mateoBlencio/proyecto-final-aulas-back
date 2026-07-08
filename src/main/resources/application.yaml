@@ -55,6 +55,9 @@ cors:
   allowed-origins: ""
 
 siga:
+  api:
+    # Prefijo de versión de la API. Bump solo ante breaking change de contrato.
+    base-path: /v1
   solver:
     # Solves concurrentes del SolverManager; excedentes se encolan. AUTO = según cores.
     parallel-solver-count: AUTO

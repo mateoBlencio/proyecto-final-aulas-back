@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/v1/solver")
+@RequestMapping("${siga.api.base-path}/solver")
 @RequiredArgsConstructor
 @Tag(name = "Solver", description = "Optimal classroom assignment via constraint solver")
 public class SolverController {

@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
 @RestController
-@RequestMapping("/v1/classrooms")
+@RequestMapping("${siga.api.base-path}/classrooms")
 @RequiredArgsConstructor
 public class ClassroomController {
 
