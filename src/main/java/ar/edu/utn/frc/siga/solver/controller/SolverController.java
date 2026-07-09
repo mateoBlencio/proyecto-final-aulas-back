@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/v1/solver")
 @RequiredArgsConstructor
 @Tag(name = "Solver", description = "Optimal classroom assignment via constraint solver")
-@PreAuthorize("hasAnyRole('ADMIN','AUXILIAR_AULICO')")
+@PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
 public class SolverController {
 
     private final SolverService solverService;

@@ -32,7 +32,7 @@ public class AcademicEventController {
     private final AcademicEventService academicEventService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','AUXILIAR_AULICO')")
+    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     @Operation(summary = "Listar eventos académicos",
                description = "Devuelve todos los eventos académicos registrados.")
     public ResponseEntity<List<AcademicEventResponseDto>> findAll() {
@@ -43,7 +43,7 @@ public class AcademicEventController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','AUXILIAR_AULICO')")
+    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     @Operation(summary = "Obtener evento académico por ID",
                description = "Devuelve los datos de un evento académico existente.")
     public ResponseEntity<AcademicEventResponseDto> findById(@PathVariable Long id) {
@@ -52,7 +52,7 @@ public class AcademicEventController {
     }
 
     @GetMapping("/{id}/occurrences")
-    @PreAuthorize("hasAnyRole('ADMIN','AUXILIAR_AULICO')")
+    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     @Operation(summary = "Listar ocurrencias de un evento",
                description = "Devuelve todas las ocurrencias generadas para un evento académico.")
     public ResponseEntity<List<OccurrenceResponseDto>> findOccurrences(@PathVariable Long id) {
@@ -63,7 +63,7 @@ public class AcademicEventController {
     }
 
     @PostMapping("/recurring")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Crear evento recurrente",
                description = "Crea un evento recurrente semanal y genera todas sus ocurrencias.")
     public ResponseEntity<AcademicEventResponseDto> createRecurring(
@@ -75,7 +75,7 @@ public class AcademicEventController {
     }
 
     @PostMapping("/unique")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Crea un evento único",
                description = "Crea un evento que ocurre una única vez y genera una única ocurrencia.")
     public ResponseEntity<AcademicEventResponseDto> createUnique(

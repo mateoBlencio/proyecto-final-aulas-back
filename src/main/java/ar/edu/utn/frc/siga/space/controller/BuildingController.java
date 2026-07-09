@@ -19,7 +19,7 @@ import java.util.List;
 @RequestMapping("/v1/buildings")
 @RequiredArgsConstructor
 @Tag(name = "Edificios", description = "Consulta de edificios disponibles")
-@PreAuthorize("hasAnyRole('ADMIN','AUXILIAR_AULICO')")
+@PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
 public class BuildingController {
 
     private final BuildingService buildingService;

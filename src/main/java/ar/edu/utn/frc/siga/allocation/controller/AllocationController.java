@@ -34,7 +34,7 @@ import java.util.List;
 @RequestMapping("/v1/allocations")
 @RequiredArgsConstructor
 @Tag(name = "Asignaciones", description = "Asignación manual de aulas para ocurrencias específicas")
-@PreAuthorize("hasAnyRole('ADMIN','AUXILIAR_AULICO')")
+@PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
 public class AllocationController {
 
     private final AllocationService allocationService;

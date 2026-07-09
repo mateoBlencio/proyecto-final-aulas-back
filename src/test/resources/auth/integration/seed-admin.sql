@@ -5,10 +5,10 @@ SELECT 'admin.test@frc.utn.edu.ar', '$2y$10$o7WlgInnrDPs6RaXEE.P8.u5kv/Z.q6MxDmf
 WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE correo = 'admin.test@frc.utn.edu.ar');
 
 INSERT INTO usuario_rol (id_usuario, rol)
-SELECT u.id_usuario, 'ADMIN'
+SELECT u.id_usuario, 'SUBSECRETARIA'
 FROM usuario u
 WHERE u.correo = 'admin.test@frc.utn.edu.ar'
-  AND NOT EXISTS (SELECT 1 FROM usuario_rol ur WHERE ur.id_usuario = u.id_usuario AND ur.rol = 'ADMIN');
+  AND NOT EXISTS (SELECT 1 FROM usuario_rol ur WHERE ur.id_usuario = u.id_usuario AND ur.rol = 'SUBSECRETARIA');
 
 INSERT INTO usuario (correo, password_hash, habilitado, eliminado)
 SELECT 'auxiliar.test@frc.utn.edu.ar', '$2y$10$o7WlgInnrDPs6RaXEE.P8.u5kv/Z.q6MxDmfAobeVTp50itKh4Yoi', true, false
