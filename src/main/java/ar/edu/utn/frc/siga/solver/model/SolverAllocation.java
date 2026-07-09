@@ -7,5 +7,5 @@ import org.springframework.modulith.NamedInterface;
  * (classroomId null = sin aula disponible sin conflicto).
  */
 @NamedInterface("api")
-public record SolverAssignment(String eventId, Integer classroomId) {
+public record SolverAllocation(String eventId, Integer classroomId) {
 }

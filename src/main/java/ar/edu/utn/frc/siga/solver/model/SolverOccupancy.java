@@ -10,5 +10,5 @@ import java.time.LocalTime;
  * El solver la modela como asignación pinned para no solapar los eventos nuevos.
  */
 @NamedInterface("api")
-public record OccupancyDto(Integer classroomId, LocalDate date, LocalTime startTime, LocalTime endTime) {
+public record SolverOccupancy(Integer classroomId, LocalDate date, LocalTime startTime, LocalTime endTime) {
 }

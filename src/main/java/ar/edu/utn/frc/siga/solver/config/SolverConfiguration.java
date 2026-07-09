@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.siga.solver.config;
 
-import ar.edu.utn.frc.siga.solver.model.ClassAssignment;
+import ar.edu.utn.frc.siga.solver.model.ClassAllocation;
 import ar.edu.utn.frc.siga.solver.model.ScheduleSolution;
 import ar.edu.utn.frc.siga.solver.service.impl.ClassroomConstraintProvider;
 import ai.timefold.solver.core.api.solver.SolverFactory;
@@ -26,7 +26,7 @@ public class SolverConfiguration {
     public SolverFactory<ScheduleSolution> scheduleSolverFactory(SolverProperties properties) {
         SolverConfig config = new SolverConfig()
                 .withSolutionClass(ScheduleSolution.class)
-                .withEntityClasses(ClassAssignment.class)
+                .withEntityClasses(ClassAllocation.class)
                 .withConstraintProviderClass(ClassroomConstraintProvider.class)
                 .withEnvironmentMode(properties.getEnvironmentMode())
                 .withTerminationConfig(new TerminationConfig()

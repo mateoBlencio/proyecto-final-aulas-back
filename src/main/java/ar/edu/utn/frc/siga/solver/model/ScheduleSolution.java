@@ -25,14 +25,14 @@ public class ScheduleSolution {
     List<SolverRoom> classrooms;
 
     @PlanningEntityCollectionProperty
-    List<ClassAssignment> assignments;
+    List<ClassAllocation> allocations;
 
     @Setter
     @PlanningScore
     HardSoftScore score;
 
-    public ScheduleSolution(List<SolverRoom> classrooms, List<ClassAssignment> assignments) {
+    public ScheduleSolution(List<SolverRoom> classrooms, List<ClassAllocation> allocations) {
         this.classrooms = classrooms;
-        this.assignments = assignments;
+        this.allocations = allocations;
     }
 }

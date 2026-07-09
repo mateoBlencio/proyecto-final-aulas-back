@@ -21,4 +21,7 @@ docs {
   Corre el solver con TODAS las aulas disponibles de la BD y la ocupación existente
   (asignaciones ya hechas) como restricción dura. Devuelve una preview con previewId,
   sin persistir asignaciones. El confirm es un paso aparte (pendiente).
+
+  Respuesta: { "previewId": "prev_xxxxxxxx", "allocations": [ { "eventId": "1", "classroomId": 5 } ] }
+  classroomId null = el solver no encontró aula sin conflicto para ese evento.
 }

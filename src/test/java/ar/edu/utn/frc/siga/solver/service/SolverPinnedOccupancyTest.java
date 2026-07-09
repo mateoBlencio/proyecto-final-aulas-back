@@ -3,9 +3,9 @@ package ar.edu.utn.frc.siga.solver.service;
 import ar.edu.utn.frc.siga.solver.config.SolverConfiguration;
 import ar.edu.utn.frc.siga.solver.config.SolverProperties;
 import ar.edu.utn.frc.siga.solver.exception.PreviewNotFoundException;
-import ar.edu.utn.frc.siga.solver.model.OccupancyDto;
+import ar.edu.utn.frc.siga.solver.model.SolverOccupancy;
 import ar.edu.utn.frc.siga.solver.model.ScheduleSolution;
-import ar.edu.utn.frc.siga.solver.model.SolverAssignment;
+import ar.edu.utn.frc.siga.solver.model.SolverAllocation;
 import ar.edu.utn.frc.siga.solver.model.SolverEvent;
 import ar.edu.utn.frc.siga.solver.model.SolverPreview;
 import ar.edu.utn.frc.siga.solver.model.SolverRoom;
@@ -51,16 +51,16 @@ class SolverPinnedOccupancyTest {
     @Test
     void newEvent_avoidsClassroomOccupiedOnOverlappingDate() {
         // Aula 1 ocupada el lunes 2026-03-09, 08:00-09:30 → colisiona con e1 ese día.
-        List<OccupancyDto> occupancy = List.of(
-                new OccupancyDto(1, LocalDate.of(2026, 3, 9), LocalTime.of(8, 0), LocalTime.of(9, 30)));
+        List<SolverOccupancy> occupancy = List.of(
+                new SolverOccupancy(1, LocalDate.of(2026, 3, 9), LocalTime.of(8, 0), LocalTime.of(9, 30)));
 
         SolverServiceImpl service = newService();
         SolverPreview preview = service.preview(List.of(mondayEvent()), List.of(room(1), room(2)), occupancy, 5);
 
-        assertThat(preview.assignments()).hasSize(1);
-        SolverAssignment assignment = preview.assignments().get(0);
-        assertThat(assignment.eventId()).isEqualTo("e1");
-        assertThat(assignment.classroomId()).isEqualTo(2);
+        assertThat(preview.allocations()).hasSize(1);
+        SolverAllocation allocation = preview.allocations().get(0);
+        assertThat(allocation.eventId()).isEqualTo("e1");
+        assertThat(allocation.classroomId()).isEqualTo(2);
 
         // Preview persistida y recuperable; id inexistente → 410.
         assertThat(service.getPreview(preview.previewId()).previewId()).isEqualTo(preview.previewId());

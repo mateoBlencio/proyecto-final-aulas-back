@@ -34,7 +34,7 @@ public class AutoAllocationController {
         log.debug("POST /v1/allocations/auto-preview: eventIds={}", request.getEventIds());
         SolverPreview preview = autoAllocationService.autoPreview(request);
         log.info("Auto-preview generado: previewId={}, asignaciones={}",
-                preview.previewId(), preview.assignments().size());
+                preview.previewId(), preview.allocations().size());
         return ResponseEntity.ok(preview);
     }
 

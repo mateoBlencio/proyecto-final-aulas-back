@@ -18,7 +18,7 @@ import java.util.Set;
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @PlanningEntity
-public class ClassAssignment {
+public class ClassAllocation {
 
     @PlanningId
     String id;
@@ -45,7 +45,7 @@ public class ClassAssignment {
     @PlanningVariable
     SolverRoom classroom;
 
-    public ClassAssignment(SolverEvent event, List<SolverRoom> candidates, Set<String> conflictingEventIds) {
+    public ClassAllocation(SolverEvent event, List<SolverRoom> candidates, Set<String> conflictingEventIds) {
         this.id = event.planningId();
         this.event = event;
         this.candidates = candidates;
@@ -54,11 +54,11 @@ public class ClassAssignment {
     }
 
     /** Ocupación existente: aula fija, no planificable. */
-    public static ClassAssignment pinned(SolverEvent event, SolverRoom classroom, Set<String> conflictingEventIds) {
-        ClassAssignment assignment = new ClassAssignment(event, List.of(classroom), conflictingEventIds);
-        assignment.pinned = true;
-        assignment.classroom = classroom;
-        return assignment;
+    public static ClassAllocation pinned(SolverEvent event, SolverRoom classroom, Set<String> conflictingEventIds) {
+        ClassAllocation allocation = new ClassAllocation(event, List.of(classroom), conflictingEventIds);
+        allocation.pinned = true;
+        allocation.classroom = classroom;
+        return allocation;
     }
 
     public int getOvercrowding() {

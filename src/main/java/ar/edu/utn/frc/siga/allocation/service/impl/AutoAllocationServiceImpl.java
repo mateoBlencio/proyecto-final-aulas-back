@@ -12,7 +12,7 @@ import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.service.AutoAllocationService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
-import ar.edu.utn.frc.siga.solver.model.OccupancyDto;
+import ar.edu.utn.frc.siga.solver.model.SolverOccupancy;
 import ar.edu.utn.frc.siga.solver.model.SolverEvent;
 import ar.edu.utn.frc.siga.solver.model.SolverPreview;
 import ar.edu.utn.frc.siga.solver.model.SolverRoom;
@@ -58,7 +58,7 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
         List<SolverRoom> classrooms = classroomService.findAllAvailable().stream()
                 .map(this::toSolverRoom)
                 .toList();
-        List<OccupancyDto> occupancy = buildOccupancy(events, ownEventIds);
+        List<SolverOccupancy> occupancy = buildOccupancy(events, ownEventIds);
         int timeLimit = request.getTimeLimitSeconds() != null
                 ? request.getTimeLimitSeconds() : DEFAULT_TIME_LIMIT_SECONDS;
 
@@ -100,7 +100,7 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
         return new SolverRoom(c.getId(), c.getCapacity(), c.getBuildingId());
     }
 
-    private List<OccupancyDto> buildOccupancy(List<RecurringEvent> events, Set<Long> ownEventIds) {
+    private List<SolverOccupancy> buildOccupancy(List<RecurringEvent> events, Set<Long> ownEventIds) {
         LocalDate from = events.stream().map(RecurringEvent::getStartDate)
                 .min(Comparator.naturalOrder()).orElseThrow();
         LocalDate to = events.stream()
@@ -113,9 +113,9 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
                 .toList();
     }
 
-    private OccupancyDto toOccupancy(Allocation a) {
+    private SolverOccupancy toOccupancy(Allocation a) {
         AcademicEvent occupant = a.getOccurrence().getEvent();
-        return new OccupancyDto(
+        return new SolverOccupancy(
                 a.getClassroom().getId(),
                 a.getOccurrence().getDate(),
                 occupant.getStartTime(),

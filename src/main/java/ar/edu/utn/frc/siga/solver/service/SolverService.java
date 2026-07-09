@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.siga.solver.service;
 
-import ar.edu.utn.frc.siga.solver.model.OccupancyDto;
+import ar.edu.utn.frc.siga.solver.model.SolverOccupancy;
 import ar.edu.utn.frc.siga.solver.model.SolverEvent;
 import ar.edu.utn.frc.siga.solver.model.SolverPreview;
 import ar.edu.utn.frc.siga.solver.model.SolverRoom;
@@ -16,7 +16,7 @@ public interface SolverService {
      * la ocupación existente (no-solapamiento duro). Guarda y devuelve la preview.
      */
     SolverPreview preview(List<SolverEvent> events, List<SolverRoom> classrooms,
-                          List<OccupancyDto> occupancy, int timeLimitSeconds);
+                          List<SolverOccupancy> occupancy, int timeLimitSeconds);
 
     /** Recupera una preview guardada; lanza PreviewNotFoundException (410) si no existe/expiró. */
     SolverPreview getPreview(String previewId);

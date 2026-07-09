@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.siga.solver.config;
 
-import ar.edu.utn.frc.siga.solver.model.ClassAssignment;
+import ar.edu.utn.frc.siga.solver.model.ClassAllocation;
 import ar.edu.utn.frc.siga.solver.model.ScheduleSolution;
 import ar.edu.utn.frc.siga.solver.model.SolverEvent;
 import ar.edu.utn.frc.siga.solver.model.SolverRoom;
@@ -32,8 +32,8 @@ class SolverConfigurationTest {
             SolverRoom room = new SolverRoom(1, 40, null);
             SolverEvent event = new SolverEvent("ev-1", null, 30, LocalTime.of(8, 0), LocalTime.of(9, 30),
                     Set.of(LocalDate.of(2026, 3, 2)));
-            ClassAssignment assignment = new ClassAssignment(event, List.of(room), Set.of());
-            ScheduleSolution problem = new ScheduleSolution(List.of(room), List.of(assignment));
+            ClassAllocation allocation = new ClassAllocation(event, List.of(room), Set.of());
+            ScheduleSolution problem = new ScheduleSolution(List.of(room), List.of(allocation));
 
             ScheduleSolution solution = manager.solveBuilder()
                     .withProblemId("test-trivial")
@@ -46,8 +46,8 @@ class SolverConfigurationTest {
                     .getFinalBestSolution();
 
             assertThat(solution.getScore().hardScore()).isZero();
-            assertThat(solution.getAssignments()).hasSize(1);
-            assertThat(solution.getAssignments().get(0).getClassroom()).isEqualTo(room);
+            assertThat(solution.getAllocations()).hasSize(1);
+            assertThat(solution.getAllocations().getFirst().getClassroom()).isEqualTo(room);
         }
     }
 

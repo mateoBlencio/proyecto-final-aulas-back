@@ -3,10 +3,10 @@ package ar.edu.utn.frc.siga.solver.service.impl;
 import ar.edu.utn.frc.siga.solver.config.SolverProperties;
 import ar.edu.utn.frc.siga.solver.exception.PreviewNotFoundException;
 import ar.edu.utn.frc.siga.solver.exception.SchedulingException;
-import ar.edu.utn.frc.siga.solver.model.ClassAssignment;
-import ar.edu.utn.frc.siga.solver.model.OccupancyDto;
+import ar.edu.utn.frc.siga.solver.model.ClassAllocation;
+import ar.edu.utn.frc.siga.solver.model.SolverOccupancy;
 import ar.edu.utn.frc.siga.solver.model.ScheduleSolution;
-import ar.edu.utn.frc.siga.solver.model.SolverAssignment;
+import ar.edu.utn.frc.siga.solver.model.SolverAllocation;
 import ar.edu.utn.frc.siga.solver.model.SolverEvent;
 import ar.edu.utn.frc.siga.solver.model.SolverPreview;
 import ar.edu.utn.frc.siga.solver.model.SolverRoom;
@@ -47,7 +47,7 @@ public class SolverServiceImpl implements SolverService {
 
     @Override
     public SolverPreview preview(List<SolverEvent> events, List<SolverRoom> classrooms,
-                                 List<OccupancyDto> occupancy, int timeLimitSeconds) {
+                                 List<SolverOccupancy> occupancy, int timeLimitSeconds) {
         Map<Integer, SolverRoom> roomsById = classrooms.stream()
                 .collect(Collectors.toMap(SolverRoom::id, r -> r));
         List<ExistingOccupancy> existing = buildExistingOccupancy(occupancy, roomsById);
@@ -78,14 +78,14 @@ public class SolverServiceImpl implements SolverService {
     }
 
     private SolverPreview toPreview(ScheduleSolution solution) {
-        List<SolverAssignment> assignments = solution.getAssignments().stream()
+        List<SolverAllocation> allocations = solution.getAllocations().stream()
                 .filter(a -> !a.isPinned())
-                .map(a -> new SolverAssignment(
+                .map(a -> new SolverAllocation(
                         a.getEvent().planningId(),
                         a.getClassroom() != null ? a.getClassroom().id() : null))
                 .toList();
         String previewId = "prev_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-        return new SolverPreview(previewId, assignments);
+        return new SolverPreview(previewId, allocations);
     }
 
     /**
@@ -93,11 +93,11 @@ public class SolverServiceImpl implements SolverService {
      * Si el aula ocupada no es candidata (no disponible), no puede colisionar con ningún
      * evento nuevo y se descarta.
      */
-    private List<ExistingOccupancy> buildExistingOccupancy(List<OccupancyDto> occupancy,
+    private List<ExistingOccupancy> buildExistingOccupancy(List<SolverOccupancy> occupancy,
                                                            Map<Integer, SolverRoom> roomsById) {
         if (occupancy == null || occupancy.isEmpty()) return List.of();
         List<ExistingOccupancy> result = new ArrayList<>();
-        for (OccupancyDto occ : occupancy) {
+        for (SolverOccupancy occ : occupancy) {
             SolverRoom room = roomsById.get(occ.classroomId());
             if (room == null) continue;
             String planningId = "occupied:" + occ.classroomId() + ":" + occ.date() + ":" + occ.startTime();
@@ -113,16 +113,16 @@ public class SolverServiceImpl implements SolverService {
                                    List<SolverRoom> classrooms,
                                    Map<String, Set<String>> conflictsByEventId,
                                    int timeLimitSeconds) {
-        List<ClassAssignment> assignments = new ArrayList<>();
+        List<ClassAllocation> allocations = new ArrayList<>();
         for (SolverEvent event : events) {
-            assignments.add(new ClassAssignment(
+            allocations.add(new ClassAllocation(
                     event, classrooms, conflictsByEventId.getOrDefault(event.planningId(), Set.of())));
         }
         for (ExistingOccupancy occ : existing) {
-            assignments.add(ClassAssignment.pinned(
+            allocations.add(ClassAllocation.pinned(
                     occ.event(), occ.room(), conflictsByEventId.getOrDefault(occ.event().planningId(), Set.of())));
         }
-        ScheduleSolution problem = new ScheduleSolution(classrooms, assignments);
+        ScheduleSolution problem = new ScheduleSolution(classrooms, allocations);
         return runSolver(problem, timeLimitSeconds);
     }
 

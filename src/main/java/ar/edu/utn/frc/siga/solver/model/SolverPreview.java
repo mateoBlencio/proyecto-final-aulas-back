@@ -9,5 +9,5 @@ import java.util.List;
  * asignaciones evento→aula. Sin adornos; allocation le da forma al cliente.
  */
 @NamedInterface("api")
-public record SolverPreview(String previewId, List<SolverAssignment> assignments) {
+public record SolverPreview(String previewId, List<SolverAllocation> allocations) {
 }
