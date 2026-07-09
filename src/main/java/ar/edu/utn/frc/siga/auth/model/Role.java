@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.siga.auth.model;
 
 public enum Role {
-    ADMIN,
+    SUBSECRETARIA,
     AUXILIAR_AULICO
 }

@@ -11,9 +11,9 @@ SELECT 'admin@frc.utn.edu.ar', '$2y$10$entcSj2YEpWjWBz8UaCICuk98/ex9c9p4Gr4F.i/Z
 WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE correo = 'admin@frc.utn.edu.ar');
 
 INSERT INTO usuario_rol (id_usuario, rol)
-SELECT u.id_usuario, 'ADMIN'
+SELECT u.id_usuario, 'SUBSECRETARIA'
 FROM usuario u
 WHERE u.correo = 'admin@frc.utn.edu.ar'
   AND NOT EXISTS (
-      SELECT 1 FROM usuario_rol ur WHERE ur.id_usuario = u.id_usuario AND ur.rol = 'ADMIN'
+      SELECT 1 FROM usuario_rol ur WHERE ur.id_usuario = u.id_usuario AND ur.rol = 'SUBSECRETARIA'
   );
