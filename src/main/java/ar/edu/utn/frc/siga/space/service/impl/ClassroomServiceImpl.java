@@ -118,7 +118,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         log.info("Classroom deleted: id={}", id);
     }
 
-    protected Classroom findExistingClassroomById(Integer id) {
+    private Classroom findExistingClassroomById(Integer id) {
         return classroomRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> {
                     log.warn("Classroom not found: id={}", id);

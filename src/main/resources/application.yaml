@@ -63,6 +63,8 @@ siga:
     environment-mode: PHASE_ASSERT
     preview:
       ttl-minutes: 30
+  space:
+    default-classroom-type: Normal
 
 logging:
   level:

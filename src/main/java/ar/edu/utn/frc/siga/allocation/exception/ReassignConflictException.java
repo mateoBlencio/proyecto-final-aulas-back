@@ -20,5 +20,6 @@ public class ReassignConflictException extends SigaAppException {
         super(HttpStatus.CONFLICT, "Reassign conflict",
                 "No se puede reasignar: " + conflicts.size() + " ocurrencia(s) solapan con asignaciones existentes.");
         this.conflicts = conflicts;
+        withProperty("conflicts", conflicts);
     }
 }
