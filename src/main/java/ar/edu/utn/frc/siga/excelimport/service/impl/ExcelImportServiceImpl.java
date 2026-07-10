@@ -1,33 +1,33 @@
 package ar.edu.utn.frc.siga.excelimport.service.impl;
 
+import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
+import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
+import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
+import ar.edu.utn.frc.siga.academic.dto.response.StudyPlanResponseDto;
+import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
+import ar.edu.utn.frc.siga.academic.model.TermType;
+import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
+import ar.edu.utn.frc.siga.academic.service.CommissionService;
+import ar.edu.utn.frc.siga.academic.service.SpecialtyService;
+import ar.edu.utn.frc.siga.academic.service.StudyPlanService;
+import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
+import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateFromDateRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
-import ar.edu.utn.frc.siga.academic.model.Specialty;
-import ar.edu.utn.frc.siga.academic.model.StudyPlan;
-import ar.edu.utn.frc.siga.academic.model.Subject;
-import ar.edu.utn.frc.siga.academic.service.SpecialtyService;
-import ar.edu.utn.frc.siga.academic.service.StudyPlanService;
-import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
-import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
-import ar.edu.utn.frc.siga.academic.model.Commission;
-import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
-import ar.edu.utn.frc.siga.academic.model.TermType;
-import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
-import ar.edu.utn.frc.siga.academic.service.CommissionService;
-import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
 import ar.edu.utn.frc.siga.excelimport.dto.ExcelRowDto;
 import ar.edu.utn.frc.siga.excelimport.dto.ImportResultDto;
 import ar.edu.utn.frc.siga.excelimport.exception.ExcelImportException;
 import ar.edu.utn.frc.siga.excelimport.mapper.ExcelRowMapper;
 import ar.edu.utn.frc.siga.excelimport.service.ExcelImportService;
 import ar.edu.utn.frc.siga.excelimport.validator.ExcelTemplateValidator;
-import ar.edu.utn.frc.siga.space.model.Building;
-import ar.edu.utn.frc.siga.space.model.Classroom;
+import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.BuildingService;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
@@ -89,63 +89,67 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             LocalDate startDate = termType.startDate(year);
             LocalDate endDate = termType.endDate(year);
 
-            Specialty specialty = cache.getSpecialty(dto.specialtyCode(), () -> {
-                FindOrCreateResult<Specialty> r = specialtyService.findOrCreate(dto.specialtyCode());
+            // Se resuelven por su efecto (crear/reusar y quedar cacheadas): los pasos
+            // siguientes encadenan por clave natural (dto.specialtyCode()/studyPlanCode()),
+            // no necesitan el DTO en sí.
+            cache.getSpecialty(dto.specialtyCode(), () -> {
+                FindOrCreateResult<SpecialtyResponseDto> r = specialtyService.findOrCreate(dto.specialtyCode());
                 count(r, entitiesCreated, entitiesReused);
-                return r.entity();
+                return r.value();
             });
 
-            StudyPlan studyPlan = cache.getStudyPlan(dto.studyPlanCode() + "-" + specialty.getId(), () -> {
-                FindOrCreateResult<StudyPlan> r = studyPlanService.findOrCreate(dto.studyPlanCode(), specialty);
+            cache.getStudyPlan(dto.studyPlanCode() + "-" + dto.specialtyCode(), () -> {
+                FindOrCreateResult<StudyPlanResponseDto> r =
+                    studyPlanService.findOrCreate(dto.studyPlanCode(), dto.specialtyCode());
                 count(r, entitiesCreated, entitiesReused);
-                return r.entity();
+                return r.value();
             });
 
-            Subject subject = cache.getSubject(dto.subjectCode() + "-" + studyPlan.getId(), () -> {
-                FindOrCreateResult<Subject> r = subjectService.findOrCreate(
-                    dto.subjectCode(), dto.subjectName(), studyPlan, dto.termType());
-                count(r, entitiesCreated, entitiesReused);
-                return r.entity();
-            });
+            SubjectResponseDto subject = cache.getSubject(
+                dto.subjectCode() + "-" + dto.studyPlanCode() + "-" + dto.specialtyCode(), () -> {
+                    FindOrCreateResult<SubjectResponseDto> r = subjectService.findOrCreate(
+                        dto.subjectCode(), dto.subjectName(), dto.studyPlanCode(), dto.specialtyCode(), dto.termType());
+                    count(r, entitiesCreated, entitiesReused);
+                    return r.value();
+                });
 
-            AcademicPeriod period = cache.getPeriod(year + "-" + termType.getSemester(), () -> {
-                FindOrCreateResult<AcademicPeriod> r = academicPeriodService.findOrCreate(year, termType);
+            AcademicPeriodResponseDto period = cache.getPeriod(year + "-" + termType.getSemester(), () -> {
+                FindOrCreateResult<AcademicPeriodResponseDto> r = academicPeriodService.findOrCreate(year, termType);
                 count(r, entitiesCreated, entitiesReused);
-                return r.entity();
+                return r.value();
             });
 
             int yearLevel = Character.getNumericValue(dto.courseCode().charAt(0));
-            Commission commission = cache.getCommission(
-                dto.courseCode() + "-" + dto.commissionNumber() + "-" + period.getId(), () -> {
-                    FindOrCreateResult<Commission> r = commissionService.findOrCreate(
-                        dto.courseCode(), dto.commissionNumber(), yearLevel, period);
+            CommissionResponseDto commission = cache.getCommission(
+                dto.courseCode() + "-" + dto.commissionNumber() + "-" + period.year() + "-" + period.semester(), () -> {
+                    FindOrCreateResult<CommissionResponseDto> r = commissionService.findOrCreate(
+                        dto.courseCode(), dto.commissionNumber(), yearLevel, period.year(), period.semester());
                     count(r, entitiesCreated, entitiesReused);
-                    return r.entity();
+                    return r.value();
                 });
 
-            cache.getSubjectCommission(subject.getId() + "-" + commission.getId(), () -> {
-                FindOrCreateResult<SubjectCommission> r = subjectCommissionService.findOrCreate(
-                    subject, commission, dto.enrolledCount());
+            cache.getSubjectCommission(subject.id() + "-" + commission.id(), () -> {
+                var r = subjectCommissionService.findOrCreate(subject.id(), commission.id(), dto.enrolledCount());
                 count(r, entitiesCreated, entitiesReused);
-                return r.entity();
+                return r.value();
             });
 
-            Building building = cache.getBuilding(dto.buildingName(), () -> {
-                FindOrCreateResult<Building> r = buildingService.findOrCreate(dto.buildingName());
+            BuildingResponseDto building = cache.getBuilding(dto.buildingName(), () -> {
+                FindOrCreateResult<BuildingResponseDto> r = buildingService.findOrCreate(dto.buildingName());
                 count(r, entitiesCreated, entitiesReused);
-                return r.entity();
+                return r.value();
             });
 
-            Classroom classroom = cache.getClassroom(dto.roomNumber() + "-" + building.getId(), () -> {
-                FindOrCreateResult<Classroom> r = classroomService.findOrCreate(
-                    dto.roomNumber(), building, dto.enrolledCount());
+            ClassroomResponseDto classroom = cache.getClassroom(dto.roomNumber() + "-" + building.id(), () -> {
+                FindOrCreateResult<ClassroomResponseDto> r = classroomService.findOrCreate(
+                    dto.roomNumber(), building.id(), dto.enrolledCount());
                 count(r, entitiesCreated, entitiesReused);
-                return r.entity();
+                return r.value();
             });
 
             int durationMinutes = dto.durationMinutes() != null
                 ? dto.durationMinutes()
-                : (int) java.time.Duration.between(dto.startTime(), dto.endTime()).toMinutes();
+                : (int) Duration.between(dto.startTime(), dto.endTime()).toMinutes();
 
             var eventResult = academicEventService.findOrCreateRecurringEvent(
                 new CreateRecurringEventRequestDto(
@@ -155,16 +159,16 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                     dto.dayOfWeek(),
                     startDate,
                     endDate,
-                    subject.getId(),
-                    commission.getId()
+                    subject.id(),
+                    commission.id()
                 )
             );
 
             allocationService.importAssignmentsFromDate(
                 new AllocateFromDateRequestDto(
-                    eventResult.entity().id(),
+                    eventResult.value().id(),
                     startDate,
-                    classroom.getId(),
+                    classroom.id(),
                     "Importado de Excel"
                 )
             );
@@ -173,7 +177,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             else assignmentsReused++;
             processedRows++;
             log.info("Row {}: subject={}, commission={}, classroom={}",
-                rowNum, subject.getName(), commission.getCommissionNumber(), dto.roomNumber());
+                rowNum, subject.name(), commission.commissionNumber(), dto.roomNumber());
         }
 
         log.info("Import completed: {} rows, {} events created", processedRows, assignmentsCreated);

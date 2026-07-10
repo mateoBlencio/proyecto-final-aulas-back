@@ -77,8 +77,8 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startDate());
 
         // Solo se valida existencia vía la fachada (404 si no existe); no se necesita el DTO completo.
-        subjectService.findDtoById(dto.subjectId());
-        commissionService.findDtoById(dto.commissionId());
+        subjectService.findById(dto.subjectId());
+        commissionService.findById(dto.commissionId());
 
         RecurringEvent event = RecurringEvent.builder()
                 .enrolled(dto.enrolled())

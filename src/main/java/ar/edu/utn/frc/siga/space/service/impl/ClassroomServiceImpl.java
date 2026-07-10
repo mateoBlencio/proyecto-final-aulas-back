@@ -10,8 +10,8 @@ import ar.edu.utn.frc.siga.space.mapper.ClassroomMapper;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
+import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
-import ar.edu.utn.frc.siga.space.service.BuildingService;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import ar.edu.utn.frc.siga.space.service.ClassroomTypeService;
 import ar.edu.utn.frc.siga.space.specification.ClassroomSpecification;
@@ -23,6 +23,16 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
+import java.util.List;
+
+/**
+ * Nota: resuelve {@link Building} vía {@link BuildingRepository} directo (no vía
+ * {@code BuildingService}) porque el aula necesita la entidad para la relación JPA
+ * {@code Classroom.building}, ambas intra-módulo. {@code BuildingService} (fachada
+ * {@code api}) solo expone DTOs — devolver la entidad ahí sería reintroducir el mismo
+ * acoplamiento que la Fase 4 elimina, aunque el consumidor esté en el propio módulo.
+ */
 @Slf4j
 @Service
 @Transactional(readOnly = true)
@@ -30,7 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ClassroomServiceImpl implements ClassroomService {
 
     private final ClassroomRepository classroomRepository;
-    private final BuildingService buildingService;
+    private final BuildingRepository buildingRepository;
     private final ClassroomTypeService classroomTypeService;
     private final ClassroomMapper classroomMapper;
 
@@ -40,7 +50,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         log.debug("Creating classroom: roomNumber={}, buildingId={}, classroomTypeId={}",
                 dto.roomNumber(), dto.buildingId(), dto.classroomTypeId());
 
-        Building building = buildingService.findById(dto.buildingId());
+        Building building = findActiveBuilding(dto.buildingId());
         ClassroomType classroomType = classroomTypeService.findById(dto.classroomTypeId());
 
         if (classroomRepository.findByRoomNumberAndDeletedFalse(dto.roomNumber()).isPresent()) {
@@ -67,7 +77,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     @Override
-    public java.util.List<ClassroomResponseDto> findAllAvailable() {
+    public List<ClassroomResponseDto> findAllAvailable() {
         log.debug("Listing all available classrooms");
         return classroomRepository.findByAvailableTrueAndDeletedFalse().stream()
                 .map(classroomMapper::toDto)
@@ -75,7 +85,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     @Override
-    public java.util.List<ClassroomResponseDto> findByIds(java.util.Collection<Integer> ids) {
+    public List<ClassroomResponseDto> findByIds(Collection<Integer> ids) {
         log.debug("Fetching classrooms by ids: {}", ids);
         return classroomRepository.findAllById(ids).stream()
                 .map(classroomMapper::toDto)
@@ -95,7 +105,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         log.debug("Updating classroom: id={}, roomNumber={}", id, dto.roomNumber());
 
         Classroom entity = this.findExistingClassroomById(id);
-        Building building = buildingService.findById(dto.buildingId());
+        Building building = findActiveBuilding(dto.buildingId());
         ClassroomType classroomType = classroomTypeService.findById(dto.classroomTypeId());
 
         validateFloor(dto, building);
@@ -120,12 +130,47 @@ public class ClassroomServiceImpl implements ClassroomService {
         log.info("Classroom deleted: id={}", id);
     }
 
+    @Override
+    @Transactional
+    public FindOrCreateResult<ClassroomResponseDto> findOrCreate(String roomNumber, Integer buildingId, Integer enrolledCount) {
+        Building building = requireBuilding(buildingId);
+        return FindOrCreateResult.resolve(
+                classroomRepository.findByRoomNumberAndBuildingAndDeletedFalse(roomNumber, building),
+                () -> {
+                    log.warn("Creating Classroom with provisional data: roomNumber={}, buildingId={}",
+                            roomNumber, buildingId);
+                    return classroomRepository.save(
+                            Classroom.builder()
+                                    .roomNumber(roomNumber)
+                                    .building(building)
+                                    .floor(0)
+                                    .capacity(enrolledCount != null && enrolledCount > 0 ? enrolledCount : 1)
+                                    .classroomType(classroomTypeService.findDefault())
+                                    .build());
+                }
+        ).map(classroomMapper::toDto);
+    }
+
     private Classroom findExistingClassroomById(Integer id) {
         return classroomRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> {
                     log.warn("Classroom not found: id={}", id);
                     return ResourceNotFoundException.of("Classroom", id);
                 });
+    }
+
+    private Building findActiveBuilding(Integer id) {
+        return buildingRepository.findByIdAndDeletedFalse(id)
+                .filter(Building::getActive)
+                .orElseThrow(() -> {
+                    log.warn("Building not found: id={}", id);
+                    return ResourceNotFoundException.of("Building", id);
+                });
+    }
+
+    private Building requireBuilding(Integer id) {
+        return buildingRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> ResourceNotFoundException.of("Building", id));
     }
 
     private void validateFloor(ClassroomRequestDto dto, Building building) {
@@ -135,27 +180,6 @@ public class ClassroomServiceImpl implements ClassroomService {
             throw new SpaceDomainException(
                     "Floor " + dto.floor() + " exceeds building floor count " + building.getFloorCount());
         }
-    }
-
-    @Override
-    @Transactional
-    public FindOrCreateResult<Classroom> findOrCreate(String roomNumber, Building building, Integer enrolledCount) {
-        return classroomRepository.findByRoomNumberAndBuildingAndDeletedFalse(roomNumber, building)
-                .map(found -> new FindOrCreateResult<>(found, false))
-                .orElseGet(() -> {
-                    log.warn("Creating Classroom with provisional data: roomNumber={}, buildingId={}",
-                        roomNumber, building.getId());
-                    Classroom created = classroomRepository.save(
-                        Classroom.builder()
-                            .roomNumber(roomNumber)
-                            .building(building)
-                            .floor(0)
-                            .capacity(enrolledCount != null && enrolledCount > 0 ? enrolledCount : 1)
-                            .classroomType(classroomTypeService.findDefault())
-                            .build()
-                    );
-                    return new FindOrCreateResult<>(created, true);
-                });
     }
 
     private void validateCapacity(ClassroomRequestDto dto) {

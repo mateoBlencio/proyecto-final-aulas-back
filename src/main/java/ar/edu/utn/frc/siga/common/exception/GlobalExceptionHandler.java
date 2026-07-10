@@ -90,7 +90,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ProblemDetail handleMaxUploadSize(MaxUploadSizeExceededException ex) {
         log.warn("Archivo demasiado grande: {}", ex.getMessage());
-        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.PAYLOAD_TOO_LARGE);
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.CONTENT_TOO_LARGE);
         problem.setTitle("Archivo demasiado grande");
         problem.setDetail("El archivo enviado supera el tamaño máximo permitido.");
         return problem;

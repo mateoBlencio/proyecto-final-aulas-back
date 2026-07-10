@@ -38,9 +38,9 @@ public class AcademicEventComposer {
         AcademicEvent realEvent = (AcademicEvent) Hibernate.unproxy(event);
         if (realEvent instanceof RecurringEvent r) {
             SubjectResponseDto subject = r.getSubjectId() != null
-                    ? subjectService.findDtoById(r.getSubjectId()) : null;
+                    ? subjectService.findById(r.getSubjectId()) : null;
             CommissionResponseDto commission = r.getCommissionId() != null
-                    ? commissionService.findDtoById(r.getCommissionId()) : null;
+                    ? commissionService.findById(r.getCommissionId()) : null;
             return mapper.toDto(realEvent, subject, commission);
         }
         return mapper.toDto(realEvent, null, null);
@@ -65,9 +65,9 @@ public class AcademicEventComposer {
             }
         }
 
-        Map<Long, SubjectResponseDto> subjectsById = subjectService.findDtosByIds(subjectIds).stream()
+        Map<Long, SubjectResponseDto> subjectsById = subjectService.findByIds(subjectIds).stream()
                 .collect(Collectors.toMap(SubjectResponseDto::id, s -> s));
-        Map<Long, CommissionResponseDto> commissionsById = commissionService.findDtosByIds(commissionIds).stream()
+        Map<Long, CommissionResponseDto> commissionsById = commissionService.findByIds(commissionIds).stream()
                 .collect(Collectors.toMap(CommissionResponseDto::id, c -> c));
 
         List<AcademicEventResponseDto> result = new ArrayList<>(realEvents.size());

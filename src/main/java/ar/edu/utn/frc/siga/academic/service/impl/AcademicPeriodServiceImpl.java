@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
+import ar.edu.utn.frc.siga.academic.mapper.AcademicPeriodMapper;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
 import ar.edu.utn.frc.siga.academic.model.TermType;
@@ -17,33 +19,23 @@ import org.springframework.transaction.annotation.Transactional;
 public class AcademicPeriodServiceImpl implements AcademicPeriodService {
 
     private final AcademicPeriodRepository academicPeriodRepository;
+    private final AcademicPeriodMapper academicPeriodMapper;
 
     @Override
     @Transactional
-    public AcademicPeriod save(AcademicPeriod academicPeriod) {
-        log.debug("Saving AcademicPeriod: year={}, semester={}",
-                academicPeriod.getYear(), academicPeriod.getSemester());
-        AcademicPeriod saved = academicPeriodRepository.save(academicPeriod);
-        log.info("AcademicPeriod saved: id={}", saved.getId());
-        return saved;
-    }
-
-    @Override
-    @Transactional
-    public FindOrCreateResult<AcademicPeriod> findOrCreate(Integer year, TermType termType) {
-        return academicPeriodRepository.findByYearAndSemester(year, termType.getSemester())
-            .map(found -> new FindOrCreateResult<>(found, false))
-            .orElseGet(() -> {
-                log.info("Creando AcademicPeriod: year={}, semester={}", year, termType.getSemester());
-                AcademicPeriod created = academicPeriodRepository.save(
-                    AcademicPeriod.builder()
-                        .year(year)
-                        .semester(termType.getSemester())
-                        .startDate(termType.startDate(year))
-                        .endDate(termType.endDate(year))
-                        .build()
-                );
-                return new FindOrCreateResult<>(created, true);
-            });
+    public FindOrCreateResult<AcademicPeriodResponseDto> findOrCreate(Integer year, TermType termType) {
+        return FindOrCreateResult.resolve(
+                academicPeriodRepository.findByYearAndSemester(year, termType.getSemester()),
+                () -> {
+                    log.info("Creando AcademicPeriod: year={}, semester={}", year, termType.getSemester());
+                    return academicPeriodRepository.save(
+                            AcademicPeriod.builder()
+                                    .year(year)
+                                    .semester(termType.getSemester())
+                                    .startDate(termType.startDate(year))
+                                    .endDate(termType.endDate(year))
+                                    .build());
+                }
+        ).map(academicPeriodMapper::toDto);
     }
 }

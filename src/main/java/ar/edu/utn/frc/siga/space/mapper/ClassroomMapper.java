@@ -7,9 +7,7 @@ import ar.edu.utn.frc.siga.space.model.Classroom;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
-import org.springframework.modulith.NamedInterface;
 
-@NamedInterface("api")
 @Mapper(config = CentralMapperConfig.class)
 public interface ClassroomMapper {
 
