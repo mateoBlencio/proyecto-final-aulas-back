@@ -31,6 +31,7 @@ spring:
 server:
   servlet:
     context-path: /api
+  forward-headers-strategy: framework
 
 springdoc:
   swagger-ui:
@@ -62,6 +63,20 @@ siga:
     unimproved-seconds-limit: 10
     # PHASE_ASSERT (default Timefold, reproducible); FULL_ASSERT solo para debugging.
     environment-mode: PHASE_ASSERT
+  jwt:
+    secret: ${JWT_SECRET}
+    access-expiration-minutes: ${JWT_ACCESS_EXPIRATION_MINUTES:20}
+    refresh-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS:30}
+    refresh-grace-seconds: ${JWT_REFRESH_GRACE_SECONDS:10}
+  auth:
+    allowed-email-domain: ${AUTH_ALLOWED_EMAIL_DOMAIN:frc.utn.edu.ar}
+  login-ratelimit:
+    max-attempts: 5
+    window-minutes: 15
+  ratelimit:
+    general:
+      capacity: 100
+      refill-period-seconds: 60
 
 logging:
   level:

@@ -33,6 +33,10 @@ cors:
   allowed-origins:
     - http://localhost:5173
 
+siga:
+  jwt:
+    secret: dev-local-fixed-secret-not-for-prod-0123456789abcdef
+
 logging:
   level:
     ar.edu.utn.frc.siga: DEBUG

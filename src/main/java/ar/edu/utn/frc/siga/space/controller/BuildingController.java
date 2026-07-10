@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,6 +19,7 @@ import java.util.List;
 @RequestMapping("/v1/buildings")
 @RequiredArgsConstructor
 @Tag(name = "Edificios", description = "Consulta de edificios disponibles")
+@PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
 public class BuildingController {
 
     private final BuildingService buildingService;

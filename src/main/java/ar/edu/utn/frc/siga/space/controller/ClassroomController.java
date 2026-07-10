@@ -14,6 +14,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,6 +34,7 @@ public class ClassroomController {
     private final ClassroomService classroomService;
 
     @PostMapping
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
     public ResponseEntity<ClassroomResponseDTO> create(@Valid @RequestBody ClassroomRequestDTO dto) {
         log.debug("POST /v1/classrooms: roomNumber={}, buildingId={}", dto.roomNumber(), dto.buildingId());
         ClassroomResponseDTO response = classroomService.create(dto);
@@ -41,12 +43,14 @@ public class ClassroomController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     public ResponseEntity<ClassroomResponseDTO> findById(@PathVariable Integer id) {
         log.debug("GET /v1/classrooms/{}", id);
         return ResponseEntity.ok(classroomService.findById(id));
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     public ResponseEntity<Page<ClassroomResponseDTO>> findAll(
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
             @RequestParam(required = false) String roomNumber,
@@ -66,6 +70,7 @@ public class ClassroomController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
     public ResponseEntity<ClassroomResponseDTO> update(@PathVariable Integer id,
                                                         @Valid @RequestBody ClassroomRequestDTO dto) {
         log.debug("PUT /v1/classrooms/{}: roomNumber={}", id, dto.roomNumber());
@@ -75,6 +80,7 @@ public class ClassroomController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
     public ResponseEntity<Void> delete(@PathVariable Integer id) {
         log.debug("DELETE /v1/classrooms/{}", id);
         classroomService.delete(id);

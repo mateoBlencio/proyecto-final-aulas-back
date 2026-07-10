@@ -1,0 +1,23 @@
+meta {
+  name: Login
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/login
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "email": "admin@frc.utn.edu.ar",
+    "password":"AdminSiga2026!"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
