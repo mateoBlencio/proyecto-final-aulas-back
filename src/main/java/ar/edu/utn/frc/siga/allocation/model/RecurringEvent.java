@@ -1,7 +1,5 @@
 package ar.edu.utn.frc.siga.allocation.model;
 
-import ar.edu.utn.frc.siga.academic.model.Subject;
-import ar.edu.utn.frc.siga.academic.model.Commission;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.DiscriminatorValue;
@@ -9,9 +7,7 @@ import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -42,13 +38,13 @@ public class RecurringEvent extends AcademicEvent {
     @Column(name = "fecha_fin")
     private LocalDate endDate;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_materia")
-    private Subject subject;
+    /** ID de la materia (academic::Subject). Referencia por ID plano, sin relación JPA cross-módulo. */
+    @Column(name = "id_materia")
+    private Long subjectId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_comision")
-    private Commission commission;
+    /** ID de la comisión (academic::Commission). Referencia por ID plano, sin relación JPA cross-módulo. */
+    @Column(name = "id_comision")
+    private Long commissionId;
 
     @ElementCollection
     @CollectionTable(name = "evento_recurrente_fecha_excluida", joinColumns = @JoinColumn(name = "id_evento_academico"))

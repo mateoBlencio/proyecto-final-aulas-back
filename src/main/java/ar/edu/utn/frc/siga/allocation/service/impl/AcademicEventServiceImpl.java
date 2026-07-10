@@ -16,11 +16,9 @@ import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.repository.RecurringEventRepository;
 import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
-import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
-import ar.edu.utn.frc.siga.academic.model.Commission;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -78,10 +76,9 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         log.debug("Creating recurring event: subjectId={}, commissionId={}, dayOfWeek={}, startDate={}",
                 dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startDate());
 
-        Subject subject = subjectService.findById(dto.subjectId())
-                .orElseThrow(() -> ResourceNotFoundException.of("Subject", dto.subjectId()));
-        Commission commission = commissionService.findById(dto.commissionId())
-                .orElseThrow(() -> ResourceNotFoundException.of("Commission", dto.commissionId()));
+        // Solo se valida existencia vía la fachada (404 si no existe); no se necesita el DTO completo.
+        subjectService.findDtoById(dto.subjectId());
+        commissionService.findDtoById(dto.commissionId());
 
         RecurringEvent event = RecurringEvent.builder()
                 .enrolled(dto.enrolled())
@@ -90,8 +87,8 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 .dayOfWeek(dto.dayOfWeek())
                 .startDate(dto.startDate())
                 .endDate(dto.endDate())
-                .subject(subject)
-                .commission(commission)
+                .subjectId(dto.subjectId())
+                .commissionId(dto.commissionId())
                 .build();
 
         AcademicEvent saved = eventRepository.save(event);
@@ -106,7 +103,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     @Transactional
     public FindOrCreateResult<AcademicEventResponseDto> findOrCreateRecurringEvent(CreateRecurringEventRequestDto dto) {
         return recurringEventRepository
-                .findBySubject_IdAndCommission_IdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
+                .findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
                         dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startTime(),
                         dto.startDate(), dto.endDate())
                 .map(existing -> {

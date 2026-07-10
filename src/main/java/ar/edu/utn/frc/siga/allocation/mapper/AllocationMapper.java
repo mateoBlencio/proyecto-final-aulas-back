@@ -17,9 +17,9 @@ import org.mapstruct.Mapping;
 @Mapper(config = CentralMapperConfig.class, uses = OccurrenceMapper.class)
 public interface AllocationMapper {
 
-    // "event"/"classroom" se fuerzan a mapear el parámetro entero: sin esto MapStruct
-    // prefiere silenciosamente allocation.getClassroom() (entidad JPA de otro módulo)
-    // por sobre el ClassroomResponseDto ya resuelto por el composer.
+    // "event"/"classroom" se fuerzan a mapear el parámetro entero: allocation solo tiene
+    // classroomId (Integer) — el ClassroomResponseDto siempre viene resuelto por el
+    // composer, nunca navegando la entidad.
     @Mapping(target = "id", source = "allocation.id")
     @Mapping(target = "event", source = "event")
     @Mapping(target = "classroom", source = "classroom")

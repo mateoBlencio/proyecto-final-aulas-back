@@ -18,7 +18,6 @@ import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
-import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,10 +63,10 @@ public class AllocationServiceImpl implements AllocationService {
                     "Occurrence " + occurrenceId + " already has an allocation. Use PUT /allocations/{id} to reassign.");
         }
 
-        Classroom classroom = findClassroom(dto.classroomId());
+        Integer classroomId = findClassroom(dto.classroomId());
         Allocation saved = allocationRepository.save(Allocation.builder()
                 .occurrence(occurrence)
-                .classroom(classroom)
+                .classroomId(classroomId)
                 .source(AllocationSource.MANUAL)
                 .createdAt(LocalDateTime.now())
                 .observation(dto.observation())
@@ -88,7 +87,7 @@ public class AllocationServiceImpl implements AllocationService {
         Allocation allocation = findAllocation(allocationId);
         validateNotPast(allocation.getOccurrence());
 
-        allocation.setClassroom(findClassroom(dto.classroomId()));
+        allocation.setClassroomId(findClassroom(dto.classroomId()));
         allocation.setSource(AllocationSource.MANUAL);
         allocation.setObservation(dto.observation());
 
@@ -105,7 +104,7 @@ public class AllocationServiceImpl implements AllocationService {
         for (BatchReassignRequestDto.MoveDto move : dto.moves()) {
             Allocation allocation = findAllocation(move.allocationId());
             validateNotPast(allocation.getOccurrence());
-            allocation.setClassroom(findClassroom(move.classroomId()));
+            allocation.setClassroomId(findClassroom(move.classroomId()));
             allocation.setSource(AllocationSource.MANUAL);
             results.add(composer.compose(allocationRepository.save(allocation)));
         }
@@ -125,16 +124,16 @@ public class AllocationServiceImpl implements AllocationService {
             throw new AllocationConflictException("assignManuallyFromDate is only supported for recurring events");
         }
 
-        Classroom classroom = findClassroom(dto.classroomId());
+        Integer classroomId = findClassroom(dto.classroomId());
         LocalDate effectiveFrom = dto.fromDate().isBefore(LocalDate.now()) ? LocalDate.now() : dto.fromDate();
 
         List<Occurrence> occurrences = occurrenceRepository
                 .findByEvent_IdAndDateGreaterThanEqual(dto.recurringEventId(), effectiveFrom);
 
-        validateNoOverlap(occurrences, classroom, event);
+        validateNoOverlap(occurrences, classroomId, event);
 
         List<AllocationResponseDto> results = allocateToOccurrences(
-                occurrences, classroom, dto.observation(), AllocationSource.MANUAL, true);
+                occurrences, classroomId, dto.observation(), AllocationSource.MANUAL, true);
 
         log.info("assignManuallyFromDate complete: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), results.size());
         return results;
@@ -145,7 +144,7 @@ public class AllocationServiceImpl implements AllocationService {
      * con asignaciones existentes de OTROS eventos. Si alguna choca, corta con 409 y
      * el detalle de cuáles.
      */
-    private void validateNoOverlap(List<Occurrence> targets, Classroom classroom, AcademicEvent event) {
+    private void validateNoOverlap(List<Occurrence> targets, Integer classroomId, AcademicEvent event) {
         List<Occurrence> future = targets.stream().filter(o -> !o.isPast()).toList();
         if (future.isEmpty()) return;
 
@@ -159,7 +158,7 @@ public class AllocationServiceImpl implements AllocationService {
 
         List<ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceConflictDto> conflicts = new ArrayList<>();
         for (Allocation existing : allocationRepository.findOccupancyBetween(min, max, OccurrenceStatus.ASSIGNED)) {
-            if (!existing.getClassroom().getId().equals(classroom.getId())) continue;
+            if (!existing.getClassroomId().equals(classroomId)) continue;
             AcademicEvent occupant = existing.getOccurrence().getEvent();
             if (occupant.getId().equals(event.getId())) continue; // sus propias asignaciones se reemplazan
             Occurrence target = targetByDate.get(existing.getOccurrence().getDate());
@@ -167,7 +166,7 @@ public class AllocationServiceImpl implements AllocationService {
             if (start.isBefore(occupant.endTime()) && occupant.getStartTime().isBefore(end)) {
                 conflicts.add(new ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceConflictDto(
                         target.getId(), target.getDate(), start, end,
-                        classroom.getId(), occupant.getId(), existing.getId()));
+                        classroomId, occupant.getId(), existing.getId()));
             }
         }
 
@@ -188,57 +187,54 @@ public class AllocationServiceImpl implements AllocationService {
             throw new AllocationConflictException("importAssignmentsFromDate is only supported for recurring events");
         }
 
-        Classroom classroom = findClassroom(dto.classroomId());
+        Integer classroomId = findClassroom(dto.classroomId());
 
         List<Occurrence> occurrences = occurrenceRepository
                 .findByEvent_IdAndDateGreaterThanEqual(dto.recurringEventId(), dto.fromDate());
 
         List<AllocationResponseDto> results = allocateToOccurrences(
-                occurrences, classroom, dto.observation(), AllocationSource.IMPORTED, false);
+                occurrences, classroomId, dto.observation(), AllocationSource.IMPORTED, false);
 
         log.info("importAssignmentsFromDate complete: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), results.size());
         return results;
     }
 
     private List<AllocationResponseDto> allocateToOccurrences(
-            List<Occurrence> occurrences, Classroom classroom, String observation,
+            List<Occurrence> occurrences, Integer classroomId, String observation,
             AllocationSource source, boolean skipPast) {
-        List<AllocationResponseDto> results = new ArrayList<>();
+        List<Allocation> saved = new ArrayList<>();
         for (Occurrence occurrence : occurrences) {
             if (skipPast && occurrence.isPast()) continue;
             if (!isAssignable(occurrence)) continue;
 
             Allocation allocation = allocationRepository.findByOccurrence_Id(occurrence.getId())
                     .map(existing -> {
-                        existing.setClassroom(classroom);
+                        existing.setClassroomId(classroomId);
                         existing.setSource(source);
                         existing.setObservation(observation);
                         return existing;
                     })
                     .orElseGet(() -> Allocation.builder()
                             .occurrence(occurrence)
-                            .classroom(classroom)
+                            .classroomId(classroomId)
                             .source(source)
                             .createdAt(LocalDateTime.now())
                             .observation(observation)
                             .build());
 
-            results.add(composer.compose(allocationRepository.save(allocation)));
+            saved.add(allocationRepository.save(allocation));
 
             occurrence.setStatus(OccurrenceStatus.ASSIGNED);
             occurrenceRepository.save(occurrence);
         }
-        return results;
+        return composer.composeAll(saved);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<AllocationResponseDto> findByDate(LocalDate date) {
         log.debug("findByDate: date={}", date);
-        return allocationRepository.findByDateEager(date)
-                .stream()
-                .map(composer::compose)
-                .toList();
+        return composer.composeAll(allocationRepository.findByDateEager(date));
     }
 
     private Occurrence findOccurrence(Long id) {
@@ -257,9 +253,11 @@ public class AllocationServiceImpl implements AllocationService {
                 });
     }
 
-    private Classroom findClassroom(Integer id) {
+    /** Valida que el aula exista (404 de la fachada de space) y devuelve su ID plano. */
+    private Integer findClassroom(Integer id) {
         try {
-            return classroomService.requireById(id);
+            classroomService.findById(id);
+            return id;
         } catch (ResourceNotFoundException ex) {
             log.warn("Classroom not found: id={}", id);
             throw new AllocationConflictException("Classroom not found with id: " + id);

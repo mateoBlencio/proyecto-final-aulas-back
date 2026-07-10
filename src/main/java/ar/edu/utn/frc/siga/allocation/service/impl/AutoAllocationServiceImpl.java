@@ -97,7 +97,7 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
     }
 
     private SolverEvent toSolverEvent(RecurringEvent e, Set<LocalDate> dates) {
-        String commissionKey = e.getCommission() != null ? String.valueOf(e.getCommission().getId()) : null;
+        String commissionKey = e.getCommissionId() != null ? String.valueOf(e.getCommissionId()) : null;
         return new SolverEvent(String.valueOf(e.getId()), commissionKey, e.getEnrolled(),
                 e.getStartTime(), e.endTime(), dates);
     }
@@ -121,7 +121,7 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
     private SolverOccupancy toOccupancy(Allocation a) {
         AcademicEvent occupant = a.getOccurrence().getEvent();
         return new SolverOccupancy(
-                a.getClassroom().getId(),
+                a.getClassroomId(),
                 a.getOccurrence().getDate(),
                 occupant.getStartTime(),
                 occupant.endTime());

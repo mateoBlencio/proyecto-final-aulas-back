@@ -19,16 +19,12 @@ public interface AllocationRepository extends JpaRepository<Allocation, Long> {
     @Query("SELECT a FROM Allocation a " +
            "JOIN FETCH a.occurrence o " +
            "JOIN FETCH o.event e " +
-           "JOIN FETCH a.classroom c " +
-           "JOIN FETCH c.building " +
            "WHERE o.date = :date")
     List<Allocation> findByDateEager(@Param("date") LocalDate date);
 
     @Query("SELECT a FROM Allocation a " +
            "JOIN FETCH a.occurrence o " +
            "JOIN FETCH o.event e " +
-           "JOIN FETCH a.classroom c " +
-           "JOIN FETCH c.building " +
            "WHERE a.id = :id")
     Optional<Allocation> findByIdEager(@Param("id") Long id);
 
@@ -40,7 +36,6 @@ public interface AllocationRepository extends JpaRepository<Allocation, Long> {
     @Query("SELECT a FROM Allocation a " +
            "JOIN FETCH a.occurrence o " +
            "JOIN FETCH o.event e " +
-           "JOIN FETCH a.classroom c " +
            "WHERE o.date BETWEEN :from AND :to AND o.status = :status")
     List<Allocation> findOccupancyBetween(@Param("from") LocalDate from, @Param("to") LocalDate to,
                                            @Param("status") OccurrenceStatus status);

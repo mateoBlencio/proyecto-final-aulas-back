@@ -10,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.modulith.NamedInterface;
 
+import java.util.Collection;
 import java.util.List;
 
 @NamedInterface("api")
@@ -22,7 +23,13 @@ public interface ClassroomService {
     /** Todas las aulas disponibles (no eliminadas) para la asignación automática. */
     List<ClassroomResponseDto> findAllAvailable();
 
-    Classroom requireById(Integer id);
+    /**
+     * Busca aulas por lote de IDs para componer DTOs de datos ajenos sin N+1 (p. ej.
+     * desde {@code AllocationComposer}). A diferencia de {@link #findById(Integer)}, NO
+     * filtra aulas eliminadas: una asignación histórica puede referenciar un aula ya
+     * borrada y su dato debe poder seguir componiéndose (no lanza 404).
+     */
+    List<ClassroomResponseDto> findByIds(Collection<Integer> ids);
 
     Page<ClassroomResponseDto> findAll(ClassroomFilter filter, Pageable pageable);
 

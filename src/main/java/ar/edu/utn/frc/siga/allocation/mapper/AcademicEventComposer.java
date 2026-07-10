@@ -37,10 +37,10 @@ public class AcademicEventComposer {
     public AcademicEventResponseDto compose(AcademicEvent event) {
         AcademicEvent realEvent = (AcademicEvent) Hibernate.unproxy(event);
         if (realEvent instanceof RecurringEvent r) {
-            SubjectResponseDto subject = r.getSubject() != null
-                    ? subjectService.findDtoById(r.getSubject().getId()) : null;
-            CommissionResponseDto commission = r.getCommission() != null
-                    ? commissionService.findDtoById(r.getCommission().getId()) : null;
+            SubjectResponseDto subject = r.getSubjectId() != null
+                    ? subjectService.findDtoById(r.getSubjectId()) : null;
+            CommissionResponseDto commission = r.getCommissionId() != null
+                    ? commissionService.findDtoById(r.getCommissionId()) : null;
             return mapper.toDto(realEvent, subject, commission);
         }
         return mapper.toDto(realEvent, null, null);
@@ -56,11 +56,11 @@ public class AcademicEventComposer {
         Set<Long> commissionIds = new LinkedHashSet<>();
         for (AcademicEvent event : realEvents) {
             if (event instanceof RecurringEvent r) {
-                if (r.getSubject() != null) {
-                    subjectIds.add(r.getSubject().getId());
+                if (r.getSubjectId() != null) {
+                    subjectIds.add(r.getSubjectId());
                 }
-                if (r.getCommission() != null) {
-                    commissionIds.add(r.getCommission().getId());
+                if (r.getCommissionId() != null) {
+                    commissionIds.add(r.getCommissionId());
                 }
             }
         }
@@ -73,10 +73,10 @@ public class AcademicEventComposer {
         List<AcademicEventResponseDto> result = new ArrayList<>(realEvents.size());
         for (AcademicEvent event : realEvents) {
             if (event instanceof RecurringEvent r) {
-                SubjectResponseDto subject = r.getSubject() != null
-                        ? subjectsById.get(r.getSubject().getId()) : null;
-                CommissionResponseDto commission = r.getCommission() != null
-                        ? commissionsById.get(r.getCommission().getId()) : null;
+                SubjectResponseDto subject = r.getSubjectId() != null
+                        ? subjectsById.get(r.getSubjectId()) : null;
+                CommissionResponseDto commission = r.getCommissionId() != null
+                        ? commissionsById.get(r.getCommissionId()) : null;
                 result.add(mapper.toDto(event, subject, commission));
             } else {
                 result.add(mapper.toDto(event, null, null));

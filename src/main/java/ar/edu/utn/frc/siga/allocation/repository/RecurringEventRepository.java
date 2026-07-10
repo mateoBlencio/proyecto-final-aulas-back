@@ -12,7 +12,7 @@ import java.util.Optional;
 @Repository
 public interface RecurringEventRepository extends JpaRepository<RecurringEvent, Long> {
 
-    Optional<RecurringEvent> findBySubject_IdAndCommission_IdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
+    Optional<RecurringEvent> findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
             Long subjectId, Long commissionId, DayOfWeek dayOfWeek, LocalTime startTime,
             LocalDate startDate, LocalDate endDate);
 }

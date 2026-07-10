@@ -31,10 +31,9 @@ public interface AcademicEventMapper {
         return toDto((UniqueEvent) realEvent, subject, commission);
     }
 
-    // "subject"/"commission" se fuerzan a mapear el parámetro entero (no
-    // event.getSubject()/event.getCommission()): sin esto MapStruct prefiere
-    // silenciosamente la navegación a la entidad JPA por sobre el DTO ya resuelto
-    // por el composer, reintroduciendo el acoplamiento cross-módulo que se quiere evitar.
+    // "subject"/"commission" se fuerzan a mapear el parámetro entero: el evento solo
+    // tiene subjectId/commissionId (Long) — el SubjectResponseDto/CommissionResponseDto
+    // siempre viene resuelto por el composer, nunca navegando la entidad.
     @Mapping(target = "id", source = "event.id")
     @Mapping(target = "type", constant = "RECURRING")
     @Mapping(target = "durationMinutes", expression = "java(event.getDuration().toMinutes())")

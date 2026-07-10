@@ -75,9 +75,11 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     @Override
-    public Classroom requireById(Integer id) {
-        log.debug("Fetching classroom entity by id={}", id);
-        return this.findExistingClassroomById(id);
+    public java.util.List<ClassroomResponseDto> findByIds(java.util.Collection<Integer> ids) {
+        log.debug("Fetching classrooms by ids: {}", ids);
+        return classroomRepository.findAllById(ids).stream()
+                .map(classroomMapper::toDto)
+                .toList();
     }
 
     @Override
