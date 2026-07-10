@@ -62,7 +62,7 @@ public class AllocationController {
             @Valid @RequestBody AllocateOccurrenceRequestDto dto) {
         log.debug("POST /v1/allocations/occurrences/{}: classroomId={}", occurrenceId, dto.classroomId());
         AllocationResponseDto response = allocationService.assignManually(occurrenceId, dto);
-        log.info("Allocation created: id={}, occurrenceId={}", response.getId(), occurrenceId);
+        log.info("Allocation created: id={}, occurrenceId={}", response.id(), occurrenceId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

@@ -2,8 +2,8 @@ package ar.edu.utn.frc.siga.space.service;
 
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
-import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDTO;
-import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDTO;
+import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import org.springframework.data.domain.Page;
@@ -15,18 +15,18 @@ import java.util.List;
 @NamedInterface("api")
 public interface ClassroomService {
 
-    ClassroomResponseDTO create(ClassroomRequestDTO dto);
+    ClassroomResponseDto create(ClassroomRequestDto dto);
 
-    ClassroomResponseDTO findById(Integer id);
+    ClassroomResponseDto findById(Integer id);
 
     /** Todas las aulas disponibles (no eliminadas) para la asignación automática. */
-    List<ClassroomResponseDTO> findAllAvailable();
+    List<ClassroomResponseDto> findAllAvailable();
 
     Classroom requireById(Integer id);
 
-    Page<ClassroomResponseDTO> findAll(ClassroomFilter filter, Pageable pageable);
+    Page<ClassroomResponseDto> findAll(ClassroomFilter filter, Pageable pageable);
 
-    ClassroomResponseDTO update(Integer id, ClassroomRequestDTO dto);
+    ClassroomResponseDto update(Integer id, ClassroomRequestDto dto);
 
     void delete(Integer id);
 

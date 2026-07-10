@@ -2,8 +2,8 @@ package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
-import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDTO;
-import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDTO;
+import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.space.exception.SpaceDomainException;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomMapper;
@@ -36,7 +36,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
     @Override
     @Transactional
-    public ClassroomResponseDTO create(ClassroomRequestDTO dto) {
+    public ClassroomResponseDto create(ClassroomRequestDto dto) {
         log.debug("Creating classroom: roomNumber={}, buildingId={}, classroomTypeId={}",
                 dto.roomNumber(), dto.buildingId(), dto.classroomTypeId());
 
@@ -57,20 +57,20 @@ public class ClassroomServiceImpl implements ClassroomService {
 
         Classroom saved = classroomRepository.save(entity);
         log.info("Classroom created: id={}, roomNumber={}", saved.getId(), saved.getRoomNumber());
-        return classroomMapper.toResponseDto(saved);
+        return classroomMapper.toDto(saved);
     }
 
     @Override
-    public ClassroomResponseDTO findById(Integer id) {
+    public ClassroomResponseDto findById(Integer id) {
         log.debug("Fetching classroom by id={}", id);
-        return classroomMapper.toResponseDto(this.findExistingClassroomById(id));
+        return classroomMapper.toDto(this.findExistingClassroomById(id));
     }
 
     @Override
-    public java.util.List<ClassroomResponseDTO> findAllAvailable() {
+    public java.util.List<ClassroomResponseDto> findAllAvailable() {
         log.debug("Listing all available classrooms");
         return classroomRepository.findByAvailableTrueAndDeletedFalse().stream()
-                .map(classroomMapper::toResponseDto)
+                .map(classroomMapper::toDto)
                 .toList();
     }
 
@@ -81,15 +81,15 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     @Override
-    public Page<ClassroomResponseDTO> findAll(ClassroomFilter filter, Pageable pageable) {
+    public Page<ClassroomResponseDto> findAll(ClassroomFilter filter, Pageable pageable) {
         log.debug("Listing classrooms: filter={}, page={}, size={}", filter, pageable.getPageNumber(), pageable.getPageSize());
         return classroomRepository.findAll(ClassroomSpecification.withFilter(filter), pageable)
-                .map(classroomMapper::toResponseDto);
+                .map(classroomMapper::toDto);
     }
 
     @Override
     @Transactional
-    public ClassroomResponseDTO update(Integer id, ClassroomRequestDTO dto) {
+    public ClassroomResponseDto update(Integer id, ClassroomRequestDto dto) {
         log.debug("Updating classroom: id={}, roomNumber={}", id, dto.roomNumber());
 
         Classroom entity = this.findExistingClassroomById(id);
@@ -105,7 +105,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
         Classroom saved = classroomRepository.save(entity);
         log.info("Classroom updated: id={}, roomNumber={}", saved.getId(), saved.getRoomNumber());
-        return classroomMapper.toResponseDto(saved);
+        return classroomMapper.toDto(saved);
     }
 
     @Override
@@ -126,7 +126,7 @@ public class ClassroomServiceImpl implements ClassroomService {
                 });
     }
 
-    private void validateFloor(ClassroomRequestDTO dto, Building building) {
+    private void validateFloor(ClassroomRequestDto dto, Building building) {
         if (dto.floor() > building.getFloorCount()) {
             log.warn("Floor validation failed: floor={} exceeds building floorCount={}, buildingId={}",
                     dto.floor(), building.getFloorCount(), building.getId());
@@ -156,7 +156,7 @@ public class ClassroomServiceImpl implements ClassroomService {
                 });
     }
 
-    private void validateCapacity(ClassroomRequestDTO dto) {
+    private void validateCapacity(ClassroomRequestDto dto) {
         if (dto.capacity() <= 0) {
             log.warn("Capacity validation failed: capacity={}", dto.capacity());
             throw new SpaceDomainException("Capacity must be positive");

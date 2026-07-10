@@ -12,9 +12,9 @@ import java.time.LocalTime;
         @JsonSubTypes.Type(value = UniqueEventResponseDto.class, name = "UNIQUE_EVENT")
 })
 public sealed interface AcademicEventResponseDto permits RecurringEventResponseDto, UniqueEventResponseDto {
-    Long getId();
-    EventType getType();
-    Integer getEnrolled();
-    LocalTime getStartTime();
-    long getDurationMinutes();
+    Long id();
+    EventType type();
+    Integer enrolled();
+    LocalTime startTime();
+    long durationMinutes();
 }

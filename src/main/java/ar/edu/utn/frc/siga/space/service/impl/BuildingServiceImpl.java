@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.space.service.impl;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
+import ar.edu.utn.frc.siga.space.mapper.BuildingMapper;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
 import ar.edu.utn.frc.siga.space.service.BuildingService;
@@ -21,6 +22,7 @@ import java.util.List;
 public class BuildingServiceImpl implements BuildingService {
 
     private final BuildingRepository buildingRepository;
+    private final BuildingMapper buildingMapper;
 
     @Override
     public Building findById(Integer id) {
@@ -38,12 +40,7 @@ public class BuildingServiceImpl implements BuildingService {
         log.debug("Listing all active buildings");
         return buildingRepository.findAllByDeletedFalse().stream()
                 .filter(Building::getActive)
-                .map(b -> BuildingResponseDto.builder()
-                        .id(b.getId())
-                        .name(b.getName())
-                        .floorCount(b.getFloorCount())
-                        .active(b.getActive())
-                        .build())
+                .map(buildingMapper::toDto)
                 .toList();
     }
 

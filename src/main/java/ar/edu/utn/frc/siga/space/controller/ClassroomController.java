@@ -1,8 +1,8 @@
 package ar.edu.utn.frc.siga.space.controller;
 
 import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
-import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDTO;
-import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDTO;
+import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import jakarta.validation.Valid;
 
@@ -33,21 +33,21 @@ public class ClassroomController {
     private final ClassroomService classroomService;
 
     @PostMapping
-    public ResponseEntity<ClassroomResponseDTO> create(@Valid @RequestBody ClassroomRequestDTO dto) {
+    public ResponseEntity<ClassroomResponseDto> create(@Valid @RequestBody ClassroomRequestDto dto) {
         log.debug("POST /v1/classrooms: roomNumber={}, buildingId={}", dto.roomNumber(), dto.buildingId());
-        ClassroomResponseDTO response = classroomService.create(dto);
-        log.info("Classroom created via controller: id={}", response.getId());
+        ClassroomResponseDto response = classroomService.create(dto);
+        log.info("Classroom created via controller: id={}", response.id());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ClassroomResponseDTO> findById(@PathVariable Integer id) {
+    public ResponseEntity<ClassroomResponseDto> findById(@PathVariable Integer id) {
         log.debug("GET /v1/classrooms/{}", id);
         return ResponseEntity.ok(classroomService.findById(id));
     }
 
     @GetMapping
-    public ResponseEntity<Page<ClassroomResponseDTO>> findAll(
+    public ResponseEntity<Page<ClassroomResponseDto>> findAll(
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
             @RequestParam(required = false) String roomNumber,
             @RequestParam(required = false) Integer buildingId,
@@ -60,17 +60,17 @@ public class ClassroomController {
         log.debug("GET /v1/classrooms: buildingId={}, page={}", buildingId, pageable.getPageNumber());
         ClassroomFilter filter = new ClassroomFilter(roomNumber, buildingId, classroomTypeId,
                 capacityMin, capacityMax, floor, available);
-        Page<ClassroomResponseDTO> page = classroomService.findAll(filter, pageable);
+        Page<ClassroomResponseDto> page = classroomService.findAll(filter, pageable);
         log.info("Classrooms listed: total={}", page.getTotalElements());
         return ResponseEntity.ok(page);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ClassroomResponseDTO> update(@PathVariable Integer id,
-                                                        @Valid @RequestBody ClassroomRequestDTO dto) {
+    public ResponseEntity<ClassroomResponseDto> update(@PathVariable Integer id,
+                                                        @Valid @RequestBody ClassroomRequestDto dto) {
         log.debug("PUT /v1/classrooms/{}: roomNumber={}", id, dto.roomNumber());
-        ClassroomResponseDTO response = classroomService.update(id, dto);
-        log.info("Classroom updated via controller: id={}", response.getId());
+        ClassroomResponseDto response = classroomService.update(id, dto);
+        log.info("Classroom updated via controller: id={}", response.id());
         return ResponseEntity.ok(response);
     }
 

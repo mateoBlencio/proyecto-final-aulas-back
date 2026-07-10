@@ -66,9 +66,9 @@ public class AcademicEventComposer {
         }
 
         Map<Long, SubjectResponseDto> subjectsById = subjectService.findDtosByIds(subjectIds).stream()
-                .collect(Collectors.toMap(SubjectResponseDto::getId, s -> s));
+                .collect(Collectors.toMap(SubjectResponseDto::id, s -> s));
         Map<Long, CommissionResponseDto> commissionsById = commissionService.findDtosByIds(commissionIds).stream()
-                .collect(Collectors.toMap(CommissionResponseDto::getId, c -> c));
+                .collect(Collectors.toMap(CommissionResponseDto::id, c -> c));
 
         List<AcademicEventResponseDto> result = new ArrayList<>(realEvents.size());
         for (AcademicEvent event : realEvents) {

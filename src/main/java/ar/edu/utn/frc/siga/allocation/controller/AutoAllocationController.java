@@ -31,7 +31,7 @@ public class AutoAllocationController {
     @Operation(summary = "Generar preview de asignación automática",
                description = "Corre el solver con las aulas disponibles y la ocupación existente; devuelve una preview con su previewId, sin persistir asignaciones.")
     public ResponseEntity<SolverPreview> autoPreview(@Valid @RequestBody AutoPreviewRequestDto request) {
-        log.debug("POST /v1/allocations/auto-preview: eventIds={}", request.getEventIds());
+        log.debug("POST /v1/allocations/auto-preview: eventIds={}", request.eventIds());
         SolverPreview preview = autoAllocationService.autoPreview(request);
         log.info("Auto-preview generado: previewId={}, asignaciones={}",
                 preview.previewId(), preview.allocations().size());

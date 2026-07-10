@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceResponseDto;
 import ar.edu.utn.frc.siga.common.exception.InvalidDateRangeException;
 import ar.edu.utn.frc.siga.allocation.mapper.AcademicEventComposer;
+import ar.edu.utn.frc.siga.allocation.mapper.OccurrenceMapper;
 import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.Occurrence;
 import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
@@ -42,6 +43,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     private final RecurringEventRepository recurringEventRepository;
     private final OccurrenceRepository occurrenceRepository;
     private final AcademicEventComposer composer;
+    private final OccurrenceMapper occurrenceMapper;
     private final SubjectService subjectService;
     private final CommissionService commissionService;
 
@@ -66,14 +68,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
             throw ResourceNotFoundException.of("AcademicEvent", eventId);
         }
         return occurrenceRepository.findByEvent_Id(eventId).stream()
-                .map(o -> OccurrenceResponseDto.builder()
-                        .id(o.getId())
-                        .eventId(eventId)
-                        .date(o.getDate())
-                        .status(o.getStatus())
-                        .startTime(o.startTime())
-                        .endTime(o.endTime())
-                        .build())
+                .map(occurrenceMapper::toDto)
                 .collect(Collectors.toList());
     }
 

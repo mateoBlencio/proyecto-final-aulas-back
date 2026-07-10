@@ -6,7 +6,7 @@ import ar.edu.utn.frc.siga.allocation.dto.request.BatchReassignRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.exception.ReassignConflictException;
-import ar.edu.utn.frc.siga.allocation.mapper.AllocationMapper;
+import ar.edu.utn.frc.siga.allocation.mapper.AllocationComposer;
 import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
@@ -40,14 +40,14 @@ public class AllocationServiceImpl implements AllocationService {
     private final OccurrenceRepository occurrenceRepository;
     private final AcademicEventRepository eventRepository;
     private final ClassroomService classroomService;
-    private final AllocationMapper mapper;
+    private final AllocationComposer composer;
 
     @Override
     @Transactional(readOnly = true)
     public AllocationResponseDto findById(Long allocationId) {
         Allocation allocation = allocationRepository.findByIdEager(allocationId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Allocation", allocationId));
-        return mapper.toDto(allocation);
+        return composer.compose(allocation);
     }
 
     @Override
@@ -77,7 +77,7 @@ public class AllocationServiceImpl implements AllocationService {
         occurrenceRepository.save(occurrence);
 
         log.info("Allocation created: id={}, occurrenceId={}, classroomId={}", saved.getId(), occurrenceId, dto.classroomId());
-        return mapper.toDto(saved);
+        return composer.compose(saved);
     }
 
     @Override
@@ -94,7 +94,7 @@ public class AllocationServiceImpl implements AllocationService {
 
         Allocation saved = allocationRepository.save(allocation);
         log.info("Allocation reassigned: id={}, classroomId={}", allocationId, dto.classroomId());
-        return mapper.toDto(saved);
+        return composer.compose(saved);
     }
 
     @Override
@@ -107,7 +107,7 @@ public class AllocationServiceImpl implements AllocationService {
             validateNotPast(allocation.getOccurrence());
             allocation.setClassroom(findClassroom(move.classroomId()));
             allocation.setSource(AllocationSource.MANUAL);
-            results.add(mapper.toDto(allocationRepository.save(allocation)));
+            results.add(composer.compose(allocationRepository.save(allocation)));
         }
         log.info("batchReassign complete: moved={}", results.size());
         return results;
@@ -223,7 +223,7 @@ public class AllocationServiceImpl implements AllocationService {
                             .observation(observation)
                             .build());
 
-            results.add(mapper.toDto(allocationRepository.save(allocation)));
+            results.add(composer.compose(allocationRepository.save(allocation)));
 
             occurrence.setStatus(OccurrenceStatus.ASSIGNED);
             occurrenceRepository.save(occurrence);
@@ -237,7 +237,7 @@ public class AllocationServiceImpl implements AllocationService {
         log.debug("findByDate: date={}", date);
         return allocationRepository.findByDateEager(date)
                 .stream()
-                .map(mapper::toDto)
+                .map(composer::compose)
                 .toList();
     }
 

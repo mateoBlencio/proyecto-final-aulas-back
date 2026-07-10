@@ -6,42 +6,44 @@ import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.UniqueEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
-import ar.edu.utn.frc.siga.allocation.model.EventType;
 import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
+import ar.edu.utn.frc.siga.common.mapper.CentralMapperConfig;
 import org.hibernate.Hibernate;
-import org.springframework.stereotype.Component;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
-@Component
-public class AcademicEventMapper {
+/**
+ * Mapea la jerarquía {@link AcademicEvent} (recurrente/único) a su DTO sellado
+ * correspondiente. MapStruct no puede generar el despacho polimórfico por sí solo
+ * (la entidad puede llegar proxied por Hibernate), así que el método de entrada es
+ * un {@code default} que desproxya y delega en el método concreto según el subtipo;
+ * cada método concreto sí es MapStruct puro.
+ */
+@Mapper(config = CentralMapperConfig.class)
+public interface AcademicEventMapper {
 
-    public AcademicEventResponseDto toDto(AcademicEvent event, SubjectResponseDto subject, CommissionResponseDto commission) {
+    default AcademicEventResponseDto toDto(AcademicEvent event, SubjectResponseDto subject, CommissionResponseDto commission) {
         AcademicEvent realEvent = (AcademicEvent) Hibernate.unproxy(event);
-
         if (realEvent instanceof RecurringEvent r) {
-            return RecurringEventResponseDto.builder()
-                    .id(r.getId())
-                    .type(EventType.RECURRING)
-                    .enrolled(r.getEnrolled())
-                    .startTime(r.getStartTime())
-                    .durationMinutes(r.getDuration().toMinutes())
-                    .dayOfWeek(r.getDayOfWeek())
-                    .startDate(r.getStartDate())
-                    .endDate(r.getEndDate())
-                    .subject(subject)
-                    .commission(commission)
-                    .build();
+            return toDto(r, subject, commission);
         }
-
-        UniqueEvent u = (UniqueEvent) realEvent;
-        return UniqueEventResponseDto.builder()
-                .id(u.getId())
-                .type(EventType.UNIQUE_EVENT)
-                .enrolled(u.getEnrolled())
-                .startTime(u.getStartTime())
-                .durationMinutes(u.getDuration().toMinutes())
-                .date(u.getDate())
-                .description(u.getDescription())
-                .build();
+        return toDto((UniqueEvent) realEvent, subject, commission);
     }
+
+    // "subject"/"commission" se fuerzan a mapear el parámetro entero (no
+    // event.getSubject()/event.getCommission()): sin esto MapStruct prefiere
+    // silenciosamente la navegación a la entidad JPA por sobre el DTO ya resuelto
+    // por el composer, reintroduciendo el acoplamiento cross-módulo que se quiere evitar.
+    @Mapping(target = "id", source = "event.id")
+    @Mapping(target = "type", constant = "RECURRING")
+    @Mapping(target = "durationMinutes", expression = "java(event.getDuration().toMinutes())")
+    @Mapping(target = "subject", source = "subject")
+    @Mapping(target = "commission", source = "commission")
+    RecurringEventResponseDto toDto(RecurringEvent event, SubjectResponseDto subject, CommissionResponseDto commission);
+
+    @Mapping(target = "id", source = "event.id")
+    @Mapping(target = "type", constant = "UNIQUE_EVENT")
+    @Mapping(target = "durationMinutes", expression = "java(event.getDuration().toMinutes())")
+    UniqueEventResponseDto toDto(UniqueEvent event, SubjectResponseDto subject, CommissionResponseDto commission);
 }

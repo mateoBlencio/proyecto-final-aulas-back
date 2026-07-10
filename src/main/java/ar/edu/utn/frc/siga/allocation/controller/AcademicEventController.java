@@ -82,7 +82,7 @@ public class AcademicEventController {
             @Valid @RequestBody CreateRecurringEventRequestDto dto) {
         log.debug("POST /v1/events/recurring: subjectId={}, commissionId={}", dto.subjectId(), dto.commissionId());
         AcademicEventResponseDto response = academicEventService.createRecurringEvent(dto);
-        log.info("Recurring event created via controller: id={}", response.getId());
+        log.info("Recurring event created via controller: id={}", response.id());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -93,7 +93,7 @@ public class AcademicEventController {
             @Valid @RequestBody CreateUniqueEventRequestDto dto) {
         log.debug("POST /v1/events/unique: date={}", dto.date());
         AcademicEventResponseDto response = academicEventService.createUniqueEvent(dto);
-        log.info("Unique event created via controller: id={}", response.getId());
+        log.info("Unique event created via controller: id={}", response.id());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }

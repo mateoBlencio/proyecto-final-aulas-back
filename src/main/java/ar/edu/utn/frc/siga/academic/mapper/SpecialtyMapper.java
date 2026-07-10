@@ -2,18 +2,11 @@ package ar.edu.utn.frc.siga.academic.mapper;
 
 import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
-import org.springframework.stereotype.Component;
+import ar.edu.utn.frc.siga.common.mapper.CentralMapperConfig;
+import org.mapstruct.Mapper;
 
-@Component
-public class SpecialtyMapper {
+@Mapper(config = CentralMapperConfig.class)
+public interface SpecialtyMapper {
 
-    public SpecialtyResponseDto toDto(Specialty specialty) {
-        if (specialty == null) {
-            return null;
-        }
-        return SpecialtyResponseDto.builder()
-                .specialtyCode(specialty.getSpecialtyCode())
-                .name(specialty.getName())
-                .build();
-    }
+    SpecialtyResponseDto toDto(Specialty specialty);
 }

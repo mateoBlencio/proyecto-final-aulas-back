@@ -1,40 +1,27 @@
 package ar.edu.utn.frc.siga.allocation.mapper;
 
+import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceResponseDto;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
-import ar.edu.utn.frc.siga.allocation.model.Occurrence;
-import ar.edu.utn.frc.siga.space.mapper.ClassroomMapper;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
+import ar.edu.utn.frc.siga.common.mapper.CentralMapperConfig;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
-@Component
-@RequiredArgsConstructor
-public class AllocationMapper {
+/**
+ * Mapper puro: solo mapea los campos propios de {@link Allocation} (incluida la
+ * ocurrencia, intra-módulo, vía {@link OccurrenceMapper}). Los datos ajenos (evento
+ * académico compuesto, aula) se resuelven afuera, en {@link AllocationComposer}, y se
+ * pasan como parámetros — mismo patrón que {@link AcademicEventMapper}.
+ */
+@Mapper(config = CentralMapperConfig.class, uses = OccurrenceMapper.class)
+public interface AllocationMapper {
 
-    private final AcademicEventComposer composer;
-    private final ClassroomMapper classroomMapper;
-
-    public AllocationResponseDto toDto(Allocation allocation) {
-        Occurrence occurrence = allocation.getOccurrence();
-
-        OccurrenceResponseDto occurrenceDto = OccurrenceResponseDto.builder()
-                .id(occurrence.getId())
-                .eventId(occurrence.getEvent().getId())
-                .date(occurrence.getDate())
-                .status(occurrence.getStatus())
-                .startTime(occurrence.startTime())
-                .endTime(occurrence.endTime())
-                .build();
-
-        return AllocationResponseDto.builder()
-                .id(allocation.getId())
-                .source(allocation.getSource())
-                .createdAt(allocation.getCreatedAt())
-                .observation(allocation.getObservation())
-                .occurrence(occurrenceDto)
-                .event(composer.compose(occurrence.getEvent()))
-                .classroom(classroomMapper.toResponseDto(allocation.getClassroom()))
-                .build();
-    }
+    // "event"/"classroom" se fuerzan a mapear el parámetro entero: sin esto MapStruct
+    // prefiere silenciosamente allocation.getClassroom() (entidad JPA de otro módulo)
+    // por sobre el ClassroomResponseDto ya resuelto por el composer.
+    @Mapping(target = "id", source = "allocation.id")
+    @Mapping(target = "event", source = "event")
+    @Mapping(target = "classroom", source = "classroom")
+    AllocationResponseDto toDto(Allocation allocation, AcademicEventResponseDto event, ClassroomResponseDto classroom);
 }

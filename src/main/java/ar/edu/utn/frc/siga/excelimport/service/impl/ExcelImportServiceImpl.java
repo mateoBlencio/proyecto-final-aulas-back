@@ -162,7 +162,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
             allocationService.importAssignmentsFromDate(
                 new AllocateFromDateRequestDto(
-                    eventResult.entity().getId(),
+                    eventResult.entity().id(),
                     startDate,
                     classroom.getId(),
                     "Importado de Excel"

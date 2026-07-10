@@ -17,7 +17,7 @@ import ar.edu.utn.frc.siga.solver.model.SolverEvent;
 import ar.edu.utn.frc.siga.solver.model.SolverPreview;
 import ar.edu.utn.frc.siga.solver.model.SolverRoom;
 import ar.edu.utn.frc.siga.solver.service.SolverService;
-import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDTO;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,7 +48,7 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
     @Override
     @Transactional(readOnly = true)
     public SolverPreview autoPreview(AutoPreviewRequestDto request) {
-        List<RecurringEvent> events = loadRecurringEvents(request.getEventIds());
+        List<RecurringEvent> events = loadRecurringEvents(request.eventIds());
         Set<Long> ownEventIds = events.stream().map(AcademicEvent::getId).collect(Collectors.toSet());
         Map<Long, Set<LocalDate>> datesByEvent = scheduledDatesByEvent(ownEventIds);
 
@@ -65,8 +65,8 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
                 .map(this::toSolverRoom)
                 .toList();
         List<SolverOccupancy> occupancy = buildOccupancy(events);
-        int timeLimit = request.getTimeLimitSeconds() != null
-                ? request.getTimeLimitSeconds() : DEFAULT_TIME_LIMIT_SECONDS;
+        int timeLimit = request.timeLimitSeconds() != null
+                ? request.timeLimitSeconds() : DEFAULT_TIME_LIMIT_SECONDS;
 
         log.info("Auto-preview: {} events, {} available classrooms, {} occupied slots",
                 solverEvents.size(), classrooms.size(), occupancy.size());
@@ -102,8 +102,8 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
                 e.getStartTime(), e.endTime(), dates);
     }
 
-    private SolverRoom toSolverRoom(ClassroomResponseDTO c) {
-        return new SolverRoom(c.getId(), c.getCapacity(), c.getBuildingId());
+    private SolverRoom toSolverRoom(ClassroomResponseDto c) {
+        return new SolverRoom(c.id(), c.capacity(), c.buildingId());
     }
 
     private List<SolverOccupancy> buildOccupancy(List<RecurringEvent> events) {
