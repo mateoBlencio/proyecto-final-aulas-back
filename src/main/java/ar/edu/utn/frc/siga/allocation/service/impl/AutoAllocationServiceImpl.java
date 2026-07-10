@@ -54,11 +54,17 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
 
         List<SolverEvent> solverEvents = events.stream()
                 .map(e -> toSolverEvent(e, datesByEvent.getOrDefault(e.getId(), Set.of())))
+                .filter(e -> !e.occurrenceDates().isEmpty())
                 .toList();
+        if (solverEvents.isEmpty()) {
+            throw new AllocationConflictException(
+                    "los eventos indicados no tienen ocurrencias pendientes de asignación");
+        }
+
         List<SolverRoom> classrooms = classroomService.findAllAvailable().stream()
                 .map(this::toSolverRoom)
                 .toList();
-        List<SolverOccupancy> occupancy = buildOccupancy(events, ownEventIds);
+        List<SolverOccupancy> occupancy = buildOccupancy(events);
         int timeLimit = request.getTimeLimitSeconds() != null
                 ? request.getTimeLimitSeconds() : DEFAULT_TIME_LIMIT_SECONDS;
 
@@ -91,7 +97,7 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
     }
 
     private SolverEvent toSolverEvent(RecurringEvent e, Set<LocalDate> dates) {
-        String commissionKey = e.getCommission() != null ? e.getCommission().getCourseCode() : null;
+        String commissionKey = e.getCommission() != null ? String.valueOf(e.getCommission().getId()) : null;
         return new SolverEvent(String.valueOf(e.getId()), commissionKey, e.getEnrolled(),
                 e.getStartTime(), e.endTime(), dates);
     }
@@ -100,15 +106,14 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
         return new SolverRoom(c.getId(), c.getCapacity(), c.getBuildingId());
     }
 
-    private List<SolverOccupancy> buildOccupancy(List<RecurringEvent> events, Set<Long> ownEventIds) {
+    private List<SolverOccupancy> buildOccupancy(List<RecurringEvent> events) {
         LocalDate from = events.stream().map(RecurringEvent::getStartDate)
                 .min(Comparator.naturalOrder()).orElseThrow();
         LocalDate to = events.stream()
                 .map(e -> e.getEndDate() != null ? e.getEndDate() : e.getStartDate().plusYears(1))
                 .max(Comparator.naturalOrder()).orElseThrow();
 
-        return allocationRepository.findOccupancyBetween(from, to).stream()
-                .filter(a -> !ownEventIds.contains(a.getOccurrence().getEvent().getId()))
+        return allocationRepository.findOccupancyBetween(from, to, OccurrenceStatus.ASSIGNED).stream()
                 .map(this::toOccupancy)
                 .toList();
     }

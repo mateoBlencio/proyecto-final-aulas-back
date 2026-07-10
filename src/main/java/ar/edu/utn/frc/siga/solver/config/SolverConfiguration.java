@@ -18,7 +18,7 @@ public class SolverConfiguration {
 
     /**
      * Tope de seguridad si un solve llega sin terminación por request;
-     * coincide con el máximo permitido en AllocationParametersDto.
+     * coincide con el máximo permitido en AutoPreviewRequestDto (@Max(300)).
      */
     private static final long DEFAULT_SECONDS_LIMIT = 300L;
 

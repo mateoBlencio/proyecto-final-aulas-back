@@ -1,7 +1,7 @@
 package ar.edu.utn.frc.siga.solver.service.impl;
 
 import ar.edu.utn.frc.siga.solver.config.SolverProperties;
-import ar.edu.utn.frc.siga.solver.exception.PreviewNotFoundException;
+import ar.edu.utn.frc.siga.solver.exception.ExpiredPreviewException;
 import ar.edu.utn.frc.siga.solver.exception.SchedulingException;
 import ar.edu.utn.frc.siga.solver.model.ClassAllocation;
 import ar.edu.utn.frc.siga.solver.model.SolverOccupancy;
@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -74,7 +75,7 @@ public class SolverServiceImpl implements SolverService {
     @Override
     public SolverPreview getPreview(String previewId) {
         return previewStore.get(previewId)
-                .orElseThrow(() -> new PreviewNotFoundException(previewId));
+                .orElseThrow(() -> new ExpiredPreviewException(previewId));
     }
 
     private SolverPreview toPreview(ScheduleSolution solution) {
@@ -92,20 +93,27 @@ public class SolverServiceImpl implements SolverService {
      * Cada ocupación existente cuya aula sea candidata se vuelve una asignación pinned.
      * Si el aula ocupada no es candidata (no disponible), no puede colisionar con ningún
      * evento nuevo y se descarta.
+     * Deduplicada por planningId: si en BD hay dos allocations preexistentes conflictivas
+     * (mismo aula/fecha/hora), generarían el mismo {@code @PlanningId} y Timefold explota.
+     * Se conserva solo la primera y se loguea la duplicada descartada.
      */
     private List<ExistingOccupancy> buildExistingOccupancy(List<SolverOccupancy> occupancy,
                                                            Map<Integer, SolverRoom> roomsById) {
         if (occupancy == null || occupancy.isEmpty()) return List.of();
-        List<ExistingOccupancy> result = new ArrayList<>();
+        Map<String, ExistingOccupancy> byPlanningId = new LinkedHashMap<>();
         for (SolverOccupancy occ : occupancy) {
             SolverRoom room = roomsById.get(occ.classroomId());
             if (room == null) continue;
             String planningId = "occupied:" + occ.classroomId() + ":" + occ.date() + ":" + occ.startTime();
+            if (byPlanningId.containsKey(planningId)) {
+                log.warn("Ocupación existente duplicada descartada, planningId={}", planningId);
+                continue;
+            }
             SolverEvent event = new SolverEvent(planningId, null, 0,
                     occ.startTime(), occ.endTime(), Set.of(occ.date()));
-            result.add(new ExistingOccupancy(event, room));
+            byPlanningId.put(planningId, new ExistingOccupancy(event, room));
         }
-        return result;
+        return new ArrayList<>(byPlanningId.values());
     }
 
     private ScheduleSolution solve(List<SolverEvent> events,

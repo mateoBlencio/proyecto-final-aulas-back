@@ -2,7 +2,7 @@ package ar.edu.utn.frc.siga.solver.service;
 
 import ar.edu.utn.frc.siga.solver.config.SolverConfiguration;
 import ar.edu.utn.frc.siga.solver.config.SolverProperties;
-import ar.edu.utn.frc.siga.solver.exception.PreviewNotFoundException;
+import ar.edu.utn.frc.siga.solver.exception.ExpiredPreviewException;
 import ar.edu.utn.frc.siga.solver.model.SolverOccupancy;
 import ar.edu.utn.frc.siga.solver.model.ScheduleSolution;
 import ar.edu.utn.frc.siga.solver.model.SolverAllocation;
@@ -65,6 +65,25 @@ class SolverPinnedOccupancyTest {
         // Preview persistida y recuperable; id inexistente → 410.
         assertThat(service.getPreview(preview.previewId()).previewId()).isEqualTo(preview.previewId());
         assertThatThrownBy(() -> service.getPreview("prev_missing"))
-                .isInstanceOf(PreviewNotFoundException.class);
+                .isInstanceOf(ExpiredPreviewException.class);
+    }
+
+    @Test
+    void duplicatedExistingOccupancy_doesNotExplode_collapsesToSinglePinned() {
+        // Conflicto viejo en BD: dos allocations preexistentes en la misma aula/fecha/hora
+        // generarían el mismo planningId ("occupied:aula:fecha:hora"). El solver debe
+        // deduplicar en vez de explotar por @PlanningId repetido.
+        SolverOccupancy duplicated = new SolverOccupancy(1, LocalDate.of(2026, 3, 9), LocalTime.of(8, 0), LocalTime.of(9, 30));
+        List<SolverOccupancy> occupancy = List.of(duplicated, duplicated);
+
+        SolverServiceImpl service = newService();
+        SolverPreview preview = service.preview(List.of(mondayEvent()), List.of(room(1), room(2)), occupancy, 5);
+
+        // El evento nuevo evita el aula 1 (ocupada el 2026-03-09) tal como si hubiera una
+        // sola ocupación pinned: prueba indirecta de que la duplicada se colapsó en una.
+        assertThat(preview.allocations()).hasSize(1);
+        SolverAllocation allocation = preview.allocations().get(0);
+        assertThat(allocation.eventId()).isEqualTo("e1");
+        assertThat(allocation.classroomId()).isEqualTo(2);
     }
 }

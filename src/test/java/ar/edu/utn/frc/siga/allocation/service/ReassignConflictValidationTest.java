@@ -82,7 +82,7 @@ class ReassignConflictValidationTest {
         RecurringEvent occupant = event(20L);
         Allocation existing = Allocation.builder()
                 .id(500L).classroom(room).occurrence(occurrence(200L, occupant)).build();
-        lenient().when(allocationRepository.findOccupancyBetween(day, day)).thenReturn(List.of(existing));
+        lenient().when(allocationRepository.findOccupancyBetween(day, day, OccurrenceStatus.ASSIGNED)).thenReturn(List.of(existing));
 
         assertThatThrownBy(() -> invoke(List.of(targetOcc), room, target))
                 .isInstanceOf(ReassignConflictException.class)
@@ -103,7 +103,7 @@ class ReassignConflictValidationTest {
         RecurringEvent occupant = event(20L);
         Allocation existing = Allocation.builder()
                 .id(500L).classroom(classroom(2)).occurrence(occurrence(200L, occupant)).build();
-        lenient().when(allocationRepository.findOccupancyBetween(day, day)).thenReturn(List.of(existing));
+        lenient().when(allocationRepository.findOccupancyBetween(day, day, OccurrenceStatus.ASSIGNED)).thenReturn(List.of(existing));
 
         assertThatCode(() -> invoke(List.of(targetOcc), classroom(1), target)).doesNotThrowAnyException();
     }

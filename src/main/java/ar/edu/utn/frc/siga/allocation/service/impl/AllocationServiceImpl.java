@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.BatchReassignRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
+import ar.edu.utn.frc.siga.allocation.exception.ReassignConflictException;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationMapper;
 import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
@@ -157,7 +158,7 @@ public class AllocationServiceImpl implements AllocationService {
         java.time.LocalTime end = event.endTime();
 
         List<ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceConflictDto> conflicts = new ArrayList<>();
-        for (Allocation existing : allocationRepository.findOccupancyBetween(min, max)) {
+        for (Allocation existing : allocationRepository.findOccupancyBetween(min, max, OccurrenceStatus.ASSIGNED)) {
             if (!existing.getClassroom().getId().equals(classroom.getId())) continue;
             AcademicEvent occupant = existing.getOccurrence().getEvent();
             if (occupant.getId().equals(event.getId())) continue; // sus propias asignaciones se reemplazan
@@ -171,7 +172,7 @@ public class AllocationServiceImpl implements AllocationService {
         }
 
         if (!conflicts.isEmpty()) {
-            throw new ar.edu.utn.frc.siga.allocation.exception.ReassignConflictException(conflicts);
+            throw new ReassignConflictException(conflicts);
         }
     }
 
