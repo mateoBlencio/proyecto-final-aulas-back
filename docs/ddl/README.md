@@ -30,4 +30,4 @@ eliminarlo más adelante cuando la base de datos compartida lo permita.
 
 | Script | Descripción | Estado |
 |--------|-------------|--------|
-| _(sin scripts todavía)_ | | |
+| `001_envers_tablas_auditoria.sql` | Tablas de auditoría de Hibernate Envers (`revinfo` + `*_aud`) para `allocation` (ver ADR-007) | pendiente |

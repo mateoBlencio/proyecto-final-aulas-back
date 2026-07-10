@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.academic.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -14,10 +15,12 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "plan_estudio",
        uniqueConstraints = @UniqueConstraint(columnNames = {"codigo_plan", "id_especialidad"}))
+@SQLRestriction("eliminado = false")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -33,7 +36,7 @@ public class StudyPlan {
     @Column(name = "codigo_plan", nullable = false)
     private Integer planCode;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_especialidad", nullable = false)
     private Specialty specialty;
 

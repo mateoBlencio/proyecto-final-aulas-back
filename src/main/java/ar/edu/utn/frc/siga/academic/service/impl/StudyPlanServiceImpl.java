@@ -29,7 +29,7 @@ public class StudyPlanServiceImpl implements StudyPlanService {
     public FindOrCreateResult<StudyPlanResponseDto> findOrCreate(Integer planCode, Integer specialtyCode) {
         Specialty specialty = requireSpecialty(specialtyCode);
         return FindOrCreateResult.resolve(
-                studyPlanRepository.findByPlanCodeAndSpecialtyAndDeletedFalse(planCode, specialty),
+                studyPlanRepository.findByPlanCodeAndSpecialty(planCode, specialty),
                 () -> {
                     log.info("Creando StudyPlan: code={}, specialty={}", planCode, specialty.getId());
                     return studyPlanRepository.save(
@@ -42,7 +42,7 @@ public class StudyPlanServiceImpl implements StudyPlanService {
     }
 
     private Specialty requireSpecialty(Integer specialtyCode) {
-        return specialtyRepository.findBySpecialtyCodeAndDeletedFalse(specialtyCode)
+        return specialtyRepository.findBySpecialtyCode(specialtyCode)
                 .orElseThrow(() -> ResourceNotFoundException.of("Specialty", specialtyCode));
     }
 }

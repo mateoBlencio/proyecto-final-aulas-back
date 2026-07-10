@@ -34,7 +34,7 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
         Subject subject = requireSubject(subjectId);
         Commission commission = requireCommission(commissionId);
         return FindOrCreateResult.resolve(
-                subjectCommissionRepository.findBySubjectAndCommissionAndDeletedFalse(subject, commission),
+                subjectCommissionRepository.findBySubjectAndCommission(subject, commission),
                 () -> {
                     log.info("Creando SubjectCommission: subject={}, commission={}", subjectId, commissionId);
                     return subjectCommissionRepository.save(

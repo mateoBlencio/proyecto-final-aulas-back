@@ -26,7 +26,7 @@ public class BuildingServiceImpl implements BuildingService {
     @Override
     public List<BuildingResponseDto> findAll() {
         log.debug("Listing all active buildings");
-        return buildingRepository.findAllByDeletedFalse().stream()
+        return buildingRepository.findAll().stream()
                 .filter(Building::getActive)
                 .map(buildingMapper::toDto)
                 .toList();
@@ -36,7 +36,7 @@ public class BuildingServiceImpl implements BuildingService {
     @Transactional
     public FindOrCreateResult<BuildingResponseDto> findOrCreate(String name) {
         return FindOrCreateResult.resolve(
-                buildingRepository.findByNameAndDeletedFalse(name),
+                buildingRepository.findByName(name),
                 () -> {
                     log.warn("Creando Building con datos provisionales: name={}", name);
                     return buildingRepository.save(

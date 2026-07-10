@@ -11,11 +11,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ClassroomRepository extends JpaRepository<Classroom, Integer>, JpaSpecificationExecutor<Classroom> {
 
-    Optional<Classroom> findByIdAndDeletedFalse(Integer id);
+    Optional<Classroom> findByRoomNumber(String roomNumber);
 
-    Optional<Classroom> findByRoomNumberAndDeletedFalse(String roomNumber);
+    Optional<Classroom> findByRoomNumberAndBuilding(String roomNumber, Building building);
 
-    Optional<Classroom> findByRoomNumberAndBuildingAndDeletedFalse(String roomNumber, Building building);
-
-    List<Classroom> findByAvailableTrueAndDeletedFalse();
+    List<Classroom> findByAvailableTrue();
 }

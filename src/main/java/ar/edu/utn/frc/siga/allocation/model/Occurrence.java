@@ -18,13 +18,19 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.AccessLevel;
+import org.hibernate.envers.Audited;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
+/**
+ * Ocurrencia concreta (fecha) de un {@link AcademicEvent}. Auditada con Hibernate Envers (ver
+ * ADR-007): los cambios de estado quedan registrados en {@code ocurrencia_aud}.
+ */
 @Entity
 @Table(name = "ocurrencia")
+@Audited
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

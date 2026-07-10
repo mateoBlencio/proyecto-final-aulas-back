@@ -9,5 +9,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface SubjectCommissionRepository extends JpaRepository<SubjectCommission, Long> {
-    Optional<SubjectCommission> findBySubjectAndCommissionAndDeletedFalse(Subject subject, Commission commission);
+    Optional<SubjectCommission> findBySubjectAndCommission(Subject subject, Commission commission);
 }

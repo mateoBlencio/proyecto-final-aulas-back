@@ -30,7 +30,7 @@ public class ClassroomTypeServiceImpl implements ClassroomTypeService {
 
     @Override
     public ClassroomType findDefault() {
-        return classroomTypeRepository.findByDescriptionIgnoreCaseAndDeletedFalse(defaultClassroomTypeDescription)
+        return classroomTypeRepository.findByDescriptionIgnoreCase(defaultClassroomTypeDescription)
                 .orElseThrow(() -> {
                     log.warn("Default ClassroomType not found: description={}", defaultClassroomTypeDescription);
                     return new SpaceDomainException(
@@ -40,7 +40,7 @@ public class ClassroomTypeServiceImpl implements ClassroomTypeService {
     }
 
     private ClassroomType findExistingById(Integer id) {
-        return classroomTypeRepository.findByIdAndDeletedFalse(id)
+        return classroomTypeRepository.findById(id)
                 .orElseThrow(() -> {
                     log.warn("ClassroomType not found: id={}", id);
                     return ResourceNotFoundException.of("ClassroomType", id);

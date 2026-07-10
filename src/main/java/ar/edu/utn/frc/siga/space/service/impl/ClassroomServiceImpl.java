@@ -53,7 +53,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         Building building = findActiveBuilding(dto.buildingId());
         ClassroomType classroomType = classroomTypeService.findById(dto.classroomTypeId());
 
-        if (classroomRepository.findByRoomNumberAndDeletedFalse(dto.roomNumber()).isPresent()) {
+        if (classroomRepository.findByRoomNumber(dto.roomNumber()).isPresent()) {
             log.warn("Classroom creation rejected: roomNumber '{}' already exists", dto.roomNumber());
             throw new SpaceDomainException("Classroom roomNumber already exists: " + dto.roomNumber());
         }
@@ -79,7 +79,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Override
     public List<ClassroomResponseDto> findAllAvailable() {
         log.debug("Listing all available classrooms");
-        return classroomRepository.findByAvailableTrueAndDeletedFalse().stream()
+        return classroomRepository.findByAvailableTrue().stream()
                 .map(classroomMapper::toDto)
                 .toList();
     }
@@ -135,7 +135,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     public FindOrCreateResult<ClassroomResponseDto> findOrCreate(String roomNumber, Integer buildingId, Integer enrolledCount) {
         Building building = requireBuilding(buildingId);
         return FindOrCreateResult.resolve(
-                classroomRepository.findByRoomNumberAndBuildingAndDeletedFalse(roomNumber, building),
+                classroomRepository.findByRoomNumberAndBuilding(roomNumber, building),
                 () -> {
                     log.warn("Creating Classroom with provisional data: roomNumber={}, buildingId={}",
                             roomNumber, buildingId);
@@ -152,7 +152,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     private Classroom findExistingClassroomById(Integer id) {
-        return classroomRepository.findByIdAndDeletedFalse(id)
+        return classroomRepository.findById(id)
                 .orElseThrow(() -> {
                     log.warn("Classroom not found: id={}", id);
                     return ResourceNotFoundException.of("Classroom", id);
@@ -160,7 +160,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     private Building findActiveBuilding(Integer id) {
-        return buildingRepository.findByIdAndDeletedFalse(id)
+        return buildingRepository.findById(id)
                 .filter(Building::getActive)
                 .orElseThrow(() -> {
                     log.warn("Building not found: id={}", id);
@@ -169,7 +169,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     private Building requireBuilding(Integer id) {
-        return buildingRepository.findByIdAndDeletedFalse(id)
+        return buildingRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("Building", id));
     }
 

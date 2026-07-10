@@ -48,7 +48,7 @@ public class SubjectServiceImpl implements SubjectService {
             Integer code, String name, Integer studyPlanCode, Integer specialtyCode, String term) {
         StudyPlan studyPlan = requireStudyPlan(studyPlanCode, specialtyCode);
         return FindOrCreateResult.resolve(
-                subjectRepository.findByCodeAndStudyPlanAndDeletedFalse(code, studyPlan),
+                subjectRepository.findByCodeAndStudyPlan(code, studyPlan),
                 () -> {
                     log.info("Creating Subject: code={}, plan={}", code, studyPlan.getId());
                     return subjectRepository.save(
@@ -63,9 +63,9 @@ public class SubjectServiceImpl implements SubjectService {
     }
 
     private StudyPlan requireStudyPlan(Integer studyPlanCode, Integer specialtyCode) {
-        Specialty specialty = specialtyRepository.findBySpecialtyCodeAndDeletedFalse(specialtyCode)
+        Specialty specialty = specialtyRepository.findBySpecialtyCode(specialtyCode)
                 .orElseThrow(() -> ResourceNotFoundException.of("Specialty", specialtyCode));
-        return studyPlanRepository.findByPlanCodeAndSpecialtyAndDeletedFalse(studyPlanCode, specialty)
+        return studyPlanRepository.findByPlanCodeAndSpecialty(studyPlanCode, specialty)
                 .orElseThrow(() -> ResourceNotFoundException.of("StudyPlan", studyPlanCode));
     }
 }

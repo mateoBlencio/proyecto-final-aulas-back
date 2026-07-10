@@ -45,7 +45,7 @@ public class CommissionServiceImpl implements CommissionService {
             Integer yearLevel, Integer periodYear, Integer periodSemester) {
         AcademicPeriod period = requirePeriod(periodYear, periodSemester);
         return FindOrCreateResult.resolve(
-                commissionRepository.findByCourseCodeAndCommissionNumberAndAcademicPeriodAndDeletedFalse(
+                commissionRepository.findByCourseCodeAndCommissionNumberAndAcademicPeriod(
                         courseCode, commissionNumber, period),
                 () -> {
                     log.info("Creating Commission: course={}, commission={}, period={}",

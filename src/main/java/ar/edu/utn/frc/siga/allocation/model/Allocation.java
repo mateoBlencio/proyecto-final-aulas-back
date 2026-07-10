@@ -17,11 +17,17 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.envers.Audited;
 
 import java.time.LocalDateTime;
 
+/**
+ * Asignación de un aula a una ocurrencia. Auditada con Hibernate Envers (ver ADR-007): cada
+ * creación/modificación/baja queda registrada en {@code asignacion_aula_aud}.
+ */
 @Entity
 @Table(name = "asignacion_aula")
+@Audited
 @Getter
 @Setter
 @Builder

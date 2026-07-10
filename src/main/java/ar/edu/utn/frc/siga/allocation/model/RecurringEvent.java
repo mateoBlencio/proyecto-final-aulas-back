@@ -13,6 +13,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.envers.Audited;
+import org.hibernate.envers.NotAudited;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -23,6 +25,7 @@ import java.util.List;
 @Entity
 @Table(name = "evento_recurrente")
 @DiscriminatorValue("RECURRING")
+@Audited
 @Getter
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -46,9 +49,15 @@ public class RecurringEvent extends AcademicEvent {
     @Column(name = "id_comision")
     private Long commissionId;
 
+    /**
+     * OBSOLETO: nunca se escribe (solo se lee en {@link #toOccurrences()}, siempre vacío en la
+     * práctica). Se marca {@code @NotAudited} para no generar una tabla de auditoría
+     * ({@code evento_recurrente_fecha_excluida_aud}) para un campo que jamás cambia.
+     */
     @ElementCollection
     @CollectionTable(name = "evento_recurrente_fecha_excluida", joinColumns = @JoinColumn(name = "id_evento_academico"))
     @Column(name = "fecha")
+    @NotAudited
     List<LocalDate> excludedDates;
 
     @Override

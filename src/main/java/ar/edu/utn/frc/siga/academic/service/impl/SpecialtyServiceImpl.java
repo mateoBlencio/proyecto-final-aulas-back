@@ -24,7 +24,7 @@ public class SpecialtyServiceImpl implements SpecialtyService {
     @Transactional
     public FindOrCreateResult<SpecialtyResponseDto> findOrCreate(Integer specialtyCode) {
         return FindOrCreateResult.resolve(
-                specialtyRepository.findBySpecialtyCodeAndDeletedFalse(specialtyCode),
+                specialtyRepository.findBySpecialtyCode(specialtyCode),
                 () -> {
                     log.warn("Creando Specialty con nombre provisional: codigo={}", specialtyCode);
                     return specialtyRepository.save(

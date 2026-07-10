@@ -8,8 +8,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ClassroomTypeRepository extends JpaRepository<ClassroomType, Integer> {
 
-    Optional<ClassroomType> findByIdAndDeletedFalse(Integer id);
-
-    Optional<ClassroomType> findByDescriptionIgnoreCaseAndDeletedFalse(String description);
+    Optional<ClassroomType> findByDescriptionIgnoreCase(String description);
 
 }

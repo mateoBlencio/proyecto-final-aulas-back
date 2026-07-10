@@ -16,15 +16,22 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.envers.Audited;
 
 import java.time.Duration;
 import java.time.LocalTime;
 import java.util.List;
 
+/**
+ * Evento académico base (recurrente o único). Auditada con Hibernate Envers (ver ADR-007), junto
+ * con sus subtipos {@link RecurringEvent} y {@link UniqueEvent}: los cambios quedan registrados
+ * en {@code evento_academico_aud} y sus tablas {@code _aud} de subclase (herencia JOINED).
+ */
 @Entity
 @Table(name = "evento_academico")
 @Inheritance(strategy = InheritanceType.JOINED)
 @DiscriminatorColumn(name = "tipo_evento")
+@Audited
 @Getter
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
