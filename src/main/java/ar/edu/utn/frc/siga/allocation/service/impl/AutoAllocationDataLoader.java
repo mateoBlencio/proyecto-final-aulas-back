@@ -52,12 +52,13 @@ class AutoAllocationDataLoader {
     }
 
     /**
-     * Ocupación de BD con el id del evento ocupante — {@link SolverOccupancy} no lo trae
-     * (el solver solo necesita la franja bloqueada, no quién la ocupa). Lo necesita
-     * validate-move para reportar {@code conflictingEventId} en un conflicto DATABASE.
+     * Ocupación de BD con el id del evento y de la asignación ocupante — {@link SolverOccupancy}
+     * no los trae (el solver solo necesita la franja bloqueada, no quién la ocupa). Los
+     * necesitan validate-move ({@code conflictingEventId} en un conflicto DATABASE) y
+     * confirm ({@code conflictingAllocationId} en el {@code OccurrenceConflictDto}).
      */
     record DatabaseOccupancy(Integer classroomId, LocalDate date, LocalTime startTime, LocalTime endTime,
-                              Long eventId) {
+                              Long eventId, Long allocationId) {
     }
 
     @Transactional(readOnly = true)
@@ -141,7 +142,7 @@ class AutoAllocationDataLoader {
                 occupant.endTime());
     }
 
-    /** Igual que {@link #toOccupancy} pero conservando el id del evento ocupante. */
+    /** Igual que {@link #toOccupancy} pero conservando el id del evento y de la asignación ocupante. */
     private DatabaseOccupancy toDatabaseOccupancy(Allocation a) {
         AcademicEvent occupant = a.getOccurrence().getEvent();
         return new DatabaseOccupancy(
@@ -149,6 +150,7 @@ class AutoAllocationDataLoader {
                 a.getOccurrence().getDate(),
                 occupant.getStartTime(),
                 occupant.endTime(),
-                occupant.getId());
+                occupant.getId(),
+                a.getId());
     }
 }

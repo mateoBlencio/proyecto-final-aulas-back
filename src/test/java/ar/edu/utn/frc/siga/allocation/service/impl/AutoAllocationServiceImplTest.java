@@ -1,16 +1,20 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
 import ar.edu.utn.frc.siga.allocation.dto.request.AutoPreviewRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.ConfirmAutoPreviewRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.PreviewAllocationDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.ValidateMoveRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AutoPreviewResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.ConfirmAutoPreviewResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto.ConflictOrigin;
 import ar.edu.utn.frc.siga.allocation.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ValidateMoveResponseDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
+import ar.edu.utn.frc.siga.allocation.exception.ReassignConflictException;
 import ar.edu.utn.frc.siga.allocation.mapper.AcademicEventComposer;
+import ar.edu.utn.frc.siga.allocation.mapper.AllocationComposer;
 import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
@@ -54,8 +58,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -75,6 +81,8 @@ class AutoAllocationServiceImplTest {
     private SolverService solverService;
     @Mock
     private AcademicEventComposer academicEventComposer;
+    @Mock
+    private AllocationComposer allocationComposer;
 
     @Captor
     private ArgumentCaptor<List<SolverEvent>> solverEventsCaptor;
@@ -89,7 +97,8 @@ class AutoAllocationServiceImplTest {
         // los repos mockeados para ejercitar dedup/pinned/fechas a través del servicio.
         AutoAllocationDataLoader dataLoader = new AutoAllocationDataLoader(
                 eventRepository, occurrenceRepository, allocationRepository, classroomService);
-        service = new AutoAllocationServiceImpl(dataLoader, classroomService, academicEventComposer, solverService);
+        service = new AutoAllocationServiceImpl(dataLoader, classroomService, academicEventComposer, solverService,
+                occurrenceRepository, allocationRepository, allocationComposer);
 
         lenient().when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5, 100)));
         lenient().when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 100)));
@@ -107,6 +116,8 @@ class AutoAllocationServiceImplTest {
             }
             return result;
         });
+        lenient().when(allocationComposer.composeAll(any())).thenReturn(List.of());
+        lenient().when(allocationRepository.findByOccurrence_IdIn(any())).thenReturn(List.of());
     }
 
     @Test
@@ -409,6 +420,212 @@ class AutoAllocationServiceImplTest {
         assertThat(result.conflicts()).isEmpty();
     }
 
+    @Test
+    @DisplayName("confirm: crea allocation nueva para occurrence sin asignación y actualiza la existente sin duplicar")
+    void confirmCreaYActualizaAllocationsSinDuplicar() {
+        RecurringEvent event1 = recurringEvent(1L);
+        RecurringEvent event2 = recurringEvent(2L, LocalTime.of(14, 0), Duration.ofMinutes(60));
+        LocalDate date1 = futureDate(1);
+        LocalDate date2 = futureDate(2);
+        Occurrence occ1 = occurrence(10L, event1, date1, OccurrenceStatus.SCHEDULED);
+        Occurrence occ2 = occurrence(11L, event2, date2, OccurrenceStatus.ASSIGNED);
+        Allocation existingForOcc2 = allocation(900L, occ2, 3);
+
+        when(solverService.getPreview("prev_confirm")).thenReturn(new SolverPreview("prev_confirm",
+                List.of(new SolverAllocation("1", 5), new SolverAllocation("2", 7))));
+        when(eventRepository.findAllById(any())).thenReturn(List.of(event1, event2));
+        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+                .thenReturn(List.of(occ1, occ2));
+        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 100), classroom(7, 100)));
+        when(allocationRepository.findByOccurrence_IdIn(any())).thenReturn(List.of(existingForOcc2));
+        when(allocationRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ConfirmAutoPreviewRequestDto request = new ConfirmAutoPreviewRequestDto(
+                List.of(new PreviewAllocationDto(1L, 5), new PreviewAllocationDto(2L, 7)));
+
+        ArgumentCaptor<List<Allocation>> savedCaptor = ArgumentCaptor.forClass(List.class);
+        service.confirm("prev_confirm", request);
+        verify(allocationComposer).composeAll(savedCaptor.capture());
+
+        List<Allocation> saved = savedCaptor.getValue();
+        assertThat(saved).hasSize(2);
+        Allocation savedForOcc1 = saved.stream().filter(a -> a.getOccurrence().getId().equals(10L)).findFirst().orElseThrow();
+        Allocation savedForOcc2 = saved.stream().filter(a -> a.getOccurrence().getId().equals(11L)).findFirst().orElseThrow();
+
+        assertThat(savedForOcc1.getId()).isNull(); // nueva, todavía sin id asignado por la BD
+        assertThat(savedForOcc1.getClassroomId()).isEqualTo(5);
+        assertThat(savedForOcc1.getSource()).isEqualTo(AllocationSource.AUTOMATIC);
+
+        assertThat(savedForOcc2.getId()).isEqualTo(900L); // reusa la existente, no duplica
+        assertThat(savedForOcc2.getClassroomId()).isEqualTo(7);
+        assertThat(savedForOcc2.getSource()).isEqualTo(AllocationSource.AUTOMATIC);
+
+        verify(occurrenceRepository).save(argThat(o -> o.getId().equals(10L) && o.getStatus() == OccurrenceStatus.ASSIGNED));
+        verify(occurrenceRepository).save(argThat(o -> o.getId().equals(11L) && o.getStatus() == OccurrenceStatus.ASSIGNED));
+    }
+
+    @Test
+    @DisplayName("confirm: occurrence ya ASSIGNED conserva su estado y queda con el aula nueva")
+    void confirmOccurrenceAssignedConservaEstadoConAulaNueva() {
+        RecurringEvent event = recurringEvent(1L);
+        LocalDate date = futureDate(1);
+        Occurrence occ = occurrence(10L, event, date, OccurrenceStatus.ASSIGNED);
+        Allocation existing = allocation(900L, occ, 3);
+
+        when(solverService.getPreview("prev_confirm")).thenReturn(new SolverPreview("prev_confirm",
+                List.of(new SolverAllocation("1", 5))));
+        when(eventRepository.findAllById(any())).thenReturn(List.of(event));
+        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+                .thenReturn(List.of(occ));
+        when(allocationRepository.findByOccurrence_IdIn(any())).thenReturn(List.of(existing));
+        when(allocationRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ConfirmAutoPreviewRequestDto request = new ConfirmAutoPreviewRequestDto(
+                List.of(new PreviewAllocationDto(1L, 5)));
+
+        service.confirm("prev_confirm", request);
+
+        assertThat(occ.getStatus()).isEqualTo(OccurrenceStatus.ASSIGNED);
+        assertThat(existing.getClassroomId()).isEqualTo(5);
+        assertThat(existing.getSource()).isEqualTo(AllocationSource.AUTOMATIC);
+        verify(occurrenceRepository).save(occ);
+    }
+
+    @Test
+    @DisplayName("confirm: invalida el preview tras aplicar la propuesta")
+    void confirmInvalidaElPreviewTrasAplicar() {
+        RecurringEvent event = recurringEvent(1L);
+        Occurrence occ = occurrence(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
+        when(solverService.getPreview("prev_confirm")).thenReturn(new SolverPreview("prev_confirm",
+                List.of(new SolverAllocation("1", 5))));
+        when(eventRepository.findAllById(any())).thenReturn(List.of(event));
+        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+                .thenReturn(List.of(occ));
+        when(allocationRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.confirm("prev_confirm", new ConfirmAutoPreviewRequestDto(List.of(new PreviewAllocationDto(1L, 5))));
+
+        verify(solverService).invalidatePreview("prev_confirm");
+    }
+
+    @Test
+    @DisplayName("confirm: 410 si el preview expiró")
+    void confirmPreviewExpirado() {
+        when(solverService.getPreview("prev_expired")).thenThrow(new ExpiredPreviewException("prev_expired"));
+
+        assertThatThrownBy(() -> service.confirm("prev_expired",
+                new ConfirmAutoPreviewRequestDto(List.of(new PreviewAllocationDto(1L, 5)))))
+                .isInstanceOf(ExpiredPreviewException.class);
+    }
+
+    @Test
+    @DisplayName("confirm: 409 si un eventId del body no pertenece al preview")
+    void confirmEventoFueraDelPreview() {
+        when(solverService.getPreview("prev_confirm")).thenReturn(new SolverPreview("prev_confirm",
+                List.of(new SolverAllocation("1", 5))));
+
+        assertThatThrownBy(() -> service.confirm("prev_confirm",
+                new ConfirmAutoPreviewRequestDto(List.of(new PreviewAllocationDto(2L, 5)))))
+                .isInstanceOf(AllocationConflictException.class)
+                .hasMessageContaining("2");
+    }
+
+    @Test
+    @DisplayName("confirm: 409 si el body tiene eventIds duplicados")
+    void confirmDuplicadosEnBody() {
+        when(solverService.getPreview("prev_confirm")).thenReturn(new SolverPreview("prev_confirm",
+                List.of(new SolverAllocation("1", 5))));
+
+        assertThatThrownBy(() -> service.confirm("prev_confirm", new ConfirmAutoPreviewRequestDto(
+                List.of(new PreviewAllocationDto(1L, 5), new PreviewAllocationDto(1L, 7)))))
+                .isInstanceOf(AllocationConflictException.class)
+                .hasMessageContaining("duplicados");
+
+        verify(allocationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("confirm: 409 si el aula no existe o no está disponible")
+    void confirmAulaNoDisponible() {
+        RecurringEvent event = recurringEvent(1L);
+        when(solverService.getPreview("prev_confirm")).thenReturn(new SolverPreview("prev_confirm",
+                List.of(new SolverAllocation("1", 5))));
+        when(eventRepository.findAllById(any())).thenReturn(List.of(event));
+        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 100, false)));
+
+        assertThatThrownBy(() -> service.confirm("prev_confirm",
+                new ConfirmAutoPreviewRequestDto(List.of(new PreviewAllocationDto(1L, 5)))))
+                .isInstanceOf(AllocationConflictException.class)
+                .hasMessageContaining("5");
+
+        verify(allocationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("confirm: 409 si la propuesta choca con una asignación firme de BD, sin persistir nada")
+    void confirmConflictoContraBdSinPersistir() {
+        RecurringEvent event = recurringEvent(1L);
+        RecurringEvent foreignEvent = recurringEvent(99L);
+        LocalDate date = futureDate(1);
+        Occurrence occ = occurrence(10L, event, date, OccurrenceStatus.SCHEDULED);
+        Allocation foreignAllocation = allocation(500L,
+                occurrence(50L, foreignEvent, date, OccurrenceStatus.ASSIGNED), 5);
+
+        when(solverService.getPreview("prev_confirm")).thenReturn(new SolverPreview("prev_confirm",
+                List.of(new SolverAllocation("1", 5))));
+        when(eventRepository.findAllById(any())).thenReturn(List.of(event));
+        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+                .thenReturn(List.of(occ));
+        when(allocationRepository.findOccupancyBetween(any(), any(), eq(OccurrenceStatus.ASSIGNED)))
+                .thenReturn(List.of(foreignAllocation));
+
+        assertThatThrownBy(() -> service.confirm("prev_confirm",
+                new ConfirmAutoPreviewRequestDto(List.of(new PreviewAllocationDto(1L, 5)))))
+                .isInstanceOf(ReassignConflictException.class);
+
+        verify(allocationRepository, never()).save(any());
+        verify(occurrenceRepository, never()).save(any());
+        verify(solverService, never()).invalidatePreview(any());
+    }
+
+    @Test
+    @DisplayName("confirm: 409 si dos ítems del propio set chocan entre sí (misma aula, mismo horario, fecha compartida)")
+    void confirmConflictoInternoEntreDosItems() {
+        RecurringEvent event1 = recurringEvent(1L);
+        RecurringEvent event2 = recurringEvent(2L);
+        LocalDate date = futureDate(1);
+        Occurrence occ1 = occurrence(10L, event1, date, OccurrenceStatus.SCHEDULED);
+        Occurrence occ2 = occurrence(11L, event2, date, OccurrenceStatus.SCHEDULED);
+
+        when(solverService.getPreview("prev_confirm")).thenReturn(new SolverPreview("prev_confirm",
+                List.of(new SolverAllocation("1", 9), new SolverAllocation("2", 9))));
+        when(eventRepository.findAllById(any())).thenReturn(List.of(event1, event2));
+        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+                .thenReturn(List.of(occ1, occ2));
+        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(9, 100)));
+
+        assertThatThrownBy(() -> service.confirm("prev_confirm", new ConfirmAutoPreviewRequestDto(
+                List.of(new PreviewAllocationDto(1L, 9), new PreviewAllocationDto(2L, 9)))))
+                .isInstanceOf(ReassignConflictException.class);
+
+        verify(allocationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("confirm: classroomId null va a skippedEventIds y no se aplica")
+    void confirmClassroomIdNullQuedaSkipped() {
+        when(solverService.getPreview("prev_confirm")).thenReturn(new SolverPreview("prev_confirm",
+                List.of(new SolverAllocation("1", null))));
+
+        ConfirmAutoPreviewResponseDto result = service.confirm("prev_confirm",
+                new ConfirmAutoPreviewRequestDto(List.of(new PreviewAllocationDto(1L, null))));
+
+        assertThat(result.applied()).isEmpty();
+        assertThat(result.skippedEventIds()).containsExactly(1L);
+        verify(allocationRepository, never()).save(any());
+        verify(solverService, never()).invalidatePreview(any());
+    }
+
     private RecurringEvent recurringEvent(long id) {
         return recurringEvent(id, LocalTime.of(8, 0), Duration.ofMinutes(90));
     }
@@ -445,7 +662,11 @@ class AutoAllocationServiceImplTest {
     }
 
     private ClassroomResponseDto classroom(Integer id, Integer capacity) {
-        return new ClassroomResponseDto(id, "Aula " + id, 1, capacity, true, 1, "Edificio 1", 1, "Tipo");
+        return classroom(id, capacity, true);
+    }
+
+    private ClassroomResponseDto classroom(Integer id, Integer capacity, boolean available) {
+        return new ClassroomResponseDto(id, "Aula " + id, 1, capacity, available, 1, "Edificio 1", 1, "Tipo");
     }
 
     private LocalDate futureDate(int daysFromNow) {

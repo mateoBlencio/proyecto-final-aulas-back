@@ -13,4 +13,7 @@ public interface PreviewStore {
     void save(SolverPreview preview);
 
     Optional<SolverPreview> get(String previewId);
+
+    /** Elimina una preview (p. ej. tras confirmarla): protege contra doble aplicación. */
+    void remove(String previewId);
 }

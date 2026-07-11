@@ -1,8 +1,10 @@
 package ar.edu.utn.frc.siga.allocation.controller;
 
 import ar.edu.utn.frc.siga.allocation.dto.request.AutoPreviewRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.ConfirmAutoPreviewRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.ValidateMoveRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AutoPreviewResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.ConfirmAutoPreviewResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ValidateMoveResponseDto;
 import ar.edu.utn.frc.siga.allocation.service.AutoAllocationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -59,6 +61,20 @@ public class AutoAllocationController {
         ValidateMoveResponseDto response = autoAllocationService.validateMove(previewId, request);
         log.info("Validación de movimiento: previewId={}, eventId={}, valid={}, conflicts={}",
                 previewId, request.eventId(), response.valid(), response.conflicts().size());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/auto-preview/{previewId}/confirm")
+    @Operation(summary = "Confirmar el preview de asignación automática",
+               description = "Persiste de forma atómica la propuesta final ajustada por el usuario, re-validando "
+                       + "todo contra la BD actual antes de escribir. Eventos sin aula propuesta quedan en "
+                       + "skippedEventIds (revisión manual). Invalida el preview: un re-confirm da 410.")
+    public ResponseEntity<ConfirmAutoPreviewResponseDto> confirm(
+            @PathVariable String previewId, @Valid @RequestBody ConfirmAutoPreviewRequestDto request) {
+        log.debug("POST /v1/allocations/auto-preview/{}/confirm: allocations={}", previewId, request.allocations().size());
+        ConfirmAutoPreviewResponseDto response = autoAllocationService.confirm(previewId, request);
+        log.info("Confirm de preview: previewId={}, applied={}, skipped={}",
+                previewId, response.applied().size(), response.skippedEventIds().size());
         return ResponseEntity.ok(response);
     }
 }

@@ -20,4 +20,11 @@ public interface SolverService {
 
     /** Recupera una preview guardada; lanza PreviewNotFoundException (410) si no existe/expiró. */
     SolverPreview getPreview(String previewId);
+
+    /**
+     * Invalida una preview ya aplicada (confirmada). Se llama al final del confirm, tras
+     * persistir: un re-confirm sobre el mismo previewId da 410 (protección natural contra
+     * doble submit) en vez de volver a aplicar la misma propuesta.
+     */
+    void invalidatePreview(String previewId);
 }

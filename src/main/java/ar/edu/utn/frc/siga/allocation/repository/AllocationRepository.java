@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,6 +16,9 @@ import java.util.Optional;
 public interface AllocationRepository extends JpaRepository<Allocation, Long> {
 
     Optional<Allocation> findByOccurrence_Id(Long occurrenceId);
+
+    /** Batch por ids de ocurrencia — evita N+1 al aplicar un confirm sobre muchas occurrences. */
+    List<Allocation> findByOccurrence_IdIn(Collection<Long> occurrenceIds);
 
     @Query("SELECT a FROM Allocation a " +
            "JOIN FETCH a.occurrence o " +

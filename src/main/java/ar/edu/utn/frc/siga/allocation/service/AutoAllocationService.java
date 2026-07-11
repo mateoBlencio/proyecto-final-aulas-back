@@ -1,8 +1,10 @@
 package ar.edu.utn.frc.siga.allocation.service;
 
 import ar.edu.utn.frc.siga.allocation.dto.request.AutoPreviewRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.ConfirmAutoPreviewRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.ValidateMoveRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AutoPreviewResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.ConfirmAutoPreviewResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ValidateMoveResponseDto;
 
 /**
@@ -32,4 +34,17 @@ public interface AutoAllocationService {
      * {@code currentAllocations} no pertenece al preview.
      */
     ValidateMoveResponseDto validateMove(String previewId, ValidateMoveRequestDto request);
+
+    /**
+     * Confirma un preview de asignación automática: aplica de forma atómica la propuesta
+     * FINAL ajustada por el usuario ({@code request.allocations()}), re-validando todo
+     * contra el estado actual de la BD antes de escribir nada. Eventos con
+     * {@code classroomId == null} quedan en {@code skippedEventIds} (revisión manual, no
+     * se aplican). {@code source = AUTOMATIC} se estampa siempre dentro del servicio.
+     * Invalida el preview al finalizar: un re-confirm sobre el mismo previewId da 410.
+     * 410 si el preview expiró; 409 si hay duplicados, algún eventId no pertenece al
+     * preview, un aula no existe/no está disponible, o la propuesta genera una
+     * superposición nueva contra BD o entre sí.
+     */
+    ConfirmAutoPreviewResponseDto confirm(String previewId, ConfirmAutoPreviewRequestDto request);
 }

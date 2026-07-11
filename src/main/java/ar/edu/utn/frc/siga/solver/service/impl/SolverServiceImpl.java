@@ -78,6 +78,11 @@ public class SolverServiceImpl implements SolverService {
                 .orElseThrow(() -> new ExpiredPreviewException(previewId));
     }
 
+    @Override
+    public void invalidatePreview(String previewId) {
+        previewStore.remove(previewId);
+    }
+
     private SolverPreview toPreview(ScheduleSolution solution) {
         List<SolverAllocation> allocations = solution.getAllocations().stream()
                 .filter(a -> !a.isPinned())

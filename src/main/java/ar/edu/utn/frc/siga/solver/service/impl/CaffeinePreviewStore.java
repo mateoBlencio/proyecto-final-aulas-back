@@ -30,4 +30,9 @@ public class CaffeinePreviewStore implements PreviewStore {
     public Optional<SolverPreview> get(String previewId) {
         return Optional.ofNullable(cache.getIfPresent(previewId));
     }
+
+    @Override
+    public void remove(String previewId) {
+        cache.invalidate(previewId);
+    }
 }
