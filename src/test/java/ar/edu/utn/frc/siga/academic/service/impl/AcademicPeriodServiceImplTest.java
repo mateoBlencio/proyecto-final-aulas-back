@@ -1,0 +1,125 @@
+package ar.edu.utn.frc.siga.academic.service.impl;
+
+import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
+import ar.edu.utn.frc.siga.academic.mapper.AcademicPeriodMapperImpl;
+import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
+import ar.edu.utn.frc.siga.academic.model.TermType;
+import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
+import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+@DisplayName("AcademicPeriodServiceImpl")
+class AcademicPeriodServiceImplTest {
+
+    @Mock
+    private AcademicPeriodRepository academicPeriodRepository;
+
+    private AcademicPeriodServiceImpl service;
+
+    @BeforeEach
+    void setUp() {
+        // AcademicPeriodMapperImpl no tiene dependencias (uses ninguno): se instancia real.
+        service = new AcademicPeriodServiceImpl(academicPeriodRepository, new AcademicPeriodMapperImpl());
+    }
+
+    @Test
+    @DisplayName("findOrCreate: si el período ya existe, no lo crea y created queda en false")
+    void findOrCreateWithExistingPeriodDoesNotSave() {
+        AcademicPeriod existing = AcademicPeriod.builder()
+                .id(1L).year(2026).semester(1)
+                .startDate(LocalDate.of(2026, 3, 1))
+                .endDate(LocalDate.of(2026, 7, 31))
+                .active(true)
+                .build();
+        when(academicPeriodRepository.findByYearAndSemester(2026, 1)).thenReturn(Optional.of(existing));
+
+        FindOrCreateResult<AcademicPeriodResponseDto> result =
+                service.findOrCreate(2026, TermType.PRIMER_CUATRIMESTRE);
+
+        assertThat(result.created()).isFalse();
+        assertThat(result.value().year()).isEqualTo(2026);
+        assertThat(result.value().semester()).isEqualTo(1);
+        verify(academicPeriodRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("findOrCreate: si no existe, crea el período con las fechas del TermType y created queda en true")
+    void findOrCreateWithoutExistingPeriodCreatesWithTermTypeDates() {
+        when(academicPeriodRepository.findByYearAndSemester(2026, 2)).thenReturn(Optional.empty());
+        when(academicPeriodRepository.save(any())).thenAnswer(invocation -> {
+            AcademicPeriod toSave = invocation.getArgument(0);
+            toSave.setId(9L);
+            return toSave;
+        });
+
+        FindOrCreateResult<AcademicPeriodResponseDto> result =
+                service.findOrCreate(2026, TermType.SEGUNDO_CUATRIMESTRE);
+
+        assertThat(result.created()).isTrue();
+
+        ArgumentCaptor<AcademicPeriod> captor = ArgumentCaptor.forClass(AcademicPeriod.class);
+        verify(academicPeriodRepository).save(captor.capture());
+        AcademicPeriod saved = captor.getValue();
+        assertThat(saved.getYear()).isEqualTo(2026);
+        assertThat(saved.getSemester()).isEqualTo(2);
+        assertThat(saved.getStartDate()).isEqualTo(LocalDate.of(2026, 8, 1));
+        assertThat(saved.getEndDate()).isEqualTo(LocalDate.of(2026, 11, 30));
+
+        assertThat(result.value().startDate()).isEqualTo(LocalDate.of(2026, 8, 1));
+        assertThat(result.value().endDate()).isEqualTo(LocalDate.of(2026, 11, 30));
+    }
+
+    @Test
+    @DisplayName("findActive: devuelve solo los períodos activos, mapeando year/semester/startDate/endDate")
+    void findActiveReturnsOnlyActivePeriodsMapped() {
+        AcademicPeriod active = AcademicPeriod.builder()
+                .id(1L).year(2026).semester(1)
+                .startDate(LocalDate.of(2026, 3, 1))
+                .endDate(LocalDate.of(2026, 7, 31))
+                .active(true)
+                .build();
+        when(academicPeriodRepository.findByActiveTrue()).thenReturn(List.of(active));
+
+        List<AcademicPeriodResponseDto> result = service.findActive();
+
+        assertThat(result).hasSize(1);
+        AcademicPeriodResponseDto dto = result.get(0);
+        assertThat(dto.year()).isEqualTo(2026);
+        assertThat(dto.semester()).isEqualTo(1);
+        assertThat(dto.startDate()).isEqualTo(LocalDate.of(2026, 3, 1));
+        assertThat(dto.endDate()).isEqualTo(LocalDate.of(2026, 7, 31));
+    }
+
+    @Test
+    @DisplayName("findActive: con endDate null en la entidad, el DTO también lo expone en null")
+    void findActiveMapsNullEndDate() {
+        AcademicPeriod active = AcademicPeriod.builder()
+                .id(2L).year(2026).semester(0)
+                .startDate(LocalDate.of(2026, 3, 1))
+                .endDate(null)
+                .active(true)
+                .build();
+        when(academicPeriodRepository.findByActiveTrue()).thenReturn(List.of(active));
+
+        List<AcademicPeriodResponseDto> result = service.findActive();
+
+        assertThat(result.get(0).endDate()).isNull();
+    }
+}
