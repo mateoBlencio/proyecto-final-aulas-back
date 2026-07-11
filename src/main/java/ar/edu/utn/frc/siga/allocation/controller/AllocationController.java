@@ -3,7 +3,9 @@ package ar.edu.utn.frc.siga.allocation.controller;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateFromDateRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.BatchReassignRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.AllocationProblemsResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
+import ar.edu.utn.frc.siga.allocation.service.AllocationProblemService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,6 +36,23 @@ import java.util.List;
 public class AllocationController {
 
     private final AllocationService allocationService;
+    private final AllocationProblemService allocationProblemService;
+
+    @GetMapping("/problems")
+    @Operation(summary = "Listar problemas de asignación de aulas",
+               description = "Devuelve, para la pantalla de asignación automática, tres listados en el rango "
+                       + "indicado: eventos sin aula, aulas con sobrecupo y superposiciones de horario-aula. "
+                       + "Por defecto 'from' es hoy y 'to' es el fin del período académico activo "
+                       + "(o 'from' + 6 meses si no hay período activo con fecha de fin).")
+    public ResponseEntity<AllocationProblemsResponseDto> findProblems(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        log.debug("GET /v1/allocations/problems: from={}, to={}", from, to);
+        AllocationProblemsResponseDto response = allocationProblemService.findProblems(from, to);
+        log.info("Problemas de asignación listados: unassigned={}, overcrowded={}, overlaps={}",
+                response.unassigned().size(), response.overcrowded().size(), response.overlaps().size());
+        return ResponseEntity.ok(response);
+    }
 
     @GetMapping
     @Operation(summary = "Listar asignaciones por fecha",

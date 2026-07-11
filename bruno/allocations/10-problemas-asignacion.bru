@@ -1,0 +1,37 @@
+meta {
+  name: Problemas de asignación de aulas
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/v1/allocations/problems?from=2026-08-01&to=2026-12-15
+  body: none
+  auth: none
+}
+
+params:query {
+  from: 2026-08-01
+  to: 2026-12-15
+}
+
+docs {
+  Devuelve, para la pantalla de asignación automática, tres listados en el rango
+  [from, to]:
+
+  - unassigned: eventos con ocurrencias SCHEDULED sin aula (mismo listado que
+    GET /v1/events/unassigned).
+  - overcrowded: pares evento-aula donde la cantidad de inscriptos supera la
+    capacidad del aula asignada. Una fila por par, con todas las fechas en
+    conflicto (un evento recurrente con sobrecupo semanal es una sola fila).
+  - overlaps: pares de eventos cuyos horarios se superponen en la misma aula.
+    Una fila por par, con todas las fechas en que chocan.
+
+  Ambos query params son opcionales:
+  - from: si se omite, es hoy.
+  - to: si se omite, es la fecha de fin (endDate) del período académico activo
+    (el mayor si hay más de uno); si no hay período activo o no tiene endDate,
+    from + 6 meses.
+
+  'to' anterior a 'from' → 400 Bad Request.
+}

@@ -12,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Slf4j
 @Service
 @Transactional(readOnly = true)
@@ -37,5 +39,13 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
                                     .build());
                 }
         ).map(academicPeriodMapper::toDto);
+    }
+
+    @Override
+    public List<AcademicPeriodResponseDto> findActive() {
+        log.debug("Buscando períodos académicos activos");
+        return academicPeriodRepository.findByActiveTrue().stream()
+                .map(academicPeriodMapper::toDto)
+                .toList();
     }
 }
