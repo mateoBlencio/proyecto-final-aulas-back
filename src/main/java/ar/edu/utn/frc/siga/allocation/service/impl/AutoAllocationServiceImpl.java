@@ -1,15 +1,21 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
 import ar.edu.utn.frc.siga.allocation.dto.request.AutoPreviewRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.PreviewAllocationDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.ValidateMoveRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AutoPreviewResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto.ConflictOrigin;
 import ar.edu.utn.frc.siga.allocation.dto.response.ProposedAllocationDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.ValidateMoveResponseDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.mapper.AcademicEventComposer;
 import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.service.AutoAllocationService;
 import ar.edu.utn.frc.siga.allocation.service.impl.AutoAllocationDataLoader.AutoPreviewInputs;
+import ar.edu.utn.frc.siga.allocation.service.impl.AutoAllocationDataLoader.DatabaseOccupancy;
 import ar.edu.utn.frc.siga.solver.model.SolverAllocation;
 import ar.edu.utn.frc.siga.solver.model.SolverEvent;
 import ar.edu.utn.frc.siga.solver.model.SolverPreview;
@@ -21,6 +27,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -78,6 +85,102 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
                 .collect(Collectors.toSet());
         AutoPreviewInputs inputs = dataLoader.load(eventIds);
         return compose(preview, inputs.events(), inputs.datesByEvent());
+    }
+
+    /**
+     * Sin mutación (pura consulta): reusa una sola carga del {@link AutoAllocationDataLoader}
+     * con el set completo de eventos del preview para tener fechas y horarios de todos
+     * ellos (necesarios para el chequeo PREVIEW), y la ocupación de BD ya excluye esos
+     * mismos eventos (sus aulas están liberadas para el solver).
+     */
+    @Override
+    public ValidateMoveResponseDto validateMove(String previewId, ValidateMoveRequestDto request) {
+        SolverPreview preview = solverService.getPreview(previewId);
+        Set<Long> previewEventIds = preview.allocations().stream()
+                .map(a -> Long.valueOf(a.eventId()))
+                .collect(Collectors.toSet());
+        validateBelongsToPreview(request, previewEventIds);
+
+        AutoPreviewInputs inputs = dataLoader.load(previewEventIds);
+        Map<Long, RecurringEvent> eventsById = inputs.events().stream()
+                .collect(Collectors.toMap(AcademicEvent::getId, e -> e));
+
+        RecurringEvent movedEvent = eventsById.get(request.eventId());
+        Set<LocalDate> movedDates = Set.copyOf(inputs.datesByEvent().getOrDefault(request.eventId(), List.of()));
+        LocalTime movedStart = movedEvent.getStartTime();
+        LocalTime movedEnd = movedEvent.endTime();
+
+        List<MoveConflictDto> conflicts = new ArrayList<>();
+        conflicts.addAll(databaseConflicts(inputs, request.classroomId(), movedDates, movedStart, movedEnd));
+        conflicts.addAll(previewConflicts(request, inputs, eventsById, movedDates, movedStart, movedEnd));
+
+        return new ValidateMoveResponseDto(conflicts.isEmpty(), conflicts);
+    }
+
+    /** {@code eventId} y todos los {@code currentAllocations} deben pertenecer al preview vigente. */
+    private void validateBelongsToPreview(ValidateMoveRequestDto request, Set<Long> previewEventIds) {
+        if (!previewEventIds.contains(request.eventId())) {
+            throw new AllocationConflictException(
+                    "el evento " + request.eventId() + " no pertenece al preview indicado");
+        }
+        Set<Long> foreign = request.currentAllocations().stream()
+                .map(PreviewAllocationDto::eventId)
+                .filter(id -> !previewEventIds.contains(id))
+                .collect(Collectors.toSet());
+        if (!foreign.isEmpty()) {
+            throw new AllocationConflictException(
+                    "los eventos " + foreign + " de currentAllocations no pertenecen al preview indicado");
+        }
+    }
+
+    /**
+     * Conflictos contra asignaciones firmes de BD: {@code inputs.databaseOccupancy()} ya
+     * excluye los eventos del preview (sus aulas quedaron liberadas), así que solo puede
+     * chocar contra ocupación de eventos ajenos al preview.
+     */
+    private List<MoveConflictDto> databaseConflicts(AutoPreviewInputs inputs, Integer destination,
+            Set<LocalDate> movedDates, LocalTime movedStart, LocalTime movedEnd) {
+        List<MoveConflictDto> conflicts = new ArrayList<>();
+        for (DatabaseOccupancy occupancy : inputs.databaseOccupancy()) {
+            if (!destination.equals(occupancy.classroomId())) continue;
+            if (!movedDates.contains(occupancy.date())) continue;
+            if (!overlaps(movedStart, movedEnd, occupancy.startTime(), occupancy.endTime())) continue;
+            conflicts.add(new MoveConflictDto(occupancy.date(), occupancy.startTime(), occupancy.endTime(),
+                    destination, occupancy.eventId(), ConflictOrigin.DATABASE));
+        }
+        return conflicts;
+    }
+
+    /**
+     * Conflictos contra el resto de la propuesta ajustada que viaja en el request: otros
+     * ítems de {@code currentAllocations} (excluido el propio evento movido) que también
+     * apuntan al aula destino, comparando fechas compartidas y franja horaria.
+     */
+    private List<MoveConflictDto> previewConflicts(ValidateMoveRequestDto request, AutoPreviewInputs inputs,
+            Map<Long, RecurringEvent> eventsById, Set<LocalDate> movedDates, LocalTime movedStart, LocalTime movedEnd) {
+        List<MoveConflictDto> conflicts = new ArrayList<>();
+        for (PreviewAllocationDto allocation : request.currentAllocations()) {
+            if (allocation.eventId().equals(request.eventId())) continue;
+            if (!request.classroomId().equals(allocation.classroomId())) continue;
+
+            RecurringEvent other = eventsById.get(allocation.eventId());
+            if (other == null) continue;
+            LocalTime otherStart = other.getStartTime();
+            LocalTime otherEnd = other.endTime();
+            if (!overlaps(movedStart, movedEnd, otherStart, otherEnd)) continue;
+
+            for (LocalDate date : inputs.datesByEvent().getOrDefault(allocation.eventId(), List.of())) {
+                if (!movedDates.contains(date)) continue;
+                conflicts.add(new MoveConflictDto(date, otherStart, otherEnd, request.classroomId(),
+                        allocation.eventId(), ConflictOrigin.PREVIEW));
+            }
+        }
+        return conflicts;
+    }
+
+    /** Barrido de franjas horarias reusable (Fase 4): fin == inicio no es solapamiento. */
+    private boolean overlaps(LocalTime start1, LocalTime end1, LocalTime start2, LocalTime end2) {
+        return start1.isBefore(end2) && start2.isBefore(end1);
     }
 
     private SolverEvent toSolverEvent(RecurringEvent e, List<LocalDate> dates) {

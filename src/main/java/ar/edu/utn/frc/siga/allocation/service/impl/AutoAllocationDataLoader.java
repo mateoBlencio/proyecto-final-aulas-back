@@ -20,6 +20,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +29,7 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /**
- * Carga TODO lo que necesita el auto-preview en una única transacción corta y lo
+ * Carga todo lo que necesita el auto-preview en una única transacción corta y lo
  * devuelve materializado (entidades des-proxeadas con {@link Hibernate#unproxy}, con
  * OSIV off un proxy lazy fuera de transacción explota). Existe para que
  * {@code AutoAllocationServiceImpl#autoPreview} pueda dejar de ser transaccional: la
@@ -46,7 +47,17 @@ class AutoAllocationDataLoader {
 
     /** Todo lo que el auto-preview necesita, ya materializado fuera de la sesión de Hibernate. */
     record AutoPreviewInputs(List<RecurringEvent> events, Map<Long, List<LocalDate>> datesByEvent,
-                              List<SolverRoom> rooms, List<SolverOccupancy> occupancy) {
+                              List<SolverRoom> rooms, List<SolverOccupancy> occupancy,
+                              List<DatabaseOccupancy> databaseOccupancy) {
+    }
+
+    /**
+     * Ocupación de BD con el id del evento ocupante — {@link SolverOccupancy} no lo trae
+     * (el solver solo necesita la franja bloqueada, no quién la ocupa). Lo necesita
+     * validate-move para reportar {@code conflictingEventId} en un conflicto DATABASE.
+     */
+    record DatabaseOccupancy(Integer classroomId, LocalDate date, LocalTime startTime, LocalTime endTime,
+                              Long eventId) {
     }
 
     @Transactional(readOnly = true)
@@ -56,8 +67,12 @@ class AutoAllocationDataLoader {
         List<SolverRoom> rooms = classroomService.findAllAvailable().stream()
                 .map(this::toSolverRoom)
                 .toList();
-        List<SolverOccupancy> occupancy = buildOccupancy(events, eventIds);
-        return new AutoPreviewInputs(events, datesByEvent, rooms, occupancy);
+        List<Allocation> databaseAllocations = loadDatabaseAllocations(events, eventIds);
+        List<SolverOccupancy> occupancy = databaseAllocations.stream().map(this::toOccupancy).toList();
+        List<DatabaseOccupancy> databaseOccupancy = databaseAllocations.stream()
+                .map(this::toDatabaseOccupancy)
+                .toList();
+        return new AutoPreviewInputs(events, datesByEvent, rooms, occupancy, databaseOccupancy);
     }
 
     private List<RecurringEvent> loadRecurringEvents(Set<Long> eventIds) {
@@ -98,9 +113,11 @@ class AutoAllocationDataLoader {
     /**
      * Ocupación existente en el rango de los eventos seleccionados, EXCLUYENDO las
      * allocations cuyo evento está en {@code selectedEventIds}: esas aulas quedan libres
-     * para que el solver pueda reasignarlas (D2). El resto sigue pinned.
+     * para que el solver pueda reasignarlas (D2). El resto sigue pinned. Se devuelve la
+     * entidad completa (no un record del solver) para poder derivar tanto la ocupación
+     * pinned del solver como el detalle con eventId que necesita validate-move.
      */
-    private List<SolverOccupancy> buildOccupancy(List<RecurringEvent> events, Set<Long> selectedEventIds) {
+    private List<Allocation> loadDatabaseAllocations(List<RecurringEvent> events, Set<Long> selectedEventIds) {
         if (events.isEmpty()) {
             return List.of();
         }
@@ -112,7 +129,6 @@ class AutoAllocationDataLoader {
 
         return allocationRepository.findOccupancyBetween(from, to, OccurrenceStatus.ASSIGNED).stream()
                 .filter(a -> !selectedEventIds.contains(a.getOccurrence().getEvent().getId()))
-                .map(this::toOccupancy)
                 .toList();
     }
 
@@ -123,5 +139,16 @@ class AutoAllocationDataLoader {
                 a.getOccurrence().getDate(),
                 occupant.getStartTime(),
                 occupant.endTime());
+    }
+
+    /** Igual que {@link #toOccupancy} pero conservando el id del evento ocupante. */
+    private DatabaseOccupancy toDatabaseOccupancy(Allocation a) {
+        AcademicEvent occupant = a.getOccurrence().getEvent();
+        return new DatabaseOccupancy(
+                a.getClassroomId(),
+                a.getOccurrence().getDate(),
+                occupant.getStartTime(),
+                occupant.endTime(),
+                occupant.getId());
     }
 }

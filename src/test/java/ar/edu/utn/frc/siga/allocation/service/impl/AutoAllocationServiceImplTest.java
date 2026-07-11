@@ -1,9 +1,14 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
 import ar.edu.utn.frc.siga.allocation.dto.request.AutoPreviewRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.PreviewAllocationDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.ValidateMoveRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AutoPreviewResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto.ConflictOrigin;
 import ar.edu.utn.frc.siga.allocation.dto.response.RecurringEventResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.ValidateMoveResponseDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.mapper.AcademicEventComposer;
 import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
@@ -17,6 +22,7 @@ import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
 import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.solver.exception.ExpiredPreviewException;
 import ar.edu.utn.frc.siga.solver.model.SolverAllocation;
 import ar.edu.utn.frc.siga.solver.model.SolverEvent;
 import ar.edu.utn.frc.siga.solver.model.SolverOccupancy;
@@ -248,12 +254,171 @@ class AutoAllocationServiceImplTest {
         assertThat(result.allocations().get(0).classroom().id()).isEqualTo(5);
     }
 
+    @Test
+    @DisplayName("validateMove: aula destino libre, sin conflictos")
+    void validateMoveAulaLibre() {
+        RecurringEvent event1 = recurringEvent(1L);
+        RecurringEvent event2 = recurringEvent(2L);
+        LocalDate date = futureDate(1);
+        when(solverService.getPreview("prev_move")).thenReturn(new SolverPreview("prev_move",
+                List.of(new SolverAllocation("1", 5), new SolverAllocation("2", 7))));
+        when(eventRepository.findAllById(any())).thenReturn(List.of(event1, event2));
+        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+                .thenReturn(List.of(
+                        occurrence(10L, event1, date, OccurrenceStatus.SCHEDULED),
+                        occurrence(11L, event2, date, OccurrenceStatus.SCHEDULED)));
+
+        ValidateMoveRequestDto request = new ValidateMoveRequestDto(1L, 9,
+                List.of(new PreviewAllocationDto(1L, 9), new PreviewAllocationDto(2L, 7)));
+        ValidateMoveResponseDto result = service.validateMove("prev_move", request);
+
+        assertThat(result.valid()).isTrue();
+        assertThat(result.conflicts()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("validateMove: conflicto contra asignación firme de BD de un evento ajeno al preview")
+    void validateMoveConflictoDatabase() {
+        RecurringEvent event1 = recurringEvent(1L);
+        RecurringEvent event2 = recurringEvent(2L);
+        RecurringEvent foreignEvent = recurringEvent(99L);
+        LocalDate date = futureDate(1);
+        Allocation foreignAllocation = allocation(500L,
+                occurrence(50L, foreignEvent, date, OccurrenceStatus.ASSIGNED), 9);
+        when(solverService.getPreview("prev_move")).thenReturn(new SolverPreview("prev_move",
+                List.of(new SolverAllocation("1", 5), new SolverAllocation("2", 7))));
+        when(eventRepository.findAllById(any())).thenReturn(List.of(event1, event2));
+        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+                .thenReturn(List.of(
+                        occurrence(10L, event1, date, OccurrenceStatus.SCHEDULED),
+                        occurrence(11L, event2, date, OccurrenceStatus.SCHEDULED)));
+        when(allocationRepository.findOccupancyBetween(any(), any(), eq(OccurrenceStatus.ASSIGNED)))
+                .thenReturn(List.of(foreignAllocation));
+
+        ValidateMoveRequestDto request = new ValidateMoveRequestDto(1L, 9,
+                List.of(new PreviewAllocationDto(1L, 9), new PreviewAllocationDto(2L, 7)));
+        ValidateMoveResponseDto result = service.validateMove("prev_move", request);
+
+        assertThat(result.valid()).isFalse();
+        assertThat(result.conflicts()).hasSize(1);
+        MoveConflictDto conflict = result.conflicts().get(0);
+        assertThat(conflict.date()).isEqualTo(date);
+        assertThat(conflict.startTime()).isEqualTo(LocalTime.of(8, 0));
+        assertThat(conflict.endTime()).isEqualTo(LocalTime.of(9, 30));
+        assertThat(conflict.classroomId()).isEqualTo(9);
+        assertThat(conflict.conflictingEventId()).isEqualTo(99L);
+        assertThat(conflict.origin()).isEqualTo(ConflictOrigin.DATABASE);
+    }
+
+    @Test
+    @DisplayName("validateMove: conflicto contra otro ítem de la propuesta ajustada en el aula destino")
+    void validateMoveConflictoPreview() {
+        RecurringEvent event1 = recurringEvent(1L);
+        RecurringEvent event2 = recurringEvent(2L);
+        LocalDate date = futureDate(1);
+        when(solverService.getPreview("prev_move")).thenReturn(new SolverPreview("prev_move",
+                List.of(new SolverAllocation("1", 5), new SolverAllocation("2", 7))));
+        when(eventRepository.findAllById(any())).thenReturn(List.of(event1, event2));
+        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+                .thenReturn(List.of(
+                        occurrence(10L, event1, date, OccurrenceStatus.SCHEDULED),
+                        occurrence(11L, event2, date, OccurrenceStatus.SCHEDULED)));
+
+        ValidateMoveRequestDto request = new ValidateMoveRequestDto(1L, 7,
+                List.of(new PreviewAllocationDto(1L, 7), new PreviewAllocationDto(2L, 7)));
+        ValidateMoveResponseDto result = service.validateMove("prev_move", request);
+
+        assertThat(result.valid()).isFalse();
+        assertThat(result.conflicts()).hasSize(1);
+        MoveConflictDto conflict = result.conflicts().get(0);
+        assertThat(conflict.date()).isEqualTo(date);
+        assertThat(conflict.classroomId()).isEqualTo(7);
+        assertThat(conflict.conflictingEventId()).isEqualTo(2L);
+        assertThat(conflict.origin()).isEqualTo(ConflictOrigin.PREVIEW);
+    }
+
+    @Test
+    @DisplayName("validateMove: la ocupación de BD de un evento del propio preview no cuenta (está liberada)")
+    void validateMoveIgnoraOcupacionDeEventosDelPreview() {
+        RecurringEvent event1 = recurringEvent(1L);
+        RecurringEvent event2 = recurringEvent(2L);
+        LocalDate date = futureDate(1);
+        Allocation event2Allocation = allocation(600L,
+                occurrence(60L, event2, date, OccurrenceStatus.ASSIGNED), 9);
+        when(solverService.getPreview("prev_move")).thenReturn(new SolverPreview("prev_move",
+                List.of(new SolverAllocation("1", 5), new SolverAllocation("2", 7))));
+        when(eventRepository.findAllById(any())).thenReturn(List.of(event1, event2));
+        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+                .thenReturn(List.of(
+                        occurrence(10L, event1, date, OccurrenceStatus.SCHEDULED),
+                        occurrence(11L, event2, date, OccurrenceStatus.SCHEDULED)));
+        when(allocationRepository.findOccupancyBetween(any(), any(), eq(OccurrenceStatus.ASSIGNED)))
+                .thenReturn(List.of(event2Allocation));
+
+        ValidateMoveRequestDto request = new ValidateMoveRequestDto(1L, 9,
+                List.of(new PreviewAllocationDto(1L, 9), new PreviewAllocationDto(2L, 7)));
+        ValidateMoveResponseDto result = service.validateMove("prev_move", request);
+
+        assertThat(result.valid()).isTrue();
+        assertThat(result.conflicts()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("validateMove: 410 si el preview expiró")
+    void validateMovePreviewExpirado() {
+        when(solverService.getPreview("prev_expired")).thenThrow(new ExpiredPreviewException("prev_expired"));
+
+        assertThatThrownBy(() -> service.validateMove("prev_expired",
+                new ValidateMoveRequestDto(1L, 9, List.of())))
+                .isInstanceOf(ExpiredPreviewException.class);
+    }
+
+    @Test
+    @DisplayName("validateMove: 409 si el eventId movido no pertenece al preview")
+    void validateMoveEventoAjenoAlPreview() {
+        when(solverService.getPreview("prev_move")).thenReturn(new SolverPreview("prev_move",
+                List.of(new SolverAllocation("1", 5), new SolverAllocation("2", 7))));
+
+        ValidateMoveRequestDto request = new ValidateMoveRequestDto(3L, 9, List.of(new PreviewAllocationDto(1L, 5)));
+
+        assertThatThrownBy(() -> service.validateMove("prev_move", request))
+                .isInstanceOf(AllocationConflictException.class)
+                .hasMessageContaining("3");
+    }
+
+    @Test
+    @DisplayName("validateMove: franjas adyacentes (fin del movido == inicio del ocupante) no conflictúan")
+    void validateMoveFranjasAdyacentesNoConflictuan() {
+        RecurringEvent event1 = recurringEvent(1L);
+        RecurringEvent adjacentEvent = recurringEvent(99L, LocalTime.of(9, 30), Duration.ofMinutes(60));
+        LocalDate date = futureDate(1);
+        Allocation adjacentAllocation = allocation(700L,
+                occurrence(70L, adjacentEvent, date, OccurrenceStatus.ASSIGNED), 9);
+        when(solverService.getPreview("prev_move")).thenReturn(new SolverPreview("prev_move",
+                List.of(new SolverAllocation("1", 5))));
+        when(eventRepository.findAllById(any())).thenReturn(List.of(event1));
+        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+                .thenReturn(List.of(occurrence(10L, event1, date, OccurrenceStatus.SCHEDULED)));
+        when(allocationRepository.findOccupancyBetween(any(), any(), eq(OccurrenceStatus.ASSIGNED)))
+                .thenReturn(List.of(adjacentAllocation));
+
+        ValidateMoveRequestDto request = new ValidateMoveRequestDto(1L, 9, List.of(new PreviewAllocationDto(1L, 9)));
+        ValidateMoveResponseDto result = service.validateMove("prev_move", request);
+
+        assertThat(result.valid()).isTrue();
+        assertThat(result.conflicts()).isEmpty();
+    }
+
     private RecurringEvent recurringEvent(long id) {
+        return recurringEvent(id, LocalTime.of(8, 0), Duration.ofMinutes(90));
+    }
+
+    private RecurringEvent recurringEvent(long id, LocalTime startTime, Duration duration) {
         return RecurringEvent.builder()
                 .id(id)
                 .enrolled(30)
-                .startTime(LocalTime.of(8, 0))
-                .duration(Duration.ofMinutes(90))
+                .startTime(startTime)
+                .duration(duration)
                 .dayOfWeek(DayOfWeek.MONDAY)
                 .startDate(LocalDate.now().minusMonths(1))
                 .endDate(LocalDate.now().plusMonths(4))

@@ -1,7 +1,9 @@
 package ar.edu.utn.frc.siga.allocation.controller;
 
 import ar.edu.utn.frc.siga.allocation.dto.request.AutoPreviewRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.ValidateMoveRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AutoPreviewResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.ValidateMoveResponseDto;
 import ar.edu.utn.frc.siga.allocation.service.AutoAllocationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -42,5 +44,21 @@ public class AutoAllocationController {
     public ResponseEntity<AutoPreviewResponseDto> getPreview(@PathVariable String previewId) {
         log.debug("GET /v1/allocations/auto-preview/{}", previewId);
         return ResponseEntity.ok(autoAllocationService.getPreview(previewId));
+    }
+
+    @PostMapping("/auto-preview/{previewId}/validate-move")
+    @Operation(summary = "Validar movimiento de aula sobre el preview",
+               description = "Valida si mover el bloque de un evento a otra aula genera una superposición nueva, "
+                       + "contra lo firme de BD y contra el resto de la propuesta ajustada. Responde 200 siempre "
+                       + "que el request sea coherente con el preview: el conflicto va en el body (valid=false), "
+                       + "nunca como 409. 410 si el preview expiró; 409 si el evento no pertenece al preview.")
+    public ResponseEntity<ValidateMoveResponseDto> validateMove(
+            @PathVariable String previewId, @Valid @RequestBody ValidateMoveRequestDto request) {
+        log.debug("POST /v1/allocations/auto-preview/{}/validate-move: eventId={}, classroomId={}",
+                previewId, request.eventId(), request.classroomId());
+        ValidateMoveResponseDto response = autoAllocationService.validateMove(previewId, request);
+        log.info("Validación de movimiento: previewId={}, eventId={}, valid={}, conflicts={}",
+                previewId, request.eventId(), response.valid(), response.conflicts().size());
+        return ResponseEntity.ok(response);
     }
 }
