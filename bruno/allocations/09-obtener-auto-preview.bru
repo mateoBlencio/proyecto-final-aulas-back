@@ -15,6 +15,11 @@ vars:pre-request {
 }
 
 docs {
-  Recupera una preview generada. 410 Gone si expiró (TTL) o no existe.
+  Recupera una preview generada y la recompone contra el estado actual de la BD
+  (evento, fechas de ocurrencia futuras y aula). 410 Gone si expiró (TTL) o no existe.
   Reemplazá previewId por el devuelto en POST /auto-preview.
+
+  Respuesta: misma forma que el POST — { previewId, allocations: [ { event,
+  occurrenceDates, classroom } ], unresolved: [ { event, occurrenceDates,
+  classroom: null } ] }. unresolved queda para revisión manual.
 }

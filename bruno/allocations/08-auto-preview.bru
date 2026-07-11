@@ -22,6 +22,23 @@ docs {
   (asignaciones ya hechas) como restricción dura. Devuelve una preview con previewId,
   sin persistir asignaciones. El confirm es un paso aparte (pendiente).
 
-  Respuesta: { "previewId": "prev_xxxxxxxx", "allocations": [ { "eventId": "1", "classroomId": 5 } ] }
-  classroomId null = el solver no encontró aula sin conflicto para ese evento.
+  eventIds = eventos a (RE)RESOLVER, vengan del listado que vengan (GET /problems):
+  - eventos SIN aula asignada, o
+  - eventos YA asignados con sobrecupo o superposición: sus aulas se "sueltan" para
+    que el solver pueda reasignarlas (a otra aula, o la misma si es óptima).
+  Los ids duplicados se deduplican (un evento puede aparecer en más de un listado).
+  Todo lo NO seleccionado sigue siendo intocable (ocupación pinned): la propuesta
+  jamás pisa asignaciones firmes. Solo se consideran occurrences futuras (>= hoy).
+
+  Respuesta (datos para dibujar la propuesta en el calendario):
+  {
+    "previewId": "prev_xxxxxxxx",
+    "allocations": [ { "event": {...}, "occurrenceDates": ["2026-08-03", ...], "classroom": {...} } ],
+    "unresolved": [ { "event": {...}, "occurrenceDates": [...], "classroom": null } ]
+  }
+  allocations = filas con aula propuesta; unresolved = el solver no encontró aula sin
+  conflicto para ese evento → queda para revisión manual.
+
+  IMPORTANTE: el timeout del cliente debe superar timeLimitSeconds (el POST queda
+  pendiente mientras corre el solver; con timeLimitSeconds=300 puede tardar 5 min).
 }

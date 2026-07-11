@@ -1,7 +1,7 @@
 package ar.edu.utn.frc.siga.allocation.service;
 
 import ar.edu.utn.frc.siga.allocation.dto.request.AutoPreviewRequestDto;
-import ar.edu.utn.frc.siga.solver.model.SolverPreview;
+import ar.edu.utn.frc.siga.allocation.dto.response.AutoPreviewResponseDto;
 
 /**
  * Orquesta la asignación automática: carga los eventos, junta las aulas disponibles y
@@ -10,5 +10,13 @@ import ar.edu.utn.frc.siga.solver.model.SolverPreview;
  */
 public interface AutoAllocationService {
 
-    SolverPreview autoPreview(AutoPreviewRequestDto request);
+    /**
+     * Genera una preview con el solver a partir de los eventos indicados (sin aula, o ya
+     * asignados para re-resolver sobrecupo/superposición) y la compone con los datos que
+     * necesita el calendario del front.
+     */
+    AutoPreviewResponseDto autoPreview(AutoPreviewRequestDto request);
+
+    /** Recupera una preview generada previamente y la recompone contra el estado actual de la BD. */
+    AutoPreviewResponseDto getPreview(String previewId);
 }
