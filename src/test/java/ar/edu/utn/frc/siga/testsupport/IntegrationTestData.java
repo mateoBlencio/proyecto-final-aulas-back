@@ -1,5 +1,11 @@
 package ar.edu.utn.frc.siga.testsupport;
 
+import ar.edu.utn.frc.siga.academic.model.TermType;
+import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
+import ar.edu.utn.frc.siga.academic.service.CommissionService;
+import ar.edu.utn.frc.siga.academic.service.SpecialtyService;
+import ar.edu.utn.frc.siga.academic.service.StudyPlanService;
+import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
@@ -39,6 +45,12 @@ public class IntegrationTestData {
     private final BuildingRepository buildingRepository;
     private final ClassroomRepository classroomRepository;
     private final ClassroomTypeRepository classroomTypeRepository;
+
+    private final SpecialtyService specialtyService;
+    private final StudyPlanService studyPlanService;
+    private final SubjectService subjectService;
+    private final CommissionService commissionService;
+    private final AcademicPeriodService academicPeriodService;
 
     @Value("${siga.space.default-classroom-type:Normal}")
     private String defaultClassroomTypeDescription;
@@ -92,5 +104,33 @@ public class IntegrationTestData {
     /** Aula disponible, piso 1, capacidad 40, con el tipo de aula por defecto. */
     public Classroom aula(Building building) {
         return aula(building, tipoAulaNormal(), 1, 40, true);
+    }
+
+    /** Materia + comisión resultantes del seed {@link #materiaYComision()}. */
+    public record SubjectAndCommission(Long subjectId, Long commissionId) {}
+
+    /**
+     * Encadena Specialty->StudyPlan->Subject y AcademicPeriod->Commission (todo vía
+     * {@code findOrCreate}, claves naturales con sufijo único) para obtener un par
+     * subjectId/commissionId válido, el mínimo que {@code AcademicEventService.createRecurringEvent}
+     * necesita (valida existencia de ambos por ID contra las fachadas de {@code academic}).
+     */
+    public SubjectAndCommission materiaYComision() {
+        int specialtyCode = (int) nextSeq();
+        int planCode = (int) nextSeq();
+        int subjectCode = (int) nextSeq();
+        specialtyService.findOrCreate(specialtyCode);
+        studyPlanService.findOrCreate(planCode, specialtyCode);
+        Long subjectId = subjectService
+                .findOrCreate(subjectCode, "Materia-IT", planCode, specialtyCode, TermType.ANUAL.getLabel())
+                .value().id();
+
+        int year = 2100 + (int) (nextSeq() % 500);
+        academicPeriodService.findOrCreate(year, TermType.ANUAL);
+        Long commissionId = commissionService
+                .findOrCreate("CUR-" + nextSeq(), 1, 1, year, TermType.ANUAL.getSemester())
+                .value().id();
+
+        return new SubjectAndCommission(subjectId, commissionId);
     }
 }
