@@ -5,7 +5,11 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/events/435
+  url: {{baseUrl}}/v1/events/:id
   body: none
   auth: none
+}
+
+params:path {
+  id: 1
 }

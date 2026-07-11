@@ -63,7 +63,7 @@ Instancia concreta de un evento en una **fecha específica** (tabla `ocurrencia`
 
 Asignación de aula: combinación **Occurrence + Classroom** (tabla `asignacion_aula`). Que un evento esté "asignado" significa que sus occurrences están en estado `ASSIGNED`. Pueden existir occurrences **sin asignar** (`SCHEDULED`) — es un estado válido, no un error, **incluso si la occurrence está próxima a ocurrir o ya ocurrió**. El endpoint `GET /v1/events/unassigned` (módulo `allocation`, `AcademicEventController`) lista, agrupados por evento, los eventos con occurrences en `SCHEDULED` entre un rango de fechas (por defecto desde hoy); excluye `ASSIGNED`/`CANCELLED`/`SUSPENDED`.
 
-⚠ Gap de modelado conocido: hoy no hay forma de distinguir "sin aula porque el dictado es virtual" de "pendiente de asignación" — una clase virtual queda como `SCHEDULED` sin allocation indefinidamente (y aparecería en `/v1/events/unassigned`). La suspensión intencional sí tiene marca propia (`SUSPENDED`).
+⚠ Gap de modelado conocido: hoy no hay forma de distinguir "sin aula porque el dictado es virtual" de "pendiente de asignación" — una clase virtual queda como `SCHEDULED` sin allocation indefinidamente (y aparecería en `/v1/allocations/unassigned`). La suspensión intencional sí tiene marca propia (`SUSPENDED`).
 
 - `occurrence`: `@OneToOne` — una occurrence tiene a lo sumo una allocation vigente.
 - `classroom`: el aula asignada (obligatoria). ⚠ `@ManyToOne` a entidad del módulo `space` — deuda técnica.

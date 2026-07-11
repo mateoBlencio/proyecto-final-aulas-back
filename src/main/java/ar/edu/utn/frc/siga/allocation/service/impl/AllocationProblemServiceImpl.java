@@ -3,7 +3,6 @@ package ar.edu.utn.frc.siga.allocation.service.impl;
 import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.AllocationProblemsResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ClassroomOverlapDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OvercrowdedAllocationDto;
 import ar.edu.utn.frc.siga.allocation.mapper.AcademicEventComposer;
@@ -23,22 +22,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Detecta sobrecupo y superposiciones a partir de una única lectura de la ocupación
- * asignada en el rango ({@link AllocationRepository#findOccupancyBetween}); el listado
- * de eventos sin aula delega en {@link AcademicEventService#findUnassignedEvents}.
- * Todo el cómputo de agrupación es en memoria (O(n log n)) sobre ese único result set,
- * sin joins cross-módulo ni N+1: aulas y eventos se resuelven en un batch cada uno.
+ * Cada tipo de problema se expone por separado. Sobrecupo y superposición se calculan
+ * en memoria (O(n log n)) sobre una única lectura de la ocupación asignada del rango
+ * ({@link AllocationRepository#findOccupancyBetween}); el listado de eventos sin aula
+ * delega en {@link AcademicEventService#findUnassignedEvents}. Sin joins cross-módulo
+ * ni N+1: aulas y eventos se resuelven en un batch cada uno.
  */
 @Slf4j
 @Service
@@ -53,63 +45,87 @@ public class AllocationProblemServiceImpl implements AllocationProblemService {
     private final AcademicEventComposer academicEventComposer;
 
     @Override
-    public AllocationProblemsResponseDto findProblems(LocalDate from, LocalDate to) {
+    public List<AcademicEventResponseDto> findUnassigned(LocalDate from, LocalDate to) {
+        Range range = resolveRange(from, to);
+        List<AcademicEventResponseDto> unassigned = academicEventService.findUnassignedEvents(range.from(), range.to());
+        log.info("Eventos sin aula listados: count={}", unassigned.size());
+        return unassigned;
+    }
+
+    @Override
+    public List<OvercrowdedAllocationDto> findOvercrowded(LocalDate from, LocalDate to) {
+        Range range = resolveRange(from, to);
+        List<Allocation> occupancy = readOccupancy(range);
+
+        Map<OvercrowdKey, OvercrowdAcc> overcrowdAccs = new LinkedHashMap<>();
+        for (Allocation allocation : occupancy) {
+            AcademicEvent event = allocation.getOccurrence().getEvent();
+            Integer classroomId = allocation.getClassroomId();
+            overcrowdAccs.computeIfAbsent(new OvercrowdKey(event.getId(), classroomId),
+                            k -> new OvercrowdAcc(event, classroomId))
+                    .dates.add(allocation.getOccurrence().getDate());
+        }
+
+        Set<AcademicEvent> events = new LinkedHashSet<>();
+        Set<Integer> classroomIds = new LinkedHashSet<>();
+        for (OvercrowdAcc acc : overcrowdAccs.values()) {
+            events.add(acc.event);
+            classroomIds.add(acc.classroomId);
+        }
+
+        List<OvercrowdedAllocationDto> overcrowded = buildOvercrowded(
+                overcrowdAccs, composeEventsById(events), fetchClassroomsById(classroomIds));
+        log.info("Aulas con sobrecupo listadas: count={}", overcrowded.size());
+        return overcrowded;
+    }
+
+    @Override
+    public List<ClassroomOverlapDto> findOverlaps(LocalDate from, LocalDate to) {
+        Range range = resolveRange(from, to);
+        List<Allocation> occupancy = readOccupancy(range);
+
+        Map<GroupKey, List<Allocation>> byClassroomAndDate = new LinkedHashMap<>();
+        for (Allocation allocation : occupancy) {
+            Occurrence occurrence = allocation.getOccurrence();
+            byClassroomAndDate.computeIfAbsent(new GroupKey(allocation.getClassroomId(), occurrence.getDate()),
+                    k -> new ArrayList<>()).add(allocation);
+        }
+
+        Map<OverlapKey, OverlapAcc> overlapAccs = computeOverlaps(byClassroomAndDate);
+
+        Set<AcademicEvent> events = new LinkedHashSet<>();
+        Set<Integer> classroomIds = new LinkedHashSet<>();
+        for (OverlapAcc acc : overlapAccs.values()) {
+            events.add(acc.eventA);
+            events.add(acc.eventB);
+            classroomIds.add(acc.classroomId);
+        }
+
+        List<ClassroomOverlapDto> overlaps = buildOverlaps(
+                overlapAccs, composeEventsById(events), fetchClassroomsById(classroomIds));
+        log.info("Superposiciones de horario-aula listadas: count={}", overlaps.size());
+        return overlaps;
+    }
+
+    private List<Allocation> readOccupancy(Range range) {
+        return allocationRepository.findOccupancyBetween(range.from(), range.to(), OccurrenceStatus.ASSIGNED);
+    }
+
+    private Map<Integer, ClassroomResponseDto> fetchClassroomsById(Set<Integer> ids) {
+        return classroomService.findByIds(ids).stream()
+                .collect(Collectors.toMap(ClassroomResponseDto::id, c -> c));
+    }
+
+    /** Resuelve el rango efectivo compartido por los tres listados y valida {@code to >= from}. */
+    private Range resolveRange(LocalDate from, LocalDate to) {
         LocalDate effectiveFrom = from != null ? from : LocalDate.now();
         LocalDate effectiveTo = to != null ? to : resolveDefaultTo(effectiveFrom);
         if (effectiveTo.isBefore(effectiveFrom)) {
             throw new InvalidDateRangeException(
                     "'to' (" + effectiveTo + ") no puede ser anterior a 'from' (" + effectiveFrom + ")");
         }
-
-        log.debug("Buscando problemas de asignación: from={}, to={}", effectiveFrom, effectiveTo);
-
-        List<AcademicEventResponseDto> unassigned = academicEventService.findUnassignedEvents(effectiveFrom, effectiveTo);
-
-        List<Allocation> occupancy = allocationRepository.findOccupancyBetween(
-                effectiveFrom, effectiveTo, OccurrenceStatus.ASSIGNED);
-
-        Map<OvercrowdKey, OvercrowdAcc> overcrowdAccs = new LinkedHashMap<>();
-        Map<GroupKey, List<Allocation>> byClassroomAndDate = new LinkedHashMap<>();
-
-        for (Allocation allocation : occupancy) {
-            Occurrence occurrence = allocation.getOccurrence();
-            AcademicEvent event = occurrence.getEvent();
-            Integer classroomId = allocation.getClassroomId();
-
-            overcrowdAccs.computeIfAbsent(new OvercrowdKey(event.getId(), classroomId),
-                            k -> new OvercrowdAcc(event, classroomId))
-                    .dates.add(occurrence.getDate());
-
-            byClassroomAndDate.computeIfAbsent(new GroupKey(classroomId, occurrence.getDate()), k -> new ArrayList<>())
-                    .add(allocation);
-        }
-
-        Map<OverlapKey, OverlapAcc> overlapAccs = computeOverlaps(byClassroomAndDate);
-
-        // Batch único de eventos y aulas ajenos, reunidos desde ambas detecciones.
-        Set<AcademicEvent> eventsToCompose = new LinkedHashSet<>();
-        Set<Integer> classroomIdsToFetch = new LinkedHashSet<>();
-        for (OvercrowdAcc acc : overcrowdAccs.values()) {
-            eventsToCompose.add(acc.event);
-            classroomIdsToFetch.add(acc.classroomId);
-        }
-        for (OverlapAcc acc : overlapAccs.values()) {
-            eventsToCompose.add(acc.eventA);
-            eventsToCompose.add(acc.eventB);
-            classroomIdsToFetch.add(acc.classroomId);
-        }
-
-        Map<Long, AcademicEventResponseDto> eventDtoById = composeEventsById(eventsToCompose);
-        Map<Integer, ClassroomResponseDto> classroomDtoById = classroomService.findByIds(classroomIdsToFetch).stream()
-                .collect(Collectors.toMap(ClassroomResponseDto::id, c -> c));
-
-        List<OvercrowdedAllocationDto> overcrowded = buildOvercrowded(overcrowdAccs, eventDtoById, classroomDtoById);
-        List<ClassroomOverlapDto> overlaps = buildOverlaps(overlapAccs, eventDtoById, classroomDtoById);
-
-        log.info("Problemas de asignación encontrados: unassigned={}, overcrowded={}, overlaps={}",
-                unassigned.size(), overcrowded.size(), overlaps.size());
-
-        return new AllocationProblemsResponseDto(unassigned, overcrowded, overlaps);
+        log.debug("Rango de problemas de asignación: from={}, to={}", effectiveFrom, effectiveTo);
+        return new Range(effectiveFrom, effectiveTo);
     }
 
     /**
@@ -119,7 +135,7 @@ public class AllocationProblemServiceImpl implements AllocationProblemService {
     private LocalDate resolveDefaultTo(LocalDate from) {
         return academicPeriodService.findActive().stream()
                 .map(AcademicPeriodResponseDto::endDate)
-                .filter(endDate -> endDate != null)
+                .filter(Objects::nonNull)
                 .max(Comparator.naturalOrder())
                 .orElseGet(() -> from.plusMonths(6));
     }
@@ -196,6 +212,10 @@ public class AllocationProblemServiceImpl implements AllocationProblemService {
                     List.copyOf(acc.dates)));
         }
         return overlaps;
+    }
+
+    /** Rango efectivo resuelto (ambos extremos no nulos, {@code to >= from}). */
+    private record Range(LocalDate from, LocalDate to) {
     }
 
     /** Clave de agrupación para sobrecupo: un evento puede tener sobrecupo en más de un aula a lo largo del rango. */

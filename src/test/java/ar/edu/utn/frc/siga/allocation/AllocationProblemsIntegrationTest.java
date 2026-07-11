@@ -6,7 +6,9 @@ import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateUniqueEventRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.AllocationProblemsResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.ClassroomOverlapDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.OvercrowdedAllocationDto;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.allocation.model.Occurrence;
@@ -37,9 +39,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Integración de {@code GET /v1/allocations/problems} contra Postgres real: las tres
- * detecciones (unassigned, overcrowded, overlaps) sobre datos sembrados, el rango por
- * defecto (fin del período académico activo) y el 400 por rango inválido.
+ * Integración de los tres endpoints de problemas de asignación contra Postgres real:
+ * {@code GET /v1/allocations/unassigned}, {@code /overcrowded} y {@code /overlaps} sobre
+ * datos sembrados, el rango por defecto (fin del período académico activo) y el 400 por
+ * rango inválido.
  */
 @Import(IntegrationTestData.class)
 @DisplayName("Allocation Problems API (integración)")
@@ -84,9 +87,17 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
         occurrenceRepository.save(occurrence);
     }
 
+    private <T> T[] getList(String path, LocalDate from, LocalDate to, Class<T[]> type) throws Exception {
+        MvcResult result = mockMvc.perform(get(path)
+                        .param("from", from.toString()).param("to", to.toString()))
+                .andExpect(status().isOk())
+                .andReturn();
+        return objectMapper.readValue(result.getResponse().getContentAsString(), type);
+    }
+
     @Test
-    @DisplayName("GET /v1/allocations/problems con rango explícito devuelve unassigned, overcrowded y overlaps sembrados")
-    void findProblems_explicitRange_returnsSeededProblems() throws Exception {
+    @DisplayName("Los tres endpoints devuelven unassigned, overcrowded y overlaps sembrados en el rango explícito")
+    void problemEndpoints_explicitRange_returnSeededProblems() throws Exception {
         LocalDate from = LocalDate.now().plusDays(60);
         LocalDate to = LocalDate.now().plusDays(70);
         var edificio = testData.edificio();
@@ -115,17 +126,13 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
         Long overlapEventAId = overlapOccA.getEvent().getId();
         Long overlapEventBId = overlapOccB.getEvent().getId();
 
-        MvcResult result = mockMvc.perform(get("/v1/allocations/problems")
-                        .param("from", from.toString()).param("to", to.toString()))
-                .andExpect(status().isOk())
-                .andReturn();
+        AcademicEventResponseDto[] unassigned = getList("/v1/allocations/unassigned", from, to,
+                AcademicEventResponseDto[].class);
+        assertThat(unassigned).anySatisfy(e -> assertThat(e.id()).isEqualTo(unassignedEventId));
 
-        AllocationProblemsResponseDto response = objectMapper.readValue(
-                result.getResponse().getContentAsString(), AllocationProblemsResponseDto.class);
-
-        assertThat(response.unassigned()).anySatisfy(e -> assertThat(e.id()).isEqualTo(unassignedEventId));
-
-        assertThat(response.overcrowded()).anySatisfy(o -> {
+        OvercrowdedAllocationDto[] overcrowded = getList("/v1/allocations/overcrowded", from, to,
+                OvercrowdedAllocationDto[].class);
+        assertThat(overcrowded).anySatisfy(o -> {
             assertThat(o.event().id()).isEqualTo(overcrowdEventId);
             assertThat(o.classroom().id()).isEqualTo(aulaChica.getId());
             assertThat(o.enrolled()).isEqualTo(50);
@@ -133,7 +140,9 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
             assertThat(o.excess()).isEqualTo(40);
         });
 
-        assertThat(response.overlaps()).anySatisfy(o -> {
+        ClassroomOverlapDto[] overlaps = getList("/v1/allocations/overlaps", from, to,
+                ClassroomOverlapDto[].class);
+        assertThat(overlaps).anySatisfy(o -> {
             assertThat(o.classroom().id()).isEqualTo(aulaOverlap.getId());
             assertThat(Set.of(o.eventA().id(), o.eventB().id()))
                     .containsExactlyInAnyOrder(overlapEventAId, overlapEventBId);
@@ -141,8 +150,8 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /v1/allocations/problems sin 'to' usa el fin del período académico activo con mayor endDate")
-    void findProblems_withoutTo_usesActivePeriodEndDate() throws Exception {
+    @DisplayName("GET /v1/allocations/unassigned sin 'to' usa el fin del período académico activo con mayor endDate")
+    void unassigned_withoutTo_usesActivePeriodEndDate() throws Exception {
         // Año deliberadamente muy lejano: garantiza ser el endDate máximo entre todos los períodos
         // activos existentes (los de otros tests usan años <= 2600), sin importar el orden de ejecución.
         int year = 9000 + (int) (IntegrationTestData.nextSeq() % 500);
@@ -151,18 +160,18 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
         var dto = new CreateUniqueEventRequestDto(20, START, DURATION, period.endDate(), "Evento en el limite del periodo");
         Long eventId = academicEventService.createUniqueEvent(dto).id();
 
-        mockMvc.perform(get("/v1/allocations/problems"))
+        mockMvc.perform(get("/v1/allocations/unassigned"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.unassigned[?(@.id == " + eventId + ")]").exists());
+                .andExpect(jsonPath("$[?(@.id == " + eventId + ")]").exists());
     }
 
     @Test
-    @DisplayName("GET /v1/allocations/problems con to<from responde 400")
-    void findProblems_invalidRange_returns400() throws Exception {
+    @DisplayName("GET /v1/allocations/overcrowded con to<from responde 400")
+    void overcrowded_invalidRange_returns400() throws Exception {
         LocalDate from = LocalDate.now().plusDays(10);
         LocalDate to = LocalDate.now().plusDays(1);
 
-        mockMvc.perform(get("/v1/allocations/problems")
+        mockMvc.perform(get("/v1/allocations/overcrowded")
                         .param("from", from.toString()).param("to", to.toString()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("Invalid date range"));

@@ -11,6 +11,6 @@ import org.springframework.stereotype.Repository;
 public interface AcademicPeriodRepository extends JpaRepository<AcademicPeriod, Long> {
     Optional<AcademicPeriod> findByYearAndSemester(Integer year, Integer semester);
 
-    /** Períodos académicos activos, para resolver el rango por defecto de {@code /allocations/problems}. */
+    /** Períodos académicos activos, para resolver el rango por defecto de los problemas de {@code /allocations}. */
     List<AcademicPeriod> findByActiveTrue();
 }

@@ -1,19 +1,30 @@
 package ar.edu.utn.frc.siga.allocation.service;
 
-import ar.edu.utn.frc.siga.allocation.dto.response.AllocationProblemsResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.ClassroomOverlapDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.OvercrowdedAllocationDto;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * Detección de problemas de asignación de aulas para la pantalla de asignación
- * automática: eventos sin aula, aulas con sobrecupo y superposiciones de horario-aula.
+ * automática, cada uno en su propio listado: eventos sin aula, aulas con sobrecupo
+ * y superposiciones de horario-aula.
+ *
+ * <p>Los tres comparten la misma resolución de rango: {@code from} nulo default a hoy;
+ * {@code to} nulo default al fin del período académico activo (o {@code from + 6 meses}
+ * si no hay período activo con {@code endDate}); {@code to} anterior a {@code from}
+ * lanza {@code InvalidDateRangeException}.
  */
 public interface AllocationProblemService {
 
-    /**
-     * Busca los tres listados de problemas en el rango [from, to]. {@code from} nulo
-     * default a hoy; {@code to} nulo default al fin del período académico activo (o
-     * {@code from + 6 meses} si no hay período activo con {@code endDate}).
-     */
-    AllocationProblemsResponseDto findProblems(LocalDate from, LocalDate to);
+    /** Eventos con ocurrencias SCHEDULED (sin aula) en el rango. */
+    List<AcademicEventResponseDto> findUnassigned(LocalDate from, LocalDate to);
+
+    /** Pares evento-aula donde los inscriptos superan la capacidad del aula asignada. */
+    List<OvercrowdedAllocationDto> findOvercrowded(LocalDate from, LocalDate to);
+
+    /** Pares de eventos cuyos horarios se superponen en la misma aula. */
+    List<ClassroomOverlapDto> findOverlaps(LocalDate from, LocalDate to);
 }

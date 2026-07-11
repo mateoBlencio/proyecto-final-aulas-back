@@ -5,9 +5,13 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/allocations/auto-preview/{{previewId}}
+  url: {{baseUrl}}/v1/allocations/auto-preview/:previewId
   body: none
   auth: none
+}
+
+params:path {
+  previewId: prev_c021e2ff
 }
 
 vars:pre-request {

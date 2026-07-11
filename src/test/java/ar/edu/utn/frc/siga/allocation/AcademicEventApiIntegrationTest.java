@@ -124,42 +124,6 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /v1/events/unassigned en rango devuelve el evento sembrado sin aula asignada")
-    void findUnassigned_returnsSeededEventWithinRange() throws Exception {
-        IntegrationTestData.SubjectAndCommission sc = testData.materiaYComision();
-        LocalDate date = LocalDate.now().plusDays(2);
-        DayOfWeek dayOfWeek = date.getDayOfWeek();
-
-        CreateRecurringEventRequestDto dto = new CreateRecurringEventRequestDto(
-                25, LocalTime.of(9, 0), 60, dayOfWeek, date, date, sc.subjectId(), sc.commissionId());
-        MvcResult created = mockMvc.perform(post("/v1/events/recurring")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(dto)))
-                .andExpect(status().isCreated())
-                .andReturn();
-        Long eventId = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
-
-        mockMvc.perform(get("/v1/events/unassigned")
-                        .param("from", date.toString())
-                        .param("to", date.toString()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.id == " + eventId + ")]").exists());
-    }
-
-    @Test
-    @DisplayName("GET /v1/events/unassigned con to<from responde 400")
-    void findUnassigned_invalidRange_returns400() throws Exception {
-        LocalDate from = LocalDate.now().plusDays(10);
-        LocalDate to = LocalDate.now().plusDays(1);
-
-        mockMvc.perform(get("/v1/events/unassigned")
-                        .param("from", from.toString())
-                        .param("to", to.toString()))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("Invalid date range"));
-    }
-
-    @Test
     @DisplayName("findOrCreateRecurringEvent no duplica: segunda llamada idéntica reusa el evento existente")
     void findOrCreateRecurringEvent_doesNotDuplicate() {
         IntegrationTestData.SubjectAndCommission sc = testData.materiaYComision();

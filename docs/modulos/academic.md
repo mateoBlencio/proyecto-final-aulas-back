@@ -28,7 +28,7 @@ IDs internos de `academic`. Consistente con ADR-004.
 
 **`AcademicPeriodService.findActive()`** (sprint 03): devuelve los períodos académicos
 con `activo = true`. Consumido por `allocation` (`AllocationProblemServiceImpl`) para
-resolver el `to` por defecto de `GET /v1/allocations/problems` — ver
+resolver el `to` por defecto de los endpoints `GET /v1/allocations/{unassigned,overcrowded,overlaps}` — ver
 [allocation.md](allocation.md). `AcademicPeriodResponseDto` expone `year`, `semester`,
 `startDate` y `endDate` (antes solo `year`/`semester`); `endDate` puede ser `null`.
 

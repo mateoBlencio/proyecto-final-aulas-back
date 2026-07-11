@@ -23,7 +23,6 @@ consumidos por `excelimport`), `AllocationProblemService` y `AutoAllocationServi
 | Método | Path | Descripción |
 |---|---|---|
 | GET | `/v1/events` | Todos los eventos |
-| GET | `/v1/events/unassigned?from&to` | Eventos con ocurrencias `SCHEDULED` en rango |
 | GET | `/v1/events/{id}` | Evento por ID |
 | GET | `/v1/events/{id}/occurrences` | Ocurrencias del evento |
 | POST | `/v1/events/recurring` | Crea evento recurrente + genera ocurrencias |
@@ -33,7 +32,9 @@ consumidos por `excelimport`), `AllocationProblemService` y `AutoAllocationServi
 
 | Método | Path | Descripción |
 |---|---|---|
-| GET | `/v1/allocations/problems?from&to` | Sobrecupo y superposiciones en el rango (ver más abajo) |
+| GET | `/v1/allocations/unassigned?from&to` | Eventos sin aula en el rango (ver más abajo) |
+| GET | `/v1/allocations/overcrowded?from&to` | Aulas con sobrecupo en el rango (ver más abajo) |
+| GET | `/v1/allocations/overlaps?from&to` | Superposiciones de horario-aula en el rango (ver más abajo) |
 | GET | `/v1/allocations?date` | Asignaciones de un día |
 | GET | `/v1/allocations/{id}` | Por ID |
 | POST | `/v1/allocations/occurrences/{occurrenceId}` | Asignación manual (falla si ya tiene aula, si ya pasó, o **409** si solapa con otra asignación) |
@@ -97,25 +98,27 @@ arman los DTOs trayendo datos de `space`/`academic` por `findByIds` (batch, sin 
 
 ### Problemas de asignación (`AllocationProblemServiceImpl`, sprint 03)
 
-`GET /v1/allocations/problems?from&to` — `@Transactional(readOnly=true)`. Detecta, sobre
-**una única lectura** de la ocupación `ASSIGNED` en el rango (`findOccupancyBetween`):
+Tres endpoints `@Transactional(readOnly=true)`, uno por tipo de problema, que comparten
+la misma resolución de rango:
 
-- **Rango por defecto**: `from` nulo ⇒ hoy; `to` nulo ⇒ el mayor `endDate` entre los
-  períodos académicos activos (`AcademicPeriodService.findActive()`), o `from + 6 meses`
-  si no hay período activo con `endDate`. `to < from` (efectivo) ⇒
+- **Rango por defecto** (los tres): `from` nulo ⇒ hoy; `to` nulo ⇒ el mayor `endDate`
+  entre los períodos académicos activos (`AcademicPeriodService.findActive()`), o
+  `from + 6 meses` si no hay período activo con `endDate`. `to < from` (efectivo) ⇒
   `InvalidDateRangeException` (**400**).
-- **Sobrecupo**: agrupa la ocupación por (evento, aula) y compara `enrolled` (`null` se
-  trata como `0`) contra `classroom.capacity()`; agrupa todas las fechas en conflicto de
-  un mismo par evento-aula en una sola fila (`OvercrowdedAllocationDto`).
-- **Superposiciones**: agrupa por (aula, fecha), ordena por hora de inicio y barre con
-  corte temprano (mismo patrón que `SolverServiceImpl.computeConflicts`) para evitar el
-  producto cartesiano; los pares en conflicto se agregan por (eventoA, eventoB, aula)
-  acumulando todas las fechas en que chocan (`ClassroomOverlapDto`).
-  Franjas adyacentes no cuentan como superposición (mismo criterio `<`/`<`).
-- El listado de eventos sin aula (`unassigned`) delega en
-  `AcademicEventService.findUnassignedEvents` (sin cambios de sprint 03).
-- Eventos y aulas ajenos se resuelven en **un solo batch cada uno** (`findByIds`) reunido
-  desde ambas detecciones — sin N+1.
+- **`GET /v1/allocations/unassigned`** — eventos con ocurrencias `SCHEDULED` (sin aula);
+  delega en `AcademicEventService.findUnassignedEvents` con el rango ya resuelto.
+- **`GET /v1/allocations/overcrowded`** — sobre una lectura de la ocupación `ASSIGNED`
+  (`findOccupancyBetween`), agrupa por (evento, aula) y compara `enrolled` (`null` ⇒ `0`)
+  contra `classroom.capacity()`; agrupa todas las fechas en conflicto de un mismo par
+  evento-aula en una sola fila (`OvercrowdedAllocationDto`).
+- **`GET /v1/allocations/overlaps`** — sobre la misma lectura de ocupación, agrupa por
+  (aula, fecha), ordena por hora de inicio y barre con corte temprano (mismo patrón que
+  `SolverServiceImpl.computeConflicts`) para evitar el producto cartesiano; los pares en
+  conflicto se agregan por (eventoA, eventoB, aula) acumulando todas las fechas en que
+  chocan (`ClassroomOverlapDto`). Franjas adyacentes no cuentan (criterio `<`/`<`).
+- En `overcrowded`/`overlaps`, eventos y aulas ajenos se resuelven en **un solo batch cada
+  uno** (`findByIds`) — sin N+1. Cada endpoint hace su propia lectura de ocupación
+  (independientes; si el front pide los dos, son dos lecturas).
 
 ### Asignación automática (`AutoAllocationServiceImpl`)
 

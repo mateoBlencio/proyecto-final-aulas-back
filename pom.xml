@@ -173,7 +173,7 @@
 							<artifactId>lombok</artifactId>
 						</exclude>
 					</excludes>
-					<jvmArguments>-Duser.timezone=UTC</jvmArguments>
+					<jvmArguments>-Duser.timezone=UTC -Xmx2g</jvmArguments>
 				</configuration>
 			</plugin>
 
