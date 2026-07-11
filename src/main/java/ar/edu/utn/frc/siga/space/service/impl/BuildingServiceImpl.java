@@ -25,7 +25,7 @@ public class BuildingServiceImpl implements BuildingService {
 
     @Override
     public List<BuildingResponseDto> findAll() {
-        log.debug("Listing all active buildings");
+        log.debug("Listando todos los edificios activos");
         return buildingRepository.findAll().stream()
                 .filter(Building::getActive)
                 .map(buildingMapper::toDto)

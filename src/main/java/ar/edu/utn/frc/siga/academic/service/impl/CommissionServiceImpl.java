@@ -48,7 +48,7 @@ public class CommissionServiceImpl implements CommissionService {
                 commissionRepository.findByCourseCodeAndCommissionNumberAndAcademicPeriod(
                         courseCode, commissionNumber, period),
                 () -> {
-                    log.info("Creating Commission: course={}, commission={}, period={}",
+                    log.info("Creando Commission: course={}, commission={}, period={}",
                             courseCode, commissionNumber, period.getId());
                     return commissionRepository.save(
                             Commission.builder()

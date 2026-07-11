@@ -39,7 +39,7 @@ public class AcademicEventController {
     public ResponseEntity<List<AcademicEventResponseDto>> findAll() {
         log.debug("GET /v1/events");
         List<AcademicEventResponseDto> events = academicEventService.findAll();
-        log.info("Events listed: count={}", events.size());
+        log.info("Eventos listados: count={}", events.size());
         return ResponseEntity.ok(events);
     }
 
@@ -53,7 +53,7 @@ public class AcademicEventController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         log.debug("GET /v1/events/unassigned: from={}, to={}", from, to);
         List<AcademicEventResponseDto> events = academicEventService.findUnassignedEvents(from, to);
-        log.info("Unassigned events listed: count={}", events.size());
+        log.info("Eventos sin asignar listados: count={}", events.size());
         return ResponseEntity.ok(events);
     }
 
@@ -71,7 +71,7 @@ public class AcademicEventController {
     public ResponseEntity<List<OccurrenceResponseDto>> findOccurrences(@PathVariable Long id) {
         log.debug("GET /v1/events/{}/occurrences", id);
         List<OccurrenceResponseDto> occurrences = academicEventService.findOccurrencesByEventId(id);
-        log.info("Occurrences listed: eventId={}, count={}", id, occurrences.size());
+        log.info("Ocurrencias listadas: eventId={}, count={}", id, occurrences.size());
         return ResponseEntity.ok(occurrences);
     }
 
@@ -82,7 +82,7 @@ public class AcademicEventController {
             @Valid @RequestBody CreateRecurringEventRequestDto dto) {
         log.debug("POST /v1/events/recurring: subjectId={}, commissionId={}", dto.subjectId(), dto.commissionId());
         AcademicEventResponseDto response = academicEventService.createRecurringEvent(dto);
-        log.info("Recurring event created via controller: id={}", response.id());
+        log.info("Evento recurrente creado vía controller: id={}", response.id());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -93,7 +93,7 @@ public class AcademicEventController {
             @Valid @RequestBody CreateUniqueEventRequestDto dto) {
         log.debug("POST /v1/events/unique: date={}", dto.date());
         AcademicEventResponseDto response = academicEventService.createUniqueEvent(dto);
-        log.info("Unique event created via controller: id={}", response.id());
+        log.info("Evento único creado vía controller: id={}", response.id());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }

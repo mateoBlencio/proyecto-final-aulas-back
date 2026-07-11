@@ -87,7 +87,7 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
         int timeLimit = request.timeLimitSeconds() != null
                 ? request.timeLimitSeconds() : DEFAULT_TIME_LIMIT_SECONDS;
 
-        log.info("Auto-preview: {} events, {} available classrooms, {} occupied slots",
+        log.info("Auto-preview: {} eventos, {} aulas disponibles, {} franjas ocupadas",
                 solverEvents.size(), inputs.rooms().size(), inputs.occupancy().size());
 
         SolverPreview preview = solverService.preview(solverEvents, inputs.rooms(), inputs.occupancy(), timeLimit);

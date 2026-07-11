@@ -48,7 +48,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     @Override
     @Transactional(readOnly = true)
     public List<AcademicEventResponseDto> findAll() {
-        log.debug("Listing all academic events");
+        log.debug("Listando todos los eventos académicos");
         return composer.compose(eventRepository.findAll());
     }
 
@@ -73,7 +73,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     @Override
     @Transactional
     public AcademicEventResponseDto createRecurringEvent(CreateRecurringEventRequestDto dto) {
-        log.debug("Creating recurring event: subjectId={}, commissionId={}, dayOfWeek={}, startDate={}",
+        log.debug("Creando evento recurrente: subjectId={}, commissionId={}, dayOfWeek={}, startDate={}",
                 dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startDate());
 
         // Solo se valida existencia vía la fachada (404 si no existe); no se necesita el DTO completo.
@@ -95,7 +95,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         List<Occurrence> occurrences = saved.toOccurrences();
         occurrenceRepository.saveAll(occurrences);
 
-        log.info("Recurring event created: id={}, occurrences={}", saved.getId(), occurrences.size());
+        log.info("Evento recurrente creado: id={}, occurrences={}", saved.getId(), occurrences.size());
         return composer.compose(saved);
     }
 
@@ -107,7 +107,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                         dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startTime(),
                         dto.startDate(), dto.endDate())
                 .map(existing -> {
-                    log.debug("Reusing existing recurring event: id={}", existing.getId());
+                    log.debug("Reutilizando evento recurrente existente: id={}", existing.getId());
                     return new FindOrCreateResult<>(composer.compose(existing), false);
                 })
                 .orElseGet(() -> new FindOrCreateResult<>(createRecurringEvent(dto), true));
@@ -116,7 +116,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     @Override
     @Transactional
     public AcademicEventResponseDto createUniqueEvent(CreateUniqueEventRequestDto dto) {
-        log.debug("Creating unique event: date={}", dto.date());
+        log.debug("Creando evento único: date={}", dto.date());
 
         UniqueEvent event = UniqueEvent.builder()
                 .enrolled(dto.enrolled())
@@ -130,7 +130,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         List<Occurrence> occurrences = saved.toOccurrences();
         occurrenceRepository.saveAll(occurrences);
 
-        log.info("Unique event created: id={}", saved.getId());
+        log.info("Evento único creado: id={}", saved.getId());
         return composer.compose(saved);
     }
 

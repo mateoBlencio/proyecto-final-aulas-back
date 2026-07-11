@@ -25,7 +25,7 @@ public class ExcelImportController {
             @RequestParam("file") MultipartFile file) {
         log.debug("POST /v1/excelimports: filename={}, size={}", file.getOriginalFilename(), file.getSize());
         ImportResultDto result = excelImportService.importExcel(file);
-        log.info("Excel import completed: filename={}", file.getOriginalFilename());
+        log.info("Importación Excel completada: filename={}", file.getOriginalFilename());
         return ResponseEntity.ok(result);
     }
 }

@@ -50,7 +50,7 @@ public class SubjectServiceImpl implements SubjectService {
         return FindOrCreateResult.resolve(
                 subjectRepository.findByCodeAndStudyPlan(code, studyPlan),
                 () -> {
-                    log.info("Creating Subject: code={}, plan={}", code, studyPlan.getId());
+                    log.info("Creando Subject: code={}, plan={}", code, studyPlan.getId());
                     return subjectRepository.save(
                             Subject.builder()
                                     .code(code)

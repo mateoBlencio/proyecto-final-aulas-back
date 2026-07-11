@@ -47,14 +47,14 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Override
     @Transactional
     public ClassroomResponseDto create(ClassroomRequestDto dto) {
-        log.debug("Creating classroom: roomNumber={}, buildingId={}, classroomTypeId={}",
+        log.debug("Creando aula: roomNumber={}, buildingId={}, classroomTypeId={}",
                 dto.roomNumber(), dto.buildingId(), dto.classroomTypeId());
 
         Building building = findActiveBuilding(dto.buildingId());
         ClassroomType classroomType = classroomTypeService.findById(dto.classroomTypeId());
 
         if (classroomRepository.findByRoomNumber(dto.roomNumber()).isPresent()) {
-            log.warn("Classroom creation rejected: roomNumber '{}' already exists", dto.roomNumber());
+            log.warn("Creación de aula rechazada: roomNumber '{}' ya existe", dto.roomNumber());
             throw new SpaceDomainException("Classroom roomNumber already exists: " + dto.roomNumber());
         }
 
@@ -66,19 +66,19 @@ public class ClassroomServiceImpl implements ClassroomService {
         entity.setClassroomType(classroomType);
 
         Classroom saved = classroomRepository.save(entity);
-        log.info("Classroom created: id={}, roomNumber={}", saved.getId(), saved.getRoomNumber());
+        log.info("Aula creada: id={}, roomNumber={}", saved.getId(), saved.getRoomNumber());
         return classroomMapper.toDto(saved);
     }
 
     @Override
     public ClassroomResponseDto findById(Integer id) {
-        log.debug("Fetching classroom by id={}", id);
+        log.debug("Buscando aula por id={}", id);
         return classroomMapper.toDto(this.findExistingClassroomById(id));
     }
 
     @Override
     public List<ClassroomResponseDto> findAllAvailable() {
-        log.debug("Listing all available classrooms");
+        log.debug("Listando todas las aulas disponibles");
         return classroomRepository.findByAvailableTrue().stream()
                 .map(classroomMapper::toDto)
                 .toList();
@@ -86,7 +86,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
     @Override
     public List<ClassroomResponseDto> findByIds(Collection<Integer> ids) {
-        log.debug("Fetching classrooms by ids: {}", ids);
+        log.debug("Buscando aulas por ids: {}", ids);
         return classroomRepository.findAllById(ids).stream()
                 .map(classroomMapper::toDto)
                 .toList();
@@ -94,7 +94,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
     @Override
     public Page<ClassroomResponseDto> findAll(ClassroomFilter filter, Pageable pageable) {
-        log.debug("Listing classrooms: filter={}, page={}, size={}", filter, pageable.getPageNumber(), pageable.getPageSize());
+        log.debug("Listando aulas: filter={}, page={}, size={}", filter, pageable.getPageNumber(), pageable.getPageSize());
         return classroomRepository.findAll(ClassroomSpecification.withFilter(filter), pageable)
                 .map(classroomMapper::toDto);
     }
@@ -102,7 +102,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Override
     @Transactional
     public ClassroomResponseDto update(Integer id, ClassroomRequestDto dto) {
-        log.debug("Updating classroom: id={}, roomNumber={}", id, dto.roomNumber());
+        log.debug("Actualizando aula: id={}, roomNumber={}", id, dto.roomNumber());
 
         Classroom entity = this.findExistingClassroomById(id);
         Building building = findActiveBuilding(dto.buildingId());
@@ -116,18 +116,18 @@ public class ClassroomServiceImpl implements ClassroomService {
         entity.setClassroomType(classroomType);
 
         Classroom saved = classroomRepository.save(entity);
-        log.info("Classroom updated: id={}, roomNumber={}", saved.getId(), saved.getRoomNumber());
+        log.info("Aula actualizada: id={}, roomNumber={}", saved.getId(), saved.getRoomNumber());
         return classroomMapper.toDto(saved);
     }
 
     @Override
     @Transactional
     public void delete(Integer id) {
-        log.debug("Soft-deleting classroom: id={}", id);
+        log.debug("Eliminando (soft-delete) aula: id={}", id);
         Classroom classroom = this.findExistingClassroomById(id);
         classroom.setDeleted(true);
         classroomRepository.save(classroom);
-        log.info("Classroom deleted: id={}", id);
+        log.info("Aula eliminada: id={}", id);
     }
 
     @Override
@@ -137,7 +137,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         return FindOrCreateResult.resolve(
                 classroomRepository.findByRoomNumberAndBuilding(roomNumber, building),
                 () -> {
-                    log.warn("Creating Classroom with provisional data: roomNumber={}, buildingId={}",
+                    log.warn("Creando aula con datos provisionales: roomNumber={}, buildingId={}",
                             roomNumber, buildingId);
                     return classroomRepository.save(
                             Classroom.builder()
@@ -154,7 +154,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     private Classroom findExistingClassroomById(Integer id) {
         return classroomRepository.findById(id)
                 .orElseThrow(() -> {
-                    log.warn("Classroom not found: id={}", id);
+                    log.warn("Aula no encontrada: id={}", id);
                     return ResourceNotFoundException.of("Classroom", id);
                 });
     }
@@ -163,7 +163,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         return buildingRepository.findById(id)
                 .filter(Building::getActive)
                 .orElseThrow(() -> {
-                    log.warn("Building not found: id={}", id);
+                    log.warn("Edificio no encontrado: id={}", id);
                     return ResourceNotFoundException.of("Building", id);
                 });
     }
@@ -175,7 +175,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
     private void validateFloor(ClassroomRequestDto dto, Building building) {
         if (dto.floor() > building.getFloorCount()) {
-            log.warn("Floor validation failed: floor={} exceeds building floorCount={}, buildingId={}",
+            log.warn("Validación de piso fallida: floor={} excede floorCount={} del edificio, buildingId={}",
                     dto.floor(), building.getFloorCount(), building.getId());
             throw new SpaceDomainException(
                     "Floor " + dto.floor() + " exceeds building floor count " + building.getFloorCount());
@@ -184,7 +184,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
     private void validateCapacity(ClassroomRequestDto dto) {
         if (dto.capacity() <= 0) {
-            log.warn("Capacity validation failed: capacity={}", dto.capacity());
+            log.warn("Validación de capacidad fallida: capacity={}", dto.capacity());
             throw new SpaceDomainException("Capacity must be positive");
         }
     }

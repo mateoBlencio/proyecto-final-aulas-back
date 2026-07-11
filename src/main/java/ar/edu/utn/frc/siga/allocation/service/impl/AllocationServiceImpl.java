@@ -57,7 +57,7 @@ public class AllocationServiceImpl implements AllocationService {
     @Override
     @Transactional
     public AllocationResponseDto assignManually(Long occurrenceId, AllocateOccurrenceRequestDto dto) {
-        log.debug("Assigning occurrence={} to classroom={}", occurrenceId, dto.classroomId());
+        log.debug("Asignando ocurrencia={} a aula={}", occurrenceId, dto.classroomId());
 
         Occurrence occurrence = findOccurrence(occurrenceId);
         validateNotPast(occurrence);
@@ -81,14 +81,14 @@ public class AllocationServiceImpl implements AllocationService {
         occurrence.setStatus(OccurrenceStatus.ASSIGNED);
         occurrenceRepository.save(occurrence);
 
-        log.info("Allocation created: id={}, occurrenceId={}, classroomId={}", saved.getId(), occurrenceId, dto.classroomId());
+        log.info("Asignación creada: id={}, occurrenceId={}, classroomId={}", saved.getId(), occurrenceId, dto.classroomId());
         return composer.compose(saved);
     }
 
     @Override
     @Transactional
     public AllocationResponseDto reassign(Long allocationId, AllocateOccurrenceRequestDto dto) {
-        log.debug("Reassigning allocation={} to classroom={}", allocationId, dto.classroomId());
+        log.debug("Reasignando asignación={} a aula={}", allocationId, dto.classroomId());
 
         Allocation allocation = findAllocation(allocationId);
         validateNotPast(allocation.getOccurrence());
@@ -101,7 +101,7 @@ public class AllocationServiceImpl implements AllocationService {
         allocation.setObservation(dto.observation());
 
         Allocation saved = allocationRepository.save(allocation);
-        log.info("Allocation reassigned: id={}, classroomId={}", allocationId, dto.classroomId());
+        log.info("Asignación reasignada: id={}, classroomId={}", allocationId, dto.classroomId());
         return composer.compose(saved);
     }
 
@@ -131,7 +131,7 @@ public class AllocationServiceImpl implements AllocationService {
             allocation.setSource(AllocationSource.MANUAL);
             results.add(composer.compose(allocationRepository.save(allocation)));
         }
-        log.info("batchReassign complete: moved={}", results.size());
+        log.info("batchReassign completo: moved={}", results.size());
         return results;
     }
 
@@ -158,7 +158,7 @@ public class AllocationServiceImpl implements AllocationService {
         List<AllocationResponseDto> results = allocateToOccurrences(
                 occurrences, classroomId, dto.observation(), AllocationSource.MANUAL, true);
 
-        log.info("assignManuallyFromDate complete: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), results.size());
+        log.info("assignManuallyFromDate completo: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), results.size());
         return results;
     }
 
@@ -182,7 +182,7 @@ public class AllocationServiceImpl implements AllocationService {
         List<AllocationResponseDto> results = allocateToOccurrences(
                 occurrences, classroomId, dto.observation(), AllocationSource.IMPORTED, false);
 
-        log.info("importAssignmentsFromDate complete: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), results.size());
+        log.info("importAssignmentsFromDate completo: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), results.size());
         return results;
     }
 
@@ -309,7 +309,7 @@ public class AllocationServiceImpl implements AllocationService {
     private Occurrence findOccurrence(Long id) {
         return occurrenceRepository.findById(id)
                 .orElseThrow(() -> {
-                    log.warn("Occurrence not found: id={}", id);
+                    log.warn("Ocurrencia no encontrada: id={}", id);
                     return ResourceNotFoundException.of("Occurrence", id);
                 });
     }
@@ -317,7 +317,7 @@ public class AllocationServiceImpl implements AllocationService {
     private Allocation findAllocation(Long id) {
         return allocationRepository.findById(id)
                 .orElseThrow(() -> {
-                    log.warn("Allocation not found: id={}", id);
+                    log.warn("Asignación no encontrada: id={}", id);
                     return ResourceNotFoundException.of("Allocation", id);
                 });
     }
@@ -328,7 +328,7 @@ public class AllocationServiceImpl implements AllocationService {
             classroomService.findById(id);
             return id;
         } catch (ResourceNotFoundException ex) {
-            log.warn("Classroom not found: id={}", id);
+            log.warn("Aula no encontrada: id={}", id);
             throw new AllocationConflictException("Classroom not found with id: " + id);
         }
     }

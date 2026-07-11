@@ -59,12 +59,12 @@ public class SolverServiceImpl implements SolverService {
         existing.forEach(e -> allEvents.add(e.event()));
         Map<String, Set<String>> conflictsByEventId = computeConflicts(allEvents);
 
-        log.info("Starting solver preview: {} events, {} classrooms, {} occupied slots, limit {}s",
+        log.info("Iniciando preview del solver: {} eventos, {} aulas, {} franjas ocupadas, límite {}s",
                 events.size(), classrooms.size(), existing.size(), timeLimitSeconds);
 
         long start = System.currentTimeMillis();
         ScheduleSolution solution = solve(events, existing, classrooms, conflictsByEventId, timeLimitSeconds);
-        log.info("Solver preview completed in {}ms, score {}",
+        log.info("Preview del solver completado en {}ms, score {}",
                 System.currentTimeMillis() - start, solution.getScore());
 
         SolverPreview preview = toPreview(solution);
@@ -155,7 +155,7 @@ public class SolverServiceImpl implements SolverService {
             throw new SchedulingException("Optimization interrupted", e);
         } catch (ExecutionException e) {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
-            log.error("Solver job {} failed", jobId, cause);
+            log.error("Job del solver {} falló", jobId, cause);
             throw new SchedulingException("Error during optimization: " + cause.getMessage(), cause);
         }
     }

@@ -62,7 +62,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     @Override
     @Transactional
     public ImportResultDto importExcel(MultipartFile file) {
-        log.info("Starting Excel import: {} - {} bytes", file.getName(), file.getSize());
+        log.info("Iniciando importación Excel: {} - {} bytes", file.getName(), file.getSize());
 
         Workbook workbook = validator.validate(file);
         Sheet sheet = workbook.getSheet("Hoja1");
@@ -176,11 +176,11 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             if (eventResult.created()) assignmentsCreated++;
             else assignmentsReused++;
             processedRows++;
-            log.info("Row {}: subject={}, commission={}, classroom={}",
+            log.info("Fila {}: subject={}, commission={}, classroom={}",
                 rowNum, subject.name(), commission.commissionNumber(), dto.roomNumber());
         }
 
-        log.info("Import completed: {} rows, {} events created", processedRows, assignmentsCreated);
+        log.info("Importación completada: {} filas, {} eventos creados", processedRows, assignmentsCreated);
 
         return new ImportResultDto(processedRows, assignmentsCreated,
             assignmentsReused, entitiesCreated.get(), entitiesReused.get());

@@ -36,7 +36,7 @@ public class ClassroomController {
     public ResponseEntity<ClassroomResponseDto> create(@Valid @RequestBody ClassroomRequestDto dto) {
         log.debug("POST /v1/classrooms: roomNumber={}, buildingId={}", dto.roomNumber(), dto.buildingId());
         ClassroomResponseDto response = classroomService.create(dto);
-        log.info("Classroom created via controller: id={}", response.id());
+        log.info("Aula creada vía controller: id={}", response.id());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -61,7 +61,7 @@ public class ClassroomController {
         ClassroomFilter filter = new ClassroomFilter(roomNumber, buildingId, classroomTypeId,
                 capacityMin, capacityMax, floor, available);
         Page<ClassroomResponseDto> page = classroomService.findAll(filter, pageable);
-        log.info("Classrooms listed: total={}", page.getTotalElements());
+        log.info("Aulas listadas: total={}", page.getTotalElements());
         return ResponseEntity.ok(page);
     }
 
@@ -70,7 +70,7 @@ public class ClassroomController {
                                                         @Valid @RequestBody ClassroomRequestDto dto) {
         log.debug("PUT /v1/classrooms/{}: roomNumber={}", id, dto.roomNumber());
         ClassroomResponseDto response = classroomService.update(id, dto);
-        log.info("Classroom updated via controller: id={}", response.id());
+        log.info("Aula actualizada vía controller: id={}", response.id());
         return ResponseEntity.ok(response);
     }
 
@@ -78,7 +78,7 @@ public class ClassroomController {
     public ResponseEntity<Void> delete(@PathVariable Integer id) {
         log.debug("DELETE /v1/classrooms/{}", id);
         classroomService.delete(id);
-        log.info("Classroom deleted via controller: id={}", id);
+        log.info("Aula eliminada vía controller: id={}", id);
         return ResponseEntity.noContent().build();
     }
 

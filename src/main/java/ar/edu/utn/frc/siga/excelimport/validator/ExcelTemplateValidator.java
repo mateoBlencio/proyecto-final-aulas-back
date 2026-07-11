@@ -38,13 +38,13 @@ public class ExcelTemplateValidator {
 
     public Workbook validate(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            log.warn("File is null or empty");
+            log.warn("Archivo nulo o vacío");
             throw new ExcelFormatException("File is empty or null");
         }
 
         String filename = file.getOriginalFilename();
         if (filename == null || !(filename.endsWith(".xls") || filename.endsWith(".xlsx"))) {
-            log.warn("Invalid file extension: {}", filename);
+            log.warn("Extensión de archivo inválida: {}", filename);
             throw new ExcelFormatException(
                 "Invalid file extension: expected .xls or .xlsx, got " + filename);
         }
@@ -53,28 +53,28 @@ public class ExcelTemplateValidator {
         try (InputStream is = file.getInputStream()) {
             workbook = WorkbookFactory.create(is);
         } catch (EmptyFileException e) {
-            log.warn("Empty file");
+            log.warn("Archivo vacío");
             throw new ExcelFormatException("File is empty");
         } catch (NotOfficeXmlFileException | IOException e) {
-            log.warn("File is not a valid Excel file: {}", e.getMessage());
+            log.warn("El archivo no es un Excel válido: {}", e.getMessage());
             throw new ExcelFormatException("File is not a valid Excel file: " + e.getMessage());
         }
 
         Sheet sheet = workbook.getSheet(SHEET_NAME);
         if (sheet == null) {
-            log.warn("Sheet '{}' not found", SHEET_NAME);
+            log.warn("Hoja '{}' no encontrada", SHEET_NAME);
             throw new ExcelFormatException("Sheet '" + SHEET_NAME + "' not found. " +
                 "The Excel file must contain a sheet named '" + SHEET_NAME + "'");
         }
 
         Row headerRow = sheet.getRow(HEADER_ROW_INDEX);
         if (headerRow == null) {
-            log.warn("Header row (row 6) not found");
+            log.warn("Fila de encabezado (fila 6) no encontrada");
             throw new ExcelFormatException("Header row (row 6) not found");
         }
 
         if (headerRow.getLastCellNum() < EXPECTED_COLUMN_COUNT) {
-            log.warn("Header row has {} columns, expected at least {}",
+            log.warn("La fila de encabezado tiene {} columnas, se esperaban al menos {}",
                 headerRow.getLastCellNum(), EXPECTED_COLUMN_COUNT);
             throw new ExcelFormatException("Header row has " + headerRow.getLastCellNum()
                 + " columns, expected at least " + EXPECTED_COLUMN_COUNT);
@@ -85,7 +85,7 @@ public class ExcelTemplateValidator {
             String actualValue = cell == null ? "" : cell.getStringCellValue().trim();
             String expectedValue = EXPECTED_HEADERS.get(i);
             if (!actualValue.equals(expectedValue)) {
-                log.warn("Header mismatch at column {}: expected '{}', found '{}'",
+                log.warn("Encabezado no coincide en columna {}: se esperaba '{}', se encontró '{}'",
                     i + 1, expectedValue, actualValue);
                 throw new ExcelFormatException(
                     "Header mismatch at column " + (i + 1)
@@ -103,7 +103,7 @@ public class ExcelTemplateValidator {
         }
 
         if (!hasDataRow) {
-            log.warn("No data rows found in the file");
+            log.warn("No se encontraron filas de datos en el archivo");
             throw new ExcelFormatException("No data rows found. " +
                 "The file must contain at least one data row starting from row 7.");
         }
