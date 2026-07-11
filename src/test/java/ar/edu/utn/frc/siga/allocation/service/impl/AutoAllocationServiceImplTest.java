@@ -26,6 +26,7 @@ import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
 import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.solver.exception.ExpiredPreviewException;
 import ar.edu.utn.frc.siga.solver.model.SolverAllocation;
 import ar.edu.utn.frc.siga.solver.model.SolverEvent;
@@ -219,6 +220,100 @@ class AutoAllocationServiceImplTest {
         assertThatThrownBy(() -> service.autoPreview(new AutoPreviewRequestDto(List.of(3L), null)))
                 .isInstanceOf(AllocationConflictException.class)
                 .hasMessageContaining("recurrentes");
+    }
+
+    @Test
+    @DisplayName("autoPreview: eventId inexistente → 404, incluso con ids duplicados en el request")
+    void autoPreviewEventoInexistente() {
+        RecurringEvent event = recurringEvent(1L);
+        when(eventRepository.findAllById(any())).thenReturn(List.of(event));
+
+        assertThatThrownBy(() -> service.autoPreview(new AutoPreviewRequestDto(List.of(1L, 1L, 99L), null)))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("autoPreview: evento sin ocurrencias pendientes (ni SCHEDULED ni ASSIGNED futuras) → conflicto")
+    void autoPreviewSinOcurrenciasPendientes() {
+        RecurringEvent event = recurringEvent(1L);
+        when(eventRepository.findAllById(any())).thenReturn(List.of(event));
+        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+                .thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null)))
+                .isInstanceOf(AllocationConflictException.class)
+                .hasMessageContaining("ocurrencias pendientes");
+    }
+
+    @Test
+    @DisplayName("Mapea el evento y el aula al modelo del solver con todos los campos correctos")
+    void mapeaSolverEventYSolverRoomCorrectamente() {
+        RecurringEvent event = recurringEvent(1L); // enrolled=30, 08:00-09:30
+        LocalDate date = futureDate(1);
+        when(eventRepository.findAllById(any())).thenReturn(List.of(event));
+        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+                .thenReturn(List.of(occurrence(10L, event, date, OccurrenceStatus.SCHEDULED)));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5, 100)));
+
+        service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null));
+
+        ArgumentCaptor<List<SolverRoom>> roomsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(solverService).preview(solverEventsCaptor.capture(), roomsCaptor.capture(), any(), anyInt());
+
+        SolverEvent solverEvent = solverEventsCaptor.getValue().get(0);
+        assertThat(solverEvent.planningId()).isEqualTo("1");
+        assertThat(solverEvent.commissionKey()).isNull();
+        assertThat(solverEvent.enrolled()).isEqualTo(30);
+        assertThat(solverEvent.startTime()).isEqualTo(LocalTime.of(8, 0));
+        assertThat(solverEvent.endTime()).isEqualTo(LocalTime.of(9, 30));
+        assertThat(solverEvent.occurrenceDates()).containsExactly(date);
+
+        SolverRoom solverRoom = roomsCaptor.getValue().get(0);
+        assertThat(solverRoom.id()).isEqualTo(5);
+        assertThat(solverRoom.capacity()).isEqualTo(100);
+        assertThat(solverRoom.buildingId()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Consulta la ocupación de BD en el rango [min(startDate), max(endDate)] de los eventos seleccionados")
+    void consultaOcupacionEnRangoDeFechasDeLosEventos() {
+        LocalDate start1 = LocalDate.now().minusMonths(3);
+        LocalDate end1 = LocalDate.now().plusMonths(1);
+        LocalDate start2 = LocalDate.now().minusMonths(1);
+        LocalDate end2 = LocalDate.now().plusMonths(5);
+        RecurringEvent event1 = RecurringEvent.builder().id(1L).enrolled(30).startTime(LocalTime.of(8, 0))
+                .duration(Duration.ofMinutes(90)).dayOfWeek(DayOfWeek.MONDAY).startDate(start1).endDate(end1).build();
+        RecurringEvent event2 = RecurringEvent.builder().id(2L).enrolled(30).startTime(LocalTime.of(14, 0))
+                .duration(Duration.ofMinutes(60)).dayOfWeek(DayOfWeek.MONDAY).startDate(start2).endDate(end2).build();
+        when(eventRepository.findAllById(any())).thenReturn(List.of(event1, event2));
+        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+                .thenReturn(List.of(
+                        occurrence(10L, event1, futureDate(1), OccurrenceStatus.SCHEDULED),
+                        occurrence(11L, event2, futureDate(2), OccurrenceStatus.SCHEDULED)));
+
+        service.autoPreview(new AutoPreviewRequestDto(List.of(1L, 2L), null));
+
+        ArgumentCaptor<LocalDate> fromCaptor = ArgumentCaptor.forClass(LocalDate.class);
+        ArgumentCaptor<LocalDate> toCaptor = ArgumentCaptor.forClass(LocalDate.class);
+        verify(allocationRepository).findOccupancyBetween(
+                fromCaptor.capture(), toCaptor.capture(), eq(OccurrenceStatus.ASSIGNED));
+        assertThat(fromCaptor.getValue()).isEqualTo(start1);
+        assertThat(toCaptor.getValue()).isEqualTo(end2);
+    }
+
+    @Test
+    @DisplayName("autoPreview: usa timeLimitSeconds=30 por defecto si el request no lo trae")
+    void autoPreviewUsaTimeLimitPorDefecto() {
+        RecurringEvent event = recurringEvent(1L);
+        when(eventRepository.findAllById(any())).thenReturn(List.of(event));
+        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+                .thenReturn(List.of(occurrence(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED)));
+
+        service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null));
+
+        ArgumentCaptor<Integer> timeLimitCaptor = ArgumentCaptor.forClass(Integer.class);
+        verify(solverService).preview(any(), any(), any(), timeLimitCaptor.capture());
+        assertThat(timeLimitCaptor.getValue()).isEqualTo(30);
     }
 
     @Test
