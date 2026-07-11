@@ -141,16 +141,22 @@ public class SolverServiceImpl implements SolverService {
                     occ.event(), occ.room(), conflictsByEventId.getOrDefault(occ.event().planningId(), Set.of())));
         }
         ScheduleSolution problem = new ScheduleSolution(classrooms, allocations);
+        log.info("Modelo del solver armado: {} entidades de planificación ({} nuevas + {} pinned), "
+                        + "{} aulas candidatas por evento",
+                allocations.size(), events.size(), existing.size(), classrooms.size());
         return runSolver(problem, timeLimitSeconds);
     }
 
     private ScheduleSolution runSolver(ScheduleSolution problem, int timeLimitSeconds) {
         String jobId = UUID.randomUUID().toString();
+        log.info("Job del solver {} lanzado, límite {}s", jobId, timeLimitSeconds);
         SolverJob<ScheduleSolution> job = solverManager.solveBuilder()
                 .withProblemId(jobId)
                 .withProblem(problem)
                 .withConfigOverride(new SolverConfigOverride()
                         .withTerminationConfig(buildTermination(timeLimitSeconds)))
+                .withBestSolutionEventConsumer(event ->
+                        log.info("Job del solver {}: nuevo mejor score {}", jobId, event.solution().getScore()))
                 .run();
         try {
             return job.getFinalBestSolution();

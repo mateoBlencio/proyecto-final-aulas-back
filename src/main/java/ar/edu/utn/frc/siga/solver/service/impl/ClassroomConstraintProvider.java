@@ -64,28 +64,39 @@ public class ClassroomConstraintProvider implements ConstraintProvider {
                 .asConstraint("Minimizar subocupacion");
     }
 
-    /** Eventos de la misma comisión: preferir la misma aula (penaliza si difieren). */
+    /**
+     * Eventos de la misma comisión: preferir la misma aula (penaliza si difieren).
+     * El pre-filtro (comisión no nula, no pinned, aula asignada) se aplica ANTES del join:
+     * si se dejara post-join, el {@code equal(commissionKey)} indexaría todos los nulls en un
+     * mismo bucket y emparejaría O(n²) eventos sin comisión → explosión de tuplas y OOM.
+     */
     Constraint preferSameRoomSameCommission(ConstraintFactory factory) {
         return factory
-                .forEachUniquePair(ClassAllocation.class,
-                        Joiners.equal(ClassAllocation::getCommissionKey))
-                .filter((a, b) -> !a.isPinned() && !b.isPinned()
-                        && a.getCommissionKey() != null
-                        && a.getClassroom() != null && b.getClassroom() != null
-                        && !a.getClassroom().equals(b.getClassroom()))
+                .forEach(ClassAllocation.class)
+                .filter(a -> !a.isPinned() && a.getCommissionKey() != null && a.getClassroom() != null)
+                .join(ClassAllocation.class,
+                        Joiners.equal(ClassAllocation::getCommissionKey),
+                        Joiners.lessThan(ClassAllocation::getId),
+                        Joiners.filtering((a, b) -> !b.isPinned() && b.getClassroom() != null
+                                && !a.getClassroom().equals(b.getClassroom())))
                 .penalize(HardSoftScore.ONE_SOFT, (a, b) -> SAME_COMMISSION_DIFF_ROOM_WEIGHT)
                 .asConstraint("Preferir misma aula por comision");
     }
 
-    /** Eventos de la misma comisión: en su defecto, preferir el mismo edificio. */
+    /**
+     * Eventos de la misma comisión: en su defecto, preferir el mismo edificio.
+     * Mismo pre-filtro antes del join que {@link #preferSameRoomSameCommission} para evitar
+     * el emparejamiento cuadrático de eventos sin comisión.
+     */
     Constraint preferSameBuildingSameCommission(ConstraintFactory factory) {
         return factory
-                .forEachUniquePair(ClassAllocation.class,
-                        Joiners.equal(ClassAllocation::getCommissionKey))
-                .filter((a, b) -> !a.isPinned() && !b.isPinned()
-                        && a.getCommissionKey() != null
-                        && a.getBuildingId() != null && b.getBuildingId() != null
-                        && !a.getBuildingId().equals(b.getBuildingId()))
+                .forEach(ClassAllocation.class)
+                .filter(a -> !a.isPinned() && a.getCommissionKey() != null && a.getBuildingId() != null)
+                .join(ClassAllocation.class,
+                        Joiners.equal(ClassAllocation::getCommissionKey),
+                        Joiners.lessThan(ClassAllocation::getId),
+                        Joiners.filtering((a, b) -> !b.isPinned() && b.getBuildingId() != null
+                                && !a.getBuildingId().equals(b.getBuildingId())))
                 .penalize(HardSoftScore.ONE_SOFT, (a, b) -> SAME_COMMISSION_DIFF_BUILDING_WEIGHT)
                 .asConstraint("Preferir mismo edificio por comision");
     }

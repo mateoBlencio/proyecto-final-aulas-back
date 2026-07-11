@@ -71,3 +71,7 @@ logging:
   level:
     root: WARN
     ar.edu.utn.frc.siga: INFO
+    # Fases del solver (construction heuristic / local search) y resumen de score de Timefold.
+    ai.timefold.solver.core.impl.solver: INFO
+    ai.timefold.solver.core.impl.constructionheuristic: INFO
+    ai.timefold.solver.core.impl.localsearch: INFO
