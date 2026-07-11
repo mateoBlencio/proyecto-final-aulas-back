@@ -28,6 +28,7 @@ import java.time.LocalDate;
 
 import java.util.List;
 
+/** Endpoints de asignación manual de aulas (individual, en lote, desde una fecha) y de detección de problemas de asignación. */
 @Slf4j
 @RestController
 @RequestMapping("${siga.api.base-path}/allocations")
@@ -38,6 +39,7 @@ public class AllocationController {
     private final AllocationService allocationService;
     private final AllocationProblemService allocationProblemService;
 
+    /** Eventos sin aula, aulas con sobrecupo y superposiciones de horario-aula en el rango indicado. */
     @GetMapping("/problems")
     @Operation(summary = "Listar problemas de asignación de aulas",
                description = "Devuelve, para la pantalla de asignación automática, tres listados en el rango "
@@ -54,6 +56,7 @@ public class AllocationController {
         return ResponseEntity.ok(response);
     }
 
+    /** Todas las asignaciones vigentes en la fecha indicada. */
     @GetMapping
     @Operation(summary = "Listar asignaciones por fecha",
                description = "Devuelve todas las asignaciones del día indicado.")
@@ -65,6 +68,7 @@ public class AllocationController {
         return ResponseEntity.ok(allocations);
     }
 
+    /** Datos de una asignación existente por su ID. */
     @GetMapping("/{id}")
     @Operation(summary = "Obtener asignación por ID",
                description = "Devuelve los datos de una asignación existente.")
@@ -73,6 +77,7 @@ public class AllocationController {
         return ResponseEntity.ok(allocationService.findById(id));
     }
 
+    /** Asigna manualmente un aula a una ocurrencia puntual (source MANUAL). */
     @PostMapping("/occurrences/{occurrenceId}")
     @Operation(summary = "Asignar aula a ocurrencia",
                description = "Asigna manualmente un aula a una ocurrencia específica. Falla si la ocurrencia ya tiene asignación o si ya ocurrió.")
@@ -85,6 +90,7 @@ public class AllocationController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    /** Cambia el aula de una asignación existente (source MANUAL). */
     @PutMapping("/{id}")
     @Operation(summary = "Reasignar aula",
                description = "Cambia el aula de una asignación existente. Falla si la ocurrencia ya ocurrió.")
@@ -97,6 +103,7 @@ public class AllocationController {
         return ResponseEntity.ok(response);
     }
 
+    /** Reasigna varias asignaciones en una única operación atómica (source MANUAL). */
     @PutMapping("/batch")
     @Operation(summary = "Reasignar aulas en lote",
                description = "Cambia el aula de múltiples asignaciones en una sola operación atómica. Falla si cualquier ocurrencia ya ocurrió.")
@@ -108,6 +115,7 @@ public class AllocationController {
         return ResponseEntity.ok(response);
     }
 
+    /** Asigna un aula a todas las occurrences futuras de un evento recurrente desde una fecha (source MANUAL). */
     @PostMapping("/from-date")
     @Operation(summary = "Asignar aula desde una fecha",
                description = "Asigna un aula a todas las ocurrencias futuras de un evento recurrente a partir de la fecha indicada. Crea nuevas asignaciones o actualiza las existentes.")

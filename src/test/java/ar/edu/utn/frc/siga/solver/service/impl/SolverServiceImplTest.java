@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.solver.config.SolverProperties;
 import ar.edu.utn.frc.siga.solver.exception.ExpiredPreviewException;
 import ar.edu.utn.frc.siga.solver.model.ClassAllocation;
 import ar.edu.utn.frc.siga.solver.model.ScheduleSolution;
+import ar.edu.utn.frc.siga.solver.model.SolverAllocation;
 import ar.edu.utn.frc.siga.solver.model.SolverEvent;
 import ar.edu.utn.frc.siga.solver.model.SolverOccupancy;
 import ar.edu.utn.frc.siga.solver.model.SolverPreview;
@@ -212,7 +213,7 @@ class SolverServiceImplTest {
             SolverPreview preview = service.preview(List.of(newEvent), List.of(room), List.of(occupancy), 5);
 
             assertThat(preview.allocations())
-                    .extracting(ar.edu.utn.frc.siga.solver.model.SolverAllocation::eventId)
+                    .extracting(SolverAllocation::eventId)
                     .containsExactly("nuevo");
         }
 

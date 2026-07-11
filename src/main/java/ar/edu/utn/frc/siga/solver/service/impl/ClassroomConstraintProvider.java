@@ -8,12 +8,18 @@ import ai.timefold.solver.core.api.score.stream.ConstraintProvider;
 import ai.timefold.solver.core.api.score.stream.Joiners;
 import org.jspecify.annotations.NonNull;
 
+/**
+ * Restricciones hard/soft de la asignación automática de aulas. La jerarquía de pesos
+ * (ver ADR-008) es: sobrecupo (100.000 por alumno excedente) ≫ misma comisión en el mismo
+ * edificio (4.000) > misma comisión en la misma aula (2.000) > capacidad ociosa (1).
+ */
 public class ClassroomConstraintProvider implements ConstraintProvider {
 
     private static final int OVERCROWDING_WEIGHT = 100_000;
     private static final int SAME_COMMISSION_DIFF_ROOM_WEIGHT = 2_000;
     private static final int SAME_COMMISSION_DIFF_BUILDING_WEIGHT = 4_000;
 
+    /** Restricciones que evalúa el solver, en el orden en que se registran. */
     @Override
     public Constraint[] defineConstraints(@NonNull ConstraintFactory factory) {
         return new Constraint[]{
@@ -25,6 +31,11 @@ public class ClassroomConstraintProvider implements ConstraintProvider {
         };
     }
 
+    /**
+     * Restricción dura: dos asignaciones no pueden compartir la misma aula si sus eventos
+     * tienen horarios que se solapan (conflicto precalculado antes del solve). Se excluye el
+     * par pinned-pinned porque esas ocupaciones ya son un hecho consumado, no algo a corregir.
+     */
     Constraint noOverlap(ConstraintFactory factory) {
         return factory
                 .forEachUniquePair(ClassAllocation.class, Joiners.equal(ClassAllocation::getClassroom),
@@ -34,6 +45,7 @@ public class ClassroomConstraintProvider implements ConstraintProvider {
                 .asConstraint("Sin solapamiento");
     }
 
+    /** Restricción blanda: penaliza (fuerte) asignar un evento a un aula con menos capacidad que sus inscriptos. */
     Constraint minimizeOvercrowding(ConstraintFactory factory) {
         return factory
                 .forEach(ClassAllocation.class)
@@ -42,6 +54,7 @@ public class ClassroomConstraintProvider implements ConstraintProvider {
                 .asConstraint("Minimizar sobreocupacion");
     }
 
+    /** Restricción blanda: penaliza la capacidad del aula que queda sin usar, para preferir aulas ajustadas al curso. */
     Constraint minimizeUnusedCapacity(ConstraintFactory factory) {
         return factory
                 .forEach(ClassAllocation.class)

@@ -27,6 +27,10 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    /**
+     * Traduce cualquier {@link SigaAppException} de dominio a un {@code ProblemDetail} con el
+     * status, título y detalle propios de la excepción, más sus propiedades extra.
+     */
     @ExceptionHandler(SigaAppException.class)
     public ProblemDetail handleAppException(SigaAppException ex) {
         log.warn("{}: {}", ex.getTitle(), ex.getMessage());
@@ -37,6 +41,10 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
+    /**
+     * Captura fallos de validación de {@code @Valid} en el body de la request y devuelve
+     * un 400 con los errores agrupados por campo (o por objeto, si no hay campo asociado).
+     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleValidation(MethodArgumentNotValidException ex) {
         Map<String, List<String>> fieldErrors = ex.getBindingResult().getAllErrors().stream()
@@ -52,6 +60,10 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
+    /**
+     * Captura violaciones de restricciones de validación en parámetros/path variables (no en
+     * el body) y devuelve un 400 con los errores agrupados por nombre de propiedad.
+     */
     @ExceptionHandler(ConstraintViolationException.class)
     public ProblemDetail handleConstraintViolation(ConstraintViolationException ex) {
         Map<String, List<String>> errors = ex.getConstraintViolations().stream()
@@ -68,6 +80,10 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
+    /**
+     * Captura errores de deserialización del body (JSON malformado, tipo incompatible, etc.)
+     * y devuelve un 400 genérico sin filtrar el detalle interno del parser.
+     */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ProblemDetail handleNotReadable(HttpMessageNotReadableException ex) {
         log.warn("Cuerpo de la petición ilegible: {}", ex.getMessage());
@@ -77,6 +93,10 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
+    /**
+     * Captura un parámetro que no puede convertirse al tipo esperado (por ejemplo, un
+     * {@code id} no numérico en la URL) y devuelve un 400 indicando el tipo requerido.
+     */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         log.warn("Parámetro con tipo inválido: {}", ex.getMessage());
@@ -87,6 +107,10 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
+    /**
+     * Captura un archivo subido (por ejemplo, en la importación de Excel) que excede el
+     * tamaño máximo configurado y devuelve un 413 (Content Too Large).
+     */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ProblemDetail handleMaxUploadSize(MaxUploadSizeExceededException ex) {
         log.warn("Archivo demasiado grande: {}", ex.getMessage());
@@ -96,6 +120,12 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
+    /**
+     * Fallback para cualquier excepción no manejada explícitamente. Si el framework ya generó
+     * un {@link ErrorResponse} con su propio {@code ProblemDetail} (404, 405, etc.), lo respeta
+     * tal cual; de lo contrario, la trata como error inesperado y devuelve un 500 genérico
+     * sin exponer el detalle interno.
+     */
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleUnexpected(Exception ex) {
         // Las excepciones de framework que ya traen su ProblemDetail (404 de recurso

@@ -14,6 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 
+/**
+ * Implementación de {@link BuildingService}.
+ */
 @Slf4j
 @Service
 @Transactional(readOnly = true)

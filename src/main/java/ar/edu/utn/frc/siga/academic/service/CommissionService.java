@@ -7,6 +7,10 @@ import java.util.List;
 
 import org.springframework.modulith.NamedInterface;
 
+/**
+ * Fachada de comisiones: resolución por ID y find-or-create idempotente por clave
+ * natural (curso + número de comisión + período), sin exponer la entidad JPA.
+ */
 @NamedInterface("api")
 public interface CommissionService {
 

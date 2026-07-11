@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+/** Propiedades de configuración del solver, bajo el prefijo {@code siga.solver} de application.yaml. */
 @Getter
 @Setter
 @ConfigurationProperties(prefix = "siga.solver")

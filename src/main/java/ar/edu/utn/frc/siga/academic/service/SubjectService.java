@@ -7,6 +7,11 @@ import java.util.List;
 
 import org.springframework.modulith.NamedInterface;
 
+/**
+ * Fachada de materias: resolución por ID y find-or-create idempotente por código dentro
+ * de un plan de estudio, consumida por otros módulos (p. ej. {@code allocation},
+ * {@code excelimport}) sin exponer la entidad JPA.
+ */
 @NamedInterface("api")
 public interface SubjectService {
 

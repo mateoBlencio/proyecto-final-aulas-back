@@ -13,6 +13,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
+/**
+ * Especialidad académica (carrera): raíz de la jerarquía académica, de la que cuelgan
+ * los planes de estudio.
+ */
 @Entity
 @Table(name = "especialidad")
 @SQLRestriction("eliminado = false")

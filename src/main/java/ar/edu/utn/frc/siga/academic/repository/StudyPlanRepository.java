@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+/** Acceso a datos de {@link StudyPlan}. */
 @Repository
 public interface StudyPlanRepository extends JpaRepository<StudyPlan, Long> {
     Optional<StudyPlan> findByPlanCodeAndSpecialty(Integer planCode, Specialty specialty);

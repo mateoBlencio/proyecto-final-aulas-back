@@ -14,15 +14,22 @@ import lombok.experimental.FieldDefaults;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * Entidad de planificación del solver: la asignación aula↔evento que Timefold ajusta
+ * durante el solve. Cada instancia representa un evento (nuevo o una ocupación existente
+ * pinned) y su variable de planificación es el aula elegida.
+ */
 @Getter
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @PlanningEntity
 public class ClassAllocation {
 
+    /** Identificador de planificación: el {@code planningId} del evento. */
     @PlanningId
     String id;
 
+    /** Evento del solver que esta entidad representa. */
     SolverEvent event;
 
     /**
@@ -32,6 +39,7 @@ public class ClassAllocation {
     @ValueRangeProvider
     List<SolverRoom> candidates;
 
+    /** IDs de eventos cuyo horario se solapa con este (precalculado antes del solve). */
     Set<String> conflictingEventIds;
 
     /**
@@ -41,6 +49,7 @@ public class ClassAllocation {
     @PlanningPin
     boolean pinned;
 
+    /** Variable de planificación: aula asignada a este evento (null hasta que el solver decide). */
     @Setter
     @PlanningVariable
     SolverRoom classroom;

@@ -33,6 +33,11 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
+/**
+ * Orquesta una corrida del solver: arma el modelo de planificación (eventos nuevos + ocupación
+ * existente pinned), lo somete al {@link SolverManager} de Timefold con límite de tiempo, y
+ * guarda/recupera la preview resultante vía {@link PreviewStore}.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor

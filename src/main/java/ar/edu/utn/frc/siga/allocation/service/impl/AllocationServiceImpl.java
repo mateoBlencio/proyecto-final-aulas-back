@@ -35,6 +35,11 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * Implementación de los intent methods de asignación manual/importada: valida contra el
+ * estado actual de BD (occurrence asignable, aula existente, sin solapamiento) y aplica
+ * cada operación (individual o batch) en una única transacción atómica.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -54,6 +59,11 @@ public class AllocationServiceImpl implements AllocationService {
         return composer.compose(allocation);
     }
 
+    /**
+     * Asigna un aula a una occurrence puntual (source MANUAL). Rechaza si la occurrence ya
+     * ocurrió, ya tiene asignación, está CANCELLED/SUSPENDED, o si el aula ya está ocupada
+     * ese día/horario.
+     */
     @Override
     @Transactional
     public AllocationResponseDto assignManually(Long occurrenceId, AllocateOccurrenceRequestDto dto) {
@@ -85,6 +95,10 @@ public class AllocationServiceImpl implements AllocationService {
         return composer.compose(saved);
     }
 
+    /**
+     * Cambia el aula de una asignación existente (source MANUAL). Rechaza si la occurrence
+     * ya ocurrió o si el nuevo aula ya está ocupada ese día/horario.
+     */
     @Override
     @Transactional
     public AllocationResponseDto reassign(Long allocationId, AllocateOccurrenceRequestDto dto) {
@@ -105,6 +119,11 @@ public class AllocationServiceImpl implements AllocationService {
         return composer.compose(saved);
     }
 
+    /**
+     * Reasigna varias asignaciones en una sola transacción atómica (source MANUAL): todos
+     * los moves se resuelven y validan (contra BD y entre sí) antes de escribir nada; si
+     * cualquiera choca o ya ocurrió, no se aplica ninguno.
+     */
     @Override
     @Transactional
     public List<AllocationResponseDto> batchReassign(BatchReassignRequestDto dto) {
@@ -135,6 +154,12 @@ public class AllocationServiceImpl implements AllocationService {
         return results;
     }
 
+    /**
+     * Asigna un aula a todas las occurrences futuras (fecha &gt;= hoy) de un evento
+     * recurrente desde {@code fromDate}, salteando las que ya ocurrieron (source MANUAL).
+     * Valida que ninguna choque antes de aplicar el lote completo; solo soportado para
+     * eventos recurrentes.
+     */
     @Override
     @Transactional
     public List<AllocationResponseDto> assignManuallyFromDate(AllocateFromDateRequestDto dto) {
@@ -162,6 +187,11 @@ public class AllocationServiceImpl implements AllocationService {
         return results;
     }
 
+    /**
+     * Igual que {@link #assignManuallyFromDate}, pero para carga masiva desde Excel (source
+     * IMPORTED): incluye occurrences pasadas (no se saltean) y no valida solapamiento previo,
+     * ya que la importación reemplaza el estado existente por diseño.
+     */
     @Override
     @Transactional
     public List<AllocationResponseDto> importAssignmentsFromDate(AllocateFromDateRequestDto dto) {
@@ -186,6 +216,11 @@ public class AllocationServiceImpl implements AllocationService {
         return results;
     }
 
+    /**
+     * Crea o actualiza (upsert por occurrence) la asignación de cada occurrence de la
+     * lista al aula indicada, y la pasa a ASSIGNED. Las no-asignables (CANCELLED/SUSPENDED,
+     * o pasadas cuando {@code skipPast}) se saltean por diseño, no son un fallo parcial.
+     */
     private List<AllocationResponseDto> allocateToOccurrences(
             List<Occurrence> occurrences, Integer classroomId, String observation,
             AllocationSource source, boolean skipPast) {

@@ -50,6 +50,12 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * Implementación de {@link AutoAllocationService}: arma los modelos del solver a partir
+ * de los eventos y la ocupación existente ({@link AutoAllocationDataLoader}), delega la
+ * optimización en el motor puro ({@code solver::api}) y compone/valida el resultado
+ * (preview, validate-move y confirm) contra el estado actual de la base.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor

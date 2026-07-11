@@ -4,6 +4,7 @@ import org.springframework.modulith.NamedInterface;
 
 import java.time.LocalDate;
 
+/** Representación pública de un período académico (año + cuatrimestre). */
 @NamedInterface("api")
 public record AcademicPeriodResponseDto(
         Integer year,

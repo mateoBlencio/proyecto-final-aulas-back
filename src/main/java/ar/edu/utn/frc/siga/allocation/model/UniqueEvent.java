@@ -13,6 +13,10 @@ import org.hibernate.envers.Audited;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * Evento académico que ocurre una sola vez (mesa de examen final, parcial, trabajo
+ * práctico, o una mesa especial fuera de calendario). Genera exactamente una {@link Occurrence}.
+ */
 @Entity
 @Table(name = "evento_unico_academico")
 @DiscriminatorValue("UNIQUE_EVENT")

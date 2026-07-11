@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.excelimport.service.impl;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
+import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -57,7 +58,7 @@ class ImportCacheTest {
         AtomicInteger buildingCalls = new AtomicInteger();
         cache.getBuilding("1", () -> {
             buildingCalls.incrementAndGet();
-            return new ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto(1, "Edificio Central", 5, true);
+            return new BuildingResponseDto(1, "Edificio Central", 5, true);
         });
 
         assertThat(buildingCalls.get()).isEqualTo(1);

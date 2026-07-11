@@ -19,6 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -234,7 +235,8 @@ class ClassroomServiceImplTest {
         Classroom classroom = SpaceTestData.classroom().build();
         ClassroomResponseDto dto = new ClassroomResponseDto(1, "101", 1, 40, true, 1, "Edificio Central", 1, "Normal");
         Page<Classroom> page = new PageImpl<>(List.of(classroom), pageable, 1);
-        when(classroomRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
+        when(classroomRepository.findAll(ArgumentMatchers.<Specification<Classroom>>any(), eq(pageable)))
+                .thenReturn(page);
         when(classroomMapper.toDto(classroom)).thenReturn(dto);
 
         Page<ClassroomResponseDto> result = service.findAll(filter, pageable);

@@ -8,6 +8,9 @@ import org.springframework.http.HttpStatus;
  * para trabajar contra el estado actual de la BD.
  */
 public class ExpiredPreviewException extends SigaAppException {
+
+    private static final long serialVersionUID = 1L;
+
     public ExpiredPreviewException(String previewId) {
         super(HttpStatus.GONE, "Preview no disponible",
                 "El preview '" + previewId + "' no existe o expiró. Generá uno nuevo.");

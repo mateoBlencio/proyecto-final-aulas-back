@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 import java.util.List;
 
+/** Endpoints de eventos académicos (recurrentes/únicos): alta, consulta y sus ocurrencias. */
 @Slf4j
 @RestController
 @RequestMapping("${siga.api.base-path}/events")
@@ -33,6 +34,7 @@ public class AcademicEventController {
 
     private final AcademicEventService academicEventService;
 
+    /** Todos los eventos académicos registrados. */
     @GetMapping
     @Operation(summary = "Listar eventos académicos",
                description = "Devuelve todos los eventos académicos registrados.")
@@ -43,6 +45,7 @@ public class AcademicEventController {
         return ResponseEntity.ok(events);
     }
 
+    /** Eventos con occurrences SCHEDULED (pendientes de aula) entre las fechas indicadas, agrupados por evento. */
     @GetMapping("/unassigned")
     @Operation(summary = "Listar eventos con ocurrencias sin aula asignada",
                description = "Devuelve, agrupados por evento, las ocurrencias en estado SCHEDULED "
@@ -57,6 +60,7 @@ public class AcademicEventController {
         return ResponseEntity.ok(events);
     }
 
+    /** Datos de un evento académico existente por su ID. */
     @GetMapping("/{id}")
     @Operation(summary = "Obtener evento académico por ID",
                description = "Devuelve los datos de un evento académico existente.")
@@ -65,6 +69,7 @@ public class AcademicEventController {
         return ResponseEntity.ok(academicEventService.findById(id));
     }
 
+    /** Todas las occurrences generadas para un evento académico. */
     @GetMapping("/{id}/occurrences")
     @Operation(summary = "Listar ocurrencias de un evento",
                description = "Devuelve todas las ocurrencias generadas para un evento académico.")
@@ -75,6 +80,7 @@ public class AcademicEventController {
         return ResponseEntity.ok(occurrences);
     }
 
+    /** Crea un evento recurrente semanal y genera todas sus occurrences. */
     @PostMapping("/recurring")
     @Operation(summary = "Crear evento recurrente",
                description = "Crea un evento recurrente semanal y genera todas sus ocurrencias.")
@@ -86,6 +92,7 @@ public class AcademicEventController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    /** Crea un evento que ocurre una única vez y genera su única occurrence. */
     @PostMapping("/unique")
     @Operation(summary = "Crea un evento único",
                description = "Crea un evento que ocurre una única vez y genera una única ocurrencia.")

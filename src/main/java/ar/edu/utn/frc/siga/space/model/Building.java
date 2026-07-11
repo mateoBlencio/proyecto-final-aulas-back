@@ -17,6 +17,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
+/**
+ * Edificio de la facultad, agrupador físico de aulas. Un edificio puede estar
+ * {@code active = false} (no ofrecido para asignación) sin estar eliminado.
+ */
 @Entity
 @Table(name = "edificio")
 @SQLRestriction("eliminado = false")

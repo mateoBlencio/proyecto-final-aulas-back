@@ -1,0 +1,25 @@
+meta {
+  name: Obtener preview por id
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/allocations/auto-preview/{{previewId}}
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  previewId: prev_00000000
+}
+
+docs {
+  Recupera una preview generada y la recompone contra el estado actual de la BD
+  (evento, fechas de ocurrencia futuras y aula). 410 Gone si expiró (TTL) o no existe.
+  Reemplazá previewId por el devuelto en POST /auto-preview.
+  
+  Respuesta: misma forma que el POST — { previewId, allocations: [ { event,
+  occurrenceDates, classroom } ], unresolved: [ { event, occurrenceDates,
+  classroom: null } ] }. unresolved queda para revisión manual.
+}

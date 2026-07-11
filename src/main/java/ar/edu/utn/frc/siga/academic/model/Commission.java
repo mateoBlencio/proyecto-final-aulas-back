@@ -8,6 +8,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
+/**
+ * Comisión de cursado (grupo de alumnos) dentro de un {@link AcademicPeriod}, identificada
+ * por su código de curso y número de comisión (p. ej. "1K1").
+ */
 @Entity
 @Table(name = "comision", uniqueConstraints = @UniqueConstraint(columnNames = {"id_periodo", "codigo_curso", "numero_comision"}))
 @SQLRestriction("eliminado = false")

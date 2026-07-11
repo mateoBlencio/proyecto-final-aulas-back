@@ -10,6 +10,11 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.util.Optional;
 
+/**
+ * Implementación in-memory de {@link PreviewStore} sobre Caffeine, para una sola instancia.
+ * Cada preview expira sola tras el TTL configurado ({@code siga.solver.preview.ttl-minutes}):
+ * es un bound de staleness contra el estado de la BD, no una eviction por presión de memoria.
+ */
 @Component
 public class CaffeinePreviewStore implements PreviewStore {
 

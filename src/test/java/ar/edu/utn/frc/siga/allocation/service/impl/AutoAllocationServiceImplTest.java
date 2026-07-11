@@ -42,6 +42,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -89,6 +90,10 @@ class AutoAllocationServiceImplTest {
     private ArgumentCaptor<List<SolverEvent>> solverEventsCaptor;
     @Captor
     private ArgumentCaptor<List<SolverOccupancy>> occupancyCaptor;
+    @Captor
+    private ArgumentCaptor<List<SolverRoom>> roomsCaptor;
+    @Captor
+    private ArgumentCaptor<List<Allocation>> savedCaptor;
 
     private AutoAllocationServiceImpl service;
 
@@ -108,7 +113,8 @@ class AutoAllocationServiceImplTest {
                 .thenReturn(List.of());
         lenient().when(solverService.preview(any(), any(), any(), anyInt()))
                 .thenReturn(new SolverPreview("prev_test", List.of()));
-        lenient().when(academicEventComposer.compose(any(Collection.class))).thenAnswer(invocation -> {
+        lenient().when(academicEventComposer.compose(ArgumentMatchers.<Collection<? extends AcademicEvent>>any()))
+                .thenAnswer(invocation -> {
             Collection<AcademicEvent> events = invocation.getArgument(0);
             List<AcademicEventResponseDto> result = new ArrayList<>();
             for (AcademicEvent event : events) {
@@ -257,7 +263,6 @@ class AutoAllocationServiceImplTest {
 
         service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null));
 
-        ArgumentCaptor<List<SolverRoom>> roomsCaptor = ArgumentCaptor.forClass(List.class);
         verify(solverService).preview(solverEventsCaptor.capture(), roomsCaptor.capture(), any(), anyInt());
 
         SolverEvent solverEvent = solverEventsCaptor.getValue().get(0);
@@ -538,7 +543,6 @@ class AutoAllocationServiceImplTest {
         ConfirmAutoPreviewRequestDto request = new ConfirmAutoPreviewRequestDto(
                 List.of(new PreviewAllocationDto(1L, 5), new PreviewAllocationDto(2L, 7)));
 
-        ArgumentCaptor<List<Allocation>> savedCaptor = ArgumentCaptor.forClass(List.class);
         service.confirm("prev_confirm", request);
         verify(allocationComposer).composeAll(savedCaptor.capture());
 

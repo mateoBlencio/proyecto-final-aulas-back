@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 
+/** Acceso a {@code Occurrence} (fechas concretas generadas por un {@code AcademicEvent}). */
 @Repository
 public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
 

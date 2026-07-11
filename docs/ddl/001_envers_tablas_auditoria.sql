@@ -82,7 +82,7 @@ CREATE TABLE public.asignacion_aula_aud (
     CONSTRAINT asignacion_aula_aud_pkey PRIMARY KEY (rev, id_asignacion),
     CONSTRAINT asignacion_aula_aud_origen_check
         CHECK (((origen)::text = ANY ((ARRAY['MANUAL'::character varying, 'AUTOMATIC'::character varying, 'IMPORTED'::character varying])::text[]))),
-    CONSTRAINT fkfjl2akgh9d7j8r9cgoteku442
+    CONSTRAINT fk_asignacion_aula_aud_rev
         FOREIGN KEY (rev) REFERENCES public.revinfo(rev)
 );
 
@@ -99,7 +99,7 @@ CREATE TABLE public.ocurrencia_aud (
     CONSTRAINT ocurrencia_aud_pkey PRIMARY KEY (rev, id_ocurrencia),
     CONSTRAINT ocurrencia_aud_estado_check
         CHECK (((estado)::text = ANY ((ARRAY['SCHEDULED'::character varying, 'ASSIGNED'::character varying, 'CANCELLED'::character varying, 'SUSPENDED'::character varying])::text[]))),
-    CONSTRAINT fk70p3nmfm1jhnow6dhxrshvvde
+    CONSTRAINT fk_ocurrencia_aud_rev
         FOREIGN KEY (rev) REFERENCES public.revinfo(rev)
 );
 
@@ -116,7 +116,7 @@ CREATE TABLE public.evento_academico_aud (
     hora_inicio           time(0) without time zone,
     duracion_minutos      integer,
     CONSTRAINT evento_academico_aud_pkey PRIMARY KEY (rev, id_evento_academico),
-    CONSTRAINT fk79v89sx1qsacrl9yjir1xp1mi
+    CONSTRAINT fk_evento_academico_aud_rev
         FOREIGN KEY (rev) REFERENCES public.revinfo(rev)
 );
 
@@ -136,7 +136,7 @@ CREATE TABLE public.evento_recurrente_aud (
     CONSTRAINT evento_recurrente_aud_pkey PRIMARY KEY (rev, id_evento_academico),
     CONSTRAINT evento_recurrente_aud_dia_semana_check
         CHECK (((dia_semana)::text = ANY ((ARRAY['MONDAY'::character varying, 'TUESDAY'::character varying, 'WEDNESDAY'::character varying, 'THURSDAY'::character varying, 'FRIDAY'::character varying, 'SATURDAY'::character varying, 'SUNDAY'::character varying])::text[]))),
-    CONSTRAINT fkqm8ifi0mtsqh908xxtc2u32jv
+    CONSTRAINT fk_evento_recurrente_aud_evento
         FOREIGN KEY (rev, id_evento_academico) REFERENCES public.evento_academico_aud(rev, id_evento_academico)
 );
 
@@ -150,6 +150,6 @@ CREATE TABLE public.evento_unico_academico_aud (
     fecha                 date,
     descripcion           character varying(255),
     CONSTRAINT evento_unico_academico_aud_pkey PRIMARY KEY (rev, id_evento_academico),
-    CONSTRAINT fkg9mo5p6qgfr5cv2rrh1u8bt88
+    CONSTRAINT fk_evento_unico_academico_aud_evento
         FOREIGN KEY (rev, id_evento_academico) REFERENCES public.evento_academico_aud(rev, id_evento_academico)
 );

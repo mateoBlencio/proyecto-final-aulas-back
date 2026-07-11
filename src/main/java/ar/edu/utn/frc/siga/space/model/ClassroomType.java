@@ -13,6 +13,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
+/**
+ * Categoría de aula (ej. "Normal", "Laboratorio", "Auditorio"), usada para filtrar
+ * aulas compatibles con los requisitos de un evento académico.
+ */
 @Entity
 @Table(name = "tipo_aula")
 @SQLRestriction("eliminado = false")

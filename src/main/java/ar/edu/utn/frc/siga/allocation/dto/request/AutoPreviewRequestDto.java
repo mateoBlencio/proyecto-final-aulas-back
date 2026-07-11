@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotEmpty;
 
 import java.util.List;
 
+/** Pedido de preview de asignación automática: qué eventos asignar y cuánto tiempo darle al solver. */
 @Schema(description = "Solicitud de preview automático: eventos a asignar + tiempo del solver")
 public record AutoPreviewRequestDto(
 

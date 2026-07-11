@@ -41,6 +41,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+/**
+ * Implementación de la importación masiva desde Excel: valida la plantilla, recorre
+ * las filas de datos y por cada una resuelve (o crea) especialidad, plan de estudios,
+ * materia, período académico, comisión, edificio y aula, para finalmente crear el
+ * evento recurrente y su asignación de aula. Usa {@link ImportCache} para no repetir
+ * búsquedas/creaciones de la misma entidad entre filas de la misma importación.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -59,6 +66,11 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     private final BuildingService buildingService;
     private final ClassroomService classroomService;
 
+    /**
+     * Procesa el archivo completo en una única transacción: recorre las filas de datos
+     * desde la fila 7 hasta la primera fila vacía (fin de los datos), y por cada una
+     * encadena la resolución/creación de entidades y la asignación de aula del evento.
+     */
     @Override
     @Transactional
     public ImportResultDto importExcel(MultipartFile file) {

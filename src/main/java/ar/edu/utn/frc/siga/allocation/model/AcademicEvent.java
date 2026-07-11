@@ -54,11 +54,17 @@ public abstract class AcademicEvent {
     @Column(name = "duracion_minutos", nullable = false)
     protected Duration duration;
 
+    /** Hora de fin derivada: {@code startTime + duration}. El horario vive en el evento, no en la occurrence. */
     public LocalTime endTime() {
         return startTime.plus(duration);
     }
 
+    /** Tipo concreto del evento (espejo del discriminador de herencia); la subclase es la fuente de verdad. */
     public abstract EventType getType();
 
+    /**
+     * Genera todas las {@link Occurrence} de este evento (una vez, no bajo demanda), cada
+     * una nacida en estado {@code SCHEDULED} sin aula asignada.
+     */
     public abstract List<Occurrence> toOccurrences();
 }

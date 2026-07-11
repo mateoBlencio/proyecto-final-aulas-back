@@ -12,6 +12,10 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Wiring de Timefold: define el modelo de planificación, el {@code ConstraintProvider}
+ * y los beans {@link SolverFactory}/{@link SolverManager} que orquestan los solves.
+ */
 @Configuration
 @EnableConfigurationProperties(SolverProperties.class)
 public class SolverConfiguration {
@@ -22,6 +26,7 @@ public class SolverConfiguration {
      */
     private static final long DEFAULT_SECONDS_LIMIT = 300L;
 
+    /** Fábrica de solvers configurada con el modelo, las restricciones y el modo de entorno. */
     @Bean
     public SolverFactory<ScheduleSolution> scheduleSolverFactory(SolverProperties properties) {
         SolverConfig config = new SolverConfig()
@@ -34,6 +39,7 @@ public class SolverConfiguration {
         return SolverFactory.create(config);
     }
 
+    /** Administra los solves concurrentes (uno por preview) sobre la fábrica configurada. */
     @Bean
     public SolverManager<ScheduleSolution> scheduleSolverManager(
             SolverFactory<ScheduleSolution> solverFactory, SolverProperties properties) {

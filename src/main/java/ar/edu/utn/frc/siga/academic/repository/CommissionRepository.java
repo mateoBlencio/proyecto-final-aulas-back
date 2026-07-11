@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+/** Acceso a datos de {@link Commission}. */
 @Repository
 public interface CommissionRepository extends JpaRepository<Commission, Long> {
     Optional<Commission> findByCourseCodeAndCommissionNumberAndAcademicPeriod(

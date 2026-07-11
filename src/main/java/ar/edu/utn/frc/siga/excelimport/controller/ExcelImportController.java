@@ -12,6 +12,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+/**
+ * Expone la importación masiva de eventos y comisiones desde un archivo Excel
+ * con la planilla de oferta académica.
+ */
 @Slf4j
 @RestController
 @RequestMapping("${siga.api.base-path}/excelimports")
@@ -20,6 +24,10 @@ public class ExcelImportController {
 
     private final ExcelImportService excelImportService;
 
+    /**
+     * Recibe el archivo Excel subido, delega la importación completa (validación de
+     * plantilla, parseo de filas y creación/asignación de eventos) y devuelve el resumen.
+     */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ImportResultDto> importExcel(
             @RequestParam("file") MultipartFile file) {

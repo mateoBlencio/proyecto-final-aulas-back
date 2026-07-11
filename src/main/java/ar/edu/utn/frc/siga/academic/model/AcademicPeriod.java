@@ -14,6 +14,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * Período académico (año + cuatrimestre) que agrupa las {@link Commission} vigentes en
+ * ese lapso; {@code active} marca los períodos usados como rango por defecto en las
+ * pantallas de asignación.
+ */
 @Entity
 @Table(name = "periodo_academico",
        uniqueConstraints = @UniqueConstraint(columnNames = {"anio", "cuatrimestre"}))

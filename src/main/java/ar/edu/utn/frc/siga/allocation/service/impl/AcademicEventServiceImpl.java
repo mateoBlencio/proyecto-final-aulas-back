@@ -32,6 +32,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Implementación de alta y consulta de eventos académicos (recurrentes/únicos): valida
+ * la existencia de materia/comisión ajenas vía sus fachadas, genera las occurrences del
+ * evento al crearlo, y resuelve el listado de eventos pendientes de asignación de aula.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -70,6 +75,10 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Crea un evento recurrente (validando primero que materia y comisión existan vía sus
+     * fachadas) y genera de una vez todas sus occurrences semanales, sin aula (SCHEDULED).
+     */
     @Override
     @Transactional
     public AcademicEventResponseDto createRecurringEvent(CreateRecurringEventRequestDto dto) {
@@ -99,6 +108,11 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         return composer.compose(saved);
     }
 
+    /**
+     * Reutiliza un evento recurrente idéntico (misma materia/comisión/día/horario/ventana
+     * de fechas) si ya existe; si no, lo crea. Pensado para importaciones donde varias
+     * filas de la planilla describen el mismo evento.
+     */
     @Override
     @Transactional
     public FindOrCreateResult<AcademicEventResponseDto> findOrCreateRecurringEvent(CreateRecurringEventRequestDto dto) {
@@ -113,6 +127,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 .orElseGet(() -> new FindOrCreateResult<>(createRecurringEvent(dto), true));
     }
 
+    /** Crea un evento único y genera su única occurrence, sin aula (SCHEDULED). */
     @Override
     @Transactional
     public AcademicEventResponseDto createUniqueEvent(CreateUniqueEventRequestDto dto) {
@@ -134,6 +149,11 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         return composer.compose(saved);
     }
 
+    /**
+     * Agrupa por evento las occurrences en SCHEDULED entre {@code from} (default hoy) y
+     * {@code to} (sin límite superior si es null); excluye ASSIGNED/CANCELLED/SUSPENDED.
+     * Rechaza el rango si {@code to} es anterior a {@code from}.
+     */
     @Override
     @Transactional(readOnly = true)
     public List<AcademicEventResponseDto> findUnassignedEvents(LocalDate from, LocalDate to) {

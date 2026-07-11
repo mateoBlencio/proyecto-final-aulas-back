@@ -20,6 +20,11 @@ import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
+/**
+ * Valida que el archivo subido respete la plantilla institucional de oferta académica:
+ * extensión, hoja "Hoja1", fila de encabezados (fila 6) con las columnas esperadas en
+ * orden, y presencia de al menos una fila de datos.
+ */
 @Component
 @Slf4j
 public class ExcelTemplateValidator {
@@ -36,6 +41,11 @@ public class ExcelTemplateValidator {
     private static final int FIRST_DATA_ROW_INDEX = 6;
     private static final int EXPECTED_COLUMN_COUNT = 16;
 
+    /**
+     * Abre el archivo y verifica extensión, hoja, fila de encabezados y columnas contra
+     * la plantilla esperada, y que exista al menos una fila de datos; lanza
+     * {@link ExcelFormatException} ante cualquier desvío.
+     */
     public Workbook validate(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             log.warn("Archivo nulo o vacío");
@@ -111,6 +121,10 @@ public class ExcelTemplateValidator {
         return workbook;
     }
 
+    /**
+     * Extrae el año académico de la celda de metadatos (fila 4, patrón "Año=YYYY");
+     * si la celda no existe o no matchea, devuelve el año actual como fallback.
+     */
     public int extractYear(Sheet sheet) {
         Row row = sheet.getRow(3);
         if (row == null) return Year.now().getValue();

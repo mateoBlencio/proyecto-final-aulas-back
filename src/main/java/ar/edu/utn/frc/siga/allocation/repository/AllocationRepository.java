@@ -12,6 +12,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+/** Acceso a {@code Allocation} (asignación vigente de aula a una occurrence). */
 @Repository
 public interface AllocationRepository extends JpaRepository<Allocation, Long> {
 

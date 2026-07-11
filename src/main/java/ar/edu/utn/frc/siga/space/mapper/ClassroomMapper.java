@@ -8,6 +8,10 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
+/**
+ * Mapea {@link Classroom} hacia/desde sus DTOs, incluyendo los campos desnormalizados
+ * de edificio y tipo de aula en la respuesta.
+ */
 @Mapper(config = CentralMapperConfig.class)
 public interface ClassroomMapper {
 

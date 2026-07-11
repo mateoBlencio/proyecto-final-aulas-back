@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.common.mapper.CentralMapperConfig;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+/** Mapea {@link SubjectCommission} hacia su DTO, aplanando materia y comisión a su ID. */
 @Mapper(config = CentralMapperConfig.class)
 public interface SubjectCommissionMapper {
 

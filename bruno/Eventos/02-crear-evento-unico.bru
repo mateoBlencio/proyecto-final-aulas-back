@@ -1,0 +1,21 @@
+meta {
+  name: Crear evento único
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/v1/events/unique
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "enrolled": 45,
+    "startTime": "19:55",
+    "durationMinutes": 180,
+    "date": "2026-06-27",
+    "description": "Examen Final Ingeniería Civil I"
+  }
+}

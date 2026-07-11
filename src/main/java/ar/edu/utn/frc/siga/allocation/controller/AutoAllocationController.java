@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** Endpoints del flujo de asignación automática (preview interactivo, validate-move y confirm) orquestado sobre el solver. */
 @Slf4j
 @RestController
 @RequestMapping("${siga.api.base-path}/allocations")
@@ -29,6 +30,7 @@ public class AutoAllocationController {
 
     private final AutoAllocationService autoAllocationService;
 
+    /** Corre el solver y genera una preview (no persiste asignaciones). */
     @PostMapping("/auto-preview")
     @Operation(summary = "Generar preview de asignación automática",
                description = "Corre el solver con las aulas disponibles y la ocupación existente; devuelve una preview con su previewId, sin persistir asignaciones.")
@@ -40,6 +42,7 @@ public class AutoAllocationController {
         return ResponseEntity.ok(preview);
     }
 
+    /** Recupera una preview ya generada, recompuesta contra el estado actual de la BD. */
     @GetMapping("/auto-preview/{previewId}")
     @Operation(summary = "Recuperar una preview generada",
                description = "Devuelve una preview previamente generada. 410 si expiró o no existe.")
@@ -48,6 +51,7 @@ public class AutoAllocationController {
         return ResponseEntity.ok(autoAllocationService.getPreview(previewId));
     }
 
+    /** Valida si arrastrar un evento del preview a otra aula genera una superposición nueva. */
     @PostMapping("/auto-preview/{previewId}/validate-move")
     @Operation(summary = "Validar movimiento de aula sobre el preview",
                description = "Valida si mover el bloque de un evento a otra aula genera una superposición nueva, "
@@ -64,6 +68,7 @@ public class AutoAllocationController {
         return ResponseEntity.ok(response);
     }
 
+    /** Aplica de forma atómica la propuesta final del preview (source AUTOMATIC), re-validando contra la BD actual. */
     @PostMapping("/auto-preview/{previewId}/confirm")
     @Operation(summary = "Confirmar el preview de asignación automática",
                description = "Persiste de forma atómica la propuesta final ajustada por el usuario, re-validando "

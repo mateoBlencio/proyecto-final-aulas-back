@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 
 import org.springframework.modulith.NamedInterface;
 
+/** Fachada de planes de estudio: resolución idempotente (find-or-create) por código de plan dentro de una especialidad. */
 @NamedInterface("api")
 public interface StudyPlanService {
 

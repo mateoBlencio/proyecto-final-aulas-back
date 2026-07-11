@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.allocation.model.EventType;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
+/** Vista de respuesta de un {@code UniqueEvent}: evento que ocurre una sola vez en {@code date}. */
 public record UniqueEventResponseDto(
         Long id,
         EventType type,

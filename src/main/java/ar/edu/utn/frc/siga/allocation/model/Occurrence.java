@@ -64,6 +64,7 @@ public class Occurrence {
         return event.endTime();
     }
 
+    /** true si ya pasó el momento de inicio (fecha + hora de inicio del evento vs. ahora). */
     public boolean isPast() {
         return LocalDateTime.now().isAfter(date.atTime(event.getStartTime()));
     }

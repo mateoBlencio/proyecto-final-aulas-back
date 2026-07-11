@@ -199,6 +199,8 @@ class GlobalExceptionHandlerTest {
 
     /** Subtipo de {@link SigaAppException} de uso exclusivo en tests, para probar la genericidad del handler. */
     private static final class TestSigaException extends SigaAppException {
+        private static final long serialVersionUID = 1L;
+
         TestSigaException(HttpStatus status, String title, String detail) {
             super(status, title, detail);
         }

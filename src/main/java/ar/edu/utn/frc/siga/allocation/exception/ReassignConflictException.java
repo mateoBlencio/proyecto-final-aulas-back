@@ -12,7 +12,9 @@ import java.util.List;
  * con asignaciones existentes. Lleva el detalle de cuáles.
  */
 @Getter
-public class ReassignConflictException extends SigaAppException {
+public final class ReassignConflictException extends SigaAppException {
+
+    private static final long serialVersionUID = 1L;
 
     private final transient List<OccurrenceConflictDto> conflicts;
 

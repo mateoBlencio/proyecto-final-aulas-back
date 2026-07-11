@@ -6,12 +6,18 @@ import java.util.Map;
 import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
+/**
+ * Base de las excepciones de dominio de la aplicación. Cada subclase representa
+ * un error HTTP específico; {@link GlobalExceptionHandler} las traduce a {@code ProblemDetail}.
+ */
 @Getter
 public abstract class SigaAppException extends RuntimeException {
 
+    private static final long serialVersionUID = 1L;
+
     private final HttpStatus status;
     private final String title;
-    private final Map<String, Object> properties = new LinkedHashMap<>();
+    private final transient Map<String, Object> properties = new LinkedHashMap<>();
 
     protected SigaAppException(HttpStatus status, String title, String detail) {
         super(detail);
@@ -33,6 +39,9 @@ public abstract class SigaAppException extends RuntimeException {
         return this;
     }
 
+    /**
+     * Propiedades adicionales para adjuntar al {@code ProblemDetail} de respuesta.
+     */
     public Map<String, Object> getProperties() {
         return Collections.unmodifiableMap(properties);
     }

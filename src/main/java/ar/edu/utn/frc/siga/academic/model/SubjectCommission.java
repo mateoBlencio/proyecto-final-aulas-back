@@ -1,6 +1,5 @@
 package ar.edu.utn.frc.siga.academic.model;
 
-import ar.edu.utn.frc.siga.academic.model.Subject;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -18,6 +17,11 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
+/**
+ * Tabla de unión materia×comisión: liga una {@link Subject} con una {@link Commission} y
+ * carga los atributos propios de ese dictado que condicionan la asignación de aula
+ * (cantidad de inscriptos, si requiere laboratorio, si permite superposición, modalidad).
+ */
 @Entity
 @Table(name = "materia_comision",
        uniqueConstraints = @UniqueConstraint(columnNames = {"id_materia", "id_comision"}))

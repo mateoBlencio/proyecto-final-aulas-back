@@ -26,6 +26,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -71,7 +72,8 @@ class AllocationProblemServiceImplTest {
         lenient().when(academicEventService.findUnassignedEvents(any(), any())).thenReturn(List.of());
         lenient().when(academicPeriodService.findActive()).thenReturn(List.of());
         lenient().when(classroomService.findByIds(any())).thenReturn(List.of());
-        lenient().when(academicEventComposer.compose(any(Collection.class))).thenAnswer(invocation -> {
+        lenient().when(academicEventComposer.compose(ArgumentMatchers.<Collection<? extends AcademicEvent>>any()))
+                .thenAnswer(invocation -> {
             Collection<AcademicEvent> events = invocation.getArgument(0);
             List<AcademicEventResponseDto> result = new ArrayList<>();
             for (AcademicEvent event : events) {
