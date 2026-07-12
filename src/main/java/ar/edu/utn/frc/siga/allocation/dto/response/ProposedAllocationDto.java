@@ -10,10 +10,14 @@ import java.util.List;
  * el evento, las fechas de ocurrencia que ocupa y el aula propuesta. {@code classroom}
  * viaja {@code null} solo cuando la fila pertenece a {@code unresolved} (el solver no
  * encontró aula sin conflicto para ese evento y queda para revisión manual).
+ * {@code overcrowdedBy} es la cantidad de alumnos que exceden la capacidad del aula
+ * propuesta (0 si entran todos, o si la fila es {@code unresolved}): el front pinta la
+ * alerta de sobrecupo cuando es {@code > 0}.
  */
 public record ProposedAllocationDto(
         AcademicEventResponseDto event,
         List<LocalDate> occurrenceDates,
-        ClassroomResponseDto classroom
+        ClassroomResponseDto classroom,
+        int overcrowdedBy
 ) {
 }

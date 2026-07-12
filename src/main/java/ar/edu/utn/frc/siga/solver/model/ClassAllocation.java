@@ -49,9 +49,13 @@ public class ClassAllocation {
     @PlanningPin
     boolean pinned;
 
-    /** Variable de planificación: aula asignada a este evento (null hasta que el solver decide). */
+    /**
+     * Variable de planificación: aula asignada a este evento. {@code allowsUnassigned}: el
+     * solver puede dejarla null cuando no hay aula sin solape (0 hard) en vez de forzar una
+     * que se superpone (−1 hard). Un null final = evento inubicable, va a {@code unresolved}.
+     */
     @Setter
-    @PlanningVariable
+    @PlanningVariable(allowsUnassigned = true)
     SolverRoom classroom;
 
     public ClassAllocation(SolverEvent event, List<SolverRoom> candidates, Set<String> conflictingEventIds) {

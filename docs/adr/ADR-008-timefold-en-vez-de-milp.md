@@ -54,8 +54,10 @@ Usamos **Timefold Solver** (Apache 2.0, `timefold-solver-core`) con:
   `ClassAllocation` con `@PlanningVariable` aula, `SolverRoom`), desacoplado de
   las entidades JPA.
 - `ConstraintProvider` con 1 restricción HARD (no-solape sobre pares de
-  conflicto precalculados) y 4 SOFT con la jerarquía de pesos descripta en
-  [docs/modulos/solver.md](../modulos/solver.md).
+  conflicto precalculados), 1 MEDIUM (asignar todo lo posible) y 4 SOFT con la
+  jerarquía de pesos descripta en [docs/modulos/solver.md](../modulos/solver.md).
+  La variable de planificación `classroom` es `allowsUnassigned`: el solver deja
+  sin aula lo verdaderamente inubicable en vez de forzar un solape.
 - Terminación por `unimproved-seconds-limit` + límite total por request:
   comportamiento *anytime* — siempre hay una mejor-solución-hasta-ahora que
   devolver al usuario.
@@ -89,12 +91,14 @@ Negativas / trade-offs aceptados:
 
 - **Sin certificado de optimalidad ni de infactibilidad.** Un MILP/CP-SAT puede
   demostrar "no existe asignación sin conflictos"; Timefold solo devuelve la
-  mejor encontrada. Caso extremo documentado: con todas las aulas ocupadas, la
-  variable de planificación no-nullable obliga a proponer un aula aunque viole
-  la HARD (score hard negativo, "false-feasible" — ver FIXME en
-  `ClassroomConstraintProviderTest` y `AutoAllocationFlowIntegrationTest`).
-  Mitigación pendiente: variable nullable o descarte de propuestas con hard
-  negativo en `toPreview`.
+  mejor encontrada. El caso "false-feasible" original (variable no-nullable que
+  obligaba a proponer un aula en solape, score hard negativo indistinguible de
+  una fila sana) quedó **resuelto**: `classroom` es `allowsUnassigned` y una
+  restricción MEDIUM ("asignar todo lo posible") hace que el solver deje sin aula
+  solo lo inubicable, que viaja explícito en `unresolved` (allocation además
+  aplica un floor: un evento que ya tenía aula nunca regresa a `unresolved`).
+  Sigue sin haber certificado formal de infactibilidad, pero ya no hay propuestas
+  con hard negativo camufladas.
 - **No determinista entre corridas** (salvo semilla fija): dos previews sobre el
   mismo estado pueden diferir. Aceptable porque la propuesta es editable y el
   usuario confirma explícitamente.

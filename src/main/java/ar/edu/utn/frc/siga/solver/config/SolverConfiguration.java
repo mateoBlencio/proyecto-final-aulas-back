@@ -5,9 +5,11 @@ import ar.edu.utn.frc.siga.solver.model.ScheduleSolution;
 import ar.edu.utn.frc.siga.solver.service.impl.ClassroomConstraintProvider;
 import ai.timefold.solver.core.api.solver.SolverFactory;
 import ai.timefold.solver.core.api.solver.SolverManager;
+import ai.timefold.solver.core.config.score.director.ScoreDirectorFactoryConfig;
 import ai.timefold.solver.core.config.solver.SolverConfig;
 import ai.timefold.solver.core.config.solver.SolverManagerConfig;
 import ai.timefold.solver.core.config.solver.termination.TerminationConfig;
+import java.util.Map;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,10 +31,17 @@ public class SolverConfiguration {
     /** Fábrica de solvers configurada con el modelo, las restricciones y el modo de entorno. */
     @Bean
     public SolverFactory<ScheduleSolution> scheduleSolverFactory(SolverProperties properties) {
+        SolverProperties.Weights weights = properties.getWeights();
+        ScoreDirectorFactoryConfig scoreDirectorFactoryConfig = new ScoreDirectorFactoryConfig()
+                .withConstraintProviderClass(ClassroomConstraintProvider.class)
+                .withConstraintProviderCustomProperties(Map.of(
+                        "overcrowdingWeight", String.valueOf(weights.getOvercrowding()),
+                        "sameCommissionDiffRoomWeight", String.valueOf(weights.getSameCommissionDiffRoom()),
+                        "sameCommissionDiffBuildingWeight", String.valueOf(weights.getSameCommissionDiffBuilding())));
         SolverConfig config = new SolverConfig()
                 .withSolutionClass(ScheduleSolution.class)
                 .withEntityClasses(ClassAllocation.class)
-                .withConstraintProviderClass(ClassroomConstraintProvider.class)
+                .withScoreDirectorFactory(scoreDirectorFactoryConfig)
                 .withEnvironmentMode(properties.getEnvironmentMode())
                 .withTerminationConfig(new TerminationConfig()
                         .withSecondsSpentLimit(DEFAULT_SECONDS_LIMIT));

@@ -342,7 +342,50 @@ class AutoAllocationServiceImplTest {
         assertThat(result.allocations().get(0).event().enrolled()).isEqualTo(30);
         assertThat(result.allocations().get(0).occurrenceDates()).containsExactly(date1, date2);
         assertThat(result.allocations().get(0).classroom().id()).isEqualTo(5);
+        assertThat(result.allocations().get(0).overcrowdedBy()).isZero(); // capacidad 100 >= inscriptos 30
         assertThat(result.unresolved()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Sobrecupo: fila resuelta con inscriptos > capacidad del aula reporta overcrowdedBy > 0")
+    void sobrecupoReportaOvercrowdedBy() {
+        RecurringEvent event = recurringEvent(1L); // enrolled = 30
+        when(eventRepository.findAllById(any())).thenReturn(List.of(event));
+        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+                .thenReturn(List.of(occurrence(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED)));
+        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 20))); // capacidad 20 < 30
+        when(solverService.preview(any(), any(), any(), anyInt())).thenReturn(new SolverPreview("prev_oc",
+                List.of(new SolverAllocation("1", 5))));
+
+        AutoPreviewResponseDto result = service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null));
+
+        assertThat(result.allocations()).hasSize(1);
+        assertThat(result.allocations().get(0).classroom().id()).isEqualTo(5);
+        assertThat(result.allocations().get(0).overcrowdedBy()).isEqualTo(10);
+        assertThat(result.unresolved()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Floor: evento ya asignado que el solver deja sin aula conserva su aula previa (no cae en unresolved)")
+    void floorEventoYaAsignadoConservaAulaPrevia() {
+        RecurringEvent event = recurringEvent(1L);
+        LocalDate date = futureDate(1);
+        Allocation prior = allocation(100L, occurrence(10L, event, date, OccurrenceStatus.ASSIGNED), 3);
+        when(eventRepository.findAllById(any())).thenReturn(List.of(event));
+        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+                .thenReturn(List.of(occurrence(10L, event, date, OccurrenceStatus.ASSIGNED)));
+        when(allocationRepository.findOccupancyBetween(any(), any(), eq(OccurrenceStatus.ASSIGNED)))
+                .thenReturn(List.of(prior));
+        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(3, 100)));
+        when(solverService.preview(any(), any(), any(), anyInt())).thenReturn(new SolverPreview("prev_floor",
+                List.of(new SolverAllocation("1", null)))); // el solver no ubicó el evento
+
+        AutoPreviewResponseDto result = service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null));
+
+        assertThat(result.unresolved()).isEmpty();
+        assertThat(result.allocations()).hasSize(1);
+        assertThat(result.allocations().get(0).event().id()).isEqualTo(1L);
+        assertThat(result.allocations().get(0).classroom().id()).isEqualTo(3); // aula previa conservada
     }
 
     @Test

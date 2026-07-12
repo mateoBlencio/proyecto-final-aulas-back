@@ -154,15 +154,12 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("auto-preview con todas las aulas ocupadas: el solver igual propone un aula (solución infactible, no unresolved)")
-    void autoPreview_allRoomsOccupied_stillProposesInfeasibleRoom() throws Exception {
-        // FIXME: comportamiento actual, no el deseable. ClassAllocation.classroom es una
-        // @PlanningVariable NO nullable: el solver está obligado a asignar algún aula aunque
-        // todas violen la constraint HARD de no-solape (score hard negativo, false-feasible).
-        // "unresolved" hoy solo puede salir de una solución sin inicializar, nunca de una
-        // infactible. Mismo gap documentado en ClassroomConstraintProviderTest (overcrowding
-        // sin aula): si se quiere que el evento quede en unresolved, la variable debería ser
-        // nullable o el preview debería descartar propuestas con conflicto HARD.
+    @DisplayName("auto-preview con todas las aulas ocupadas: el evento (nuevo, sin aula previa) queda en unresolved")
+    void autoPreview_allRoomsOccupied_leavesEventUnresolved() throws Exception {
+        // Con classroom `allowsUnassigned` + la constraint MEDIUM "asignar todo lo posible",
+        // el solver deja el evento sin aula (0 hard) en vez de forzar una que se solapa
+        // (−1 hard): ya no hay false-feasible. Como es un evento nuevo (sin aula previa en BD),
+        // no aplica el floor de no-regresión → viaja explícito en `unresolved`.
         var sc = testData.materiaYComision();
         LocalDate date = LocalDate.now().plusDays(101);
         blockAllAvailableRooms(date, START, DURATION);
@@ -170,10 +167,10 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
 
         AutoPreviewResponseDto preview = autoPreview(List.of(eventId));
 
-        assertThat(preview.allocations()).hasSize(1);
-        assertThat(preview.allocations().get(0).event().id()).isEqualTo(eventId);
-        assertThat(preview.allocations().get(0).classroom()).isNotNull();
-        assertThat(preview.unresolved()).isEmpty();
+        assertThat(preview.allocations()).isEmpty();
+        assertThat(preview.unresolved()).hasSize(1);
+        assertThat(preview.unresolved().get(0).event().id()).isEqualTo(eventId);
+        assertThat(preview.unresolved().get(0).classroom()).isNull();
     }
 
     @Test

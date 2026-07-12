@@ -45,10 +45,16 @@ class AutoAllocationDataLoader {
     private final AllocationRepository allocationRepository;
     private final ClassroomService classroomService;
 
-    /** Todo lo que el auto-preview necesita, ya materializado fuera de la sesión de Hibernate. */
+    /**
+     * Todo lo que el auto-preview necesita, ya materializado fuera de la sesión de Hibernate.
+     * {@code priorRoomByEvent} es el aula que cada evento seleccionado ya tenía asignada
+     * (si tenía): garantiza que un evento previamente asignado nunca regrese a
+     * {@code unresolved} — si el solver no lo ubica, conserva su aula previa.
+     */
     record AutoPreviewInputs(List<RecurringEvent> events, Map<Long, List<LocalDate>> datesByEvent,
                               List<SolverRoom> rooms, List<SolverOccupancy> occupancy,
-                              List<DatabaseOccupancy> databaseOccupancy) {
+                              List<DatabaseOccupancy> databaseOccupancy,
+                              Map<Long, Integer> priorRoomByEvent) {
     }
 
     /**
@@ -68,12 +74,23 @@ class AutoAllocationDataLoader {
         List<SolverRoom> rooms = classroomService.findAllAvailable().stream()
                 .map(this::toSolverRoom)
                 .toList();
-        List<Allocation> databaseAllocations = loadDatabaseAllocations(events, eventIds);
+
+        List<Allocation> occupancyInRange = loadOccupancyInRange(events);
+        // Ocupación ajena (pinned): excluye los eventos seleccionados → sus aulas quedan libres (D2).
+        List<Allocation> databaseAllocations = occupancyInRange.stream()
+                .filter(a -> !eventIds.contains(a.getOccurrence().getEvent().getId()))
+                .toList();
+        // Aula previa de cada evento seleccionado que ya estaba asignado (floor de no-regresión).
+        Map<Long, Integer> priorRoomByEvent = occupancyInRange.stream()
+                .filter(a -> eventIds.contains(a.getOccurrence().getEvent().getId()))
+                .collect(Collectors.toMap(
+                        a -> a.getOccurrence().getEvent().getId(), Allocation::getClassroomId, (x, y) -> x));
+
         List<SolverOccupancy> occupancy = databaseAllocations.stream().map(this::toOccupancy).toList();
         List<DatabaseOccupancy> databaseOccupancy = databaseAllocations.stream()
                 .map(this::toDatabaseOccupancy)
                 .toList();
-        return new AutoPreviewInputs(events, datesByEvent, rooms, occupancy, databaseOccupancy);
+        return new AutoPreviewInputs(events, datesByEvent, rooms, occupancy, databaseOccupancy, priorRoomByEvent);
     }
 
     private List<RecurringEvent> loadRecurringEvents(Set<Long> eventIds) {
@@ -112,13 +129,13 @@ class AutoAllocationDataLoader {
     }
 
     /**
-     * Ocupación existente en el rango de los eventos seleccionados, EXCLUYENDO las
-     * allocations cuyo evento está en {@code selectedEventIds}: esas aulas quedan libres
-     * para que el solver pueda reasignarlas (D2). El resto sigue pinned. Se devuelve la
-     * entidad completa (no un record del solver) para poder derivar tanto la ocupación
-     * pinned del solver como el detalle con eventId que necesita validate-move.
+     * Ocupación existente (ASSIGNED) en el rango de fechas de los eventos seleccionados, sin
+     * filtrar por evento: quien llama separa la ajena (pinned) de la de los propios eventos
+     * (que da el aula previa para el floor de no-regresión). Se devuelve la entidad completa
+     * (no un record del solver) para derivar tanto la ocupación pinned como el detalle con
+     * eventId que necesita validate-move.
      */
-    private List<Allocation> loadDatabaseAllocations(List<RecurringEvent> events, Set<Long> selectedEventIds) {
+    private List<Allocation> loadOccupancyInRange(List<RecurringEvent> events) {
         if (events.isEmpty()) {
             return List.of();
         }
@@ -128,9 +145,7 @@ class AutoAllocationDataLoader {
                 .map(e -> e.getEndDate() != null ? e.getEndDate() : e.getStartDate().plusYears(1))
                 .max(Comparator.naturalOrder()).orElseThrow();
 
-        return allocationRepository.findOccupancyBetween(from, to, OccurrenceStatus.ASSIGNED).stream()
-                .filter(a -> !selectedEventIds.contains(a.getOccurrence().getEvent().getId()))
-                .toList();
+        return allocationRepository.findOccupancyBetween(from, to, OccurrenceStatus.ASSIGNED);
     }
 
     private SolverOccupancy toOccupancy(Allocation a) {

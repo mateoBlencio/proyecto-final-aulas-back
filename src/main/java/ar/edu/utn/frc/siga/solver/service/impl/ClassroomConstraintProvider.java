@@ -1,29 +1,40 @@
 package ar.edu.utn.frc.siga.solver.service.impl;
 
 import ar.edu.utn.frc.siga.solver.model.ClassAllocation;
-import ai.timefold.solver.core.api.score.HardSoftScore;
+import ai.timefold.solver.core.api.score.HardMediumSoftScore;
 import ai.timefold.solver.core.api.score.stream.Constraint;
 import ai.timefold.solver.core.api.score.stream.ConstraintFactory;
 import ai.timefold.solver.core.api.score.stream.ConstraintProvider;
 import ai.timefold.solver.core.api.score.stream.Joiners;
+import lombok.Setter;
 import org.jspecify.annotations.NonNull;
 
 /**
- * Restricciones hard/soft de la asignación automática de aulas. La jerarquía de pesos
- * (ver ADR-008) es: sobrecupo (100.000 por alumno excedente) ≫ misma comisión en el mismo
- * edificio (4.000) > misma comisión en la misma aula (2.000) > capacidad ociosa (1).
+ * Restricciones de la asignación automática de aulas, en tres niveles (ver ADR-008):
+ * HARD (no-solape) ≫ MEDIUM (asignar todo lo posible) ≫ SOFT. La jerarquía de pesos SOFT por
+ * defecto es: sobrecupo (100.000 por alumno excedente) ≫ misma comisión en el mismo edificio
+ * (4.000) > misma comisión en la misma aula (2.000) > capacidad ociosa (1). El nivel MEDIUM
+ * empuja a asignar aula a cada evento que no rompa el HARD, aun sobrecupando (soft), y sólo
+ * deja sin aula lo verdaderamente inubicable (solape en todas las candidatas).
+ * <p>
+ * Los pesos SOFT son configurables vía {@code siga.solver.weights.*} en application.yaml
+ * (ver {@link ar.edu.utn.frc.siga.solver.config.SolverProperties}): Timefold instancia esta
+ * clase con su constructor sin argumentos y aplica esos valores por setter
+ * ({@code constraintProviderCustomProperties}) antes de llamar a {@link #defineConstraints}.
  */
+@Setter
 public class ClassroomConstraintProvider implements ConstraintProvider {
 
-    private static final int OVERCROWDING_WEIGHT = 100_000;
-    private static final int SAME_COMMISSION_DIFF_ROOM_WEIGHT = 2_000;
-    private static final int SAME_COMMISSION_DIFF_BUILDING_WEIGHT = 4_000;
+    private int overcrowdingWeight = 100_000;
+    private int sameCommissionDiffRoomWeight = 2_000;
+    private int sameCommissionDiffBuildingWeight = 4_000;
 
     /** Restricciones que evalúa el solver, en el orden en que se registran. */
     @Override
-    public Constraint[] defineConstraints(@NonNull ConstraintFactory factory) {
+    public @NonNull Constraint[] defineConstraints(@NonNull ConstraintFactory factory) {
         return new Constraint[]{
                 noOverlap(factory),
+                assignAllPossible(factory),
                 minimizeOvercrowding(factory),
                 minimizeUnusedCapacity(factory),
                 preferSameRoomSameCommission(factory),
@@ -41,8 +52,22 @@ public class ClassroomConstraintProvider implements ConstraintProvider {
                 .forEachUniquePair(ClassAllocation.class, Joiners.equal(ClassAllocation::getClassroom),
                         Joiners.filtering((a, b) -> (!a.isPinned() || !b.isPinned())
                                         && a.conflictsWith(b.getEvent().planningId())))
-                .penalize(HardSoftScore.ONE_HARD)
+                .penalize(HardMediumSoftScore.ONE_HARD)
                 .asConstraint("Sin solapamiento");
+    }
+
+    /**
+     * Restricción media: penaliza cada evento no-pinned que quede sin aula. Domina a todo el
+     * nivel SOFT, así que el solver asigna aula siempre que no rompa el HARD (aun sobrecupando,
+     * que es soft); sólo deja sin aula lo verdaderamente inubicable (solape en toda candidata).
+     * Se usa la variante que incluye entidades sin asignar; {@code forEach} las excluiría.
+     */
+    Constraint assignAllPossible(ConstraintFactory factory) {
+        return factory
+                .forEachIncludingUnassigned(ClassAllocation.class)
+                .filter(a -> !a.isPinned() && a.getClassroom() == null)
+                .penalize(HardMediumSoftScore.ONE_MEDIUM)
+                .asConstraint("Asignar todo lo posible");
     }
 
     /** Restricción blanda: penaliza (fuerte) asignar un evento a un aula con menos capacidad que sus inscriptos. */
@@ -50,7 +75,7 @@ public class ClassroomConstraintProvider implements ConstraintProvider {
         return factory
                 .forEach(ClassAllocation.class)
                 .filter(a -> !a.isPinned() && a.getOvercrowding() > 0)
-                .penalize(HardSoftScore.ONE_SOFT, a -> (long) a.getOvercrowding() * OVERCROWDING_WEIGHT)
+                .penalize(HardMediumSoftScore.ONE_SOFT, a -> (long) a.getOvercrowding() * overcrowdingWeight)
                 .asConstraint("Minimizar sobreocupacion");
     }
 
@@ -59,7 +84,7 @@ public class ClassroomConstraintProvider implements ConstraintProvider {
         return factory
                 .forEach(ClassAllocation.class)
                 .filter(a -> !a.isPinned())
-                .penalize(HardSoftScore.ONE_SOFT,
+                .penalize(HardMediumSoftScore.ONE_SOFT,
                         ClassAllocation::getUnusedCapacity)
                 .asConstraint("Minimizar subocupacion");
     }
@@ -79,7 +104,7 @@ public class ClassroomConstraintProvider implements ConstraintProvider {
                         Joiners.lessThan(ClassAllocation::getId),
                         Joiners.filtering((a, b) -> !b.isPinned() && b.getClassroom() != null
                                 && !a.getClassroom().equals(b.getClassroom())))
-                .penalize(HardSoftScore.ONE_SOFT, (a, b) -> SAME_COMMISSION_DIFF_ROOM_WEIGHT)
+                .penalize(HardMediumSoftScore.ONE_SOFT, (a, b) -> sameCommissionDiffRoomWeight)
                 .asConstraint("Preferir misma aula por comision");
     }
 
@@ -97,7 +122,7 @@ public class ClassroomConstraintProvider implements ConstraintProvider {
                         Joiners.lessThan(ClassAllocation::getId),
                         Joiners.filtering((a, b) -> !b.isPinned() && b.getBuildingId() != null
                                 && !a.getBuildingId().equals(b.getBuildingId())))
-                .penalize(HardSoftScore.ONE_SOFT, (a, b) -> SAME_COMMISSION_DIFF_BUILDING_WEIGHT)
+                .penalize(HardMediumSoftScore.ONE_SOFT, (a, b) -> sameCommissionDiffBuildingWeight)
                 .asConstraint("Preferir mismo edificio por comision");
     }
 }

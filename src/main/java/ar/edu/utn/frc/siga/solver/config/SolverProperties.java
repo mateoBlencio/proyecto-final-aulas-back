@@ -32,6 +32,8 @@ public class SolverProperties {
 
     private Preview preview = new Preview();
 
+    private Weights weights = new Weights();
+
     /**
      * Preview generada y guardada para confirmarla después. El TTL acota la
      * obsolescencia (bound de staleness), no es eviction por memoria.
@@ -40,5 +42,18 @@ public class SolverProperties {
     @Setter
     public static class Preview {
         private long ttlMinutes = 30;
+    }
+
+    /**
+     * Pesos SOFT del {@code ClassroomConstraintProvider} (ver ADR-008). Se aplican al solver
+     * vía {@code constraintProviderCustomProperties} de Timefold, no por inyección de Spring.
+     * Default: sobrecupo ≫ misma comisión/edificio > misma comisión/aula.
+     */
+    @Getter
+    @Setter
+    public static class Weights {
+        private int overcrowding = 100_000;
+        private int sameCommissionDiffRoom = 2_000;
+        private int sameCommissionDiffBuilding = 4_000;
     }
 }

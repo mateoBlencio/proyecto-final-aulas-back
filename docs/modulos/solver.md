@@ -79,7 +79,7 @@ memoria. Tres operaciones: `save`, `get` (`Optional`), `remove`. Flujo completo:
 `preview` guarda → el usuario revisa/ajusta (via `allocation`) → confirm persiste y
 llama `invalidatePreview` → cualquier reuso posterior del id da 410.
 
-### `ClassroomConstraintProvider` — restricciones de score (`HardSoftScore`)
+### `ClassroomConstraintProvider` — restricciones de score (`HardMediumSoftScore`)
 
 No es un bean: Timefold lo instancia desde `SolverConfiguration`. Opera sobre pares o
 individuos de `ClassAllocation`:
@@ -87,23 +87,26 @@ individuos de `ClassAllocation`:
 | Constraint | Tipo | Regla |
 | --- | --- | --- |
 | `noOverlap` | **HARD** | Par único con misma aula asignada cuyo `conflictsWith` (adyacencia precalculada) da true ⇒ 1 hard. Los pares **pinned-pinned se excluyen** (conflicto preexistente en BD, el solver no puede arreglarlo y penalizarlo solo ensucia el score). |
-| `minimizeOvercrowding` | SOFT | Por allocation no-pinned con `inscriptos > capacidad`: penaliza `excedente × 100.000`. La rama "sin aula ⇒ excedente = total de inscriptos" de `getOvercrowding` es **código muerto en el scoring real**: `classroom` es una `@PlanningVariable` no-nullable y Timefold excluye entidades sin inicializar del `forEach` — verificado con `ConstraintVerifier` (ver FIXME en `ClassroomConstraintProviderTest`). |
+| `assignAllPossible` | **MEDIUM** | Por allocation no-pinned **sin aula** (`classroom == null`): 1 medium. Empuja al solver a asignar aula a todo evento que no rompa el HARD (aun sobrecupando, que es soft); el medium domina a todo el nivel soft. Usa `forEachIncludingUnassigned` (el `forEach` normal excluiría las entidades sin asignar). Con `@PlanningVariable(allowsUnassigned = true)`, el solver deja `classroom = null` solo en lo inubicable (solape en toda candidata) → esa fila viaja en `unresolved`, ya no oculta como false-feasible. |
+| `minimizeOvercrowding` | SOFT | Por allocation no-pinned con `inscriptos > capacidad`: penaliza `excedente × 100.000`. La rama "sin aula ⇒ excedente = total de inscriptos" de `getOvercrowding` es **código muerto en el scoring** (el `forEach` excluye entidades sin aula); ese caso lo cubre ahora `assignAllPossible` en el nivel medium. |
 | `minimizeUnusedCapacity` | SOFT | Por allocation no-pinned: penaliza `capacidad − inscriptos` (peso 1) — desempata hacia el aula más ajustada. |
 | `preferSameRoomSameCommission` | SOFT | Par no-pinned de la misma comisión (`commissionKey`) en aulas distintas: 2.000. |
 | `preferSameBuildingSameCommission` | SOFT | Par no-pinned de la misma comisión en edificios distintos: 4.000 (se suma a la anterior: distinta aula y distinto edificio castiga 6.000). |
 
-La jerarquía de pesos hace que el sobrecupo (100.000/alumno) domine sobre el
-agrupamiento por comisión (2.000/4.000) y este sobre el ajuste de capacidad (1/asiento).
+Jerarquía de niveles: **HARD** (sin solape) ≫ **MEDIUM** (asignar todo lo posible) ≫
+**SOFT**. Dentro del soft, el sobrecupo (100.000/alumno) domina sobre el agrupamiento por
+comisión (2.000/4.000) y este sobre el ajuste de capacidad (1/asiento).
 
 ### Modelos de planificación (soporte de los servicios)
 
 - **`ClassAllocation`** (`@PlanningEntity`): `@PlanningId` = `planningId` del evento;
   variable de decisión `classroom` con `@ValueRangeProvider` **por entidad** (todas las
-  aulas, o solo la fijada si es pinned); `@PlanningPin pinned` para ocupación inmovible;
-  helpers de score (`getOvercrowding`, `getUnusedCapacity`, `conflictsWith`,
-  `getCommissionKey`, `getBuildingId`).
+  aulas, o solo la fijada si es pinned) y `allowsUnassigned = true` (puede quedar `null`
+  si no hay aula sin solape); `@PlanningPin pinned` para ocupación inmovible; helpers de
+  score (`getOvercrowding`, `getUnusedCapacity`, `conflictsWith`, `getCommissionKey`,
+  `getBuildingId`).
 - **`ScheduleSolution`** (`@PlanningSolution`): aulas (facts) + allocations (entities) +
-  `HardSoftScore`.
+  `HardMediumSoftScore`.
 
 ### Configuración
 

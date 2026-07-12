@@ -139,7 +139,12 @@ Flujo completo de tres pasos sobre un `SolverPreview` cacheado por `solver`
      reasigne); el resto de la ocupación firme de BD sigue pinned.
    - Respuesta propia `AutoPreviewResponseDto{previewId, allocations, unresolved}`:
      `allocations` son las filas con aula propuesta, `unresolved` son los eventos que el
-     solver no pudo ubicar sin conflicto (`classroomId == null`, revisión manual).
+     solver no pudo ubicar sin conflicto (`classroomId == null`, revisión manual). Cada
+     fila (`ProposedAllocationDto`) trae `overcrowdedBy`: alumnos que exceden la capacidad
+     del aula propuesta (0 si entran; el front pinta alerta cuando es > 0).
+   - **Floor de no-regresión**: un evento que el solver deja sin aula pero que **ya tenía
+     una asignada** conserva esa aula previa (`priorRoomByEvent`) y queda en `allocations`,
+     no en `unresolved`. Sólo los eventos nuevos (sin aula previa) caen en `unresolved`.
 2. **`validateMove` — validación de movimiento sobre el preview**. Responde **200
    siempre** que el request sea coherente con el preview — el conflicto es un resultado
    esperado de la interacción de arrastre, no un error — con `valid=false` +

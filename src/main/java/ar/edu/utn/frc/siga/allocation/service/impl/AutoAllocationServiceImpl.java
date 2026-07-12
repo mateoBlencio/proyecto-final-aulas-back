@@ -97,7 +97,7 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
                 solverEvents.size(), inputs.rooms().size(), inputs.occupancy().size());
 
         SolverPreview preview = solverService.preview(solverEvents, inputs.rooms(), inputs.occupancy(), timeLimit);
-        return compose(preview, inputs.events(), inputs.datesByEvent());
+        return compose(preview, inputs.events(), inputs.datesByEvent(), inputs.priorRoomByEvent());
     }
 
     @Override
@@ -107,7 +107,7 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
                 .map(a -> Long.valueOf(a.eventId()))
                 .collect(Collectors.toSet());
         AutoPreviewInputs inputs = dataLoader.load(eventIds);
-        return compose(preview, inputs.events(), inputs.datesByEvent());
+        return compose(preview, inputs.events(), inputs.datesByEvent(), inputs.priorRoomByEvent());
     }
 
     /**
@@ -403,20 +403,29 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
     }
 
     /**
-     * Compone el DTO propio de allocation a partir de la preview cruda del solver:
-     * separa resueltos (con aula) de {@code unresolved} (classroomId null, revisión
-     * manual), y resuelve evento y aula en un solo batch cada uno.
+     * Compone el DTO propio de allocation a partir de la preview cruda del solver: separa
+     * resueltos (con aula) de {@code unresolved} (sin aula, revisión manual), y resuelve
+     * evento y aula en un solo batch cada uno. Floor de no-regresión: un evento sin aula del
+     * solver que YA estaba asignado ({@code priorRoomByEvent}) conserva esa aula previa y
+     * queda en resueltos; sólo los eventos sin aula previa caen en {@code unresolved}.
      */
     private AutoPreviewResponseDto compose(SolverPreview preview, List<RecurringEvent> events,
-                                            Map<Long, List<LocalDate>> datesByEvent) {
+                                            Map<Long, List<LocalDate>> datesByEvent,
+                                            Map<Long, Integer> priorRoomByEvent) {
         Map<Long, RecurringEvent> eventsById = events.stream()
                 .collect(Collectors.toMap(AcademicEvent::getId, e -> e));
 
         List<SolverAllocation> resolved = new ArrayList<>();
         List<SolverAllocation> unresolved = new ArrayList<>();
+        Map<String, Integer> effectiveRoomByEventId = new LinkedHashMap<>();
         for (SolverAllocation allocation : preview.allocations()) {
-            if (allocation.classroomId() != null) {
+            Integer classroomId = allocation.classroomId();
+            if (classroomId == null) {
+                classroomId = priorRoomByEvent.get(Long.valueOf(allocation.eventId()));
+            }
+            if (classroomId != null) {
                 resolved.add(allocation);
+                effectiveRoomByEventId.put(allocation.eventId(), classroomId);
             } else {
                 unresolved.add(allocation);
             }
@@ -428,14 +437,13 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
                 .toList();
         Map<Long, AcademicEventResponseDto> eventDtoById = composeEventsById(referencedEvents);
 
-        Set<Integer> classroomIds = resolved.stream()
-                .map(SolverAllocation::classroomId)
-                .collect(Collectors.toSet());
+        Set<Integer> classroomIds = Set.copyOf(effectiveRoomByEventId.values());
         Map<Integer, ClassroomResponseDto> classroomDtoById = classroomService.findByIds(classroomIds).stream()
                 .collect(Collectors.toMap(ClassroomResponseDto::id, c -> c));
 
         List<ProposedAllocationDto> allocations = resolved.stream()
-                .map(a -> toProposedAllocationDto(a, eventDtoById, datesByEvent, classroomDtoById.get(a.classroomId())))
+                .map(a -> toProposedAllocationDto(a, eventDtoById, datesByEvent,
+                        classroomDtoById.get(effectiveRoomByEventId.get(a.eventId()))))
                 .toList();
         List<ProposedAllocationDto> unresolvedDtos = unresolved.stream()
                 .map(a -> toProposedAllocationDto(a, eventDtoById, datesByEvent, null))
@@ -458,7 +466,16 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
             Map<Long, AcademicEventResponseDto> eventDtoById, Map<Long, List<LocalDate>> datesByEvent,
             ClassroomResponseDto classroom) {
         Long eventId = Long.valueOf(allocation.eventId());
+        AcademicEventResponseDto event = eventDtoById.get(eventId);
         return new ProposedAllocationDto(
-                eventDtoById.get(eventId), datesByEvent.getOrDefault(eventId, List.of()), classroom);
+                event, datesByEvent.getOrDefault(eventId, List.of()), classroom, overcrowdedBy(event, classroom));
+    }
+
+    /** Alumnos que exceden la capacidad del aula propuesta (0 si entran, o si la fila es unresolved). */
+    private int overcrowdedBy(AcademicEventResponseDto event, ClassroomResponseDto classroom) {
+        if (classroom == null || classroom.capacity() == null || event == null || event.enrolled() == null) {
+            return 0;
+        }
+        return Math.max(0, event.enrolled() - classroom.capacity());
     }
 }

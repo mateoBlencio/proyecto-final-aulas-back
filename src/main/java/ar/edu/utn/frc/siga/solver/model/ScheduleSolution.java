@@ -4,7 +4,7 @@ import ai.timefold.solver.core.api.domain.solution.PlanningEntityCollectionPrope
 import ai.timefold.solver.core.api.domain.solution.PlanningScore;
 import ai.timefold.solver.core.api.domain.solution.PlanningSolution;
 import ai.timefold.solver.core.api.domain.solution.ProblemFactCollectionProperty;
-import ai.timefold.solver.core.api.score.HardSoftScore;
+import ai.timefold.solver.core.api.score.HardMediumSoftScore;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -34,10 +34,10 @@ public class ScheduleSolution {
     @PlanningEntityCollectionProperty
     List<ClassAllocation> allocations;
 
-    /** Puntaje hard/soft de la solución actual, calculado por el {@code ConstraintProvider}. */
+    /** Puntaje hard/medium/soft de la solución actual, calculado por el {@code ConstraintProvider}. */
     @Setter
     @PlanningScore
-    HardSoftScore score;
+    HardMediumSoftScore score;
 
     public ScheduleSolution(List<SolverRoom> classrooms, List<ClassAllocation> allocations) {
         this.classrooms = classrooms;
