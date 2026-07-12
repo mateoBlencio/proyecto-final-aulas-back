@@ -68,7 +68,7 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
         var dto = new CreateRecurringEventRequestDto(
                 enrolled, START, DURATION, date.getDayOfWeek(), date, date, sc.subjectId(), sc.commissionId());
         Long eventId = academicEventService.createRecurringEvent(dto).id();
-        return occurrenceRepository.findByEvent_Id(eventId).get(0);
+        return occurrenceRepository.findByEvent_Id(eventId).getFirst();
     }
 
     private void assignOk(Long occurrenceId, Integer classroomId) throws Exception {

@@ -26,7 +26,6 @@ import java.time.LocalTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -119,8 +118,8 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
 
         List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId);
         assertThat(occurrences).hasSize(1);
-        assertThat(occurrences.get(0).getDate()).isEqualTo(date);
-        assertThat(occurrences.get(0).getStatus()).isEqualTo(OccurrenceStatus.SCHEDULED);
+        assertThat(occurrences.getFirst().getDate()).isEqualTo(date);
+        assertThat(occurrences.getFirst().getStatus()).isEqualTo(OccurrenceStatus.SCHEDULED);
     }
 
     @Test
