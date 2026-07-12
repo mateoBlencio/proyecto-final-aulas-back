@@ -22,6 +22,7 @@ import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 
 import tools.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -72,6 +73,19 @@ class ExcelImportIntegrationTest extends AbstractIntegrationTest {
     private AllocationRepository allocationRepository;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private IntegrationTestData integrationTestData;
+
+    /**
+     * El import crea aulas vía {@code ClassroomService.findOrCreate}, que asume el tipo de
+     * aula por defecto ya sembrado ({@code ClassroomTypeServiceImpl.findDefault()}). Sin
+     * {@code data.sql} (perfil integration) nada lo garantiza si esta clase corre antes que
+     * otro test que lo siembre de paso.
+     */
+    @BeforeEach
+    void seedDefaultClassroomType() {
+        integrationTestData.tipoAulaNormal();
+    }
 
     /** Fila válida con claves naturales únicas (courseCode arranca con '6', año fijo de la plantilla = 2026). */
     private DataRow uniqueRow(String buildingName) {
@@ -143,6 +157,7 @@ class ExcelImportIntegrationTest extends AbstractIntegrationTest {
                         "JOIN asignacion_aula a ON a.id_ocurrencia = o.id_ocurrencia " +
                         "WHERE a.id_aula = ? LIMIT 1",
                 Long.class, classroom1.getId());
+        assert eventId1 != null;
         assertThat(eventRepository.existsById(eventId1)).isTrue();
 
         List<Occurrence> occurrences1 = occurrenceRepository.findByEvent_Id(eventId1);
