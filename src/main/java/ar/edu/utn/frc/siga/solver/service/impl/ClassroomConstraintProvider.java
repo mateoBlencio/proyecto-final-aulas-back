@@ -10,7 +10,7 @@ import lombok.Setter;
 import org.jspecify.annotations.NonNull;
 
 /**
- * Restricciones de la asignación automática de aulas, en tres niveles (ver ADR-008):
+ * Restricciones de la asignación automática de aulas, en tres niveles:
  * HARD (no-solape) ≫ MEDIUM (asignar todo lo posible) ≫ SOFT. La jerarquía de pesos SOFT por
  * defecto es: sobrecupo (100.000 por alumno excedente) ≫ misma comisión en el mismo edificio
  * (4.000) > misma comisión en la misma aula (2.000) > capacidad ociosa (1). El nivel MEDIUM
@@ -31,7 +31,7 @@ public class ClassroomConstraintProvider implements ConstraintProvider {
 
     /** Restricciones que evalúa el solver, en el orden en que se registran. */
     @Override
-    public @NonNull Constraint[] defineConstraints(@NonNull ConstraintFactory factory) {
+    public Constraint @NonNull [] defineConstraints(@NonNull ConstraintFactory factory) {
         return new Constraint[]{
                 noOverlap(factory),
                 assignAllPossible(factory),

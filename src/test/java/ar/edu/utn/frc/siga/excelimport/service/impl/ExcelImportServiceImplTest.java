@@ -45,7 +45,6 @@ import jakarta.persistence.EntityManager;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -222,8 +221,8 @@ class ExcelImportServiceImplTest {
     // FIXME: bug de producción — ExcelImportServiceImpl.importExcel loguea `file.getName()`
     // (nombre del parámetro multipart, típicamente "file") en vez de
     // `file.getOriginalFilename()`. El log de arranque de la importación nunca muestra el
-    // nombre real del archivo subido por el usuario. Ver docs/modulos/excelimport.md
-    // ("Gaps y oportunidades"). Este test documenta el comportamiento actual (buggy), no lo
+    // nombre real del archivo subido por el usuario. Este test documenta el comportamiento
+    // actual (buggy), no lo
     // corrige.
     @Test
     @DisplayName("FIXME bug: el log de inicio muestra el nombre del parámetro multipart, no el nombre real del archivo")
@@ -242,7 +241,7 @@ class ExcelImportServiceImplTest {
             logger.detachAppender(appender);
         }
 
-        String startLog = appender.list.get(0).getFormattedMessage();
+        String startLog = appender.list.getFirst().getFormattedMessage();
         assertThat(startLog).contains("file"); // MultipartFile#getName(): nombre del campo del form
         assertThat(startLog).doesNotContain("planilla-2026.xlsx"); // comportamiento actual: no aparece
     }

@@ -28,8 +28,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * {@code findOrCreate} de academic no tiene endpoint HTTP (módulo sin controller, ver
- * {@code docs/modulos/academic.md}): se inyectan los services directamente.
+ * {@code findOrCreate} de academic no tiene endpoint HTTP (módulo sin controller):
+ * se inyectan los services directamente.
  */
 @DisplayName("Academic findOrCreate (integración)")
 class AcademicFindOrCreateIntegrationTest extends AbstractIntegrationTest {

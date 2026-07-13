@@ -45,7 +45,7 @@ public class SolverProperties {
     }
 
     /**
-     * Pesos SOFT del {@code ClassroomConstraintProvider} (ver ADR-008). Se aplican al solver
+     * Pesos SOFT del {@code ClassroomConstraintProvider}. Se aplican al solver
      * vía {@code constraintProviderCustomProperties} de Timefold, no por inyección de Spring.
      * Default: sobrecupo ≫ misma comisión/edificio > misma comisión/aula.
      */

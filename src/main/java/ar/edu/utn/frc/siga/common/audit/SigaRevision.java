@@ -21,14 +21,16 @@ import org.hibernate.envers.RevisionTimestamp;
  * tabla {@code revinfo} sin conversión. Envers soporta {@code LocalDateTime} como tipo de
  * {@link RevisionTimestamp} desde Hibernate 6, y este proyecto corre sobre Hibernate ORM 7.
  *
- * <p>Se usa exclusivamente para auditar el módulo {@code allocation} (ver ADR-007): quién y
+ * <p>Se usa exclusivamente para auditar el módulo {@code allocation}: quién y
  * cuándo creó, modificó o eliminó una asignación de aula, ocurrencia o evento académico. Envers
  * la instancia y persiste automáticamente en cada transacción que toca una entidad
- * {@code @Audited}; no se referencia a mano en ningún otro punto del código.
+ * {@code @Audited}; no se referencia a mano en ningún otro punto del código. El "quién" lo
+ * completa {@link SigaRevisionListener} con el usuario autenticado del request (email, subject
+ * del JWT), o lo deja en {@code null} si la transacción no vino de un request autenticado.
  */
 @Entity
 @Table(name = "revinfo")
-@RevisionEntity
+@RevisionEntity(SigaRevisionListener.class)
 @Getter
 @Setter
 public class SigaRevision {
@@ -42,4 +44,8 @@ public class SigaRevision {
     @RevisionTimestamp
     @Column(name = "fecha_revision", nullable = false)
     private LocalDateTime fechaRevision;
+
+    /** Email del usuario autenticado que provocó la revisión; null si la transacción no vino de un request autenticado. */
+    @Column(name = "usuario")
+    private String usuario;
 }

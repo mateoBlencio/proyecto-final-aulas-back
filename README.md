@@ -90,8 +90,9 @@ SPRING_PROFILES_ACTIVE=dev-local ./mvnw spring-boot:run
 
 - **No hay Flyway/Liquibase**: el esquema lo administra un DBA externo. La app corre
   con `ddl-auto: validate` — si las entidades no coinciden con el esquema real, no levanta.
-- Cambio de esquema → script DDL a mano en [docs/ddl/](docs/ddl/) (numerado, ver su
-  README), entregarlo al DBA, y mapear en las entidades recién cuando esté aplicado.
+- Cambio de esquema → agregarlo a mano a [scripts/sql/ddl.sql](.claude/sql/sql/ddl.sql)
+  (DDL pendiente consolidado), entregarlo al DBA, y mapear en las entidades recién
+  cuando esté aplicado.
 - Excepciones: `dev-local` y los tests de integración usan `create-drop`.
 
 ## Convenciones

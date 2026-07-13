@@ -22,7 +22,7 @@ import org.hibernate.envers.Audited;
 import java.time.LocalDateTime;
 
 /**
- * Asignación de un aula a una ocurrencia. Auditada con Hibernate Envers (ver ADR-007): cada
+ * Asignación de un aula a una ocurrencia. Auditada con Hibernate Envers: cada
  * creación/modificación/baja queda registrada en {@code asignacion_aula_aud}.
  */
 @Entity

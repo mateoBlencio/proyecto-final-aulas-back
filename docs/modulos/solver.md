@@ -123,8 +123,8 @@ Solo `common`. Módulo hoja, sin acceso a BD.
 
 ## Gaps y oportunidades
 
-- **`CLAUDE.md` referencia `SolverServiceImplTest` que NO existe.** El comando de ejemplo
-  (`./mvnw test -Dtest=SolverServiceImplTest`) apunta al vacío. El único test del módulo
+- **El comando de ejemplo `./mvnw test -Dtest=SolverServiceImplTest` referencia una clase
+  que NO existe.** Apunta al vacío. El único test del módulo
   es `CaffeinePreviewStoreTest`; la lógica de `SolverServiceImpl` y las constraints
   siguen sin cobertura.
 - **`PreviewStore` in-memory ⇒ single-instance.** Con más de una réplica, un `previewId`

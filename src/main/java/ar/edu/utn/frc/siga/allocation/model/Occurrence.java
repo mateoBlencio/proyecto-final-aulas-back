@@ -25,8 +25,8 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 /**
- * Ocurrencia concreta (fecha) de un {@link AcademicEvent}. Auditada con Hibernate Envers (ver
- * ADR-007): los cambios de estado quedan registrados en {@code ocurrencia_aud}.
+ * Ocurrencia concreta (fecha) de un {@link AcademicEvent}. Auditada con Hibernate Envers:
+ * los cambios de estado quedan registrados en {@code ocurrencia_aud}.
  */
 @Entity
 @Table(name = "ocurrencia")

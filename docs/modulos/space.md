@@ -31,7 +31,7 @@ Endpoints REST:
 
 ### Detalles de diseño relevantes
 
-- **Soft-delete declarativo** (ADR-006): `@SQLRestriction("eliminado = false")` en las
+- **Soft-delete declarativo**: `@SQLRestriction("eliminado = false")` en las
   tres entidades. El `ClassroomSpecification` **no** repite el filtro (ya lo aplica la
   entidad).
 - **`findByIds` NO filtra eliminadas** — a propósito: una asignación histórica puede

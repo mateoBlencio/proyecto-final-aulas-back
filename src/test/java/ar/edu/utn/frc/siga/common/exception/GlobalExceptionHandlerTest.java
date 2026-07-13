@@ -16,10 +16,12 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.Serial;
 import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.Set;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -57,7 +59,7 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("el handler es genérico: usa el status/title propios de cada subtipo de SigaAppException, no un mapeo hardcodeado")
     void handlerIsGenericAcrossStatuses() {
-        // Simula los subtipos de otros módulos (409/422/410/500 según docs/modulos/common.md)
+        // Simula los subtipos de otros módulos (409/422/410/500)
         // sin depender de ellos: el contrato es que SigaAppException lleve su propio status.
         for (HttpStatus status : new HttpStatus[]{HttpStatus.CONFLICT, HttpStatus.UNPROCESSABLE_CONTENT,
                 HttpStatus.GONE, HttpStatus.INTERNAL_SERVER_ERROR}) {
@@ -95,7 +97,7 @@ class GlobalExceptionHandlerTest {
         assertThat(problem.getStatus()).isEqualTo(400);
         assertThat(problem.getTitle()).isEqualTo("Validación fallida");
         @SuppressWarnings("unchecked")
-        Map<String, Object> errors = (Map<String, Object>) problem.getProperties().get("errors");
+        Map<String, Object> errors = (Map<String, Object>) requireNonNull(problem.getProperties()).get("errors");
         assertThat(errors).containsKey("target");
     }
 
@@ -116,7 +118,7 @@ class GlobalExceptionHandlerTest {
         assertThat(problem.getStatus()).isEqualTo(400);
         assertThat(problem.getTitle()).isEqualTo("Parámetros inválidos");
         @SuppressWarnings("unchecked")
-        Map<String, Object> errors = (Map<String, Object>) problem.getProperties().get("errors");
+        Map<String, Object> errors = (Map<String, Object>) requireNonNull(problem.getProperties()).get("errors");
         assertThat(errors).containsKey("year");
     }
 
@@ -199,6 +201,7 @@ class GlobalExceptionHandlerTest {
 
     /** Subtipo de {@link SigaAppException} de uso exclusivo en tests, para probar la genericidad del handler. */
     private static final class TestSigaException extends SigaAppException {
+        @Serial
         private static final long serialVersionUID = 1L;
 
         TestSigaException(HttpStatus status, String title, String detail) {

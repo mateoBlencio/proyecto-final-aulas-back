@@ -61,7 +61,7 @@ Reglas del paradigma:
 ## Base de datos: esquema externo, sin migraciones
 
 - **No hay Flyway/Liquibase.** El esquema lo administra una persona externa (DBA). La app corre con `ddl-auto: validate`: si las entidades no coinciden con el esquema real, **no levanta**.
-- Cambio de esquema necesario → escribir script DDL a mano en `docs/ddl/` (numerado, ver `docs/ddl/README.md`), entregarlo al DBA, y mapear en las entidades **recién cuando esté aplicado**.
+- Cambio de esquema necesario → agregarlo a mano a `scripts/sql/ddl.sql` (DDL pendiente consolidado), entregarlo al DBA, y mapear en las entidades **recién cuando esté aplicado**.
 - Excepciones: perfil `dev-local` usa `create-drop` + `data.sql`; los tests de integración usan Testcontainers (`jdbc:tc:postgresql:16-alpine`) con `create-drop`.
 - Seeds útiles en `scripts/sql/`.
 
@@ -81,5 +81,5 @@ Reglas del paradigma:
 - Código y comentarios en el estilo existente: nombres de clases en inglés, comentarios y mensajes en español.
 - Lombok en todo el proyecto.
 - Zona horaria fija UTC (`-Duser.timezone=UTC` en el plugin de Boot).
-- Documentación del dominio y los módulos en `docs/`: `adr/` (decisiones arquitectónicas), `ddl/` (scripts de esquema pendientes/aplicados), `modelo-dominio.md` (modelo Evento/Occurrence/Allocation), `calendario-academico-2026.md` (referencia calendario académico UTN), `para-dba.md`, `para-front.md`.
+- Documentación del dominio y los módulos en `docs/`: `adr/` (decisiones arquitectónicas), `modelo-dominio.md` (modelo Evento/Occurrence/Allocation), `calendario-academico-2026.md` (referencia calendario académico UTN), `para-dba.md`, `para-front.md`.
 - Contexto vivo de trabajo en curso (no versionado) en `.claude/plans/`: `plan-refactor.md` (plan activo de este refactor), `asignacion-automatica-preview.md`.

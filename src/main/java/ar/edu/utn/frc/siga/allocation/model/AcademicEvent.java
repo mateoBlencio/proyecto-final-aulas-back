@@ -23,7 +23,7 @@ import java.time.LocalTime;
 import java.util.List;
 
 /**
- * Evento académico base (recurrente o único). Auditada con Hibernate Envers (ver ADR-007), junto
+ * Evento académico base (recurrente o único). Auditada con Hibernate Envers, junto
  * con sus subtipos {@link RecurringEvent} y {@link UniqueEvent}: los cambios quedan registrados
  * en {@code evento_academico_aud} y sus tablas {@code _aud} de subclase (herencia JOINED).
  */

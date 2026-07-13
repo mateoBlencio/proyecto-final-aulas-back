@@ -7,7 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -17,7 +17,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * JWT stateless de verdad: valida firma + expiración y construye el {@link SecurityUser}
  * directamente desde los claims del token, sin volver a la base de datos en cada request.
  * Esto implica que un cambio de rol o de {@code habilitado} no se refleja hasta que el
- * access token vigente expira (ver plan-seguridad.md, "Filtro y autenticación").
+ * access token vigente expira.
  */
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {

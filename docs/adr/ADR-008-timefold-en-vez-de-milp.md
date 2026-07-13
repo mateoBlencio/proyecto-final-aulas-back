@@ -6,7 +6,7 @@ Aceptado — 2026-07-11
 
 ## Contexto
 
-La asignación automática (sprint 03) debe proponer un aula para cada evento
+La asignación automática debe proponer un aula para cada evento
 académico seleccionado, respetando una restricción dura (dos eventos no pueden
 compartir aula en franjas horarias que se solapan, considerando la ocupación ya
 firme en BD como inamovible/"pinned") y optimizando preferencias blandas con una

@@ -87,10 +87,17 @@ estado `pendiente` hasta que se aplique en la base de datos compartida.
   implementada; cuando la haya, agregar `usuario` a `SigaRevision` vía un
   `RevisionListener` es una extensión aislada a esa entidad, sin tocar las 5
   entidades auditadas.
+
+  > **Actualización (2026-07-13)**: la extensión prevista ya se implementó.
+  > `common/audit/SigaRevisionListener.java` completa `SigaRevision.usuario`
+  > con el email del `Authentication` del `SecurityContextHolder` (null si la
+  > transacción no vino de un request autenticado). DDL en
+  > `scripts/sql/ddl.sql`. Las 5 entidades auditadas no se
+  > tocaron, como estaba previsto.
 - El DDL de las tablas `_aud` queda acoplado al mapeo de las entidades: si
   una columna de `Allocation`/`Occurrence`/`AcademicEvent` cambia (nueva
   columna, tipo distinto), su tabla `_aud` correspondiente necesita el mismo
-  cambio a mano en un nuevo script numerado de `docs/ddl/` — exactamente la
+  cambio a mano en `scripts/sql/ddl.sql` (DDL pendiente para el DBA) — exactamente la
   misma disciplina que ya aplica al resto del esquema de SIGA.
 - **No se habilita `modifiedFlags`** (la propiedad global
   `org.hibernate.envers.global_with_modified_flag`, que le agrega a cada

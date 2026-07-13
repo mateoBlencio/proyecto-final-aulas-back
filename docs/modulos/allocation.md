@@ -60,7 +60,7 @@ arman los DTOs trayendo datos de `space`/`academic` por `findByIds` (batch, sin 
 ### Modelo
 
 - **`AcademicEvent`** — abstracta, herencia `JOINED`, discriminador `tipo_evento`.
-  Auditada con Envers (ADR-007). Subtipos:
+  Auditada con Envers. Subtipos:
   - **`RecurringEvent`** — `dayOfWeek`, `startDate`, `endDate`, `subjectId`, `commissionId`
     (IDs planos cross-módulo). `toOccurrences()` genera semanalmente desde `startDate`
     hasta `endDate` (o `startDate + 1 año` si es null).
@@ -74,7 +74,7 @@ arman los DTOs trayendo datos de `space`/`academic` por `findByIds` (batch, sin 
 
 - Todo `@Transactional`; `source` se estampa **adentro** del método (el HTTP no lo elige).
 - `assignManually`: valida no-pasado, estado asignable, y que la ocurrencia no tenga ya aula.
-- **Toda asignación manual valida no-solape contra ocupación `ASSIGNED` (sprint 03),
+- **Toda asignación manual valida no-solape contra ocupación `ASSIGNED`,
   vía el mismo helper privado `validateNoOverlap`**: `assignManually`, `reassign`,
   `batchReassign` y `assignManuallyFromDate`. Antes solo `assignManuallyFromDate` lo hacía;
   ahora es invariante único para las cuatro rutas.
@@ -96,7 +96,7 @@ arman los DTOs trayendo datos de `space`/`academic` por `findByIds` (batch, sin 
   **sin** `validateNoOverlap` — la carga masiva no se bloquea por solapamientos).
 - `allocateToOccurrences`: upsert (reusa allocation existente o crea), setea estado `ASSIGNED`.
 
-### Problemas de asignación (`AllocationProblemServiceImpl`, sprint 03)
+### Problemas de asignación (`AllocationProblemServiceImpl`)
 
 Tres endpoints `@Transactional(readOnly=true)`, uno por tipo de problema, que comparten
 la misma resolución de rango:
@@ -125,7 +125,7 @@ la misma resolución de rango:
 Flujo completo de tres pasos sobre un `SolverPreview` cacheado por `solver`
 (`PreviewStore`, TTL configurable):
 
-1. **`autoPreview` — preview con re-resolución (sprint 03)**. `eventIds` del request se
+1. **`autoPreview` — preview con re-resolución**. `eventIds` del request se
    deduplican vía `Set`. **Sin `@Transactional`**: la carga de datos vive en una
    transacción corta propia (`AutoAllocationDataLoader`, deuda B3 resuelta); el solve
    (hasta varios minutos) y la composición final corren **sin conexión JDBC retenida**.
@@ -154,7 +154,7 @@ Flujo completo de tres pasos sobre un `SolverPreview` cacheado por `solver`
    front que viaja completo en cada request porque el backend solo cachea la corrida
    original del solver). **410** si el preview expiró; **409** si `eventId` o algún
    elemento de `currentAllocations` no pertenece al preview.
-3. **`confirm` — confirmación atómica (sprint 03)**. Persiste la propuesta **final**
+3. **`confirm` — confirmación atómica**. Persiste la propuesta **final**
    ajustada por el usuario. Todas las validaciones corren **antes de la primera
    escritura**:
    - Sin eventIds duplicados en `request.allocations()` (**409**).
@@ -195,7 +195,7 @@ dependencias (agrega el dominio).
 
 ## Testing
 
-**Estado actual (sprint 03): tres suites unitarias**, el resto del módulo sigue sin
+**Estado actual: tres suites unitarias**, el resto del módulo sigue sin
 cobertura:
 
 - `AllocationServiceImplTest` — `assignManually`/`reassign`/`batchReassign`/
@@ -232,5 +232,5 @@ Sin cobertura: `RecurringEvent.toOccurrences()`, `Occurrence.isPast()`, composer
 - `from-date` con conflicto real → 409 con `OccurrenceConflictDto` correcto.
 - `batchReassign` atómico: si una falla, ninguna se persiste.
 - `confirm` atómico end-to-end: si una validación falla, nada persiste en BD.
-- **Auditoría Envers**: verificar filas en `*_aud` tras crear/modificar (ADR-007).
+- **Auditoría Envers**: verificar filas en `*_aud` tras crear/modificar.
 </content>

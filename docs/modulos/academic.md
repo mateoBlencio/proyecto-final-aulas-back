@@ -24,9 +24,9 @@ El patrón dominante es `findOrCreate` (idempotente, para la importación) + `fi
 
 **Comunicación por clave natural, no por ID cruzando frontera**: p. ej. `StudyPlanService`
 recibe `specialtyCode` (no un ID de especialidad), porque el consumidor no debería conocer
-IDs internos de `academic`. Consistente con ADR-004.
+IDs internos de `academic`.
 
-**`AcademicPeriodService.findActive()`** (sprint 03): devuelve los períodos académicos
+**`AcademicPeriodService.findActive()`**: devuelve los períodos académicos
 con `activo = true`. Consumido por `allocation` (`AllocationProblemServiceImpl`) para
 resolver el `to` por defecto de los endpoints `GET /v1/allocations/{unassigned,overcrowded,overlaps}` — ver
 [allocation.md](allocation.md). `AcademicPeriodResponseDto` expone `year`, `semester`,
@@ -52,7 +52,7 @@ Solo `common`. Módulo hoja.
 - **`findOrCreate` e idempotencia bajo concurrencia.** Toda la carga depende de que las
   claves naturales tengan unique constraints en BD y de que `findOrCreate` resuelva la
   colisión. Si el esquema del DBA no tiene esos únicos, dos filas iguales crean duplicados
-  silenciosos. **Verificar constraints en `docs/ddl/` y fijarlos con test de integración.**
+  silenciosos. **Verificar constraints en `scripts/sql/ddl.sql` y fijarlos con test de integración.**
 - **`term` como String vs `TermType` enum**: `SubjectService.findOrCreate` recibe `term`
   como texto mientras `AcademicPeriodService` usa el enum `TermType`. Inconsistencia de
   tipos entre servicios hermanos; riesgo de valores inválidos no validados.

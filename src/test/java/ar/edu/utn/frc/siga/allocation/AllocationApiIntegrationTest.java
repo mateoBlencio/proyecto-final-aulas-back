@@ -26,7 +26,6 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MvcResult;
 
-import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -75,7 +74,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
         Long eventId = academicEventService.createRecurringEvent(dto).id();
         List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId);
         assertThat(occurrences).hasSize(1);
-        return occurrences.get(0);
+        return occurrences.getFirst();
     }
 
     private MvcResult assignOk(Long occurrenceId, Integer classroomId) throws Exception {
@@ -287,5 +286,11 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(eventRevs).isGreaterThanOrEqualTo(1);          // ADD al crear
         assertThat(occurrenceRevs).isGreaterThanOrEqualTo(2);     // ADD al crear + MOD al pasar a ASSIGNED
         assertThat(allocationRevs).isGreaterThanOrEqualTo(1);     // ADD al asignar
+
+        String usuario = jdbcTemplate.queryForObject(
+                "SELECT r.usuario FROM revinfo r JOIN asignacion_aula_aud a ON a.rev = r.rev "
+                        + "WHERE a.id_asignacion = ? ORDER BY r.rev LIMIT 1",
+                String.class, allocationId);
+        assertThat(usuario).isEqualTo("integration-test@frc.utn.edu.ar");
     }
 }

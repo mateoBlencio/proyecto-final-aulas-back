@@ -10,12 +10,12 @@ dominio ni entidades de negocio.
 
 | Paquete | Pieza | Rol |
 |---|---|---|
-| `exception` | `GlobalExceptionHandler` | `@RestControllerAdvice`, mapea excepciones → `ProblemDetail` (RFC 7807). ADR-001 |
+| `exception` | `GlobalExceptionHandler` | `@RestControllerAdvice`, mapea excepciones → `ProblemDetail` (RFC 7807). |
 | `exception` | `SigaAppException`, `ResourceNotFoundException`, `InvalidDateRangeException` | Jerarquía base de errores de negocio |
 | `dto` | `FindOrCreateResult<T>` | Resultado uniforme "buscar o crear" (`value` + `created`); helpers `resolve` / `map` |
 | `converter` | `DurationMinutesConverter` | `@Converter(autoApply)` `Duration ↔ Integer` (minutos) |
-| `audit` | `SigaRevision` | `@RevisionEntity` de Envers con timestamp `LocalDateTime` en `revinfo`. ADR-007 |
-| `mapper` | `CentralMapperConfig` | Config MapStruct compartida. ADR-002 |
+| `audit` | `SigaRevision` | `@RevisionEntity` de Envers con timestamp `LocalDateTime` en `revinfo`. |
+| `mapper` | `CentralMapperConfig` | Config MapStruct compartida. |
 | `config` | `CorsConfig`, `OpenApiConfig` | CORS + Swagger |
 
 ### `GlobalExceptionHandler` — mapeo
@@ -49,8 +49,7 @@ Excepciones de framework, cada una con su propio `@ExceptionHandler`:
 | `Exception` (catch-all) — si es `ErrorResponse` (404/405 de Spring, etc.) conserva su `ProblemDetail` original; si no, 500 genérico | 500 (o el status del `ErrorResponse` original) |
 
 Verificado contra el código: no hay excepciones de negocio nuevas fuera de esta lista
-(sprint 03 agregó `ReassignConflictException` y `ExpiredPreviewException`, ambas ya
-reflejadas arriba).
+(`ReassignConflictException` y `ExpiredPreviewException` ya reflejadas arriba).
 
 ## Dependencias
 
@@ -63,7 +62,7 @@ Ninguna (base del grafo). Todos dependen de `common`.
   lógica de dominio a `common` para no convertirlo en cajón de sastre.
 - **`SigaRevision` sin usuario.** Registra `rev` + `fecha_revision` pero **no quién** hizo
   el cambio. Cuando exista autenticación, agregar `usuario` al `@RevisionEntity`
-  (`RevisionListener`) para cerrar la trazabilidad que promete ADR-007.
+  (`RevisionListener`) para cerrar la trazabilidad.
 - **Catch-all `Exception → 500`**: correcto como red final, pero conviene asegurar que no
   se filtren detalles internos en el `ProblemDetail` (mensaje genérico en prod).
 
