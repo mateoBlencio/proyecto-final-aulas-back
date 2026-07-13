@@ -6,6 +6,10 @@ import io.swagger.v3.oas.annotations.info.Info;
 import io.swagger.v3.oas.annotations.servers.Server;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Metadatos globales de la documentación OpenAPI/Swagger de la API (título, versión,
+ * contacto y servidor). No expone beans propios; solo fija la configuración vía anotación.
+ */
 @Configuration
 @OpenAPIDefinition(
         info = @Info(

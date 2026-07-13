@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+/** Propiedades de configuración del solver, bajo el prefijo {@code siga.solver} de application.yaml. */
 @Getter
 @Setter
 @ConfigurationProperties(prefix = "siga.solver")
@@ -28,4 +29,31 @@ public class SolverProperties {
      * TRACKED_FULL_ASSERT para debugging de score corruption (mucho más lento).
      */
     private EnvironmentMode environmentMode = EnvironmentMode.PHASE_ASSERT;
+
+    private Preview preview = new Preview();
+
+    private Weights weights = new Weights();
+
+    /**
+     * Preview generada y guardada para confirmarla después. El TTL acota la
+     * obsolescencia (bound de staleness), no es eviction por memoria.
+     */
+    @Getter
+    @Setter
+    public static class Preview {
+        private long ttlMinutes = 30;
+    }
+
+    /**
+     * Pesos SOFT del {@code ClassroomConstraintProvider} (ver ADR-008). Se aplican al solver
+     * vía {@code constraintProviderCustomProperties} de Timefold, no por inyección de Spring.
+     * Default: sobrecupo ≫ misma comisión/edificio > misma comisión/aula.
+     */
+    @Getter
+    @Setter
+    public static class Weights {
+        private int overcrowding = 100_000;
+        private int sameCommissionDiffRoom = 2_000;
+        private int sameCommissionDiffBuilding = 4_000;
+    }
 }

@@ -7,11 +7,16 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.springframework.modulith.NamedInterface;
+import org.hibernate.annotations.SQLRestriction;
 
-@NamedInterface("api")
+/**
+ * Aula física asignable a eventos académicos: pertenece a un {@link Building}, tiene
+ * capacidad y un {@link ClassroomType}, y puede marcarse {@code available = false}
+ * para excluirla de la asignación (manual o automática) sin eliminarla.
+ */
 @Entity
 @Table(name = "aula", uniqueConstraints = @UniqueConstraint(columnNames = {"id_edificio", "num_aula"}))
+@SQLRestriction("eliminado = false")
 @Getter
 @Setter
 @NoArgsConstructor

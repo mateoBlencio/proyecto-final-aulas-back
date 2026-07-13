@@ -7,7 +7,8 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+/** Acceso a datos de {@link SubjectCommission}. */
 @Repository
 public interface SubjectCommissionRepository extends JpaRepository<SubjectCommission, Long> {
-    Optional<SubjectCommission> findBySubjectAndCommissionAndDeletedFalse(Subject subject, Commission commission);
+    Optional<SubjectCommission> findBySubjectAndCommission(Subject subject, Commission commission);
 }

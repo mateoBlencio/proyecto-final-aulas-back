@@ -1,50 +1,35 @@
 package ar.edu.utn.frc.siga.space.mapper;
 
-import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDTO;
-import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDTO;
+import ar.edu.utn.frc.siga.common.mapper.CentralMapperConfig;
+import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.model.Classroom;
-import org.springframework.modulith.NamedInterface;
-import org.springframework.stereotype.Component;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 
-@NamedInterface("api")
-@Component
-public class ClassroomMapper {
+/**
+ * Mapea {@link Classroom} hacia/desde sus DTOs, incluyendo los campos desnormalizados
+ * de edificio y tipo de aula en la respuesta.
+ */
+@Mapper(config = CentralMapperConfig.class)
+public interface ClassroomMapper {
 
-    public ClassroomResponseDTO toResponseDto(Classroom entity) {
-        ClassroomResponseDTO.ClassroomResponseDTOBuilder builder = ClassroomResponseDTO.builder()
-                .id(entity.getId())
-                .roomNumber(entity.getRoomNumber())
-                .capacity(entity.getCapacity())
-                .floor(entity.getFloor())
-                .available(entity.getAvailable());
+    @Mapping(target = "buildingId", source = "building.id")
+    @Mapping(target = "buildingName", source = "building.name")
+    @Mapping(target = "classroomTypeId", source = "classroomType.id")
+    @Mapping(target = "classroomTypeDescription", source = "classroomType.description")
+    ClassroomResponseDto toDto(Classroom entity);
 
-        if (entity.getBuilding() != null) {
-            builder.buildingId(entity.getBuilding().getId())
-                    .buildingName(entity.getBuilding().getName());
-        }
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "deleted", ignore = true)
+    @Mapping(target = "building", ignore = true)
+    @Mapping(target = "classroomType", ignore = true)
+    Classroom toEntity(ClassroomRequestDto dto);
 
-        if (entity.getClassroomType() != null) {
-            builder.classroomTypeId(entity.getClassroomType().getId())
-                    .classroomTypeDescription(entity.getClassroomType().getDescription());
-        }
-
-        return builder.build();
-    }
-
-    public Classroom toEntity(ClassroomRequestDTO dto) {
-        return Classroom.builder()
-                .roomNumber(dto.roomNumber())
-                .capacity(dto.capacity())
-                .floor(dto.floor())
-                .available(dto.available())
-                .build();
-    }
-
-    public void updateEntity(Classroom entity, ClassroomRequestDTO dto) {
-        entity.setRoomNumber(dto.roomNumber());
-        entity.setCapacity(dto.capacity());
-        entity.setFloor(dto.floor());
-        entity.setAvailable(dto.available());
-    }
-
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "deleted", ignore = true)
+    @Mapping(target = "building", ignore = true)
+    @Mapping(target = "classroomType", ignore = true)
+    void updateEntity(@MappingTarget Classroom entity, ClassroomRequestDto dto);
 }

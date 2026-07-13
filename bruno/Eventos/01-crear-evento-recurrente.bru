@@ -1,0 +1,24 @@
+meta {
+  name: Crear evento recurrente
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/v1/events/recurring
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "enrolled": 80,
+    "startTime": "18:15",
+    "durationMinutes": 135,
+    "dayOfWeek": "MONDAY",
+    "startDate": "2026-03-09",
+    "endDate": "2026-07-11",
+    "subjectId": 1,
+    "commissionId": 1
+  }
+}

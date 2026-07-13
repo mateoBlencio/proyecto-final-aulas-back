@@ -19,6 +19,7 @@ spring:
       idle-timeout: 600000
 
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
     show-sql: false
@@ -56,13 +57,20 @@ cors:
   allowed-origins: ""
 
 siga:
+  api:
+    base-path: /v1
   solver:
-    # Solves concurrentes del SolverManager; excedentes se encolan. AUTO = según cores.
     parallel-solver-count: AUTO
-    # Corta el solve si el mejor score no mejora en N segundos (0 = deshabilitado).
-    unimproved-seconds-limit: 10
-    # PHASE_ASSERT (default Timefold, reproducible); FULL_ASSERT solo para debugging.
+    unimproved-seconds-limit: 1000
     environment-mode: PHASE_ASSERT
+    preview:
+      ttl-minutes: 30
+    weights:
+      overcrowding: 100000
+      same-commission-diff-room: 2000
+      same-commission-diff-building: 4000
+  space:
+    default-classroom-type: Normal
   jwt:
     secret: ${JWT_SECRET}
     access-expiration-minutes: ${JWT_ACCESS_EXPIRATION_MINUTES:20}
@@ -82,3 +90,7 @@ logging:
   level:
     root: WARN
     ar.edu.utn.frc.siga: INFO
+    # Fases del solver (construction heuristic / local search) y resumen de score de Timefold.
+    ai.timefold.solver.core.impl.solver: INFO
+    ai.timefold.solver.core.impl.constructionheuristic: INFO
+    ai.timefold.solver.core.impl.localsearch: INFO

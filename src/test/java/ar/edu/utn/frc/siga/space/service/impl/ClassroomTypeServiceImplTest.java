@@ -1,75 +1,84 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.space.SpaceTestData;
+import ar.edu.utn.frc.siga.space.exception.SpaceDomainException;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
 import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
-import java.util.Optional;
-import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import static org.mockito.ArgumentMatchers.anyInt;
 import org.mockito.Mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@DisplayName("ClassroomTypeServiceImpl")
 class ClassroomTypeServiceImplTest {
 
     @Mock
     private ClassroomTypeRepository classroomTypeRepository;
 
-    private ClassroomTypeServiceImpl classroomTypeService;
-
-    private ClassroomType classroomType;
+    private ClassroomTypeServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        classroomTypeService = new ClassroomTypeServiceImpl(classroomTypeRepository);
-
-        classroomType = new ClassroomType();
-        classroomType.setId(1);
-        classroomType.setDescription("CLASSROOM");
+        service = new ClassroomTypeServiceImpl(classroomTypeRepository);
+        ReflectionTestUtils.setField(service, "defaultClassroomTypeDescription", "Normal");
     }
 
     @Test
-    void findById_shouldReturnTypeWhenExists() {
-        when(classroomTypeRepository.findByIdAndDeletedFalse(1)).thenReturn(Optional.of(classroomType));
+    @DisplayName("findById: devuelve el tipo de aula cuando existe")
+    void findByIdReturnsExistingType() {
+        ClassroomType type = SpaceTestData.classroomType().build();
+        when(classroomTypeRepository.findById(1)).thenReturn(Optional.of(type));
 
-        ClassroomType result = classroomTypeService.findById(1);
-
-        assertNotNull(result);
-        assertEquals(1, result.getId());
-        assertEquals("CLASSROOM", result.getDescription());
+        assertThat(service.findById(1)).isEqualTo(type);
     }
 
     @Test
-    void findById_shouldThrowWhenNotFound() {
-        when(classroomTypeRepository.findByIdAndDeletedFalse(999)).thenReturn(Optional.empty());
+    @DisplayName("findById: si el tipo no existe, lanza ResourceNotFoundException")
+    void findByIdWithMissingTypeThrowsResourceNotFound() {
+        when(classroomTypeRepository.findById(99)).thenReturn(Optional.empty());
 
-        var ex = assertThrows(ResourceNotFoundException.class, () -> classroomTypeService.findById(999));
-        assertTrue(ex.getMessage().contains("ClassroomType not found"));
+        assertThatThrownBy(() -> service.findById(99))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("ClassroomType not found with id: 99");
     }
 
     @Test
-    void findById_shouldCallRepositoryWithCorrectId() {
-        when(classroomTypeRepository.findByIdAndDeletedFalse(1)).thenReturn(Optional.of(classroomType));
+    @DisplayName("findDefault: busca por la descripción configurada vía siga.space.default-classroom-type")
+    void findDefaultUsesConfiguredDescription() {
+        ClassroomType type = SpaceTestData.classroomType().description("Normal").build();
+        when(classroomTypeRepository.findByDescriptionIgnoreCase("Normal")).thenReturn(Optional.of(type));
 
-        classroomTypeService.findById(1);
-
-        verify(classroomTypeRepository).findByIdAndDeletedFalse(1);
+        assertThat(service.findDefault()).isEqualTo(type);
     }
 
     @Test
-    void findById_shouldThrowWhenDeleted() {
-        ClassroomType deletedType = new ClassroomType();
-        deletedType.setId(2);
-        deletedType.setDescription("DELETED");
-        deletedType.setDeleted(true);
+    @DisplayName("findDefault: respeta una descripción configurada distinta de la default")
+    void findDefaultUsesCustomConfiguredDescription() {
+        ReflectionTestUtils.setField(service, "defaultClassroomTypeDescription", "Laboratorio");
+        ClassroomType type = SpaceTestData.classroomType().description("Laboratorio").build();
+        when(classroomTypeRepository.findByDescriptionIgnoreCase("Laboratorio")).thenReturn(Optional.of(type));
 
-        when(classroomTypeRepository.findByIdAndDeletedFalse(2)).thenReturn(Optional.empty());
+        assertThat(service.findDefault()).isEqualTo(type);
+    }
 
-        assertThrows(ResourceNotFoundException.class, () -> classroomTypeService.findById(2));
+    @Test
+    @DisplayName("findDefault: si el tipo por defecto no existe, lanza SpaceDomainException")
+    void findDefaultWithMissingTypeThrowsSpaceDomainException() {
+        when(classroomTypeRepository.findByDescriptionIgnoreCase("Normal")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.findDefault())
+                .isInstanceOf(SpaceDomainException.class)
+                .hasMessageContaining("Normal");
     }
 }

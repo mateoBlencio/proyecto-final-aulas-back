@@ -6,11 +6,18 @@ import java.time.DayOfWeek;
 import java.time.LocalTime;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
 import org.springframework.stereotype.Component;
 
+/**
+ * Convierte una fila cruda del Excel de importación en un {@link ExcelRowDto},
+ * parseando y validando cada columna esperada.
+ */
 @Component
 public class ExcelRowMapper {
+
+    private static final DataFormatter DATA_FORMATTER = new DataFormatter();
 
     public ExcelRowDto map(Row row, int rowNum) {
         String courseCode = getStringCellValue(row, 0, "Curso", rowNum);
@@ -59,8 +66,7 @@ public class ExcelRowMapper {
             throw new ExcelImportException(
                 "Column '" + columnName + "' is required but was blank, row " + rowNum);
         }
-        cell.setCellType(CellType.STRING);
-        return cell.getStringCellValue().trim();
+        return DATA_FORMATTER.formatCellValue(cell).trim();
     }
 
     private Integer getNumericIntValue(Row row, int cellIndex, String columnName, int rowNum) {
@@ -96,7 +102,6 @@ public class ExcelRowMapper {
         if (cell.getCellType() == CellType.NUMERIC) {
             return String.valueOf((int) cell.getNumericCellValue());
         }
-        cell.setCellType(CellType.STRING);
-        return cell.getStringCellValue().trim();
+        return DATA_FORMATTER.formatCellValue(cell).trim();
     }
 }

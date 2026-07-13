@@ -8,13 +8,19 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.envers.Audited;
 
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * Evento académico que ocurre una sola vez (mesa de examen final, parcial, trabajo
+ * práctico, o una mesa especial fuera de calendario). Genera exactamente una {@link Occurrence}.
+ */
 @Entity
 @Table(name = "evento_unico_academico")
 @DiscriminatorValue("UNIQUE_EVENT")
+@Audited
 @Getter
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -25,6 +31,11 @@ public final class UniqueEvent extends AcademicEvent {
 
     @Column(name = "descripcion")
     private String description;
+
+    @Override
+    public EventType getType() {
+        return EventType.UNIQUE_EVENT;
+    }
 
     @Override
     public List<Occurrence> toOccurrences() {

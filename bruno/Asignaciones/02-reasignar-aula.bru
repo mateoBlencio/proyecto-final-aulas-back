@@ -1,0 +1,33 @@
+meta {
+  name: Reasignar aula
+  type: http
+  seq: 8
+}
+
+put {
+  url: {{baseUrl}}/v1/allocations/1
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "classroomId": 2,
+    "observation": "Cambio de aula por conflicto de capacidad"
+  }
+}
+
+docs {
+  Cambia el aula de una asignación existente (source = MANUAL).
+  
+  Valida que el aula nueva no esté ocupada por OTRA asignación en la misma fecha/
+  franja de la ocurrencia (la ocupación actual de esta misma asignación no cuenta
+  como conflicto: reasignar al mismo aula que ya tenía es válido). Si hay
+  solapamiento → 409 con:
+  {
+    "conflicts": [
+      { "occurrenceId", "date", "startTime", "endTime", "classroomId",
+        "conflictingEventId", "conflictingAllocationId" }
+    ]
+  }
+}

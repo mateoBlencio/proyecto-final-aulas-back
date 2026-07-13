@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.academic.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -14,12 +15,15 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.springframework.modulith.NamedInterface;
+import org.hibernate.annotations.SQLRestriction;
 
-@NamedInterface("api")
+/**
+ * Materia dictada dentro de un {@link StudyPlan}. El código es único por plan de estudio.
+ */
 @Entity
 @Table(name = "materia",
        uniqueConstraints = @UniqueConstraint(columnNames = {"codigo_materia", "id_plan"}))
+@SQLRestriction("eliminado = false")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -38,7 +42,7 @@ public class Subject {
     @Column(name = "nombre", nullable = false)
     private String name;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_plan", nullable = false)
     private StudyPlan studyPlan;
 

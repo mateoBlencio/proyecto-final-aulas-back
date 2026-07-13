@@ -14,9 +14,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * Expone la consulta de edificios activos, usada para poblar filtros de asignación de aulas.
+ */
 @Slf4j
 @RestController
-@RequestMapping("/v1/buildings")
+@RequestMapping("${siga.api.base-path}/buildings")
 @RequiredArgsConstructor
 @Tag(name = "Edificios", description = "Consulta de edificios disponibles")
 @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
@@ -30,7 +33,7 @@ public class BuildingController {
     public ResponseEntity<List<BuildingResponseDto>> findAll() {
         log.debug("GET /v1/buildings");
         List<BuildingResponseDto> buildings = buildingService.findAll();
-        log.info("Buildings listed: count={}", buildings.size());
+        log.info("Edificios listados: count={}", buildings.size());
         return ResponseEntity.ok(buildings);
     }
 }

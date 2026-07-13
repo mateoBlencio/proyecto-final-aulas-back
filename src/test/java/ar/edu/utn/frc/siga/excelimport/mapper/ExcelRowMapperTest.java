@@ -1,374 +1,138 @@
 package ar.edu.utn.frc.siga.excelimport.mapper;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import ar.edu.utn.frc.siga.excelimport.ExcelTestWorkbooks;
+import ar.edu.utn.frc.siga.excelimport.ExcelTestWorkbooks.DataRow;
 import ar.edu.utn.frc.siga.excelimport.dto.ExcelRowDto;
 import ar.edu.utn.frc.siga.excelimport.exception.ExcelImportException;
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-
 import java.time.DayOfWeek;
 import java.time.LocalTime;
+import org.apache.poi.ss.usermodel.Row;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+@ExtendWith(MockitoExtension.class)
+@DisplayName("ExcelRowMapper")
 class ExcelRowMapperTest {
 
-    private ExcelRowMapper mapper;
-    private XSSFWorkbook workbook;
-    private Row row;
+    private final ExcelRowMapper mapper = new ExcelRowMapper();
 
-    @BeforeEach
-    void setUp() {
-        mapper = new ExcelRowMapper();
-        workbook = new XSSFWorkbook();
-        row = workbook.createSheet().createRow(0);
-    }
-
-    @Test
-    void map_shouldReturnDtoWhenRowIsValid() {
-        row.createCell(0).setCellValue("1C1");
-        row.createCell(1).setCellValue(10.0);
-        row.createCell(2).setCellValue(513.0);
-        row.createCell(3).setCellValue("Edif. Dr. Gallardo");
-        row.createCell(4).setCellValue("Jueves");
-        row.createCell(5).setCellValue("1 Cuat.");
-        row.createCell(6).setCellValue(800.0);
-        row.createCell(7).setCellValue(1540.0);
-        row.createCell(8).setCellValue("18:15-19:45");
-        row.createCell(9).setCellValue(90.0);
-        row.createCell(10).setCellValue(1.5);
-        row.createCell(11).setCellValue(31.0);
-        row.createCell(12).setCellValue(2023.0);
-        row.createCell(13).setCellValue(104.0);
-        row.createCell(14).setCellValue("Ingeniería Civil I");
-        row.createCell(15).setCellValue(45.0);
+    @ParameterizedTest(name = "día ''{0}'' → {1}")
+    @DisplayName("los 7 días de la semana en español, con y sin tilde, mapean al DayOfWeek correcto")
+    @CsvSource({
+        "Lunes, MONDAY",
+        "Martes, TUESDAY",
+        "Miércoles, WEDNESDAY",
+        "Miercoles, WEDNESDAY",
+        "Jueves, THURSDAY",
+        "Viernes, FRIDAY",
+        "Sábado, SATURDAY",
+        "Sabado, SATURDAY",
+        "Domingo, SUNDAY"
+    })
+    void diasDeLaSemana(String dia, DayOfWeek esperado) {
+        Row row = rowWith(DataRow.defaultRow().toBuilder().day(dia).build());
 
         ExcelRowDto dto = mapper.map(row, 7);
 
-        assertAll(
-            () -> assertEquals("1C1", dto.courseCode()),
-            () -> assertEquals(10, dto.commissionNumber()),
-            () -> assertEquals("513", dto.roomNumber()),
-            () -> assertEquals("Edif. Dr. Gallardo", dto.buildingName()),
-            () -> assertEquals(DayOfWeek.THURSDAY, dto.dayOfWeek()),
-            () -> assertEquals("1 Cuat.", dto.termType()),
-            () -> assertEquals(LocalTime.of(8, 0), dto.startTime()),
-            () -> assertEquals(LocalTime.of(15, 40), dto.endTime()),
-            () -> assertEquals(90, dto.durationMinutes()),
-            () -> assertEquals(31, dto.specialtyCode()),
-            () -> assertEquals(2023, dto.studyPlanCode()),
-            () -> assertEquals(104, dto.subjectCode()),
-            () -> assertEquals("Ingeniería Civil I", dto.subjectName()),
-            () -> assertEquals(45, dto.enrolledCount())
-        );
+        assertThat(dto.dayOfWeek()).isEqualTo(esperado);
     }
 
     @Test
-    void map_shouldConvertNumericAulaToString() {
-        row.createCell(0).setCellValue("1C1");
-        row.createCell(1).setCellValue(10.0);
-        row.createCell(2).setCellValue(513.0);
-        row.createCell(3).setCellValue("Edif. Dr. Gallardo");
-        row.createCell(4).setCellValue("Jueves");
-        row.createCell(5).setCellValue("1 Cuat.");
-        row.createCell(6).setCellValue(800.0);
-        row.createCell(7).setCellValue(1540.0);
-        row.createCell(9).setCellValue(90.0);
-        row.createCell(11).setCellValue(31.0);
-        row.createCell(12).setCellValue(2023.0);
-        row.createCell(13).setCellValue(104.0);
-        row.createCell(14).setCellValue("Materia");
-        row.createCell(15).setCellValue(30.0);
+    @DisplayName("día inválido → ExcelImportException")
+    void diaInvalido() {
+        Row row = rowWith(DataRow.defaultRow().toBuilder().day("Lunardi").build());
+
+        assertThatThrownBy(() -> mapper.map(row, 7))
+            .isInstanceOf(ExcelImportException.class)
+            .hasMessageContaining("Unknown day of week")
+            .hasMessageContaining("Lunardi");
+    }
+
+    @Test
+    @DisplayName("horas HHMM: 1830 → 18:30 y 800 → 08:00")
+    void horasHHMM() {
+        Row row = rowWith(DataRow.defaultRow().toBuilder().startTime(1830).endTime(800).build());
 
         ExcelRowDto dto = mapper.map(row, 7);
 
-        assertEquals("513", dto.roomNumber());
+        assertThat(dto.startTime()).isEqualTo(LocalTime.of(18, 30));
+        assertThat(dto.endTime()).isEqualTo(LocalTime.of(8, 0));
     }
 
     @Test
-    void map_shouldConvertHHMMToCorrectIntValues() {
-        row.createCell(0).setCellValue("1C1");
-        row.createCell(1).setCellValue(10.0);
-        row.createCell(2).setCellValue(513.0);
-        row.createCell(3).setCellValue("Edif. Dr. Gallardo");
-        row.createCell(4).setCellValue("Jueves");
-        row.createCell(5).setCellValue("1 Cuat.");
-        row.createCell(6).setCellValue(800.0);
-        row.createCell(7).setCellValue(1720.0);
-        row.createCell(9).setCellValue(90.0);
-        row.createCell(11).setCellValue(31.0);
-        row.createCell(12).setCellValue(2023.0);
-        row.createCell(13).setCellValue(104.0);
-        row.createCell(14).setCellValue("Materia");
-        row.createCell(15).setCellValue(30.0);
+    @DisplayName("celda requerida en blanco (Curso) → excepción que referencia columna y fila")
+    void celdaRequeridaEnBlanco() {
+        ExcelTestWorkbooks fixture = ExcelTestWorkbooks.validTemplate().withValidDataRow()
+            .withBlankCell(6, 0);
+        Row row = fixture.dataRow(0);
+
+        assertThatThrownBy(() -> mapper.map(row, 7))
+            .isInstanceOf(ExcelImportException.class)
+            .hasMessageContaining("Curso")
+            .hasMessageContaining("row 7");
+    }
+
+    @Test
+    @DisplayName("tipo incorrecto en columna numérica (Comisión con texto) → excepción")
+    void tipoIncorrecto() {
+        ExcelTestWorkbooks fixture = ExcelTestWorkbooks.validTemplate().withValidDataRow()
+            .withStringCell(6, 1, "no-es-numero");
+        Row row = fixture.dataRow(0);
+
+        assertThatThrownBy(() -> mapper.map(row, 7))
+            .isInstanceOf(ExcelImportException.class)
+            .hasMessageContaining("Comisión")
+            .hasMessageContaining("must be numeric");
+    }
+
+    @Test
+    @DisplayName("aula numérica se lee como string sin decimales: 105 → \"105\", no \"105.0\"")
+    void aulaNumericaComoString() {
+        Row row = rowWith(DataRow.defaultRow().toBuilder().roomNumber(105).build());
 
         ExcelRowDto dto = mapper.map(row, 7);
 
-        assertEquals(LocalTime.of(8, 0), dto.startTime());
-        assertEquals(LocalTime.of(17, 20), dto.endTime());
+        assertThat(dto.roomNumber()).isEqualTo("105");
     }
 
     @Test
-    void map_shouldAllowNullDurationMinutes() {
-        row.createCell(0).setCellValue("1C1");
-        row.createCell(1).setCellValue(10.0);
-        row.createCell(2).setCellValue(513.0);
-        row.createCell(3).setCellValue("Edif. Dr. Gallardo");
-        row.createCell(4).setCellValue("Jueves");
-        row.createCell(5).setCellValue("1 Cuat.");
-        row.createCell(6).setCellValue(800.0);
-        row.createCell(7).setCellValue(1540.0);
-        row.createCell(11).setCellValue(31.0);
-        row.createCell(12).setCellValue(2023.0);
-        row.createCell(13).setCellValue(104.0);
-        row.createCell(14).setCellValue("Materia");
-        row.createCell(15).setCellValue(30.0);
+    @DisplayName("aula alfanumérica se preserva como texto")
+    void aulaAlfanumericaComoTexto() {
+        Row row = rowWith(DataRow.defaultRow().toBuilder().roomNumber("105B").build());
 
         ExcelRowDto dto = mapper.map(row, 7);
 
-        assertNull(dto.durationMinutes());
+        assertThat(dto.roomNumber()).isEqualTo("105B");
     }
 
     @Test
-    void map_shouldTrimStringValues() {
-        row.createCell(0).setCellValue("1C1   ");
-        row.createCell(1).setCellValue(10.0);
-        row.createCell(2).setCellValue(513.0);
-        row.createCell(3).setCellValue("  Edif. Dr. Gallardo  ");
-        row.createCell(4).setCellValue("Jueves");
-        row.createCell(5).setCellValue("1 Cuat.");
-        row.createCell(6).setCellValue(800.0);
-        row.createCell(7).setCellValue(1540.0);
-        row.createCell(9).setCellValue(90.0);
-        row.createCell(11).setCellValue(31.0);
-        row.createCell(12).setCellValue(2023.0);
-        row.createCell(13).setCellValue(104.0);
-        row.createCell(14).setCellValue("  Materia  ");
-        row.createCell(15).setCellValue(30.0);
+    @DisplayName("Durac[min] vacía → durationMinutes null (el fallback fin-inicio lo hace el service, no el mapper)")
+    void duracionVaciaEsNull() {
+        Row row = rowWith(DataRow.defaultRow().toBuilder().durationMinutes(null).build());
 
         ExcelRowDto dto = mapper.map(row, 7);
 
-        assertEquals("1C1", dto.courseCode());
-        assertEquals("Edif. Dr. Gallardo", dto.buildingName());
-        assertEquals("Materia", dto.subjectName());
+        assertThat(dto.durationMinutes()).isNull();
     }
 
     @Test
-    void map_shouldThrowWhenCursoIsBlank() {
-        row.createCell(1).setCellValue(10.0);
-        assertThrows(ExcelImportException.class, () -> mapper.map(row, 7));
-    }
-
-    @Test
-    void map_shouldThrowWhenComisionIsBlank() {
-        row.createCell(0).setCellValue("1C1");
-        row.createCell(3).setCellValue("Edif");
-        row.createCell(4).setCellValue("Jueves");
-        row.createCell(5).setCellValue("1 Cuat.");
-        row.createCell(6).setCellValue(800.0);
-        row.createCell(7).setCellValue(1540.0);
-        row.createCell(11).setCellValue(31.0);
-        row.createCell(12).setCellValue(2023.0);
-        row.createCell(13).setCellValue(104.0);
-        row.createCell(14).setCellValue("Materia");
-        row.createCell(15).setCellValue(30.0);
-        assertThrows(ExcelImportException.class, () -> mapper.map(row, 7));
-    }
-
-    @Test
-    void map_shouldThrowWhenDictadoIsBlank() {
-        row.createCell(0).setCellValue("1C1");
-        row.createCell(1).setCellValue(10.0);
-        row.createCell(2).setCellValue(513.0);
-        row.createCell(3).setCellValue("Edif");
-        row.createCell(4).setCellValue("Jueves");
-        row.createCell(6).setCellValue(800.0);
-        row.createCell(7).setCellValue(1540.0);
-        row.createCell(11).setCellValue(31.0);
-        row.createCell(12).setCellValue(2023.0);
-        row.createCell(13).setCellValue(104.0);
-        row.createCell(14).setCellValue("Materia");
-        row.createCell(15).setCellValue(30.0);
-        assertThrows(ExcelImportException.class, () -> mapper.map(row, 7));
-    }
-
-    @Test
-    void map_shouldThrowWhenDiaIsBlank() {
-        row.createCell(0).setCellValue("1C1");
-        row.createCell(1).setCellValue(10.0);
-        row.createCell(2).setCellValue(513.0);
-        row.createCell(3).setCellValue("Edif");
-        row.createCell(5).setCellValue("1 Cuat.");
-        row.createCell(6).setCellValue(800.0);
-        row.createCell(7).setCellValue(1540.0);
-        row.createCell(11).setCellValue(31.0);
-        row.createCell(12).setCellValue(2023.0);
-        row.createCell(13).setCellValue(104.0);
-        row.createCell(14).setCellValue("Materia");
-        row.createCell(15).setCellValue(30.0);
-        assertThrows(ExcelImportException.class, () -> mapper.map(row, 7));
-    }
-
-    @Test
-    void map_shouldThrowWhenNombreMateriaIsBlank() {
-        row.createCell(0).setCellValue("1C1");
-        row.createCell(1).setCellValue(10.0);
-        row.createCell(2).setCellValue(513.0);
-        row.createCell(3).setCellValue("Edif");
-        row.createCell(4).setCellValue("Jueves");
-        row.createCell(5).setCellValue("1 Cuat.");
-        row.createCell(6).setCellValue(800.0);
-        row.createCell(7).setCellValue(1540.0);
-        row.createCell(11).setCellValue(31.0);
-        row.createCell(12).setCellValue(2023.0);
-        row.createCell(13).setCellValue(104.0);
-        row.createCell(15).setCellValue(30.0);
-        assertThrows(ExcelImportException.class, () -> mapper.map(row, 7));
-    }
-
-    @Test
-    void map_shouldThrowWhenEdificioIsBlank() {
-        row.createCell(0).setCellValue("1C1");
-        row.createCell(1).setCellValue(10.0);
-        row.createCell(2).setCellValue(513.0);
-        row.createCell(4).setCellValue("Jueves");
-        row.createCell(5).setCellValue("1 Cuat.");
-        row.createCell(6).setCellValue(800.0);
-        row.createCell(7).setCellValue(1540.0);
-        row.createCell(11).setCellValue(31.0);
-        row.createCell(12).setCellValue(2023.0);
-        row.createCell(13).setCellValue(104.0);
-        row.createCell(14).setCellValue("Materia");
-        row.createCell(15).setCellValue(30.0);
-        assertThrows(ExcelImportException.class, () -> mapper.map(row, 7));
-    }
-
-    @Test
-    void map_shouldThrowWhenEspecialidadIsBlank() {
-        row.createCell(0).setCellValue("1C1");
-        row.createCell(1).setCellValue(10.0);
-        row.createCell(2).setCellValue(513.0);
-        row.createCell(3).setCellValue("Edif");
-        row.createCell(4).setCellValue("Jueves");
-        row.createCell(5).setCellValue("1 Cuat.");
-        row.createCell(6).setCellValue(800.0);
-        row.createCell(7).setCellValue(1540.0);
-        row.createCell(12).setCellValue(2023.0);
-        row.createCell(13).setCellValue(104.0);
-        row.createCell(14).setCellValue("Materia");
-        row.createCell(15).setCellValue(30.0);
-        assertThrows(ExcelImportException.class, () -> mapper.map(row, 7));
-    }
-
-    @Test
-    void map_shouldThrowWhenHoraComienzoIsNotNumeric() {
-        row.createCell(0).setCellValue("1C1");
-        row.createCell(1).setCellValue(10.0);
-        row.createCell(2).setCellValue(513.0);
-        row.createCell(3).setCellValue("Edif");
-        row.createCell(4).setCellValue("Jueves");
-        row.createCell(5).setCellValue("1 Cuat.");
-        row.createCell(6).setCellValue("ochocientos");
-        row.createCell(7).setCellValue(1540.0);
-        row.createCell(11).setCellValue(31.0);
-        row.createCell(12).setCellValue(2023.0);
-        row.createCell(13).setCellValue(104.0);
-        row.createCell(14).setCellValue("Materia");
-        row.createCell(15).setCellValue(30.0);
-        assertThrows(ExcelImportException.class, () -> mapper.map(row, 7));
-    }
-
-    @Test
-    void map_shouldThrowWhenHoraFinIsBlank() {
-        row.createCell(0).setCellValue("1C1");
-        row.createCell(1).setCellValue(10.0);
-        row.createCell(2).setCellValue(513.0);
-        row.createCell(3).setCellValue("Edif");
-        row.createCell(4).setCellValue("Jueves");
-        row.createCell(5).setCellValue("1 Cuat.");
-        row.createCell(6).setCellValue(800.0);
-        row.createCell(11).setCellValue(31.0);
-        row.createCell(12).setCellValue(2023.0);
-        row.createCell(13).setCellValue(104.0);
-        row.createCell(14).setCellValue("Materia");
-        row.createCell(15).setCellValue(30.0);
-        assertThrows(ExcelImportException.class, () -> mapper.map(row, 7));
-    }
-
-    @Test
-    void map_shouldAcceptZeroCantidadInscriptos() {
-        row.createCell(0).setCellValue("1C1");
-        row.createCell(1).setCellValue(10.0);
-        row.createCell(2).setCellValue(513.0);
-        row.createCell(3).setCellValue("Edif");
-        row.createCell(4).setCellValue("Jueves");
-        row.createCell(5).setCellValue("1 Cuat.");
-        row.createCell(6).setCellValue(800.0);
-        row.createCell(7).setCellValue(1540.0);
-        row.createCell(9).setCellValue(90.0);
-        row.createCell(11).setCellValue(31.0);
-        row.createCell(12).setCellValue(2023.0);
-        row.createCell(13).setCellValue(104.0);
-        row.createCell(14).setCellValue("Materia");
-        row.createCell(15).setCellValue(0.0);
+    @DisplayName("Durac[min] presente → se propaga tal cual")
+    void duracionPresenteSePropaga() {
+        Row row = rowWith(DataRow.defaultRow().toBuilder().durationMinutes(90).build());
 
         ExcelRowDto dto = mapper.map(row, 7);
 
-        assertEquals(0, dto.enrolledCount());
+        assertThat(dto.durationMinutes()).isEqualTo(90);
     }
 
-    @Test
-    void map_shouldHandleFormulaCells() {
-        row.createCell(0).setCellValue("1C1");
-        row.createCell(1).setCellValue(10.0);
-        row.createCell(2).setCellValue(513.0);
-        row.createCell(3).setCellValue("Edif");
-        row.createCell(4).setCellValue("Jueves");
-        row.createCell(5).setCellValue("1 Cuat.");
-
-        Cell startTimeCell = row.createCell(6);
-        startTimeCell.setCellFormula("800+0");
-        row.createCell(7).setCellValue(1540.0);
-
-        row.createCell(9).setCellValue(90.0);
-        row.createCell(11).setCellValue(31.0);
-        row.createCell(12).setCellValue(2023.0);
-        row.createCell(13).setCellValue(104.0);
-        row.createCell(14).setCellValue("Materia");
-        row.createCell(15).setCellValue(30.0);
-
-        org.apache.poi.xssf.usermodel.XSSFFormulaEvaluator.evaluateAllFormulaCells(workbook);
-
-        ExcelRowDto dto = mapper.map(row, 7);
-
-        assertEquals(LocalTime.of(8, 0), dto.startTime());
-    }
-
-    @Test
-    void map_shouldReturnDtoWithSingleDigitHHMM() {
-        row.createCell(0).setCellValue("1C1");
-        row.createCell(1).setCellValue(10.0);
-        row.createCell(2).setCellValue(513.0);
-        row.createCell(3).setCellValue("Edif. Dr. Gallardo");
-        row.createCell(4).setCellValue("Jueves");
-        row.createCell(5).setCellValue("1 Cuat.");
-        row.createCell(6).setCellValue(800.0);
-        row.createCell(7).setCellValue(900.0);
-        row.createCell(9).setCellValue(60.0);
-        row.createCell(11).setCellValue(31.0);
-        row.createCell(12).setCellValue(2023.0);
-        row.createCell(13).setCellValue(104.0);
-        row.createCell(14).setCellValue("Materia");
-        row.createCell(15).setCellValue(30.0);
-
-        ExcelRowDto dto = mapper.map(row, 7);
-
-        assertEquals(LocalTime.of(8, 0), dto.startTime());
-        assertEquals(LocalTime.of(9, 0), dto.endTime());
+    private Row rowWith(DataRow data) {
+        return ExcelTestWorkbooks.validTemplate().withDataRow(data).dataRow(0);
     }
 }

@@ -1,11 +1,14 @@
 spring:
   datasource:
-    url: jdbc:tc:postgresql:16-alpine:///testdb
+    url: jdbc:tc:postgresql:16-alpine:///siga?TC_DAEMON=true
+    username: test
+    password: test
     driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+
   jpa:
     hibernate:
       ddl-auto: create-drop
-    show-sql: false
+
   docker:
     compose:
       enabled: false
@@ -15,6 +18,8 @@ cors:
     - http://localhost:5173
 
 siga:
+  solver:
+    unimproved-seconds-limit: 1
   jwt:
     secret: integration-test-fixed-secret-not-for-prod-0123456789
     refresh-grace-seconds: 10

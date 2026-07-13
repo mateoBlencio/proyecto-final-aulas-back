@@ -16,14 +16,21 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.AccessLevel;
+import org.hibernate.envers.Audited;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
+/**
+ * Ocurrencia concreta (fecha) de un {@link AcademicEvent}. Auditada con Hibernate Envers (ver
+ * ADR-007): los cambios de estado quedan registrados en {@code ocurrencia_aud}.
+ */
 @Entity
 @Table(name = "ocurrencia")
+@Audited
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -44,6 +51,7 @@ public class Occurrence {
     @Column(name = "fecha", nullable = false)
     private LocalDate date;
 
+    @Setter
     @Enumerated(EnumType.STRING)
     @Column(name = "estado", nullable = false)
     private OccurrenceStatus status;
@@ -56,6 +64,7 @@ public class Occurrence {
         return event.endTime();
     }
 
+    /** true si ya pasó el momento de inicio (fecha + hora de inicio del evento vs. ahora). */
     public boolean isPast() {
         return LocalDateTime.now().isAfter(date.atTime(event.getStartTime()));
     }

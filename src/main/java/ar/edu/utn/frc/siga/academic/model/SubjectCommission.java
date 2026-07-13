@@ -1,8 +1,8 @@
 package ar.edu.utn.frc.siga.academic.model;
 
-import ar.edu.utn.frc.siga.academic.model.Subject;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -15,12 +15,17 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.springframework.modulith.NamedInterface;
+import org.hibernate.annotations.SQLRestriction;
 
-@NamedInterface("api")
+/**
+ * Tabla de unión materia×comisión: liga una {@link Subject} con una {@link Commission} y
+ * carga los atributos propios de ese dictado que condicionan la asignación de aula
+ * (cantidad de inscriptos, si requiere laboratorio, si permite superposición, modalidad).
+ */
 @Entity
 @Table(name = "materia_comision",
        uniqueConstraints = @UniqueConstraint(columnNames = {"id_materia", "id_comision"}))
+@SQLRestriction("eliminado = false")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -33,11 +38,11 @@ public class SubjectCommission {
     @Column(name = "id_materia_comision")
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_materia", nullable = false)
     private Subject subject;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_comision", nullable = false)
     private Commission commission;
 
