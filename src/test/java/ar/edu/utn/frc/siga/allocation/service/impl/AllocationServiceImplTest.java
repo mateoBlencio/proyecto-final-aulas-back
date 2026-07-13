@@ -78,6 +78,7 @@ class AllocationServiceImplTest {
         lenient().when(allocationRepository.findOccupancyBetween(any(), any(), eq(OccurrenceStatus.ASSIGNED)))
                 .thenReturn(List.of());
         lenient().when(allocationRepository.findByOccurrence_Id(any())).thenReturn(Optional.empty());
+        lenient().when(allocationRepository.findByOccurrence_IdIn(any())).thenReturn(List.of());
     }
 
     // ---------- assignManually ----------
@@ -418,10 +419,10 @@ class AllocationServiceImplTest {
         when(occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eq(1L), any()))
                 .thenReturn(List.of(pastOcc));
 
-        List<AllocationResponseDto> results = service.importAssignmentsFromDate(
+        int count = service.importAssignmentsFromDate(
                 new AllocateFromDateRequestDto(1L, LocalDate.now().minusDays(3), 5, null));
 
-        assertThat(results).hasSize(1);
+        assertThat(count).isEqualTo(1);
         verify(allocationRepository).save(any());
         assertThat(pastOcc.getStatus()).isEqualTo(OccurrenceStatus.ASSIGNED);
     }
@@ -450,7 +451,7 @@ class AllocationServiceImplTest {
         when(eventRepository.findById(1L)).thenReturn(Optional.of(event));
         when(occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eq(1L), any()))
                 .thenReturn(List.of(occ));
-        when(allocationRepository.findByOccurrence_Id(10L)).thenReturn(Optional.of(existing));
+        when(allocationRepository.findByOccurrence_IdIn(any())).thenReturn(List.of(existing));
 
         service.importAssignmentsFromDate(new AllocateFromDateRequestDto(1L, futureDate(1), 5, null));
 
@@ -469,10 +470,10 @@ class AllocationServiceImplTest {
         when(occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eq(1L), any()))
                 .thenReturn(List.of(cancelled, suspended));
 
-        List<AllocationResponseDto> results = service.importAssignmentsFromDate(
+        int count = service.importAssignmentsFromDate(
                 new AllocateFromDateRequestDto(1L, futureDate(1), 5, null));
 
-        assertThat(results).isEmpty();
+        assertThat(count).isZero();
         verify(allocationRepository, never()).save(any());
         verify(occurrenceRepository, never()).save(any());
     }

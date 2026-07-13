@@ -32,8 +32,12 @@ public interface AllocationService {
     /** Asigna un aula a todas las occurrences futuras de un evento recurrente desde una fecha (source MANUAL), salteando las que ya ocurrieron. */
     List<AllocationResponseDto> assignManuallyFromDate(AllocateFromDateRequestDto dto);
 
-    /** Igual que {@link #assignManuallyFromDate}, pero con source IMPORTED e incluyendo occurrences pasadas (carga masiva desde Excel). */
-    List<AllocationResponseDto> importAssignmentsFromDate(AllocateFromDateRequestDto dto);
+    /**
+     * Igual que {@link #assignManuallyFromDate}, pero con source IMPORTED e incluyendo
+     * occurrences pasadas (carga masiva desde Excel). Devuelve la cantidad de allocations
+     * aplicadas (no el DTO compuesto: el único caller productivo no lo necesita).
+     */
+    int importAssignmentsFromDate(AllocateFromDateRequestDto dto);
 
     List<AllocationResponseDto> findByDate(LocalDate date);
 }

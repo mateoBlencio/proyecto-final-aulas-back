@@ -123,15 +123,15 @@ class AcademicEventServiceImplTest {
         when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
                 dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startTime(), dto.startDate(), dto.endDate()))
                 .thenReturn(Optional.of(existing));
-        when(composer.compose(existing)).thenReturn(dummyRecurringResponseDto(7L));
 
-        FindOrCreateResult<AcademicEventResponseDto> result = service.findOrCreateRecurringEvent(dto);
+        FindOrCreateResult<Long> result = service.findOrCreateRecurringEvent(dto);
 
         assertThat(result.created()).isFalse();
-        assertThat(result.value().id()).isEqualTo(7L);
+        assertThat(result.value()).isEqualTo(7L);
         verify(eventRepository, never()).save(any());
         verify(subjectService, never()).findById(any());
         verify(commissionService, never()).findById(any());
+        verify(composer, never()).compose(any(AcademicEvent.class));
     }
 
     @Test
@@ -148,10 +148,10 @@ class AcademicEventServiceImplTest {
         when(eventRepository.save(any())).thenReturn(saved);
         when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyRecurringResponseDto(9L));
 
-        FindOrCreateResult<AcademicEventResponseDto> result = service.findOrCreateRecurringEvent(dto);
+        FindOrCreateResult<Long> result = service.findOrCreateRecurringEvent(dto);
 
         assertThat(result.created()).isTrue();
-        assertThat(result.value().id()).isEqualTo(9L);
+        assertThat(result.value()).isEqualTo(9L);
         verify(eventRepository).save(any());
     }
 

@@ -115,16 +115,16 @@ public class AcademicEventServiceImpl implements AcademicEventService {
      */
     @Override
     @Transactional
-    public FindOrCreateResult<AcademicEventResponseDto> findOrCreateRecurringEvent(CreateRecurringEventRequestDto dto) {
+    public FindOrCreateResult<Long> findOrCreateRecurringEvent(CreateRecurringEventRequestDto dto) {
         return recurringEventRepository
                 .findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
                         dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startTime(),
                         dto.startDate(), dto.endDate())
                 .map(existing -> {
                     log.debug("Reutilizando evento recurrente existente: id={}", existing.getId());
-                    return new FindOrCreateResult<>(composer.compose(existing), false);
+                    return new FindOrCreateResult<>(existing.getId(), false);
                 })
-                .orElseGet(() -> new FindOrCreateResult<>(createRecurringEvent(dto), true));
+                .orElseGet(() -> new FindOrCreateResult<>(createRecurringEvent(dto).id(), true));
     }
 
     /** Crea un evento único y genera su única occurrence, sin aula (SCHEDULED). */

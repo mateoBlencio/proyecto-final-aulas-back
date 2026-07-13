@@ -27,9 +27,10 @@ public interface AcademicEventService {
     /**
      * Busca un evento recurrente idéntico (misma materia/comisión/día/horario/ventana de
      * fechas) y lo reutiliza si existe; si no, lo crea. Pensado para importaciones donde el
-     * mismo evento puede repetirse entre filas.
+     * mismo evento puede repetirse entre filas. Devuelve solo el id (no el DTO compuesto:
+     * el único caller productivo solo necesita el id y si fue creado).
      */
-    FindOrCreateResult<AcademicEventResponseDto> findOrCreateRecurringEvent(CreateRecurringEventRequestDto dto);
+    FindOrCreateResult<Long> findOrCreateRecurringEvent(CreateRecurringEventRequestDto dto);
 
     /** Crea un evento único y genera su única occurrence (en SCHEDULED, sin aula). */
     AcademicEventResponseDto createUniqueEvent(CreateUniqueEventRequestDto dto);

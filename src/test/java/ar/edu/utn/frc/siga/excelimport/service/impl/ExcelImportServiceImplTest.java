@@ -23,7 +23,6 @@ import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateFromDateRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateRecurringEventRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.model.EventType;
 import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
@@ -42,6 +41,7 @@ import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import jakarta.persistence.EntityManager;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -80,6 +80,8 @@ class ExcelImportServiceImplTest {
     private BuildingService buildingService;
     @Mock
     private ClassroomService classroomService;
+    @Mock
+    private EntityManager entityManager;
 
     private ExcelImportServiceImpl service;
 
@@ -90,7 +92,7 @@ class ExcelImportServiceImplTest {
         service = new ExcelImportServiceImpl(new ExcelTemplateValidator(), new ExcelRowMapper(),
             specialtyService, studyPlanService, subjectService, academicPeriodService,
             commissionService, subjectCommissionService, academicEventService, allocationService,
-            buildingService, classroomService);
+            buildingService, classroomService, entityManager);
     }
 
     @Test
@@ -295,7 +297,7 @@ class ExcelImportServiceImplTest {
             row.enrolledCount(), LocalTime.of(18, 30), 90L, DayOfWeek.MONDAY,
             LocalDate.of(2026, 3, 1), LocalDate.of(2026, 11, 30), subject, commission);
         when(academicEventService.findOrCreateRecurringEvent(any()))
-            .thenReturn(new FindOrCreateResult<AcademicEventResponseDto>(event, created));
+            .thenReturn(new FindOrCreateResult<>(event.id(), created));
     }
 
     /** Variante de {@link #stubHappyPath} con ids explícitos, usada por el test de dedupe. */
@@ -333,7 +335,7 @@ class ExcelImportServiceImplTest {
             LocalTime.of(18, 30), 90L, DayOfWeek.MONDAY, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 11, 30),
             subject, commission);
         when(academicEventService.findOrCreateRecurringEvent(any()))
-            .thenReturn(new FindOrCreateResult<AcademicEventResponseDto>(event, true));
+            .thenReturn(new FindOrCreateResult<>(event.id(), true));
     }
 
     private void stubForSecondSubject(SpecialtyResponseDto specialty) {

@@ -32,6 +32,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -180,8 +181,9 @@ public class AllocationServiceImpl implements AllocationService {
 
         validateNoOverlap(occurrences.stream().map(o -> new OverlapCandidate(o, classroomId)).toList());
 
-        List<AllocationResponseDto> results = allocateToOccurrences(
+        List<Allocation> saved = allocateToOccurrences(
                 occurrences, classroomId, dto.observation(), AllocationSource.MANUAL, true);
+        List<AllocationResponseDto> results = composer.composeAll(saved);
 
         log.info("assignManuallyFromDate completo: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), results.size());
         return results;
@@ -190,11 +192,12 @@ public class AllocationServiceImpl implements AllocationService {
     /**
      * Igual que {@link #assignManuallyFromDate}, pero para carga masiva desde Excel (source
      * IMPORTED): incluye occurrences pasadas (no se saltean) y no valida solapamiento previo,
-     * ya que la importación reemplaza el estado existente por diseño.
+     * ya que la importación reemplaza el estado existente por diseño. Devuelve solo la
+     * cantidad aplicada: el caller (importación masiva) no usa el DTO compuesto.
      */
     @Override
     @Transactional
-    public List<AllocationResponseDto> importAssignmentsFromDate(AllocateFromDateRequestDto dto) {
+    public int importAssignmentsFromDate(AllocateFromDateRequestDto dto) {
         log.debug("importAssignmentsFromDate: event={}, fromDate={}, classroom={}", dto.recurringEventId(), dto.fromDate(), dto.classroomId());
 
         AcademicEvent event = eventRepository.findById(dto.recurringEventId())
@@ -209,47 +212,54 @@ public class AllocationServiceImpl implements AllocationService {
         List<Occurrence> occurrences = occurrenceRepository
                 .findByEvent_IdAndDateGreaterThanEqual(dto.recurringEventId(), dto.fromDate());
 
-        List<AllocationResponseDto> results = allocateToOccurrences(
+        List<Allocation> saved = allocateToOccurrences(
                 occurrences, classroomId, dto.observation(), AllocationSource.IMPORTED, false);
 
-        log.info("importAssignmentsFromDate completo: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), results.size());
-        return results;
+        log.info("importAssignmentsFromDate completo: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), saved.size());
+        return saved.size();
     }
 
     /**
      * Crea o actualiza (upsert por occurrence) la asignación de cada occurrence de la
      * lista al aula indicada, y la pasa a ASSIGNED. Las no-asignables (CANCELLED/SUSPENDED,
      * o pasadas cuando {@code skipPast}) se saltean por diseño, no son un fallo parcial.
+     * Prefetch en batch (una sola query) de las allocations existentes para evitar N+1.
      */
-    private List<AllocationResponseDto> allocateToOccurrences(
+    private List<Allocation> allocateToOccurrences(
             List<Occurrence> occurrences, Integer classroomId, String observation,
             AllocationSource source, boolean skipPast) {
+        Map<Long, Allocation> existingByOccurrence = allocationRepository
+                .findByOccurrence_IdIn(occurrences.stream().map(Occurrence::getId).toList())
+                .stream().collect(Collectors.toMap(a -> a.getOccurrence().getId(), a -> a));
+
         List<Allocation> saved = new ArrayList<>();
         for (Occurrence occurrence : occurrences) {
             if (skipPast && occurrence.isPast()) continue;
             if (!isAssignable(occurrence)) continue;
 
-            Allocation allocation = allocationRepository.findByOccurrence_Id(occurrence.getId())
-                    .map(existing -> {
-                        existing.setClassroomId(classroomId);
-                        existing.setSource(source);
-                        existing.setObservation(observation);
-                        return existing;
-                    })
-                    .orElseGet(() -> Allocation.builder()
-                            .occurrence(occurrence)
-                            .classroomId(classroomId)
-                            .source(source)
-                            .createdAt(LocalDateTime.now())
-                            .observation(observation)
-                            .build());
+            Allocation existing = existingByOccurrence.get(occurrence.getId());
+            Allocation allocation;
+            if (existing != null) {
+                existing.setClassroomId(classroomId);
+                existing.setSource(source);
+                existing.setObservation(observation);
+                allocation = existing;
+            } else {
+                allocation = Allocation.builder()
+                        .occurrence(occurrence)
+                        .classroomId(classroomId)
+                        .source(source)
+                        .createdAt(LocalDateTime.now())
+                        .observation(observation)
+                        .build();
+            }
 
             saved.add(allocationRepository.save(allocation));
 
             occurrence.setStatus(OccurrenceStatus.ASSIGNED);
             occurrenceRepository.save(occurrence);
         }
-        return composer.composeAll(saved);
+        return saved;
     }
 
     @Override

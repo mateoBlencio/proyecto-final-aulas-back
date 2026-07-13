@@ -3,7 +3,6 @@ package ar.edu.utn.frc.siga.allocation;
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateUniqueEventRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.model.Occurrence;
 import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
@@ -134,12 +133,12 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
 
         long before = eventRepository.count();
 
-        FindOrCreateResult<AcademicEventResponseDto> first = academicEventService.findOrCreateRecurringEvent(dto);
-        FindOrCreateResult<AcademicEventResponseDto> second = academicEventService.findOrCreateRecurringEvent(dto);
+        FindOrCreateResult<Long> first = academicEventService.findOrCreateRecurringEvent(dto);
+        FindOrCreateResult<Long> second = academicEventService.findOrCreateRecurringEvent(dto);
 
         assertThat(first.created()).isTrue();
         assertThat(second.created()).isFalse();
-        assertThat(second.value().id()).isEqualTo(first.value().id());
+        assertThat(second.value()).isEqualTo(first.value());
         assertThat(eventRepository.count()).isEqualTo(before + 1);
     }
 }

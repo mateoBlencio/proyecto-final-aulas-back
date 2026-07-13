@@ -27,6 +27,7 @@ import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.BuildingService;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
+import jakarta.persistence.EntityManager;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -65,6 +66,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     private final AllocationService allocationService;
     private final BuildingService buildingService;
     private final ClassroomService classroomService;
+    private final EntityManager entityManager;
 
     /**
      * Procesa el archivo completo en una única transacción: recorre las filas de datos
@@ -178,7 +180,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
             allocationService.importAssignmentsFromDate(
                 new AllocateFromDateRequestDto(
-                    eventResult.value().id(),
+                    eventResult.value(),
                     startDate,
                     classroom.id(),
                     "Importado de Excel"
@@ -188,8 +190,15 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             if (eventResult.created()) assignmentsCreated++;
             else assignmentsReused++;
             processedRows++;
-            log.info("Fila {}: subject={}, commission={}, classroom={}",
+            log.debug("Fila {}: subject={}, commission={}, classroom={}",
                 rowNum, subject.name(), commission.commissionNumber(), dto.roomNumber());
+
+            // Acota el persistence context de la única TX del import: sin esto, el dirty-check
+            // de cada flush (auto o explícito) crece con todas las entidades ya manejadas.
+            if (processedRows % 50 == 0) {
+                entityManager.flush();
+                entityManager.clear();
+            }
         }
 
         log.info("Importación completada: {} filas, {} eventos creados", processedRows, assignmentsCreated);
