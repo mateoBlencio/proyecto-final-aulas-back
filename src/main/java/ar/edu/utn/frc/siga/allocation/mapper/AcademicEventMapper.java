@@ -1,52 +1,48 @@
 package ar.edu.utn.frc.siga.allocation.mapper;
 
+import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
+import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.RecurringEventResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.UniqueEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
-import ar.edu.utn.frc.siga.allocation.model.EventType;
 import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
+import ar.edu.utn.frc.siga.common.mapper.CentralMapperConfig;
 import org.hibernate.Hibernate;
-import org.springframework.stereotype.Component;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
-@Component
-public class AcademicEventMapper {
+/**
+ * Mapea la jerarquía {@link AcademicEvent} (recurrente/único) a su DTO sellado
+ * correspondiente. MapStruct no puede generar el despacho polimórfico por sí solo
+ * (la entidad puede llegar proxied por Hibernate), así que el método de entrada es
+ * un {@code default} que desproxya y delega en el método concreto según el subtipo;
+ * cada método concreto sí es MapStruct puro.
+ */
+@Mapper(config = CentralMapperConfig.class)
+public interface AcademicEventMapper {
 
-    public AcademicEventResponseDto toDto(AcademicEvent event) {
+    default AcademicEventResponseDto toDto(AcademicEvent event, SubjectResponseDto subject, CommissionResponseDto commission) {
         AcademicEvent realEvent = (AcademicEvent) Hibernate.unproxy(event);
-
-        AcademicEventResponseDto.AcademicEventResponseDtoBuilder builder = AcademicEventResponseDto.builder()
-                .id(realEvent.getId())
-                .enrolled(realEvent.getEnrolled())
-                .startTime(realEvent.getStartTime())
-                .durationMinutes(realEvent.getDuration().toMinutes());
-
         if (realEvent instanceof RecurringEvent r) {
-            var subject = r.getSubject();
-            var commission = r.getCommission();
-            var studyPlan = subject != null ? subject.getStudyPlan() : null;
-            var specialty = studyPlan != null ? studyPlan.getSpecialty() : null;
-            var period = commission != null ? commission.getAcademicPeriod() : null;
-            builder.type(EventType.RECURRING)
-                    .dayOfWeek(r.getDayOfWeek())
-                    .startDate(r.getStartDate())
-                    .endDate(r.getEndDate())
-                    .subjectCode(subject != null ? subject.getCode() : null)
-                    .subjectName(subject != null ? subject.getName() : null)
-                    .subjectTerm(subject != null ? subject.getTerm() : null)
-                    .studyPlanCode(studyPlan != null ? studyPlan.getPlanCode() : null)
-                    .specialtyCode(specialty != null ? specialty.getSpecialtyCode() : null)
-                    .specialtyName(specialty != null ? specialty.getName() : null)
-                    .commissionCode(commission != null ? commission.getCourseCode() : null)
-                    .commissionNumber(commission != null ? commission.getCommissionNumber() : null)
-                    .yearLevel(commission != null ? commission.getYearLevel() : null)
-                    .periodYear(period != null ? period.getYear() : null)
-                    .periodSemester(period != null ? period.getSemester() : null);
-        } else if (realEvent instanceof UniqueEvent u) {
-            builder.type(EventType.UNIQUE_EVENT)
-                    .date(u.getDate())
-                    .description(u.getDescription());
+            return toDto(r, subject, commission);
         }
-
-        return builder.build();
+        return toDto((UniqueEvent) realEvent, subject, commission);
     }
+
+    // "subject"/"commission" se fuerzan a mapear el parámetro entero: el evento solo
+    // tiene subjectId/commissionId (Long) — el SubjectResponseDto/CommissionResponseDto
+    // siempre viene resuelto por el composer, nunca navegando la entidad.
+    @Mapping(target = "id", source = "event.id")
+    @Mapping(target = "type", constant = "RECURRING")
+    @Mapping(target = "durationMinutes", expression = "java(event.getDuration().toMinutes())")
+    @Mapping(target = "subject", source = "subject")
+    @Mapping(target = "commission", source = "commission")
+    RecurringEventResponseDto toDto(RecurringEvent event, SubjectResponseDto subject, CommissionResponseDto commission);
+
+    @Mapping(target = "id", source = "event.id")
+    @Mapping(target = "type", constant = "UNIQUE_EVENT")
+    @Mapping(target = "durationMinutes", expression = "java(event.getDuration().toMinutes())")
+    UniqueEventResponseDto toDto(UniqueEvent event, SubjectResponseDto subject, CommissionResponseDto commission);
 }

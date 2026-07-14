@@ -19,10 +19,17 @@ spring:
       idle-timeout: 600000
 
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
     show-sql: false
     database-platform: org.hibernate.dialect.PostgreSQLDialect
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
 
   docker:
     compose:
@@ -31,6 +38,7 @@ spring:
 server:
   servlet:
     context-path: /api
+  forward-headers-strategy: framework
 
 springdoc:
   swagger-ui:
@@ -55,15 +63,40 @@ cors:
   allowed-origins: ""
 
 siga:
+  api:
+    base-path: /v1
   solver:
-    # Solves concurrentes del SolverManager; excedentes se encolan. AUTO = según cores.
     parallel-solver-count: AUTO
-    # Corta el solve si el mejor score no mejora en N segundos (0 = deshabilitado).
-    unimproved-seconds-limit: 10
-    # PHASE_ASSERT (default Timefold, reproducible); FULL_ASSERT solo para debugging.
+    unimproved-seconds-limit: 1000
     environment-mode: PHASE_ASSERT
+    preview:
+      ttl-minutes: 30
+    weights:
+      overcrowding: 100000
+      same-commission-diff-room: 2000
+      same-commission-diff-building: 4000
+  space:
+    default-classroom-type: Normal
+  jwt:
+    secret: ${JWT_SECRET}
+    access-expiration-minutes: ${JWT_ACCESS_EXPIRATION_MINUTES:20}
+    refresh-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS:30}
+    refresh-grace-seconds: ${JWT_REFRESH_GRACE_SECONDS:10}
+  auth:
+    allowed-email-domain: ${AUTH_ALLOWED_EMAIL_DOMAIN:frc.utn.edu.ar}
+  login-ratelimit:
+    max-attempts: 5
+    window-minutes: 15
+  ratelimit:
+    general:
+      capacity: 100
+      refill-period-seconds: 60
 
 logging:
   level:
     root: WARN
     ar.edu.utn.frc.siga: INFO
+    # Fases del solver (construction heuristic / local search) y resumen de score de Timefold.
+    ai.timefold.solver.core.impl.solver: INFO
+    ai.timefold.solver.core.impl.constructionheuristic: INFO
+    ai.timefold.solver.core.impl.localsearch: INFO

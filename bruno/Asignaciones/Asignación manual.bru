@@ -1,0 +1,36 @@
+meta {
+  name: Asignación manual
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/v1/allocations/occurrences/:id
+  body: json
+  auth: none
+}
+
+params:path {
+  id: 
+}
+
+body:json {
+  {
+    "classroomId": 85,
+    "observation": "prueba"
+  }
+}
+
+docs {
+  Asigna un aula a una ocurrencia puntual (source = MANUAL).
+  
+  Valida que el aula no esté ya ocupada (asignación ASSIGNED existente de OTRO
+  evento) en la misma fecha/franja horaria de la ocurrencia. Si hay solapamiento →
+  409 con:
+  {
+    "conflicts": [
+      { "occurrenceId", "date", "startTime", "endTime", "classroomId",
+        "conflictingEventId", "conflictingAllocationId" }
+    ]
+  }
+}

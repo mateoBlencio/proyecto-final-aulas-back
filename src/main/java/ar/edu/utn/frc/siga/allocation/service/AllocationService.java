@@ -4,21 +4,40 @@ import ar.edu.utn.frc.siga.allocation.dto.request.AllocateFromDateRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.BatchReassignRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.AllocationSummaryDto;
 
 import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.modulith.NamedInterface;
 
+/**
+ * Fachada pública de asignación de aulas a occurrences. Cada método es un "intent method":
+ * {@code source} no es parámetro, lo estampa la implementación según el caso de uso
+ * invocado (1 caso de uso → 1 source). Toda operación de asignación/reasignación —
+ * individual o batch— es atómica.
+ */
 @NamedInterface("api")
 public interface AllocationService {
     AllocationResponseDto findById(Long allocationId);
-    AllocationResponseDto assign(Long occurrenceId, AllocateOccurrenceRequestDto dto);
+
+    /** Asigna aula (source MANUAL) a una occurrence puntual. Falla si ya tiene asignación, ya ocurrió, o no es asignable (CANCELLED/SUSPENDED). */
+    AllocationResponseDto assignManually(Long occurrenceId, AllocateOccurrenceRequestDto dto);
+
+    /** Cambia el aula de una asignación existente (source MANUAL). Falla si la occurrence ya ocurrió. */
     AllocationResponseDto reassign(Long allocationId, AllocateOccurrenceRequestDto dto);
+
+    /** Reasigna varias asignaciones en una sola transacción (source MANUAL): si algún move choca o ya ocurrió, no se aplica ninguno. */
     List<AllocationResponseDto> batchReassign(BatchReassignRequestDto dto);
-    void cancel(Long allocationId);
-    List<AllocationResponseDto> assignFromDate(AllocateFromDateRequestDto dto);
-    List<AllocationResponseDto> assignAllFromDate(AllocateFromDateRequestDto dto);
-    List<AllocationSummaryDto> findByDate(LocalDate date);
+
+    /** Asigna un aula a todas las occurrences futuras de un evento recurrente desde una fecha (source MANUAL), salteando las que ya ocurrieron. */
+    List<AllocationResponseDto> assignManuallyFromDate(AllocateFromDateRequestDto dto);
+
+    /**
+     * Igual que {@link #assignManuallyFromDate}, pero con source IMPORTED e incluyendo
+     * occurrences pasadas (carga masiva desde Excel). Devuelve la cantidad de allocations
+     * aplicadas (no el DTO compuesto: el único caller productivo no lo necesita).
+     */
+    int importAssignmentsFromDate(AllocateFromDateRequestDto dto);
+
+    List<AllocationResponseDto> findByDate(LocalDate date);
 }

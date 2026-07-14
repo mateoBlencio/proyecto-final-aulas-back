@@ -1,0 +1,22 @@
+meta {
+  name: Refresh
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/auth/refresh
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "refreshToken":"QpiJbOe9FuUGPrUC8qqoCTJESmYwUHo55QMnwK9NcQM"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

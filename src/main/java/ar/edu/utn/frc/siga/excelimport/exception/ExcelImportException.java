@@ -3,7 +3,12 @@ package ar.edu.utn.frc.siga.excelimport.exception;
 import ar.edu.utn.frc.siga.common.exception.SigaAppException;
 import org.springframework.http.HttpStatus;
 
+/**
+ * Falla el procesamiento de una fila o del archivo Excel durante la importación masiva.
+ */
 public class ExcelImportException extends SigaAppException {
+
+    private static final long serialVersionUID = 1L;
 
     public ExcelImportException(String message) {
         super(HttpStatus.UNPROCESSABLE_CONTENT, "Import error", message);

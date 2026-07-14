@@ -1,10 +1,14 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.academic.dto.response.StudyPlanResponseDto;
+import ar.edu.utn.frc.siga.academic.mapper.StudyPlanMapper;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
+import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
 import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
 import ar.edu.utn.frc.siga.academic.service.StudyPlanService;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
+import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,30 +21,28 @@ import org.springframework.transaction.annotation.Transactional;
 public class StudyPlanServiceImpl implements StudyPlanService {
 
     private final StudyPlanRepository studyPlanRepository;
+    private final SpecialtyRepository specialtyRepository;
+    private final StudyPlanMapper studyPlanMapper;
 
     @Override
     @Transactional
-    public StudyPlan save(StudyPlan studyPlan) {
-        log.debug("Saving StudyPlan: planCode={}", studyPlan.getPlanCode());
-        StudyPlan saved = studyPlanRepository.save(studyPlan);
-        log.info("StudyPlan saved: id={}", saved.getId());
-        return saved;
+    public FindOrCreateResult<StudyPlanResponseDto> findOrCreate(Integer planCode, Integer specialtyCode) {
+        Specialty specialty = requireSpecialty(specialtyCode);
+        return FindOrCreateResult.resolve(
+                studyPlanRepository.findByPlanCodeAndSpecialty(planCode, specialty),
+                () -> {
+                    log.info("Creando StudyPlan: code={}, specialty={}", planCode, specialty.getId());
+                    return studyPlanRepository.save(
+                            StudyPlan.builder()
+                                    .planCode(planCode)
+                                    .specialty(specialty)
+                                    .build());
+                }
+        ).map(studyPlanMapper::toDto);
     }
 
-    @Override
-    @Transactional
-    public FindOrCreateResult<StudyPlan> findOrCreate(Integer planCode, Specialty specialty) {
-        return studyPlanRepository.findByPlanCodeAndSpecialtyAndDeletedFalse(planCode, specialty)
-            .map(found -> new FindOrCreateResult<>(found, false))
-            .orElseGet(() -> {
-                log.info("Creando StudyPlan: code={}, specialty={}", planCode, specialty.getId());
-                StudyPlan created = studyPlanRepository.save(
-                    StudyPlan.builder()
-                        .planCode(planCode)
-                        .specialty(specialty)
-                        .build()
-                );
-                return new FindOrCreateResult<>(created, true);
-            });
+    private Specialty requireSpecialty(Integer specialtyCode) {
+        return specialtyRepository.findBySpecialtyCode(specialtyCode)
+                .orElseThrow(() -> ResourceNotFoundException.of("Specialty", specialtyCode));
     }
 }

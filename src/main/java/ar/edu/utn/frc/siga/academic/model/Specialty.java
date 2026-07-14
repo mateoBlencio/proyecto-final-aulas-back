@@ -11,11 +11,15 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.springframework.modulith.NamedInterface;
+import org.hibernate.annotations.SQLRestriction;
 
-@NamedInterface("api")
+/**
+ * Especialidad académica (carrera): raíz de la jerarquía académica, de la que cuelgan
+ * los planes de estudio.
+ */
 @Entity
 @Table(name = "especialidad")
+@SQLRestriction("eliminado = false")
 @Getter
 @Setter
 @NoArgsConstructor

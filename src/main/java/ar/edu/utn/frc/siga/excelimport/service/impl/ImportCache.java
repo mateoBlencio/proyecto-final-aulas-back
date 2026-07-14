@@ -1,57 +1,62 @@
 package ar.edu.utn.frc.siga.excelimport.service.impl;
 
-import ar.edu.utn.frc.siga.academic.model.Specialty;
-import ar.edu.utn.frc.siga.academic.model.StudyPlan;
-import ar.edu.utn.frc.siga.academic.model.Subject;
-import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
-import ar.edu.utn.frc.siga.academic.model.Commission;
-import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
-import ar.edu.utn.frc.siga.space.model.Building;
-import ar.edu.utn.frc.siga.space.model.Classroom;
+import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
+import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
+import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
+import ar.edu.utn.frc.siga.academic.dto.response.StudyPlanResponseDto;
+import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
+import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
+import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
 
+/**
+ * Cache de deduplicación por fila de Excel: evita repetir el findOrCreate de la misma
+ * entidad ya resuelta en filas anteriores. Cachea DTOs, no entidades: desde la Fase 4
+ * las fachadas {@code api} de {@code academic} y {@code space} solo devuelven DTOs.
+ */
 class ImportCache {
 
-    private final Map<Integer, Specialty> specialties = new HashMap<>();
-    private final Map<String, StudyPlan> studyPlans = new HashMap<>();
-    private final Map<String, Subject> subjects = new HashMap<>();
-    private final Map<String, AcademicPeriod> periods = new HashMap<>();
-    private final Map<String, Commission> commissions = new HashMap<>();
-    private final Map<String, SubjectCommission> subjectCommissions = new HashMap<>();
-    private final Map<String, Building> buildings = new HashMap<>();
-    private final Map<String, Classroom> classrooms = new HashMap<>();
+    private final Map<Integer, SpecialtyResponseDto> specialties = new HashMap<>();
+    private final Map<String, StudyPlanResponseDto> studyPlans = new HashMap<>();
+    private final Map<String, SubjectResponseDto> subjects = new HashMap<>();
+    private final Map<String, AcademicPeriodResponseDto> periods = new HashMap<>();
+    private final Map<String, CommissionResponseDto> commissions = new HashMap<>();
+    private final Map<String, SubjectCommissionResponseDto> subjectCommissions = new HashMap<>();
+    private final Map<String, BuildingResponseDto> buildings = new HashMap<>();
+    private final Map<String, ClassroomResponseDto> classrooms = new HashMap<>();
 
-    Specialty getSpecialty(Integer code, Supplier<Specialty> loader) {
+    SpecialtyResponseDto getSpecialty(Integer code, Supplier<SpecialtyResponseDto> loader) {
         return specialties.computeIfAbsent(code, k -> loader.get());
     }
 
-    StudyPlan getStudyPlan(String key, Supplier<StudyPlan> loader) {
+    StudyPlanResponseDto getStudyPlan(String key, Supplier<StudyPlanResponseDto> loader) {
         return studyPlans.computeIfAbsent(key, k -> loader.get());
     }
 
-    Subject getSubject(String key, Supplier<Subject> loader) {
+    SubjectResponseDto getSubject(String key, Supplier<SubjectResponseDto> loader) {
         return subjects.computeIfAbsent(key, k -> loader.get());
     }
 
-    AcademicPeriod getPeriod(String key, Supplier<AcademicPeriod> loader) {
+    AcademicPeriodResponseDto getPeriod(String key, Supplier<AcademicPeriodResponseDto> loader) {
         return periods.computeIfAbsent(key, k -> loader.get());
     }
 
-    Commission getCommission(String key, Supplier<Commission> loader) {
+    CommissionResponseDto getCommission(String key, Supplier<CommissionResponseDto> loader) {
         return commissions.computeIfAbsent(key, k -> loader.get());
     }
 
-    SubjectCommission getSubjectCommission(String key, Supplier<SubjectCommission> loader) {
+    SubjectCommissionResponseDto getSubjectCommission(String key, Supplier<SubjectCommissionResponseDto> loader) {
         return subjectCommissions.computeIfAbsent(key, k -> loader.get());
     }
 
-    Building getBuilding(String key, Supplier<Building> loader) {
+    BuildingResponseDto getBuilding(String key, Supplier<BuildingResponseDto> loader) {
         return buildings.computeIfAbsent(key, k -> loader.get());
     }
 
-    Classroom getClassroom(String key, Supplier<Classroom> loader) {
+    ClassroomResponseDto getClassroom(String key, Supplier<ClassroomResponseDto> loader) {
         return classrooms.computeIfAbsent(key, k -> loader.get());
     }
 }

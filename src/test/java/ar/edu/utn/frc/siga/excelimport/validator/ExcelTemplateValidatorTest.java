@@ -1,208 +1,158 @@
 package ar.edu.utn.frc.siga.excelimport.validator;
 
-import ar.edu.utn.frc.siga.excelimport.ExcelTestFactory;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import ar.edu.utn.frc.siga.excelimport.ExcelTestWorkbooks;
 import ar.edu.utn.frc.siga.excelimport.exception.ExcelFormatException;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import org.junit.jupiter.api.BeforeEach;
+import java.time.Year;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.multipart.MultipartFile;
-
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import java.io.ByteArrayInputStream;
+import org.springframework.mock.web.MockMultipartFile;
 
 @ExtendWith(MockitoExtension.class)
+@DisplayName("ExcelTemplateValidator")
 class ExcelTemplateValidatorTest {
 
-    private ExcelTemplateValidator validator;
+    private final ExcelTemplateValidator validator = new ExcelTemplateValidator();
 
-    @BeforeEach
-    void setUp() {
-        validator = new ExcelTemplateValidator();
-    }
+    @Test
+    @DisplayName("plantilla válida con al menos una fila de datos → pasa y devuelve el workbook")
+    void plantillaValidaPasa() {
+        MockMultipartFile file = ExcelTestWorkbooks.validTemplate().withValidDataRow().toMultipartFile();
 
-    private void mockInputStream(MultipartFile file, byte[] data) {
-        try {
-            when(file.getInputStream()).thenReturn(new ByteArrayInputStream(data));
-        } catch (java.io.IOException e) {
-            throw new RuntimeException(e);
-        }
+        Workbook workbook = validator.validate(file);
+
+        assertThat(workbook).isNotNull();
+        assertThat(workbook.getSheet(ExcelTestWorkbooks.SHEET_NAME)).isNotNull();
     }
 
     @Test
-    void validate_shouldPassWhenFileIsValid() {
-        MultipartFile file = mock(MultipartFile.class);
-        when(file.isEmpty()).thenReturn(false);
-        when(file.getOriginalFilename()).thenReturn("test.xlsx");
-        mockInputStream(file, ExcelTestFactory.validXlsx(1));
-
-        assertDoesNotThrow(() -> validator.validate(file));
+    @DisplayName("archivo null → ExcelFormatException")
+    void archivoNull() {
+        assertThatThrownBy(() -> validator.validate(null))
+            .isInstanceOf(ExcelFormatException.class);
     }
 
     @Test
-    void validate_shouldPassWhenFileIsXls() {
-        MultipartFile file = mock(MultipartFile.class);
-        when(file.isEmpty()).thenReturn(false);
-        when(file.getOriginalFilename()).thenReturn("test.xls");
-        mockInputStream(file, ExcelTestFactory.validXls(1));
+    @DisplayName("archivo vacío (sin bytes) → ExcelFormatException")
+    void archivoVacio() {
+        MockMultipartFile file = new MockMultipartFile("file", "import.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new byte[0]);
 
-        assertDoesNotThrow(() -> validator.validate(file));
+        assertThatThrownBy(() -> validator.validate(file))
+            .isInstanceOf(ExcelFormatException.class);
     }
 
     @Test
-    void validate_shouldThrowWhenFileIsNotExcel() {
-        MultipartFile file = mock(MultipartFile.class);
-        when(file.isEmpty()).thenReturn(false);
-        when(file.getOriginalFilename()).thenReturn("test.csv");
+    @DisplayName("extensión incorrecta → ExcelFormatException con el nombre de archivo recibido")
+    void extensionIncorrecta() {
+        MockMultipartFile file = new MockMultipartFile("file", "import.txt",
+            "text/plain", "contenido".getBytes());
 
-        assertThrows(ExcelFormatException.class, () -> validator.validate(file));
+        assertThatThrownBy(() -> validator.validate(file))
+            .isInstanceOf(ExcelFormatException.class)
+            .hasMessageContaining("expected .xls or .xlsx")
+            .hasMessageContaining("import.txt");
     }
 
     @Test
-    void validate_shouldThrowWhenSheetHoja1Missing() {
-        MultipartFile file = mock(MultipartFile.class);
-        when(file.isEmpty()).thenReturn(false);
-        when(file.getOriginalFilename()).thenReturn("test.xlsx");
+    @DisplayName("nombre de archivo null → ExcelFormatException (falla la validación de extensión)")
+    void nombreArchivoNull() {
+        MockMultipartFile file = new MockMultipartFile("file", null,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "contenido".getBytes());
 
-        org.apache.poi.xssf.usermodel.XSSFWorkbook wb = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
-        wb.createSheet("OtroNombre");
-        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-        try { wb.write(baos); wb.close(); } catch (Exception e) { throw new RuntimeException(e); }
-
-        mockInputStream(file, baos.toByteArray());
-
-        assertThrows(ExcelFormatException.class, () -> validator.validate(file));
+        assertThatThrownBy(() -> validator.validate(file))
+            .isInstanceOf(ExcelFormatException.class);
     }
 
     @Test
-    void validate_shouldThrowWhenHeaderRowMissing() {
-        MultipartFile file = mock(MultipartFile.class);
-        when(file.isEmpty()).thenReturn(false);
-        when(file.getOriginalFilename()).thenReturn("test.xlsx");
+    @DisplayName("contenido no es un Excel válido → ExcelFormatException")
+    void contenidoNoExcel() {
+        MockMultipartFile file = new MockMultipartFile("file", "import.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "esto no es un archivo excel".getBytes());
 
-        org.apache.poi.xssf.usermodel.XSSFWorkbook wb = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
-        wb.createSheet("Hoja1");
-        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-        try { wb.write(baos); wb.close(); } catch (Exception e) { throw new RuntimeException(e); }
-
-        mockInputStream(file, baos.toByteArray());
-
-        assertThrows(ExcelFormatException.class, () -> validator.validate(file));
+        assertThatThrownBy(() -> validator.validate(file))
+            .isInstanceOf(ExcelFormatException.class);
     }
 
     @Test
-    void validate_shouldThrowWhenHeaderNameMismatch() {
-        MultipartFile file = mock(MultipartFile.class);
-        when(file.isEmpty()).thenReturn(false);
-        when(file.getOriginalFilename()).thenReturn("test.xlsx");
-        mockInputStream(file, ExcelTestFactory.badHeaders());
+    @DisplayName("sin hoja 'Hoja1' → ExcelFormatException que nombra la hoja esperada")
+    void sinHojaEsperada() {
+        MockMultipartFile file = ExcelTestWorkbooks.validTemplate().withValidDataRow()
+            .renameSheet("OtraHoja")
+            .toMultipartFile();
 
-        assertThrows(ExcelFormatException.class, () -> validator.validate(file));
+        assertThatThrownBy(() -> validator.validate(file))
+            .isInstanceOf(ExcelFormatException.class)
+            .hasMessageContaining("Hoja1");
     }
 
     @Test
-    void validate_shouldThrowWhenNoDataRows() {
-        MultipartFile file = mock(MultipartFile.class);
-        when(file.isEmpty()).thenReturn(false);
-        when(file.getOriginalFilename()).thenReturn("test.xlsx");
-        mockInputStream(file, ExcelTestFactory.noDataRows());
+    @DisplayName("header alterado → ExcelFormatException que nombra el header esperado y el encontrado")
+    void headerAlterado() {
+        MockMultipartFile file = ExcelTestWorkbooks.validTemplate().withValidDataRow()
+            .withHeader(0, "CursoX")
+            .toMultipartFile();
 
-        assertThrows(ExcelFormatException.class, () -> validator.validate(file));
+        assertThatThrownBy(() -> validator.validate(file))
+            .isInstanceOf(ExcelFormatException.class)
+            .hasMessageContaining("column 1")
+            .hasMessageContaining("expected 'Curso'")
+            .hasMessageContaining("found 'CursoX'");
     }
 
     @Test
-    void validate_shouldPassWhenHeadersHaveTrailingSpaces() {
-        MultipartFile file = mock(MultipartFile.class);
-        when(file.isEmpty()).thenReturn(false);
-        when(file.getOriginalFilename()).thenReturn("test.xlsx");
+    @DisplayName("menos de 16 columnas en el header → ExcelFormatException")
+    void menosDe16Columnas() {
+        MockMultipartFile file = ExcelTestWorkbooks.validTemplate().withValidDataRow()
+            .truncateHeaderColumns(10)
+            .toMultipartFile();
 
-        org.apache.poi.xssf.usermodel.XSSFWorkbook wb = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
-        org.apache.poi.ss.usermodel.Sheet sheet = wb.createSheet("Hoja1");
-        sheet.createRow(3).createCell(0).setCellValue("Año=2026");
-
-        String[] headersWithSpaces = {
-            "Curso ", "Comisión ", "Aula ", "Nombre Edificio ", "Día       ",
-            "Dictado ", "Hora Comienzo ", "Hora Fin ", "Rango Horario ", "Durac[min] ",
-            "Duracion[hs] ", "Especialidad ", "Plan ", "Materia ",
-            "Nombre de materia ", "Cantidad de Cursado "
-        };
-        org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(5);
-        for (int i = 0; i < 16; i++) {
-            headerRow.createCell(i).setCellValue(headersWithSpaces[i]);
-        }
-        sheet.createRow(6).createCell(0).setCellValue("1C1");
-
-        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-        try { wb.write(baos); wb.close(); } catch (Exception e) { throw new RuntimeException(e); }
-
-        mockInputStream(file, baos.toByteArray());
-
-        assertDoesNotThrow(() -> validator.validate(file));
+        assertThatThrownBy(() -> validator.validate(file))
+            .isInstanceOf(ExcelFormatException.class)
+            .hasMessageContaining("expected at least 16");
     }
 
     @Test
-    void validate_shouldPassWhenDataRowFollowedByEmptyRow() {
-        MultipartFile file = mock(MultipartFile.class);
-        when(file.isEmpty()).thenReturn(false);
-        when(file.getOriginalFilename()).thenReturn("test.xlsx");
+    @DisplayName("sin filas de datos → ExcelFormatException")
+    void sinFilasDeDatos() {
+        MockMultipartFile file = ExcelTestWorkbooks.validTemplate().toMultipartFile();
 
-        org.apache.poi.xssf.usermodel.XSSFWorkbook wb = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
-        org.apache.poi.ss.usermodel.Sheet sheet = wb.createSheet("Hoja1");
-        sheet.createRow(3).createCell(0).setCellValue("Año=2026");
-
-        String[] headers = {
-            "Curso", "Comisión", "Aula", "Nombre Edificio", "Día", "Dictado",
-            "Hora Comienzo", "Hora Fin", "Rango Horario", "Durac[min]",
-            "Duracion[hs]", "Especialidad", "Plan", "Materia",
-            "Nombre de materia", "Cantidad de Cursado"
-        };
-        org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(5);
-        for (int i = 0; i < 16; i++) {
-            headerRow.createCell(i).setCellValue(headers[i]);
-        }
-
-        org.apache.poi.ss.usermodel.Row dataRow = sheet.createRow(6);
-        dataRow.createCell(0).setCellValue("1C1");
-        dataRow.createCell(1).setCellValue(10.0);
-        dataRow.createCell(2).setCellValue(513.0);
-        dataRow.createCell(3).setCellValue("Edif");
-        dataRow.createCell(4).setCellValue("Jueves");
-        dataRow.createCell(5).setCellValue("1 Cuat.");
-        dataRow.createCell(6).setCellValue(800.0);
-        dataRow.createCell(7).setCellValue(1540.0);
-        dataRow.createCell(11).setCellValue(31.0);
-        dataRow.createCell(12).setCellValue(2023.0);
-        dataRow.createCell(13).setCellValue(104.0);
-        dataRow.createCell(14).setCellValue("Materia");
-        dataRow.createCell(15).setCellValue(30.0);
-
-        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-        try { wb.write(baos); wb.close(); } catch (Exception e) { throw new RuntimeException(e); }
-
-        mockInputStream(file, baos.toByteArray());
-
-        assertDoesNotThrow(() -> validator.validate(file));
+        assertThatThrownBy(() -> validator.validate(file))
+            .isInstanceOf(ExcelFormatException.class)
+            .hasMessageContaining("No data rows found");
     }
 
     @Test
-    void validate_shouldThrowWhenFileIsEmpty() {
-        MultipartFile file = mock(MultipartFile.class);
-        when(file.isEmpty()).thenReturn(true);
+    @DisplayName("extractYear: fila 'Año=2026' bien formada → 2026")
+    void extractYearFeliz() {
+        ExcelTestWorkbooks fixture = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow();
+        Sheet sheet = fixture.sheet();
 
-        assertThrows(ExcelFormatException.class, () -> validator.validate(file));
+        assertThat(validator.extractYear(sheet)).isEqualTo(2026);
     }
 
     @Test
-    void validate_shouldReturnWorkbookOnSuccess() {
-        MultipartFile file = mock(MultipartFile.class);
-        when(file.isEmpty()).thenReturn(false);
-        when(file.getOriginalFilename()).thenReturn("test.xlsx");
-        mockInputStream(file, ExcelTestFactory.validXlsx(1));
+    @DisplayName("extractYear: sin fila de año → fallback al año actual")
+    void extractYearSinFila() {
+        ExcelTestWorkbooks fixture = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow()
+            .withoutYearRow();
 
-        assertNotNull(validator.validate(file));
+        assertThat(validator.extractYear(fixture.sheet())).isEqualTo(Year.now().getValue());
+    }
+
+    @Test
+    @DisplayName("extractYear: fila de año mal formada (sin patrón Año=NNNN) → fallback al año actual")
+    void extractYearMalFormada() {
+        ExcelTestWorkbooks fixture = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow()
+            .withYearCellValue("esto no tiene el patrón esperado");
+
+        assertThat(validator.extractYear(fixture.sheet())).isEqualTo(Year.now().getValue());
     }
 }

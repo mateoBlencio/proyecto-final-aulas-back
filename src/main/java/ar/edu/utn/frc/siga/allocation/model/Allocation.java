@@ -1,6 +1,5 @@
 package ar.edu.utn.frc.siga.allocation.model;
 
-import ar.edu.utn.frc.siga.space.model.Classroom;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -10,7 +9,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -19,11 +17,17 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.envers.Audited;
 
 import java.time.LocalDateTime;
 
+/**
+ * Asignación de un aula a una ocurrencia. Auditada con Hibernate Envers: cada
+ * creación/modificación/baja queda registrada en {@code asignacion_aula_aud}.
+ */
 @Entity
 @Table(name = "asignacion_aula")
+@Audited
 @Getter
 @Setter
 @Builder
@@ -42,9 +46,13 @@ public class Allocation {
     @JoinColumn(name = "id_ocurrencia")
     private Occurrence occurrence;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_aula", nullable = false)
-    private Classroom classroom;
+    /**
+     * ID del aula asignada (space::Classroom). Referencia por ID plano en vez de
+     * {@code @ManyToOne}: la FK física sigue en la BD, pero la integridad referencial
+     * a nivel de módulo la garantiza solo el esquema, no una relación JPA cross-módulo.
+     */
+    @Column(name = "id_aula", nullable = false)
+    private Integer classroomId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "origen", nullable = false)

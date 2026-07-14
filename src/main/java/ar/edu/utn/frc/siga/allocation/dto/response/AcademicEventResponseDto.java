@@ -1,37 +1,24 @@
 package ar.edu.utn.frc.siga.allocation.dto.response;
 
 import ar.edu.utn.frc.siga.allocation.model.EventType;
-import lombok.Builder;
-import lombok.Value;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
-import java.time.DayOfWeek;
-import java.time.LocalDate;
 import java.time.LocalTime;
 
-@Value
-@Builder
-public class AcademicEventResponseDto {
-    Long id;
-    EventType type;
-    Integer enrolled;
-    LocalTime startTime;
-    long durationMinutes;
-    // Recurring
-    DayOfWeek dayOfWeek;
-    LocalDate startDate;
-    LocalDate endDate;
-    Integer subjectCode;
-    String subjectName;
-    String subjectTerm;
-    Integer studyPlanCode;
-    Integer specialtyCode;
-    String specialtyName;
-    String commissionCode;
-    Integer commissionNumber;
-    Integer yearLevel;
-    Integer periodYear;
-    Integer periodSemester;
-    // Unique
-    LocalDate date;
-    String description;
+/**
+ * Vista de respuesta de un {@code AcademicEvent}, polimórfica por {@code type}
+ * ({@code RECURRING}/{@code UNIQUE_EVENT}) sobre sus dos variantes concretas.
+ */
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.EXISTING_PROPERTY, property = "type", visible = true)
+@JsonSubTypes({
+        @JsonSubTypes.Type(value = RecurringEventResponseDto.class, name = "RECURRING"),
+        @JsonSubTypes.Type(value = UniqueEventResponseDto.class, name = "UNIQUE_EVENT")
+})
+public sealed interface AcademicEventResponseDto permits RecurringEventResponseDto, UniqueEventResponseDto {
+    Long id();
+    EventType type();
+    Integer enrolled();
+    LocalTime startTime();
+    long durationMinutes();
 }

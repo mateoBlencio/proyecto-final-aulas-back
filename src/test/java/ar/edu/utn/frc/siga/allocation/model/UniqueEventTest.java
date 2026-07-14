@@ -1,5 +1,8 @@
 package ar.edu.utn.frc.siga.allocation.model;
 
+import ar.edu.utn.frc.siga.allocation.AllocationTestData;
+
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -9,43 +12,43 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@DisplayName("UniqueEvent.toOccurrences")
 class UniqueEventTest {
 
     @Test
-    void upUe001_occurrences_singleDate() {
-        UniqueEvent event = UniqueEvent.builder()
-                .planningId("e1").enrolled(30)
-                .startTime(LocalTime.of(8, 0))
-                .duration(Duration.ofMinutes(90))
-                .date(LocalDate.of(2024, 7, 23))
-                .build();
+    @DisplayName("genera exactamente 1 ocurrencia en su date, SCHEDULED")
+    void generaUnaOcurrenciaScheduled() {
+        LocalDate date = LocalDate.of(2026, 3, 10);
+        UniqueEvent event = AllocationTestData.uniqueEvent(1L, date, LocalTime.of(10, 0), Duration.ofMinutes(60));
 
-        List<Occurrence> occ = event.toOccurrences();
-        assertThat(occ).extracting(Occurrence::getDate)
-                .containsExactly(LocalDate.of(2024, 7, 23));
+        List<Occurrence> occurrences = event.toOccurrences();
+
+        assertThat(occurrences).hasSize(1);
+        Occurrence occurrence = occurrences.getFirst();
+        assertThat(occurrence.getDate()).isEqualTo(date);
+        assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.SCHEDULED);
+        assertThat(occurrence.getEvent()).isSameAs(event);
     }
 
     @Test
-    void upUe002_endTime_90min() {
-        UniqueEvent event = UniqueEvent.builder()
-                .planningId("e1").enrolled(30)
-                .startTime(LocalTime.of(8, 0))
-                .duration(Duration.ofMinutes(90))
-                .date(LocalDate.of(2024, 7, 23))
-                .build();
+    @DisplayName("la ocurrencia generada expone el startTime/endTime del evento")
+    void exponeStartTimeYEndTime() {
+        LocalTime startTime = LocalTime.of(14, 30);
+        Duration duration = Duration.ofMinutes(45);
+        UniqueEvent event = AllocationTestData.uniqueEvent(1L, LocalDate.of(2026, 3, 10), startTime, duration);
 
-        assertThat(event.endTime()).isEqualTo(LocalTime.of(9, 30));
+        Occurrence occurrence = event.toOccurrences().getFirst();
+
+        assertThat(occurrence.startTime()).isEqualTo(startTime);
+        assertThat(occurrence.endTime()).isEqualTo(startTime.plus(duration));
     }
 
     @Test
-    void upUe003_endTime_lateNight() {
-        UniqueEvent event = UniqueEvent.builder()
-                .planningId("e1").enrolled(30)
-                .startTime(LocalTime.of(21, 35))
-                .duration(Duration.ofMinutes(90))
-                .date(LocalDate.of(2024, 7, 23))
-                .build();
+    @DisplayName("getType() devuelve UNIQUE_EVENT")
+    void getTypeDevuelveUniqueEvent() {
+        UniqueEvent event = AllocationTestData.uniqueEvent(1L, LocalDate.of(2026, 3, 10),
+                LocalTime.of(9, 0), Duration.ofMinutes(30));
 
-        assertThat(event.endTime()).isEqualTo(LocalTime.of(23, 5));
+        assertThat(event.getType()).isEqualTo(EventType.UNIQUE_EVENT);
     }
 }

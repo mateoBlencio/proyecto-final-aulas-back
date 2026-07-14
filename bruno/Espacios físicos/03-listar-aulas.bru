@@ -1,0 +1,19 @@
+meta {
+  name: Listar aulas con filtros
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/classrooms
+  body: none
+  auth: none
+}
+
+params:query {
+  buildingId: 1
+  capacityMin: 60
+  available: true
+  page: 0
+  size: 20
+}

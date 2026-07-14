@@ -15,11 +15,15 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.springframework.modulith.NamedInterface;
+import org.hibernate.annotations.SQLRestriction;
 
-@NamedInterface("api")
+/**
+ * Edificio de la facultad, agrupador físico de aulas. Un edificio puede estar
+ * {@code active = false} (no ofrecido para asignación) sin estar eliminado.
+ */
 @Entity
 @Table(name = "edificio")
+@SQLRestriction("eliminado = false")
 @Getter
 @Setter
 @NoArgsConstructor
