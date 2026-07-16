@@ -1,10 +1,13 @@
 package ar.edu.utn.frc.siga.allocation.controller;
 
+import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceResponseDto;
 import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
+import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -16,6 +19,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,6 +35,7 @@ import java.util.List;
 public class AcademicEventController {
 
     private final AcademicEventService academicEventService;
+    private final AllocationService allocationService;
 
     /** Todos los eventos académicos registrados. */
     @GetMapping
@@ -90,5 +95,19 @@ public class AcademicEventController {
         AcademicEventResponseDto response = academicEventService.createUniqueEvent(dto);
         log.info("Evento único creado vía controller: id={}", response.id());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /** Cambia el aula de todas las occurrences futuras de un evento recurrente (source MANUAL). */
+    @PutMapping("/{eventId}/classroom")
+    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @Operation(summary = "Reasignar aula de un evento",
+               description = "Cambia el aula de todas las ocurrencias futuras de un evento recurrente. Las ocurrencias ya pasadas quedan intactas. Falla si el evento no es recurrente o si ya finalizó.")
+    public ResponseEntity<List<AllocationResponseDto>> reassignEvent(
+            @PathVariable Long eventId,
+            @Valid @RequestBody AllocateOccurrenceRequestDto dto) {
+        log.debug("PUT /v1/events/{}/classroom: classroomId={}", eventId, dto.classroomId());
+        List<AllocationResponseDto> response = allocationService.reassignEvent(eventId, dto);
+        log.info("Evento reasignado: eventId={}, count={}", eventId, response.size());
+        return ResponseEntity.ok(response);
     }
 }

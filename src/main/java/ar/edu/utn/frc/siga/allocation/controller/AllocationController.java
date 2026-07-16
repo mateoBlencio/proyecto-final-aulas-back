@@ -103,6 +103,7 @@ public class AllocationController {
 
     /** Asigna manualmente un aula a una ocurrencia puntual (source MANUAL). */
     @PostMapping("/occurrences/{occurrenceId}")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Asignar aula a ocurrencia",
                description = "Asigna manualmente un aula a una ocurrencia específica. Falla si la ocurrencia ya tiene asignación o si ya ocurrió.")
     public ResponseEntity<AllocationResponseDto> allocateManually(
@@ -116,6 +117,7 @@ public class AllocationController {
 
     /** Cambia el aula de una asignación existente (source MANUAL). */
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Reasignar aula",
                description = "Cambia el aula de una asignación existente. Falla si la ocurrencia ya ocurrió.")
     public ResponseEntity<AllocationResponseDto> reassign(
@@ -127,21 +129,9 @@ public class AllocationController {
         return ResponseEntity.ok(response);
     }
 
-    /** Cambia el aula de todas las occurrences futuras de un evento recurrente (source MANUAL). */
-    @PutMapping("/events/{eventId}")
-    @Operation(summary = "Reasignar aula de un evento",
-               description = "Cambia el aula de todas las ocurrencias futuras de un evento recurrente. Las ocurrencias ya pasadas quedan intactas. Falla si el evento no es recurrente o si ya finalizó.")
-    public ResponseEntity<List<AllocationResponseDto>> reassignEvent(
-            @PathVariable Long eventId,
-            @Valid @RequestBody AllocateOccurrenceRequestDto dto) {
-        log.debug("PUT /v1/allocations/events/{}: classroomId={}", eventId, dto.classroomId());
-        List<AllocationResponseDto> response = allocationService.reassignEvent(eventId, dto);
-        log.info("Evento reasignado: eventId={}, count={}", eventId, response.size());
-        return ResponseEntity.ok(response);
-    }
-
     /** Reasigna varias asignaciones en una única operación atómica (source MANUAL). */
     @PutMapping("/batch")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Reasignar aulas en lote",
                description = "Cambia el aula de múltiples asignaciones en una sola operación atómica. Falla si cualquier ocurrencia ya ocurrió.")
     public ResponseEntity<List<AllocationResponseDto>> batchReassign(
@@ -154,6 +144,7 @@ public class AllocationController {
 
     /** Asigna un aula a todas las occurrences futuras de un evento recurrente desde una fecha (source MANUAL). */
     @PostMapping("/from-date")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Asignar aula desde una fecha",
                description = "Asigna un aula a todas las ocurrencias futuras de un evento recurrente a partir de la fecha indicada. Crea nuevas asignaciones o actualiza las existentes.")
     public ResponseEntity<List<AllocationResponseDto>> assignManuallyFromDate(

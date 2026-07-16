@@ -1,13 +1,17 @@
 meta {
   name: Reasignar aula de un evento
   type: http
-  seq: 10
+  seq: 7
 }
 
 put {
-  url: {{baseUrl}}/v1/allocations/events/1
+  url: {{baseUrl}}/v1/events/:id/classroom
   body: json
   auth: none
+}
+
+params:path {
+  id: 1
 }
 
 body:json {
@@ -20,7 +24,7 @@ body:json {
 docs {
   Cambia el aula de TODAS las ocurrencias futuras de un evento recurrente
   (source = MANUAL). Las ocurrencias ya pasadas quedan intactas.
-
+  
   Falla si el evento no es recurrente, o si ya finalizó (ninguna ocurrencia
   futura). Valida que ninguna ocurrencia choque contra ocupación firme de BD
   antes de aplicar el lote completo. Si hay solapamiento → 409 con:
