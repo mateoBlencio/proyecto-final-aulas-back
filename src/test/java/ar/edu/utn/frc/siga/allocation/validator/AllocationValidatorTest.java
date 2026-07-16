@@ -223,6 +223,26 @@ class AllocationValidatorTest {
         assertThat(validator.isApplicable(pasadaAsignable)).isFalse();
     }
 
+    @Test
+    @DisplayName("validateEventNotFinished: todas las ocurrencias pasadas lanza AllocationConflictException")
+    void validateEventNotFinishedTodasPasadasLanza() {
+        RecurringEvent event = AllocationTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90));
+        Occurrence pasada = AllocationTestData.occurrence(10L, event, LocalDate.now().minusDays(1), OccurrenceStatus.SCHEDULED);
+
+        assertThatThrownBy(() -> validator.validateEventNotFinished(List.of(pasada)))
+                .isInstanceOf(AllocationConflictException.class);
+    }
+
+    @Test
+    @DisplayName("validateEventNotFinished: al menos una ocurrencia futura no lanza")
+    void validateEventNotFinishedConFuturaNoLanza() {
+        RecurringEvent event = AllocationTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90));
+        Occurrence pasada = AllocationTestData.occurrence(10L, event, LocalDate.now().minusDays(1), OccurrenceStatus.SCHEDULED);
+        Occurrence futura = AllocationTestData.occurrence(11L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
+
+        assertThatCode(() -> validator.validateEventNotFinished(List.of(pasada, futura))).doesNotThrowAnyException();
+    }
+
     // ---------- aulas ----------
 
     @Test

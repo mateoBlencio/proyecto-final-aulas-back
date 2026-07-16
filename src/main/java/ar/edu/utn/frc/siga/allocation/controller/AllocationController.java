@@ -127,6 +127,19 @@ public class AllocationController {
         return ResponseEntity.ok(response);
     }
 
+    /** Cambia el aula de todas las occurrences futuras de un evento recurrente (source MANUAL). */
+    @PutMapping("/events/{eventId}")
+    @Operation(summary = "Reasignar aula de un evento",
+               description = "Cambia el aula de todas las ocurrencias futuras de un evento recurrente. Las ocurrencias ya pasadas quedan intactas. Falla si el evento no es recurrente o si ya finalizó.")
+    public ResponseEntity<List<AllocationResponseDto>> reassignEvent(
+            @PathVariable Long eventId,
+            @Valid @RequestBody AllocateOccurrenceRequestDto dto) {
+        log.debug("PUT /v1/allocations/events/{}: classroomId={}", eventId, dto.classroomId());
+        List<AllocationResponseDto> response = allocationService.reassignEvent(eventId, dto);
+        log.info("Evento reasignado: eventId={}, count={}", eventId, response.size());
+        return ResponseEntity.ok(response);
+    }
+
     /** Reasigna varias asignaciones en una única operación atómica (source MANUAL). */
     @PutMapping("/batch")
     @Operation(summary = "Reasignar aulas en lote",

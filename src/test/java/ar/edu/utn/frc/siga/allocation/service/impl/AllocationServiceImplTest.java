@@ -409,6 +409,70 @@ class AllocationServiceImplTest {
         assertThat(dateCaptor.getValue()).isEqualTo(LocalDate.now());
     }
 
+    // ---------- reassignEvent ----------
+
+    @Test
+    @DisplayName("reassignEvent: evento en curso, asigna las ocurrencias futuras devueltas por el repo")
+    void reassignEventFeliz() {
+        RecurringEvent event = recurringEvent(1L);
+        Occurrence occ1 = occurrence(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
+        Occurrence occ2 = occurrence(11L, event, futureDate(8), OccurrenceStatus.SCHEDULED);
+
+        when(eventRepository.findById(1L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eq(1L), any()))
+                .thenReturn(List.of(occ1, occ2));
+
+        List<AllocationResponseDto> results = service.reassignEvent(1L, new AllocateOccurrenceRequestDto(5, "obs"));
+
+        assertThat(results).hasSize(2);
+        verify(allocationRepository, times(2)).save(any());
+    }
+
+    @Test
+    @DisplayName("reassignEvent: evento finalizado (sin ocurrencias futuras) → conflicto, no persiste")
+    void reassignEventFinalizado() {
+        RecurringEvent event = recurringEvent(1L);
+        Occurrence pastOcc = occurrence(10L, event, LocalDate.now().minusDays(1), OccurrenceStatus.SCHEDULED);
+
+        when(eventRepository.findById(1L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eq(1L), any()))
+                .thenReturn(List.of(pastOcc));
+
+        assertThatThrownBy(() -> service.reassignEvent(1L, new AllocateOccurrenceRequestDto(5, null)))
+                .isInstanceOf(AllocationConflictException.class);
+
+        verify(allocationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("reassignEvent: evento no recurrente (UniqueEvent) → conflicto, no soportado")
+    void reassignEventEventoUnico() {
+        UniqueEvent uniqueEvent = UniqueEvent.builder()
+                .id(1L)
+                .enrolled(20)
+                .startTime(LocalTime.of(18, 0))
+                .duration(Duration.ofMinutes(120))
+                .date(futureDate(2))
+                .build();
+        when(eventRepository.findById(1L)).thenReturn(Optional.of(uniqueEvent));
+
+        assertThatThrownBy(() -> service.reassignEvent(1L, new AllocateOccurrenceRequestDto(5, null)))
+                .isInstanceOf(AllocationConflictException.class);
+
+        verify(allocationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("reassignEvent: evento inexistente → ResourceNotFoundException")
+    void reassignEventEventoInexistente() {
+        when(eventRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.reassignEvent(1L, new AllocateOccurrenceRequestDto(5, null)))
+                .isInstanceOf(ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException.class);
+
+        verify(allocationRepository, never()).save(any());
+    }
+
     // ---------- importAllocationsFromDate ----------
 
     @Test

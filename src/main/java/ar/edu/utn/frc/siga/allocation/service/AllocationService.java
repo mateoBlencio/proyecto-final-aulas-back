@@ -29,6 +29,13 @@ public interface AllocationService {
     /** Reasigna varias asignaciones en una sola transacción (source MANUAL): si algún move choca o ya ocurrió, no se aplica ninguno. */
     List<AllocationResponseDto> batchReallocate(BatchReassignRequestDto dto);
 
+    /**
+     * Cambia el aula de todas las occurrences futuras de un evento recurrente (source
+     * MANUAL): las occurrences pasadas quedan intactas. Falla si el evento no es
+     * recurrente o si ya finalizó (no tiene occurrences futuras).
+     */
+    List<AllocationResponseDto> reassignEvent(Long recurringEventId, AllocateOccurrenceRequestDto dto);
+
     /** Asigna un aula a todas las occurrences futuras de un evento recurrente desde una fecha (source MANUAL), salteando las que ya ocurrieron. */
     List<AllocationResponseDto> allocateManuallyFromDate(AllocateFromDateRequestDto dto);
 

@@ -150,6 +150,14 @@ public class AllocationValidator {
         }
     }
 
+    /** Evento sin ocurrencias futuras (todas ya sucedieron) → no se puede reasignar. */
+    public void validateEventNotFinished(List<Occurrence> occurrences) {
+        if (occurrences.stream().allMatch(Occurrence::isPast)) {
+            throw new AllocationConflictException(
+                    "Cannot reassign event: all its occurrences have already taken place.");
+        }
+    }
+
     /** Ocurrencia CANCELLED/SUSPENDED → no se le puede asignar aula. */
     public void validateAssignable(Occurrence occurrence) {
         if (!isAssignable(occurrence)) {

@@ -1,0 +1,33 @@
+meta {
+  name: Reasignar aula de un evento
+  type: http
+  seq: 10
+}
+
+put {
+  url: {{baseUrl}}/v1/allocations/events/1
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "classroomId": 2,
+    "observation": "Cambio de aula por conflicto de capacidad"
+  }
+}
+
+docs {
+  Cambia el aula de TODAS las ocurrencias futuras de un evento recurrente
+  (source = MANUAL). Las ocurrencias ya pasadas quedan intactas.
+
+  Falla si el evento no es recurrente, o si ya finalizó (ninguna ocurrencia
+  futura). Valida que ninguna ocurrencia choque contra ocupación firme de BD
+  antes de aplicar el lote completo. Si hay solapamiento → 409 con:
+  {
+    "conflicts": [
+      { "occurrenceId", "date", "startTime", "endTime", "classroomId",
+        "conflictingEventId", "conflictingAllocationId" }
+    ]
+  }
+}

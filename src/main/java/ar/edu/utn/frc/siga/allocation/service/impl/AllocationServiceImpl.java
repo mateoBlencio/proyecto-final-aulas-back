@@ -160,6 +160,46 @@ public class AllocationServiceImpl implements AllocationService {
     }
 
     /**
+     * Cambia el aula de todas las occurrences futuras (fecha &ge; hoy) de un evento
+     * recurrente (source MANUAL); las occurrences pasadas quedan intactas. Rechaza si el
+     * evento no es recurrente o si ya finalizó (ninguna occurrence futura). Valida que
+     * ninguna choque antes de aplicar el lote completo.
+     */
+    @Override
+    @Transactional
+    public List<AllocationResponseDto> reassignEvent(Long recurringEventId, AllocateOccurrenceRequestDto dto) {
+        log.debug("reassignEvent: event={}, classroom={}", recurringEventId, dto.classroomId());
+
+        AcademicEvent event = eventRepository.findById(recurringEventId)
+                .orElseThrow(() -> ResourceNotFoundException.of("AcademicEvent", recurringEventId));
+
+        if (!(Hibernate.unproxy(event) instanceof RecurringEvent)) {
+            throw new AllocationConflictException("reassignEvent is only supported for recurring events");
+        }
+
+        List<Occurrence> occurrences = occurrenceRepository
+                .findByEvent_IdAndDateGreaterThanEqual(recurringEventId, LocalDate.now());
+
+        validator.validateEventNotFinished(occurrences);
+
+        Integer classroomId = dto.classroomId();
+        validator.validateClassroomsAvailable(Set.of(classroomId));
+
+        validator.validateNoOverlap(
+                occurrences.stream()
+                        .map(o -> new AllocationCandidate(o, classroomId))
+                        .toList()
+        );
+
+        List<Allocation> saved = allocateToOccurrences(
+                occurrences, classroomId, dto.observation(), AllocationSource.MANUAL, true);
+        List<AllocationResponseDto> results = composer.composeAll(saved);
+
+        log.info("reassignEvent completo: event={}, allocated={}", recurringEventId, results.size());
+        return results;
+    }
+
+    /**
      * Asigna un aula a todas las occurrences futuras (fecha &ge; hoy) de un evento
      * recurrente desde {@code fromDate}, salteando las que ya ocurrieron (source MANUAL).
      * Valida que ninguna choque antes de aplicar el lote completo; solo soportado para
