@@ -151,12 +151,12 @@ class ClassroomConstraintProviderTest {
         }
 
         @Test
-        @DisplayName("sin aula asignada no penaliza sobreocupación (lo cubre assignAllPossible, no esta constraint)")
+        @DisplayName("sin aula asignada no penaliza sobreocupación (lo cubre allocateAllPossible, no esta constraint)")
         void noRoomAssigned() {
             // Un evento sin aula (classroom null) NO penaliza sobreocupación: forEach lo excluye,
             // así que la rama `classroom == null → enrolled` de getOvercrowding() no corre durante
             // el scoring. Antes esto era "false-feasible" (un evento inubicable no dejaba rastro en
-            // el score); ahora `assignAllPossible` (MEDIUM) sí lo penaliza —ver su @Nested— y con
+            // el score); ahora `allocateAllPossible` (MEDIUM) sí lo penaliza —ver su @Nested— y con
             // allowsUnassigned el solver deja el evento sin aula → viaja en `unresolved`, no oculto.
             SolverEvent e = event("a", null, 12, LocalTime.of(8, 0), LocalTime.of(10, 0));
             ClassAllocation alloc = new ClassAllocation(e, List.of(), Set.of());
@@ -169,8 +169,8 @@ class ClassroomConstraintProviderTest {
     }
 
     @Nested
-    @DisplayName("assignAllPossible (MEDIUM)")
-    class AssignAllPossible {
+    @DisplayName("allocateAllPossible (MEDIUM)")
+    class AllocateAllPossible {
 
         @Test
         @DisplayName("evento no-pinned sin aula penaliza 1 (empuja a asignar)")
@@ -179,20 +179,20 @@ class ClassroomConstraintProviderTest {
             ClassAllocation alloc = new ClassAllocation(e, List.of(), Set.of());
             // classroom queda null.
 
-            verifier.verifyThat(ClassroomConstraintProvider::assignAllPossible)
+            verifier.verifyThat(ClassroomConstraintProvider::allocateAllPossible)
                     .given(alloc)
                     .penalizesBy(1);
         }
 
         @Test
         @DisplayName("evento con aula asignada no penaliza")
-        void assignedNoImpact() {
+        void allocatedNoImpact() {
             SolverRoom room = new SolverRoom(1, 40, 100);
             SolverEvent e = event("a", null, 10, LocalTime.of(8, 0), LocalTime.of(10, 0));
             ClassAllocation alloc = new ClassAllocation(e, List.of(room), Set.of());
             alloc.setClassroom(room);
 
-            verifier.verifyThat(ClassroomConstraintProvider::assignAllPossible)
+            verifier.verifyThat(ClassroomConstraintProvider::allocateAllPossible)
                     .given(alloc)
                     .hasNoImpact();
         }
@@ -204,7 +204,7 @@ class ClassroomConstraintProviderTest {
             SolverEvent e = event("occupied:1:2026-08-03:08:00", null, 10, LocalTime.of(8, 0), LocalTime.of(10, 0));
             ClassAllocation alloc = ClassAllocation.pinned(e, room, Set.of());
 
-            verifier.verifyThat(ClassroomConstraintProvider::assignAllPossible)
+            verifier.verifyThat(ClassroomConstraintProvider::allocateAllPossible)
                     .given(alloc)
                     .hasNoImpact();
         }

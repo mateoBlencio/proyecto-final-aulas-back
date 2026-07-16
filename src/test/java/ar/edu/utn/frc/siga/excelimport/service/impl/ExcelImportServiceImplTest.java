@@ -129,7 +129,7 @@ class ExcelImportServiceImplTest {
 
         ArgumentCaptor<AllocateFromDateRequestDto> allocationCaptor =
             ArgumentCaptor.forClass(AllocateFromDateRequestDto.class);
-        verify(allocationService).importAssignmentsFromDate(allocationCaptor.capture());
+        verify(allocationService).importAllocationsFromDate(allocationCaptor.capture());
         AllocateFromDateRequestDto allocationDto = allocationCaptor.getValue();
         assertThat(allocationDto.recurringEventId()).isEqualTo(1L);
         assertThat(allocationDto.classroomId()).isEqualTo(5);

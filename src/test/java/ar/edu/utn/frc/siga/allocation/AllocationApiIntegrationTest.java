@@ -213,7 +213,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     @DisplayName("POST /v1/allocations/from-date con solape responde 409 con el detalle del conflicto")
-    void assignFromDate_withOverlap_returns409WithDetail() throws Exception {
+    void allocateFromDate_withOverlap_returns409WithDetail() throws Exception {
         var sc = testData.materiaYComision();
         Classroom aula = testData.aula(testData.edificio());
         LocalDate date = LocalDate.now().plusDays(12);
@@ -238,7 +238,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     @DisplayName("POST /v1/allocations/from-date sin solape asigna todas las ocurrencias futuras")
-    void assignFromDate_withoutOverlap_assignsFutureOccurrences() throws Exception {
+    void allocateFromDate_withoutOverlap_assignsFutureOccurrences() throws Exception {
         var sc = testData.materiaYComision();
         Classroom aula = testData.aula(testData.edificio());
         LocalDate date = LocalDate.now().plusDays(13);

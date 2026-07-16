@@ -105,11 +105,11 @@ public class AllocationController {
     @PostMapping("/occurrences/{occurrenceId}")
     @Operation(summary = "Asignar aula a ocurrencia",
                description = "Asigna manualmente un aula a una ocurrencia específica. Falla si la ocurrencia ya tiene asignación o si ya ocurrió.")
-    public ResponseEntity<AllocationResponseDto> assignManually(
+    public ResponseEntity<AllocationResponseDto> allocateManually(
             @PathVariable Long occurrenceId,
             @Valid @RequestBody AllocateOccurrenceRequestDto dto) {
         log.debug("POST /v1/allocations/occurrences/{}: classroomId={}", occurrenceId, dto.classroomId());
-        AllocationResponseDto response = allocationService.assignManually(occurrenceId, dto);
+        AllocationResponseDto response = allocationService.allocateManually(occurrenceId, dto);
         log.info("Asignación creada: id={}, occurrenceId={}", response.id(), occurrenceId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -122,7 +122,7 @@ public class AllocationController {
             @PathVariable Long id,
             @Valid @RequestBody AllocateOccurrenceRequestDto dto) {
         log.debug("PUT /v1/allocations/{}: classroomId={}", id, dto.classroomId());
-        AllocationResponseDto response = allocationService.reassign(id, dto);
+        AllocationResponseDto response = allocationService.reallocate(id, dto);
         log.info("Asignación reasignada: id={}", id);
         return ResponseEntity.ok(response);
     }
@@ -134,7 +134,7 @@ public class AllocationController {
     public ResponseEntity<List<AllocationResponseDto>> batchReassign(
             @Valid @RequestBody BatchReassignRequestDto dto) {
         log.debug("PUT /v1/allocations/batch: moves={}", dto.moves().size());
-        List<AllocationResponseDto> response = allocationService.batchReassign(dto);
+        List<AllocationResponseDto> response = allocationService.batchReallocate(dto);
         log.info("Reasignación en lote completa: moved={}", response.size());
         return ResponseEntity.ok(response);
     }
@@ -147,7 +147,7 @@ public class AllocationController {
             @Valid @RequestBody AllocateFromDateRequestDto dto) {
         log.debug("POST /v1/allocations/from-date: recurringEventId={}, classroomId={}, fromDate={}",
                 dto.recurringEventId(), dto.classroomId(), dto.fromDate());
-        List<AllocationResponseDto> response = allocationService.assignManuallyFromDate(dto);
+        List<AllocationResponseDto> response = allocationService.allocateManuallyFromDate(dto);
         log.info("Asignaciones creadas desde fecha: recurringEventId={}, count={}", dto.recurringEventId(), response.size());
         return ResponseEntity.ok(response);
     }

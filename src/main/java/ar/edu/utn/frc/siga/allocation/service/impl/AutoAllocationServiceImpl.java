@@ -8,12 +8,9 @@ import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AutoPreviewResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ConfirmAutoPreviewResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto.ConflictOrigin;
-import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ProposedAllocationDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ValidateMoveResponseDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
-import ar.edu.utn.frc.siga.allocation.exception.ReassignConflictException;
 import ar.edu.utn.frc.siga.allocation.mapper.AcademicEventComposer;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationComposer;
 import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
@@ -26,7 +23,9 @@ import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.service.AutoAllocationService;
 import ar.edu.utn.frc.siga.allocation.service.impl.AutoAllocationDataLoader.AutoPreviewInputs;
-import ar.edu.utn.frc.siga.allocation.service.impl.AutoAllocationDataLoader.DatabaseOccupancy;
+import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
+import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.AllocationCandidate;
+import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.OccupiedSlot;
 import ar.edu.utn.frc.siga.solver.model.SolverAllocation;
 import ar.edu.utn.frc.siga.solver.model.SolverEvent;
 import ar.edu.utn.frc.siga.solver.model.SolverPreview;
@@ -42,7 +41,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +68,7 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
     private final OccurrenceRepository occurrenceRepository;
     private final AllocationRepository allocationRepository;
     private final AllocationComposer allocationComposer;
+    private final AllocationValidator validator;
 
     /**
      * Sin {@code @Transactional} (deuda B3): la carga de datos vive en una transacción
@@ -122,7 +121,7 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
         Set<Long> previewEventIds = preview.allocations().stream()
                 .map(a -> Long.valueOf(a.eventId()))
                 .collect(Collectors.toSet());
-        validateBelongsToPreview(request, previewEventIds);
+        validator.validateBelongsToPreview(request, previewEventIds);
 
         AutoPreviewInputs inputs = dataLoader.load(previewEventIds);
         Map<Long, RecurringEvent> eventsById = inputs.events().stream()
@@ -133,9 +132,13 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
         LocalTime movedStart = movedEvent.getStartTime();
         LocalTime movedEnd = movedEvent.endTime();
 
+        List<OccupiedSlot> databaseOccupancy = inputs.databaseOccupancy().stream()
+                .map(o -> new OccupiedSlot(o.classroomId(), o.date(), o.startTime(), o.endTime(), o.eventId(), o.allocationId()))
+                .toList();
+
         List<MoveConflictDto> conflicts = new ArrayList<>();
-        conflicts.addAll(databaseConflicts(inputs, request.classroomId(), movedDates, movedStart, movedEnd));
-        conflicts.addAll(previewConflicts(request, inputs, eventsById, movedDates, movedStart, movedEnd));
+        conflicts.addAll(validator.moveDatabaseConflicts(request.classroomId(), movedDates, movedStart, movedEnd, databaseOccupancy));
+        conflicts.addAll(validator.movePreviewConflicts(request, eventsById, inputs.datesByEvent(), movedDates, movedStart, movedEnd));
 
         return new ValidateMoveResponseDto(conflicts.isEmpty(), conflicts);
     }
@@ -155,8 +158,8 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
                 .map(a -> Long.valueOf(a.eventId()))
                 .collect(Collectors.toSet());
 
-        validateNoDuplicateEventIds(request.allocations());
-        validateAllocationsBelongToPreview(request.allocations(), previewEventIds);
+        validator.validateNoDuplicateEventIds(request.allocations());
+        validator.validateAllocationsBelongToPreview(request.allocations(), previewEventIds);
 
         // Collectors.toMap no admite valores null (Map.merge los rechaza) y classroomId
         // puede serlo (evento sin aula propuesta) → se construye el mapa a mano.
@@ -179,22 +182,24 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
         }
 
         AutoPreviewInputs inputs = dataLoader.load(eventIdsWithClassroom);
-        validateClassrooms(classroomByEvent, eventIdsWithClassroom);
+        Set<Integer> classroomIds = eventIdsWithClassroom.stream().map(classroomByEvent::get).collect(Collectors.toSet());
+        validator.validateClassroomsAvailable(classroomIds);
 
         List<Occurrence> targetOccurrences = occurrenceRepository
                 .findByEvent_IdInAndStatusInAndDateGreaterThanEqual(
                         eventIdsWithClassroom, List.of(OccurrenceStatus.SCHEDULED, OccurrenceStatus.ASSIGNED),
                         LocalDate.now())
                 .stream()
-                .filter(this::isApplicable)
+                .filter(validator::isApplicable)
                 .toList();
 
-        List<OccurrenceConflictDto> conflicts = new ArrayList<>();
-        conflicts.addAll(databaseOverlapConflicts(targetOccurrences, classroomByEvent, inputs.databaseOccupancy()));
-        conflicts.addAll(internalOverlapConflicts(targetOccurrences, classroomByEvent));
-        if (!conflicts.isEmpty()) {
-            throw new ReassignConflictException(conflicts);
-        }
+        List<AllocationCandidate> candidates = targetOccurrences.stream()
+                .map(o -> new AllocationCandidate(o, classroomByEvent.get(o.getEvent().getId())))
+                .toList();
+        List<OccupiedSlot> occupancy = inputs.databaseOccupancy().stream()
+                .map(o -> new OccupiedSlot(o.classroomId(), o.date(), o.startTime(), o.endTime(), o.eventId(), o.allocationId()))
+                .toList();
+        validator.validateNoOverlap(candidates, occupancy);
 
         List<Allocation> saved = applyAllocations(targetOccurrences, classroomByEvent);
         solverService.invalidatePreview(previewId);
@@ -202,99 +207,6 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
         log.info("Confirm aplicado: previewId={}, applied={}, skipped={}",
                 previewId, saved.size(), skippedEventIds.size());
         return new ConfirmAutoPreviewResponseDto(allocationComposer.composeAll(saved), skippedEventIds);
-    }
-
-    /** La propuesta final no puede traer el mismo evento dos veces. */
-    private void validateNoDuplicateEventIds(List<PreviewAllocationDto> allocations) {
-        List<Long> eventIds = allocations.stream().map(PreviewAllocationDto::eventId).toList();
-        if (new HashSet<>(eventIds).size() != eventIds.size()) {
-            throw new AllocationConflictException("La propuesta final tiene eventos duplicados.");
-        }
-    }
-
-    /** Todo evento de la propuesta final debe pertenecer al preview que se está confirmando. */
-    private void validateAllocationsBelongToPreview(List<PreviewAllocationDto> allocations, Set<Long> previewEventIds) {
-        Set<Long> foreign = allocations.stream()
-                .map(PreviewAllocationDto::eventId)
-                .filter(id -> !previewEventIds.contains(id))
-                .collect(Collectors.toSet());
-        if (!foreign.isEmpty()) {
-            throw new AllocationConflictException(
-                    "los eventos " + foreign + " no pertenecen al preview indicado");
-        }
-    }
-
-    /** UN batch de aulas: inexistente o no disponible corta con 409 antes de escribir nada. */
-    private void validateClassrooms(Map<Long, Integer> classroomByEvent, Set<Long> eventIdsWithClassroom) {
-        Set<Integer> classroomIds = eventIdsWithClassroom.stream()
-                .map(classroomByEvent::get)
-                .collect(Collectors.toSet());
-        Map<Integer, ClassroomResponseDto> classroomsById = classroomService.findByIds(classroomIds).stream()
-                .collect(Collectors.toMap(ClassroomResponseDto::id, c -> c));
-        for (Integer classroomId : classroomIds) {
-            ClassroomResponseDto classroom = classroomsById.get(classroomId);
-            if (classroom == null || !Boolean.TRUE.equals(classroom.available())) {
-                throw new AllocationConflictException("El aula " + classroomId + " no existe o no está disponible.");
-            }
-        }
-    }
-
-    /** Ocurrencia asignable: no pasada, ni CANCELLED/SUSPENDED (patrón {@code allocateToOccurrences}). */
-    private boolean isApplicable(Occurrence occurrence) {
-        return !occurrence.isPast()
-                && occurrence.getStatus() != OccurrenceStatus.CANCELLED
-                && occurrence.getStatus() != OccurrenceStatus.SUSPENDED;
-    }
-
-    /**
-     * Conflictos contra asignaciones firmes de BD: {@code databaseOccupancy} ya excluye los
-     * eventos del propio set (sus aulas quedaron liberadas), así que solo puede chocar
-     * contra ocupación de eventos ajenos al set que se está confirmando.
-     */
-    private List<OccurrenceConflictDto> databaseOverlapConflicts(List<Occurrence> targetOccurrences,
-            Map<Long, Integer> classroomByEvent, List<DatabaseOccupancy> databaseOccupancy) {
-        List<OccurrenceConflictDto> conflicts = new ArrayList<>();
-        for (Occurrence occurrence : targetOccurrences) {
-            Integer classroomId = classroomByEvent.get(occurrence.getEvent().getId());
-            LocalTime start = occurrence.startTime();
-            LocalTime end = occurrence.endTime();
-            for (DatabaseOccupancy occupied : databaseOccupancy) {
-                if (!classroomId.equals(occupied.classroomId())) continue;
-                if (!occurrence.getDate().equals(occupied.date())) continue;
-                if (!overlaps(start, end, occupied.startTime(), occupied.endTime())) continue;
-                conflicts.add(new OccurrenceConflictDto(occurrence.getId(), occurrence.getDate(), start, end,
-                        classroomId, occupied.eventId(), occupied.allocationId()));
-            }
-        }
-        return conflicts;
-    }
-
-    /**
-     * Conflictos entre los propios ítems del set final: dos eventos distintos cayendo en
-     * la misma aula/fecha con franjas que se pisan. Nada persiste todavía → no hay
-     * asignación real involucrada en el choque, {@code conflictingAllocationId} va null.
-     */
-    private List<OccurrenceConflictDto> internalOverlapConflicts(List<Occurrence> targetOccurrences,
-            Map<Long, Integer> classroomByEvent) {
-        Map<String, List<Occurrence>> byClassroomAndDate = targetOccurrences.stream()
-                .collect(Collectors.groupingBy(
-                        o -> classroomByEvent.get(o.getEvent().getId()) + "|" + o.getDate()));
-
-        List<OccurrenceConflictDto> conflicts = new ArrayList<>();
-        for (List<Occurrence> group : byClassroomAndDate.values()) {
-            if (group.size() < 2) continue;
-            for (int i = 0; i < group.size(); i++) {
-                Occurrence a = group.get(i);
-                for (int j = i + 1; j < group.size(); j++) {
-                    Occurrence b = group.get(j);
-                    if (a.getEvent().getId().equals(b.getEvent().getId())) continue;
-                    if (!overlaps(a.startTime(), a.endTime(), b.startTime(), b.endTime())) continue;
-                    conflicts.add(new OccurrenceConflictDto(a.getId(), a.getDate(), a.startTime(), a.endTime(),
-                            classroomByEvent.get(a.getEvent().getId()), b.getEvent().getId(), null));
-                }
-            }
-        }
-        return conflicts;
     }
 
     /**
@@ -328,72 +240,6 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
             occurrenceRepository.save(occurrence);
         }
         return saved;
-    }
-
-    /** {@code eventId} y todos los {@code currentAllocations} deben pertenecer al preview vigente. */
-    private void validateBelongsToPreview(ValidateMoveRequestDto request, Set<Long> previewEventIds) {
-        if (!previewEventIds.contains(request.eventId())) {
-            throw new AllocationConflictException(
-                    "el evento " + request.eventId() + " no pertenece al preview indicado");
-        }
-        Set<Long> foreign = request.currentAllocations().stream()
-                .map(PreviewAllocationDto::eventId)
-                .filter(id -> !previewEventIds.contains(id))
-                .collect(Collectors.toSet());
-        if (!foreign.isEmpty()) {
-            throw new AllocationConflictException(
-                    "los eventos " + foreign + " de currentAllocations no pertenecen al preview indicado");
-        }
-    }
-
-    /**
-     * Conflictos contra asignaciones firmes de BD: {@code inputs.databaseOccupancy()} ya
-     * excluye los eventos del preview (sus aulas quedaron liberadas), así que solo puede
-     * chocar contra ocupación de eventos ajenos al preview.
-     */
-    private List<MoveConflictDto> databaseConflicts(AutoPreviewInputs inputs, Integer destination,
-            Set<LocalDate> movedDates, LocalTime movedStart, LocalTime movedEnd) {
-        List<MoveConflictDto> conflicts = new ArrayList<>();
-        for (DatabaseOccupancy occupancy : inputs.databaseOccupancy()) {
-            if (!destination.equals(occupancy.classroomId())) continue;
-            if (!movedDates.contains(occupancy.date())) continue;
-            if (!overlaps(movedStart, movedEnd, occupancy.startTime(), occupancy.endTime())) continue;
-            conflicts.add(new MoveConflictDto(occupancy.date(), occupancy.startTime(), occupancy.endTime(),
-                    destination, occupancy.eventId(), ConflictOrigin.DATABASE));
-        }
-        return conflicts;
-    }
-
-    /**
-     * Conflictos contra el resto de la propuesta ajustada que viaja en el request: otros
-     * ítems de {@code currentAllocations} (excluido el propio evento movido) que también
-     * apuntan al aula destino, comparando fechas compartidas y franja horaria.
-     */
-    private List<MoveConflictDto> previewConflicts(ValidateMoveRequestDto request, AutoPreviewInputs inputs,
-            Map<Long, RecurringEvent> eventsById, Set<LocalDate> movedDates, LocalTime movedStart, LocalTime movedEnd) {
-        List<MoveConflictDto> conflicts = new ArrayList<>();
-        for (PreviewAllocationDto allocation : request.currentAllocations()) {
-            if (allocation.eventId().equals(request.eventId())) continue;
-            if (!request.classroomId().equals(allocation.classroomId())) continue;
-
-            RecurringEvent other = eventsById.get(allocation.eventId());
-            if (other == null) continue;
-            LocalTime otherStart = other.getStartTime();
-            LocalTime otherEnd = other.endTime();
-            if (!overlaps(movedStart, movedEnd, otherStart, otherEnd)) continue;
-
-            for (LocalDate date : inputs.datesByEvent().getOrDefault(allocation.eventId(), List.of())) {
-                if (!movedDates.contains(date)) continue;
-                conflicts.add(new MoveConflictDto(date, otherStart, otherEnd, request.classroomId(),
-                        allocation.eventId(), ConflictOrigin.PREVIEW));
-            }
-        }
-        return conflicts;
-    }
-
-    /** Barrido de franjas horarias reusable (Fase 4): fin == inicio no es solapamiento. */
-    private boolean overlaps(LocalTime start1, LocalTime end1, LocalTime start2, LocalTime end2) {
-        return start1.isBefore(end2) && start2.isBefore(end1);
     }
 
     private SolverEvent toSolverEvent(RecurringEvent e, List<LocalDate> dates) {

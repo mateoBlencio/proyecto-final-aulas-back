@@ -21,23 +21,23 @@ public interface AllocationService {
     AllocationResponseDto findById(Long allocationId);
 
     /** Asigna aula (source MANUAL) a una occurrence puntual. Falla si ya tiene asignación, ya ocurrió, o no es asignable (CANCELLED/SUSPENDED). */
-    AllocationResponseDto assignManually(Long occurrenceId, AllocateOccurrenceRequestDto dto);
+    AllocationResponseDto allocateManually(Long occurrenceId, AllocateOccurrenceRequestDto dto);
 
     /** Cambia el aula de una asignación existente (source MANUAL). Falla si la occurrence ya ocurrió. */
-    AllocationResponseDto reassign(Long allocationId, AllocateOccurrenceRequestDto dto);
+    AllocationResponseDto reallocate(Long allocationId, AllocateOccurrenceRequestDto dto);
 
     /** Reasigna varias asignaciones en una sola transacción (source MANUAL): si algún move choca o ya ocurrió, no se aplica ninguno. */
-    List<AllocationResponseDto> batchReassign(BatchReassignRequestDto dto);
+    List<AllocationResponseDto> batchReallocate(BatchReassignRequestDto dto);
 
     /** Asigna un aula a todas las occurrences futuras de un evento recurrente desde una fecha (source MANUAL), salteando las que ya ocurrieron. */
-    List<AllocationResponseDto> assignManuallyFromDate(AllocateFromDateRequestDto dto);
+    List<AllocationResponseDto> allocateManuallyFromDate(AllocateFromDateRequestDto dto);
 
     /**
-     * Igual que {@link #assignManuallyFromDate}, pero con source IMPORTED e incluyendo
+     * Igual que {@link #allocateManuallyFromDate}, pero con source IMPORTED e incluyendo
      * occurrences pasadas (carga masiva desde Excel). Devuelve la cantidad de allocations
      * aplicadas (no el DTO compuesto: el único caller productivo no lo necesita).
      */
-    int importAssignmentsFromDate(AllocateFromDateRequestDto dto);
+    int importAllocationsFromDate(AllocateFromDateRequestDto dto);
 
     List<AllocationResponseDto> findByDate(LocalDate date);
 }

@@ -26,6 +26,7 @@ import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
 import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.solver.exception.ExpiredPreviewException;
 import ar.edu.utn.frc.siga.solver.model.SolverAllocation;
@@ -103,8 +104,9 @@ class AutoAllocationServiceImplTest {
         // los repos mockeados para ejercitar dedup/pinned/fechas a través del servicio.
         AutoAllocationDataLoader dataLoader = new AutoAllocationDataLoader(
                 eventRepository, occurrenceRepository, allocationRepository, classroomService);
+        AllocationValidator validator = new AllocationValidator(classroomService, allocationRepository);
         service = new AutoAllocationServiceImpl(dataLoader, classroomService, academicEventComposer, solverService,
-                occurrenceRepository, allocationRepository, allocationComposer);
+                occurrenceRepository, allocationRepository, allocationComposer, validator);
 
         lenient().when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5, 100)));
         lenient().when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 100)));
@@ -139,7 +141,7 @@ class AutoAllocationServiceImplTest {
 
         verify(solverService).preview(solverEventsCaptor.capture(), any(), any(), anyInt());
         assertThat(solverEventsCaptor.getValue()).hasSize(1);
-        assertThat(solverEventsCaptor.getValue().get(0).planningId()).isEqualTo("1");
+        assertThat(solverEventsCaptor.getValue().getFirst().planningId()).isEqualTo("1");
     }
 
     @Test
@@ -162,7 +164,7 @@ class AutoAllocationServiceImplTest {
         verify(solverService).preview(any(), any(), occupancyCaptor.capture(), anyInt());
         List<SolverOccupancy> occupancy = occupancyCaptor.getValue();
         assertThat(occupancy).hasSize(1);
-        assertThat(occupancy.get(0).classroomId()).isEqualTo(7);
+        assertThat(occupancy.getFirst().classroomId()).isEqualTo(7);
     }
 
     @Test
@@ -183,7 +185,7 @@ class AutoAllocationServiceImplTest {
         verify(occurrenceRepository).findByEvent_IdInAndStatusInAndDateGreaterThanEqual(
                 any(), eq(List.of(OccurrenceStatus.SCHEDULED, OccurrenceStatus.ASSIGNED)), eq(LocalDate.now()));
         verify(solverService).preview(solverEventsCaptor.capture(), any(), any(), anyInt());
-        assertThat(solverEventsCaptor.getValue().get(0).occurrenceDates())
+        assertThat(solverEventsCaptor.getValue().getFirst().occurrenceDates())
                 .containsExactlyInAnyOrder(scheduledDate, assignedDate);
     }
 
@@ -204,11 +206,11 @@ class AutoAllocationServiceImplTest {
 
         assertThat(result.previewId()).isEqualTo("prev_abc");
         assertThat(result.allocations()).hasSize(1);
-        assertThat(result.allocations().get(0).event().id()).isEqualTo(1L);
-        assertThat(result.allocations().get(0).classroom()).isNotNull();
+        assertThat(result.allocations().getFirst().event().id()).isEqualTo(1L);
+        assertThat(result.allocations().getFirst().classroom()).isNotNull();
         assertThat(result.unresolved()).hasSize(1);
-        assertThat(result.unresolved().get(0).event().id()).isEqualTo(2L);
-        assertThat(result.unresolved().get(0).classroom()).isNull();
+        assertThat(result.unresolved().getFirst().event().id()).isEqualTo(2L);
+        assertThat(result.unresolved().getFirst().classroom()).isNull();
     }
 
     @Test
@@ -265,7 +267,7 @@ class AutoAllocationServiceImplTest {
 
         verify(solverService).preview(solverEventsCaptor.capture(), roomsCaptor.capture(), any(), anyInt());
 
-        SolverEvent solverEvent = solverEventsCaptor.getValue().get(0);
+        SolverEvent solverEvent = solverEventsCaptor.getValue().getFirst();
         assertThat(solverEvent.planningId()).isEqualTo("1");
         assertThat(solverEvent.commissionKey()).isNull();
         assertThat(solverEvent.enrolled()).isEqualTo(30);
@@ -273,7 +275,7 @@ class AutoAllocationServiceImplTest {
         assertThat(solverEvent.endTime()).isEqualTo(LocalTime.of(9, 30));
         assertThat(solverEvent.occurrenceDates()).containsExactly(date);
 
-        SolverRoom solverRoom = roomsCaptor.getValue().get(0);
+        SolverRoom solverRoom = roomsCaptor.getValue().getFirst();
         assertThat(solverRoom.id()).isEqualTo(5);
         assertThat(solverRoom.capacity()).isEqualTo(100);
         assertThat(solverRoom.buildingId()).isEqualTo(1);
@@ -338,11 +340,11 @@ class AutoAllocationServiceImplTest {
         AutoPreviewResponseDto result = service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null));
 
         assertThat(result.allocations()).hasSize(1);
-        assertThat(result.allocations().get(0).event().id()).isEqualTo(1L);
-        assertThat(result.allocations().get(0).event().enrolled()).isEqualTo(30);
-        assertThat(result.allocations().get(0).occurrenceDates()).containsExactly(date1, date2);
-        assertThat(result.allocations().get(0).classroom().id()).isEqualTo(5);
-        assertThat(result.allocations().get(0).overcrowdedBy()).isZero(); // capacidad 100 >= inscriptos 30
+        assertThat(result.allocations().getFirst().event().id()).isEqualTo(1L);
+        assertThat(result.allocations().getFirst().event().enrolled()).isEqualTo(30);
+        assertThat(result.allocations().getFirst().occurrenceDates()).containsExactly(date1, date2);
+        assertThat(result.allocations().getFirst().classroom().id()).isEqualTo(5);
+        assertThat(result.allocations().getFirst().overcrowdedBy()).isZero(); // capacidad 100 >= inscriptos 30
         assertThat(result.unresolved()).isEmpty();
     }
 
@@ -360,8 +362,8 @@ class AutoAllocationServiceImplTest {
         AutoPreviewResponseDto result = service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null));
 
         assertThat(result.allocations()).hasSize(1);
-        assertThat(result.allocations().get(0).classroom().id()).isEqualTo(5);
-        assertThat(result.allocations().get(0).overcrowdedBy()).isEqualTo(10);
+        assertThat(result.allocations().getFirst().classroom().id()).isEqualTo(5);
+        assertThat(result.allocations().getFirst().overcrowdedBy()).isEqualTo(10);
         assertThat(result.unresolved()).isEmpty();
     }
 
@@ -384,8 +386,8 @@ class AutoAllocationServiceImplTest {
 
         assertThat(result.unresolved()).isEmpty();
         assertThat(result.allocations()).hasSize(1);
-        assertThat(result.allocations().get(0).event().id()).isEqualTo(1L);
-        assertThat(result.allocations().get(0).classroom().id()).isEqualTo(3); // aula previa conservada
+        assertThat(result.allocations().getFirst().event().id()).isEqualTo(1L);
+        assertThat(result.allocations().getFirst().classroom().id()).isEqualTo(3); // aula previa conservada
     }
 
     @Test
@@ -403,9 +405,9 @@ class AutoAllocationServiceImplTest {
 
         assertThat(result.previewId()).isEqualTo("prev_abc");
         assertThat(result.allocations()).hasSize(1);
-        assertThat(result.allocations().get(0).event().id()).isEqualTo(1L);
-        assertThat(result.allocations().get(0).occurrenceDates()).containsExactly(date);
-        assertThat(result.allocations().get(0).classroom().id()).isEqualTo(5);
+        assertThat(result.allocations().getFirst().event().id()).isEqualTo(1L);
+        assertThat(result.allocations().getFirst().occurrenceDates()).containsExactly(date);
+        assertThat(result.allocations().getFirst().classroom().id()).isEqualTo(5);
     }
 
     @Test
@@ -455,7 +457,7 @@ class AutoAllocationServiceImplTest {
 
         assertThat(result.valid()).isFalse();
         assertThat(result.conflicts()).hasSize(1);
-        MoveConflictDto conflict = result.conflicts().get(0);
+        MoveConflictDto conflict = result.conflicts().getFirst();
         assertThat(conflict.date()).isEqualTo(date);
         assertThat(conflict.startTime()).isEqualTo(LocalTime.of(8, 0));
         assertThat(conflict.endTime()).isEqualTo(LocalTime.of(9, 30));
@@ -484,7 +486,7 @@ class AutoAllocationServiceImplTest {
 
         assertThat(result.valid()).isFalse();
         assertThat(result.conflicts()).hasSize(1);
-        MoveConflictDto conflict = result.conflicts().get(0);
+        MoveConflictDto conflict = result.conflicts().getFirst();
         assertThat(conflict.date()).isEqualTo(date);
         assertThat(conflict.classroomId()).isEqualTo(7);
         assertThat(conflict.conflictingEventId()).isEqualTo(2L);
