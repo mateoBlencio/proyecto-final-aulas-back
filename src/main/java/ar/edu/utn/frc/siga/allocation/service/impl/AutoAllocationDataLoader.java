@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.OccupiedSlot;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.solver.model.SolverOccupancy;
 import ar.edu.utn.frc.siga.solver.model.SolverRoom;
@@ -20,7 +21,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -53,18 +53,8 @@ class AutoAllocationDataLoader {
      */
     record AutoPreviewInputs(List<RecurringEvent> events, Map<Long, List<LocalDate>> datesByEvent,
                               List<SolverRoom> rooms, List<SolverOccupancy> occupancy,
-                              List<DatabaseOccupancy> databaseOccupancy,
+                              List<OccupiedSlot> databaseOccupancy,
                               Map<Long, Integer> priorRoomByEvent) {
-    }
-
-    /**
-     * Ocupación de BD con el id del evento y de la asignación ocupante — {@link SolverOccupancy}
-     * no los trae (el solver solo necesita la franja bloqueada, no quién la ocupa). Los
-     * necesitan validate-move ({@code conflictingEventId} en un conflicto DATABASE) y
-     * confirm ({@code conflictingAllocationId} en el {@code OccurrenceConflictDto}).
-     */
-    record DatabaseOccupancy(Integer classroomId, LocalDate date, LocalTime startTime, LocalTime endTime,
-                              Long eventId, Long allocationId) {
     }
 
     @Transactional(readOnly = true)
@@ -87,8 +77,8 @@ class AutoAllocationDataLoader {
                         a -> a.getOccurrence().getEvent().getId(), Allocation::getClassroomId, (x, y) -> x));
 
         List<SolverOccupancy> occupancy = databaseAllocations.stream().map(this::toOccupancy).toList();
-        List<DatabaseOccupancy> databaseOccupancy = databaseAllocations.stream()
-                .map(this::toDatabaseOccupancy)
+        List<OccupiedSlot> databaseOccupancy = databaseAllocations.stream()
+                .map(this::toOccupiedSlot)
                 .toList();
         return new AutoPreviewInputs(events, datesByEvent, rooms, occupancy, databaseOccupancy, priorRoomByEvent);
     }
@@ -158,9 +148,9 @@ class AutoAllocationDataLoader {
     }
 
     /** Igual que {@link #toOccupancy} pero conservando el id del evento y de la asignación ocupante. */
-    private DatabaseOccupancy toDatabaseOccupancy(Allocation a) {
+    private OccupiedSlot toOccupiedSlot(Allocation a) {
         AcademicEvent occupant = a.getOccurrence().getEvent();
-        return new DatabaseOccupancy(
+        return new OccupiedSlot(
                 a.getClassroomId(),
                 a.getOccurrence().getDate(),
                 occupant.getStartTime(),

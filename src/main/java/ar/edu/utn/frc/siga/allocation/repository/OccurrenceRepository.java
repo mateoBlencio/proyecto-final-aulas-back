@@ -16,8 +16,6 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
 
     List<Occurrence> findByEvent_Id(Long eventId);
 
-    List<Occurrence> findByEvent_IdInAndStatus(Collection<Long> eventIds, OccurrenceStatus status);
-
     /**
      * Occurrences futuras de un conjunto de eventos en alguno de los estados dados. Se usa
      * para el auto-preview con re-resolución: incluir ASSIGNED (además de SCHEDULED) trae

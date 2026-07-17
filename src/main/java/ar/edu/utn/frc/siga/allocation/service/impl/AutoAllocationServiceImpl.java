@@ -19,13 +19,11 @@ import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.allocation.model.Occurrence;
 import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
-import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.service.AutoAllocationService;
 import ar.edu.utn.frc.siga.allocation.service.impl.AutoAllocationDataLoader.AutoPreviewInputs;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.AllocationCandidate;
-import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.OccupiedSlot;
 import ar.edu.utn.frc.siga.solver.model.SolverAllocation;
 import ar.edu.utn.frc.siga.solver.model.SolverEvent;
 import ar.edu.utn.frc.siga.solver.model.SolverPreview;
@@ -38,7 +36,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -66,9 +63,9 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
     private final AcademicEventComposer academicEventComposer;
     private final SolverService solverService;
     private final OccurrenceRepository occurrenceRepository;
-    private final AllocationRepository allocationRepository;
     private final AllocationComposer allocationComposer;
     private final AllocationValidator validator;
+    private final AllocationWriter writer;
 
     /**
      * Sin {@code @Transactional} (deuda B3): la carga de datos vive en una transacción
@@ -132,12 +129,8 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
         LocalTime movedStart = movedEvent.getStartTime();
         LocalTime movedEnd = movedEvent.endTime();
 
-        List<OccupiedSlot> databaseOccupancy = inputs.databaseOccupancy().stream()
-                .map(o -> new OccupiedSlot(o.classroomId(), o.date(), o.startTime(), o.endTime(), o.eventId(), o.allocationId()))
-                .toList();
-
         List<MoveConflictDto> conflicts = new ArrayList<>();
-        conflicts.addAll(validator.moveDatabaseConflicts(request.classroomId(), movedDates, movedStart, movedEnd, databaseOccupancy));
+        conflicts.addAll(validator.moveDatabaseConflicts(request.classroomId(), movedDates, movedStart, movedEnd, inputs.databaseOccupancy()));
         conflicts.addAll(validator.movePreviewConflicts(request, eventsById, inputs.datesByEvent(), movedDates, movedStart, movedEnd));
 
         return new ValidateMoveResponseDto(conflicts.isEmpty(), conflicts);
@@ -196,50 +189,22 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
         List<AllocationCandidate> candidates = targetOccurrences.stream()
                 .map(o -> new AllocationCandidate(o, classroomByEvent.get(o.getEvent().getId())))
                 .toList();
-        List<OccupiedSlot> occupancy = inputs.databaseOccupancy().stream()
-                .map(o -> new OccupiedSlot(o.classroomId(), o.date(), o.startTime(), o.endTime(), o.eventId(), o.allocationId()))
-                .toList();
-        validator.validateNoOverlap(candidates, occupancy);
+        validator.validateNoOverlap(candidates, inputs.databaseOccupancy());
 
-        List<Allocation> saved = applyAllocations(targetOccurrences, classroomByEvent);
+        // Agrupa por evento (aula distinta por evento) preservando orden estable, y cada
+        // grupo pasa por el único punto de escritura (AllocationWriter): upsert + ASSIGNED.
+        Map<Long, List<Occurrence>> occurrencesByEvent = targetOccurrences.stream()
+                .collect(Collectors.groupingBy(o -> o.getEvent().getId(), LinkedHashMap::new, Collectors.toList()));
+        List<Allocation> saved = new ArrayList<>();
+        for (Map.Entry<Long, List<Occurrence>> entry : occurrencesByEvent.entrySet()) {
+            saved.addAll(writer.apply(entry.getValue(), classroomByEvent.get(entry.getKey()), null,
+                    AllocationSource.AUTOMATIC, true));
+        }
         solverService.invalidatePreview(previewId);
 
         log.info("Confirm aplicado: previewId={}, applied={}, skipped={}",
                 previewId, saved.size(), skippedEventIds.size());
         return new ConfirmAutoPreviewResponseDto(allocationComposer.composeAll(saved), skippedEventIds);
-    }
-
-    /**
-     * Aplica la propuesta final: actualiza la allocation existente de cada ocurrencia
-     * (aula nueva + {@code source = AUTOMATIC}) o crea una si no había, y la ocurrencia
-     * pasa a ASSIGNED. Batch {@code findByOccurrence_IdIn} para evitar N+1.
-     */
-    private List<Allocation> applyAllocations(List<Occurrence> targetOccurrences, Map<Long, Integer> classroomByEvent) {
-        List<Long> occurrenceIds = targetOccurrences.stream().map(Occurrence::getId).toList();
-        Map<Long, Allocation> existingByOccurrenceId = allocationRepository.findByOccurrence_IdIn(occurrenceIds).stream()
-                .collect(Collectors.toMap(a -> a.getOccurrence().getId(), a -> a));
-
-        List<Allocation> saved = new ArrayList<>();
-        for (Occurrence occurrence : targetOccurrences) {
-            Integer classroomId = classroomByEvent.get(occurrence.getEvent().getId());
-            Allocation allocation = existingByOccurrenceId.get(occurrence.getId());
-            if (allocation != null) {
-                allocation.setClassroomId(classroomId);
-                allocation.setSource(AllocationSource.AUTOMATIC);
-            } else {
-                allocation = Allocation.builder()
-                        .occurrence(occurrence)
-                        .classroomId(classroomId)
-                        .source(AllocationSource.AUTOMATIC)
-                        .createdAt(LocalDateTime.now())
-                        .build();
-            }
-            saved.add(allocationRepository.save(allocation));
-
-            occurrence.setStatus(OccurrenceStatus.ASSIGNED);
-            occurrenceRepository.save(occurrence);
-        }
-        return saved;
     }
 
     private SolverEvent toSolverEvent(RecurringEvent e, List<LocalDate> dates) {

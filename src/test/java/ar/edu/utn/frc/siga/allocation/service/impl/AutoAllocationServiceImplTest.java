@@ -61,7 +61,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -105,8 +104,9 @@ class AutoAllocationServiceImplTest {
         AutoAllocationDataLoader dataLoader = new AutoAllocationDataLoader(
                 eventRepository, occurrenceRepository, allocationRepository, classroomService);
         AllocationValidator validator = new AllocationValidator(classroomService, allocationRepository);
+        AllocationWriter writer = new AllocationWriter(allocationRepository, validator);
         service = new AutoAllocationServiceImpl(dataLoader, classroomService, academicEventComposer, solverService,
-                occurrenceRepository, allocationRepository, allocationComposer, validator);
+                occurrenceRepository, allocationComposer, validator, writer);
 
         lenient().when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5, 100)));
         lenient().when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 100)));
@@ -604,8 +604,9 @@ class AutoAllocationServiceImplTest {
         assertThat(savedForOcc2.getClassroomId()).isEqualTo(7);
         assertThat(savedForOcc2.getSource()).isEqualTo(AllocationSource.AUTOMATIC);
 
-        verify(occurrenceRepository).save(argThat(o -> o.getId().equals(10L) && o.getStatus() == OccurrenceStatus.ASSIGNED));
-        verify(occurrenceRepository).save(argThat(o -> o.getId().equals(11L) && o.getStatus() == OccurrenceStatus.ASSIGNED));
+        // occ1/occ2 llegan managed; el writer ya no llama save() explícito (dirty checking).
+        assertThat(occ1.getStatus()).isEqualTo(OccurrenceStatus.ASSIGNED);
+        assertThat(occ2.getStatus()).isEqualTo(OccurrenceStatus.ASSIGNED);
     }
 
     @Test
@@ -622,7 +623,6 @@ class AutoAllocationServiceImplTest {
         when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
                 .thenReturn(List.of(occ));
         when(allocationRepository.findByOccurrence_IdIn(any())).thenReturn(List.of(existing));
-        when(allocationRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ConfirmAutoPreviewRequestDto request = new ConfirmAutoPreviewRequestDto(
                 List.of(new PreviewAllocationDto(1L, 5)));
@@ -632,7 +632,6 @@ class AutoAllocationServiceImplTest {
         assertThat(occ.getStatus()).isEqualTo(OccurrenceStatus.ASSIGNED);
         assertThat(existing.getClassroomId()).isEqualTo(5);
         assertThat(existing.getSource()).isEqualTo(AllocationSource.AUTOMATIC);
-        verify(occurrenceRepository).save(occ);
     }
 
     @Test

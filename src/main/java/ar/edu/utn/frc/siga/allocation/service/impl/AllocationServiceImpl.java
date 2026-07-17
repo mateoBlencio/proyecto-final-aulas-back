@@ -29,7 +29,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -48,6 +47,7 @@ public class AllocationServiceImpl implements AllocationService {
     private final AcademicEventRepository eventRepository;
     private final AllocationComposer composer;
     private final AllocationValidator validator;
+    private final AllocationWriter writer;
 
     @Override
     @Transactional(readOnly = true)
@@ -87,8 +87,9 @@ public class AllocationServiceImpl implements AllocationService {
                 .observation(dto.observation())
                 .build());
 
+        // occurrence llega managed (findOccurrence en esta misma tx): dirty checking la
+        // persiste, no hace falta save() explícito.
         occurrence.setStatus(OccurrenceStatus.ASSIGNED);
-        occurrenceRepository.save(occurrence);
 
         log.info("Asignación creada: id={}, occurrenceId={}, classroomId={}", saved.getId(), occurrenceId, dto.classroomId());
         return composer.compose(saved);
@@ -114,9 +115,10 @@ public class AllocationServiceImpl implements AllocationService {
         allocation.setSource(AllocationSource.MANUAL);
         allocation.setObservation(dto.observation());
 
-        Allocation saved = allocationRepository.save(allocation);
+        // allocation llega managed (cargada por findById en esta misma tx): dirty
+        // checking la persiste, no hace falta save() explícito.
         log.info("Asignación reasignada: id={}, classroomId={}", allocationId, dto.classroomId());
-        return composer.compose(saved);
+        return composer.compose(allocation);
     }
 
     /**
@@ -148,12 +150,14 @@ public class AllocationServiceImpl implements AllocationService {
         );
         validator.validateNoOverlap(candidates);
 
+        // Entidades managed (cargadas por findAllocation en esta misma tx): dirty
+        // checking las persiste, no hace falta save() explícito.
         List<AllocationResponseDto> results = new ArrayList<>();
         for (int i = 0; i < allocations.size(); i++) {
             Allocation allocation = allocations.get(i);
             allocation.setClassroomId(candidates.get(i).classroomId());
             allocation.setSource(AllocationSource.MANUAL);
-            results.add(composer.compose(allocationRepository.save(allocation)));
+            results.add(composer.compose(allocation));
         }
         log.info("batchReallocate completo: moved={}", results.size());
         return results;
@@ -170,12 +174,7 @@ public class AllocationServiceImpl implements AllocationService {
     public List<AllocationResponseDto> reassignEvent(Long recurringEventId, AllocateOccurrenceRequestDto dto) {
         log.debug("reassignEvent: event={}, classroom={}", recurringEventId, dto.classroomId());
 
-        AcademicEvent event = eventRepository.findById(recurringEventId)
-                .orElseThrow(() -> ResourceNotFoundException.of("AcademicEvent", recurringEventId));
-
-        if (!(Hibernate.unproxy(event) instanceof RecurringEvent)) {
-            throw new AllocationConflictException("reassignEvent is only supported for recurring events");
-        }
+        findRecurringEvent(recurringEventId, "reassignEvent");
 
         List<Occurrence> occurrences = occurrenceRepository
                 .findByEvent_IdAndDateGreaterThanEqual(recurringEventId, LocalDate.now());
@@ -191,7 +190,7 @@ public class AllocationServiceImpl implements AllocationService {
                         .toList()
         );
 
-        List<Allocation> saved = allocateToOccurrences(
+        List<Allocation> saved = writer.apply(
                 occurrences, classroomId, dto.observation(), AllocationSource.MANUAL, true);
         List<AllocationResponseDto> results = composer.composeAll(saved);
 
@@ -210,28 +209,15 @@ public class AllocationServiceImpl implements AllocationService {
     public List<AllocationResponseDto> allocateManuallyFromDate(AllocateFromDateRequestDto dto) {
         log.debug("allocateManuallyFromDate: event={}, fromDate={}, classroom={}", dto.recurringEventId(), dto.fromDate(), dto.classroomId());
 
-        AcademicEvent event = eventRepository.findById(dto.recurringEventId())
-                .orElseThrow(() -> ResourceNotFoundException.of("AcademicEvent", dto.recurringEventId()));
-
-        if (!(Hibernate.unproxy(event) instanceof RecurringEvent)) {
-            throw new AllocationConflictException("allocateManuallyFromDate is only supported for recurring events");
-        }
+        findRecurringEvent(dto.recurringEventId(), "allocateManuallyFromDate");
 
         Integer classroomId = dto.classroomId();
         validator.validateClassroomsAvailable(Set.of(classroomId));
         LocalDate effectiveFrom = dto.fromDate().isBefore(LocalDate.now()) ? LocalDate.now() : dto.fromDate();
 
-        List<Occurrence> occurrences = occurrenceRepository
-                .findByEvent_IdAndDateGreaterThanEqual(dto.recurringEventId(), effectiveFrom);
-
-        validator.validateNoOverlap(
-                occurrences.stream()
-                        .map(o -> new AllocationCandidate(o, classroomId))
-                        .toList()
-        );
-
-        List<Allocation> saved = allocateToOccurrences(
-                occurrences, classroomId, dto.observation(), AllocationSource.MANUAL, true);
+        List<Allocation> saved = allocateEventFromDate(
+                dto.recurringEventId(), effectiveFrom, classroomId, dto.observation(),
+                AllocationSource.MANUAL, true, true);
         List<AllocationResponseDto> results = composer.composeAll(saved);
 
         log.info("allocateManuallyFromDate completo: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), results.size());
@@ -249,67 +235,55 @@ public class AllocationServiceImpl implements AllocationService {
     public int importAllocationsFromDate(AllocateFromDateRequestDto dto) {
         log.debug("importAllocationsFromDate: event={}, fromDate={}, classroom={}", dto.recurringEventId(), dto.fromDate(), dto.classroomId());
 
-        AcademicEvent event = eventRepository.findById(dto.recurringEventId())
-                .orElseThrow(() -> ResourceNotFoundException.of("AcademicEvent", dto.recurringEventId()));
-
-        if (!(Hibernate.unproxy(event) instanceof RecurringEvent)) {
-            throw new AllocationConflictException("importAllocationsFromDate is only supported for recurring events");
-        }
+        findRecurringEvent(dto.recurringEventId(), "importAllocationsFromDate");
 
         Integer classroomId = dto.classroomId();
         validator.validateClassroomsAvailable(Set.of(classroomId));
 
-        List<Occurrence> occurrences = occurrenceRepository
-                .findByEvent_IdAndDateGreaterThanEqual(dto.recurringEventId(), dto.fromDate());
-
-        List<Allocation> saved = allocateToOccurrences(
-                occurrences, classroomId, dto.observation(), AllocationSource.IMPORTED, false);
+        List<Allocation> saved = allocateEventFromDate(
+                dto.recurringEventId(), dto.fromDate(), classroomId, dto.observation(),
+                AllocationSource.IMPORTED, false, false);
 
         log.info("importAllocationsFromDate completo: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), saved.size());
         return saved.size();
     }
 
     /**
-     * Crea o actualiza (upsert por occurrence) la asignación de cada occurrence de la
-     * lista al aula indicada, y la pasa a ASSIGNED. Las no-asignables (CANCELLED/SUSPENDED,
-     * o pasadas cuando {@code skipPast}) se saltean por diseño, no son un fallo parcial.
-     * Prefetch en batch (una sola query) de las allocations existentes para evitar N+1.
+     * Carga por eventId y desproxea; solo eventos recurrentes soportan estas operaciones
+     * por fecha. {@code operation} identifica al caller en el mensaje de la excepción
+     * (cada intent method preserva su propio texto, aunque la causa sea la misma).
      */
-    private List<Allocation> allocateToOccurrences(
-            List<Occurrence> occurrences, Integer classroomId, String observation,
-            AllocationSource source, boolean skipPast) {
-        Map<Long, Allocation> existingByOccurrence = allocationRepository
-                .findByOccurrence_IdIn(occurrences.stream().map(Occurrence::getId).toList())
-                .stream().collect(Collectors.toMap(a -> a.getOccurrence().getId(), a -> a));
+    private void findRecurringEvent(Long eventId, String operation) {
+        AcademicEvent event = eventRepository.findById(eventId)
+                .orElseThrow(() -> ResourceNotFoundException.of("AcademicEvent", eventId));
 
-        List<Allocation> saved = new ArrayList<>();
-        for (Occurrence occurrence : occurrences) {
-            if (skipPast && occurrence.isPast()) continue;
-            if (!validator.isAssignable(occurrence)) continue;
-
-            Allocation existing = existingByOccurrence.get(occurrence.getId());
-            Allocation allocation;
-            if (existing != null) {
-                existing.setClassroomId(classroomId);
-                existing.setSource(source);
-                existing.setObservation(observation);
-                allocation = existing;
-            } else {
-                allocation = Allocation.builder()
-                        .occurrence(occurrence)
-                        .classroomId(classroomId)
-                        .source(source)
-                        .createdAt(LocalDateTime.now())
-                        .observation(observation)
-                        .build();
-            }
-
-            saved.add(allocationRepository.save(allocation));
-
-            occurrence.setStatus(OccurrenceStatus.ASSIGNED);
-            occurrenceRepository.save(occurrence);
+        if (!(Hibernate.unproxy(event) instanceof RecurringEvent)) {
+            throw new AllocationConflictException(operation + " is only supported for recurring events");
         }
-        return saved;
+    }
+
+    /**
+     * Núcleo común de {@link #allocateManuallyFromDate} e {@link #importAllocationsFromDate}:
+     * carga las occurrences del evento desde {@code fromDate} y delega la escritura al
+     * {@link AllocationWriter}, validando solapamiento antes si corresponde. Las
+     * validaciones previas (evento recurrente, aula disponible) quedan en cada intent
+     * method: no afectan qué se carga ni se escribe acá, así que su orden relativo a la
+     * carga no es observable.
+     */
+    private List<Allocation> allocateEventFromDate(Long eventId, LocalDate fromDate, Integer classroomId,
+            String observation, AllocationSource source, boolean validateOverlap, boolean skipPast) {
+        List<Occurrence> occurrences = occurrenceRepository
+                .findByEvent_IdAndDateGreaterThanEqual(eventId, fromDate);
+
+        if (validateOverlap) {
+            validator.validateNoOverlap(
+                    occurrences.stream()
+                            .map(o -> new AllocationCandidate(o, classroomId))
+                            .toList()
+            );
+        }
+
+        return writer.apply(occurrences, classroomId, observation, source, skipPast);
     }
 
     @Override

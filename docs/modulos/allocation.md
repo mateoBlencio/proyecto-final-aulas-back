@@ -113,8 +113,18 @@ componen DTOs) y delegan cada validación acá:
   **clamp** de `fromDate` a hoy si viene en el pasado (`effectiveFrom = max(fromDate, today)`).
 - `importAllocationsFromDate`: variante para excel (source `IMPORTED`, no saltea pasado,
   **sin** `validateNoOverlap` — la carga masiva no se bloquea por solapamientos).
-- `allocateToOccurrences`: upsert (reusa allocation existente o crea), setea estado
-  `ASSIGNED`, saltea no-aplicables por diseño (no es fallo parcial).
+
+### Escritura única (`service/impl/AllocationWriter`)
+
+Componente package-private (sin interfaz) que es el **único punto de escritura de
+asignaciones**: upsert por ocurrencia (reusa la allocation existente o crea una nueva) +
+pase a `ASSIGNED`, con prefetch batch de las allocations existentes (sin N+1). Saltea
+no-asignables (`CANCELLED`/`SUSPENDED`, o pasadas cuando `skipPast`) por diseño — no es
+fallo parcial. Todos los flujos (manual, importado y el `confirm` automático) pasan por
+acá; el intent method que llama decide las validaciones previas y estampa su `source`.
+Corre dentro de la transacción del caller: las entidades managed se persisten por dirty
+checking, solo las allocations nuevas requieren `save()`. Gancho futuro: cuando exista la
+notificación al docente, este será el único lugar que publique el evento de dominio.
 
 ### Problemas de asignación (`AllocationProblemServiceImpl`)
 

@@ -67,7 +67,8 @@ class AllocationServiceImplTest {
     @BeforeEach
     void setUp() {
         AllocationValidator validator = new AllocationValidator(classroomService, allocationRepository);
-        service = new AllocationServiceImpl(allocationRepository, occurrenceRepository, eventRepository, composer, validator);
+        AllocationWriter writer = new AllocationWriter(allocationRepository, validator);
+        service = new AllocationServiceImpl(allocationRepository, occurrenceRepository, eventRepository, composer, validator, writer);
 
         lenient().when(classroomService.findByIds(any())).thenAnswer(invocation -> {
             java.util.Collection<Integer> ids = invocation.getArgument(0);
@@ -254,7 +255,7 @@ class AllocationServiceImplTest {
         AllocationResponseDto result = service.reallocate(900L, new AllocateOccurrenceRequestDto(5, "misma aula"));
 
         assertThat(result).isNotNull();
-        verify(allocationRepository).save(allocation);
+        // allocation llega managed; el service ya no llama save() explícito (dirty checking).
         assertThat(allocation.getClassroomId()).isEqualTo(5);
     }
 
@@ -281,7 +282,7 @@ class AllocationServiceImplTest {
                 List.of(new BatchReassignRequestDto.MoveDto(100L, 5), new BatchReassignRequestDto.MoveDto(101L, 6))));
 
         assertThat(results).hasSize(2);
-        verify(allocationRepository, times(2)).save(any());
+        // Ambas allocations llegan managed; el service ya no llama save() explícito (dirty checking).
         assertThat(alloc1.getClassroomId()).isEqualTo(5);
         assertThat(alloc2.getClassroomId()).isEqualTo(6);
     }
@@ -520,7 +521,7 @@ class AllocationServiceImplTest {
 
         service.importAllocationsFromDate(new AllocateFromDateRequestDto(1L, futureDate(1), 5, null));
 
-        verify(allocationRepository).save(existing);
+        // existing llega managed; el writer ya no llama save() explícito (dirty checking).
         assertThat(existing.getClassroomId()).isEqualTo(5);
         assertThat(existing.getSource()).isEqualTo(AllocationSource.IMPORTED);
     }
