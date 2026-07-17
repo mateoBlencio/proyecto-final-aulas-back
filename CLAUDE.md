@@ -81,5 +81,5 @@ Reglas del paradigma:
 - Código y comentarios en el estilo existente: nombres de clases en inglés, comentarios y mensajes en español.
 - Lombok en todo el proyecto.
 - Zona horaria fija UTC (`-Duser.timezone=UTC` en el plugin de Boot).
-- Documentación del dominio y los módulos en `docs/`: `adr/` (decisiones arquitectónicas), `modelo-dominio.md` (modelo Evento/Occurrence/Allocation), `calendario-academico-2026.md` (referencia calendario académico UTN), `para-dba.md`, `para-front.md`.
+- Documentación del dominio y los módulos en `docs/`: `adr/` (decisiones arquitectónicas), `modelo-dominio.md` (modelo Evento/Occurrence/Allocation), `modulos/` (una ficha por módulo), `restricciones-asignacion.md` (mapa completo de reglas de asignación), `calendario-academico-2026.md` (referencia calendario académico UTN).
 - Contexto vivo de trabajo en curso (no versionado) en `.claude/plans/`: `plan-refactor.md` (plan activo de este refactor), `asignacion-automatica-preview.md`.
