@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
@@ -55,12 +57,23 @@ class AuditHistoryApiIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    /** Evento recurrente de 1 sola ocurrencia en {@code date}, creado por el servicio real. */
+    /**
+     * Evento recurrente de 1 sola ocurrencia en {@code date}, creado por el servicio real.
+     * Al invocar el servicio directamente (sin request HTTP) hay que poblar el
+     * {@code SecurityContext} a mano para que la revisión de Envers registre el usuario.
+     */
     private Occurrence seedOccurrence(LocalDate date) {
         var sc = testData.materiaYComision();
         var dto = new CreateRecurringEventRequestDto(
                 30, START, DURATION, date.getDayOfWeek(), date, date, sc.subjectId(), sc.commissionId());
-        Long eventId = academicEventService.createRecurringEvent(dto).id();
+        Long eventId;
+        SecurityContextHolder.getContext().setAuthentication(
+                new TestingAuthenticationToken(USER, null, "ROLE_SUBSECRETARIA"));
+        try {
+            eventId = academicEventService.createRecurringEvent(dto).id();
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
         List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId);
         assertThat(occurrences).hasSize(1);
         return occurrences.getFirst();

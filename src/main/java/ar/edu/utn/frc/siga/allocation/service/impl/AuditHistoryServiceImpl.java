@@ -34,8 +34,8 @@ import java.util.function.Function;
 /**
  * Implementación de la consulta del historial de auditoría sobre las tablas {@code _aud}
  * vía {@code AuditReader}. Cada query devuelve tuplas {entidad, {@link SigaRevision},
- * {@link RevisionType}} en orden de revisión ascendente; en revisiones DELETED Envers
- * devuelve la entidad solo con el id, por lo que el snapshot va en null.
+ * {@link RevisionType}} en orden de revisión ascendente; en revisiones DELETED el snapshot
+ * va en null por contrato (la baja no tiene estado vigente que mostrar).
  */
 @Slf4j
 @Service
