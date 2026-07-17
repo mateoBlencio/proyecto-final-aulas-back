@@ -1,0 +1,15 @@
+meta {
+  name: Historial de una ocurrencia
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/v1/allocations/occurrences/:occurrenceId/history
+  body: none
+  auth: none
+}
+
+params:path {
+  occurrenceId: 1
+}

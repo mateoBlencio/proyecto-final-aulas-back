@@ -4,11 +4,15 @@ import ar.edu.utn.frc.siga.allocation.dto.request.AllocateFromDateRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.BatchReassignRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.AllocationHistorySnapshotDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ClassroomOverlapDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceHistorySnapshotDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OvercrowdedAllocationDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.RevisionDto;
 import ar.edu.utn.frc.siga.allocation.service.AllocationProblemService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
+import ar.edu.utn.frc.siga.allocation.service.AuditHistoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -42,6 +46,7 @@ public class AllocationController {
 
     private final AllocationService allocationService;
     private final AllocationProblemService allocationProblemService;
+    private final AuditHistoryService auditHistoryService;
 
     /** Eventos con ocurrencias sin aula asignada en el rango indicado. */
     @GetMapping("/unassigned")
@@ -99,6 +104,30 @@ public class AllocationController {
     public ResponseEntity<AllocationResponseDto> findById(@PathVariable Long id) {
         log.debug("GET /v1/allocations/{}", id);
         return ResponseEntity.ok(allocationService.findById(id));
+    }
+
+    /** Historial de auditoría de una ocurrencia: cada revisión con quién, cuándo y el estado de ese momento. */
+    @GetMapping("/occurrences/{occurrenceId}/history")
+    @Operation(summary = "Historial de auditoría de una ocurrencia",
+               description = "Devuelve las revisiones de auditoría (Envers) de la ocurrencia en orden ascendente: "
+                       + "cambios de estado (cuándo se canceló/suspendió y quién). El snapshot es null en revisiones DELETED.")
+    public ResponseEntity<List<RevisionDto<OccurrenceHistorySnapshotDto>>> findOccurrenceHistory(
+            @PathVariable Long occurrenceId) {
+        log.debug("GET /v1/allocations/occurrences/{}/history", occurrenceId);
+        return ResponseEntity.ok(auditHistoryService.findOccurrenceHistory(occurrenceId));
+    }
+
+    /** Historial de auditoría de las asignaciones de una ocurrencia: qué aula tuvo en cada momento y quién la cambió. */
+    @GetMapping("/occurrences/{occurrenceId}/allocation-history")
+    @Operation(summary = "Historial de asignaciones de una ocurrencia",
+               description = "Devuelve las revisiones de auditoría (Envers) de la(s) asignación(es) de la ocurrencia "
+                       + "en orden ascendente: qué aula tuvo en cada momento, origen (MANUAL/AUTOMATIC/IMPORTED) y "
+                       + "quién la cambió. Se consulta por ocurrencia porque la asignación puede borrarse y recrearse. "
+                       + "Lista vacía si la ocurrencia existe pero nunca tuvo asignación.")
+    public ResponseEntity<List<RevisionDto<AllocationHistorySnapshotDto>>> findAllocationHistory(
+            @PathVariable Long occurrenceId) {
+        log.debug("GET /v1/allocations/occurrences/{}/allocation-history", occurrenceId);
+        return ResponseEntity.ok(auditHistoryService.findAllocationHistory(occurrenceId));
     }
 
     /** Asigna manualmente un aula a una ocurrencia puntual (source MANUAL). */

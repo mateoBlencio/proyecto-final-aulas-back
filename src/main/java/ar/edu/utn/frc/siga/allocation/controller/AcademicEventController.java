@@ -3,8 +3,11 @@ package ar.edu.utn.frc.siga.allocation.controller;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.EventHistorySnapshotDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.RevisionDto;
 import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
+import ar.edu.utn.frc.siga.allocation.service.AuditHistoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -31,6 +34,7 @@ import java.util.List;
 public class AcademicEventController {
 
     private final AcademicEventService academicEventService;
+    private final AuditHistoryService auditHistoryService;
 
     /** Todos los eventos académicos registrados. */
     @GetMapping
@@ -64,6 +68,18 @@ public class AcademicEventController {
         List<OccurrenceResponseDto> occurrences = academicEventService.findOccurrencesByEventId(id);
         log.info("Ocurrencias listadas: eventId={}, count={}", id, occurrences.size());
         return ResponseEntity.ok(occurrences);
+    }
+
+    /** Historial de auditoría de un evento académico: cada revisión con quién, cuándo y el estado de ese momento. */
+    @GetMapping("/{id}/history")
+    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @Operation(summary = "Historial de auditoría de un evento",
+               description = "Devuelve las revisiones de auditoría (Envers) del evento en orden ascendente: "
+                       + "cambios de horario, inscriptos, comisión, alta y baja; con usuario y fecha de cada cambio. "
+                       + "El snapshot es null en revisiones DELETED.")
+    public ResponseEntity<List<RevisionDto<EventHistorySnapshotDto>>> findHistory(@PathVariable Long id) {
+        log.debug("GET /v1/events/{}/history", id);
+        return ResponseEntity.ok(auditHistoryService.findEventHistory(id));
     }
 
     /** Crea un evento recurrente semanal y genera todas sus occurrences. */
