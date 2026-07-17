@@ -218,15 +218,9 @@ class ExcelImportServiceImplTest {
         assertThat(result.assignmentsCreated()).isZero();
     }
 
-    // FIXME: bug de producción — ExcelImportServiceImpl.importExcel loguea `file.getName()`
-    // (nombre del parámetro multipart, típicamente "file") en vez de
-    // `file.getOriginalFilename()`. El log de arranque de la importación nunca muestra el
-    // nombre real del archivo subido por el usuario. Este test documenta el comportamiento
-    // actual (buggy), no lo
-    // corrige.
     @Test
-    @DisplayName("FIXME bug: el log de inicio muestra el nombre del parámetro multipart, no el nombre real del archivo")
-    void logDeInicioNoMuestraElNombreRealDelArchivoFIXME() {
+    @DisplayName("el log de inicio muestra el nombre real del archivo subido")
+    void logDeInicioMuestraElNombreRealDelArchivo() {
         stubHappyPath(DataRow.defaultRow());
         MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow()
             .toMultipartFile("planilla-2026.xlsx");
@@ -242,8 +236,7 @@ class ExcelImportServiceImplTest {
         }
 
         String startLog = appender.list.getFirst().getFormattedMessage();
-        assertThat(startLog).contains("file"); // MultipartFile#getName(): nombre del campo del form
-        assertThat(startLog).doesNotContain("planilla-2026.xlsx"); // comportamiento actual: no aparece
+        assertThat(startLog).contains("planilla-2026.xlsx");
     }
 
     // ---------- helpers de stubbing ----------
