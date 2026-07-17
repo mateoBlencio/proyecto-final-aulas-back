@@ -1,0 +1,15 @@
+meta {
+  name: Historial de un evento
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/v1/events/:id/history
+  body: none
+  auth: none
+}
+
+params:path {
+  id: 1
+}

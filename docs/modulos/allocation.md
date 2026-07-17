@@ -27,6 +27,7 @@ consumidos por `excelimport`), `AllocationProblemService` y `AutoAllocationServi
 | GET | `/v1/events/{id}/occurrences` | Ocurrencias del evento |
 | POST | `/v1/events/recurring` | Crea evento recurrente + genera ocurrencias |
 | POST | `/v1/events/unique` | Crea evento único (1 ocurrencia) |
+| GET | `/v1/events/{id}/history` | Historial de auditoría del evento (Envers, ver más abajo) |
 | PUT | `/v1/events/{eventId}/classroom` | Reasignación permanente: cambia el aula de **todas las ocurrencias futuras** de un evento recurrente (las pasadas quedan intactas). **409** si el evento no es recurrente, si ya finalizó, o si alguna ocurrencia solapa |
 
 **Asignaciones** (`/v1/allocations`, `AllocationController`):
@@ -42,6 +43,8 @@ consumidos por `excelimport`), `AllocationProblemService` y `AutoAllocationServi
 | PUT | `/v1/allocations/{id}` | Reasignar aula (**409** si solapa) |
 | PUT | `/v1/allocations/batch` | Reasignación en lote, atómica (**409** si algún move solapa con BD o con otro move del propio lote) |
 | POST | `/v1/allocations/from-date` | Asigna aula a todas las ocurrencias futuras de un recurrente desde `fromDate` (clamped a hoy si es pasada; **409** si solapa) |
+| GET | `/v1/allocations/occurrences/{occurrenceId}/history` | Historial de auditoría de la ocurrencia (Envers, ver más abajo) |
+| GET | `/v1/allocations/occurrences/{occurrenceId}/allocation-history` | Historial de auditoría de las asignaciones de la ocurrencia (Envers, ver más abajo) |
 
 **Asignación automática** (`/v1/allocations/auto-preview`, `AutoAllocationController`,
 propio de `AutoAllocationService`):
@@ -113,6 +116,27 @@ componen DTOs) y delegan cada validación acá:
   **clamp** de `fromDate` a hoy si viene en el pasado (`effectiveFrom = max(fromDate, today)`).
 - `importAllocationsFromDate`: variante para excel (source `IMPORTED`, no saltea pasado,
   **sin** `validateNoOverlap` — la carga masiva no se bloquea por solapamientos).
+- `allocateToOccurrences`: upsert (reusa allocation existente o crea), setea estado `ASSIGNED`.
+
+### Historial de auditoría (`AuditHistoryServiceImpl`)
+
+Consulta de solo lectura sobre las tablas `_aud` de Envers (ADR-007) vía `AuditReader`
+(`AuditReaderFactory.get(entityManager)`), tres métodos `@Transactional(readOnly=true)`:
+
+- **`findEventHistory(eventId)`** — `forRevisionsOfEntity(AcademicEvent.class, ...)`;
+  con herencia JOINED la query devuelve el subtipo real, mapeado al snapshot polimórfico
+  por `type` (`EventHistorySnapshotDto` sealed, mismo patrón que `AcademicEventResponseDto`).
+- **`findOccurrenceHistory(occurrenceId)`** — revisiones de la ocurrencia (cambios de estado).
+- **`findAllocationHistory(occurrenceId)`** — filtra por la FK auditada con
+  `AuditEntity.relatedId("occurrence")` sin cargar la ocurrencia; por ocurrencia y no por
+  `allocationId` porque la allocation puede borrarse/recrearse.
+
+Contrato común `RevisionDto<T>{revision, date, user, kind, snapshot}` (orden ascendente);
+`kind` mapea `RevisionType` ADD/MOD/DEL → CREATED/MODIFIED/DELETED; en DELETED el snapshot
+va en null (Envers devuelve la entidad solo con el id). Historial vacío + entidad
+inexistente hoy ⇒ **404** (si la entidad existe, el INSERT siempre auditó). Snapshots con
+IDs planos sin componer contra otros módulos (el dato histórico crudo; el front resuelve
+nombres). Ver [`../para-front.md`](../para-front.md).
 
 ### Escritura única (`service/impl/AllocationWriter`)
 
@@ -243,6 +267,37 @@ Módulo con cobertura unitaria e integración (Testcontainers):
   sin `enrolled` null), superposición, agregación de fechas por par, rango por defecto,
   `InvalidDateRangeException`.
 - `AutoAllocationServiceImplTest` — dedup de `eventIds`, exclusión de la ocupación pinned
+  de los eventos seleccionados, inclusión de occurrences `ASSIGNED` futuras
+  (re-resolución), separación `allocations`/`unresolved`, 409 por `UniqueEvent`,
+  `validateMove` (libre, conflicto BD, conflicto PREVIEW, ocupación propia liberada, 410,
+  409, franjas adyacentes), `confirm` (alta y update sin duplicar, conserva `ASSIGNED`,
+  invalida preview, 410 en re-confirm, 409 por duplicados/ajeno al preview/aula
+  inexistente o no disponible/conflicto BD/conflicto interno, `skippedEventIds`).
+
+- `AuditHistoryApiIntegrationTest` (Testcontainers, commits reales) — los 3 endpoints de
+  historial: asignar → reasignar → borrar refleja CREATED/MODIFIED/DELETED (snapshot null
+  en DELETED), transición SCHEDULED→ASSIGNED de la ocurrencia, alta del evento con campos
+  del subtipo, usuario capturado, orden ascendente, lista vacía y 404.
+
+Sin cobertura: `RecurringEvent.toOccurrences()`, `Occurrence.isPast()`, composers,
+`AcademicEventServiceImpl`, y toda la capa de integración (Testcontainers).
+
+### Unitarios recomendados (pendientes, alta prioridad)
+- `RecurringEvent.toOccurrences()`: primer día = `nextOrSame(dayOfWeek)`, paso semanal,
+  `endDate` null ⇒ `+1 año`, exclusión de fechas.
+- `Occurrence.isPast()` / `startTime()` / `endTime()` (inyectar `Clock` primero).
+- `AcademicEvent.endTime()` = `startTime + duration`.
+- `allocateToOccurrences`: upsert (reusa vs crea), salteo de pasadas (`skipPast`), salteo
+  de `CANCELLED`/`SUSPENDED`.
+- Composers: armado de DTO sin N+1 (mockear `findByIds`).
+
+### Integración (Testcontainers) recomendados
+- Flujo completo `POST recurring` → ocurrencias generadas en BD.
+- `assignManually` feliz + 409 por ocurrencia ya asignada + 409 por pasada.
+- `from-date` con conflicto real → 409 con `OccurrenceConflictDto` correcto.
+- `batchReassign` atómico: si una falla, ninguna se persiste.
+- `confirm` atómico end-to-end: si una validación falla, nada persiste en BD.
+- **Auditoría Envers**: verificar filas en `*_aud` tras crear/modificar.
   de los eventos seleccionados, re-resolución de `ASSIGNED` futuras, separación
   `allocations`/`unresolved`, 409 por `UniqueEvent`, `validateMove` completo, `confirm`
   completo (atómico, 410 en re-confirm, `skippedEventIds`).

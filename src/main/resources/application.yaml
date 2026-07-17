@@ -30,6 +30,12 @@ spring:
           batch_size: 50
         order_inserts: true
         order_updates: true
+      org:
+        hibernate:
+          envers:
+            # Guardar los datos de la entidad en la revisión DEL: sin esto la fila DEL queda
+            # con las FKs en null y el historial filtrado por relatedId no la encuentra.
+            store_data_at_delete: true
 
   docker:
     compose:
