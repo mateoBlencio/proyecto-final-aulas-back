@@ -47,7 +47,6 @@ class RefreshTokenServiceImplTest {
                 .email("rotacion.test@frc.utn.edu.ar")
                 .passwordHash("irrelevante")
                 .enabled(true)
-                .deleted(false)
                 .roles(Set.of(Role.AUXILIAR_AULICO))
                 .build());
     }

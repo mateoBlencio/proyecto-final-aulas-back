@@ -1,0 +1,17 @@
+meta {
+  name: Habilitar / inhabilitar usuario
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/v1/users/1/enabled
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "enabled": false
+  }
+}

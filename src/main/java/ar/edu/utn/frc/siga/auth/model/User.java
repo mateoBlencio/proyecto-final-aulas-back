@@ -43,10 +43,6 @@ public class User {
     @Column(name = "habilitado", nullable = false)
     private Boolean enabled = true;
 
-    @Builder.Default
-    @Column(name = "eliminado", nullable = false)
-    private Boolean deleted = false;
-
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "usuario_rol", joinColumns = @JoinColumn(name = "id_usuario"))
     @Enumerated(EnumType.STRING)
