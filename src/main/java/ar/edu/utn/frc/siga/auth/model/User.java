@@ -18,9 +18,11 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "usuario")
+@SQLRestriction("eliminado = false")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -42,6 +44,10 @@ public class User {
     @Builder.Default
     @Column(name = "habilitado", nullable = false)
     private Boolean enabled = true;
+
+    @Builder.Default
+    @Column(name = "eliminado", nullable = false)
+    private Boolean deleted = false;
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "usuario_rol", joinColumns = @JoinColumn(name = "id_usuario"))
