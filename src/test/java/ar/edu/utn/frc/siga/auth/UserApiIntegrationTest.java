@@ -120,10 +120,10 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("POST /v1/users con body inválido responde 400 con errores de validación")
     void create_invalidBody_returns400WithErrors() throws Exception {
-        // password de menos de 8 caracteres → falla @Size
+        // password en blanco → falla @NotBlank
         mockMvc.perform(post("/v1/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createBody(uniqueEmail(), "corta", Role.AUXILIAR_AULICO)))
+                        .content(createBody(uniqueEmail(), "", Role.AUXILIAR_AULICO)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.password").exists());
     }
