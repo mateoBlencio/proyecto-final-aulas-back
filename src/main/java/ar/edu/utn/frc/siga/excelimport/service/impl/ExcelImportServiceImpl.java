@@ -76,7 +76,8 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     @Override
     @Transactional
     public ImportResultDto importExcel(MultipartFile file) {
-        log.info("Iniciando importación Excel: {} - {} bytes", file.getName(), file.getSize());
+        String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "(sin nombre)";
+        log.info("Iniciando importación Excel: {} - {} bytes", originalFilename, file.getSize());
 
         Workbook workbook = validator.validate(file);
         Sheet sheet = workbook.getSheet("Hoja1");

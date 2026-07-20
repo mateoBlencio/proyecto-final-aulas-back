@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.academic.model;
 
 import java.time.LocalDate;
+import java.util.Locale;
 import java.util.Optional;
 
 import lombok.Getter;
@@ -42,11 +43,22 @@ public enum TermType {
         };
     }
 
-    /** Resuelve el {@link TermType} a partir de su etiqueta legible (p. ej. "1 Cuat."), usada al importar desde Excel. */
+    /**
+     * Resuelve el {@link TermType} a partir de su etiqueta legible (p. ej. "1 Cuat."), usada al importar desde
+     * Excel. La comparación es tolerante a mayúsculas/minúsculas, espacios y punto final, para no romper con
+     * datos de origen inconsistentes.
+     */
     public static Optional<TermType> fromLabel(String label) {
+        if (label == null) return Optional.empty();
+        String normalized = normalize(label);
         for (TermType t : values()) {
-            if (t.label.equals(label)) return Optional.of(t);
+            if (normalize(t.label).equals(normalized)) return Optional.of(t);
         }
         return Optional.empty();
+    }
+
+    private static String normalize(String s) {
+        String n = s.trim().toLowerCase(Locale.ROOT);
+        return n.endsWith(".") ? n.substring(0, n.length() - 1) : n;
     }
 }
