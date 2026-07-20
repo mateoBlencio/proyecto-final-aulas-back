@@ -19,9 +19,7 @@ import java.util.stream.Collectors;
 /**
  * Único punto de escritura de asignaciones: upsert por ocurrencia + pase a ASSIGNED.
  * Toda fuente (manual, importada, automática) pasa por acá; el intent method que llama
- * decide validaciones previas y estampa su source. Gancho a futuro: cuando exista
- * notificación al docente, este será el único lugar que publique el evento de dominio
- * (AllocationChangedEvent).
+ * decide validaciones previas y estampa su source.
  */
 @Component
 @RequiredArgsConstructor

@@ -13,6 +13,7 @@ import ar.edu.utn.frc.siga.allocation.model.Occurrence;
 import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
+import ar.edu.utn.frc.siga.common.util.Maps;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
@@ -30,15 +31,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Centraliza TODAS las reglas de negocio de asignación de aulas, compartidas entre el flujo
- * manual ({@code AllocationServiceImpl}) y el automático ({@code AutoAllocationServiceImpl}).
- * Los services solo orquestan (cargan entidades, persisten, componen DTOs) y delegan aquí
- * cada validación. Depende de {@link AllocationRepository} (para cargar la ocupación firme al
- * validar solapamiento) y de {@link ClassroomService} (fachada de {@code space}, para validar
- * aulas). Queda privado al módulo {@code allocation} (el paquete {@code validator} no forma
- * parte de ningún {@code ::api}).
- */
+/** Centraliza todas las reglas de negocio de asignación de aulas, compartidas entre flujo manual y automático. */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -207,8 +200,8 @@ public class AllocationValidator {
      * escribir nada.
      */
     public void validateClassroomsAvailable(Set<Integer> classroomIds) {
-        Map<Integer, ClassroomResponseDto> classroomsById = classroomService.findByIds(classroomIds).stream()
-                .collect(Collectors.toMap(ClassroomResponseDto::id, c -> c));
+        Map<Integer, ClassroomResponseDto> classroomsById =
+                Maps.byId(classroomService.findByIds(classroomIds), ClassroomResponseDto::id);
         for (Integer classroomId : classroomIds) {
             ClassroomResponseDto classroom = classroomsById.get(classroomId);
             if (classroom == null || !Boolean.TRUE.equals(classroom.available())) {

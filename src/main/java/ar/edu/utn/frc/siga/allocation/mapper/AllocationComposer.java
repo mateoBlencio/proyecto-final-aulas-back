@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.allocation.mapper;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
+import ar.edu.utn.frc.siga.common.util.Maps;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
@@ -15,13 +16,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Compone el DTO de una asignación resolviendo el evento académico (vía
- * {@link AcademicEventComposer}) y el aula (vía {@link ClassroomService#findByIds}) —
- * datos ajenos al agregado {@link Allocation}. El fetch/mapeo de esos datos vive acá
- * para que {@link AllocationMapper} sea un mapper puro sobre la entidad, espejo del
- * patrón {@link AcademicEventComposer}.
- */
+/** Compone el DTO de una asignación resolviendo evento académico y aula, datos ajenos a la entidad. */
 @Component
 @RequiredArgsConstructor
 public class AllocationComposer {
@@ -47,8 +42,7 @@ public class AllocationComposer {
         Set<Integer> classroomIds = allocations.stream()
                 .map(Allocation::getClassroomId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
-        Map<Integer, ClassroomResponseDto> classroomsById = classroomService.findByIds(classroomIds).stream()
-                .collect(Collectors.toMap(ClassroomResponseDto::id, c -> c));
+        Map<Integer, ClassroomResponseDto> classroomsById = Maps.byId(classroomService.findByIds(classroomIds), ClassroomResponseDto::id);
 
         List<AllocationResponseDto> result = new ArrayList<>(allocations.size());
         for (int i = 0; i < allocations.size(); i++) {

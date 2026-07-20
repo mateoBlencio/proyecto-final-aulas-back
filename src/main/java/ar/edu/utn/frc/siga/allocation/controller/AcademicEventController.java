@@ -41,7 +41,6 @@ public class AcademicEventController {
     private final AllocationService allocationService;
     private final AuditHistoryService auditHistoryService;
 
-    /** Todos los eventos académicos registrados. */
     @GetMapping
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     @Operation(summary = "Listar eventos académicos",
@@ -53,7 +52,6 @@ public class AcademicEventController {
         return ResponseEntity.ok(events);
     }
 
-    /** Datos de un evento académico existente por su ID. */
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     @Operation(summary = "Obtener evento académico por ID",
@@ -63,7 +61,6 @@ public class AcademicEventController {
         return ResponseEntity.ok(academicEventService.findById(id));
     }
 
-    /** Todas las occurrences generadas para un evento académico. */
     @GetMapping("/{id}/occurrences")
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     @Operation(summary = "Listar ocurrencias de un evento",
@@ -75,7 +72,6 @@ public class AcademicEventController {
         return ResponseEntity.ok(occurrences);
     }
 
-    /** Historial de auditoría de un evento académico: cada revisión con quién, cuándo y el estado de ese momento. */
     @GetMapping("/{id}/history")
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     @Operation(summary = "Historial de auditoría de un evento",
@@ -87,7 +83,6 @@ public class AcademicEventController {
         return ResponseEntity.ok(auditHistoryService.findEventHistory(id));
     }
 
-    /** Crea un evento recurrente semanal y genera todas sus occurrences. */
     @PostMapping("/recurring")
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Crear evento recurrente",
@@ -100,7 +95,6 @@ public class AcademicEventController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    /** Crea un evento que ocurre una única vez y genera su única occurrence. */
     @PostMapping("/unique")
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Crea un evento único",
@@ -113,7 +107,6 @@ public class AcademicEventController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    /** Cambia el aula de todas las occurrences futuras de un evento recurrente (source MANUAL). */
     @PutMapping("/{eventId}/classroom")
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     @Operation(summary = "Reasignar aula de un evento",

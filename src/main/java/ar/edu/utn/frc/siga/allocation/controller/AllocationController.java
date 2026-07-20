@@ -48,7 +48,6 @@ public class AllocationController {
     private final AllocationProblemService allocationProblemService;
     private final AuditHistoryService auditHistoryService;
 
-    /** Eventos con ocurrencias sin aula asignada en el rango indicado. */
     @GetMapping("/unassigned")
     @Operation(summary = "Listar eventos sin aula asignada",
                description = "Devuelve, agrupados por evento, las ocurrencias SCHEDULED (sin aula) en el rango "
@@ -61,7 +60,6 @@ public class AllocationController {
         return ResponseEntity.ok(allocationProblemService.findUnassigned(from, to));
     }
 
-    /** Aulas con sobrecupo (inscriptos > capacidad) en el rango indicado. */
     @GetMapping("/overcrowded")
     @Operation(summary = "Listar aulas con sobrecupo",
                description = "Devuelve los pares evento-aula donde la cantidad de inscriptos supera la capacidad "
@@ -73,7 +71,6 @@ public class AllocationController {
         return ResponseEntity.ok(allocationProblemService.findOvercrowded(from, to));
     }
 
-    /** Superposiciones de horario en la misma aula en el rango indicado. */
     @GetMapping("/overlaps")
     @Operation(summary = "Listar superposiciones de horario-aula",
                description = "Devuelve los pares de eventos cuyos horarios se superponen en la misma aula, "
@@ -85,7 +82,6 @@ public class AllocationController {
         return ResponseEntity.ok(allocationProblemService.findOverlaps(from, to));
     }
 
-    /** Todas las asignaciones vigentes en la fecha indicada. */
     @GetMapping
     @Operation(summary = "Listar asignaciones por fecha",
                description = "Devuelve todas las asignaciones del día indicado.")
@@ -97,7 +93,6 @@ public class AllocationController {
         return ResponseEntity.ok(allocations);
     }
 
-    /** Datos de una asignación existente por su ID. */
     @GetMapping("/{id}")
     @Operation(summary = "Obtener asignación por ID",
                description = "Devuelve los datos de una asignación existente.")
@@ -106,7 +101,6 @@ public class AllocationController {
         return ResponseEntity.ok(allocationService.findById(id));
     }
 
-    /** Historial de auditoría de una ocurrencia: cada revisión con quién, cuándo y el estado de ese momento. */
     @GetMapping("/occurrences/{occurrenceId}/history")
     @Operation(summary = "Historial de auditoría de una ocurrencia",
                description = "Devuelve las revisiones de auditoría (Envers) de la ocurrencia en orden ascendente: "
@@ -117,7 +111,6 @@ public class AllocationController {
         return ResponseEntity.ok(auditHistoryService.findOccurrenceHistory(occurrenceId));
     }
 
-    /** Historial de auditoría de las asignaciones de una ocurrencia: qué aula tuvo en cada momento y quién la cambió. */
     @GetMapping("/occurrences/{occurrenceId}/allocation-history")
     @Operation(summary = "Historial de asignaciones de una ocurrencia",
                description = "Devuelve las revisiones de auditoría (Envers) de la(s) asignación(es) de la ocurrencia "
@@ -130,7 +123,6 @@ public class AllocationController {
         return ResponseEntity.ok(auditHistoryService.findAllocationHistory(occurrenceId));
     }
 
-    /** Asigna manualmente un aula a una ocurrencia puntual (source MANUAL). */
     @PostMapping("/occurrences/{occurrenceId}")
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Asignar aula a ocurrencia",
@@ -144,7 +136,6 @@ public class AllocationController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    /** Cambia el aula de una asignación existente (source MANUAL). */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Reasignar aula",
@@ -158,7 +149,6 @@ public class AllocationController {
         return ResponseEntity.ok(response);
     }
 
-    /** Reasigna varias asignaciones en una única operación atómica (source MANUAL). */
     @PutMapping("/batch")
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Reasignar aulas en lote",
@@ -171,7 +161,6 @@ public class AllocationController {
         return ResponseEntity.ok(response);
     }
 
-    /** Asigna un aula a todas las occurrences futuras de un evento recurrente desde una fecha (source MANUAL). */
     @PostMapping("/from-date")
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Asignar aula desde una fecha",

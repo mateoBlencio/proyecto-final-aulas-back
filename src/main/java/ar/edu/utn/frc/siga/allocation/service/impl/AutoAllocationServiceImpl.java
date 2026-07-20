@@ -27,6 +27,7 @@ import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.AllocationCandidate;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.OccupiedSlot;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.ResolvedProposal;
+import ar.edu.utn.frc.siga.common.util.Maps;
 import ar.edu.utn.frc.siga.solver.model.SolverAllocation;
 import ar.edu.utn.frc.siga.solver.model.SolverEvent;
 import ar.edu.utn.frc.siga.solver.model.SolverPreview;
@@ -49,12 +50,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Implementación de {@link AutoAllocationService}: arma los modelos del solver a partir
- * de los eventos y la ocupación existente ({@link AutoAllocationDataLoader}), delega la
- * optimización en el motor puro ({@code solver::api}) y compone/valida el resultado
- * (preview, validate-move y confirm) contra el estado actual de la base.
- */
+/** Arma los modelos del solver, delega la optimización y compone/valida el resultado (preview, validate-move y confirm). */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -246,11 +242,10 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
                 .map(a -> eventsById.get(Long.valueOf(a.eventId())))
                 .filter(Objects::nonNull)
                 .toList();
-        Map<Long, AcademicEventResponseDto> eventDtoById = composeEventsById(referencedEvents);
+        Map<Long, AcademicEventResponseDto> eventDtoById = academicEventComposer.composeById(referencedEvents);
 
         Set<Integer> classroomIds = Set.copyOf(effectiveRoomByEventId.values());
-        Map<Integer, ClassroomResponseDto> classroomDtoById = classroomService.findByIds(classroomIds).stream()
-                .collect(Collectors.toMap(ClassroomResponseDto::id, c -> c));
+        Map<Integer, ClassroomResponseDto> classroomDtoById = Maps.byId(classroomService.findByIds(classroomIds), ClassroomResponseDto::id);
 
         List<ProposedAllocationDto> allocations = resolved.stream()
                 .map(a -> toProposedAllocationDto(a, eventDtoById, datesByEvent,
@@ -279,16 +274,6 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
                     datesByEvent.getOrDefault(eventId, List.of()), event.getStartTime(), event.endTime()));
         }
         return proposals;
-    }
-
-    /** Composición por lote de eventos ajenos, indexada por id para lookup O(1). */
-    private Map<Long, AcademicEventResponseDto> composeEventsById(List<RecurringEvent> events) {
-        List<AcademicEventResponseDto> composed = academicEventComposer.compose(events);
-        Map<Long, AcademicEventResponseDto> byId = new LinkedHashMap<>();
-        for (int i = 0; i < events.size(); i++) {
-            byId.put(events.get(i).getId(), composed.get(i));
-        }
-        return byId;
     }
 
     private ProposedAllocationDto toProposedAllocationDto(SolverAllocation allocation,
