@@ -96,6 +96,15 @@ public class AllocationValidator {
     }
 
     /**
+     * Combina {@link #validateClassroomsAvailable} (deriva el set de aulas de los candidates)
+     * y {@link #validateNoOverlap(List)}: par repetido en cada intent method del flujo manual.
+     */
+    public void validateBatch(List<AllocationCandidate> candidates) {
+        validateClassroomsAvailable(candidates.stream().map(AllocationCandidate::classroomId).collect(Collectors.toSet()));
+        validateNoOverlap(candidates);
+    }
+
+    /**
      * Igual que {@link #validateNoOverlap(List)} pero con la ocupación ya cargada por el
      * caller (flujo automático: snapshot propio que ya excluye los eventos del preview).
      */
@@ -110,7 +119,7 @@ public class AllocationValidator {
     }
 
     /** Conflictos de cada candidato contra ocupación firme de BD ya cargada. */
-    public List<OccurrenceConflictDto> databaseConflicts(List<AllocationCandidate> candidates, List<OccupiedSlot> occupancy) {
+    List<OccurrenceConflictDto> databaseConflicts(List<AllocationCandidate> candidates, List<OccupiedSlot> occupancy) {
         List<OccurrenceConflictDto> conflicts = new ArrayList<>();
         for (AllocationCandidate candidate : candidates) {
             LocalTime start = candidate.occurrence().startTime();
@@ -132,7 +141,7 @@ public class AllocationValidator {
      * asignación real involucrada en el choque, {@code conflictingAllocationId} va null.
      * Dos ocurrencias del MISMO evento nunca son conflicto entre sí.
      */
-    public List<OccurrenceConflictDto> internalConflicts(List<AllocationCandidate> candidates) {
+    List<OccurrenceConflictDto> internalConflicts(List<AllocationCandidate> candidates) {
         List<OccurrenceConflictDto> conflicts = new ArrayList<>();
         for (int i = 0; i < candidates.size(); i++) {
             AllocationCandidate a = candidates.get(i);

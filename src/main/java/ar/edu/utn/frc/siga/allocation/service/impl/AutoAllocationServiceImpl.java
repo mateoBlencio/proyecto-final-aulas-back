@@ -71,11 +71,7 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
     private final AllocationValidator validator;
     private final AllocationWriter writer;
 
-    /**
-     * Sin {@code @Transactional} (deuda B3): la carga de datos vive en una transacción
-     * corta propia ({@link AutoAllocationDataLoader}); el solve (hasta varios minutos) y
-     * la composición final corren sin conexión JDBC retenida.
-     */
+    /** Sin {@code @Transactional}: ver {@link AutoAllocationDataLoader} para el motivo. */
     @Override
     public AutoPreviewResponseDto autoPreview(AutoPreviewRequestDto request) {
         Set<Long> eventIds = Set.copyOf(request.eventIds());

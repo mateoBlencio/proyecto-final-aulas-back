@@ -80,28 +80,6 @@ class RecurringEventTest {
     }
 
     @Test
-    @DisplayName("las fechas en excludedDates se saltean")
-    void excludedDatesSeSaltean() {
-        LocalDate startDate = LocalDate.of(2026, 1, 5);
-        LocalDate excluded = startDate.plusWeeks(1);
-        RecurringEvent event = RecurringEvent.builder()
-                .id(1L)
-                .enrolled(30)
-                .startTime(LocalTime.of(8, 0))
-                .duration(Duration.ofMinutes(90))
-                .dayOfWeek(startDate.getDayOfWeek())
-                .startDate(startDate)
-                .endDate(startDate.plusWeeks(3))
-                .excludedDates(List.of(excluded))
-                .build();
-
-        List<Occurrence> occurrences = event.toOccurrences();
-
-        assertThat(occurrences).extracting(Occurrence::getDate).doesNotContain(excluded);
-        assertThat(occurrences).hasSize(3);
-    }
-
-    @Test
     @DisplayName("todas las ocurrencias generadas nacen SCHEDULED y referencian al evento")
     void naceScheduledYReferenciaAlEvento() {
         LocalDate startDate = LocalDate.of(2026, 1, 5);

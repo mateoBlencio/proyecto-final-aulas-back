@@ -19,6 +19,7 @@ import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,8 +61,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     @Override
     @Transactional(readOnly = true)
     public AcademicEventResponseDto findById(Long eventId) {
-        return composer.compose(eventRepository.findById(eventId)
-                .orElseThrow(() -> ResourceNotFoundException.of("AcademicEvent", eventId)));
+        return composer.compose(Finder.orThrow(eventRepository::findById, eventId, "AcademicEvent"));
     }
 
     @Override

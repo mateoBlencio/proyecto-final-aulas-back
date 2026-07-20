@@ -18,7 +18,7 @@ import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.AllocationCandidate;
-import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.util.Finder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
@@ -53,8 +53,7 @@ public class AllocationServiceImpl implements AllocationService {
     @Override
     @Transactional(readOnly = true)
     public AllocationResponseDto findById(Long allocationId) {
-        Allocation allocation = allocationRepository.findByIdEager(allocationId)
-                .orElseThrow(() -> ResourceNotFoundException.of("Allocation", allocationId));
+        Allocation allocation = Finder.orThrow(allocationRepository::findByIdEager, allocationId, "Allocation");
         return composer.compose(allocation);
     }
 
@@ -77,8 +76,7 @@ public class AllocationServiceImpl implements AllocationService {
         }
 
         Integer classroomId = dto.classroomId();
-        validator.validateClassroomsAvailable(Set.of(classroomId));
-        validator.validateNoOverlap(List.of(new AllocationCandidate(occurrence, classroomId)));
+        validator.validateBatch(List.of(new AllocationCandidate(occurrence, classroomId)));
 
         Allocation saved = allocationRepository.save(Allocation.builder()
                 .occurrence(occurrence)
@@ -109,8 +107,7 @@ public class AllocationServiceImpl implements AllocationService {
         validator.validateNotPast(allocation.getOccurrence());
 
         Integer classroomId = dto.classroomId();
-        validator.validateClassroomsAvailable(Set.of(classroomId));
-        validator.validateNoOverlap(List.of(new AllocationCandidate(allocation.getOccurrence(), classroomId)));
+        validator.validateBatch(List.of(new AllocationCandidate(allocation.getOccurrence(), classroomId)));
 
         allocation.setClassroomId(classroomId);
         allocation.setSource(AllocationSource.MANUAL);
@@ -144,12 +141,7 @@ public class AllocationServiceImpl implements AllocationService {
             candidates.add(new AllocationCandidate(allocation.getOccurrence(), classroomId));
         }
 
-        validator.validateClassroomsAvailable(
-                candidates.stream()
-                        .map(AllocationCandidate::classroomId)
-                        .collect(Collectors.toSet())
-        );
-        validator.validateNoOverlap(candidates);
+        validator.validateBatch(candidates);
 
         // Entidades managed (cargadas por findAllocation en esta misma tx): dirty
         // checking las persiste, no hace falta save() explícito.
@@ -183,13 +175,7 @@ public class AllocationServiceImpl implements AllocationService {
         validator.validateEventNotFinished(occurrences);
 
         Integer classroomId = dto.classroomId();
-        validator.validateClassroomsAvailable(Set.of(classroomId));
-
-        validator.validateNoOverlap(
-                occurrences.stream()
-                        .map(o -> new AllocationCandidate(o, classroomId))
-                        .toList()
-        );
+        validator.validateBatch(occurrences.stream().map(o -> new AllocationCandidate(o, classroomId)).toList());
 
         List<Allocation> saved = writer.apply(
                 occurrences, classroomId, dto.observation(), AllocationSource.MANUAL, true);
@@ -280,8 +266,7 @@ public class AllocationServiceImpl implements AllocationService {
      * (cada intent method preserva su propio texto, aunque la causa sea la misma).
      */
     private void findRecurringEvent(Long eventId, String operation) {
-        AcademicEvent event = eventRepository.findById(eventId)
-                .orElseThrow(() -> ResourceNotFoundException.of("AcademicEvent", eventId));
+        AcademicEvent event = Finder.orThrow(eventRepository::findById, eventId, "AcademicEvent");
 
         if (!(Hibernate.unproxy(event) instanceof RecurringEvent)) {
             throw new AllocationConflictException(operation + " is only supported for recurring events");
@@ -289,12 +274,10 @@ public class AllocationServiceImpl implements AllocationService {
     }
 
     /**
-     * Núcleo común de {@link #allocateManuallyFromDate} e {@link #importAllocationsFromDate}:
-     * carga las occurrences del evento desde {@code fromDate} y delega la escritura al
-     * {@link AllocationWriter}, validando solapamiento antes si corresponde. Las
-     * validaciones previas (evento recurrente, aula disponible) quedan en cada intent
-     * method: no afectan qué se carga ni se escribe acá, así que su orden relativo a la
-     * carga no es observable.
+     * Carga las occurrences del evento desde {@code fromDate}, valida solapamiento si
+     * corresponde (el caller decide: la importación no lo valida, reemplaza el estado
+     * existente por diseño) y delega la escritura al {@link AllocationWriter}, que
+     * estampa {@code source} y opcionalmente saltea occurrences pasadas.
      */
     private List<Allocation> allocateEventFromDate(Long eventId, LocalDate fromDate, Integer classroomId,
             String observation, AllocationSource source, boolean validateOverlap, boolean skipPast) {
@@ -320,19 +303,11 @@ public class AllocationServiceImpl implements AllocationService {
     }
 
     private Occurrence findOccurrence(Long id) {
-        return occurrenceRepository.findById(id)
-                .orElseThrow(() -> {
-                    log.warn("Ocurrencia no encontrada: id={}", id);
-                    return ResourceNotFoundException.of("Occurrence", id);
-                });
+        return Finder.orThrow(occurrenceRepository::findById, id, "Occurrence");
     }
 
     private Allocation findAllocation(Long id) {
-        return allocationRepository.findById(id)
-                .orElseThrow(() -> {
-                    log.warn("Asignación no encontrada: id={}", id);
-                    return ResourceNotFoundException.of("Allocation", id);
-                });
+        return Finder.orThrow(allocationRepository::findById, id, "Allocation");
     }
 
 }

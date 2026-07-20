@@ -66,7 +66,7 @@ class AutoAllocationDataLoader {
                 .toList();
 
         List<Allocation> occupancyInRange = loadOccupancyInRange(events);
-        // Ocupación ajena (pinned): excluye los eventos seleccionados → sus aulas quedan libres (D2).
+        // Ocupación ajena (pinned): excluye los eventos seleccionados → sus aulas quedan libres.
         List<Allocation> databaseAllocations = occupancyInRange.stream()
                 .filter(a -> !eventIds.contains(a.getOccurrence().getEvent().getId()))
                 .toList();
@@ -100,7 +100,7 @@ class AutoAllocationDataLoader {
 
     /**
      * Fechas futuras de occurrences SCHEDULED o ASSIGNED por evento: incluir ASSIGNED
-     * trae las fechas de eventos ya asignados que se quieren re-resolver (D2); el filtro
+     * trae las fechas de eventos ya asignados que se quieren re-resolver; el filtro
      * de fecha evita re-resolver clases ya dictadas.
      */
     private Map<Long, List<LocalDate>> datesByEvent(Set<Long> eventIds) {
