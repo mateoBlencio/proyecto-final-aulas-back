@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.allocation.dto.response.AutoPreviewResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ConfirmAutoPreviewResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ProposedAllocationDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.UnresolvedAllocationDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ValidateMoveResponseDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.mapper.AcademicEventComposer;
@@ -24,9 +25,12 @@ import ar.edu.utn.frc.siga.allocation.service.AutoAllocationService;
 import ar.edu.utn.frc.siga.allocation.service.impl.AutoAllocationDataLoader.AutoPreviewInputs;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.AllocationCandidate;
+import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.OccupiedSlot;
+import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.ResolvedProposal;
 import ar.edu.utn.frc.siga.solver.model.SolverAllocation;
 import ar.edu.utn.frc.siga.solver.model.SolverEvent;
 import ar.edu.utn.frc.siga.solver.model.SolverPreview;
+import ar.edu.utn.frc.siga.solver.model.SolverRoom;
 import ar.edu.utn.frc.siga.solver.service.SolverService;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
@@ -93,7 +97,8 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
                 solverEvents.size(), inputs.rooms().size(), inputs.occupancy().size());
 
         SolverPreview preview = solverService.preview(solverEvents, inputs.rooms(), inputs.occupancy(), timeLimit);
-        return compose(preview, inputs.events(), inputs.datesByEvent(), inputs.priorRoomByEvent());
+        return compose(preview, inputs.events(), inputs.datesByEvent(), inputs.priorRoomByEvent(),
+                inputs.rooms(), inputs.databaseOccupancy());
     }
 
     @Override
@@ -103,7 +108,8 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
                 .map(a -> Long.valueOf(a.eventId()))
                 .collect(Collectors.toSet());
         AutoPreviewInputs inputs = dataLoader.load(eventIds);
-        return compose(preview, inputs.events(), inputs.datesByEvent(), inputs.priorRoomByEvent());
+        return compose(preview, inputs.events(), inputs.datesByEvent(), inputs.priorRoomByEvent(),
+                inputs.rooms(), inputs.databaseOccupancy());
     }
 
     /**
@@ -218,11 +224,14 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
      * resueltos (con aula) de {@code unresolved} (sin aula, revisión manual), y resuelve
      * evento y aula en un solo batch cada uno. Floor de no-regresión: un evento sin aula del
      * solver que YA estaba asignado ({@code priorRoomByEvent}) conserva esa aula previa y
-     * queda en resueltos; sólo los eventos sin aula previa caen en {@code unresolved}.
+     * queda en resueltos; sólo los eventos sin aula previa caen en {@code unresolved}, con los
+     * conflictos que explican por qué ninguna aula candidata ({@code rooms}) le sirvió, contra
+     * el estado final: ocupación firme de BD ({@code databaseOccupancy}) + los propios resueltos.
      */
     private AutoPreviewResponseDto compose(SolverPreview preview, List<RecurringEvent> events,
                                             Map<Long, List<LocalDate>> datesByEvent,
-                                            Map<Long, Integer> priorRoomByEvent) {
+                                            Map<Long, Integer> priorRoomByEvent,
+                                            List<SolverRoom> rooms, List<OccupiedSlot> databaseOccupancy) {
         Map<Long, RecurringEvent> eventsById = events.stream()
                 .collect(Collectors.toMap(AcademicEvent::getId, e -> e));
 
@@ -256,11 +265,29 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
                 .map(a -> toProposedAllocationDto(a, eventDtoById, datesByEvent,
                         classroomDtoById.get(effectiveRoomByEventId.get(a.eventId()))))
                 .toList();
-        List<ProposedAllocationDto> unresolvedDtos = unresolved.stream()
-                .map(a -> toProposedAllocationDto(a, eventDtoById, datesByEvent, null))
+
+        Set<Integer> candidateRoomIds = rooms.stream().map(SolverRoom::id).collect(Collectors.toSet());
+        List<ResolvedProposal> resolvedProposals = buildResolvedProposals(effectiveRoomByEventId, eventsById, datesByEvent);
+        List<UnresolvedAllocationDto> unresolvedDtos = unresolved.stream()
+                .map(a -> toUnresolvedAllocationDto(a, eventDtoById, datesByEvent, eventsById,
+                        candidateRoomIds, databaseOccupancy, resolvedProposals))
                 .toList();
 
         return new AutoPreviewResponseDto(preview.previewId(), allocations, unresolvedDtos);
+    }
+
+    /** Las propuestas ya resueltas del preview, en la forma que espera {@code validator.unresolvedConflicts}. */
+    private List<ResolvedProposal> buildResolvedProposals(Map<String, Integer> effectiveRoomByEventId,
+            Map<Long, RecurringEvent> eventsById, Map<Long, List<LocalDate>> datesByEvent) {
+        List<ResolvedProposal> proposals = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : effectiveRoomByEventId.entrySet()) {
+            Long eventId = Long.valueOf(entry.getKey());
+            RecurringEvent event = eventsById.get(eventId);
+            if (event == null) continue;
+            proposals.add(new ResolvedProposal(eventId, entry.getValue(),
+                    datesByEvent.getOrDefault(eventId, List.of()), event.getStartTime(), event.endTime()));
+        }
+        return proposals;
     }
 
     /** Composición por lote de eventos ajenos, indexada por id para lookup O(1). */
@@ -280,6 +307,26 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
         AcademicEventResponseDto event = eventDtoById.get(eventId);
         return new ProposedAllocationDto(
                 event, datesByEvent.getOrDefault(eventId, List.of()), classroom, overcrowdedBy(event, classroom));
+    }
+
+    /**
+     * Fila {@code unresolved}: evento sin aula + los conflictos que explican por qué ninguna
+     * aula candidata sirvió (delegado en {@code validator.unresolvedConflicts}). Sin horario
+     * del evento (evento borrado entre el solve y la composición, caso extremo) no hay franja
+     * contra la que comparar y viaja sin conflictos.
+     */
+    private UnresolvedAllocationDto toUnresolvedAllocationDto(SolverAllocation allocation,
+            Map<Long, AcademicEventResponseDto> eventDtoById, Map<Long, List<LocalDate>> datesByEvent,
+            Map<Long, RecurringEvent> eventsById, Set<Integer> candidateRoomIds,
+            List<OccupiedSlot> databaseOccupancy, List<ResolvedProposal> resolvedProposals) {
+        Long eventId = Long.valueOf(allocation.eventId());
+        AcademicEventResponseDto event = eventDtoById.get(eventId);
+        List<LocalDate> dates = datesByEvent.getOrDefault(eventId, List.of());
+        RecurringEvent recurringEvent = eventsById.get(eventId);
+        List<MoveConflictDto> conflicts = recurringEvent == null ? List.of()
+                : validator.unresolvedConflicts(candidateRoomIds, Set.copyOf(dates),
+                        recurringEvent.getStartTime(), recurringEvent.endTime(), databaseOccupancy, resolvedProposals);
+        return new UnresolvedAllocationDto(event, dates, conflicts);
     }
 
     /** Alumnos que exceden la capacidad del aula propuesta (0 si entran, o si la fila es unresolved). */

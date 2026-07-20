@@ -81,7 +81,7 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
     }
 
     private Occurrence occurrenceOf(Long eventId) {
-        return occurrenceRepository.findByEvent_Id(eventId).get(0);
+        return occurrenceRepository.findByEvent_Id(eventId).getFirst();
     }
 
     private void assignOk(Long occurrenceId, Integer classroomId) throws Exception {
@@ -148,8 +148,8 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(preview.previewId()).isNotBlank();
         assertThat(preview.allocations()).hasSize(1);
-        assertThat(preview.allocations().get(0).event().id()).isEqualTo(eventId);
-        assertThat(preview.allocations().get(0).classroom()).isNotNull();
+        assertThat(preview.allocations().getFirst().event().id()).isEqualTo(eventId);
+        assertThat(preview.allocations().getFirst().classroom()).isNotNull();
         assertThat(preview.unresolved()).isEmpty();
     }
 
@@ -169,8 +169,12 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(preview.allocations()).isEmpty();
         assertThat(preview.unresolved()).hasSize(1);
-        assertThat(preview.unresolved().get(0).event().id()).isEqualTo(eventId);
-        assertThat(preview.unresolved().get(0).classroom()).isNull();
+        assertThat(preview.unresolved().getFirst().event().id()).isEqualTo(eventId);
+        // Todas las aulas del sistema están bloqueadas por "blockers" en BD: cada conflicto
+        // reportado debe apuntar a la ocupación firme que le tomó esa aula.
+        assertThat(preview.unresolved().getFirst().conflicts()).isNotEmpty();
+        assertThat(preview.unresolved().getFirst().conflicts())
+                .allSatisfy(c -> assertThat(c.origin()).isEqualTo(MoveConflictDto.ConflictOrigin.DATABASE));
     }
 
     @Test
@@ -194,7 +198,7 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
         AutoPreviewResponseDto preview = autoPreview(List.of(eventId));
 
         assertThat(preview.allocations()).hasSize(1);
-        ProposedAllocationDto proposal = preview.allocations().get(0);
+        ProposedAllocationDto proposal = preview.allocations().getFirst();
         assertThat(proposal.event().id()).isEqualTo(eventId);
         assertThat(proposal.classroom()).isNotNull();
         assertThat(proposal.classroom().id()).isNotEqualTo(aulaActual.getId());
@@ -217,7 +221,7 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
                 result.getResponse().getContentAsString(), AutoPreviewResponseDto.class);
         assertThat(recovered.previewId()).isEqualTo(original.previewId());
         assertThat(recovered.allocations()).hasSize(1);
-        assertThat(recovered.allocations().get(0).event().id()).isEqualTo(eventId);
+        assertThat(recovered.allocations().getFirst().event().id()).isEqualTo(eventId);
 
         mockMvc.perform(get("/v1/allocations/auto-preview/{id}", "prev_no_existe"))
                 .andExpect(status().isGone());
@@ -320,7 +324,7 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
 
         AutoPreviewResponseDto preview = autoPreview(List.of(eventId));
         assertThat(preview.allocations()).hasSize(1);
-        Integer proposedRoom = preview.allocations().get(0).classroom().id();
+        Integer proposedRoom = preview.allocations().getFirst().classroom().id();
 
         MvcResult confirmResult = mockMvc.perform(post("/v1/allocations/auto-preview/{id}/confirm", preview.previewId())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -359,7 +363,7 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
 
         AutoPreviewResponseDto preview = autoPreview(List.of(eventId));
         assertThat(preview.allocations()).hasSize(1);
-        Integer proposedRoom = preview.allocations().get(0).classroom().id();
+        Integer proposedRoom = preview.allocations().getFirst().classroom().id();
 
         // Conflicto inyectado DESPUÉS del preview: otro evento toma exactamente esa aula/franja.
         var scForeign = testData.materiaYComision();

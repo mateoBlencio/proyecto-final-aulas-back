@@ -66,6 +66,13 @@ propia fachada (`AutoAllocationService`); el solver nunca ve entidades JPA.
    solver no encontró aula) y genera `previewId = "prev_" + 8 hex de UUID`.
 7. **Persiste la preview en `PreviewStore`** y la devuelve.
 
+`SolverAllocation` con `classroomId == null` es todo lo que este módulo expone sobre un
+evento inubicable: el solver no explica *por qué* ninguna aula sirvió, solo el resultado.
+El **motivo** (qué evento bloquea qué aula, en qué fecha) se calcula aparte en
+`allocation`, post-solve, reusando `AllocationValidator` — ver `unresolved` en
+`docs/modulos/allocation.md`. El contrato `::api` de este módulo (`SolverPreview` y
+compañía) queda intacto: no engorda para cargar ese detalle.
+
 `getPreview(previewId)` delega en el store; `Optional` vacío ⇒
 `ExpiredPreviewException` (mapeada a 410 Gone). `invalidatePreview(previewId)` hace
 `remove` en el store; `allocation` lo llama al final del confirm, tras persistir.

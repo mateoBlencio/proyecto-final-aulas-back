@@ -1,6 +1,10 @@
 package ar.edu.utn.frc.siga.allocation.validator;
 
 import ar.edu.utn.frc.siga.allocation.AllocationTestData;
+import ar.edu.utn.frc.siga.allocation.dto.request.PreviewAllocationDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.ValidateMoveRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto.ConflictOrigin;
 import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceConflictDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.exception.ReassignConflictException;
@@ -11,6 +15,7 @@ import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.AllocationCandidate;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.OccupiedSlot;
+import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.ResolvedProposal;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 
@@ -25,6 +30,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -271,6 +277,80 @@ class AllocationValidatorTest {
         when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, true)));
 
         assertThatCode(() -> validator.validateClassroomsAvailable(Set.of(5))).doesNotThrowAnyException();
+    }
+
+    // ---------- unresolvedConflicts ----------
+
+    @Test
+    @DisplayName("unresolvedConflicts: aula bloqueada por BD y aula bloqueada por propuesta del preview → un conflicto por aula, origin correcto")
+    void unresolvedConflictsUnoPorAulaConOriginCorrecto() {
+        LocalDate date = futureDate(1);
+        LocalTime start = LocalTime.of(8, 0);
+        LocalTime end = LocalTime.of(9, 30);
+        OccupiedSlot dbSlot = new OccupiedSlot(5, date, start, end, 99L, 500L);
+        ResolvedProposal previewProposal = new ResolvedProposal(1L, 6, List.of(date), start, end);
+
+        List<MoveConflictDto> conflicts = validator.unresolvedConflicts(Set.of(5, 6), Set.of(date), start, end,
+                List.of(dbSlot), List.of(previewProposal));
+
+        assertThat(conflicts).hasSize(2);
+        assertThat(conflicts).anySatisfy(c -> {
+            assertThat(c.classroomId()).isEqualTo(5);
+            assertThat(c.origin()).isEqualTo(ConflictOrigin.DATABASE);
+            assertThat(c.conflictingEventId()).isEqualTo(99L);
+        });
+        assertThat(conflicts).anySatisfy(c -> {
+            assertThat(c.classroomId()).isEqualTo(6);
+            assertThat(c.origin()).isEqualTo(ConflictOrigin.PREVIEW);
+            assertThat(c.conflictingEventId()).isEqualTo(1L);
+        });
+    }
+
+    @Test
+    @DisplayName("unresolvedConflicts: tope de un conflicto por aula candidata, aunque haya varias fechas bloqueadas")
+    void unresolvedConflictsTopeUnoPorAula() {
+        LocalDate date1 = futureDate(1);
+        LocalDate date2 = futureDate(8);
+        LocalTime start = LocalTime.of(8, 0);
+        LocalTime end = LocalTime.of(9, 30);
+        OccupiedSlot slot1 = new OccupiedSlot(5, date1, start, end, 99L, 500L);
+        OccupiedSlot slot2 = new OccupiedSlot(5, date2, start, end, 98L, 501L);
+
+        List<MoveConflictDto> conflicts = validator.unresolvedConflicts(Set.of(5), Set.of(date1, date2), start, end,
+                List.of(slot1, slot2), List.of());
+
+        assertThat(conflicts).hasSize(1);
+        assertThat(conflicts.getFirst().date()).isEqualTo(date1); // el primero por fecha
+    }
+
+    @Test
+    @DisplayName("unresolvedConflicts: aula libre (sin BD ni preview) no aparece en el resultado")
+    void unresolvedConflictsAulaLibreNoAparece() {
+        LocalDate date = futureDate(1);
+        LocalTime start = LocalTime.of(8, 0);
+        LocalTime end = LocalTime.of(9, 30);
+        OccupiedSlot dbSlot = new OccupiedSlot(5, date, start, end, 99L, 500L);
+
+        List<MoveConflictDto> conflicts = validator.unresolvedConflicts(Set.of(5, 7), Set.of(date), start, end,
+                List.of(dbSlot), List.of());
+
+        assertThat(conflicts).hasSize(1);
+        assertThat(conflicts.getFirst().classroomId()).isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("movePreviewConflicts: fila unresolved (classroomId null) en la propuesta ajustada no bloquea ni rompe")
+    void movePreviewConflictsIgnoraFilasSinAula() {
+        RecurringEvent other = AllocationTestData.recurringEvent(2L, LocalTime.of(8, 0), Duration.ofMinutes(90));
+        LocalDate date = futureDate(1);
+        ValidateMoveRequestDto request = new ValidateMoveRequestDto(1L, 9,
+                List.of(new PreviewAllocationDto(2L, null)));
+
+        List<MoveConflictDto> conflicts = validator.movePreviewConflicts(request,
+                Map.of(2L, other), Map.of(2L, List.of(date)),
+                Set.of(date), LocalTime.of(8, 0), LocalTime.of(9, 30));
+
+        assertThat(conflicts).isEmpty();
     }
 
     // ---------- helpers ----------

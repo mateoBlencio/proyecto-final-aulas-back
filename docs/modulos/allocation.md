@@ -199,6 +199,15 @@ Flujo completo de tres pasos sobre un `SolverPreview` cacheado por `solver`
    - **Floor de no-regresión**: un evento que el solver deja sin aula pero que **ya tenía
      una asignada** conserva esa aula previa (`priorRoomByEvent`) y queda en `allocations`,
      no en `unresolved`. Sólo los eventos nuevos (sin aula previa) caen en `unresolved`.
+   - **Motivos de `unresolved`** (`UnresolvedAllocationDto{event, dates, conflicts}`):
+     los motivos se calculan en `allocation`, no en el solver — este no expone por qué una
+     asignación fue inviable, solo el resultado. Post-solve, `AutoAllocationServiceImpl`
+     reusa `AllocationValidator.unresolvedConflicts` (el mismo núcleo de `validateMove`)
+     para recorrer cada aula candidata (`inputs.rooms()`) contra el estado final —
+     ocupación firme de BD primero, propuestas ya resueltas del propio preview después —
+     y guardar el primer bloqueo (por fecha) de cada una. Tope de un `MoveConflictDto`
+     por aula candidata; `conflicts` vacío significa que no se pudo determinar el motivo
+     (no debería pasar salvo un solve subóptimo por corte de tiempo — se loguea `warn`).
 2. **`validateMove` — validación de movimiento sobre el preview**. Responde **200
    siempre** que el request sea coherente con el preview — el conflicto es un resultado
    esperado de la interacción de arrastre, no un error — con `valid=false` +

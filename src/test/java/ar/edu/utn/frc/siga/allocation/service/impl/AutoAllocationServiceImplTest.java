@@ -210,7 +210,45 @@ class AutoAllocationServiceImplTest {
         assertThat(result.allocations().getFirst().classroom()).isNotNull();
         assertThat(result.unresolved()).hasSize(1);
         assertThat(result.unresolved().getFirst().event().id()).isEqualTo(2L);
-        assertThat(result.unresolved().getFirst().classroom()).isNull();
+    }
+
+    @Test
+    @DisplayName("unresolved: reporta un conflicto por aula candidata, contra BD y contra el resto del preview")
+    void unresolvedReportaConflictosPorAulaCandidata() {
+        RecurringEvent resolved = recurringEvent(1L); // toma el aula 6 en el preview
+        RecurringEvent unresolvedEvent = recurringEvent(2L); // mismo horario, sin aula
+        RecurringEvent foreignEvent = recurringEvent(99L);
+        LocalDate date = futureDate(1);
+        Allocation foreignAllocation = allocation(500L,
+                occurrence(50L, foreignEvent, date, OccurrenceStatus.ASSIGNED), 5);
+
+        when(eventRepository.findAllById(any())).thenReturn(List.of(resolved, unresolvedEvent));
+        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+                .thenReturn(List.of(
+                        occurrence(10L, resolved, date, OccurrenceStatus.SCHEDULED),
+                        occurrence(11L, unresolvedEvent, date, OccurrenceStatus.SCHEDULED)));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5, 100), classroom(6, 100)));
+        when(allocationRepository.findOccupancyBetween(any(), any(), eq(OccurrenceStatus.ASSIGNED)))
+                .thenReturn(List.of(foreignAllocation));
+        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(6, 100)));
+        when(solverService.preview(any(), any(), any(), anyInt())).thenReturn(new SolverPreview("prev_unresolved",
+                List.of(new SolverAllocation("1", 6), new SolverAllocation("2", null))));
+
+        AutoPreviewResponseDto result = service.autoPreview(new AutoPreviewRequestDto(List.of(1L, 2L), null));
+
+        assertThat(result.unresolved()).hasSize(1);
+        List<MoveConflictDto> conflicts = result.unresolved().getFirst().conflicts();
+        assertThat(conflicts).hasSize(2); // una entrada por aula candidata (5 y 6)
+        assertThat(conflicts).anySatisfy(c -> {
+            assertThat(c.classroomId()).isEqualTo(5);
+            assertThat(c.origin()).isEqualTo(ConflictOrigin.DATABASE);
+            assertThat(c.conflictingEventId()).isEqualTo(99L);
+        });
+        assertThat(conflicts).anySatisfy(c -> {
+            assertThat(c.classroomId()).isEqualTo(6);
+            assertThat(c.origin()).isEqualTo(ConflictOrigin.PREVIEW);
+            assertThat(c.conflictingEventId()).isEqualTo(1L);
+        });
     }
 
     @Test

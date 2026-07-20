@@ -16,6 +16,7 @@ import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -25,6 +26,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -37,6 +39,7 @@ import java.util.stream.Collectors;
  * aulas). Queda privado al módulo {@code allocation} (el paquete {@code validator} no forma
  * parte de ningún {@code ::api}).
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class AllocationValidator {
@@ -54,6 +57,16 @@ public class AllocationValidator {
      */
     public record OccupiedSlot(Integer classroomId, LocalDate date, LocalTime startTime, LocalTime endTime,
                                 Long eventId, Long allocationId) {
+    }
+
+    /**
+     * Propuesta ya resuelta del preview (evento → aula candidata en ciertas fechas/franja),
+     * desacoplada de {@link PreviewAllocationDto} para que el núcleo de comparación no dependa
+     * del request HTTP de validate-move (lo reusa también {@code unresolvedConflicts}, que no
+     * tiene un {@code ValidateMoveRequestDto} a mano).
+     */
+    public record ResolvedProposal(Long eventId, Integer classroomId, List<LocalDate> dates,
+                                    LocalTime startTime, LocalTime endTime) {
     }
 
     // ---------- solapamiento ----------
@@ -256,26 +269,81 @@ public class AllocationValidator {
     /**
      * Conflictos contra el resto de la propuesta ajustada que viaja en el request: otros
      * ítems de {@code currentAllocations} (excluido el propio evento movido) que también
-     * apuntan al aula destino, comparando fechas compartidas y franja horaria.
+     * apuntan al aula destino, comparando fechas compartidas y franja horaria. Delega en
+     * {@link #previewConflicts(Set, Set, LocalTime, LocalTime, List)}, el núcleo reusado
+     * también por {@link #unresolvedConflicts}.
      */
     public List<MoveConflictDto> movePreviewConflicts(ValidateMoveRequestDto request,
             Map<Long, RecurringEvent> eventsById, Map<Long, List<LocalDate>> datesByEvent,
             Set<LocalDate> movedDates, LocalTime movedStart, LocalTime movedEnd) {
+        List<ResolvedProposal> proposals = request.currentAllocations().stream()
+                .filter(allocation -> !allocation.eventId().equals(request.eventId()))
+                .map(allocation -> toResolvedProposal(allocation, eventsById, datesByEvent))
+                .filter(Objects::nonNull)
+                .toList();
+        return previewConflicts(Set.of(request.classroomId()), movedDates, movedStart, movedEnd, proposals);
+    }
+
+    /** {@link PreviewAllocationDto} + horarios/fechas de su evento → {@link ResolvedProposal}, o null si el evento es ajeno al mapa cargado. */
+    private ResolvedProposal toResolvedProposal(PreviewAllocationDto allocation,
+            Map<Long, RecurringEvent> eventsById, Map<Long, List<LocalDate>> datesByEvent) {
+        RecurringEvent event = eventsById.get(allocation.eventId());
+        if (event == null) return null;
+        return new ResolvedProposal(allocation.eventId(), allocation.classroomId(),
+                datesByEvent.getOrDefault(allocation.eventId(), List.of()), event.getStartTime(), event.endTime());
+    }
+
+    // ---------- conflictos de unresolved (flujo automático, post-solve) ----------
+
+    /**
+     * Primer bloqueo por aula candidata para un evento inubicable del preview: para cada aula
+     * candidata se busca el conflicto más temprano (por fecha), primero contra la ocupación
+     * firme de BD y, si no hay, contra las propuestas ya resueltas del propio preview. Tope de
+     * un conflicto por aula. Una aula candidata sin bloqueo hallado no debería darse (MEDIUM
+     * domina SOFT, pero el solve puede cortar por tiempo) — se loguea y esa aula simplemente
+     * no aparece en el resultado.
+     */
+    public List<MoveConflictDto> unresolvedConflicts(Set<Integer> candidateRoomIds, Set<LocalDate> dates,
+            LocalTime start, LocalTime end, List<OccupiedSlot> databaseOccupancy,
+            List<ResolvedProposal> resolvedProposals) {
         List<MoveConflictDto> conflicts = new ArrayList<>();
-        for (PreviewAllocationDto allocation : request.currentAllocations()) {
-            if (allocation.eventId().equals(request.eventId())) continue;
-            if (!request.classroomId().equals(allocation.classroomId())) continue;
+        for (Integer roomId : candidateRoomIds) {
+            MoveConflictDto conflict = moveDatabaseConflicts(roomId, dates, start, end, databaseOccupancy).stream()
+                    .min(Comparator.comparing(MoveConflictDto::date))
+                    .orElse(null);
+            if (conflict == null) {
+                conflict = previewConflicts(Set.of(roomId), dates, start, end, resolvedProposals).stream()
+                        .min(Comparator.comparing(MoveConflictDto::date))
+                        .orElse(null);
+            }
+            if (conflict != null) {
+                conflicts.add(conflict);
+            } else {
+                log.warn("Aula candidata {} sin conflicto hallado para evento inubicable del preview ({}-{})",
+                        roomId, start, end);
+            }
+        }
+        return conflicts;
+    }
 
-            RecurringEvent other = eventsById.get(allocation.eventId());
-            if (other == null) continue;
-            LocalTime otherStart = other.getStartTime();
-            LocalTime otherEnd = other.endTime();
-            if (!overlaps(movedStart, movedEnd, otherStart, otherEnd)) continue;
-
-            for (LocalDate date : datesByEvent.getOrDefault(allocation.eventId(), List.of())) {
-                if (!movedDates.contains(date)) continue;
-                conflicts.add(new MoveConflictDto(date, otherStart, otherEnd, request.classroomId(),
-                        allocation.eventId(), ConflictOrigin.PREVIEW));
+    /**
+     * Núcleo reutilizable: TODOS los conflictos de un evento (fechas + franja) contra una
+     * lista de propuestas ya resueltas, filtrando por aula candidata. Sin capar cantidad — cada
+     * caller decide si se queda con todos ({@link #movePreviewConflicts}) o con el primero por
+     * aula ({@link #unresolvedConflicts}).
+     */
+    private List<MoveConflictDto> previewConflicts(Set<Integer> candidateRoomIds, Set<LocalDate> dates,
+            LocalTime start, LocalTime end, List<ResolvedProposal> resolvedProposals) {
+        List<MoveConflictDto> conflicts = new ArrayList<>();
+        for (ResolvedProposal proposal : resolvedProposals) {
+            // classroomId null = fila unresolved de la propuesta ajustada: no ocupa aula, no bloquea.
+            // (Set.of(...).contains(null) además tiraría NPE.)
+            if (proposal.classroomId() == null || !candidateRoomIds.contains(proposal.classroomId())) continue;
+            if (!overlaps(start, end, proposal.startTime(), proposal.endTime())) continue;
+            for (LocalDate date : proposal.dates()) {
+                if (!dates.contains(date)) continue;
+                conflicts.add(new MoveConflictDto(date, proposal.startTime(), proposal.endTime(),
+                        proposal.classroomId(), proposal.eventId(), ConflictOrigin.PREVIEW));
             }
         }
         return conflicts;
