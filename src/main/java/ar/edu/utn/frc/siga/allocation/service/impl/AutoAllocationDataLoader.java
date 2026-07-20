@@ -78,7 +78,7 @@ class AutoAllocationDataLoader {
 
         List<SolverOccupancy> occupancy = databaseAllocations.stream().map(this::toOccupancy).toList();
         List<OccupiedSlot> databaseOccupancy = databaseAllocations.stream()
-                .map(this::toOccupiedSlot)
+                .map(OccupiedSlot::from)
                 .toList();
         return new AutoPreviewInputs(events, datesByEvent, rooms, occupancy, databaseOccupancy, priorRoomByEvent);
     }
@@ -145,17 +145,5 @@ class AutoAllocationDataLoader {
                 a.getOccurrence().getDate(),
                 occupant.getStartTime(),
                 occupant.endTime());
-    }
-
-    /** Igual que {@link #toOccupancy} pero conservando el id del evento y de la asignación ocupante. */
-    private OccupiedSlot toOccupiedSlot(Allocation a) {
-        AcademicEvent occupant = a.getOccurrence().getEvent();
-        return new OccupiedSlot(
-                a.getClassroomId(),
-                a.getOccurrence().getDate(),
-                occupant.getStartTime(),
-                occupant.endTime(),
-                occupant.getId(),
-                a.getId());
     }
 }

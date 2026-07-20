@@ -13,8 +13,7 @@ import org.mapstruct.Mapping;
 public interface AllocationMapper {
 
     // "event"/"classroom" se fuerzan a mapear el parámetro entero: allocation solo tiene
-    // classroomId (Integer) — el ClassroomResponseDto siempre viene resuelto por el
-    // composer, nunca navegando la entidad.
+    // sus ids, los DTOs siempre vienen resueltos por el composer.
     @Mapping(target = "id", source = "allocation.id")
     @Mapping(target = "event", source = "event")
     @Mapping(target = "classroom", source = "classroom")

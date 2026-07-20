@@ -4,7 +4,7 @@ import ar.edu.utn.frc.siga.allocation.dto.request.CreateRecurringEventRequestDto
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceResponseDto;
-import ar.edu.utn.frc.siga.common.exception.InvalidDateRangeException;
+import ar.edu.utn.frc.siga.common.util.DateRanges;
 import ar.edu.utn.frc.siga.allocation.mapper.AcademicEventComposer;
 import ar.edu.utn.frc.siga.allocation.mapper.OccurrenceMapper;
 import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
@@ -157,11 +157,8 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     @Override
     @Transactional(readOnly = true)
     public List<AcademicEventResponseDto> findUnassignedEvents(LocalDate from, LocalDate to) {
-        LocalDate effectiveFrom = from != null ? from : LocalDate.now();
-        if (to != null && to.isBefore(effectiveFrom)) {
-            throw new InvalidDateRangeException(
-                    "'to' (" + to + ") no puede ser anterior a 'from' (" + effectiveFrom + ")");
-        }
+        LocalDate effectiveFrom = DateRanges.defaultFrom(from);
+        DateRanges.requireNotBefore(to, effectiveFrom);
 
         List<Occurrence> occurrences = to != null
                 ? occurrenceRepository.findByStatusAndDateBetweenOrderByEvent_IdAscDateAsc(

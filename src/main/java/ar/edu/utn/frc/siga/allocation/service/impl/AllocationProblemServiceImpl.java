@@ -13,7 +13,7 @@ import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationProblemService;
-import ar.edu.utn.frc.siga.common.exception.InvalidDateRangeException;
+import ar.edu.utn.frc.siga.common.util.DateRanges;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
@@ -124,12 +124,9 @@ public class AllocationProblemServiceImpl implements AllocationProblemService {
 
     /** Resuelve el rango efectivo compartido por los tres listados y valida {@code to >= from}. */
     private Range resolveRange(LocalDate from, LocalDate to) {
-        LocalDate effectiveFrom = from != null ? from : LocalDate.now();
+        LocalDate effectiveFrom = DateRanges.defaultFrom(from);
         LocalDate effectiveTo = to != null ? to : resolveDefaultTo(effectiveFrom);
-        if (effectiveTo.isBefore(effectiveFrom)) {
-            throw new InvalidDateRangeException(
-                    "'to' (" + effectiveTo + ") no puede ser anterior a 'from' (" + effectiveFrom + ")");
-        }
+        DateRanges.requireNotBefore(effectiveTo, effectiveFrom);
         log.debug("Rango de problemas de asignación: from={}, to={}", effectiveFrom, effectiveTo);
         return new Range(effectiveFrom, effectiveTo);
     }

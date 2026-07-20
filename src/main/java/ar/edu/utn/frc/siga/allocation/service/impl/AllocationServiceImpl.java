@@ -113,8 +113,6 @@ public class AllocationServiceImpl implements AllocationService {
         allocation.setSource(AllocationSource.MANUAL);
         allocation.setObservation(dto.observation());
 
-        // allocation llega managed (cargada por findById en esta misma tx): dirty
-        // checking la persiste, no hace falta save() explícito.
         log.info("Asignación reasignada: id={}, classroomId={}", allocationId, dto.classroomId());
         return composer.compose(allocation);
     }
@@ -145,13 +143,12 @@ public class AllocationServiceImpl implements AllocationService {
 
         // Entidades managed (cargadas por findAllocation en esta misma tx): dirty
         // checking las persiste, no hace falta save() explícito.
-        List<AllocationResponseDto> results = new ArrayList<>();
         for (int i = 0; i < allocations.size(); i++) {
             Allocation allocation = allocations.get(i);
             allocation.setClassroomId(candidates.get(i).classroomId());
             allocation.setSource(AllocationSource.MANUAL);
-            results.add(composer.compose(allocation));
         }
+        List<AllocationResponseDto> results = composer.composeAll(allocations);
         log.info("batchReallocate completo: moved={}", results.size());
         return results;
     }

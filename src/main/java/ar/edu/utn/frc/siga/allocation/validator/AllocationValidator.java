@@ -14,6 +14,7 @@ import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.common.util.Maps;
+import ar.edu.utn.frc.siga.common.util.TimeRanges;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /** Centraliza todas las reglas de negocio de asignación de aulas, compartidas entre flujo manual y automático. */
 @Slf4j
@@ -44,12 +46,15 @@ public class AllocationValidator {
     public record AllocationCandidate(Occurrence occurrence, Integer classroomId) {
     }
 
-    /**
-     * Forma común de una franja ocupada, independiente de la fuente: el flujo manual la
-     * carga desde BD ({@code Allocation}) y el automático desde su snapshot de ocupación.
-     */
+    /** Franja ocupada, sea de BD o de un snapshot automático. */
     public record OccupiedSlot(Integer classroomId, LocalDate date, LocalTime startTime, LocalTime endTime,
                                 Long eventId, Long allocationId) {
+
+        public static OccupiedSlot from(Allocation a) {
+            AcademicEvent occupant = a.getOccurrence().getEvent();
+            return new OccupiedSlot(a.getClassroomId(), a.getOccurrence().getDate(),
+                    occupant.getStartTime(), occupant.endTime(), occupant.getId(), a.getId());
+        }
     }
 
     /**
@@ -82,7 +87,7 @@ public class AllocationValidator {
         List<OccupiedSlot> occupancy = allocationRepository.findOccupancyBetween(min, max, OccurrenceStatus.ASSIGNED)
                 .stream()
                 .filter(a -> !ownOccurrenceIds.contains(a.getOccurrence().getId()))
-                .map(this::toOccupiedSlot)
+                .map(OccupiedSlot::from)
                 .toList();
 
         validateNoOverlap(future, occupancy);
@@ -120,7 +125,7 @@ public class AllocationValidator {
             for (OccupiedSlot occupied : occupancy) {
                 if (!occupied.classroomId().equals(candidate.classroomId())) continue;
                 if (!occupied.date().equals(candidate.occurrence().getDate())) continue;
-                if (!overlaps(start, end, occupied.startTime(), occupied.endTime())) continue;
+                if (!TimeRanges.overlaps(start, end, occupied.startTime(), occupied.endTime())) continue;
                 conflicts.add(new OccurrenceConflictDto(candidate.occurrence().getId(), candidate.occurrence().getDate(),
                         start, end, candidate.classroomId(), occupied.eventId(), occupied.allocationId()));
             }
@@ -147,7 +152,7 @@ public class AllocationValidator {
                 LocalTime aEnd = a.occurrence().endTime();
                 LocalTime bStart = b.occurrence().startTime();
                 LocalTime bEnd = b.occurrence().endTime();
-                if (!overlaps(aStart, aEnd, bStart, bEnd)) continue;
+                if (!TimeRanges.overlaps(aStart, aEnd, bStart, bEnd)) continue;
                 conflicts.add(new OccurrenceConflictDto(a.occurrence().getId(), a.occurrence().getDate(),
                         aStart, aEnd, a.classroomId(), b.occurrence().getEvent().getId(), null));
             }
@@ -222,10 +227,7 @@ public class AllocationValidator {
 
     /** El total de los eventos de la propuesta final debe pertenecer al preview que se está confirmando. */
     public void validateAllocationsBelongToPreview(List<PreviewAllocationDto> allocations, Set<Long> previewEventIds) {
-        Set<Long> foreign = allocations.stream()
-                .map(PreviewAllocationDto::eventId)
-                .filter(id -> !previewEventIds.contains(id))
-                .collect(Collectors.toSet());
+        Set<Long> foreign = foreignIds(allocations.stream().map(PreviewAllocationDto::eventId), previewEventIds);
         if (!foreign.isEmpty()) {
             throw new AllocationConflictException(
                     "los eventos " + foreign + " no pertenecen al preview indicado");
@@ -238,14 +240,16 @@ public class AllocationValidator {
             throw new AllocationConflictException(
                     "el evento " + request.eventId() + " no pertenece al preview indicado");
         }
-        Set<Long> foreign = request.currentAllocations().stream()
-                .map(PreviewAllocationDto::eventId)
-                .filter(id -> !previewEventIds.contains(id))
-                .collect(Collectors.toSet());
+        Set<Long> foreign = foreignIds(
+                request.currentAllocations().stream().map(PreviewAllocationDto::eventId), previewEventIds);
         if (!foreign.isEmpty()) {
             throw new AllocationConflictException(
                     "los eventos " + foreign + " de currentAllocations no pertenecen al preview indicado");
         }
+    }
+
+    private Set<Long> foreignIds(Stream<Long> ids, Set<Long> previewEventIds) {
+        return ids.filter(id -> !previewEventIds.contains(id)).collect(Collectors.toSet());
     }
 
     // ---------- conflictos de validate-move (flujo automático) ----------
@@ -261,7 +265,7 @@ public class AllocationValidator {
         for (OccupiedSlot occupancy : databaseOccupancy) {
             if (!destination.equals(occupancy.classroomId())) continue;
             if (!movedDates.contains(occupancy.date())) continue;
-            if (!overlaps(movedStart, movedEnd, occupancy.startTime(), occupancy.endTime())) continue;
+            if (!TimeRanges.overlaps(movedStart, movedEnd, occupancy.startTime(), occupancy.endTime())) continue;
             conflicts.add(new MoveConflictDto(occupancy.date(), occupancy.startTime(), occupancy.endTime(),
                     destination, occupancy.eventId(), ConflictOrigin.DATABASE));
         }
@@ -341,7 +345,7 @@ public class AllocationValidator {
             // classroomId null = fila unresolved de la propuesta ajustada: no ocupa aula, no bloquea.
             // (Set.of(...).contains(null) además tiraría NPE.)
             if (proposal.classroomId() == null || !candidateRoomIds.contains(proposal.classroomId())) continue;
-            if (!overlaps(start, end, proposal.startTime(), proposal.endTime())) continue;
+            if (!TimeRanges.overlaps(start, end, proposal.startTime(), proposal.endTime())) continue;
             for (LocalDate date : proposal.dates()) {
                 if (!dates.contains(date)) continue;
                 conflicts.add(new MoveConflictDto(date, proposal.startTime(), proposal.endTime(),
@@ -351,17 +355,4 @@ public class AllocationValidator {
         return conflicts;
     }
 
-    // ---------- helpers ----------
-
-    /** Mapea una asignación existente de BD a la forma común de ocupación. */
-    private OccupiedSlot toOccupiedSlot(Allocation a) {
-        AcademicEvent occupant = a.getOccurrence().getEvent();
-        return new OccupiedSlot(a.getClassroomId(), a.getOccurrence().getDate(),
-                occupant.getStartTime(), occupant.endTime(), occupant.getId(), a.getId());
-    }
-
-    /** Barrido de franjas horarias: fin == inicio no es solapamiento. */
-    private boolean overlaps(LocalTime start1, LocalTime end1, LocalTime start2, LocalTime end2) {
-        return start1.isBefore(end2) && start2.isBefore(end1);
-    }
 }

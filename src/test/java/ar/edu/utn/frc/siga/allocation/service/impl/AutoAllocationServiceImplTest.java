@@ -53,9 +53,9 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.ArrayList;
-import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -115,12 +115,12 @@ class AutoAllocationServiceImplTest {
                 .thenReturn(List.of());
         lenient().when(solverService.preview(any(), any(), any(), anyInt()))
                 .thenReturn(new SolverPreview("prev_test", List.of()));
-        lenient().when(academicEventComposer.compose(ArgumentMatchers.<Collection<? extends AcademicEvent>>any()))
+        lenient().when(academicEventComposer.composeById(ArgumentMatchers.<List<? extends AcademicEvent>>any()))
                 .thenAnswer(invocation -> {
-            Collection<AcademicEvent> events = invocation.getArgument(0);
-            List<AcademicEventResponseDto> result = new ArrayList<>();
+            List<AcademicEvent> events = invocation.getArgument(0);
+            Map<Long, AcademicEventResponseDto> result = new LinkedHashMap<>();
             for (AcademicEvent event : events) {
-                result.add(new RecurringEventResponseDto(event.getId(), EventType.RECURRING, event.getEnrolled(),
+                result.put(event.getId(), new RecurringEventResponseDto(event.getId(), EventType.RECURRING, event.getEnrolled(),
                         event.getStartTime(), event.getDuration().toMinutes(), null, null, null, null, null));
             }
             return result;

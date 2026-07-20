@@ -27,14 +27,10 @@ public class AllocationComposer {
 
     /** Composición de una única asignación (delega en el batch con una lista de un elemento). */
     public AllocationResponseDto compose(Allocation allocation) {
-        return composeAll(List.of(allocation)).get(0);
+        return composeAll(List.of(allocation)).getFirst();
     }
 
-    /**
-     * Composición por lote: prefetch de aulas distintas en un solo batch, sin N+1.
-     * Tolerante a aulas inexistentes/borradas (asignaciones históricas): en ese caso el
-     * aula viaja {@code null} en el DTO en vez de lanzar 404.
-     */
+    /** Tolerante a aulas inexistentes/borradas (asignaciones históricas): viajan {@code null} en vez de lanzar 404. */
     public List<AllocationResponseDto> composeAll(List<Allocation> allocations) {
         List<AcademicEventResponseDto> events = eventComposer.compose(
                 allocations.stream().map(a -> a.getOccurrence().getEvent()).toList());

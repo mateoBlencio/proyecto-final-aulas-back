@@ -119,8 +119,7 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
         validator.validateBelongsToPreview(request, previewEventIds);
 
         AutoPreviewInputs inputs = dataLoader.load(previewEventIds);
-        Map<Long, RecurringEvent> eventsById = inputs.events().stream()
-                .collect(Collectors.toMap(AcademicEvent::getId, e -> e));
+        Map<Long, RecurringEvent> eventsById = Maps.byId(inputs.events(), AcademicEvent::getId);
 
         RecurringEvent movedEvent = eventsById.get(request.eventId());
         Set<LocalDate> movedDates = Set.copyOf(inputs.datesByEvent().getOrDefault(request.eventId(), List.of()));
@@ -189,8 +188,8 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
                 .toList();
         validator.validateNoOverlap(candidates, inputs.databaseOccupancy());
 
-        // Aula distinta por evento, pero una única pasada por AllocationWriter (una sola query
-        // de asignaciones existentes) en vez de una por evento: evita N+1 con muchos eventos.
+        // Aula distinta por evento, pero una sola pasada de escritura (una sola query de
+        // asignaciones existentes) en vez de una por evento: evita N+1 con muchos eventos.
         List<Allocation> saved = writer.apply(targetOccurrences,
                 o -> classroomByEvent.get(o.getEvent().getId()), null, AllocationSource.AUTOMATIC, true);
         solverService.invalidatePreview(previewId);
@@ -219,8 +218,7 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
                                             Map<Long, List<LocalDate>> datesByEvent,
                                             Map<Long, Integer> priorRoomByEvent,
                                             List<SolverRoom> rooms, List<OccupiedSlot> databaseOccupancy) {
-        Map<Long, RecurringEvent> eventsById = events.stream()
-                .collect(Collectors.toMap(AcademicEvent::getId, e -> e));
+        Map<Long, RecurringEvent> eventsById = Maps.byId(events, AcademicEvent::getId);
 
         List<SolverAllocation> resolved = new ArrayList<>();
         List<SolverAllocation> unresolved = new ArrayList<>();
