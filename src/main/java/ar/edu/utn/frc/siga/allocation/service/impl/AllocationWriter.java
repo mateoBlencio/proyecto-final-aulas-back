@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -39,6 +40,17 @@ class AllocationWriter {
      */
     List<Allocation> apply(List<Occurrence> occurrences, Integer classroomId, String observation,
                             AllocationSource source, boolean skipPast) {
+        return apply(occurrences, o -> classroomId, observation, source, skipPast);
+    }
+
+    /**
+     * Igual que {@link #apply(List, Integer, String, AllocationSource, boolean)} pero con aula
+     * resuelta por ocurrencia: permite aplicar occurrences de varios eventos (aula distinta por
+     * evento) en una sola pasada, con una única query de asignaciones existentes en vez de una
+     * por evento (evita N+1 cuando el caller agrupa por evento, p. ej. confirm de auto-preview).
+     */
+    List<Allocation> apply(List<Occurrence> occurrences, Function<Occurrence, Integer> classroomIdResolver,
+                            String observation, AllocationSource source, boolean skipPast) {
         Map<Long, Allocation> existingByOccurrence = allocationRepository
                 .findByOccurrence_IdIn(occurrences.stream().map(Occurrence::getId).toList())
                 .stream().collect(Collectors.toMap(a -> a.getOccurrence().getId(), a -> a));
@@ -48,6 +60,7 @@ class AllocationWriter {
             if (skipPast && occurrence.isPast()) continue;
             if (!validator.isAssignable(occurrence)) continue;
 
+            Integer classroomId = classroomIdResolver.apply(occurrence);
             Allocation existing = existingByOccurrence.get(occurrence.getId());
             Allocation allocation;
             if (existing != null) {

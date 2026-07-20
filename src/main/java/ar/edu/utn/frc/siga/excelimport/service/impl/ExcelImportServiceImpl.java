@@ -30,6 +30,8 @@ import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import jakarta.persistence.EntityManager;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -90,6 +92,12 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         int assignmentsReused = 0;
         AtomicInteger entitiesCreated = new AtomicInteger(0);
         AtomicInteger entitiesReused = new AtomicInteger(0);
+
+        // Se acumulan las requests de asignación de todas las filas y se aplican en un solo
+        // batch al final: el cuello del import (~2 min con 1300 filas) era repetir, fila por
+        // fila, las mismas 4 queries (evento, aula, occurrences, asignaciones existentes) que
+        // una sola vez para todo el archivo. Ver AllocationService#importAllocationsBatch.
+        List<AllocateFromDateRequestDto> pendingAllocations = new ArrayList<>();
 
         for (int rowIndex = 6; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
             Row row = sheet.getRow(rowIndex);
@@ -179,14 +187,12 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 )
             );
 
-            allocationService.importAllocationsFromDate(
-                new AllocateFromDateRequestDto(
-                    eventResult.value(),
-                    startDate,
-                    classroom.id(),
-                    "Importado de Excel"
-                )
-            );
+            pendingAllocations.add(new AllocateFromDateRequestDto(
+                eventResult.value(),
+                startDate,
+                classroom.id(),
+                "Importado de Excel"
+            ));
 
             if (eventResult.created()) assignmentsCreated++;
             else assignmentsReused++;
@@ -201,6 +207,8 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 entityManager.clear();
             }
         }
+
+        allocationService.importAllocationsBatch(pendingAllocations);
 
         log.info("Importación completada: {} filas, {} eventos creados", processedRows, assignmentsCreated);
 

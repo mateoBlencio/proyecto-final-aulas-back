@@ -27,6 +27,14 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
 
     List<Occurrence> findByEvent_IdAndDateGreaterThanEqual(Long eventId, LocalDate date);
 
+    /**
+     * Igual que {@link #findByEvent_IdAndDateGreaterThanEqual} pero para varios eventos a
+     * la vez: una sola query en vez de una por evento (import masivo desde Excel). El
+     * caller filtra en memoria si cada evento tiene su propia fecha desde (acá se pasa la
+     * más antigua de todas y se sobre-trae).
+     */
+    List<Occurrence> findByEvent_IdInAndDateGreaterThanEqual(Collection<Long> eventIds, LocalDate date);
+
     @EntityGraph(attributePaths = "event")
     List<Occurrence> findByStatusAndDateGreaterThanEqualOrderByEvent_IdAscDateAsc(
             OccurrenceStatus status, LocalDate from);

@@ -29,6 +29,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -245,6 +246,31 @@ public class AllocationServiceImpl implements AllocationService {
                 AllocationSource.IMPORTED, false, false);
 
         log.info("importAllocationsFromDate completo: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), saved.size());
+        return saved.size();
+    }
+
+    @Override
+    public int importAllocationsBatch(List<AllocateFromDateRequestDto> items) {
+        if (items.isEmpty()) return 0;
+
+        Map<Long, Integer> classroomByEvent = items.stream()
+                .collect(Collectors.toMap(AllocateFromDateRequestDto::recurringEventId, AllocateFromDateRequestDto::classroomId));
+        validator.validateClassroomsAvailable(Set.copyOf(classroomByEvent.values()));
+
+        Map<Long, LocalDate> fromDateByEvent = items.stream()
+                .collect(Collectors.toMap(AllocateFromDateRequestDto::recurringEventId, AllocateFromDateRequestDto::fromDate));
+        LocalDate earliestFromDate = fromDateByEvent.values().stream().min(LocalDate::compareTo).orElseThrow();
+
+        List<Occurrence> occurrences = occurrenceRepository
+                .findByEvent_IdInAndDateGreaterThanEqual(classroomByEvent.keySet(), earliestFromDate).stream()
+                .filter(o -> !o.getDate().isBefore(fromDateByEvent.get(o.getEvent().getId())))
+                .toList();
+
+        List<Allocation> saved = writer.apply(occurrences,
+                o -> classroomByEvent.get(o.getEvent().getId()),
+                items.getFirst().observation(), AllocationSource.IMPORTED, false);
+
+        log.info("importAllocationsBatch completo: events={}, allocated={}", classroomByEvent.size(), saved.size());
         return saved.size();
     }
 

@@ -197,15 +197,10 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
                 .toList();
         validator.validateNoOverlap(candidates, inputs.databaseOccupancy());
 
-        // Agrupa por evento (aula distinta por evento) preservando orden estable, y cada
-        // grupo pasa por el único punto de escritura (AllocationWriter): upsert + ASSIGNED.
-        Map<Long, List<Occurrence>> occurrencesByEvent = targetOccurrences.stream()
-                .collect(Collectors.groupingBy(o -> o.getEvent().getId(), LinkedHashMap::new, Collectors.toList()));
-        List<Allocation> saved = new ArrayList<>();
-        for (Map.Entry<Long, List<Occurrence>> entry : occurrencesByEvent.entrySet()) {
-            saved.addAll(writer.apply(entry.getValue(), classroomByEvent.get(entry.getKey()), null,
-                    AllocationSource.AUTOMATIC, true));
-        }
+        // Aula distinta por evento, pero una única pasada por AllocationWriter (una sola query
+        // de asignaciones existentes) en vez de una por evento: evita N+1 con muchos eventos.
+        List<Allocation> saved = writer.apply(targetOccurrences,
+                o -> classroomByEvent.get(o.getEvent().getId()), null, AllocationSource.AUTOMATIC, true);
         solverService.invalidatePreview(previewId);
 
         log.info("Confirm aplicado: previewId={}, applied={}, skipped={}",

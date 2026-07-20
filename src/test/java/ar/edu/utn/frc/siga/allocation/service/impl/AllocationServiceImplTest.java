@@ -544,6 +544,59 @@ class AllocationServiceImplTest {
         verify(occurrenceRepository, never()).save(any());
     }
 
+    // ---------- importAllocationsBatch ----------
+
+    @Test
+    @DisplayName("importAllocationsBatch: aplica occurrences de varios eventos con su propia aula, en un solo pase")
+    void importAllocationsBatchVariosEventos() {
+        RecurringEvent event1 = recurringEvent(1L);
+        RecurringEvent event2 = recurringEvent(2L);
+        Occurrence occ1 = occurrence(10L, event1, futureDate(1), OccurrenceStatus.SCHEDULED);
+        Occurrence occ2 = occurrence(20L, event2, futureDate(1), OccurrenceStatus.SCHEDULED);
+        when(occurrenceRepository.findByEvent_IdInAndDateGreaterThanEqual(any(), any()))
+                .thenReturn(List.of(occ1, occ2));
+
+        int count = service.importAllocationsBatch(List.of(
+                new AllocateFromDateRequestDto(1L, futureDate(1), 5, "Importado de Excel"),
+                new AllocateFromDateRequestDto(2L, futureDate(1), 7, "Importado de Excel")));
+
+        assertThat(count).isEqualTo(2);
+        verify(allocationRepository).save(
+                org.mockito.ArgumentMatchers.argThat(a -> a.getOccurrence() == occ1 && a.getClassroomId() == 5));
+        verify(allocationRepository).save(
+                org.mockito.ArgumentMatchers.argThat(a -> a.getOccurrence() == occ2 && a.getClassroomId() == 7));
+    }
+
+    @Test
+    @DisplayName("importAllocationsBatch: filtra en memoria las occurrences anteriores a la fecha propia de cada evento")
+    void importAllocationsBatchFiltraPorFromDatePropio() {
+        RecurringEvent event1 = recurringEvent(1L);
+        RecurringEvent event2 = recurringEvent(2L);
+        // occ1 es anterior al fromDate de event1 (2do cuatrimestre vs 1ro): la query trae de más
+        // (usa la fecha más antigua de todo el batch), el filtro en memoria la debe descartar.
+        Occurrence occ1 = occurrence(10L, event1, futureDate(1), OccurrenceStatus.SCHEDULED);
+        Occurrence occ2 = occurrence(20L, event2, futureDate(5), OccurrenceStatus.SCHEDULED);
+        when(occurrenceRepository.findByEvent_IdInAndDateGreaterThanEqual(any(), any()))
+                .thenReturn(List.of(occ1, occ2));
+
+        int count = service.importAllocationsBatch(List.of(
+                new AllocateFromDateRequestDto(1L, futureDate(3), 5, "Importado de Excel"),
+                new AllocateFromDateRequestDto(2L, futureDate(1), 7, "Importado de Excel")));
+
+        assertThat(count).isEqualTo(1);
+        verify(allocationRepository).save(
+                org.mockito.ArgumentMatchers.argThat(a -> a.getOccurrence() == occ2));
+    }
+
+    @Test
+    @DisplayName("importAllocationsBatch: lista vacía no consulta nada y devuelve 0")
+    void importAllocationsBatchListaVacia() {
+        int count = service.importAllocationsBatch(List.of());
+
+        assertThat(count).isZero();
+        verify(occurrenceRepository, never()).findByEvent_IdInAndDateGreaterThanEqual(any(), any());
+    }
+
     // ---------- helpers ----------
 
     private RecurringEvent recurringEvent(long id) {

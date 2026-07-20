@@ -45,6 +45,7 @@ import jakarta.persistence.EntityManager;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -127,10 +128,9 @@ class ExcelImportServiceImplTest {
         assertThat(eventDto.startDate()).isEqualTo(LocalDate.of(2026, 3, 1));
         assertThat(eventDto.endDate()).isEqualTo(LocalDate.of(2026, 11, 30)); // TermType.ANUAL
 
-        ArgumentCaptor<AllocateFromDateRequestDto> allocationCaptor =
-            ArgumentCaptor.forClass(AllocateFromDateRequestDto.class);
-        verify(allocationService).importAllocationsFromDate(allocationCaptor.capture());
-        AllocateFromDateRequestDto allocationDto = allocationCaptor.getValue();
+        ArgumentCaptor<List<AllocateFromDateRequestDto>> allocationCaptor = ArgumentCaptor.forClass(List.class);
+        verify(allocationService).importAllocationsBatch(allocationCaptor.capture());
+        AllocateFromDateRequestDto allocationDto = allocationCaptor.getValue().get(0);
         assertThat(allocationDto.recurringEventId()).isEqualTo(1L);
         assertThat(allocationDto.classroomId()).isEqualTo(5);
         assertThat(allocationDto.observation()).isEqualTo("Importado de Excel");

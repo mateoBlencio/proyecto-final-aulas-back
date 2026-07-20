@@ -10,6 +10,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Inheritance;
 import jakarta.persistence.InheritanceType;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
@@ -40,7 +41,8 @@ public abstract class AcademicEvent {
 
     @EqualsAndHashCode.Include
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "evento_academico_seq")
+    @SequenceGenerator(name = "evento_academico_seq", sequenceName = "evento_academico_id_evento_academico_seq", allocationSize = 50)
     @Column(name = "id_evento_academico")
     protected Long id;
 
