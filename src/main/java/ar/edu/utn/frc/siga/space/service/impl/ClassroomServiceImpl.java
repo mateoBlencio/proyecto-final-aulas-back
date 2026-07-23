@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Nota: resuelve {@link Building} vía {@link BuildingRepository} directo (no vía
@@ -129,11 +130,29 @@ public class ClassroomServiceImpl implements ClassroomService {
         log.info("Aula eliminada: id={}", id);
     }
 
+    /**
+     * Busca por edificio+número; si no matchea, hace fallback a buscar solo por número
+     * — tolera edificio mal cargado en el origen (p. ej. typo de planilla) sin tocar el
+     * dato — pero solo si el número resulta en una única aula en todo el catálogo (no
+     * siempre es así, p. ej. "999" es código genérico repetido entre edificios).
+     */
     @Override
     public ClassroomResponseDto findByRoomNumberAndBuilding(String roomNumber, Integer buildingId) {
         Building building = requireBuilding(buildingId);
         return classroomMapper.toDto(classroomRepository.findByRoomNumberAndBuilding(roomNumber, building)
+                .or(() -> fallbackByRoomNumberOnly(roomNumber, buildingId))
                 .orElseThrow(() -> ResourceNotFoundException.of("Classroom", roomNumber)));
+    }
+
+    private Optional<Classroom> fallbackByRoomNumberOnly(String roomNumber, Integer buildingId) {
+        List<Classroom> matches = classroomRepository.findAllByRoomNumber(roomNumber);
+        if (matches.size() != 1) {
+            return Optional.empty();
+        }
+        Classroom found = matches.getFirst();
+        log.warn("Aula '{}' no está en el edificio informado (buildingId={}); se usa la única "
+                + "coincidencia por número, en buildingId={}", roomNumber, buildingId, found.getBuilding().getId());
+        return Optional.of(found);
     }
 
     private Classroom findExistingClassroomById(Integer id) {

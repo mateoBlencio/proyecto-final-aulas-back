@@ -233,6 +233,7 @@ public class AllocationServiceImpl implements AllocationService {
     }
 
     @Override
+    @Transactional
     public int importAllocationsBatch(List<AllocateFromDateRequestDto> items) {
         if (items.isEmpty()) return 0;
 

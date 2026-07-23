@@ -41,7 +41,6 @@ import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import jakarta.persistence.EntityManager;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -80,19 +79,20 @@ class ExcelImportServiceImplTest {
     private BuildingService buildingService;
     @Mock
     private ClassroomService classroomService;
-    @Mock
-    private EntityManager entityManager;
 
     private ExcelImportServiceImpl service;
 
     @BeforeEach
     void setUp() {
         // validator y rowMapper reales: son la unidad de POI que se ejercita de punta a punta,
-        // solo se mockean las fachadas de los otros módulos.
+        // solo se mockean las fachadas de los otros módulos. ExcelRowResolver se instancia real
+        // (no mock): es un simple orquestador de esas fachadas, la anotación @Transactional no
+        // aplica fuera de un contexto Spring.
+        ExcelRowResolver rowResolver = new ExcelRowResolver(specialtyService, studyPlanService, subjectService,
+            academicPeriodService, commissionService, subjectCommissionService, academicEventService,
+            buildingService, classroomService);
         service = new ExcelImportServiceImpl(new ExcelTemplateValidator(), new ExcelRowMapper(),
-            specialtyService, studyPlanService, subjectService, academicPeriodService,
-            commissionService, subjectCommissionService, academicEventService, allocationService,
-            buildingService, classroomService, entityManager);
+            rowResolver, allocationService);
     }
 
     @Test
@@ -202,8 +202,8 @@ class ExcelImportServiceImplTest {
     }
 
     @Test
-    @DisplayName("catálogo no encontrado (p. ej. materia inexistente) → propaga ResourceNotFoundException")
-    void materiaInexistentePropagaResourceNotFound() {
+    @DisplayName("catálogo no encontrado (p. ej. materia inexistente) → saltea la fila y la reporta, no aborta el import")
+    void materiaInexistenteSalteaFilaYLaReporta() {
         SpecialtyResponseDto specialty = new SpecialtyResponseDto(1, "Ingeniería en Sistemas");
         when(specialtyService.findBySpecialtyCode(1)).thenReturn(specialty);
         StudyPlanResponseDto plan = new StudyPlanResponseDto(1, specialty);
@@ -213,8 +213,31 @@ class ExcelImportServiceImplTest {
 
         MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow().toMultipartFile();
 
-        assertThatThrownBy(() -> service.importExcel(file))
-            .isInstanceOf(ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException.class);
+        ImportResultDto result = service.importExcel(file);
+
+        assertThat(result.processedRows()).isZero();
+        assertThat(result.skippedRows()).hasSize(1);
+        assertThat(result.skippedRows().getFirst().message()).contains("Subject not found with id: 100");
+        verify(allocationService).importAllocationsBatch(List.of());
+    }
+
+    @Test
+    @DisplayName("aula resuelta en un edificio distinto al informado → importa igual pero reporta la advertencia")
+    void aulaEnEdificioDistintoReportaWarning() {
+        stubHappyPath(DataRow.defaultRow());
+        // El aula existe, pero en un edificio distinto al informado por la fila (fallback
+        // por número de ClassroomService.findByRoomNumberAndBuilding).
+        ClassroomResponseDto classroomEnOtroEdificio = new ClassroomResponseDto(5, "105", 1, 40,
+            true, 7, "Otro Edificio", 1, "Aula");
+        when(classroomService.findByRoomNumberAndBuilding("105", 5)).thenReturn(classroomEnOtroEdificio);
+        MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow().toMultipartFile();
+
+        ImportResultDto result = service.importExcel(file);
+
+        assertThat(result.processedRows()).isEqualTo(1);
+        assertThat(result.skippedRows()).isEmpty();
+        assertThat(result.rowWarnings()).hasSize(1);
+        assertThat(result.rowWarnings().getFirst().message()).contains("Otro Edificio");
     }
 
     @Test

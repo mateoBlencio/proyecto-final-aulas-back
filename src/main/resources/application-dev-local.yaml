@@ -6,6 +6,8 @@ spring:
   docker:
     compose:
       enabled: true
+      stop:
+        command: down
   sql:
     init:
       mode: always

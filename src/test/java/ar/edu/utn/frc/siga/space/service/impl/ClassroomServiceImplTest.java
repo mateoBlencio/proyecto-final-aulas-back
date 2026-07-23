@@ -382,6 +382,37 @@ class ClassroomServiceImplTest {
     }
 
     @Test
+    @DisplayName("findByRoomNumberAndBuilding: si no está en el edificio informado, hace fallback a buscar solo por número")
+    void findByRoomNumberAndBuildingFallsBackToRoomNumberOnly() {
+        Building informedBuilding = SpaceTestData.building().id(2).name("Edif. Ing.Inchaurrondo").build();
+        Classroom actual = SpaceTestData.classroom().build(); // vive en el building real, id=1
+        ClassroomResponseDto dto = new ClassroomResponseDto(1, "101", 1, 40, true, 1, "Edificio Central", 1, "Normal");
+        when(buildingRepository.findById(2)).thenReturn(Optional.of(informedBuilding));
+        when(classroomRepository.findByRoomNumberAndBuilding("101", informedBuilding)).thenReturn(Optional.empty());
+        when(classroomRepository.findAllByRoomNumber("101")).thenReturn(List.of(actual));
+        when(classroomMapper.toDto(actual)).thenReturn(dto);
+
+        ClassroomResponseDto result = service.findByRoomNumberAndBuilding("101", 2);
+
+        assertThat(result).isEqualTo(dto);
+    }
+
+    @Test
+    @DisplayName("findByRoomNumberAndBuilding: si el número es ambiguo (más de un aula en catálogo), no adivina y lanza ResourceNotFoundException")
+    void findByRoomNumberAndBuildingWithAmbiguousRoomNumberThrowsResourceNotFound() {
+        Building informedBuilding = SpaceTestData.building().id(2).name("Otro edificio").build();
+        Classroom other1 = SpaceTestData.classroom().id(10).build();
+        Classroom other2 = SpaceTestData.classroom().id(11).build();
+        when(buildingRepository.findById(2)).thenReturn(Optional.of(informedBuilding));
+        when(classroomRepository.findByRoomNumberAndBuilding("999", informedBuilding)).thenReturn(Optional.empty());
+        when(classroomRepository.findAllByRoomNumber("999")).thenReturn(List.of(other1, other2));
+
+        assertThatThrownBy(() -> service.findByRoomNumberAndBuilding("999", 2))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Classroom not found with id: 999");
+    }
+
+    @Test
     @DisplayName("findByRoomNumberAndBuilding: si el aula no existe en el edificio, lanza ResourceNotFoundException")
     void findByRoomNumberAndBuildingWithMissingClassroomThrowsResourceNotFound() {
         Building building = SpaceTestData.building().build();
