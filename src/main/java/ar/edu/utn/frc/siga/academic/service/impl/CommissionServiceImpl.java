@@ -1,10 +1,8 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
-import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.CommissionMapper;
 import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
-import ar.edu.utn.frc.siga.academic.model.Commission;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
@@ -40,25 +38,21 @@ public class CommissionServiceImpl implements CommissionService {
     }
 
     @Override
-    @Transactional
-    public FindOrCreateResult<CommissionResponseDto> findOrCreate(String courseCode, Integer commissionNumber,
-            Integer yearLevel, Integer periodYear, Integer periodSemester) {
+    public List<CommissionResponseDto> findAll() {
+        return commissionRepository.findAll().stream()
+                .map(commissionMapper::toDto)
+                .toList();
+    }
+
+    @Override
+    public CommissionResponseDto findByCourseAndNumberAndPeriod(String courseCode, Integer commissionNumber,
+            Integer periodYear, Integer periodSemester) {
         AcademicPeriod period = requirePeriod(periodYear, periodSemester);
-        return FindOrCreateResult.resolve(
-                commissionRepository.findByCourseCodeAndCommissionNumberAndAcademicPeriod(
-                        courseCode, commissionNumber, period),
-                () -> {
-                    log.info("Creando Commission: course={}, commission={}, period={}",
-                            courseCode, commissionNumber, period.getId());
-                    return commissionRepository.save(
-                            Commission.builder()
-                                    .courseCode(courseCode)
-                                    .commissionNumber(commissionNumber)
-                                    .yearLevel(yearLevel)
-                                    .academicPeriod(period)
-                                    .build());
-                }
-        ).map(commissionMapper::toDto);
+        return commissionRepository.findByCourseCodeAndCommissionNumberAndAcademicPeriod(
+                        courseCode, commissionNumber, period)
+                .map(commissionMapper::toDto)
+                .orElseThrow(() -> ResourceNotFoundException.of("Commission",
+                        courseCode + "-" + commissionNumber + "-" + periodYear + "-" + periodSemester));
     }
 
     private AcademicPeriod requirePeriod(Integer year, Integer semester) {

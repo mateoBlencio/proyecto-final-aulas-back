@@ -20,7 +20,6 @@ import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
 import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.repository.RecurringEventRepository;
-import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.InvalidDateRangeException;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 
@@ -112,11 +111,11 @@ class AcademicEventServiceImplTest {
         assertThat(occurrences).allSatisfy(o -> assertThat(o.getStatus()).isEqualTo(OccurrenceStatus.SCHEDULED));
     }
 
-    // ---------- findOrCreateRecurringEvent ----------
+    // ---------- findRecurringEvent ----------
 
     @Test
-    @DisplayName("findOrCreateRecurringEvent: existe uno con la misma sextupla → lo reusa, no crea")
-    void findOrCreateReusaExistente() {
+    @DisplayName("findRecurringEvent: existe uno con la misma sextupla → devuelve su id")
+    void findRecurringEventDevuelveIdExistente() {
         CreateRecurringEventRequestDto dto = recurringDto(DayOfWeek.MONDAY,
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19));
         RecurringEvent existing = AllocationTestData.recurringEvent(7L, dto.dayOfWeek(), dto.startDate(), dto.endDate());
@@ -124,10 +123,9 @@ class AcademicEventServiceImplTest {
                 dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startTime(), dto.startDate(), dto.endDate()))
                 .thenReturn(Optional.of(existing));
 
-        FindOrCreateResult<Long> result = service.findOrCreateRecurringEvent(dto);
+        Long result = service.findRecurringEvent(dto);
 
-        assertThat(result.created()).isFalse();
-        assertThat(result.value()).isEqualTo(7L);
+        assertThat(result).isEqualTo(7L);
         verify(eventRepository, never()).save(any());
         verify(subjectService, never()).findById(any());
         verify(commissionService, never()).findById(any());
@@ -135,24 +133,17 @@ class AcademicEventServiceImplTest {
     }
 
     @Test
-    @DisplayName("findOrCreateRecurringEvent: no existe ninguno con esa sextupla → lo crea")
-    void findOrCreateCreaNuevo() {
+    @DisplayName("findRecurringEvent: no existe ninguno con esa sextupla → lanza ResourceNotFoundException")
+    void findRecurringEventSinExistenteLanzaResourceNotFound() {
         CreateRecurringEventRequestDto dto = recurringDto(DayOfWeek.MONDAY,
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19));
         when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
                 dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startTime(), dto.startDate(), dto.endDate()))
                 .thenReturn(Optional.empty());
-        when(subjectService.findById(1L)).thenReturn(AllocationTestData.subjectResponseDto(1L));
-        when(commissionService.findById(1L)).thenReturn(AllocationTestData.commissionResponseDto(1L));
-        RecurringEvent saved = AllocationTestData.recurringEvent(9L, dto.dayOfWeek(), dto.startDate(), dto.endDate());
-        when(eventRepository.save(any())).thenReturn(saved);
-        when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyRecurringResponseDto(9L));
 
-        FindOrCreateResult<Long> result = service.findOrCreateRecurringEvent(dto);
-
-        assertThat(result.created()).isTrue();
-        assertThat(result.value()).isEqualTo(9L);
-        verify(eventRepository).save(any());
+        assertThatThrownBy(() -> service.findRecurringEvent(dto))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(eventRepository, never()).save(any());
     }
 
     // ---------- createUniqueEvent ----------
@@ -219,9 +210,8 @@ class AcademicEventServiceImplTest {
         when(occurrenceRepository.findByStatusAndDateBetweenOrderByEvent_IdAscDateAsc(OccurrenceStatus.SCHEDULED, from, to))
                 .thenReturn(List.of(occA1, occB1, occA2));
         when(composer.compose(anyCollection())).thenAnswer(invocation -> {
-            @SuppressWarnings("unchecked")
             Collection<AcademicEvent> events = invocation.getArgument(0);
-            return events.stream().<AcademicEventResponseDto>map(e -> dummyRecurringResponseDto(e.getId())).toList();
+            return events.stream().map(e -> dummyRecurringResponseDto(e.getId())).toList();
         });
 
         List<AcademicEventResponseDto> result = service.findUnassignedEvents(from, to);

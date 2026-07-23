@@ -4,12 +4,10 @@ import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SubjectMapper;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
-import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
 import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
-import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import java.util.Collection;
 import java.util.List;
@@ -30,6 +28,13 @@ public class SubjectServiceImpl implements SubjectService {
     private final SubjectMapper subjectMapper;
 
     @Override
+    public List<SubjectResponseDto> findAll() {
+        return subjectRepository.findAll().stream()
+                .map(subjectMapper::toDto)
+                .toList();
+    }
+
+    @Override
     public SubjectResponseDto findById(Long id) {
         return subjectMapper.toDto(subjectRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("Subject", id)));
@@ -43,23 +48,10 @@ public class SubjectServiceImpl implements SubjectService {
     }
 
     @Override
-    @Transactional
-    public FindOrCreateResult<SubjectResponseDto> findOrCreate(
-            Integer code, String name, Integer studyPlanCode, Integer specialtyCode, String term) {
+    public SubjectResponseDto findByCodeAndStudyPlan(Integer code, Integer studyPlanCode, Integer specialtyCode) {
         StudyPlan studyPlan = requireStudyPlan(studyPlanCode, specialtyCode);
-        return FindOrCreateResult.resolve(
-                subjectRepository.findByCodeAndStudyPlan(code, studyPlan),
-                () -> {
-                    log.info("Creando Subject: code={}, plan={}", code, studyPlan.getId());
-                    return subjectRepository.save(
-                            Subject.builder()
-                                    .code(code)
-                                    .name(name)
-                                    .studyPlan(studyPlan)
-                                    .term(term)
-                                    .build());
-                }
-        ).map(subjectMapper::toDto);
+        return subjectMapper.toDto(subjectRepository.findByCodeAndStudyPlan(code, studyPlan)
+                .orElseThrow(() -> ResourceNotFoundException.of("Subject", code)));
     }
 
     private StudyPlan requireStudyPlan(Integer studyPlanCode, Integer specialtyCode) {

@@ -34,7 +34,7 @@ public class ClassroomConstraintProvider implements ConstraintProvider {
     public Constraint @NonNull [] defineConstraints(@NonNull ConstraintFactory factory) {
         return new Constraint[]{
                 noOverlap(factory),
-                assignAllPossible(factory),
+                allocateAllPossible(factory),
                 minimizeOvercrowding(factory),
                 minimizeUnusedCapacity(factory),
                 preferSameRoomSameCommission(factory),
@@ -62,7 +62,7 @@ public class ClassroomConstraintProvider implements ConstraintProvider {
      * que es soft); sólo deja sin aula lo verdaderamente inubicable (solape en toda candidata).
      * Se usa la variante que incluye entidades sin asignar; {@code forEach} las excluiría.
      */
-    Constraint assignAllPossible(ConstraintFactory factory) {
+    Constraint allocateAllPossible(ConstraintFactory factory) {
         return factory
                 .forEachIncludingUnassigned(ClassAllocation.class)
                 .filter(a -> !a.isPinned() && a.getClassroom() == null)

@@ -20,4 +20,8 @@ public interface AcademicPeriodService {
 
     /** Períodos académicos activos, usados por {@code allocation} para resolver el rango por defecto de "problems". */
     List<AcademicPeriodResponseDto> findActive();
+
+    List<AcademicPeriodResponseDto> findAll();
+
+    AcademicPeriodResponseDto findById(Long id);
 }

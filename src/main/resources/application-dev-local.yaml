@@ -6,11 +6,13 @@ spring:
   docker:
     compose:
       enabled: true
+      stop:
+        command: down
   sql:
     init:
       mode: always
   jpa:
-    show-sql: true
+    show-sql: false
     defer-datasource-initialization: true
     properties:
       hibernate:
@@ -40,4 +42,4 @@ logging:
   level:
     ar.edu.utn.frc.siga: DEBUG
     org.springframework.web: INFO
-    org.hibernate.SQL: DEBUG
+    org.hibernate.SQL: WARN

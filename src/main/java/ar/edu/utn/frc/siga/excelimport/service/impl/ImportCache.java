@@ -13,9 +13,9 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 /**
- * Cache de deduplicación por fila de Excel: evita repetir el findOrCreate de la misma
- * entidad ya resuelta en filas anteriores. Cachea DTOs, no entidades: desde la Fase 4
- * las fachadas {@code api} de {@code academic} y {@code space} solo devuelven DTOs.
+ * Cache de deduplicación por fila de Excel: evita repetir la búsqueda de la misma
+ * entidad ya resuelta en filas anteriores. Cachea DTOs, no entidades: las fachadas
+ * {@code api} de {@code academic} y {@code space} solo devuelven DTOs.
  */
 class ImportCache {
 

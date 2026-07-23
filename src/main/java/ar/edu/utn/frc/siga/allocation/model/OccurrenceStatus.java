@@ -2,11 +2,11 @@ package ar.edu.utn.frc.siga.allocation.model;
 
 /**
  * Máquina de estados de una {@link Occurrence}. Las transiciones están centralizadas en
- * los servicios de asignación: pasar a {@code ASSIGNED} ocurre al asignar/reasignar aula,
- * y volver a {@code SCHEDULED} ocurre al cancelar la {@link Allocation} vigente.
+ * los servicios de asignación: pasar a {@code ASSIGNED} ocurre al asignar/reasignar aula.
+ * No hay, hoy, ningún camino de vuelta a {@code SCHEDULED}.
  */
 public enum OccurrenceStatus {
-    /** Programada, sin aula asignada. Estado inicial; también adonde vuelve al cancelarse una allocation. */
+    /** Programada, sin aula asignada. Estado inicial. */
     SCHEDULED,
     /** Tiene aula: existe una {@link Allocation} vigente para esta occurrence. */
     ASSIGNED,

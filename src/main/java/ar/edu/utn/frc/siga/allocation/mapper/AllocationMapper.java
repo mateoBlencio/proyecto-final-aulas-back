@@ -8,18 +8,12 @@ import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-/**
- * Mapper puro: solo mapea los campos propios de {@link Allocation} (incluida la
- * ocurrencia, intra-módulo, vía {@link OccurrenceMapper}). Los datos ajenos (evento
- * académico compuesto, aula) se resuelven afuera, en {@link AllocationComposer}, y se
- * pasan como parámetros — mismo patrón que {@link AcademicEventMapper}.
- */
+/** Mapper puro: solo mapea los campos propios de la asignación. Datos ajenos (evento, aula) se pasan resueltos como parámetros. */
 @Mapper(config = CentralMapperConfig.class, uses = OccurrenceMapper.class)
 public interface AllocationMapper {
 
     // "event"/"classroom" se fuerzan a mapear el parámetro entero: allocation solo tiene
-    // classroomId (Integer) — el ClassroomResponseDto siempre viene resuelto por el
-    // composer, nunca navegando la entidad.
+    // sus ids, los DTOs siempre vienen resueltos por el composer.
     @Mapping(target = "id", source = "allocation.id")
     @Mapping(target = "event", source = "event")
     @Mapping(target = "classroom", source = "classroom")

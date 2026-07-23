@@ -1,6 +1,5 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
-import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
@@ -25,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Nota: resuelve {@link Building} vía {@link BuildingRepository} directo (no vía
@@ -130,25 +130,29 @@ public class ClassroomServiceImpl implements ClassroomService {
         log.info("Aula eliminada: id={}", id);
     }
 
+    /**
+     * Busca por edificio+número; si no matchea, hace fallback a buscar solo por número
+     * — tolera edificio mal cargado en el origen (p. ej. typo de planilla) sin tocar el
+     * dato — pero solo si el número resulta en una única aula en todo el catálogo (no
+     * siempre es así, p. ej. "999" es código genérico repetido entre edificios).
+     */
     @Override
-    @Transactional
-    public FindOrCreateResult<ClassroomResponseDto> findOrCreate(String roomNumber, Integer buildingId, Integer enrolledCount) {
+    public ClassroomResponseDto findByRoomNumberAndBuilding(String roomNumber, Integer buildingId) {
         Building building = requireBuilding(buildingId);
-        return FindOrCreateResult.resolve(
-                classroomRepository.findByRoomNumberAndBuilding(roomNumber, building),
-                () -> {
-                    log.warn("Creando aula con datos provisionales: roomNumber={}, buildingId={}",
-                            roomNumber, buildingId);
-                    return classroomRepository.save(
-                            Classroom.builder()
-                                    .roomNumber(roomNumber)
-                                    .building(building)
-                                    .floor(0)
-                                    .capacity(enrolledCount != null && enrolledCount > 0 ? enrolledCount : 1)
-                                    .classroomType(classroomTypeService.findDefault())
-                                    .build());
-                }
-        ).map(classroomMapper::toDto);
+        return classroomMapper.toDto(classroomRepository.findByRoomNumberAndBuilding(roomNumber, building)
+                .or(() -> fallbackByRoomNumberOnly(roomNumber, buildingId))
+                .orElseThrow(() -> ResourceNotFoundException.of("Classroom", roomNumber)));
+    }
+
+    private Optional<Classroom> fallbackByRoomNumberOnly(String roomNumber, Integer buildingId) {
+        List<Classroom> matches = classroomRepository.findAllByRoomNumber(roomNumber);
+        if (matches.size() != 1) {
+            return Optional.empty();
+        }
+        Classroom found = matches.getFirst();
+        log.warn("Aula '{}' no está en el edificio informado (buildingId={}); se usa la única "
+                + "coincidencia por número, en buildingId={}", roomNumber, buildingId, found.getBuilding().getId());
+        return Optional.of(found);
     }
 
     private Classroom findExistingClassroomById(Integer id) {

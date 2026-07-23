@@ -1,10 +1,16 @@
 package ar.edu.utn.frc.siga.allocation.controller;
 
+import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.EventHistorySnapshotDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.RevisionDto;
 import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
+import ar.edu.utn.frc.siga.allocation.service.AllocationService;
+import ar.edu.utn.frc.siga.allocation.service.AuditHistoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -16,6 +22,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,8 +38,9 @@ import java.util.List;
 public class AcademicEventController {
 
     private final AcademicEventService academicEventService;
+    private final AllocationService allocationService;
+    private final AuditHistoryService auditHistoryService;
 
-    /** Todos los eventos académicos registrados. */
     @GetMapping
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     @Operation(summary = "Listar eventos académicos",
@@ -44,7 +52,6 @@ public class AcademicEventController {
         return ResponseEntity.ok(events);
     }
 
-    /** Datos de un evento académico existente por su ID. */
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     @Operation(summary = "Obtener evento académico por ID",
@@ -54,7 +61,6 @@ public class AcademicEventController {
         return ResponseEntity.ok(academicEventService.findById(id));
     }
 
-    /** Todas las occurrences generadas para un evento académico. */
     @GetMapping("/{id}/occurrences")
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     @Operation(summary = "Listar ocurrencias de un evento",
@@ -66,7 +72,17 @@ public class AcademicEventController {
         return ResponseEntity.ok(occurrences);
     }
 
-    /** Crea un evento recurrente semanal y genera todas sus occurrences. */
+    @GetMapping("/{id}/history")
+    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @Operation(summary = "Historial de auditoría de un evento",
+               description = "Devuelve las revisiones de auditoría (Envers) del evento en orden ascendente: "
+                       + "cambios de horario, inscriptos, comisión, alta y baja; con usuario y fecha de cada cambio. "
+                       + "El snapshot es null en revisiones DELETED.")
+    public ResponseEntity<List<RevisionDto<EventHistorySnapshotDto>>> findHistory(@PathVariable Long id) {
+        log.debug("GET /v1/events/{}/history", id);
+        return ResponseEntity.ok(auditHistoryService.findEventHistory(id));
+    }
+
     @PostMapping("/recurring")
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Crear evento recurrente",
@@ -79,7 +95,6 @@ public class AcademicEventController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    /** Crea un evento que ocurre una única vez y genera su única occurrence. */
     @PostMapping("/unique")
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Crea un evento único",
@@ -90,5 +105,18 @@ public class AcademicEventController {
         AcademicEventResponseDto response = academicEventService.createUniqueEvent(dto);
         log.info("Evento único creado vía controller: id={}", response.id());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PutMapping("/{eventId}/classroom")
+    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @Operation(summary = "Reasignar aula de un evento",
+               description = "Cambia el aula de todas las ocurrencias futuras de un evento recurrente. Las ocurrencias ya pasadas quedan intactas. Falla si el evento no es recurrente o si ya finalizó.")
+    public ResponseEntity<List<AllocationResponseDto>> reassignEvent(
+            @PathVariable Long eventId,
+            @Valid @RequestBody AllocateOccurrenceRequestDto dto) {
+        log.debug("PUT /v1/events/{}/classroom: classroomId={}", eventId, dto.classroomId());
+        List<AllocationResponseDto> response = allocationService.reassignEvent(eventId, dto);
+        log.info("Evento reasignado: eventId={}, count={}", eventId, response.size());
+        return ResponseEntity.ok(response);
     }
 }

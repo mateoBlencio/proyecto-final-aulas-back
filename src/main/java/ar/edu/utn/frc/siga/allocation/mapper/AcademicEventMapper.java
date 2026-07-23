@@ -32,8 +32,7 @@ public interface AcademicEventMapper {
     }
 
     // "subject"/"commission" se fuerzan a mapear el parámetro entero: el evento solo
-    // tiene subjectId/commissionId (Long) — el SubjectResponseDto/CommissionResponseDto
-    // siempre viene resuelto por el composer, nunca navegando la entidad.
+    // tiene sus ids (Long), los DTOs siempre vienen resueltos por el composer.
     @Mapping(target = "id", source = "event.id")
     @Mapping(target = "type", constant = "RECURRING")
     @Mapping(target = "durationMinutes", expression = "java(event.getDuration().toMinutes())")

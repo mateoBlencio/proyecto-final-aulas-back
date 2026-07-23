@@ -10,6 +10,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -40,7 +41,8 @@ public class Occurrence {
 
     @EqualsAndHashCode.Include
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "ocurrencia_seq")
+    @SequenceGenerator(name = "ocurrencia_seq", sequenceName = "ocurrencia_id_ocurrencia_seq", allocationSize = 50)
     @Column(name = "id_ocurrencia")
     private Long id;
 

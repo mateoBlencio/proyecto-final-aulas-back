@@ -213,7 +213,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     @DisplayName("POST /v1/allocations/from-date con solape responde 409 con el detalle del conflicto")
-    void assignFromDate_withOverlap_returns409WithDetail() throws Exception {
+    void allocateFromDate_withOverlap_returns409WithDetail() throws Exception {
         var sc = testData.materiaYComision();
         Classroom aula = testData.aula(testData.edificio());
         LocalDate date = LocalDate.now().plusDays(12);
@@ -238,7 +238,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     @DisplayName("POST /v1/allocations/from-date sin solape asigna todas las ocurrencias futuras")
-    void assignFromDate_withoutOverlap_assignsFutureOccurrences() throws Exception {
+    void allocateFromDate_withoutOverlap_assignsFutureOccurrences() throws Exception {
         var sc = testData.materiaYComision();
         Classroom aula = testData.aula(testData.edificio());
         LocalDate date = LocalDate.now().plusDays(13);
@@ -263,6 +263,70 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
                     assertThat(a.getClassroomId()).isEqualTo(aula.getId());
                     assertThat(a.getSource()).isEqualTo(AllocationSource.MANUAL);
                 });
+    }
+
+    @Test
+    @DisplayName("PUT /v1/events/{eventId}/classroom reasigna las ocurrencias futuras y deja intactas las pasadas")
+    void reassignEvent_happyPath_reassignsFutureOnly() throws Exception {
+        var sc = testData.materiaYComision();
+        var edificio = testData.edificio();
+        Classroom aulaOriginal = testData.aula(edificio);
+        Classroom aulaNueva = testData.aula(edificio);
+        LocalDate date = LocalDate.now().plusDays(15);
+
+        var dto = new CreateRecurringEventRequestDto(
+                30, START, DURATION, date.getDayOfWeek(), date, date.plusWeeks(2), sc.subjectId(), sc.commissionId());
+        Long eventId = academicEventService.createRecurringEvent(dto).id();
+
+        // Ocurrencia pasada del mismo evento, sembrada directo por repositorio (la creación
+        // vía servicio solo genera ocurrencias desde hoy en adelante); se le asigna el aula
+        // original para verificar que reassignEvent no la toca.
+        Occurrence past = occurrenceRepository.save(Occurrence.builder()
+                .event(eventRepository.findById(eventId).orElseThrow())
+                .date(LocalDate.now().minusDays(7))
+                .status(OccurrenceStatus.ASSIGNED)
+                .build());
+        long pastAllocationId = allocationRepository.save(Allocation.builder()
+                .occurrence(past)
+                .classroomId(aulaOriginal.getId())
+                .source(AllocationSource.MANUAL)
+                .createdAt(java.time.LocalDateTime.now())
+                .build()).getId();
+
+        mockMvc.perform(put("/v1/events/{eventId}/classroom", eventId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new AllocateOccurrenceRequestDto(aulaNueva.getId(), "reasignación de evento"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3));
+
+        List<Occurrence> futureOccurrences = occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eventId, LocalDate.now());
+        assertThat(allocationRepository.findByOccurrence_IdIn(futureOccurrences.stream().map(Occurrence::getId).toList()))
+                .hasSize(3)
+                .allSatisfy(a -> assertThat(a.getClassroomId()).isEqualTo(aulaNueva.getId()));
+
+        // La ocurrencia pasada queda intacta.
+        assertThat(allocationRepository.findById(pastAllocationId).orElseThrow().getClassroomId())
+                .isEqualTo(aulaOriginal.getId());
+    }
+
+    @Test
+    @DisplayName("PUT /v1/events/{eventId}/classroom sobre un evento ya finalizado responde 409")
+    void reassignEvent_finishedEvent_returns409() throws Exception {
+        Classroom aula = testData.aula(testData.edificio());
+        LocalDate yesterday = LocalDate.now().minusDays(1);
+        RecurringEvent event = eventRepository.save(RecurringEvent.builder()
+                .enrolled(30).startTime(START).duration(Duration.ofMinutes(DURATION))
+                .dayOfWeek(yesterday.getDayOfWeek()).startDate(yesterday).endDate(yesterday)
+                .subjectId(999_999L).commissionId(999_999L)
+                .build());
+        occurrenceRepository.save(Occurrence.builder()
+                .event(event).date(yesterday).status(OccurrenceStatus.SCHEDULED).build());
+
+        mockMvc.perform(put("/v1/events/{eventId}/classroom", event.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new AllocateOccurrenceRequestDto(aula.getId(), null))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Allocation error"));
     }
 
     @Test

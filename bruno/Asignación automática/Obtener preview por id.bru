@@ -7,15 +7,11 @@ meta {
 get {
   url: {{baseUrl}}/v1/allocations/auto-preview/:previewId
   body: none
-  auth: none
+  auth: inherit
 }
 
 params:path {
   previewId: prev_c021e2ff
-}
-
-vars:pre-request {
-  previewId: prev_00000000
 }
 
 docs {
@@ -24,6 +20,7 @@ docs {
   Reemplazá previewId por el devuelto en POST /auto-preview.
   
   Respuesta: misma forma que el POST — { previewId, allocations: [ { event,
-  occurrenceDates, classroom } ], unresolved: [ { event, occurrenceDates,
-  classroom: null } ] }. unresolved queda para revisión manual.
+  occurrenceDates, classroom } ], unresolved: [ { event, dates, conflicts } ] }.
+  unresolved queda para revisión manual; conflicts explica qué bloquea cada aula
+  candidata (ver docs de "Generar preview").
 }

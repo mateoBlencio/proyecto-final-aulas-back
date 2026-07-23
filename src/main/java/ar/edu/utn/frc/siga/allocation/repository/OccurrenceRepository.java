@@ -16,8 +16,6 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
 
     List<Occurrence> findByEvent_Id(Long eventId);
 
-    List<Occurrence> findByEvent_IdInAndStatus(Collection<Long> eventIds, OccurrenceStatus status);
-
     /**
      * Occurrences futuras de un conjunto de eventos en alguno de los estados dados. Se usa
      * para el auto-preview con re-resolución: incluir ASSIGNED (además de SCHEDULED) trae
@@ -28,6 +26,14 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
             Collection<Long> eventIds, Collection<OccurrenceStatus> statuses, LocalDate date);
 
     List<Occurrence> findByEvent_IdAndDateGreaterThanEqual(Long eventId, LocalDate date);
+
+    /**
+     * Igual que {@link #findByEvent_IdAndDateGreaterThanEqual} pero para varios eventos a
+     * la vez: una sola query en vez de una por evento (import masivo desde Excel). El
+     * caller filtra en memoria si cada evento tiene su propia fecha desde (acá se pasa la
+     * más antigua de todas y se sobre-trae).
+     */
+    List<Occurrence> findByEvent_IdInAndDateGreaterThanEqual(Collection<Long> eventIds, LocalDate date);
 
     @EntityGraph(attributePaths = "event")
     List<Occurrence> findByStatusAndDateGreaterThanEqualOrderByEvent_IdAscDateAsc(

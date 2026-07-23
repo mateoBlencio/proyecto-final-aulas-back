@@ -4,7 +4,7 @@ import ar.edu.utn.frc.siga.allocation.dto.request.CreateRecurringEventRequestDto
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceResponseDto;
-import ar.edu.utn.frc.siga.common.exception.InvalidDateRangeException;
+import ar.edu.utn.frc.siga.common.util.DateRanges;
 import ar.edu.utn.frc.siga.allocation.mapper.AcademicEventComposer;
 import ar.edu.utn.frc.siga.allocation.mapper.OccurrenceMapper;
 import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
@@ -17,8 +17,8 @@ import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.repository.RecurringEventRepository;
 import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
-import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,8 +60,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     @Override
     @Transactional(readOnly = true)
     public AcademicEventResponseDto findById(Long eventId) {
-        return composer.compose(eventRepository.findById(eventId)
-                .orElseThrow(() -> ResourceNotFoundException.of("AcademicEvent", eventId)));
+        return composer.compose(Finder.orThrow(eventRepository::findById, eventId, "AcademicEvent"));
     }
 
     @Override
@@ -109,22 +108,19 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     }
 
     /**
-     * Reutiliza un evento recurrente idéntico (misma materia/comisión/día/horario/ventana
-     * de fechas) si ya existe; si no, lo crea. Pensado para importaciones donde varias
-     * filas de la planilla describen el mismo evento.
+     * Busca un evento recurrente idéntico (misma materia/comisión/día/horario/ventana de
+     * fechas): catálogo cargado por fuera de esta app, falla si no existe.
      */
     @Override
-    @Transactional
-    public FindOrCreateResult<Long> findOrCreateRecurringEvent(CreateRecurringEventRequestDto dto) {
+    @Transactional(readOnly = true)
+    public Long findRecurringEvent(CreateRecurringEventRequestDto dto) {
         return recurringEventRepository
                 .findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
                         dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startTime(),
                         dto.startDate(), dto.endDate())
-                .map(existing -> {
-                    log.debug("Reutilizando evento recurrente existente: id={}", existing.getId());
-                    return new FindOrCreateResult<>(existing.getId(), false);
-                })
-                .orElseGet(() -> new FindOrCreateResult<>(createRecurringEvent(dto).id(), true));
+                .map(RecurringEvent::getId)
+                .orElseThrow(() -> ResourceNotFoundException.of("RecurringEvent",
+                        dto.subjectId() + "-" + dto.commissionId() + "-" + dto.dayOfWeek() + "-" + dto.startTime()));
     }
 
     /** Crea un evento único y genera su única occurrence, sin aula (SCHEDULED). */
@@ -157,11 +153,8 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     @Override
     @Transactional(readOnly = true)
     public List<AcademicEventResponseDto> findUnassignedEvents(LocalDate from, LocalDate to) {
-        LocalDate effectiveFrom = from != null ? from : LocalDate.now();
-        if (to != null && to.isBefore(effectiveFrom)) {
-            throw new InvalidDateRangeException(
-                    "'to' (" + to + ") no puede ser anterior a 'from' (" + effectiveFrom + ")");
-        }
+        LocalDate effectiveFrom = DateRanges.defaultFrom(from);
+        DateRanges.requireNotBefore(to, effectiveFrom);
 
         List<Occurrence> occurrences = to != null
                 ? occurrenceRepository.findByStatusAndDateBetweenOrderByEvent_IdAscDateAsc(

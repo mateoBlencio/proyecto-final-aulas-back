@@ -14,11 +14,11 @@ import java.time.Duration;
 public class DurationMinutesConverter implements AttributeConverter<Duration, Integer> {
 
     /**
-     * Trunca la duración a minutos enteros para la columna numérica.
+     * Redondea la duración al minuto más cercano para la columna numérica.
      */
     @Override
     public Integer convertToDatabaseColumn(Duration duration) {
-        return duration == null ? null : (int) duration.toMinutes();
+        return duration == null ? null : (int) Math.round(duration.toSeconds() / 60.0);
     }
 
     /**

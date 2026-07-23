@@ -21,23 +21,39 @@ public interface AllocationService {
     AllocationResponseDto findById(Long allocationId);
 
     /** Asigna aula (source MANUAL) a una occurrence puntual. Falla si ya tiene asignación, ya ocurrió, o no es asignable (CANCELLED/SUSPENDED). */
-    AllocationResponseDto assignManually(Long occurrenceId, AllocateOccurrenceRequestDto dto);
+    AllocationResponseDto allocateManually(Long occurrenceId, AllocateOccurrenceRequestDto dto);
 
     /** Cambia el aula de una asignación existente (source MANUAL). Falla si la occurrence ya ocurrió. */
-    AllocationResponseDto reassign(Long allocationId, AllocateOccurrenceRequestDto dto);
+    AllocationResponseDto reallocate(Long allocationId, AllocateOccurrenceRequestDto dto);
 
     /** Reasigna varias asignaciones en una sola transacción (source MANUAL): si algún move choca o ya ocurrió, no se aplica ninguno. */
-    List<AllocationResponseDto> batchReassign(BatchReassignRequestDto dto);
-
-    /** Asigna un aula a todas las occurrences futuras de un evento recurrente desde una fecha (source MANUAL), salteando las que ya ocurrieron. */
-    List<AllocationResponseDto> assignManuallyFromDate(AllocateFromDateRequestDto dto);
+    List<AllocationResponseDto> batchReallocate(BatchReassignRequestDto dto);
 
     /**
-     * Igual que {@link #assignManuallyFromDate}, pero con source IMPORTED e incluyendo
+     * Cambia el aula de todas las occurrences futuras de un evento recurrente (source
+     * MANUAL): las occurrences pasadas quedan intactas. Falla si el evento no es
+     * recurrente o si ya finalizó (no tiene occurrences futuras).
+     */
+    List<AllocationResponseDto> reassignEvent(Long recurringEventId, AllocateOccurrenceRequestDto dto);
+
+    /** Asigna un aula a todas las occurrences futuras de un evento recurrente desde una fecha (source MANUAL), salteando las que ya ocurrieron. */
+    List<AllocationResponseDto> allocateManuallyFromDate(AllocateFromDateRequestDto dto);
+
+    /**
+     * Igual que {@link #allocateManuallyFromDate}, pero con source IMPORTED e incluyendo
      * occurrences pasadas (carga masiva desde Excel). Devuelve la cantidad de allocations
      * aplicadas (no el DTO compuesto: el único caller productivo no lo necesita).
      */
-    int importAssignmentsFromDate(AllocateFromDateRequestDto dto);
+    int importAllocationsFromDate(AllocateFromDateRequestDto dto);
+
+    /**
+     * Batch de {@link #importAllocationsFromDate} para una importación completa: una sola
+     * validación de aulas y un solo pase de escritura para todos los eventos, en vez de
+     * repetir toda la operación (con sus queries) evento por evento. Asume que cada
+     * {@code recurringEventId} viene de {@code findRecurringEvent}, así que no
+     * repite la validación de "es evento recurrente" que sí hace {@link #importAllocationsFromDate}.
+     */
+    int importAllocationsBatch(List<AllocateFromDateRequestDto> items);
 
     List<AllocationResponseDto> findByDate(LocalDate date);
 }

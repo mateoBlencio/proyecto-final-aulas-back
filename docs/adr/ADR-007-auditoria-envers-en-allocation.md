@@ -105,7 +105,16 @@ estado `pendiente` hasta que se aplique en la base de datos compartida.
   indicando si ese campo puntual cambió en esa revisión). Envers ya permite
   reconstruir qué cambió comparando dos revisiones consecutivas de la fila
   vía `AuditReader`, que es el único acceso a auditoría que este alcance
-  necesita hoy; las columnas `_mod` solo aportan cuando se consulta el
+  necesita hoy — el consumidor previsto del `AuditReader` ya existe:
+
+  > **Actualización (2026-07-17)**: `allocation/service/AuditHistoryService`
+  > expone el historial por API (`GET /v1/events/{id}/history`,
+  > `GET /v1/allocations/occurrences/{id}/history`,
+  > `GET /v1/allocations/occurrences/{id}/allocation-history`) leyendo las
+  > tablas `_aud` vía `AuditReader`, sin cambio de esquema. El diff campo a
+  > campo sigue del lado del consumidor (comparar snapshots consecutivos).
+
+  las columnas `_mod` solo aportan cuando se consulta el
   historial con una librería/UI que las explota directo por SQL, y acá no
   hay ese consumidor. Si aparece, es una propiedad de configuración
   aditiva —no requiere revisar esta decisión— pero sí una migración de

@@ -12,6 +12,7 @@ import ar.edu.utn.frc.siga.solver.model.SolverPreview;
 import ar.edu.utn.frc.siga.solver.model.SolverRoom;
 import ar.edu.utn.frc.siga.solver.service.PreviewStore;
 import ar.edu.utn.frc.siga.solver.service.SolverService;
+import ar.edu.utn.frc.siga.common.util.TimeRanges;
 import ai.timefold.solver.core.api.solver.SolverConfigOverride;
 import ai.timefold.solver.core.api.solver.SolverJob;
 import ai.timefold.solver.core.api.solver.SolverManager;
@@ -205,7 +206,7 @@ public class SolverServiceImpl implements SolverService {
                     SolverEvent b = sameDate.get(j);
                     if (!b.startTime().isBefore(a.endTime())) break;
                     if (a.planningId().equals(b.planningId())) continue;
-                    if (timesOverlap(a, b)) {
+                    if (TimeRanges.overlaps(a.startTime(), a.endTime(), b.startTime(), b.endTime())) {
                         adjacency.computeIfAbsent(a.planningId(), id -> new HashSet<>()).add(b.planningId());
                         adjacency.computeIfAbsent(b.planningId(), id -> new HashSet<>()).add(a.planningId());
                     }
@@ -213,9 +214,5 @@ public class SolverServiceImpl implements SolverService {
             }
         }
         return adjacency;
-    }
-
-    private boolean timesOverlap(SolverEvent a, SolverEvent b) {
-        return a.startTime().isBefore(b.endTime()) && b.startTime().isBefore(a.endTime());
     }
 }

@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.OccupiedSlot;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.solver.model.SolverOccupancy;
 import ar.edu.utn.frc.siga.solver.model.SolverRoom;
@@ -20,7 +21,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -53,18 +53,8 @@ class AutoAllocationDataLoader {
      */
     record AutoPreviewInputs(List<RecurringEvent> events, Map<Long, List<LocalDate>> datesByEvent,
                               List<SolverRoom> rooms, List<SolverOccupancy> occupancy,
-                              List<DatabaseOccupancy> databaseOccupancy,
+                              List<OccupiedSlot> databaseOccupancy,
                               Map<Long, Integer> priorRoomByEvent) {
-    }
-
-    /**
-     * Ocupación de BD con el id del evento y de la asignación ocupante — {@link SolverOccupancy}
-     * no los trae (el solver solo necesita la franja bloqueada, no quién la ocupa). Los
-     * necesitan validate-move ({@code conflictingEventId} en un conflicto DATABASE) y
-     * confirm ({@code conflictingAllocationId} en el {@code OccurrenceConflictDto}).
-     */
-    record DatabaseOccupancy(Integer classroomId, LocalDate date, LocalTime startTime, LocalTime endTime,
-                              Long eventId, Long allocationId) {
     }
 
     @Transactional(readOnly = true)
@@ -76,7 +66,7 @@ class AutoAllocationDataLoader {
                 .toList();
 
         List<Allocation> occupancyInRange = loadOccupancyInRange(events);
-        // Ocupación ajena (pinned): excluye los eventos seleccionados → sus aulas quedan libres (D2).
+        // Ocupación ajena (pinned): excluye los eventos seleccionados → sus aulas quedan libres.
         List<Allocation> databaseAllocations = occupancyInRange.stream()
                 .filter(a -> !eventIds.contains(a.getOccurrence().getEvent().getId()))
                 .toList();
@@ -87,8 +77,8 @@ class AutoAllocationDataLoader {
                         a -> a.getOccurrence().getEvent().getId(), Allocation::getClassroomId, (x, y) -> x));
 
         List<SolverOccupancy> occupancy = databaseAllocations.stream().map(this::toOccupancy).toList();
-        List<DatabaseOccupancy> databaseOccupancy = databaseAllocations.stream()
-                .map(this::toDatabaseOccupancy)
+        List<OccupiedSlot> databaseOccupancy = databaseAllocations.stream()
+                .map(OccupiedSlot::from)
                 .toList();
         return new AutoPreviewInputs(events, datesByEvent, rooms, occupancy, databaseOccupancy, priorRoomByEvent);
     }
@@ -110,7 +100,7 @@ class AutoAllocationDataLoader {
 
     /**
      * Fechas futuras de occurrences SCHEDULED o ASSIGNED por evento: incluir ASSIGNED
-     * trae las fechas de eventos ya asignados que se quieren re-resolver (D2); el filtro
+     * trae las fechas de eventos ya asignados que se quieren re-resolver; el filtro
      * de fecha evita re-resolver clases ya dictadas.
      */
     private Map<Long, List<LocalDate>> datesByEvent(Set<Long> eventIds) {
@@ -155,17 +145,5 @@ class AutoAllocationDataLoader {
                 a.getOccurrence().getDate(),
                 occupant.getStartTime(),
                 occupant.endTime());
-    }
-
-    /** Igual que {@link #toOccupancy} pero conservando el id del evento y de la asignación ocupante. */
-    private DatabaseOccupancy toDatabaseOccupancy(Allocation a) {
-        AcademicEvent occupant = a.getOccurrence().getEvent();
-        return new DatabaseOccupancy(
-                a.getClassroomId(),
-                a.getOccurrence().getDate(),
-                occupant.getStartTime(),
-                occupant.endTime(),
-                occupant.getId(),
-                a.getId());
     }
 }

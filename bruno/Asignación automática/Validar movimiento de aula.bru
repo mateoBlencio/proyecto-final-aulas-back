@@ -5,9 +5,13 @@ meta {
 }
 
 post {
-  url: {{baseUrl}}/v1/allocations/auto-preview/{{previewId}}/validate-move
+  url: {{baseUrl}}/v1/allocations/auto-preview/:previewId/validate-move
   body: json
-  auth: none
+  auth: inherit
+}
+
+params:path {
+  previewId: prev_
 }
 
 body:json {
@@ -19,10 +23,6 @@ body:json {
       { "eventId": 2, "classroomId": 7 }
     ]
   }
-}
-
-vars:pre-request {
-  previewId: prev_00000000
 }
 
 docs {

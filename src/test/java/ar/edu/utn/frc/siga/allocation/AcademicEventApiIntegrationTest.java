@@ -8,7 +8,6 @@ import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
-import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 
 import tools.jackson.databind.ObjectMapper;
@@ -122,8 +121,8 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("findOrCreateRecurringEvent no duplica: segunda llamada idéntica reusa el evento existente")
-    void findOrCreateRecurringEvent_doesNotDuplicate() {
+    @DisplayName("findRecurringEvent: reusa el mismo evento existente entre llamadas idénticas, sin duplicarlo")
+    void findRecurringEvent_reusesExistingEvent() {
         IntegrationTestData.SubjectAndCommission sc = testData.materiaYComision();
         LocalDate startDate = LocalDate.now().plusDays(1);
         DayOfWeek dayOfWeek = startDate.getDayOfWeek();
@@ -131,14 +130,14 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
         CreateRecurringEventRequestDto dto = new CreateRecurringEventRequestDto(
                 30, LocalTime.of(8, 0), 90, dayOfWeek, startDate, null, sc.subjectId(), sc.commissionId());
 
+        Long createdId = academicEventService.createRecurringEvent(dto).id();
         long before = eventRepository.count();
 
-        FindOrCreateResult<Long> first = academicEventService.findOrCreateRecurringEvent(dto);
-        FindOrCreateResult<Long> second = academicEventService.findOrCreateRecurringEvent(dto);
+        Long first = academicEventService.findRecurringEvent(dto);
+        Long second = academicEventService.findRecurringEvent(dto);
 
-        assertThat(first.created()).isTrue();
-        assertThat(second.created()).isFalse();
-        assertThat(second.value()).isEqualTo(first.value());
-        assertThat(eventRepository.count()).isEqualTo(before + 1);
+        assertThat(first).isEqualTo(createdId);
+        assertThat(second).isEqualTo(createdId);
+        assertThat(eventRepository.count()).isEqualTo(before);
     }
 }

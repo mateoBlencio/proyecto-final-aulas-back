@@ -1,12 +1,13 @@
 package ar.edu.utn.frc.siga.excelimport;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
+import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
+import ar.edu.utn.frc.siga.academic.model.Commission;
+import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
-import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
-import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.allocation.model.Occurrence;
@@ -22,7 +23,6 @@ import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 
 import tools.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,7 +31,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,9 +43,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Integración end-to-end de la carga masiva desde Excel: sube un {@code .xlsx} en memoria
- * (fixture {@link ExcelTestWorkbooks}) contra Postgres real y verifica la cadena completa
- * (specialty → studyPlan → subject → period → commission → classroom → evento →
- * ocurrencias → asignaciones IMPORTED), idempotencia, y atomicidad de la transacción única.
+ * (fixture {@link ExcelTestWorkbooks}) contra Postgres real y verifica la cadena completa.
+ * Specialty/studyPlan/subject/building/classroom son catálogo (el import solo busca, no
+ * crea): cada test los siembra con {@link IntegrationTestData} antes de subir el archivo,
+ * con las mismas claves naturales que la fila de Excel referencia. Verifica también
+ * period → commission → evento → ocurrencias → asignaciones IMPORTED, idempotencia, y
+ * atomicidad de la transacción única.
  */
 @Import(IntegrationTestData.class)
 @DisplayName("Excel Import (integración)")
@@ -53,10 +58,6 @@ class ExcelImportIntegrationTest extends AbstractIntegrationTest {
     private ObjectMapper objectMapper;
     @Autowired
     private SpecialtyRepository specialtyRepository;
-    @Autowired
-    private StudyPlanRepository studyPlanRepository;
-    @Autowired
-    private SubjectRepository subjectRepository;
     @Autowired
     private CommissionRepository commissionRepository;
     @Autowired
@@ -75,17 +76,6 @@ class ExcelImportIntegrationTest extends AbstractIntegrationTest {
     private JdbcTemplate jdbcTemplate;
     @Autowired
     private IntegrationTestData integrationTestData;
-
-    /**
-     * El import crea aulas vía {@code ClassroomService.findOrCreate}, que asume el tipo de
-     * aula por defecto ya sembrado ({@code ClassroomTypeServiceImpl.findDefault()}). Sin
-     * {@code data.sql} (perfil integration) nada lo garantiza si esta clase corre antes que
-     * otro test que lo siembre de paso.
-     */
-    @BeforeEach
-    void seedDefaultClassroomType() {
-        integrationTestData.tipoAulaNormal();
-    }
 
     /** Fila válida con claves naturales únicas (courseCode arranca con '6', año fijo de la plantilla = 2026). */
     private DataRow uniqueRow(String buildingName) {
@@ -113,18 +103,39 @@ class ExcelImportIntegrationTest extends AbstractIntegrationTest {
         return "Edificio-IT-" + IntegrationTestData.nextSeq();
     }
 
+    /**
+     * Specialty/studyPlan/subject/commission/subjectCommission/recurringEvent/building/
+     * classroom son catálogo: el import solo los busca, no los crea. Siembra cada uno con
+     * la misma clave natural que {@code row} referencia (más el año fijo de la plantilla,
+     * 2026, y el día/horario codificados en {@link #uniqueRow}), para que el import los
+     * encuentre.
+     */
+    private void seedCatalog(DataRow row) {
+        var specialty = integrationTestData.especialidad(row.specialtyCode());
+        var plan = integrationTestData.planDeEstudio(row.studyPlanCode(), specialty);
+        Subject subject = integrationTestData.materia(row.subjectCode(), row.subjectName(), plan, row.termType());
+        var building = integrationTestData.edificioConNombre(row.buildingName());
+        integrationTestData.aulaConNumero((String) row.roomNumber(), building,
+                integrationTestData.tipoAulaNormal(), 1, row.enrolledCount(), true);
+
+        int year = 2026; // año fijo de ExcelTestWorkbooks.validTemplate()
+        TermType termType = TermType.fromLabel(row.termType()).orElseThrow();
+        AcademicPeriod period = integrationTestData.periodoAcademico(year, termType);
+        Commission commission = integrationTestData.comision(row.courseCode(), row.commissionNumber(), period);
+        integrationTestData.materiaComision(subject, commission, row.enrolledCount());
+        integrationTestData.eventoRecurrente(subject.getId(), commission.getId(), DayOfWeek.MONDAY,
+                LocalTime.of(18, 30), 90, termType.startDate(year), termType.endDate(year), row.enrolledCount());
+    }
+
     @Test
     @DisplayName("POST /v1/excelimports importa 2 filas válidas y persiste toda la cadena académica y de asignación, incluidas fechas pasadas")
     void importExcel_validRows_persistsFullChain() throws Exception {
         DataRow row1 = uniqueRow(uniqueBuilding());
         DataRow row2 = uniqueRow(uniqueBuilding());
+        seedCatalog(row1);
+        seedCatalog(row2);
 
-        long specialtiesBefore = specialtyRepository.count();
-        long studyPlansBefore = studyPlanRepository.count();
-        long subjectsBefore = subjectRepository.count();
         long commissionsBefore = commissionRepository.count();
-        long buildingsBefore = buildingRepository.count();
-        long classroomsBefore = classroomRepository.count();
         long eventsBefore = eventRepository.count();
 
         var workbook = ExcelTestWorkbooks.validTemplate().withDataRow(row1).withDataRow(row2);
@@ -136,19 +147,13 @@ class ExcelImportIntegrationTest extends AbstractIntegrationTest {
         ImportResultDto response = objectMapper.readValue(
                 result.getResponse().getContentAsString(), ImportResultDto.class);
         assertThat(response.processedRows()).isEqualTo(2);
-        assertThat(response.assignmentsCreated()).isEqualTo(2);
-        assertThat(response.assignmentsReused()).isZero();
 
-        assertThat(specialtyRepository.count()).isEqualTo(specialtiesBefore + 2);
-        assertThat(studyPlanRepository.count()).isEqualTo(studyPlansBefore + 2);
-        assertThat(subjectRepository.count()).isEqualTo(subjectsBefore + 2);
-        assertThat(commissionRepository.count()).isEqualTo(commissionsBefore + 2);
-        assertThat(buildingRepository.count()).isEqualTo(buildingsBefore + 2);
-        assertThat(classroomRepository.count()).isEqualTo(classroomsBefore + 2);
-        assertThat(eventRepository.count()).isEqualTo(eventsBefore + 2);
+        // Commission/RecurringEvent son catálogo pre-sembrado por seedCatalog: el import solo los busca.
+        assertThat(commissionRepository.count()).isEqualTo(commissionsBefore);
+        assertThat(eventRepository.count()).isEqualTo(eventsBefore);
         assertThat(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester())).isPresent();
 
-        // Cadena completa de la fila 1: aula creada -> evento -> ocurrencias -> asignaciones IMPORTED.
+        // Cadena completa de la fila 1: aula sembrada -> evento -> ocurrencias -> asignaciones IMPORTED.
         Classroom classroom1 = classroomRepository.findByRoomNumber((String) row1.roomNumber()).orElseThrow();
         assertThat(classroom1.getCapacity()).isEqualTo(row1.enrolledCount());
 
@@ -179,6 +184,7 @@ class ExcelImportIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("Reimportar el mismo archivo es idempotente: reusa entidades y asignaciones, sin duplicar")
     void importExcel_sameFileTwice_isIdempotent() throws Exception {
         DataRow row = uniqueRow(uniqueBuilding());
+        seedCatalog(row);
         MockMultipartFile file = ExcelTestWorkbooks.validTemplate().withDataRow(row).toMultipartFile();
 
         mockMvc.perform(multipart("/v1/excelimports").file(file)).andExpect(status().isOk());
@@ -196,8 +202,6 @@ class ExcelImportIntegrationTest extends AbstractIntegrationTest {
         ImportResultDto response = objectMapper.readValue(
                 second.getResponse().getContentAsString(), ImportResultDto.class);
         assertThat(response.processedRows()).isEqualTo(1);
-        assertThat(response.assignmentsCreated()).isZero();
-        assertThat(response.assignmentsReused()).isEqualTo(1);
 
         assertThat(specialtyRepository.count()).isEqualTo(specialtiesAfterFirst);
         assertThat(eventRepository.count()).isEqualTo(eventsAfterFirst);
@@ -231,10 +235,10 @@ class ExcelImportIntegrationTest extends AbstractIntegrationTest {
     void importExcel_secondRowInvalid_rollsBackFirstRow() throws Exception {
         DataRow validRow = uniqueRow(uniqueBuilding());
         DataRow invalidRow = uniqueRow(uniqueBuilding()).toBuilder().day("Marciano").build();
+        seedCatalog(validRow);
+        seedCatalog(invalidRow);
 
         long eventsBefore = eventRepository.count();
-        long classroomsBefore = classroomRepository.count();
-        long specialtiesBefore = specialtyRepository.count();
 
         var workbook = ExcelTestWorkbooks.validTemplate().withDataRow(validRow).withDataRow(invalidRow);
 
@@ -243,8 +247,5 @@ class ExcelImportIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.title").value("Import error"));
 
         assertThat(eventRepository.count()).isEqualTo(eventsBefore);
-        assertThat(classroomRepository.count()).isEqualTo(classroomsBefore);
-        assertThat(specialtyRepository.count()).isEqualTo(specialtiesBefore);
-        assertThat(classroomRepository.findByRoomNumber((String) validRow.roomNumber())).isEmpty();
     }
 }

@@ -79,7 +79,7 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
     }
 
     /** Segunda allocation en la misma franja/aula por repositorio directo: la API bloquea el solape (validateNoOverlap). */
-    private void assignDirect(Occurrence occurrence, Integer classroomId) {
+    private void allocateDirect(Occurrence occurrence, Integer classroomId) {
         allocationRepository.save(Allocation.builder()
                 .occurrence(occurrence).classroomId(classroomId).source(AllocationSource.MANUAL)
                 .createdAt(LocalDateTime.now()).build());
@@ -122,7 +122,7 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
         Occurrence overlapOccA = seedOccurrence(scOverlapA, overlapDate, 20);
         Occurrence overlapOccB = seedOccurrence(scOverlapB, overlapDate, 20);
         assignOk(overlapOccA.getId(), aulaOverlap.getId());
-        assignDirect(overlapOccB, aulaOverlap.getId());
+        allocateDirect(overlapOccB, aulaOverlap.getId());
         Long overlapEventAId = overlapOccA.getEvent().getId();
         Long overlapEventBId = overlapOccB.getEvent().getId();
 

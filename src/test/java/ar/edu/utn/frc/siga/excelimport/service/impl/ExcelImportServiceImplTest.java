@@ -41,10 +41,10 @@ import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import jakarta.persistence.EntityManager;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -79,47 +79,45 @@ class ExcelImportServiceImplTest {
     private BuildingService buildingService;
     @Mock
     private ClassroomService classroomService;
-    @Mock
-    private EntityManager entityManager;
 
     private ExcelImportServiceImpl service;
 
     @BeforeEach
     void setUp() {
         // validator y rowMapper reales: son la unidad de POI que se ejercita de punta a punta,
-        // solo se mockean las fachadas de los otros módulos.
+        // solo se mockean las fachadas de los otros módulos. ExcelRowResolver se instancia real
+        // (no mock): es un simple orquestador de esas fachadas, la anotación @Transactional no
+        // aplica fuera de un contexto Spring.
+        ExcelRowResolver rowResolver = new ExcelRowResolver(specialtyService, studyPlanService, subjectService,
+            academicPeriodService, commissionService, subjectCommissionService, academicEventService,
+            buildingService, classroomService);
         service = new ExcelImportServiceImpl(new ExcelTemplateValidator(), new ExcelRowMapper(),
-            specialtyService, studyPlanService, subjectService, academicPeriodService,
-            commissionService, subjectCommissionService, academicEventService, allocationService,
-            buildingService, classroomService, entityManager);
+            rowResolver, allocationService);
     }
 
     @Test
-    @DisplayName("fila válida: encadena los findOrCreate de todos los módulos con las claves correctas")
-    void cadenaCompletaDeFindOrCreate() {
+    @DisplayName("fila válida: busca catálogo y encadena find-or-create de período/find de comisión/materia-comisión con las claves correctas")
+    void cadenaCompletaDeResolucion() {
         stubHappyPath(DataRow.defaultRow());
         MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow().toMultipartFile();
 
         ImportResultDto result = service.importExcel(file);
 
         assertThat(result.processedRows()).isEqualTo(1);
-        assertThat(result.assignmentsCreated()).isEqualTo(1);
-        assertThat(result.assignmentsReused()).isZero();
-        assertThat(result.entitiesCreated()).isEqualTo(8); // specialty, plan, subject, period, commission, subjectCommission, building, classroom
-        assertThat(result.entitiesReused()).isZero();
+        assertThat(result.periodsCreated()).isEqualTo(1);
 
-        verify(specialtyService).findOrCreate(1);
-        verify(studyPlanService).findOrCreate(1, 1);
-        verify(subjectService).findOrCreate(100, "Análisis Matemático", 1, 1, "Anual");
+        verify(specialtyService).findBySpecialtyCode(1);
+        verify(studyPlanService).findByPlanCodeAndSpecialtyCode(1, 1);
+        verify(subjectService).findByCodeAndStudyPlan(100, 1, 1);
         verify(academicPeriodService).findOrCreate(2026, TermType.ANUAL);
-        verify(commissionService).findOrCreate("6301", 1, 6, 2026, 0);
-        verify(subjectCommissionService).findOrCreate(10L, 20L, 30);
-        verify(buildingService).findOrCreate("Edificio Central");
-        verify(classroomService).findOrCreate("105", 5, 30);
+        verify(commissionService).findByCourseAndNumberAndPeriod("6301", 1, 2026, 0);
+        verify(subjectCommissionService).findBySubjectAndCommission(10L, 20L);
+        verify(buildingService).findByName("Edificio Central");
+        verify(classroomService).findByRoomNumberAndBuilding("105", 5);
 
         ArgumentCaptor<CreateRecurringEventRequestDto> eventCaptor =
             ArgumentCaptor.forClass(CreateRecurringEventRequestDto.class);
-        verify(academicEventService).findOrCreateRecurringEvent(eventCaptor.capture());
+        verify(academicEventService).findRecurringEvent(eventCaptor.capture());
         CreateRecurringEventRequestDto eventDto = eventCaptor.getValue();
         assertThat(eventDto.subjectId()).isEqualTo(10L);
         assertThat(eventDto.commissionId()).isEqualTo(20L);
@@ -127,20 +125,19 @@ class ExcelImportServiceImplTest {
         assertThat(eventDto.startDate()).isEqualTo(LocalDate.of(2026, 3, 1));
         assertThat(eventDto.endDate()).isEqualTo(LocalDate.of(2026, 11, 30)); // TermType.ANUAL
 
-        ArgumentCaptor<AllocateFromDateRequestDto> allocationCaptor =
-            ArgumentCaptor.forClass(AllocateFromDateRequestDto.class);
-        verify(allocationService).importAssignmentsFromDate(allocationCaptor.capture());
-        AllocateFromDateRequestDto allocationDto = allocationCaptor.getValue();
+        ArgumentCaptor<List<AllocateFromDateRequestDto>> allocationCaptor = ArgumentCaptor.forClass(List.class);
+        verify(allocationService).importAllocationsBatch(allocationCaptor.capture());
+        AllocateFromDateRequestDto allocationDto = allocationCaptor.getValue().getFirst();
         assertThat(allocationDto.recurringEventId()).isEqualTo(1L);
         assertThat(allocationDto.classroomId()).isEqualTo(5);
         assertThat(allocationDto.observation()).isEqualTo("Importado de Excel");
     }
 
     @Test
-    @DisplayName("ImportCache dedupea: dos filas de la misma especialidad → findOrCreate de specialty se llama una sola vez")
+    @DisplayName("ImportCache dedupea: dos filas de la misma especialidad → findBySpecialtyCode se llama una sola vez")
     void cacheDedupeaEspecialidadRepetida() {
         SpecialtyResponseDto specialty = new SpecialtyResponseDto(1, "Ingeniería en Sistemas");
-        when(specialtyService.findOrCreate(1)).thenReturn(new FindOrCreateResult<>(specialty, true));
+        when(specialtyService.findBySpecialtyCode(1)).thenReturn(specialty);
         stubRestOfChain(specialty, 100, "Análisis Matemático", 20L,
             "6301", 1, 30L, "105", 5, 40L, 1L);
         // Segunda fila: mismo curso/comisión (misma clave de comisión) pero distinta materia,
@@ -155,7 +152,7 @@ class ExcelImportServiceImplTest {
         ImportResultDto result = service.importExcel(file);
 
         assertThat(result.processedRows()).isEqualTo(2);
-        verify(specialtyService, times(1)).findOrCreate(1);
+        verify(specialtyService, times(1)).findBySpecialtyCode(1);
     }
 
     @Test
@@ -170,7 +167,7 @@ class ExcelImportServiceImplTest {
             .hasMessageContaining("Unknown term type")
             .hasMessageContaining("Trimestre Fantasma");
 
-        verify(specialtyService, never()).findOrCreate(any());
+        verify(specialtyService, never()).findBySpecialtyCode(any());
     }
 
     @Test
@@ -184,7 +181,7 @@ class ExcelImportServiceImplTest {
 
         ArgumentCaptor<CreateRecurringEventRequestDto> eventCaptor =
             ArgumentCaptor.forClass(CreateRecurringEventRequestDto.class);
-        verify(academicEventService).findOrCreateRecurringEvent(eventCaptor.capture());
+        verify(academicEventService).findRecurringEvent(eventCaptor.capture());
         assertThat(eventCaptor.getValue().durationMinutes()).isEqualTo(90);
     }
 
@@ -201,32 +198,62 @@ class ExcelImportServiceImplTest {
         ImportResultDto result = service.importExcel(file);
 
         assertThat(result.processedRows()).isEqualTo(1);
-        verify(subjectService, times(1)).findOrCreate(any(), any(), any(), any(), any());
+        verify(subjectService, times(1)).findByCodeAndStudyPlan(any(), any(), any());
     }
 
     @Test
-    @DisplayName("todas las entidades ya existían → contadores de reusadas, no de creadas")
-    void contadoresDeEntidadesReusadas() {
+    @DisplayName("catálogo no encontrado (p. ej. materia inexistente) → saltea la fila y la reporta, no aborta el import")
+    void materiaInexistenteSalteaFilaYLaReporta() {
+        SpecialtyResponseDto specialty = new SpecialtyResponseDto(1, "Ingeniería en Sistemas");
+        when(specialtyService.findBySpecialtyCode(1)).thenReturn(specialty);
+        StudyPlanResponseDto plan = new StudyPlanResponseDto(1, specialty);
+        when(studyPlanService.findByPlanCodeAndSpecialtyCode(1, 1)).thenReturn(plan);
+        when(subjectService.findByCodeAndStudyPlan(100, 1, 1))
+            .thenThrow(ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException.of("Subject", 100));
+
+        MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow().toMultipartFile();
+
+        ImportResultDto result = service.importExcel(file);
+
+        assertThat(result.processedRows()).isZero();
+        assertThat(result.skippedRows()).hasSize(1);
+        assertThat(result.skippedRows().getFirst().message()).contains("Subject not found with id: 100");
+        verify(allocationService).importAllocationsBatch(List.of());
+    }
+
+    @Test
+    @DisplayName("aula resuelta en un edificio distinto al informado → importa igual pero reporta la advertencia")
+    void aulaEnEdificioDistintoReportaWarning() {
+        stubHappyPath(DataRow.defaultRow());
+        // El aula existe, pero en un edificio distinto al informado por la fila (fallback
+        // por número de ClassroomService.findByRoomNumberAndBuilding).
+        ClassroomResponseDto classroomEnOtroEdificio = new ClassroomResponseDto(5, "105", 1, 40,
+            true, 7, "Otro Edificio", 1, "Aula");
+        when(classroomService.findByRoomNumberAndBuilding("105", 5)).thenReturn(classroomEnOtroEdificio);
+        MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow().toMultipartFile();
+
+        ImportResultDto result = service.importExcel(file);
+
+        assertThat(result.processedRows()).isEqualTo(1);
+        assertThat(result.skippedRows()).isEmpty();
+        assertThat(result.rowWarnings()).hasSize(1);
+        assertThat(result.rowWarnings().getFirst().message()).contains("Otro Edificio");
+    }
+
+    @Test
+    @DisplayName("período ya existía → no cuenta como creado")
+    void periodoExistenteNoSumaAPeriodsCreated() {
         stubHappyPath(DataRow.defaultRow(), false);
         MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow().toMultipartFile();
 
         ImportResultDto result = service.importExcel(file);
 
-        assertThat(result.entitiesCreated()).isZero();
-        assertThat(result.entitiesReused()).isEqualTo(8);
-        assertThat(result.assignmentsReused()).isEqualTo(1);
-        assertThat(result.assignmentsCreated()).isZero();
+        assertThat(result.periodsCreated()).isZero();
     }
 
-    // FIXME: bug de producción — ExcelImportServiceImpl.importExcel loguea `file.getName()`
-    // (nombre del parámetro multipart, típicamente "file") en vez de
-    // `file.getOriginalFilename()`. El log de arranque de la importación nunca muestra el
-    // nombre real del archivo subido por el usuario. Este test documenta el comportamiento
-    // actual (buggy), no lo
-    // corrige.
     @Test
-    @DisplayName("FIXME bug: el log de inicio muestra el nombre del parámetro multipart, no el nombre real del archivo")
-    void logDeInicioNoMuestraElNombreRealDelArchivoFIXME() {
+    @DisplayName("el log de inicio muestra el nombre real del archivo subido")
+    void logDeInicioMuestraElNombreRealDelArchivo() {
         stubHappyPath(DataRow.defaultRow());
         MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow()
             .toMultipartFile("planilla-2026.xlsx");
@@ -242,8 +269,7 @@ class ExcelImportServiceImplTest {
         }
 
         String startLog = appender.list.getFirst().getFormattedMessage();
-        assertThat(startLog).contains("file"); // MultipartFile#getName(): nombre del campo del form
-        assertThat(startLog).doesNotContain("planilla-2026.xlsx"); // comportamiento actual: no aparece
+        assertThat(startLog).contains("planilla-2026.xlsx");
     }
 
     // ---------- helpers de stubbing ----------
@@ -254,18 +280,16 @@ class ExcelImportServiceImplTest {
 
     private void stubHappyPath(DataRow row, boolean created) {
         SpecialtyResponseDto specialty = new SpecialtyResponseDto(row.specialtyCode(), "Ingeniería en Sistemas");
-        when(specialtyService.findOrCreate(row.specialtyCode()))
-            .thenReturn(new FindOrCreateResult<>(specialty, created));
+        when(specialtyService.findBySpecialtyCode(row.specialtyCode())).thenReturn(specialty);
 
         StudyPlanResponseDto plan = new StudyPlanResponseDto(row.studyPlanCode(), specialty);
-        when(studyPlanService.findOrCreate(row.studyPlanCode(), row.specialtyCode()))
-            .thenReturn(new FindOrCreateResult<>(plan, created));
+        when(studyPlanService.findByPlanCodeAndSpecialtyCode(row.studyPlanCode(), row.specialtyCode()))
+            .thenReturn(plan);
 
         SubjectResponseDto subject = new SubjectResponseDto(10L, row.subjectCode(), row.subjectName(),
             row.termType(), plan);
-        when(subjectService.findOrCreate(row.subjectCode(), row.subjectName(), row.studyPlanCode(),
-            row.specialtyCode(), row.termType()))
-            .thenReturn(new FindOrCreateResult<>(subject, created));
+        when(subjectService.findByCodeAndStudyPlan(row.subjectCode(), row.studyPlanCode(), row.specialtyCode()))
+            .thenReturn(subject);
 
         AcademicPeriodResponseDto period = new AcademicPeriodResponseDto(2026, 0,
             LocalDate.of(2026, 3, 1), LocalDate.of(2026, 11, 30));
@@ -275,28 +299,27 @@ class ExcelImportServiceImplTest {
         int yearLevel = Character.getNumericValue(row.courseCode().charAt(0));
         CommissionResponseDto commission = new CommissionResponseDto(20L, row.courseCode(), row.commissionNumber(),
             yearLevel, period);
-        when(commissionService.findOrCreate(row.courseCode(), row.commissionNumber(), yearLevel, 2026, 0))
-            .thenReturn(new FindOrCreateResult<>(commission, created));
+        when(commissionService.findByCourseAndNumberAndPeriod(row.courseCode(), row.commissionNumber(), 2026, 0))
+            .thenReturn(commission);
 
         SubjectCommissionResponseDto subjectCommission = new SubjectCommissionResponseDto(30L, 10L, 20L,
             row.enrolledCount());
-        when(subjectCommissionService.findOrCreate(10L, 20L, row.enrolledCount()))
-            .thenReturn(new FindOrCreateResult<>(subjectCommission, created));
+        when(subjectCommissionService.findBySubjectAndCommission(10L, 20L))
+            .thenReturn(subjectCommission);
 
         BuildingResponseDto building = new BuildingResponseDto(5, row.buildingName(), 5, true);
-        when(buildingService.findOrCreate(row.buildingName()))
-            .thenReturn(new FindOrCreateResult<>(building, created));
+        when(buildingService.findByName(row.buildingName())).thenReturn(building);
 
         ClassroomResponseDto classroom = new ClassroomResponseDto(5, String.valueOf(row.roomNumber()), 1, 40,
             true, 5, row.buildingName(), 1, "Aula");
-        when(classroomService.findOrCreate(String.valueOf(row.roomNumber()), 5, row.enrolledCount()))
-            .thenReturn(new FindOrCreateResult<>(classroom, created));
+        when(classroomService.findByRoomNumberAndBuilding(String.valueOf(row.roomNumber()), 5))
+            .thenReturn(classroom);
 
         RecurringEventResponseDto event = new RecurringEventResponseDto(1L, EventType.RECURRING,
             row.enrolledCount(), LocalTime.of(18, 30), 90L, DayOfWeek.MONDAY,
             LocalDate.of(2026, 3, 1), LocalDate.of(2026, 11, 30), subject, commission);
-        when(academicEventService.findOrCreateRecurringEvent(any()))
-            .thenReturn(new FindOrCreateResult<>(event.id(), created));
+        when(academicEventService.findRecurringEvent(any()))
+            .thenReturn(event.id());
     }
 
     /** Variante de {@link #stubHappyPath} con ids explícitos, usada por el test de dedupe. */
@@ -304,49 +327,47 @@ class ExcelImportServiceImplTest {
             long subjectId, String courseCode, int commissionNumber, long commissionId, String roomNumber,
             int buildingId, long subjectCommissionId, long eventId) {
         StudyPlanResponseDto plan = new StudyPlanResponseDto(1, specialty);
-        when(studyPlanService.findOrCreate(1, 1)).thenReturn(new FindOrCreateResult<>(plan, true));
+        when(studyPlanService.findByPlanCodeAndSpecialtyCode(1, 1)).thenReturn(plan);
 
         SubjectResponseDto subject = new SubjectResponseDto(subjectId, subjectCode, subjectName, "Anual", plan);
-        when(subjectService.findOrCreate(subjectCode, subjectName, 1, 1, "Anual"))
-            .thenReturn(new FindOrCreateResult<>(subject, true));
+        when(subjectService.findByCodeAndStudyPlan(subjectCode, 1, 1)).thenReturn(subject);
 
         AcademicPeriodResponseDto period = new AcademicPeriodResponseDto(2026, 0,
             LocalDate.of(2026, 3, 1), LocalDate.of(2026, 11, 30));
         when(academicPeriodService.findOrCreate(2026, TermType.ANUAL)).thenReturn(new FindOrCreateResult<>(period, true));
 
         CommissionResponseDto commission = new CommissionResponseDto(commissionId, courseCode, commissionNumber, 6, period);
-        when(commissionService.findOrCreate(courseCode, commissionNumber, 6, 2026, 0))
-            .thenReturn(new FindOrCreateResult<>(commission, true));
+        when(commissionService.findByCourseAndNumberAndPeriod(courseCode, commissionNumber, 2026, 0))
+            .thenReturn(commission);
 
         SubjectCommissionResponseDto subjectCommission =
             new SubjectCommissionResponseDto(subjectCommissionId, subjectId, commissionId, 30);
-        when(subjectCommissionService.findOrCreate(subjectId, commissionId, 30))
-            .thenReturn(new FindOrCreateResult<>(subjectCommission, true));
+        when(subjectCommissionService.findBySubjectAndCommission(subjectId, commissionId))
+            .thenReturn(subjectCommission);
 
         BuildingResponseDto building = new BuildingResponseDto(buildingId, "Edificio Central", 5, true);
-        when(buildingService.findOrCreate("Edificio Central")).thenReturn(new FindOrCreateResult<>(building, true));
+        when(buildingService.findByName("Edificio Central")).thenReturn(building);
 
         ClassroomResponseDto classroom = new ClassroomResponseDto(buildingId, roomNumber, 1, 40, true,
             buildingId, "Edificio Central", 1, "Aula");
-        when(classroomService.findOrCreate(roomNumber, buildingId, 30)).thenReturn(new FindOrCreateResult<>(classroom, true));
+        when(classroomService.findByRoomNumberAndBuilding(roomNumber, buildingId)).thenReturn(classroom);
 
         RecurringEventResponseDto event = new RecurringEventResponseDto(eventId, EventType.RECURRING, 30,
             LocalTime.of(18, 30), 90L, DayOfWeek.MONDAY, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 11, 30),
             subject, commission);
-        when(academicEventService.findOrCreateRecurringEvent(any()))
-            .thenReturn(new FindOrCreateResult<>(event.id(), true));
+        when(academicEventService.findRecurringEvent(any()))
+            .thenReturn(event.id());
     }
 
     private void stubForSecondSubject(SpecialtyResponseDto specialty) {
         StudyPlanResponseDto plan = new StudyPlanResponseDto(1, specialty);
         SubjectResponseDto subject = new SubjectResponseDto(21L, 101, "Álgebra", "Anual", plan);
-        when(subjectService.findOrCreate(101, "Álgebra", 1, 1, "Anual"))
-            .thenReturn(new FindOrCreateResult<>(subject, true));
+        when(subjectService.findByCodeAndStudyPlan(101, 1, 1)).thenReturn(subject);
 
         // Misma comisión (cacheada de la primera fila, id 30L) pero materia distinta (21L):
         // clave de subjectCommission distinta a la de la primera fila, requiere su propio stub.
         SubjectCommissionResponseDto subjectCommission = new SubjectCommissionResponseDto(41L, 21L, 30L, 30);
-        when(subjectCommissionService.findOrCreate(21L, 30L, 30))
-            .thenReturn(new FindOrCreateResult<>(subjectCommission, true));
+        when(subjectCommissionService.findBySubjectAndCommission(21L, 30L))
+            .thenReturn(subjectCommission);
     }
 }

@@ -17,6 +17,9 @@ public interface ClassroomRepository extends JpaRepository<Classroom, Integer>, 
 
     Optional<Classroom> findByRoomNumber(String roomNumber);
 
+    /** Números de aula no siempre son únicos en catálogo (p. ej. "999" código genérico repetido entre edificios). */
+    List<Classroom> findAllByRoomNumber(String roomNumber);
+
     /** Búsqueda por número de aula dentro de un edificio puntual, usada para find-or-create. */
     Optional<Classroom> findByRoomNumberAndBuilding(String roomNumber, Building building);
 
