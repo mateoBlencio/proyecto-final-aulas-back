@@ -5,9 +5,13 @@ meta {
 }
 
 post {
-  url: {{baseUrl}}/v1/allocations/auto-preview/{{previewId}}/confirm
+  url: {{baseUrl}}/v1/allocations/auto-preview/:previewId/confirm
   body: json
-  auth: none
+  auth: inherit
+}
+
+params:path {
+  previewId: prev_00000000
 }
 
 body:json {

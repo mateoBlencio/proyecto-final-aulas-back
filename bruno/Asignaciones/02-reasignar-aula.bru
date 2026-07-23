@@ -5,9 +5,13 @@ meta {
 }
 
 put {
-  url: {{baseUrl}}/v1/allocations/1
+  url: {{baseUrl}}/v1/allocations/:id
   body: json
-  auth: none
+  auth: inherit
+}
+
+params:path {
+  id: 1
 }
 
 body:json {

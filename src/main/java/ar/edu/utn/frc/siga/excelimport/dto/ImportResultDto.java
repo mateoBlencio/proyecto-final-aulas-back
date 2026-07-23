@@ -1,13 +1,11 @@
 package ar.edu.utn.frc.siga.excelimport.dto;
 
 /**
- * Resumen de una importación de Excel: cuántas filas se procesaron y cuántas
- * asignaciones/entidades de dominio se crearon versus se reutilizaron (ya existían).
+ * Resumen de una importación de Excel: filas procesadas y períodos académicos
+ * creados (único dato que este flujo crea; el resto del catálogo se busca y falla
+ * si no existe).
  */
 public record ImportResultDto(
     int processedRows,
-    int assignmentsCreated,
-    int assignmentsReused,
-    int entitiesCreated,
-    int entitiesReused
+    int periodsCreated
 ) {}

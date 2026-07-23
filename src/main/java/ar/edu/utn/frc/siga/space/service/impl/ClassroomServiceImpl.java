@@ -1,6 +1,5 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
-import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
@@ -131,24 +130,10 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     @Override
-    @Transactional
-    public FindOrCreateResult<ClassroomResponseDto> findOrCreate(String roomNumber, Integer buildingId, Integer enrolledCount) {
+    public ClassroomResponseDto findByRoomNumberAndBuilding(String roomNumber, Integer buildingId) {
         Building building = requireBuilding(buildingId);
-        return FindOrCreateResult.resolve(
-                classroomRepository.findByRoomNumberAndBuilding(roomNumber, building),
-                () -> {
-                    log.warn("Creando aula con datos provisionales: roomNumber={}, buildingId={}",
-                            roomNumber, buildingId);
-                    return classroomRepository.save(
-                            Classroom.builder()
-                                    .roomNumber(roomNumber)
-                                    .building(building)
-                                    .floor(0)
-                                    .capacity(enrolledCount != null && enrolledCount > 0 ? enrolledCount : 1)
-                                    .classroomType(classroomTypeService.findDefault())
-                                    .build());
-                }
-        ).map(classroomMapper::toDto);
+        return classroomMapper.toDto(classroomRepository.findByRoomNumberAndBuilding(roomNumber, building)
+                .orElseThrow(() -> ResourceNotFoundException.of("Classroom", roomNumber)));
     }
 
     private Classroom findExistingClassroomById(Integer id) {

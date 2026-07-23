@@ -50,7 +50,7 @@ public interface AllocationService {
      * Batch de {@link #importAllocationsFromDate} para una importación completa: una sola
      * validación de aulas y un solo pase de escritura para todos los eventos, en vez de
      * repetir toda la operación (con sus queries) evento por evento. Asume que cada
-     * {@code recurringEventId} viene de {@code findOrCreateRecurringEvent}, así que no
+     * {@code recurringEventId} viene de {@code findRecurringEvent}, así que no
      * repite la validación de "es evento recurrente" que sí hace {@link #importAllocationsFromDate}.
      */
     int importAllocationsBatch(List<AllocateFromDateRequestDto> items);

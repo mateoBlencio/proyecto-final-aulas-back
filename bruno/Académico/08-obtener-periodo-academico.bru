@@ -1,0 +1,15 @@
+meta {
+  name: Obtener período académico por ID
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/v1/academic-periods/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: 1
+}

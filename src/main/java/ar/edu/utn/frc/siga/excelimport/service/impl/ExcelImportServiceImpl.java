@@ -2,8 +2,6 @@ package ar.edu.utn.frc.siga.excelimport.service.impl;
 
 import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
-import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
-import ar.edu.utn.frc.siga.academic.dto.response.StudyPlanResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
@@ -46,10 +44,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Implementación de la importación masiva desde Excel: valida la plantilla, recorre
- * las filas de datos y por cada una resuelve (o crea) especialidad, plan de estudios,
- * materia, período académico, comisión, edificio y aula, para finalmente crear el
- * evento recurrente y su asignación de aula. Usa {@link ImportCache} para no repetir
- * búsquedas/creaciones de la misma entidad entre filas de la misma importación.
+ * las filas de datos y por cada una busca especialidad, plan de estudios, materia,
+ * comisión, materia-comisión, evento recurrente, edificio y aula (catálogo cargado por
+ * fuera de esta app: falla si no existen), resuelve (o crea) el período académico y
+ * finalmente asigna el aula al evento. Usa {@link ImportCache} para no repetir
+ * búsquedas de la misma entidad entre filas de la misma importación.
  */
 @Service
 @RequiredArgsConstructor
@@ -88,10 +87,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         ImportCache cache = new ImportCache();
 
         int processedRows = 0;
-        int assignmentsCreated = 0;
-        int assignmentsReused = 0;
-        AtomicInteger entitiesCreated = new AtomicInteger(0);
-        AtomicInteger entitiesReused = new AtomicInteger(0);
+        AtomicInteger periodsCreated = new AtomicInteger(0);
 
         // Se acumulan las requests de asignación de todas las filas y se aplican en un solo
         // batch al final: el cuello del import (~2 min con 1300 filas) era repetir, fila por
@@ -112,69 +108,43 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             LocalDate startDate = termType.startDate(year);
             LocalDate endDate = termType.endDate(year);
 
-            // Se resuelven por su efecto (crear/reusar y quedar cacheadas): los pasos
-            // siguientes encadenan por clave natural (dto.specialtyCode()/studyPlanCode()),
-            // no necesitan el DTO en sí.
-            cache.getSpecialty(dto.specialtyCode(), () -> {
-                FindOrCreateResult<SpecialtyResponseDto> r = specialtyService.findOrCreate(dto.specialtyCode());
-                count(r, entitiesCreated, entitiesReused);
-                return r.value();
-            });
+            // Specialty/StudyPlan/Subject/Commission/SubjectCommission/RecurringEvent/Building/
+            // Classroom son catálogo cargado por fuera de esta app: se buscan (fallan si no
+            // existen), nunca se crean desde el import. Solo AcademicPeriod se crea acá.
+            cache.getSpecialty(dto.specialtyCode(), () -> specialtyService.findBySpecialtyCode(dto.specialtyCode()));
 
-            cache.getStudyPlan(dto.studyPlanCode() + "-" + dto.specialtyCode(), () -> {
-                FindOrCreateResult<StudyPlanResponseDto> r =
-                    studyPlanService.findOrCreate(dto.studyPlanCode(), dto.specialtyCode());
-                count(r, entitiesCreated, entitiesReused);
-                return r.value();
-            });
+            cache.getStudyPlan(dto.studyPlanCode() + "-" + dto.specialtyCode(), () ->
+                studyPlanService.findByPlanCodeAndSpecialtyCode(dto.studyPlanCode(), dto.specialtyCode()));
 
             SubjectResponseDto subject = cache.getSubject(
-                dto.subjectCode() + "-" + dto.studyPlanCode() + "-" + dto.specialtyCode(), () -> {
-                    FindOrCreateResult<SubjectResponseDto> r = subjectService.findOrCreate(
-                        dto.subjectCode(), dto.subjectName(), dto.studyPlanCode(), dto.specialtyCode(), dto.termType());
-                    count(r, entitiesCreated, entitiesReused);
-                    return r.value();
-                });
+                dto.subjectCode() + "-" + dto.studyPlanCode() + "-" + dto.specialtyCode(), () ->
+                    subjectService.findByCodeAndStudyPlan(dto.subjectCode(), dto.studyPlanCode(), dto.specialtyCode()));
 
             AcademicPeriodResponseDto period = cache.getPeriod(year + "-" + termType.getSemester(), () -> {
                 FindOrCreateResult<AcademicPeriodResponseDto> r = academicPeriodService.findOrCreate(year, termType);
-                count(r, entitiesCreated, entitiesReused);
+                if (r.created()) periodsCreated.incrementAndGet();
                 return r.value();
             });
 
-            int yearLevel = Character.getNumericValue(dto.courseCode().charAt(0));
             CommissionResponseDto commission = cache.getCommission(
-                dto.courseCode() + "-" + dto.commissionNumber() + "-" + period.year() + "-" + period.semester(), () -> {
-                    FindOrCreateResult<CommissionResponseDto> r = commissionService.findOrCreate(
-                        dto.courseCode(), dto.commissionNumber(), yearLevel, period.year(), period.semester());
-                    count(r, entitiesCreated, entitiesReused);
-                    return r.value();
-                });
+                dto.courseCode() + "-" + dto.commissionNumber() + "-" + period.year() + "-" + period.semester(), () ->
+                    commissionService.findByCourseAndNumberAndPeriod(
+                        dto.courseCode(), dto.commissionNumber(), period.year(), period.semester()));
 
-            cache.getSubjectCommission(subject.id() + "-" + commission.id(), () -> {
-                var r = subjectCommissionService.findOrCreate(subject.id(), commission.id(), dto.enrolledCount());
-                count(r, entitiesCreated, entitiesReused);
-                return r.value();
-            });
+            cache.getSubjectCommission(subject.id() + "-" + commission.id(), () ->
+                subjectCommissionService.findBySubjectAndCommission(subject.id(), commission.id()));
 
-            BuildingResponseDto building = cache.getBuilding(dto.buildingName(), () -> {
-                FindOrCreateResult<BuildingResponseDto> r = buildingService.findOrCreate(dto.buildingName());
-                count(r, entitiesCreated, entitiesReused);
-                return r.value();
-            });
+            BuildingResponseDto building = cache.getBuilding(dto.buildingName(), () ->
+                buildingService.findByName(dto.buildingName()));
 
-            ClassroomResponseDto classroom = cache.getClassroom(dto.roomNumber() + "-" + building.id(), () -> {
-                FindOrCreateResult<ClassroomResponseDto> r = classroomService.findOrCreate(
-                    dto.roomNumber(), building.id(), dto.enrolledCount());
-                count(r, entitiesCreated, entitiesReused);
-                return r.value();
-            });
+            ClassroomResponseDto classroom = cache.getClassroom(dto.roomNumber() + "-" + building.id(), () ->
+                classroomService.findByRoomNumberAndBuilding(dto.roomNumber(), building.id()));
 
             int durationMinutes = dto.durationMinutes() != null
                 ? dto.durationMinutes()
                 : (int) Duration.between(dto.startTime(), dto.endTime()).toMinutes();
 
-            var eventResult = academicEventService.findOrCreateRecurringEvent(
+            Long eventId = academicEventService.findRecurringEvent(
                 new CreateRecurringEventRequestDto(
                     dto.enrolledCount(),
                     dto.startTime(),
@@ -188,14 +158,12 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             );
 
             pendingAllocations.add(new AllocateFromDateRequestDto(
-                eventResult.value(),
+                eventId,
                 startDate,
                 classroom.id(),
                 "Importado de Excel"
             ));
 
-            if (eventResult.created()) assignmentsCreated++;
-            else assignmentsReused++;
             processedRows++;
             log.debug("Fila {}: subject={}, commission={}, classroom={}",
                 rowNum, subject.name(), commission.commissionNumber(), dto.roomNumber());
@@ -210,15 +178,9 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
         allocationService.importAllocationsBatch(pendingAllocations);
 
-        log.info("Importación completada: {} filas, {} eventos creados", processedRows, assignmentsCreated);
+        log.info("Importación completada: {} filas, {} períodos creados", processedRows, periodsCreated.get());
 
-        return new ImportResultDto(processedRows, assignmentsCreated,
-            assignmentsReused, entitiesCreated.get(), entitiesReused.get());
-    }
-
-    private <T> void count(FindOrCreateResult<T> result, AtomicInteger created, AtomicInteger reused) {
-        if (result.created()) created.incrementAndGet();
-        else reused.incrementAndGet();
+        return new ImportResultDto(processedRows, periodsCreated.get());
     }
 
     private boolean isRowEmpty(Row row) {

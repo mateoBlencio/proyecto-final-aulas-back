@@ -8,13 +8,11 @@ import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
 import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
-import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -23,9 +21,6 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -88,8 +83,19 @@ class SubjectServiceImplTest {
     }
 
     @Test
-    @DisplayName("findOrCreate: si la materia ya existe para ese plan, no la crea y created queda en false")
-    void findOrCreateWithExistingSubjectDoesNotSave() {
+    @DisplayName("findAll: mapea todas las materias del repositorio")
+    void findAllMapsAllSubjects() {
+        Subject subject = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
+        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null);
+        when(subjectRepository.findAll()).thenReturn(List.of(subject));
+        when(subjectMapper.toDto(subject)).thenReturn(dto);
+
+        assertThat(service.findAll()).containsExactly(dto);
+    }
+
+    @Test
+    @DisplayName("findByCodeAndStudyPlan: devuelve el DTO mapeado cuando la materia existe para ese plan")
+    void findByCodeAndStudyPlanReturnsMappedDto() {
         Subject existing = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
         SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", "Anual", null);
         when(specialtyRepository.findBySpecialtyCode(10)).thenReturn(Optional.of(specialty));
@@ -97,60 +103,41 @@ class SubjectServiceImplTest {
         when(subjectRepository.findByCodeAndStudyPlan(101, studyPlan)).thenReturn(Optional.of(existing));
         when(subjectMapper.toDto(existing)).thenReturn(dto);
 
-        FindOrCreateResult<SubjectResponseDto> result =
-                service.findOrCreate(101, "Algoritmos", 2020, 10, "Anual");
+        SubjectResponseDto result = service.findByCodeAndStudyPlan(101, 2020, 10);
 
-        assertThat(result.created()).isFalse();
-        assertThat(result.value()).isEqualTo(dto);
-        verify(subjectRepository, never()).save(any());
+        assertThat(result).isEqualTo(dto);
     }
 
     @Test
-    @DisplayName("findOrCreate: si no existe, crea la materia con code/name/studyPlan/term y created queda en true")
-    void findOrCreateWithoutExistingSubjectCreatesWithGivenFields() {
-        when(specialtyRepository.findBySpecialtyCode(10)).thenReturn(Optional.of(specialty));
-        when(studyPlanRepository.findByPlanCodeAndSpecialty(2020, specialty)).thenReturn(Optional.of(studyPlan));
-        when(subjectRepository.findByCodeAndStudyPlan(101, studyPlan)).thenReturn(Optional.empty());
-        when(subjectRepository.save(any())).thenAnswer(invocation -> {
-            Subject toSave = invocation.getArgument(0);
-            toSave.setId(7L);
-            return toSave;
-        });
-        when(subjectMapper.toDto(any())).thenReturn(new SubjectResponseDto(7L, 101, "Algoritmos", "Anual", null));
-
-        FindOrCreateResult<SubjectResponseDto> result =
-                service.findOrCreate(101, "Algoritmos", 2020, 10, "Anual");
-
-        assertThat(result.created()).isTrue();
-
-        ArgumentCaptor<Subject> captor = ArgumentCaptor.forClass(Subject.class);
-        verify(subjectRepository).save(captor.capture());
-        Subject saved = captor.getValue();
-        assertThat(saved.getCode()).isEqualTo(101);
-        assertThat(saved.getName()).isEqualTo("Algoritmos");
-        assertThat(saved.getStudyPlan()).isEqualTo(studyPlan);
-        assertThat(saved.getTerm()).isEqualTo("Anual");
-    }
-
-    @Test
-    @DisplayName("findOrCreate: si la especialidad no existe, lanza ResourceNotFoundException y no consulta el plan")
-    void findOrCreateWithMissingSpecialtyThrowsResourceNotFound() {
+    @DisplayName("findByCodeAndStudyPlan: si la especialidad no existe, lanza ResourceNotFoundException y no consulta el plan")
+    void findByCodeAndStudyPlanWithMissingSpecialtyThrowsResourceNotFound() {
         when(specialtyRepository.findBySpecialtyCode(999)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.findOrCreate(101, "Algoritmos", 2020, 999, "Anual"))
+        assertThatThrownBy(() -> service.findByCodeAndStudyPlan(101, 2020, 999))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Specialty not found with id: 999");
-        verify(studyPlanRepository, never()).findByPlanCodeAndSpecialty(any(), any());
     }
 
     @Test
-    @DisplayName("findOrCreate: si el plan de estudio no existe para esa especialidad, lanza ResourceNotFoundException")
-    void findOrCreateWithMissingStudyPlanThrowsResourceNotFound() {
+    @DisplayName("findByCodeAndStudyPlan: si el plan de estudio no existe para esa especialidad, lanza ResourceNotFoundException")
+    void findByCodeAndStudyPlanWithMissingStudyPlanThrowsResourceNotFound() {
         when(specialtyRepository.findBySpecialtyCode(10)).thenReturn(Optional.of(specialty));
         when(studyPlanRepository.findByPlanCodeAndSpecialty(2020, specialty)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.findOrCreate(101, "Algoritmos", 2020, 10, "Anual"))
+        assertThatThrownBy(() -> service.findByCodeAndStudyPlan(101, 2020, 10))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("StudyPlan not found with id: 2020");
+    }
+
+    @Test
+    @DisplayName("findByCodeAndStudyPlan: si la materia no existe para ese plan, lanza ResourceNotFoundException")
+    void findByCodeAndStudyPlanWithMissingSubjectThrowsResourceNotFound() {
+        when(specialtyRepository.findBySpecialtyCode(10)).thenReturn(Optional.of(specialty));
+        when(studyPlanRepository.findByPlanCodeAndSpecialty(2020, specialty)).thenReturn(Optional.of(studyPlan));
+        when(subjectRepository.findByCodeAndStudyPlan(101, studyPlan)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.findByCodeAndStudyPlan(101, 2020, 10))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Subject not found with id: 101");
     }
 }

@@ -1,13 +1,13 @@
 meta {
   name: Crear evento recurrente
   type: http
-  seq: 5
+  seq: 3
 }
 
 post {
   url: {{baseUrl}}/v1/events/recurring
   body: json
-  auth: none
+  auth: inherit
 }
 
 body:json {

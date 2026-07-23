@@ -1,13 +1,13 @@
 meta {
   name: Crear evento único
   type: http
-  seq: 6
+  seq: 4
 }
 
 post {
   url: {{baseUrl}}/v1/events/unique
   body: json
-  auth: none
+  auth: inherit
 }
 
 body:json {

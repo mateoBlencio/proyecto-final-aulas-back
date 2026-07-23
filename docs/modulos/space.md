@@ -4,19 +4,22 @@
 
 Catálogo físico: **aulas** (`Classroom`), **edificios** (`Building`) y **tipos de
 aula** (`ClassroomType`). Provee a `allocation` y `excelimport` los datos de aula
-(por ID + DTO) y el `findOrCreate` usado en la importación.
+(por ID + DTO).
 
 No decide asignaciones ni conoce eventos; es el módulo de referencia espacial.
 
 ## API pública (`::api`)
 
-Servicios marcados `@NamedInterface("api")`:
+Servicios marcados `@NamedInterface("api")`. Aula/edificio son **catálogo cargado por
+fuera de esta app**: `findByRoomNumberAndBuilding`/`findByName` buscan y lanzan
+`ResourceNotFoundException` si no existen, nunca crean — mismo seam de proveedor de
+datos que `academic` (ver [academic.md](academic.md)).
 
 | Servicio | Métodos clave |
 |---|---|
-| `ClassroomService` | `create`, `findById`, `findAllAvailable`, `findByIds`, `findAll(filter,pageable)`, `update`, `delete`, `findOrCreate` |
-| `BuildingService` | `findAll` (+ lo que consuma excelimport) |
-| `ClassroomTypeService` | interfaz existe, **sin controller** |
+| `ClassroomService` | `create`, `findById`, `findAllAvailable`, `findByIds`, `findAll(filter,pageable)`, `update`, `delete`, `findByRoomNumberAndBuilding` |
+| `BuildingService` | `findAll`, `findByName` |
+| `ClassroomTypeService` | `findById`, **sin controller** |
 
 Endpoints REST:
 
@@ -58,10 +61,6 @@ Solo `common`. No depende de ningún otro módulo de dominio (hoja del grafo, ju
 - **`ClassroomType` sin endpoints.** Existe servicio y entidad, pero no hay controller.
   El front no puede listar/crear tipos vía API; hoy solo se materializan por importación.
 - **`Building` solo lectura.** No hay alta/baja/edición de edificios por API.
-- **`findOrCreate` sin manejo de carrera.** Dos importaciones concurrentes (o filas que
-  resuelven el mismo aula) pueden intentar crear duplicados; la unique constraint
-  `(id_edificio, num_aula)` lo frena a nivel BD pero se traduce en excepción cruda, no en
-  reintento/resolución. Revisar si importa para el caso de uso.
 - **`available` vs `deleted`**: documentar (o unificar) la semántica; el filtro expone
   `available` pero no `deleted` (correcto), aunque no está escrito en ningún lado.
 - **`ClassroomFilter` sin validación de rangos**: `capacityMin > capacityMax` produce
@@ -74,7 +73,8 @@ Solo `common`. No depende de ningún otro módulo de dominio (hoja del grafo, ju
 ### Unitarios recomendados
 - `ClassroomSpecification.withFilter`: cada predicado por separado y combinados
   (roomNumber `like` case-insensitive, rango de capacidad, building/type/floor/available).
-- `ClassroomServiceImpl.findOrCreate`: rama "encontrada" vs "creada" (`FindOrCreateResult`).
+- `ClassroomServiceImpl.findByRoomNumberAndBuilding`: rama "encontrada" vs
+  `ResourceNotFoundException` (aula o edificio inexistente).
 - Mapeo MapStruct `Classroom ↔ ClassroomResponseDto` (incl. buildingId aplanado).
 
 ### Integración (Testcontainers) recomendados

@@ -1,6 +1,5 @@
 package ar.edu.utn.frc.siga.space.service;
 
-import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
@@ -45,9 +44,9 @@ public interface ClassroomService {
     void delete(Integer id);
 
     /**
-     * Busca un aula por número dentro de un edificio; si no existe, la crea con datos
-     * provisionales (piso 0, capacidad igual a {@code enrolledCount} o 1, tipo por defecto).
-     * Usado por flujos que reciben aulas como texto libre (p. ej. importación de Excel).
+     * Busca un aula por número dentro de un edificio; lanza {@code ResourceNotFoundException}
+     * si el aula o el edificio no existen. Usado por flujos que reciben aulas como texto
+     * libre (p. ej. importación de Excel).
      */
-    FindOrCreateResult<ClassroomResponseDto> findOrCreate(String roomNumber, Integer buildingId, Integer enrolledCount);
+    ClassroomResponseDto findByRoomNumberAndBuilding(String roomNumber, Integer buildingId);
 }

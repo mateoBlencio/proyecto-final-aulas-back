@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
-import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
+import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.mapper.BuildingMapper;
 import ar.edu.utn.frc.siga.space.model.Building;
@@ -36,18 +36,14 @@ public class BuildingServiceImpl implements BuildingService {
     }
 
     @Override
-    @Transactional
-    public FindOrCreateResult<BuildingResponseDto> findOrCreate(String name) {
-        return FindOrCreateResult.resolve(
-                buildingRepository.findByName(name),
-                () -> {
-                    log.warn("Creando Building con datos provisionales: name={}", name);
-                    return buildingRepository.save(
-                            Building.builder()
-                                    .name(name)
-                                    .floorCount(0)
-                                    .build());
-                }
-        ).map(buildingMapper::toDto);
+    public BuildingResponseDto findById(Integer id) {
+        return buildingMapper.toDto(buildingRepository.findById(id)
+                .orElseThrow(() -> ResourceNotFoundException.of("Building", id)));
+    }
+
+    @Override
+    public BuildingResponseDto findByName(String name) {
+        return buildingMapper.toDto(buildingRepository.findByName(name)
+                .orElseThrow(() -> ResourceNotFoundException.of("Building", name)));
     }
 }
