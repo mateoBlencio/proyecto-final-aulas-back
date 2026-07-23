@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/allocations/unassigned?from=2026-08-01&to=2026-12-15
+  url: {{baseUrl}}/v1/allocations/unassigned?from=2026-08-01&to=2026-12-15&includePast=false
   body: none
   auth: inherit
 }
@@ -13,16 +13,20 @@ get {
 params:query {
   from: 2026-08-01
   to: 2026-12-15
+  includePast: false
 }
 
 docs {
   Eventos con ocurrencias SCHEDULED (sin aula) en el rango [from, to], agrupados por
   evento.
-  
-  Ambos query params son opcionales:
+
+  Query params opcionales:
   - from: si se omite, es hoy.
   - to: si se omite, es la fecha de fin (endDate) del período académico activo (el mayor
     si hay más de uno); si no hay período activo o no tiene endDate, from + 6 meses.
-  
+  - includePast: si se omite, false. Excluye ocurrencias cuya fecha+hora de inicio ya
+    pasó (por diseño: no son accionables). true incluye esas ocurrencias (uso: auditoría
+    de clases que quedaron sin aula).
+
   'to' anterior a 'from' → 400 Bad Request.
 }

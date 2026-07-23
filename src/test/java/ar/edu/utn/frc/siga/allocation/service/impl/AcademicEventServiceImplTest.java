@@ -178,7 +178,7 @@ class AcademicEventServiceImplTest {
         LocalDate from = LocalDate.of(2026, 3, 10);
         LocalDate to = from.minusDays(1);
 
-        assertThatThrownBy(() -> service.findUnassignedEvents(from, to))
+        assertThatThrownBy(() -> service.findUnassignedEvents(from, to, false))
                 .isInstanceOf(InvalidDateRangeException.class);
     }
 
@@ -190,7 +190,7 @@ class AcademicEventServiceImplTest {
                 .thenReturn(List.of());
         when(composer.compose(anyCollection())).thenReturn(List.of());
 
-        service.findUnassignedEvents(null, null);
+        service.findUnassignedEvents(null, null, false);
 
         verify(occurrenceRepository).findByStatusAndDateGreaterThanEqualOrderByEvent_IdAscDateAsc(
                 OccurrenceStatus.SCHEDULED, LocalDate.now());
@@ -214,7 +214,7 @@ class AcademicEventServiceImplTest {
             return events.stream().map(e -> dummyRecurringResponseDto(e.getId())).toList();
         });
 
-        List<AcademicEventResponseDto> result = service.findUnassignedEvents(from, to);
+        List<AcademicEventResponseDto> result = service.findUnassignedEvents(from, to, true);
 
         assertThat(result).hasSize(2);
         assertThat(result.get(0).id()).isEqualTo(1L);

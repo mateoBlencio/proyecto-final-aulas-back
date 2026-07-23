@@ -52,17 +52,18 @@ public class AllocationProblemServiceImpl implements AllocationProblemService {
     private final AcademicEventComposer academicEventComposer;
 
     @Override
-    public List<AcademicEventResponseDto> findUnassigned(LocalDate from, LocalDate to) {
+    public List<AcademicEventResponseDto> findUnassigned(LocalDate from, LocalDate to, boolean includePast) {
         Range range = resolveRange(from, to);
-        List<AcademicEventResponseDto> unassigned = academicEventService.findUnassignedEvents(range.from(), range.to());
+        List<AcademicEventResponseDto> unassigned =
+                academicEventService.findUnassignedEvents(range.from(), range.to(), includePast);
         log.info("Eventos sin aula listados: count={}", unassigned.size());
         return unassigned;
     }
 
     @Override
-    public List<OvercrowdedAllocationDto> findOvercrowded(LocalDate from, LocalDate to) {
+    public List<OvercrowdedAllocationDto> findOvercrowded(LocalDate from, LocalDate to, boolean includePast) {
         Range range = resolveRange(from, to);
-        List<Allocation> occupancy = readOccupancy(range);
+        List<Allocation> occupancy = readOccupancy(range, includePast);
 
         Map<OvercrowdKey, OvercrowdAcc> overcrowdAccs = new LinkedHashMap<>();
         for (Allocation allocation : occupancy) {
@@ -87,9 +88,9 @@ public class AllocationProblemServiceImpl implements AllocationProblemService {
     }
 
     @Override
-    public List<ClassroomOverlapDto> findOverlaps(LocalDate from, LocalDate to) {
+    public List<ClassroomOverlapDto> findOverlaps(LocalDate from, LocalDate to, boolean includePast) {
         Range range = resolveRange(from, to);
-        List<Allocation> occupancy = readOccupancy(range);
+        List<Allocation> occupancy = readOccupancy(range, includePast);
 
         Map<GroupKey, List<Allocation>> byClassroomAndDate = new LinkedHashMap<>();
         for (Allocation allocation : occupancy) {
@@ -114,8 +115,11 @@ public class AllocationProblemServiceImpl implements AllocationProblemService {
         return overlaps;
     }
 
-    private List<Allocation> readOccupancy(Range range) {
-        return allocationRepository.findOccupancyBetween(range.from(), range.to(), OccurrenceStatus.ASSIGNED);
+    private List<Allocation> readOccupancy(Range range, boolean includePast) {
+        List<Allocation> occupancy =
+                allocationRepository.findOccupancyBetween(range.from(), range.to(), OccurrenceStatus.ASSIGNED);
+        if (includePast) return occupancy;
+        return occupancy.stream().filter(a -> !a.getOccurrence().isPast()).toList();
     }
 
     private Map<Integer, ClassroomResponseDto> fetchClassroomsById(Set<Integer> ids) {

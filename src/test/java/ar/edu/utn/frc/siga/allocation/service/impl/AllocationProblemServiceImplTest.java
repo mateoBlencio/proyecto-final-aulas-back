@@ -42,6 +42,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
@@ -68,7 +69,7 @@ class AllocationProblemServiceImplTest {
     @BeforeEach
     void setUp() {
         lenient().when(allocationRepository.findOccupancyBetween(any(), any(), any())).thenReturn(List.of());
-        lenient().when(academicEventService.findUnassignedEvents(any(), any())).thenReturn(List.of());
+        lenient().when(academicEventService.findUnassignedEvents(any(), any(), anyBoolean())).thenReturn(List.of());
         lenient().when(academicPeriodService.findActive()).thenReturn(List.of());
         lenient().when(classroomService.findByIds(any())).thenReturn(List.of());
         lenient().when(academicEventComposer.composeById(ArgumentMatchers.<List<? extends AcademicEvent>>any()))
@@ -95,7 +96,7 @@ class AllocationProblemServiceImplTest {
                 .thenReturn(List.of(allocation));
         when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 30)));
 
-        List<OvercrowdedAllocationDto> result = service.findOvercrowded(from, to);
+        List<OvercrowdedAllocationDto> result = service.findOvercrowded(from, to, false);
 
         assertThat(result).hasSize(1);
         OvercrowdedAllocationDto overcrowded = result.getFirst();
@@ -117,7 +118,7 @@ class AllocationProblemServiceImplTest {
                 .thenReturn(List.of(allocation));
         when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 30)));
 
-        assertThat(service.findOvercrowded(from, to)).isEmpty();
+        assertThat(service.findOvercrowded(from, to, false)).isEmpty();
     }
 
     @Test
@@ -132,7 +133,7 @@ class AllocationProblemServiceImplTest {
                 .thenReturn(List.of(allocation));
         when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 30)));
 
-        assertThat(service.findOvercrowded(from, to)).isEmpty();
+        assertThat(service.findOvercrowded(from, to, false)).isEmpty();
     }
 
     @Test
@@ -150,7 +151,7 @@ class AllocationProblemServiceImplTest {
                 .thenReturn(List.of(allocA, allocB));
         when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 100)));
 
-        List<ClassroomOverlapDto> result = service.findOverlaps(from, to);
+        List<ClassroomOverlapDto> result = service.findOverlaps(from, to, false);
 
         assertThat(result).hasSize(1);
         ClassroomOverlapDto overlap = result.getFirst();
@@ -175,7 +176,7 @@ class AllocationProblemServiceImplTest {
                 .thenReturn(List.of(allocA, allocB));
         when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 100), classroom(6, 100)));
 
-        assertThat(service.findOverlaps(from, to)).isEmpty();
+        assertThat(service.findOverlaps(from, to, false)).isEmpty();
     }
 
     @Test
@@ -192,7 +193,7 @@ class AllocationProblemServiceImplTest {
                 .thenReturn(List.of(allocA, allocB));
         when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 100)));
 
-        assertThat(service.findOverlaps(from, to)).isEmpty();
+        assertThat(service.findOverlaps(from, to, false)).isEmpty();
     }
 
     @Test
@@ -210,7 +211,7 @@ class AllocationProblemServiceImplTest {
                 .thenReturn(List.of(allocA, allocB));
         when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 100)));
 
-        assertThat(service.findOverlaps(from, to)).isEmpty();
+        assertThat(service.findOverlaps(from, to, false)).isEmpty();
     }
 
     @Test
@@ -232,7 +233,7 @@ class AllocationProblemServiceImplTest {
                 .thenReturn(List.of(allocA1, allocB1, allocA2, allocB2));
         when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 100)));
 
-        List<ClassroomOverlapDto> result = service.findOverlaps(from, to);
+        List<ClassroomOverlapDto> result = service.findOverlaps(from, to, false);
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().dates()).containsExactly(date1, date2);
@@ -245,7 +246,7 @@ class AllocationProblemServiceImplTest {
         when(academicPeriodService.findActive()).thenReturn(List.of(
                 new AcademicPeriodResponseDto(2026, 2, LocalDate.now().minusDays(10), endDate)));
 
-        service.findOvercrowded(null, null);
+        service.findOvercrowded(null, null, false);
 
         ArgumentCaptor<LocalDate> toCaptor = ArgumentCaptor.forClass(LocalDate.class);
         verify(allocationRepository).findOccupancyBetween(any(), toCaptor.capture(), eq(OccurrenceStatus.ASSIGNED));
@@ -257,7 +258,7 @@ class AllocationProblemServiceImplTest {
     void usaFallbackSeisMesesSinPeriodoActivo() {
         LocalDate from = LocalDate.of(2026, 8, 1);
 
-        service.findOvercrowded(from, null);
+        service.findOvercrowded(from, null, false);
 
         ArgumentCaptor<LocalDate> toCaptor = ArgumentCaptor.forClass(LocalDate.class);
         verify(allocationRepository).findOccupancyBetween(eq(from), toCaptor.capture(), eq(OccurrenceStatus.ASSIGNED));
@@ -270,7 +271,7 @@ class AllocationProblemServiceImplTest {
         LocalDate from = LocalDate.of(2026, 8, 10);
         LocalDate to = LocalDate.of(2026, 8, 1);
 
-        assertThatThrownBy(() -> service.findOvercrowded(from, to))
+        assertThatThrownBy(() -> service.findOvercrowded(from, to, false))
                 .isInstanceOf(InvalidDateRangeException.class);
     }
 
@@ -279,10 +280,10 @@ class AllocationProblemServiceImplTest {
     void findUnassignedDelegaConToResuelto() {
         LocalDate from = LocalDate.of(2026, 8, 1);
 
-        service.findUnassigned(from, null);
+        service.findUnassigned(from, null, false);
 
         ArgumentCaptor<LocalDate> toCaptor = ArgumentCaptor.forClass(LocalDate.class);
-        verify(academicEventService).findUnassignedEvents(eq(from), toCaptor.capture());
+        verify(academicEventService).findUnassignedEvents(eq(from), toCaptor.capture(), eq(false));
         assertThat(toCaptor.getValue()).isEqualTo(from.plusMonths(6));
     }
 

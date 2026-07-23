@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/allocations/overlaps?from=2026-08-01&to=2026-12-15
+  url: {{baseUrl}}/v1/allocations/overlaps?from=2026-08-01&to=2026-12-15&includePast=false
   body: none
   auth: inherit
 }
@@ -13,11 +13,14 @@ get {
 params:query {
   from: 2026-08-01
   to: 2026-12-15
+  includePast: false
 }
 
 docs {
   Pares de eventos cuyos horarios se superponen en la misma aula, en el rango [from, to].
   Una fila por par, con todas las fechas en que chocan.
-  
+
   Rango por defecto y 400 por rango inválido: igual que GET /v1/allocations/unassigned.
+  includePast (default false): igual semántica que /unassigned, excluye ocurrencias ya
+  pasadas salvo que se pida explícitamente.
 }

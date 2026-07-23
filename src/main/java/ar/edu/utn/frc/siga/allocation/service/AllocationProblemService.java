@@ -19,12 +19,21 @@ import java.util.List;
  */
 public interface AllocationProblemService {
 
-    /** Eventos con ocurrencias SCHEDULED (sin aula) en el rango. */
-    List<AcademicEventResponseDto> findUnassigned(LocalDate from, LocalDate to);
+    /**
+     * Eventos con ocurrencias SCHEDULED (sin aula) en el rango. Excluye ocurrencias ya
+     * pasadas salvo que {@code includePast} sea true.
+     */
+    List<AcademicEventResponseDto> findUnassigned(LocalDate from, LocalDate to, boolean includePast);
 
-    /** Pares evento-aula donde los inscriptos superan la capacidad del aula asignada. */
-    List<OvercrowdedAllocationDto> findOvercrowded(LocalDate from, LocalDate to);
+    /**
+     * Pares evento-aula donde los inscriptos superan la capacidad del aula asignada.
+     * Excluye ocurrencias ya pasadas salvo que {@code includePast} sea true.
+     */
+    List<OvercrowdedAllocationDto> findOvercrowded(LocalDate from, LocalDate to, boolean includePast);
 
-    /** Pares de eventos cuyos horarios se superponen en la misma aula. */
-    List<ClassroomOverlapDto> findOverlaps(LocalDate from, LocalDate to);
+    /**
+     * Pares de eventos cuyos horarios se superponen en la misma aula. Excluye
+     * ocurrencias ya pasadas salvo que {@code includePast} sea true.
+     */
+    List<ClassroomOverlapDto> findOverlaps(LocalDate from, LocalDate to, boolean includePast);
 }

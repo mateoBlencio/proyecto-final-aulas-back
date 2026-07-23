@@ -147,12 +147,13 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
     /**
      * Agrupa por evento las occurrences en SCHEDULED entre {@code from} (default hoy) y
-     * {@code to} (sin límite superior si es null); excluye ASSIGNED/CANCELLED/SUSPENDED.
+     * {@code to} (sin límite superior si es null); excluye ASSIGNED/CANCELLED/SUSPENDED y
+     * las ya pasadas (fecha+hora de inicio, ver {@link Occurrence#isPast()}).
      * Rechaza el rango si {@code to} es anterior a {@code from}.
      */
     @Override
     @Transactional(readOnly = true)
-    public List<AcademicEventResponseDto> findUnassignedEvents(LocalDate from, LocalDate to) {
+    public List<AcademicEventResponseDto> findUnassignedEvents(LocalDate from, LocalDate to, boolean includePast) {
         LocalDate effectiveFrom = DateRanges.defaultFrom(from);
         DateRanges.requireNotBefore(to, effectiveFrom);
 
@@ -164,6 +165,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
         Map<Long, AcademicEvent> eventById = new LinkedHashMap<>();
         for (Occurrence occurrence : occurrences) {
+            if (!includePast && occurrence.isPast()) continue;
             AcademicEvent event = occurrence.getEvent();
             eventById.putIfAbsent(event.getId(), event);
         }

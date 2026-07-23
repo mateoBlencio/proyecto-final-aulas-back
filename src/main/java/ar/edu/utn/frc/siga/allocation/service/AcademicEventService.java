@@ -36,7 +36,8 @@ public interface AcademicEventService {
     /**
      * Lista, agrupados por evento, los eventos con occurrences en SCHEDULED entre
      * {@code from} (default hoy) y {@code to} (sin límite superior si es null). Excluye
-     * occurrences ASSIGNED/CANCELLED/SUSPENDED.
+     * occurrences ASSIGNED/CANCELLED/SUSPENDED, y las ya pasadas salvo que
+     * {@code includePast} sea true.
      */
-    List<AcademicEventResponseDto> findUnassignedEvents(LocalDate from, LocalDate to);
+    List<AcademicEventResponseDto> findUnassignedEvents(LocalDate from, LocalDate to, boolean includePast);
 }
