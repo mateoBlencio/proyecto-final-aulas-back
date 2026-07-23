@@ -53,7 +53,9 @@ import org.springframework.boot.test.context.TestConfiguration;
 @RequiredArgsConstructor
 public class IntegrationTestData {
 
-    private static final AtomicLong SEQ = new AtomicLong(System.nanoTime());
+    // % 1_000_000_000L acota a 9 dígitos: nanoTime() crudo (~19 dígitos) rompe columnas angostas
+    // como aula.num_aula (varchar(20)) al concatenarle un prefijo ("AULA-" + nextSeq()).
+    private static final AtomicLong SEQ = new AtomicLong(System.nanoTime() % 1_000_000_000L);
 
     private final BuildingRepository buildingRepository;
     private final ClassroomRepository classroomRepository;
