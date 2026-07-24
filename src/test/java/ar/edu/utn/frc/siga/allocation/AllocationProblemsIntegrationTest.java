@@ -21,6 +21,7 @@ import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -112,7 +113,8 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
                         .param("from", from.toString()).param("to", to.toString()))
                 .andExpect(status().isOk())
                 .andReturn();
-        return objectMapper.readValue(result.getResponse().getContentAsString(), type);
+        JsonNode content = objectMapper.readTree(result.getResponse().getContentAsString()).get("content");
+        return objectMapper.readValue(objectMapper.writeValueAsString(content), type);
     }
 
     @Test
@@ -181,7 +183,7 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/v1/allocations/unassigned"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.id == " + eventId + ")]").exists());
+                .andExpect(jsonPath("$.content[?(@.id == " + eventId + ")]").exists());
     }
 
     @Test
