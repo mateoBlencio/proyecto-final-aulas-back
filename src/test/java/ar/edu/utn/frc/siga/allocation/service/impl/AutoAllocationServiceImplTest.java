@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
+import ar.edu.utn.frc.siga.allocation.config.EventScheduleProperties;
 import ar.edu.utn.frc.siga.allocation.dto.request.AutoPreviewRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.ConfirmAutoPreviewRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.PreviewAllocationDto;
@@ -103,7 +104,7 @@ class AutoAllocationServiceImplTest {
         // los repos mockeados para ejercitar dedup/pinned/fechas a través del servicio.
         AutoAllocationDataLoader dataLoader = new AutoAllocationDataLoader(
                 eventRepository, occurrenceRepository, allocationRepository, classroomService);
-        AllocationValidator validator = new AllocationValidator(classroomService, allocationRepository);
+        AllocationValidator validator = new AllocationValidator(classroomService, allocationRepository, new EventScheduleProperties());
         AllocationWriter writer = new AllocationWriter(allocationRepository, validator);
         service = new AutoAllocationServiceImpl(dataLoader, classroomService, academicEventComposer, solverService,
                 occurrenceRepository, allocationComposer, validator, writer);

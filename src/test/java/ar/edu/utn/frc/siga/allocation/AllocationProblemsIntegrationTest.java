@@ -5,20 +5,23 @@ import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateRecurringEventRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ClassroomOverlapDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OvercrowdedAllocationDto;
+import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.allocation.model.Occurrence;
 import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.allocation.repository.UniqueEventRepository;
 import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -60,6 +63,8 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private AllocationRepository allocationRepository;
     @Autowired
+    private UniqueEventRepository uniqueEventRepository;
+    @Autowired
     private AcademicPeriodService academicPeriodService;
     @Autowired
     private ObjectMapper objectMapper;
@@ -87,12 +92,29 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
         occurrenceRepository.save(occurrence);
     }
 
+    /**
+     * Siembra un evento único SCHEDULED sin aula, directo por repositorio: el endpoint
+     * {@code POST /v1/events/unique} exige aula obligatoria (alta atómica), así que este
+     * caso -pensado solo para ejercitar el listado de "unassigned"- construye la entidad a
+     * mano en vez de pasar por el service.
+     */
+    private Long seedUniqueEventWithoutClassroom(LocalDate date, Integer enrolled) {
+        UniqueEvent event = UniqueEvent.builder()
+                .enrolled(enrolled).startTime(START).duration(java.time.Duration.ofMinutes(DURATION))
+                .date(date).description("Evento en el límite del período")
+                .build();
+        AcademicEvent saved = uniqueEventRepository.save(event);
+        occurrenceRepository.saveAll(saved.toOccurrences());
+        return saved.getId();
+    }
+
     private <T> T[] getList(String path, LocalDate from, LocalDate to, Class<T[]> type) throws Exception {
         MvcResult result = mockMvc.perform(get(path)
                         .param("from", from.toString()).param("to", to.toString()))
                 .andExpect(status().isOk())
                 .andReturn();
-        return objectMapper.readValue(result.getResponse().getContentAsString(), type);
+        JsonNode content = objectMapper.readTree(result.getResponse().getContentAsString()).get("content");
+        return objectMapper.readValue(objectMapper.writeValueAsString(content), type);
     }
 
     @Test
@@ -157,12 +179,11 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
         int year = 9000 + (int) (IntegrationTestData.nextSeq() % 500);
         var period = academicPeriodService.findOrCreate(year, TermType.ANUAL).value();
 
-        var dto = new CreateUniqueEventRequestDto(20, START, DURATION, period.endDate(), "Evento en el limite del periodo");
-        Long eventId = academicEventService.createUniqueEvent(dto).id();
+        Long eventId = seedUniqueEventWithoutClassroom(period.endDate(), 20);
 
         mockMvc.perform(get("/v1/allocations/unassigned"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.id == " + eventId + ")]").exists());
+                .andExpect(jsonPath("$.content[?(@.id == " + eventId + ")]").exists());
     }
 
     @Test

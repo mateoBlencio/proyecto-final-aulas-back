@@ -16,6 +16,7 @@ import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 import org.hibernate.envers.Audited;
 
@@ -46,12 +47,15 @@ public abstract class AcademicEvent {
     @Column(name = "id_evento_academico")
     protected Long id;
 
+    @Setter
     @Column(name = "cantidad_inscriptos", nullable = false)
     protected Integer enrolled;
 
+    @Setter
     @Column(name = "hora_inicio", nullable = false)
     protected LocalTime startTime;
 
+    @Setter
     @Convert(converter = DurationMinutesConverter.class)
     @Column(name = "duracion_minutos", nullable = false)
     protected Duration duration;

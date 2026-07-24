@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/allocations/overlaps?from=2026-08-01&to=2026-12-15&includePast=false
+  url: {{baseUrl}}/v1/allocations/overlaps?from=2026-08-01&to=2026-12-15&includePast=false&page=0&size=20
   body: none
   auth: inherit
 }
@@ -14,6 +14,8 @@ params:query {
   from: 2026-08-01
   to: 2026-12-15
   includePast: false
+  page: 0
+  size: 20
 }
 
 docs {
@@ -23,4 +25,6 @@ docs {
   Rango por defecto y 400 por rango inválido: igual que GET /v1/allocations/unassigned.
   includePast (default false): igual semántica que /unassigned, excluye ocurrencias ya
   pasadas salvo que se pida explícitamente.
+
+  Paginado: page/size estándar (default size=20), igual que GET /v1/classrooms.
 }

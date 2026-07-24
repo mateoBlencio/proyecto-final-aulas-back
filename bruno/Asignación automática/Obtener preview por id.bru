@@ -20,7 +20,7 @@ docs {
   Reemplazá previewId por el devuelto en POST /auto-preview.
   
   Respuesta: misma forma que el POST — { previewId, allocations: [ { event,
-  occurrenceDates, classroom } ], unresolved: [ { event, dates, conflicts } ] }.
+  occurrenceDates, classroom, overcrowdedBy, unchanged } ], unresolved: [ { event, dates, conflicts } ] }.
   unresolved queda para revisión manual; conflicts explica qué bloquea cada aula
   candidata (ver docs de "Generar preview").
 }

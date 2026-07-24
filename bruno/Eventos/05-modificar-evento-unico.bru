@@ -1,0 +1,36 @@
+meta {
+  name: Modificar evento único
+  type: http
+  seq: 8
+}
+
+put {
+  url: {{baseUrl}}/v1/events/unique/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: 1
+}
+
+body:json {
+  {
+    "enrolled": 50,
+    "startTime": "20:00",
+    "durationMinutes": 120,
+    "date": "2026-06-28",
+    "description": "Examen Final Ingeniería Civil I (reprogramado)",
+    "classroomId": 2,
+    "observation": "Reprogramado por conflicto de aula"
+  }
+}
+
+docs {
+  Actualiza fecha, horario, cantidad de alumnos, aula y observaciones de un
+  evento único existente, revalidando ventana horaria, disponibilidad,
+  solapamiento y capacidad antes de guardar.
+
+  404 si el id no corresponde a un evento único (inexistente o recurrente).
+  409 si ya ocurrió, o si el aula no está disponible/hay solapamiento.
+}

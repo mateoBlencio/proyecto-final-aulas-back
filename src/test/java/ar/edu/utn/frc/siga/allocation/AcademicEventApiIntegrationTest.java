@@ -8,6 +8,7 @@ import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
+import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 
 import tools.jackson.databind.ObjectMapper;
@@ -98,11 +99,12 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /v1/events/unique crea el evento y exactamente 1 ocurrencia")
+    @DisplayName("POST /v1/events/unique crea el evento, exactamente 1 ocurrencia ASSIGNED y su allocation")
     void createUnique_persistsSingleOccurrence() throws Exception {
         LocalDate date = LocalDate.now().plusDays(5);
+        Classroom classroom = testData.aula(testData.edificio());
         CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
-                20, LocalTime.of(10, 0), 60, date, "Evento único IT");
+                20, LocalTime.of(10, 0), 60, date, "Evento único IT", classroom.getId(), null);
 
         MvcResult result = mockMvc.perform(post("/v1/events/unique")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -117,7 +119,7 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
         List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId);
         assertThat(occurrences).hasSize(1);
         assertThat(occurrences.getFirst().getDate()).isEqualTo(date);
-        assertThat(occurrences.getFirst().getStatus()).isEqualTo(OccurrenceStatus.SCHEDULED);
+        assertThat(occurrences.getFirst().getStatus()).isEqualTo(OccurrenceStatus.ASSIGNED);
     }
 
     @Test

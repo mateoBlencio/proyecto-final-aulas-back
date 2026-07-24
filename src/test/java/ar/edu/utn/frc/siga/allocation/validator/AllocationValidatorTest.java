@@ -1,12 +1,14 @@
 package ar.edu.utn.frc.siga.allocation.validator;
 
 import ar.edu.utn.frc.siga.allocation.AllocationTestData;
+import ar.edu.utn.frc.siga.allocation.config.EventScheduleProperties;
 import ar.edu.utn.frc.siga.allocation.dto.request.PreviewAllocationDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.ValidateMoveRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto.ConflictOrigin;
 import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceConflictDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
+import ar.edu.utn.frc.siga.allocation.exception.InvalidEventScheduleException;
 import ar.edu.utn.frc.siga.allocation.exception.ReassignConflictException;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.Occurrence;
@@ -52,7 +54,37 @@ class AllocationValidatorTest {
 
     @BeforeEach
     void setUp() {
-        validator = new AllocationValidator(classroomService, allocationRepository);
+        validator = new AllocationValidator(classroomService, allocationRepository, new EventScheduleProperties());
+    }
+
+    // ---------- validateBusinessHours ----------
+
+    @Test
+    @DisplayName("validateBusinessHours: horario dentro de la ventana y fin > inicio → no lanza")
+    void validateBusinessHoursHorarioValido() {
+        assertThatCode(() -> validator.validateBusinessHours(LocalTime.of(10, 0), LocalTime.of(11, 0)))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateBusinessHours: fin <= inicio → InvalidEventScheduleException (CA3)")
+    void validateBusinessHoursFinNoPosteriorAInicio() {
+        assertThatThrownBy(() -> validator.validateBusinessHours(LocalTime.of(10, 0), LocalTime.of(10, 0)))
+                .isInstanceOf(InvalidEventScheduleException.class);
+    }
+
+    @Test
+    @DisplayName("validateBusinessHours: inicio antes de la ventana permitida → InvalidEventScheduleException")
+    void validateBusinessHoursAntesDeLaVentana() {
+        assertThatThrownBy(() -> validator.validateBusinessHours(LocalTime.of(6, 0), LocalTime.of(9, 0)))
+                .isInstanceOf(InvalidEventScheduleException.class);
+    }
+
+    @Test
+    @DisplayName("validateBusinessHours: fin después de la ventana permitida → InvalidEventScheduleException")
+    void validateBusinessHoursDespuesDeLaVentana() {
+        assertThatThrownBy(() -> validator.validateBusinessHours(LocalTime.of(22, 30), LocalTime.of(23, 30)))
+                .isInstanceOf(InvalidEventScheduleException.class);
     }
 
     // ---------- databaseConflicts / validateNoOverlap ----------

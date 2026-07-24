@@ -1,0 +1,16 @@
+meta {
+  name: Listar eventos únicos
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/v1/events/unique
+  body: none
+  auth: inherit
+}
+
+docs {
+  Devuelve todos los eventos únicos (parciales, trabajos prácticos, mesas
+  especiales, etc.) con estado, aula asignada y sobrecupo de su ocurrencia.
+}

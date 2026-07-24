@@ -16,6 +16,17 @@ body:json {
     "startTime": "19:55",
     "durationMinutes": 180,
     "date": "2026-06-27",
-    "description": "Examen Final Ingeniería Civil I"
+    "description": "Examen Final Ingeniería Civil I",
+    "classroomId": 1,
+    "observation": "Reservado por Secretaría Académica"
   }
+}
+
+docs {
+  Crea un evento único, genera su única ocurrencia y le asigna el aula indicada
+  en la misma operación (atómica, source = MANUAL). El aula es obligatoria.
+
+  Valida ventana horaria (08:00-23:00 por defecto), disponibilidad del aula y
+  solapamiento antes de guardar. Si el aula no existe/no está disponible o hay
+  solapamiento → 409. Horario fuera de ventana o fin <= inicio → 400.
 }

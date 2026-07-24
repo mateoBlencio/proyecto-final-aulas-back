@@ -16,6 +16,9 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
 
     List<Occurrence> findByEvent_Id(Long eventId);
 
+    /** Batch por ids de evento (sin N+1) — usado por el composer para resolver estado/aula de eventos únicos. */
+    List<Occurrence> findByEvent_IdIn(Collection<Long> eventIds);
+
     /**
      * Occurrences futuras de un conjunto de eventos en alguno de los estados dados. Se usa
      * para el auto-preview con re-resolución: incluir ASSIGNED (además de SCHEDULED) trae

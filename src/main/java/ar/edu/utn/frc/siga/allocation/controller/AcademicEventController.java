@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.allocation.controller;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateUniqueEventRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.UpdateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.EventHistorySnapshotDto;
@@ -98,13 +99,51 @@ public class AcademicEventController {
     @PostMapping("/unique")
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Crea un evento único",
-               description = "Crea un evento que ocurre una única vez y genera una única ocurrencia.")
+               description = "Crea un evento que ocurre una única vez, genera su única ocurrencia y le asigna "
+                       + "el aula indicada en la misma operación (atómica): si el aula no está disponible o "
+                       + "hay solapamiento, no se crea el evento.")
     public ResponseEntity<AcademicEventResponseDto> createUnique(
             @Valid @RequestBody CreateUniqueEventRequestDto dto) {
-        log.debug("POST /v1/events/unique: date={}", dto.date());
+        log.debug("POST /v1/events/unique: date={}, classroomId={}", dto.date(), dto.classroomId());
         AcademicEventResponseDto response = academicEventService.createUniqueEvent(dto);
         log.info("Evento único creado vía controller: id={}", response.id());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @GetMapping("/unique")
+    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @Operation(summary = "Listar eventos únicos",
+               description = "Devuelve todos los eventos únicos (parciales, trabajos prácticos, mesas especiales, etc.).")
+    public ResponseEntity<List<AcademicEventResponseDto>> findUniqueEvents() {
+        log.debug("GET /v1/events/unique");
+        List<AcademicEventResponseDto> events = academicEventService.findUniqueEvents();
+        log.info("Eventos únicos listados: count={}", events.size());
+        return ResponseEntity.ok(events);
+    }
+
+    @PutMapping("/unique/{id}")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Modificar un evento único",
+               description = "Actualiza fecha, horario, cantidad de alumnos, aula y observaciones de un evento "
+                       + "único existente, revalidando disponibilidad, solapamiento y capacidad antes de guardar.")
+    public ResponseEntity<AcademicEventResponseDto> updateUnique(
+            @PathVariable Long id, @Valid @RequestBody UpdateUniqueEventRequestDto dto) {
+        log.debug("PUT /v1/events/unique/{}: classroomId={}", id, dto.classroomId());
+        AcademicEventResponseDto response = academicEventService.updateUniqueEvent(id, dto);
+        log.info("Evento único actualizado vía controller: id={}", id);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/unique/{id}/cancel")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Cancelar un evento único",
+               description = "Baja lógica: cancela la ocurrencia del evento sin borrarlo físicamente. "
+                       + "Deja de bloquear el aula para nuevas asignaciones.")
+    public ResponseEntity<Void> cancelUnique(@PathVariable Long id) {
+        log.debug("POST /v1/events/unique/{}/cancel", id);
+        academicEventService.cancelUniqueEvent(id);
+        log.info("Evento único cancelado vía controller: id={}", id);
+        return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{eventId}/classroom")

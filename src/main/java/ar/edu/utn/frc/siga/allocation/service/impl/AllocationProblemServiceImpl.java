@@ -15,10 +15,13 @@ import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationProblemService;
 import ar.edu.utn.frc.siga.common.util.DateRanges;
 import ar.edu.utn.frc.siga.common.util.Maps;
+import ar.edu.utn.frc.siga.common.util.Paging;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,16 +55,16 @@ public class AllocationProblemServiceImpl implements AllocationProblemService {
     private final AcademicEventComposer academicEventComposer;
 
     @Override
-    public List<AcademicEventResponseDto> findUnassigned(LocalDate from, LocalDate to, boolean includePast) {
+    public Page<AcademicEventResponseDto> findUnassigned(LocalDate from, LocalDate to, boolean includePast, Pageable pageable) {
         Range range = resolveRange(from, to);
         List<AcademicEventResponseDto> unassigned =
                 academicEventService.findUnassignedEvents(range.from(), range.to(), includePast);
         log.info("Eventos sin aula listados: count={}", unassigned.size());
-        return unassigned;
+        return Paging.of(unassigned, pageable);
     }
 
     @Override
-    public List<OvercrowdedAllocationDto> findOvercrowded(LocalDate from, LocalDate to, boolean includePast) {
+    public Page<OvercrowdedAllocationDto> findOvercrowded(LocalDate from, LocalDate to, boolean includePast, Pageable pageable) {
         Range range = resolveRange(from, to);
         List<Allocation> occupancy = readOccupancy(range, includePast);
 
@@ -84,11 +87,11 @@ public class AllocationProblemServiceImpl implements AllocationProblemService {
         List<OvercrowdedAllocationDto> overcrowded = buildOvercrowded(
                 overcrowdAccs, academicEventComposer.composeById(new ArrayList<>(events)), fetchClassroomsById(classroomIds));
         log.info("Aulas con sobrecupo listadas: count={}", overcrowded.size());
-        return overcrowded;
+        return Paging.of(overcrowded, pageable);
     }
 
     @Override
-    public List<ClassroomOverlapDto> findOverlaps(LocalDate from, LocalDate to, boolean includePast) {
+    public Page<ClassroomOverlapDto> findOverlaps(LocalDate from, LocalDate to, boolean includePast, Pageable pageable) {
         Range range = resolveRange(from, to);
         List<Allocation> occupancy = readOccupancy(range, includePast);
 
@@ -112,7 +115,7 @@ public class AllocationProblemServiceImpl implements AllocationProblemService {
         List<ClassroomOverlapDto> overlaps = buildOverlaps(
                 overlapAccs, academicEventComposer.composeById(new ArrayList<>(events)), fetchClassroomsById(classroomIds));
         log.info("Superposiciones de horario-aula listadas: count={}", overlaps.size());
-        return overlaps;
+        return Paging.of(overlaps, pageable);
     }
 
     private List<Allocation> readOccupancy(Range range, boolean includePast) {
