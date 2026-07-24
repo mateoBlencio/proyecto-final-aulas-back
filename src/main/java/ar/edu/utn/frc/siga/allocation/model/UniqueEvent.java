@@ -7,6 +7,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 import org.hibernate.envers.Audited;
 
@@ -26,9 +27,11 @@ import java.util.List;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public final class UniqueEvent extends AcademicEvent {
 
+    @Setter
     @Column(name = "fecha", nullable = false)
     private LocalDate date;
 
+    @Setter
     @Column(name = "descripcion")
     private String description;
 

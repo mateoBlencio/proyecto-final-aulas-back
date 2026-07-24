@@ -1,11 +1,13 @@
 package ar.edu.utn.frc.siga.allocation.validator;
 
+import ar.edu.utn.frc.siga.allocation.config.EventScheduleProperties;
 import ar.edu.utn.frc.siga.allocation.dto.request.PreviewAllocationDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.ValidateMoveRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto.ConflictOrigin;
 import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceConflictDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
+import ar.edu.utn.frc.siga.allocation.exception.InvalidEventScheduleException;
 import ar.edu.utn.frc.siga.allocation.exception.ReassignConflictException;
 import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
@@ -41,6 +43,7 @@ public class AllocationValidator {
 
     private final ClassroomService classroomService;
     private final AllocationRepository allocationRepository;
+    private final EventScheduleProperties scheduleProperties;
 
     /** Ocurrencia a (re)asignar y el aula destino que se le quiere dar. */
     public record AllocationCandidate(Occurrence occurrence, Integer classroomId) {
@@ -195,6 +198,24 @@ public class AllocationValidator {
     /** Ocurrencia aplicable a un lote: no pasada y asignable. */
     public boolean isApplicable(Occurrence occurrence) {
         return !occurrence.isPast() && isAssignable(occurrence);
+    }
+
+    // ---------- horario ----------
+
+    /**
+     * Rechaza un horario de evento fuera de la ventana configurada ({@code siga.events.hours})
+     * o cuya hora de fin no sea estrictamente posterior a la de inicio (CA3).
+     */
+    public void validateBusinessHours(LocalTime start, LocalTime end) {
+        if (!end.isAfter(start)) {
+            throw new InvalidEventScheduleException(
+                    "La hora de fin (" + end + ") debe ser posterior a la hora de inicio (" + start + ").");
+        }
+        if (start.isBefore(scheduleProperties.getStart()) || end.isAfter(scheduleProperties.getEnd())) {
+            throw new InvalidEventScheduleException("El horario " + start + "-" + end
+                    + " está fuera de la ventana permitida (" + scheduleProperties.getStart()
+                    + "-" + scheduleProperties.getEnd() + ").");
+        }
     }
 
     // ---------- aulas ----------

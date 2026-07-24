@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
+import ar.edu.utn.frc.siga.allocation.config.EventScheduleProperties;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateFromDateRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.BatchReassignRequestDto;
@@ -66,7 +67,7 @@ class AllocationServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        AllocationValidator validator = new AllocationValidator(classroomService, allocationRepository);
+        AllocationValidator validator = new AllocationValidator(classroomService, allocationRepository, new EventScheduleProperties());
         AllocationWriter writer = new AllocationWriter(allocationRepository, validator);
         service = new AllocationServiceImpl(allocationRepository, occurrenceRepository, eventRepository, composer, validator, writer);
 

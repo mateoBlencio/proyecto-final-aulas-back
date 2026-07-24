@@ -50,6 +50,7 @@ public class Occurrence {
     @JoinColumn(name = "id_evento_academico", nullable = false)
     private AcademicEvent event;
 
+    @Setter
     @Column(name = "fecha", nullable = false)
     private LocalDate date;
 

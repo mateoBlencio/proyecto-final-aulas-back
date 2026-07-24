@@ -85,6 +85,10 @@ siga:
       same-commission-diff-building: 4000
   space:
     default-classroom-type: Normal
+  events:
+    hours:
+      start: "08:00"
+      end: "23:00"
   jwt:
     secret: ${JWT_SECRET}
     access-expiration-minutes: ${JWT_ACCESS_EXPIRATION_MINUTES:20}
