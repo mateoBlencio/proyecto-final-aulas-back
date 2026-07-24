@@ -7,10 +7,11 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 
 /**
- * Pedido de alta de un evento único (mesa de examen, parcial, trabajo práctico): ocurre una
- * sola vez en {@code date} y se asigna a {@code classroomId} en la misma operación (atómica).
+ * Pedido de modificación de un evento único existente: reemplaza fecha, horario, cantidad de
+ * alumnos, aula y observaciones. Se revalida disponibilidad, solapamiento y capacidad antes de
+ * guardar (mismo camino que el alta).
  */
-public record CreateUniqueEventRequestDto(
+public record UpdateUniqueEventRequestDto(
         @NotNull @Min(1) Integer enrolled,
         @NotNull LocalTime startTime,
         @Min(1) int durationMinutes,

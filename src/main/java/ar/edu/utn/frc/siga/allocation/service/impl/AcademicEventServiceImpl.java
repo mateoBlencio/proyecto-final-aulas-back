@@ -1,7 +1,9 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
+import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateUniqueEventRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.UpdateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceResponseDto;
 import ar.edu.utn.frc.siga.common.util.DateRanges;
@@ -13,9 +15,13 @@ import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
 import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
+import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.repository.RecurringEventRepository;
+import ar.edu.utn.frc.siga.allocation.repository.UniqueEventRepository;
 import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
+import ar.edu.utn.frc.siga.allocation.service.AllocationService;
+import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.Finder;
@@ -44,11 +50,15 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
     private final AcademicEventRepository eventRepository;
     private final RecurringEventRepository recurringEventRepository;
+    private final UniqueEventRepository uniqueEventRepository;
     private final OccurrenceRepository occurrenceRepository;
+    private final AllocationRepository allocationRepository;
     private final AcademicEventComposer composer;
     private final OccurrenceMapper occurrenceMapper;
     private final SubjectService subjectService;
     private final CommissionService commissionService;
+    private final AllocationService allocationService;
+    private final AllocationValidator allocationValidator;
 
     @Override
     @Transactional(readOnly = true)
@@ -123,16 +133,24 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                         dto.subjectId() + "-" + dto.commissionId() + "-" + dto.dayOfWeek() + "-" + dto.startTime()));
     }
 
-    /** Crea un evento único y genera su única occurrence, sin aula (SCHEDULED). */
+    /**
+     * Crea un evento único, genera su única occurrence y le asigna el aula indicada
+     * (source MANUAL) en la misma transacción: si el aula no está disponible o hay
+     * solapamiento, {@link AllocationService#allocateManually} lanza y revierte todo, sin
+     * dejar un evento huérfano sin aula.
+     */
     @Override
     @Transactional
     public AcademicEventResponseDto createUniqueEvent(CreateUniqueEventRequestDto dto) {
-        log.debug("Creando evento único: date={}", dto.date());
+        log.debug("Creando evento único: date={}, classroomId={}", dto.date(), dto.classroomId());
+
+        Duration duration = Duration.ofMinutes(dto.durationMinutes());
+        allocationValidator.validateBusinessHours(dto.startTime(), dto.startTime().plus(duration));
 
         UniqueEvent event = UniqueEvent.builder()
                 .enrolled(dto.enrolled())
                 .startTime(dto.startTime())
-                .duration(Duration.ofMinutes(dto.durationMinutes()))
+                .duration(duration)
                 .date(dto.date())
                 .description(dto.description())
                 .build();
@@ -140,9 +158,78 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         AcademicEvent saved = eventRepository.save(event);
         List<Occurrence> occurrences = saved.toOccurrences();
         occurrenceRepository.saveAll(occurrences);
+        Occurrence occurrence = occurrences.getFirst();
 
-        log.info("Evento único creado: id={}", saved.getId());
+        allocationService.allocateManually(occurrence.getId(),
+                new AllocateOccurrenceRequestDto(dto.classroomId(), dto.observation()));
+
+        log.info("Evento único creado: id={}, classroomId={}", saved.getId(), dto.classroomId());
         return composer.compose(saved);
+    }
+
+    /** Lista todos los eventos únicos (parciales, TPs, mesas especiales, etc.). */
+    @Override
+    @Transactional(readOnly = true)
+    public List<AcademicEventResponseDto> findUniqueEvents() {
+        log.debug("Listando eventos únicos");
+        return composer.compose(uniqueEventRepository.findAll());
+    }
+
+    /**
+     * Modifica un evento único existente: revalida ventana horaria, disponibilidad,
+     * solapamiento y capacidad antes de guardar (mismo camino que el alta). {@code id} que
+     * no corresponde a un evento único (inexistente o recurrente) → 404, ya que
+     * {@link UniqueEventRepository} solo resuelve filas de {@code evento_unico_academico}.
+     */
+    @Override
+    @Transactional
+    public AcademicEventResponseDto updateUniqueEvent(Long id, UpdateUniqueEventRequestDto dto) {
+        log.debug("Actualizando evento único: id={}, classroomId={}", id, dto.classroomId());
+
+        UniqueEvent event = Finder.orThrow(uniqueEventRepository::findById, id, "UniqueEvent");
+        Occurrence occurrence = occurrenceRepository.findByEvent_Id(id).getFirst();
+
+        // Se valida el estado ANTES de mutar la occurrence: isPast() debe evaluarse contra
+        // la fecha/hora vigente, no la nueva que se está por escribir.
+        allocationValidator.validateNotPast(occurrence);
+
+        Duration duration = Duration.ofMinutes(dto.durationMinutes());
+        allocationValidator.validateBusinessHours(dto.startTime(), dto.startTime().plus(duration));
+
+        event.setEnrolled(dto.enrolled());
+        event.setStartTime(dto.startTime());
+        event.setDuration(duration);
+        event.setDate(dto.date());
+        event.setDescription(dto.description());
+        occurrence.setDate(dto.date());
+
+        AllocateOccurrenceRequestDto allocationDto = new AllocateOccurrenceRequestDto(dto.classroomId(), dto.observation());
+        allocationRepository.findByOccurrence_Id(occurrence.getId())
+                .ifPresentOrElse(
+                        existing -> allocationService.reallocate(existing.getId(), allocationDto),
+                        () -> allocationService.allocateManually(occurrence.getId(), allocationDto));
+
+        log.info("Evento único actualizado: id={}", id);
+        return composer.compose(event);
+    }
+
+    /**
+     * Baja lógica: cancela la única occurrence del evento (sin borrado físico). Una vez
+     * CANCELLED, {@code findOccupancyBetween} (solo cuenta ASSIGNED) deja de contarla, así
+     * que libera el aula para nuevas asignaciones sin tocar el registro histórico.
+     */
+    @Override
+    @Transactional
+    public void cancelUniqueEvent(Long id) {
+        log.debug("Cancelando evento único: id={}", id);
+
+        Finder.orThrow(uniqueEventRepository::findById, id, "UniqueEvent");
+        Occurrence occurrence = occurrenceRepository.findByEvent_Id(id).getFirst();
+        allocationValidator.validateNotPast(occurrence);
+
+        occurrence.setStatus(OccurrenceStatus.CANCELLED);
+
+        log.info("Evento único cancelado: id={}", id);
     }
 
     /**

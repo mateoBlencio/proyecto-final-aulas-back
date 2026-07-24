@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.allocation.service;
 
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateUniqueEventRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.UpdateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceResponseDto;
 
@@ -30,8 +31,28 @@ public interface AcademicEventService {
      */
     Long findRecurringEvent(CreateRecurringEventRequestDto dto);
 
-    /** Crea un evento único y genera su única occurrence (en SCHEDULED, sin aula). */
+    /**
+     * Crea un evento único, genera su única occurrence y le asigna el aula indicada en la
+     * misma transacción (atómico): si el aula no está disponible o hay solapamiento, no
+     * queda ningún registro persistido.
+     */
     AcademicEventResponseDto createUniqueEvent(CreateUniqueEventRequestDto dto);
+
+    /** Lista todos los eventos únicos (parciales, TPs, mesas especiales, etc.). */
+    List<AcademicEventResponseDto> findUniqueEvents();
+
+    /**
+     * Modifica un evento único existente y reasigna su aula, revalidando disponibilidad,
+     * solapamiento, capacidad y ventana horaria antes de guardar. Rechaza si ya ocurrió, o
+     * si {@code id} no corresponde a un evento único (404).
+     */
+    AcademicEventResponseDto updateUniqueEvent(Long id, UpdateUniqueEventRequestDto dto);
+
+    /**
+     * Baja lógica de un evento único: cancela su única occurrence (sin borrado físico). Una
+     * vez cancelada, deja de bloquear el aula para nuevas asignaciones.
+     */
+    void cancelUniqueEvent(Long id);
 
     /**
      * Lista, agrupados por evento, los eventos con occurrences en SCHEDULED entre

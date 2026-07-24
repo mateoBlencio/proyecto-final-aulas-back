@@ -3,23 +3,31 @@ package ar.edu.utn.frc.siga.allocation.service.impl;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.allocation.AllocationTestData;
+import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateUniqueEventRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.UpdateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.UniqueEventResponseDto;
+import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.mapper.AcademicEventComposer;
 import ar.edu.utn.frc.siga.allocation.mapper.OccurrenceMapper;
 import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
+import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.EventType;
 import ar.edu.utn.frc.siga.allocation.model.Occurrence;
 import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
 import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
+import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.repository.RecurringEventRepository;
+import ar.edu.utn.frc.siga.allocation.repository.UniqueEventRepository;
+import ar.edu.utn.frc.siga.allocation.service.AllocationService;
+import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.common.exception.InvalidDateRangeException;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 
@@ -44,6 +52,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -57,7 +66,11 @@ class AcademicEventServiceImplTest {
     @Mock
     private RecurringEventRepository recurringEventRepository;
     @Mock
+    private UniqueEventRepository uniqueEventRepository;
+    @Mock
     private OccurrenceRepository occurrenceRepository;
+    @Mock
+    private AllocationRepository allocationRepository;
     @Mock
     private AcademicEventComposer composer;
     @Mock
@@ -66,13 +79,18 @@ class AcademicEventServiceImplTest {
     private SubjectService subjectService;
     @Mock
     private CommissionService commissionService;
+    @Mock
+    private AllocationService allocationService;
+    @Mock
+    private AllocationValidator allocationValidator;
 
     private AcademicEventServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new AcademicEventServiceImpl(eventRepository, recurringEventRepository, occurrenceRepository,
-                composer, occurrenceMapper, subjectService, commissionService);
+        service = new AcademicEventServiceImpl(eventRepository, recurringEventRepository, uniqueEventRepository,
+                occurrenceRepository, allocationRepository, composer, occurrenceMapper, subjectService,
+                commissionService, allocationService, allocationValidator);
     }
 
     // ---------- createRecurringEvent ----------
@@ -149,10 +167,10 @@ class AcademicEventServiceImplTest {
     // ---------- createUniqueEvent ----------
 
     @Test
-    @DisplayName("createUniqueEvent: persiste el evento y su única ocurrencia SCHEDULED")
+    @DisplayName("createUniqueEvent: persiste el evento, su única ocurrencia SCHEDULED, y asigna el aula (source MANUAL)")
     void createUniqueEventFeliz() {
         CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
-                20, LocalTime.of(10, 0), 60, LocalDate.of(2026, 3, 10), "evento especial");
+                20, LocalTime.of(10, 0), 60, LocalDate.of(2026, 3, 10), "evento especial", 5, "obs");
         UniqueEvent saved = AllocationTestData.uniqueEvent(3L, dto.date(), dto.startTime(), Duration.ofMinutes(dto.durationMinutes()));
         when(eventRepository.save(any())).thenReturn(saved);
         when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyUniqueResponseDto(3L));
@@ -162,12 +180,152 @@ class AcademicEventServiceImplTest {
         assertThat(result).isNotNull();
         verify(subjectService, never()).findById(any());
         verify(commissionService, never()).findById(any());
+        verify(allocationValidator).validateBusinessHours(dto.startTime(), LocalTime.of(11, 0));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<Occurrence>> occurrencesCaptor = ArgumentCaptor.forClass(List.class);
         verify(occurrenceRepository).saveAll(occurrencesCaptor.capture());
+        Occurrence occurrence = occurrencesCaptor.getValue().getFirst();
         assertThat(occurrencesCaptor.getValue()).hasSize(1);
-        assertThat(occurrencesCaptor.getValue().getFirst().getStatus()).isEqualTo(OccurrenceStatus.SCHEDULED);
+        assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.SCHEDULED);
+
+        verify(allocationService).allocateManually(eq(occurrence.getId()),
+                eq(new AllocateOccurrenceRequestDto(5, "obs")));
+    }
+
+    @Test
+    @DisplayName("createUniqueEvent: aula no disponible/solapada → la excepción de allocateManually se propaga (nada queda comiteado a medias)")
+    void createUniqueEventAulaNoDisponiblePropagaExcepcion() {
+        CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
+                20, LocalTime.of(10, 0), 60, LocalDate.of(2026, 3, 10), "evento especial", 5, null);
+        UniqueEvent saved = AllocationTestData.uniqueEvent(3L, dto.date(), dto.startTime(), Duration.ofMinutes(dto.durationMinutes()));
+        when(eventRepository.save(any())).thenReturn(saved);
+        doThrow(new AllocationConflictException("aula ocupada"))
+                .when(allocationService).allocateManually(any(), any());
+
+        assertThatThrownBy(() -> service.createUniqueEvent(dto))
+                .isInstanceOf(AllocationConflictException.class);
+    }
+
+    // ---------- findUniqueEvents ----------
+
+    @Test
+    @DisplayName("findUniqueEvents: delega en el composer sobre todos los eventos únicos")
+    void findUniqueEventsDelegaEnComposer() {
+        UniqueEvent event = AllocationTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        when(uniqueEventRepository.findAll()).thenReturn(List.of(event));
+        when(composer.compose(anyCollection())).thenReturn(List.of(dummyUniqueResponseDto(3L)));
+
+        List<AcademicEventResponseDto> result = service.findUniqueEvents();
+
+        assertThat(result).hasSize(1);
+        verify(composer).compose(anyCollection());
+    }
+
+    // ---------- updateUniqueEvent ----------
+
+    @Test
+    @DisplayName("updateUniqueEvent: evento inexistente → 404, no toca occurrence ni allocation")
+    void updateUniqueEventInexistente() {
+        when(uniqueEventRepository.findById(99L)).thenReturn(Optional.empty());
+        UpdateUniqueEventRequestDto dto = updateDto();
+
+        assertThatThrownBy(() -> service.updateUniqueEvent(99L, dto))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(allocationService, never()).reallocate(any(), any());
+        verify(allocationService, never()).allocateManually(any(), any());
+    }
+
+    @Test
+    @DisplayName("updateUniqueEvent: ya tiene allocation → reallocate (no allocateManually)")
+    void updateUniqueEventConAllocationExistenteReasigna() {
+        UniqueEvent event = AllocationTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence occurrence = AllocationTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.ASSIGNED);
+        Allocation existing = Allocation.builder().id(50L).occurrence(occurrence).classroomId(5).build();
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
+        when(allocationRepository.findByOccurrence_Id(10L)).thenReturn(Optional.of(existing));
+        when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyUniqueResponseDto(3L));
+
+        UpdateUniqueEventRequestDto dto = updateDto();
+        AcademicEventResponseDto result = service.updateUniqueEvent(3L, dto);
+
+        assertThat(result).isNotNull();
+        verify(allocationValidator).validateNotPast(occurrence);
+        verify(allocationService).reallocate(50L, new AllocateOccurrenceRequestDto(dto.classroomId(), dto.observation()));
+        verify(allocationService, never()).allocateManually(any(), any());
+        assertThat(occurrence.getDate()).isEqualTo(dto.date());
+        assertThat(event.getEnrolled()).isEqualTo(dto.enrolled());
+    }
+
+    @Test
+    @DisplayName("updateUniqueEvent: sin allocation previa → allocateManually (no reallocate)")
+    void updateUniqueEventSinAllocationAsignaManualmente() {
+        UniqueEvent event = AllocationTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence occurrence = AllocationTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.SCHEDULED);
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
+        when(allocationRepository.findByOccurrence_Id(10L)).thenReturn(Optional.empty());
+        when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyUniqueResponseDto(3L));
+
+        UpdateUniqueEventRequestDto dto = updateDto();
+        service.updateUniqueEvent(3L, dto);
+
+        verify(allocationService).allocateManually(10L, new AllocateOccurrenceRequestDto(dto.classroomId(), dto.observation()));
+        verify(allocationService, never()).reallocate(any(), any());
+    }
+
+    @Test
+    @DisplayName("updateUniqueEvent: occurrence ya pasada → propaga la excepción del validator, sin escribir")
+    void updateUniqueEventOccurrencePasada() {
+        UniqueEvent event = AllocationTestData.uniqueEvent(3L, LocalDate.of(2020, 1, 1), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence occurrence = AllocationTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.ASSIGNED);
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
+        doThrow(new AllocationConflictException("ya ocurrió")).when(allocationValidator).validateNotPast(occurrence);
+
+        assertThatThrownBy(() -> service.updateUniqueEvent(3L, updateDto()))
+                .isInstanceOf(AllocationConflictException.class);
+        verify(allocationService, never()).reallocate(any(), any());
+        verify(allocationService, never()).allocateManually(any(), any());
+    }
+
+    // ---------- cancelUniqueEvent ----------
+
+    @Test
+    @DisplayName("cancelUniqueEvent: pasa la única occurrence a CANCELLED")
+    void cancelUniqueEventFeliz() {
+        UniqueEvent event = AllocationTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence occurrence = AllocationTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.ASSIGNED);
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
+
+        service.cancelUniqueEvent(3L);
+
+        assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.CANCELLED);
+    }
+
+    @Test
+    @DisplayName("cancelUniqueEvent: evento inexistente → 404")
+    void cancelUniqueEventInexistente() {
+        when(uniqueEventRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.cancelUniqueEvent(99L))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("cancelUniqueEvent: occurrence ya pasada → propaga la excepción del validator")
+    void cancelUniqueEventOccurrencePasada() {
+        UniqueEvent event = AllocationTestData.uniqueEvent(3L, LocalDate.of(2020, 1, 1), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence occurrence = AllocationTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.ASSIGNED);
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
+        doThrow(new AllocationConflictException("ya ocurrió")).when(allocationValidator).validateNotPast(occurrence);
+
+        assertThatThrownBy(() -> service.cancelUniqueEvent(3L))
+                .isInstanceOf(AllocationConflictException.class);
+        assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.ASSIGNED);
     }
 
     // ---------- findUnassignedEvents ----------
@@ -295,6 +453,11 @@ class AcademicEventServiceImplTest {
 
     private UniqueEventResponseDto dummyUniqueResponseDto(Long id) {
         return new UniqueEventResponseDto(id, EventType.UNIQUE_EVENT, 20, LocalTime.of(10, 0), 60,
-                LocalDate.of(2026, 3, 10), "evento especial");
+                LocalDate.of(2026, 3, 10), "evento especial", OccurrenceStatus.ASSIGNED, null, 0, null);
+    }
+
+    private UpdateUniqueEventRequestDto updateDto() {
+        return new UpdateUniqueEventRequestDto(
+                25, LocalTime.of(11, 0), 90, LocalDate.of(2026, 3, 15), "evento actualizado", 7, "obs actualizada");
     }
 }

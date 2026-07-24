@@ -244,7 +244,9 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
                                 new AutoPreviewRequestDto(List.of(pastEvent.getId()), 2))))
                 .andExpect(status().isConflict());
 
-        var uniqueDto = new CreateUniqueEventRequestDto(20, START, DURATION, LocalDate.now().plusDays(104), "Evento unico IT");
+        Classroom aulaUnico = testData.aula(testData.edificio());
+        var uniqueDto = new CreateUniqueEventRequestDto(
+                20, START, DURATION, LocalDate.now().plusDays(104), "Evento unico IT", aulaUnico.getId(), null);
         Long uniqueEventId = academicEventService.createUniqueEvent(uniqueDto).id();
 
         mockMvc.perform(post("/v1/allocations/auto-preview")
