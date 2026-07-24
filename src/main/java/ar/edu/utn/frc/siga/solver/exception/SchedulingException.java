@@ -3,11 +3,14 @@ package ar.edu.utn.frc.siga.solver.exception;
 import ar.edu.utn.frc.siga.common.exception.SigaAppException;
 import org.springframework.http.HttpStatus;
 
+import java.io.Serial;
+
 /**
  * Falla inesperada del solver al calcular una asignación automática.
  */
 public class SchedulingException extends SigaAppException {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
     public SchedulingException(String message) {

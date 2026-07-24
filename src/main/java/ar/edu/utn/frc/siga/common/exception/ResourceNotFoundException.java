@@ -2,11 +2,14 @@ package ar.edu.utn.frc.siga.common.exception;
 
 import org.springframework.http.HttpStatus;
 
+import java.io.Serial;
+
 /**
  * El recurso solicitado no existe.
  */
 public class ResourceNotFoundException extends SigaAppException {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
     public ResourceNotFoundException(String message) {
