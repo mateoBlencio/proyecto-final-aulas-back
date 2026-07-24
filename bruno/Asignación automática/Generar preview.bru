@@ -33,7 +33,7 @@ docs {
   Respuesta (datos para dibujar la propuesta en el calendario):
   {
     "previewId": "prev_xxxxxxxx",
-    "allocations": [ { "event": {...}, "occurrenceDates": ["2026-08-03", ...], "classroom": {...}, "overcrowdedBy": 0 } ],
+    "allocations": [ { "event": {...}, "occurrenceDates": ["2026-08-03", ...], "classroom": {...}, "overcrowdedBy": 0, "unchanged": false } ],
     "unresolved": [ { "event": {...}, "dates": ["2026-08-03", ...], "conflicts": [
       { "date": "2026-08-03", "startTime": "08:00", "endTime": "09:30", "classroomId": 9,
         "conflictingEventId": 42, "origin": "DATABASE" }
@@ -46,6 +46,9 @@ docs {
   Nota: un evento que YA tenía aula asignada nunca cae en unresolved aunque el solver no
   lo reubique — conserva su aula previa (floor de no-regresión). Solo eventos nuevos sin
   aula pueden quedar en unresolved.
+  unchanged = true cuando el aula propuesta es la misma que el evento ya tenía asignada
+  antes de correr el solver (evento nuevo sin aula previa siempre da unchanged: false).
+  El front no debe mostrar esa fila como una reasignación exitosa, sino como "sin cambios".
   
   unresolved[].conflicts: por qué ninguna aula candidata sirvió — a lo sumo UN conflicto
   por aula candidata (el primero por fecha), mismo vocabulario que validate-move (origin

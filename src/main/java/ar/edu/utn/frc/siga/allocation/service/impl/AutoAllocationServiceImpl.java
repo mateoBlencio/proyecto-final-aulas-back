@@ -247,7 +247,7 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
 
         List<ProposedAllocationDto> allocations = resolved.stream()
                 .map(a -> toProposedAllocationDto(a, eventDtoById, datesByEvent,
-                        classroomDtoById.get(effectiveRoomByEventId.get(a.eventId()))))
+                        classroomDtoById.get(effectiveRoomByEventId.get(a.eventId())), priorRoomByEvent))
                 .toList();
 
         Set<Integer> candidateRoomIds = rooms.stream().map(SolverRoom::id).collect(Collectors.toSet());
@@ -276,11 +276,13 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
 
     private ProposedAllocationDto toProposedAllocationDto(SolverAllocation allocation,
             Map<Long, AcademicEventResponseDto> eventDtoById, Map<Long, List<LocalDate>> datesByEvent,
-            ClassroomResponseDto classroom) {
+            ClassroomResponseDto classroom, Map<Long, Integer> priorRoomByEvent) {
         Long eventId = Long.valueOf(allocation.eventId());
         AcademicEventResponseDto event = eventDtoById.get(eventId);
+        boolean unchanged = classroom != null && Objects.equals(classroom.id(), priorRoomByEvent.get(eventId));
         return new ProposedAllocationDto(
-                event, datesByEvent.getOrDefault(eventId, List.of()), classroom, overcrowdedBy(event, classroom));
+                event, datesByEvent.getOrDefault(eventId, List.of()), classroom, overcrowdedBy(event, classroom),
+                unchanged);
     }
 
     /**

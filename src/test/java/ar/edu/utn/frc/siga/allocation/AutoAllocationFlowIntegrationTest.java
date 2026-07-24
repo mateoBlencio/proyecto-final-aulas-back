@@ -150,6 +150,7 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
         assertThat(preview.allocations()).hasSize(1);
         assertThat(preview.allocations().getFirst().event().id()).isEqualTo(eventId);
         assertThat(preview.allocations().getFirst().classroom()).isNotNull();
+        assertThat(preview.allocations().getFirst().unchanged()).isFalse();
         assertThat(preview.unresolved()).isEmpty();
     }
 
@@ -202,6 +203,25 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
         assertThat(proposal.event().id()).isEqualTo(eventId);
         assertThat(proposal.classroom()).isNotNull();
         assertThat(proposal.classroom().id()).isNotEqualTo(aulaActual.getId());
+        assertThat(proposal.unchanged()).isFalse();
+    }
+
+    @Test
+    @DisplayName("auto-preview: evento ya asignado a la única aula factible conserva esa aula; unchanged=true")
+    void autoPreview_keepsSameRoom_marksUnchangedTrue() throws Exception {
+        LocalDate date = LocalDate.now().plusDays(104);
+        blockAllAvailableRooms(date, START, DURATION);
+        Classroom unicaAula = testData.aula(testData.edificio());
+        var sc = testData.materiaYComision();
+        Long eventId = createEvent(sc, date, START, DURATION);
+        assignOk(occurrenceOf(eventId).getId(), unicaAula.getId());
+
+        AutoPreviewResponseDto preview = autoPreview(List.of(eventId));
+
+        assertThat(preview.allocations()).hasSize(1);
+        ProposedAllocationDto proposal = preview.allocations().getFirst();
+        assertThat(proposal.classroom().id()).isEqualTo(unicaAula.getId());
+        assertThat(proposal.unchanged()).isTrue();
     }
 
     @Test

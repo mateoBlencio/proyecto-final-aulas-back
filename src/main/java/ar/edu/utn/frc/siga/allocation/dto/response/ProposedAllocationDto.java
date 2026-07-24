@@ -12,12 +12,15 @@ import java.util.List;
  * encontró aula sin conflicto para ese evento y queda para revisión manual).
  * {@code overcrowdedBy} es la cantidad de alumnos que exceden la capacidad del aula
  * propuesta (0 si entran todos, o si la fila es {@code unresolved}): el front pinta la
- * alerta de sobrecupo cuando es {@code > 0}.
+ * alerta de sobrecupo cuando es {@code > 0}. {@code unchanged} es {@code true} cuando el
+ * aula propuesta coincide con la que el evento ya tenía asignada antes de correr el
+ * solver: el front no debe mostrar esa fila como una reasignación exitosa.
  */
 public record ProposedAllocationDto(
         AcademicEventResponseDto event,
         List<LocalDate> occurrenceDates,
         ClassroomResponseDto classroom,
-        int overcrowdedBy
+        int overcrowdedBy,
+        boolean unchanged
 ) {
 }
