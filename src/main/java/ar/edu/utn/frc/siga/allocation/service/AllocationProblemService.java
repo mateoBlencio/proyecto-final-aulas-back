@@ -3,9 +3,10 @@ package ar.edu.utn.frc.siga.allocation.service;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ClassroomOverlapDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OvercrowdedAllocationDto;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
-import java.util.List;
 
 /**
  * Detección de problemas de asignación de aulas para la pantalla de asignación
@@ -23,17 +24,17 @@ public interface AllocationProblemService {
      * Eventos con ocurrencias SCHEDULED (sin aula) en el rango. Excluye ocurrencias ya
      * pasadas salvo que {@code includePast} sea true.
      */
-    List<AcademicEventResponseDto> findUnassigned(LocalDate from, LocalDate to, boolean includePast);
+    Page<AcademicEventResponseDto> findUnassigned(LocalDate from, LocalDate to, boolean includePast, Pageable pageable);
 
     /**
      * Pares evento-aula donde los inscriptos superan la capacidad del aula asignada.
      * Excluye ocurrencias ya pasadas salvo que {@code includePast} sea true.
      */
-    List<OvercrowdedAllocationDto> findOvercrowded(LocalDate from, LocalDate to, boolean includePast);
+    Page<OvercrowdedAllocationDto> findOvercrowded(LocalDate from, LocalDate to, boolean includePast, Pageable pageable);
 
     /**
      * Pares de eventos cuyos horarios se superponen en la misma aula. Excluye
      * ocurrencias ya pasadas salvo que {@code includePast} sea true.
      */
-    List<ClassroomOverlapDto> findOverlaps(LocalDate from, LocalDate to, boolean includePast);
+    Page<ClassroomOverlapDto> findOverlaps(LocalDate from, LocalDate to, boolean includePast, Pageable pageable);
 }

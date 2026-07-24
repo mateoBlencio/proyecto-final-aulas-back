@@ -18,6 +18,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -54,12 +57,13 @@ public class AllocationController {
                        + "indicado. Por defecto 'from' es hoy y 'to' es el fin del período académico activo "
                        + "(o 'from' + 6 meses si no hay período activo con fecha de fin). Excluye ocurrencias "
                        + "ya pasadas (fecha+hora de inicio) salvo que 'includePast' sea true.")
-    public ResponseEntity<List<AcademicEventResponseDto>> findUnassigned(
+    public ResponseEntity<Page<AcademicEventResponseDto>> findUnassigned(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false, defaultValue = "false") boolean includePast) {
+            @RequestParam(required = false, defaultValue = "false") boolean includePast,
+            @PageableDefault(size = 20) Pageable pageable) {
         log.debug("GET /v1/allocations/unassigned: from={}, to={}, includePast={}", from, to, includePast);
-        return ResponseEntity.ok(allocationProblemService.findUnassigned(from, to, includePast));
+        return ResponseEntity.ok(allocationProblemService.findUnassigned(from, to, includePast, pageable));
     }
 
     @GetMapping("/overcrowded")
@@ -67,12 +71,13 @@ public class AllocationController {
                description = "Devuelve los pares evento-aula donde la cantidad de inscriptos supera la capacidad "
                        + "del aula asignada, en el rango indicado. Mismo rango por defecto que /unassigned. "
                        + "Excluye ocurrencias ya pasadas salvo que 'includePast' sea true.")
-    public ResponseEntity<List<OvercrowdedAllocationDto>> findOvercrowded(
+    public ResponseEntity<Page<OvercrowdedAllocationDto>> findOvercrowded(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false, defaultValue = "false") boolean includePast) {
+            @RequestParam(required = false, defaultValue = "false") boolean includePast,
+            @PageableDefault(size = 20) Pageable pageable) {
         log.debug("GET /v1/allocations/overcrowded: from={}, to={}, includePast={}", from, to, includePast);
-        return ResponseEntity.ok(allocationProblemService.findOvercrowded(from, to, includePast));
+        return ResponseEntity.ok(allocationProblemService.findOvercrowded(from, to, includePast, pageable));
     }
 
     @GetMapping("/overlaps")
@@ -80,12 +85,13 @@ public class AllocationController {
                description = "Devuelve los pares de eventos cuyos horarios se superponen en la misma aula, "
                        + "en el rango indicado. Mismo rango por defecto que /unassigned. "
                        + "Excluye ocurrencias ya pasadas salvo que 'includePast' sea true.")
-    public ResponseEntity<List<ClassroomOverlapDto>> findOverlaps(
+    public ResponseEntity<Page<ClassroomOverlapDto>> findOverlaps(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false, defaultValue = "false") boolean includePast) {
+            @RequestParam(required = false, defaultValue = "false") boolean includePast,
+            @PageableDefault(size = 20) Pageable pageable) {
         log.debug("GET /v1/allocations/overlaps: from={}, to={}, includePast={}", from, to, includePast);
-        return ResponseEntity.ok(allocationProblemService.findOverlaps(from, to, includePast));
+        return ResponseEntity.ok(allocationProblemService.findOverlaps(from, to, includePast, pageable));
     }
 
     @GetMapping
