@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.allocation.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.UpdateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceResponseDto;
+import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -25,11 +26,11 @@ public interface AcademicEventService {
     AcademicEventResponseDto createRecurringEvent(CreateRecurringEventRequestDto dto);
 
     /**
-     * Busca un evento recurrente idéntico (misma materia/comisión/día/horario/ventana de
-     * fechas): catálogo cargado por fuera de esta app, no se crea desde acá. Devuelve solo
-     * el id (el único caller productivo solo necesita el id).
+     * Reutiliza un evento recurrente idéntico (misma materia/comisión/día/horario/ventana
+     * de fechas) si ya existe; si no, lo crea. Pensado para importaciones donde varias
+     * filas de la planilla describen el mismo evento.
      */
-    Long findRecurringEvent(CreateRecurringEventRequestDto dto);
+    FindOrCreateResult<Long> findOrCreateRecurringEvent(CreateRecurringEventRequestDto dto);
 
     /**
      * Crea un evento único, genera su única occurrence y le asigna el aula indicada en la

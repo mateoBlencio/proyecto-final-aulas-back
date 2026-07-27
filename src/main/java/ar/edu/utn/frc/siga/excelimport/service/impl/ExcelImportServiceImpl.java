@@ -56,6 +56,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
         int processedRows = 0;
         AtomicInteger periodsCreated = new AtomicInteger(0);
+        AtomicInteger eventsCreated = new AtomicInteger(0);
         List<RowIssueDto> skippedRows = new ArrayList<>();
         List<RowIssueDto> rowWarnings = new ArrayList<>();
 
@@ -78,13 +79,15 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             LocalDate startDate = termType.startDate(year);
             LocalDate endDate = termType.endDate(year);
 
-            // Specialty/StudyPlan/Subject/Commission/SubjectCommission/RecurringEvent/Building/
-            // Classroom son catálogo cargado por fuera de esta app: se buscan (fallan si no
-            // existen), nunca se crean desde el import. Solo AcademicPeriod se crea acá. Una
-            // fila que no resuelve contra el catálogo (dato inconsistente en el origen) se
-            // saltea y se reporta en vez de abortar el import completo.
+            // Specialty/StudyPlan/Subject/Commission/SubjectCommission/Building/Classroom son
+            // catálogo cargado por fuera de esta app: se buscan (fallan si no existen), nunca
+            // se crean desde el import. AcademicPeriod y RecurringEvent sí se crean acá si no
+            // existen (varias filas de la planilla pueden describir el mismo evento). Una fila
+            // que no resuelve contra el catálogo (dato inconsistente en el origen) se saltea y
+            // se reporta en vez de abortar el import completo.
             try {
                 ExcelRowResolver.ResolvedRow resolved = rowResolver.resolve(dto, termType, year, startDate, endDate, cache, periodsCreated);
+                if (resolved.eventCreated()) eventsCreated.incrementAndGet();
 
                 if (!resolved.classroom().buildingId().equals(resolved.building().id())) {
                     rowWarnings.add(new RowIssueDto(rowNum, "Aula '" + dto.roomNumber() + "' no pertenece al edificio "
@@ -109,10 +112,10 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
         allocationService.importAllocationsBatch(pendingAllocations);
 
-        log.info("Importación completada: {} filas, {} períodos creados, {} filas salteadas, {} advertencias",
-            processedRows, periodsCreated.get(), skippedRows.size(), rowWarnings.size());
+        log.info("Importación completada: {} filas, {} períodos creados, {} eventos creados, {} filas salteadas, {} advertencias",
+            processedRows, periodsCreated.get(), eventsCreated.get(), skippedRows.size(), rowWarnings.size());
 
-        return new ImportResultDto(processedRows, periodsCreated.get(), skippedRows, rowWarnings);
+        return new ImportResultDto(processedRows, periodsCreated.get(), eventsCreated.get(), skippedRows, rowWarnings);
     }
 
     private boolean isRowEmpty(Row row) {

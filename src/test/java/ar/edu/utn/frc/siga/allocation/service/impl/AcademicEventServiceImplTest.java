@@ -28,6 +28,7 @@ import ar.edu.utn.frc.siga.allocation.repository.RecurringEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.UniqueEventRepository;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
+import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.InvalidDateRangeException;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 
@@ -130,11 +131,11 @@ class AcademicEventServiceImplTest {
         assertThat(occurrences).allSatisfy(o -> assertThat(o.getStatus()).isEqualTo(OccurrenceStatus.SCHEDULED));
     }
 
-    // ---------- findRecurringEvent ----------
+    // ---------- findOrCreateRecurringEvent ----------
 
     @Test
-    @DisplayName("findRecurringEvent: existe uno con la misma sextupla → devuelve su id")
-    void findRecurringEventDevuelveIdExistente() {
+    @DisplayName("findOrCreateRecurringEvent: existe uno con la misma sextupla → lo reusa, no crea")
+    void findOrCreateReusaExistente() {
         CreateRecurringEventRequestDto dto = recurringDto(DayOfWeek.MONDAY,
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19));
         RecurringEvent existing = AllocationTestData.recurringEvent(7L, dto.dayOfWeek(), dto.startDate(), dto.endDate());
@@ -142,9 +143,10 @@ class AcademicEventServiceImplTest {
                 dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startTime(), dto.startDate(), dto.endDate()))
                 .thenReturn(Optional.of(existing));
 
-        Long result = service.findRecurringEvent(dto);
+        FindOrCreateResult<Long> result = service.findOrCreateRecurringEvent(dto);
 
-        assertThat(result).isEqualTo(7L);
+        assertThat(result.created()).isFalse();
+        assertThat(result.value()).isEqualTo(7L);
         verify(eventRepository, never()).save(any());
         verify(subjectService, never()).findById(any());
         verify(commissionService, never()).findById(any());
@@ -152,17 +154,24 @@ class AcademicEventServiceImplTest {
     }
 
     @Test
-    @DisplayName("findRecurringEvent: no existe ninguno con esa sextupla → lanza ResourceNotFoundException")
-    void findRecurringEventSinExistenteLanzaResourceNotFound() {
+    @DisplayName("findOrCreateRecurringEvent: no existe ninguno con esa sextupla → lo crea")
+    void findOrCreateCreaNuevo() {
         CreateRecurringEventRequestDto dto = recurringDto(DayOfWeek.MONDAY,
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19));
         when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
                 dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startTime(), dto.startDate(), dto.endDate()))
                 .thenReturn(Optional.empty());
+        when(subjectService.findById(1L)).thenReturn(AllocationTestData.subjectResponseDto(1L));
+        when(commissionService.findById(1L)).thenReturn(AllocationTestData.commissionResponseDto(1L));
+        RecurringEvent saved = AllocationTestData.recurringEvent(9L, dto.dayOfWeek(), dto.startDate(), dto.endDate());
+        when(eventRepository.save(any())).thenReturn(saved);
+        when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyRecurringResponseDto(9L));
 
-        assertThatThrownBy(() -> service.findRecurringEvent(dto))
-                .isInstanceOf(ResourceNotFoundException.class);
-        verify(eventRepository, never()).save(any());
+        FindOrCreateResult<Long> result = service.findOrCreateRecurringEvent(dto);
+
+        assertThat(result.created()).isTrue();
+        assertThat(result.value()).isEqualTo(9L);
+        verify(eventRepository).save(any());
     }
 
     // ---------- createUniqueEvent ----------

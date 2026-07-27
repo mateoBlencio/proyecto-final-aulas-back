@@ -23,6 +23,7 @@ import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
+import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
@@ -118,19 +119,22 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     }
 
     /**
-     * Busca un evento recurrente idéntico (misma materia/comisión/día/horario/ventana de
-     * fechas): catálogo cargado por fuera de esta app, falla si no existe.
+     * Reutiliza un evento recurrente idéntico (misma materia/comisión/día/horario/ventana
+     * de fechas) si ya existe; si no, lo crea. Pensado para importaciones donde varias
+     * filas de la planilla describen el mismo evento.
      */
     @Override
-    @Transactional(readOnly = true)
-    public Long findRecurringEvent(CreateRecurringEventRequestDto dto) {
+    @Transactional
+    public FindOrCreateResult<Long> findOrCreateRecurringEvent(CreateRecurringEventRequestDto dto) {
         return recurringEventRepository
                 .findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
                         dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startTime(),
                         dto.startDate(), dto.endDate())
-                .map(RecurringEvent::getId)
-                .orElseThrow(() -> ResourceNotFoundException.of("RecurringEvent",
-                        dto.subjectId() + "-" + dto.commissionId() + "-" + dto.dayOfWeek() + "-" + dto.startTime()));
+                .map(existing -> {
+                    log.debug("Reutilizando evento recurrente existente: id={}", existing.getId());
+                    return new FindOrCreateResult<>(existing.getId(), false);
+                })
+                .orElseGet(() -> new FindOrCreateResult<>(createRecurringEvent(dto).id(), true));
     }
 
     /**

@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
 import ar.edu.utn.frc.siga.space.model.Classroom;
+import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 
 import tools.jackson.databind.ObjectMapper;
@@ -123,8 +124,8 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("findRecurringEvent: reusa el mismo evento existente entre llamadas idénticas, sin duplicarlo")
-    void findRecurringEvent_reusesExistingEvent() {
+    @DisplayName("findOrCreateRecurringEvent: reusa el mismo evento existente entre llamadas idénticas, sin duplicarlo")
+    void findOrCreateRecurringEvent_reusesExistingEvent() {
         IntegrationTestData.SubjectAndCommission sc = testData.materiaYComision();
         LocalDate startDate = LocalDate.now().plusDays(1);
         DayOfWeek dayOfWeek = startDate.getDayOfWeek();
@@ -135,11 +136,12 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
         Long createdId = academicEventService.createRecurringEvent(dto).id();
         long before = eventRepository.count();
 
-        Long first = academicEventService.findRecurringEvent(dto);
-        Long second = academicEventService.findRecurringEvent(dto);
+        FindOrCreateResult<Long> first = academicEventService.findOrCreateRecurringEvent(dto);
+        FindOrCreateResult<Long> second = academicEventService.findOrCreateRecurringEvent(dto);
 
-        assertThat(first).isEqualTo(createdId);
-        assertThat(second).isEqualTo(createdId);
+        assertThat(first.created()).isFalse();
+        assertThat(first.value()).isEqualTo(createdId);
+        assertThat(second.value()).isEqualTo(createdId);
         assertThat(eventRepository.count()).isEqualTo(before);
     }
 }

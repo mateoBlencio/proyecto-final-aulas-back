@@ -15,7 +15,7 @@ public interface RecurringEventRepository extends JpaRepository<RecurringEvent, 
 
     /**
      * Busca un recurrente ya existente con exactamente los mismos datos identificatorios;
-     * respalda {@code findRecurringEvent} (catálogo, falla si no existe).
+     * respalda {@code findOrCreateRecurringEvent}.
      */
     Optional<RecurringEvent> findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
             Long subjectId, Long commissionId, DayOfWeek dayOfWeek, LocalTime startTime,

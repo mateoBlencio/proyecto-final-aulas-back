@@ -117,7 +117,7 @@ class ExcelImportServiceImplTest {
 
         ArgumentCaptor<CreateRecurringEventRequestDto> eventCaptor =
             ArgumentCaptor.forClass(CreateRecurringEventRequestDto.class);
-        verify(academicEventService).findRecurringEvent(eventCaptor.capture());
+        verify(academicEventService).findOrCreateRecurringEvent(eventCaptor.capture());
         CreateRecurringEventRequestDto eventDto = eventCaptor.getValue();
         assertThat(eventDto.subjectId()).isEqualTo(10L);
         assertThat(eventDto.commissionId()).isEqualTo(20L);
@@ -181,7 +181,7 @@ class ExcelImportServiceImplTest {
 
         ArgumentCaptor<CreateRecurringEventRequestDto> eventCaptor =
             ArgumentCaptor.forClass(CreateRecurringEventRequestDto.class);
-        verify(academicEventService).findRecurringEvent(eventCaptor.capture());
+        verify(academicEventService).findOrCreateRecurringEvent(eventCaptor.capture());
         assertThat(eventCaptor.getValue().durationMinutes()).isEqualTo(90);
     }
 
@@ -318,8 +318,8 @@ class ExcelImportServiceImplTest {
         RecurringEventResponseDto event = new RecurringEventResponseDto(1L, EventType.RECURRING,
             row.enrolledCount(), LocalTime.of(18, 30), 90L, DayOfWeek.MONDAY,
             LocalDate.of(2026, 3, 1), LocalDate.of(2026, 11, 30), subject, commission);
-        when(academicEventService.findRecurringEvent(any()))
-            .thenReturn(event.id());
+        when(academicEventService.findOrCreateRecurringEvent(any()))
+            .thenReturn(new FindOrCreateResult<>(event.id(), true));
     }
 
     /** Variante de {@link #stubHappyPath} con ids explícitos, usada por el test de dedupe. */
@@ -355,8 +355,8 @@ class ExcelImportServiceImplTest {
         RecurringEventResponseDto event = new RecurringEventResponseDto(eventId, EventType.RECURRING, 30,
             LocalTime.of(18, 30), 90L, DayOfWeek.MONDAY, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 11, 30),
             subject, commission);
-        when(academicEventService.findRecurringEvent(any()))
-            .thenReturn(event.id());
+        when(academicEventService.findOrCreateRecurringEvent(any()))
+            .thenReturn(new FindOrCreateResult<>(event.id(), true));
     }
 
     private void stubForSecondSubject(SpecialtyResponseDto specialty) {

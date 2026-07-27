@@ -50,8 +50,8 @@ class ExcelRowResolver {
     private final BuildingService buildingService;
     private final ClassroomService classroomService;
 
-    record ResolvedRow(Long eventId, SubjectResponseDto subject, CommissionResponseDto commission,
-            BuildingResponseDto building, ClassroomResponseDto classroom) {
+    record ResolvedRow(Long eventId, boolean eventCreated, SubjectResponseDto subject,
+            CommissionResponseDto commission, BuildingResponseDto building, ClassroomResponseDto classroom) {
     }
 
     @Transactional
@@ -90,7 +90,7 @@ class ExcelRowResolver {
             ? dto.durationMinutes()
             : (int) Duration.between(dto.startTime(), dto.endTime()).toMinutes();
 
-        Long eventId = academicEventService.findRecurringEvent(
+        FindOrCreateResult<Long> eventResult = academicEventService.findOrCreateRecurringEvent(
             new CreateRecurringEventRequestDto(
                 dto.enrolledCount(),
                 dto.startTime(),
@@ -103,6 +103,6 @@ class ExcelRowResolver {
             )
         );
 
-        return new ResolvedRow(eventId, subject, commission, building, classroom);
+        return new ResolvedRow(eventResult.value(), eventResult.created(), subject, commission, building, classroom);
     }
 }
