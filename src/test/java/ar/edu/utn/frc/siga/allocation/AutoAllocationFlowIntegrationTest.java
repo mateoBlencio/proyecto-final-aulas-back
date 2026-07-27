@@ -121,7 +121,7 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
     private AutoPreviewResponseDto autoPreview(List<Long> eventIds) throws Exception {
         MvcResult result = mockMvc.perform(post("/v1/allocations/auto-preview")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AutoPreviewRequestDto(eventIds, 2))))
+                        .content(objectMapper.writeValueAsString(new AutoPreviewRequestDto(eventIds, null, null, 2))))
                 .andExpect(status().isOk())
                 .andReturn();
         return objectMapper.readValue(result.getResponse().getContentAsString(), AutoPreviewResponseDto.class);
@@ -261,7 +261,7 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/v1/allocations/auto-preview")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new AutoPreviewRequestDto(List.of(pastEvent.getId()), 2))))
+                                new AutoPreviewRequestDto(List.of(pastEvent.getId()), null, null, 2))))
                 .andExpect(status().isConflict());
 
         Classroom aulaUnico = testData.aula(testData.edificio());
@@ -272,7 +272,7 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/v1/allocations/auto-preview")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                new AutoPreviewRequestDto(List.of(uniqueEventId), 2))))
+                                new AutoPreviewRequestDto(List.of(uniqueEventId), null, null, 2))))
                 .andExpect(status().isConflict());
     }
 

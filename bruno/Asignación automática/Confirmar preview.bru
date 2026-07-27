@@ -7,11 +7,15 @@ meta {
 post {
   url: {{baseUrl}}/v1/allocations/auto-preview/:previewId/confirm
   body: json
-  auth: inherit
+  auth: bearer
 }
 
 params:path {
-  previewId: prev_278f84f7
+  previewId: prev_961560f8
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJhZG1pbkBmcmMudXRuLmVkdS5hciIsInJvbGVzIjpbIlNVQlNFQ1JFVEFSSUEiXSwiaWF0IjoxNzg1MTE0NTc1LCJleHAiOjE3ODUxMTU3NzV9.X-EjQOMqzdQbdcABQ3BubqKjeZHNDvvuohGpXe1eGu3uN9Oifsl_FojTuPEDvWLS
 }
 
 body:json {

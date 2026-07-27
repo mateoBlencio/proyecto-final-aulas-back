@@ -118,6 +118,14 @@ public class AllocationProblemServiceImpl implements AllocationProblemService {
         return Paging.of(overlaps, pageable);
     }
 
+    @Override
+    public List<Long> resolveAllUnassignedEventIds() {
+        Range range = resolveRange(null, null);
+        List<Long> ids = academicEventService.findUnassignedEventIds(range.from(), range.to(), false);
+        log.info("Resolución de selección masiva: eventos sin aula count={}", ids.size());
+        return ids;
+    }
+
     private List<Allocation> readOccupancy(Range range, boolean includePast) {
         List<Allocation> occupancy =
                 allocationRepository.findOccupancyBetween(range.from(), range.to(), OccurrenceStatus.ASSIGNED);

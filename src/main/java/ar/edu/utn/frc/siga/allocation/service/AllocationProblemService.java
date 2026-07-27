@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * Detección de problemas de asignación de aulas para la pantalla de asignación
@@ -37,4 +38,12 @@ public interface AllocationProblemService {
      * ocurrencias ya pasadas salvo que {@code includePast} sea true.
      */
     Page<ClassroomOverlapDto> findOverlaps(LocalDate from, LocalDate to, boolean includePast, Pageable pageable);
+
+    /**
+     * IDs de todos los eventos sin aula, con el mismo rango por defecto que
+     * {@link #findUnassigned} sin parámetros (hoy hasta fin del período académico activo,
+     * excluyendo pasadas). Pensado para resolver una selección masiva ("seleccionar todas")
+     * sin depender de la paginación del listado.
+     */
+    List<Long> resolveAllUnassignedEventIds();
 }

@@ -61,4 +61,11 @@ public interface AcademicEventService {
      * {@code includePast} sea true.
      */
     List<AcademicEventResponseDto> findUnassignedEvents(LocalDate from, LocalDate to, boolean includePast);
+
+    /**
+     * Igual criterio que {@link #findUnassignedEvents}, pero devuelve solo los IDs: pensado
+     * para resolver una selección masiva (ej. "seleccionar todas") sin componer el DTO
+     * completo de cada evento.
+     */
+    List<Long> findUnassignedEventIds(LocalDate from, LocalDate to, boolean includePast);
 }

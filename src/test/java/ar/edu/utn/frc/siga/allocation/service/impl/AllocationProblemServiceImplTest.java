@@ -291,6 +291,17 @@ class AllocationProblemServiceImplTest {
         assertThat(toCaptor.getValue()).isEqualTo(from.plusMonths(6));
     }
 
+    @Test
+    @DisplayName("resolveAllUnassignedEventIds delega en findUnassignedEventIds con el rango por defecto")
+    void resolveAllUnassignedEventIdsDelegaConRangoPorDefecto() {
+        when(academicEventService.findUnassignedEventIds(any(), any(), eq(false))).thenReturn(List.of(1L, 2L));
+
+        List<Long> ids = service.resolveAllUnassignedEventIds();
+
+        assertThat(ids).containsExactly(1L, 2L);
+        verify(academicEventService).findUnassignedEventIds(eq(LocalDate.now()), any(), eq(false));
+    }
+
     private RecurringEvent recurringEvent(long id, Integer enrolled, LocalTime startTime, int durationMinutes) {
         return RecurringEvent.builder()
                 .id(id)

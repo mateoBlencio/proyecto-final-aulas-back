@@ -7,12 +7,18 @@ meta {
 post {
   url: {{baseUrl}}/v1/allocations/auto-preview
   body: json
-  auth: inherit
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJhZG1pbkBmcmMudXRuLmVkdS5hciIsInJvbGVzIjpbIlNVQlNFQ1JFVEFSSUEiXSwiaWF0IjoxNzg1MTE0NTc1LCJleHAiOjE3ODUxMTU3NzV9.X-EjQOMqzdQbdcABQ3BubqKjeZHNDvvuohGpXe1eGu3uN9Oifsl_FojTuPEDvWLS
 }
 
 body:json {
   {
-    "eventIds": [1, 2, 3],
+    "selectAll":true,
+    "excludedIds":[1005, 171, 1006, 1325],
+    "eventIds": [],
     "timeLimitSeconds": 30
   }
 }
@@ -22,10 +28,23 @@ docs {
   (asignaciones ya hechas) como restricción dura. Devuelve una preview con previewId,
   sin persistir asignaciones. El confirm es un paso aparte (pendiente).
   
-  eventIds = eventos a (RE)RESOLVER, vengan del listado que vengan (GET /problems):
-  - eventos SIN aula asignada, o
-  - eventos YA asignados con sobrecupo o superposición: sus aulas se "sueltan" para
-    que el solver pueda reasignarlas (a otra aula, o la misma si es óptima).
+  Dos modos EXCLUYENTES para elegir los eventos a (RE)RESOLVER (ninguno o ambos a la
+  vez → 400 Invalid selection):
+  - eventIds: lista explícita, vengan del listado que vengan (GET /problems):
+    eventos SIN aula asignada, o eventos YA asignados con sobrecupo o superposición
+    (sus aulas se "sueltan" para que el solver pueda reasignarlas).
+  - selectAll: true junto con excludedIds (opcional) para resolver TODOS los eventos
+    sin aula (mismo criterio que GET /unassigned sin filtros), descontando los ids
+    que el usuario desmarcó manualmente. Pensado para el botón "Seleccionar todas
+    (N)" del front, evitando mandar miles de ids en el body.
+  
+  Ejemplo modo selectAll:
+  {
+    "selectAll": true,
+    "excludedIds": [205, 318],
+    "timeLimitSeconds": 30
+  }
+  
   Los ids duplicados se deduplican (un evento puede aparecer en más de un listado).
   Todo lo NO seleccionado sigue siendo intocable (ocupación pinned): la propuesta
   jamás pisa asignaciones firmes. Solo se consideran occurrences futuras (>= hoy).

@@ -5,23 +5,25 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/allocations/unassigned?from=2026-08-01&to=2026-12-15&includePast=false&page=0&size=20
+  url: {{baseUrl}}/v1/allocations/unassigned?page=0&size=20&sort=dayOfWeek,asc
   body: none
-  auth: inherit
+  auth: bearer
 }
 
 params:query {
-  from: 2026-08-01
-  to: 2026-12-15
-  includePast: false
   page: 0
   size: 20
+  sort: dayOfWeek,asc
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJhZG1pbkBmcmMudXRuLmVkdS5hciIsInJvbGVzIjpbIlNVQlNFQ1JFVEFSSUEiXSwiaWF0IjoxNzg1MTE0NTc1LCJleHAiOjE3ODUxMTU3NzV9.X-EjQOMqzdQbdcABQ3BubqKjeZHNDvvuohGpXe1eGu3uN9Oifsl_FojTuPEDvWLS
 }
 
 docs {
   Eventos con ocurrencias SCHEDULED (sin aula) en el rango [from, to], agrupados por
   evento.
-
+  
   Query params opcionales:
   - from: si se omite, es hoy.
   - to: si se omite, es la fecha de fin (endDate) del período académico activo (el mayor
@@ -29,8 +31,8 @@ docs {
   - includePast: si se omite, false. Excluye ocurrencias cuya fecha+hora de inicio ya
     pasó (por diseño: no son accionables). true incluye esas ocurrencias (uso: auditoría
     de clases que quedaron sin aula).
-
+  
   'to' anterior a 'from' → 400 Bad Request.
-
+  
   Paginado: page/size estándar (default size=20), igual que GET /v1/classrooms.
 }

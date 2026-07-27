@@ -188,6 +188,7 @@ buildNumber.properties
 # Mateo
 plans/
 AGENTS.md
+.mcp.json
 
 # Claude
 .claude

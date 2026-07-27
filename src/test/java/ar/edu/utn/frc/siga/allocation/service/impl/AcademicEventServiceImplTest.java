@@ -55,6 +55,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -377,6 +378,25 @@ class AcademicEventServiceImplTest {
         assertThat(result).hasSize(2);
         assertThat(result.get(0).id()).isEqualTo(1L);
         assertThat(result.get(1).id()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("findUnassignedEventIds: mismo criterio que findUnassignedEvents pero sin componer DTOs")
+    void findUnassignedEventIdsNoComponeDto() {
+        LocalDate from = LocalDate.of(2026, 3, 1);
+        LocalDate to = LocalDate.of(2026, 3, 31);
+        RecurringEvent eventA = AllocationTestData.recurringEvent(1L, DayOfWeek.MONDAY, from, to);
+        RecurringEvent eventB = AllocationTestData.recurringEvent(2L, DayOfWeek.TUESDAY, from, to);
+        Occurrence occA = AllocationTestData.occurrence(10L, eventA, from, OccurrenceStatus.SCHEDULED);
+        Occurrence occB = AllocationTestData.occurrence(11L, eventB, from.plusDays(1), OccurrenceStatus.SCHEDULED);
+
+        when(occurrenceRepository.findByStatusAndDateBetweenOrderByEvent_IdAscDateAsc(OccurrenceStatus.SCHEDULED, from, to))
+                .thenReturn(List.of(occA, occB));
+
+        List<Long> result = service.findUnassignedEventIds(from, to, true);
+
+        assertThat(result).containsExactly(1L, 2L);
+        verifyNoInteractions(composer);
     }
 
     // ---------- findAll / findById / findOccurrencesByEventId ----------

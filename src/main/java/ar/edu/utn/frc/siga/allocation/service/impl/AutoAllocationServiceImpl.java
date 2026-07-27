@@ -21,12 +21,14 @@ import ar.edu.utn.frc.siga.allocation.model.Occurrence;
 import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.allocation.service.AllocationProblemService;
 import ar.edu.utn.frc.siga.allocation.service.AutoAllocationService;
 import ar.edu.utn.frc.siga.allocation.service.impl.AutoAllocationDataLoader.AutoPreviewInputs;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.AllocationCandidate;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.OccupiedSlot;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.ResolvedProposal;
+import ar.edu.utn.frc.siga.common.exception.InvalidSelectionException;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import ar.edu.utn.frc.siga.solver.model.SolverAllocation;
 import ar.edu.utn.frc.siga.solver.model.SolverEvent;
@@ -66,11 +68,12 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
     private final AllocationComposer allocationComposer;
     private final AllocationValidator validator;
     private final AllocationWriter writer;
+    private final AllocationProblemService allocationProblemService;
 
     /** Sin {@code @Transactional}: ver {@link AutoAllocationDataLoader} para el motivo. */
     @Override
     public AutoPreviewResponseDto autoPreview(AutoPreviewRequestDto request) {
-        Set<Long> eventIds = Set.copyOf(request.eventIds());
+        Set<Long> eventIds = resolveEventIds(request);
         AutoPreviewInputs inputs = dataLoader.load(eventIds);
 
         List<SolverEvent> solverEvents = inputs.events().stream()
@@ -197,6 +200,29 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
         log.info("Confirm aplicado: previewId={}, applied={}, skipped={}",
                 previewId, saved.size(), skippedEventIds.size());
         return new ConfirmAutoPreviewResponseDto(allocationComposer.composeAll(saved), skippedEventIds);
+    }
+
+    /**
+     * Dos modos excluyentes: {@code eventIds} explícito, o {@code selectAll=true} para
+     * resolver todos los eventos sin aula ({@link AllocationProblemService#resolveAllUnassignedEventIds})
+     * descontando {@code excludedIds}. Ninguno o ambos a la vez es un request inválido.
+     */
+    private Set<Long> resolveEventIds(AutoPreviewRequestDto request) {
+        boolean selectAll = Boolean.TRUE.equals(request.selectAll());
+        boolean hasExplicitIds = request.eventIds() != null && !request.eventIds().isEmpty();
+
+        if (selectAll == hasExplicitIds) {
+            throw new InvalidSelectionException(
+                    "Debe indicar eventIds o selectAll=true, pero no ambos ni ninguno");
+        }
+        if (!selectAll) {
+            return Set.copyOf(request.eventIds());
+        }
+
+        Set<Long> excludedIds = request.excludedIds() != null ? Set.copyOf(request.excludedIds()) : Set.of();
+        return allocationProblemService.resolveAllUnassignedEventIds().stream()
+                .filter(id -> !excludedIds.contains(id))
+                .collect(Collectors.toSet());
     }
 
     private SolverEvent toSolverEvent(RecurringEvent e, List<LocalDate> dates) {

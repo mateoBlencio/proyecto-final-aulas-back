@@ -241,6 +241,20 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     @Override
     @Transactional(readOnly = true)
     public List<AcademicEventResponseDto> findUnassignedEvents(LocalDate from, LocalDate to, boolean includePast) {
+        return composer.compose(groupUnassignedEvents(from, to, includePast).values());
+    }
+
+    /**
+     * Igual criterio, pero devuelve solo los IDs sin componer el DTO completo (subject,
+     * commission, classroom): pensado para resolver selecciones masivas.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<Long> findUnassignedEventIds(LocalDate from, LocalDate to, boolean includePast) {
+        return List.copyOf(groupUnassignedEvents(from, to, includePast).keySet());
+    }
+
+    private Map<Long, AcademicEvent> groupUnassignedEvents(LocalDate from, LocalDate to, boolean includePast) {
         LocalDate effectiveFrom = DateRanges.defaultFrom(from);
         DateRanges.requireNotBefore(to, effectiveFrom);
 
@@ -256,7 +270,6 @@ public class AcademicEventServiceImpl implements AcademicEventService {
             AcademicEvent event = occurrence.getEvent();
             eventById.putIfAbsent(event.getId(), event);
         }
-
-        return composer.compose(eventById.values());
+        return eventById;
     }
 }

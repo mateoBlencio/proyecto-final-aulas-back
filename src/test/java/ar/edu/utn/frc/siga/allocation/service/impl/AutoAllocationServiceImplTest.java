@@ -27,7 +27,9 @@ import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
 import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.allocation.service.AllocationProblemService;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
+import ar.edu.utn.frc.siga.common.exception.InvalidSelectionException;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.solver.exception.ExpiredPreviewException;
 import ar.edu.utn.frc.siga.solver.model.SolverAllocation;
@@ -86,6 +88,8 @@ class AutoAllocationServiceImplTest {
     private AcademicEventComposer academicEventComposer;
     @Mock
     private AllocationComposer allocationComposer;
+    @Mock
+    private AllocationProblemService allocationProblemService;
 
     @Captor
     private ArgumentCaptor<List<SolverEvent>> solverEventsCaptor;
@@ -107,7 +111,7 @@ class AutoAllocationServiceImplTest {
         AllocationValidator validator = new AllocationValidator(classroomService, allocationRepository, new EventScheduleProperties());
         AllocationWriter writer = new AllocationWriter(allocationRepository, validator);
         service = new AutoAllocationServiceImpl(dataLoader, classroomService, academicEventComposer, solverService,
-                occurrenceRepository, allocationComposer, validator, writer);
+                occurrenceRepository, allocationComposer, validator, writer, allocationProblemService);
 
         lenient().when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5, 100)));
         lenient().when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 100)));
@@ -138,11 +142,40 @@ class AutoAllocationServiceImplTest {
         when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
                 .thenReturn(List.of(occurrence(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED)));
 
-        service.autoPreview(new AutoPreviewRequestDto(List.of(1L, 1L), null));
+        service.autoPreview(new AutoPreviewRequestDto(List.of(1L, 1L), null, null, null));
 
         verify(solverService).preview(solverEventsCaptor.capture(), any(), any(), anyInt());
         assertThat(solverEventsCaptor.getValue()).hasSize(1);
         assertThat(solverEventsCaptor.getValue().getFirst().planningId()).isEqualTo("1");
+    }
+
+    @Test
+    @DisplayName("selectAll=true resuelve contra todos los eventos sin aula, descontando excludedIds")
+    void selectAllResuelveEventosSinAulaDescontandoExcluidos() {
+        RecurringEvent kept = recurringEvent(1L);
+        when(allocationProblemService.resolveAllUnassignedEventIds()).thenReturn(List.of(1L, 2L));
+        when(eventRepository.findAllById(any())).thenReturn(List.of(kept));
+        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+                .thenReturn(List.of(occurrence(10L, kept, futureDate(1), OccurrenceStatus.SCHEDULED)));
+
+        service.autoPreview(new AutoPreviewRequestDto(null, true, List.of(2L), null));
+
+        verify(solverService).preview(solverEventsCaptor.capture(), any(), any(), anyInt());
+        assertThat(solverEventsCaptor.getValue()).extracting(SolverEvent::planningId).containsExactly("1");
+    }
+
+    @Test
+    @DisplayName("Sin eventIds y sin selectAll → InvalidSelectionException")
+    void sinEventIdsNiSelectAllLanzaExcepcion() {
+        assertThatThrownBy(() -> service.autoPreview(new AutoPreviewRequestDto(null, null, null, null)))
+                .isInstanceOf(InvalidSelectionException.class);
+    }
+
+    @Test
+    @DisplayName("eventIds y selectAll=true a la vez → InvalidSelectionException")
+    void eventIdsYSelectAllJuntosLanzaExcepcion() {
+        assertThatThrownBy(() -> service.autoPreview(new AutoPreviewRequestDto(List.of(1L), true, null, null)))
+                .isInstanceOf(InvalidSelectionException.class);
     }
 
     @Test
@@ -160,7 +193,7 @@ class AutoAllocationServiceImplTest {
         when(allocationRepository.findOccupancyBetween(any(), any(), eq(OccurrenceStatus.ASSIGNED)))
                 .thenReturn(List.of(selectedAllocation, foreignAllocation));
 
-        service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null));
+        service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null, null, null));
 
         verify(solverService).preview(any(), any(), occupancyCaptor.capture(), anyInt());
         List<SolverOccupancy> occupancy = occupancyCaptor.getValue();
@@ -180,7 +213,7 @@ class AutoAllocationServiceImplTest {
                         occurrence(10L, event, scheduledDate, OccurrenceStatus.SCHEDULED),
                         occurrence(11L, event, assignedDate, OccurrenceStatus.ASSIGNED)));
 
-        service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null));
+        service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null, null, null));
 
         // El repo se consulta con ambos estados y solo fechas desde hoy (filtra clases dictadas).
         verify(occurrenceRepository).findByEvent_IdInAndStatusInAndDateGreaterThanEqual(
@@ -203,7 +236,7 @@ class AutoAllocationServiceImplTest {
         when(solverService.preview(any(), any(), any(), anyInt())).thenReturn(new SolverPreview("prev_abc",
                 List.of(new SolverAllocation("1", 5), new SolverAllocation("2", null))));
 
-        AutoPreviewResponseDto result = service.autoPreview(new AutoPreviewRequestDto(List.of(1L, 2L), null));
+        AutoPreviewResponseDto result = service.autoPreview(new AutoPreviewRequestDto(List.of(1L, 2L), null, null, null));
 
         assertThat(result.previewId()).isEqualTo("prev_abc");
         assertThat(result.allocations()).hasSize(1);
@@ -235,7 +268,7 @@ class AutoAllocationServiceImplTest {
         when(solverService.preview(any(), any(), any(), anyInt())).thenReturn(new SolverPreview("prev_unresolved",
                 List.of(new SolverAllocation("1", 6), new SolverAllocation("2", null))));
 
-        AutoPreviewResponseDto result = service.autoPreview(new AutoPreviewRequestDto(List.of(1L, 2L), null));
+        AutoPreviewResponseDto result = service.autoPreview(new AutoPreviewRequestDto(List.of(1L, 2L), null, null, null));
 
         assertThat(result.unresolved()).hasSize(1);
         List<MoveConflictDto> conflicts = result.unresolved().getFirst().conflicts();
@@ -264,7 +297,7 @@ class AutoAllocationServiceImplTest {
                 .build();
         when(eventRepository.findAllById(any())).thenReturn(List.of(uniqueEvent));
 
-        assertThatThrownBy(() -> service.autoPreview(new AutoPreviewRequestDto(List.of(3L), null)))
+        assertThatThrownBy(() -> service.autoPreview(new AutoPreviewRequestDto(List.of(3L), null, null, null)))
                 .isInstanceOf(AllocationConflictException.class)
                 .hasMessageContaining("recurrentes");
     }
@@ -275,7 +308,7 @@ class AutoAllocationServiceImplTest {
         RecurringEvent event = recurringEvent(1L);
         when(eventRepository.findAllById(any())).thenReturn(List.of(event));
 
-        assertThatThrownBy(() -> service.autoPreview(new AutoPreviewRequestDto(List.of(1L, 1L, 99L), null)))
+        assertThatThrownBy(() -> service.autoPreview(new AutoPreviewRequestDto(List.of(1L, 1L, 99L), null, null, null)))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -287,7 +320,7 @@ class AutoAllocationServiceImplTest {
         when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
                 .thenReturn(List.of());
 
-        assertThatThrownBy(() -> service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null)))
+        assertThatThrownBy(() -> service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null, null, null)))
                 .isInstanceOf(AllocationConflictException.class)
                 .hasMessageContaining("ocurrencias pendientes");
     }
@@ -302,7 +335,7 @@ class AutoAllocationServiceImplTest {
                 .thenReturn(List.of(occurrence(10L, event, date, OccurrenceStatus.SCHEDULED)));
         when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5, 100)));
 
-        service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null));
+        service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null, null, null));
 
         verify(solverService).preview(solverEventsCaptor.capture(), roomsCaptor.capture(), any(), anyInt());
 
@@ -337,7 +370,7 @@ class AutoAllocationServiceImplTest {
                         occurrence(10L, event1, futureDate(1), OccurrenceStatus.SCHEDULED),
                         occurrence(11L, event2, futureDate(2), OccurrenceStatus.SCHEDULED)));
 
-        service.autoPreview(new AutoPreviewRequestDto(List.of(1L, 2L), null));
+        service.autoPreview(new AutoPreviewRequestDto(List.of(1L, 2L), null, null, null));
 
         ArgumentCaptor<LocalDate> fromCaptor = ArgumentCaptor.forClass(LocalDate.class);
         ArgumentCaptor<LocalDate> toCaptor = ArgumentCaptor.forClass(LocalDate.class);
@@ -355,7 +388,7 @@ class AutoAllocationServiceImplTest {
         when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
                 .thenReturn(List.of(occurrence(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED)));
 
-        service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null));
+        service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null, null, null));
 
         ArgumentCaptor<Integer> timeLimitCaptor = ArgumentCaptor.forClass(Integer.class);
         verify(solverService).preview(any(), any(), any(), timeLimitCaptor.capture());
@@ -376,7 +409,7 @@ class AutoAllocationServiceImplTest {
         when(solverService.preview(any(), any(), any(), anyInt())).thenReturn(new SolverPreview("prev_abc",
                 List.of(new SolverAllocation("1", 5))));
 
-        AutoPreviewResponseDto result = service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null));
+        AutoPreviewResponseDto result = service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null, null, null));
 
         assertThat(result.allocations()).hasSize(1);
         assertThat(result.allocations().getFirst().event().id()).isEqualTo(1L);
@@ -398,7 +431,7 @@ class AutoAllocationServiceImplTest {
         when(solverService.preview(any(), any(), any(), anyInt())).thenReturn(new SolverPreview("prev_oc",
                 List.of(new SolverAllocation("1", 5))));
 
-        AutoPreviewResponseDto result = service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null));
+        AutoPreviewResponseDto result = service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null, null, null));
 
         assertThat(result.allocations()).hasSize(1);
         assertThat(result.allocations().getFirst().classroom().id()).isEqualTo(5);
@@ -421,7 +454,7 @@ class AutoAllocationServiceImplTest {
         when(solverService.preview(any(), any(), any(), anyInt())).thenReturn(new SolverPreview("prev_floor",
                 List.of(new SolverAllocation("1", null)))); // el solver no ubicó el evento
 
-        AutoPreviewResponseDto result = service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null));
+        AutoPreviewResponseDto result = service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null, null, null));
 
         assertThat(result.unresolved()).isEmpty();
         assertThat(result.allocations()).hasSize(1);
