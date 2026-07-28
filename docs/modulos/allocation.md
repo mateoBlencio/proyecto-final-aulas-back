@@ -64,11 +64,14 @@ arman los DTOs trayendo datos de `space`/`academic` por `findByIds` (batch, sin 
 ### Modelo
 
 - **`AcademicEvent`** — abstracta, herencia `JOINED`, discriminador `tipo_evento`.
-  Auditada con Envers. Subtipos:
-  - **`RecurringEvent`** — `dayOfWeek`, `startDate`, `endDate`, `subjectId`, `commissionId`
-    (IDs planos cross-módulo). `toOccurrences()` genera semanalmente desde `startDate`
-    hasta `endDate` (o `startDate + 1 año` si es null).
-  - **`UniqueEvent`** — `date`, `description`; genera 1 ocurrencia.
+  Auditada con Envers. `subjectId`/`commissionId` (IDs planos cross-módulo, ambos nullable)
+  viven acá, compartidos por los dos subtipos. Subtipos:
+  - **`RecurringEvent`** — `dayOfWeek`, `startDate`, `endDate`. `toOccurrences()` genera
+    semanalmente desde `startDate` hasta `endDate` (o `startDate + 1 año` si es null).
+  - **`UniqueEvent`** — `date`, `kind` (`UniqueEventKind`: `PARCIAL`/`TRABAJO_PRACTICO`/
+    `EXAMEN_FINAL`/`OTRO`), `description`; genera 1 ocurrencia. `subjectId` obligatorio
+    salvo `kind=OTRO`; `commissionId` nunca obligatorio por sí solo, pero no puede venir
+    sin `subjectId` (validado en el service, ver ADR-011).
 - **`Occurrence`** — fecha + `OccurrenceStatus` (`SCHEDULED`/`ASSIGNED`/`CANCELLED`/`SUSPENDED`).
   `isPast()` compara contra `LocalDateTime.now()`.
 - **`Allocation`** — `classroomId` (ID plano a `space`), `source`

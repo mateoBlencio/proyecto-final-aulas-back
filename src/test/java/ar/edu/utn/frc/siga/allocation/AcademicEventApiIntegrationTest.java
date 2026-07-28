@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.allocation.dto.request.CreateRecurringEventRequestDto
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.model.Occurrence;
 import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.allocation.model.UniqueEventKind;
 import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
@@ -103,8 +104,10 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
     void createUnique_persistsSingleOccurrence() throws Exception {
         LocalDate date = LocalDate.now().plusDays(5);
         Classroom classroom = testData.aula(testData.edificio());
+        IntegrationTestData.SubjectAndCommission sc = testData.materiaYComision();
         CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
-                20, LocalTime.of(10, 0), 60, date, "Evento único IT", classroom.getId(), null);
+                UniqueEventKind.EXAMEN_FINAL, sc.subjectId(), sc.commissionId(),
+                date, LocalTime.of(10, 0), 60, 20, classroom.getId(), null);
 
         MvcResult result = mockMvc.perform(post("/v1/events/unique")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -120,6 +123,27 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(occurrences).hasSize(1);
         assertThat(occurrences.getFirst().getDate()).isEqualTo(date);
         assertThat(occurrences.getFirst().getStatus()).isEqualTo(OccurrenceStatus.ASSIGNED);
+    }
+
+    @Test
+    @DisplayName("POST /v1/events/unique sin eventType responde 400 (tipo_actividad no puede ser null)")
+    void createUnique_missingEventType_returns400() throws Exception {
+        LocalDate date = LocalDate.now().plusDays(6);
+        Classroom classroom = testData.aula(testData.edificio());
+        String bodyWithoutEventType = """
+                {
+                  "date": "%s",
+                  "startTime": "10:00",
+                  "durationMinutes": 60,
+                  "enrolled": 20,
+                  "classroomId": %d
+                }
+                """.formatted(date, classroom.getId());
+
+        mockMvc.perform(post("/v1/events/unique")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bodyWithoutEventType))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

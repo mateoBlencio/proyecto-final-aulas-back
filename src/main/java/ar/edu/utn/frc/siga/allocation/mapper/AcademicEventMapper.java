@@ -33,11 +33,14 @@ public interface AcademicEventMapper {
 
     @Mapping(target = "id", source = "event.id")
     @Mapping(target = "type", constant = "UNIQUE_EVENT")
+    @Mapping(target = "eventType", source = "event.kind")
     @Mapping(target = "durationMinutes", expression = "java(event.getDuration().toMinutes())")
+    @Mapping(target = "subject", source = "subject")
+    @Mapping(target = "commission", source = "commission")
     @Mapping(target = "status", source = "status")
     @Mapping(target = "classroom", source = "classroom")
     @Mapping(target = "overcrowdedBy", source = "overcrowdedBy")
     @Mapping(target = "observation", source = "observation")
-    UniqueEventResponseDto toDto(UniqueEvent event, OccurrenceStatus status, ClassroomResponseDto classroom,
-            Integer overcrowdedBy, String observation);
+    UniqueEventResponseDto toDto(UniqueEvent event, SubjectResponseDto subject, CommissionResponseDto commission,
+            OccurrenceStatus status, ClassroomResponseDto classroom, Integer overcrowdedBy, String observation);
 }

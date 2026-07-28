@@ -20,8 +20,9 @@ import java.util.List;
 
 /**
  * Clase regular que se dicta un día fijo de la semana (cursada) dentro de una ventana de
- * fechas, generando una {@link Occurrence} semanal. Referencia materia y comisión
- * ({@code academic}) por ID plano, sin relación JPA cross-módulo.
+ * fechas, generando una {@link Occurrence} semanal. {@code subjectId}/{@code commissionId}
+ * (referencia a {@code academic} por ID plano) viven en {@link AcademicEvent}, compartidos
+ * con {@link UniqueEvent}.
  */
 @Entity
 @Table(name = "evento_recurrente")
@@ -41,14 +42,6 @@ public class RecurringEvent extends AcademicEvent {
 
     @Column(name = "fecha_fin")
     private LocalDate endDate;
-
-    /** ID de la materia (academic::Subject). Referencia por ID plano, sin relación JPA cross-módulo. */
-    @Column(name = "id_materia")
-    private Long subjectId;
-
-    /** ID de la comisión (academic::Commission). Referencia por ID plano, sin relación JPA cross-módulo. */
-    @Column(name = "id_comision")
-    private Long commissionId;
 
     @Override
     public EventType getType() {

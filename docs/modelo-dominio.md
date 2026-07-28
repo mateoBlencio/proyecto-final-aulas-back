@@ -25,6 +25,7 @@ Campos comunes (en el padre):
 
 - `enrolled` (`cantidad_inscriptos`): cuánta gente asiste. Es el dato contra el que se contrasta la **capacidad del aula** (tanto en asignación manual como en el solver).
 - `startTime` + `duration`: horario del evento. `endTime()` se deriva (`startTime + duration`). **El horario vive en el evento, no en la occurrence** — cambiar el horario del evento cambia el de todas sus occurrences.
+- `subjectId` / `commissionId`: qué materia y qué comisión cursan. Ambos nullable (un evento podría no estar atado a materia/comisión). Son **IDs planos** al módulo `academic` (la FK física sigue en BD); los datos se piden a la fachada del otro módulo. Viven en el padre porque **tanto `RecurringEvent` como `UniqueEvent` los necesitan** (un parcial o examen final también tiene materia y comisión asignada, no solo la cursada regular).
 - `planningId` (`@Transient`, no persiste): identificador temporal que usa el módulo `solver` para correlacionar el evento con su `SolverEvent` durante una corrida de asignación automática.
 
 ### `RecurringEvent`
@@ -34,7 +35,6 @@ Clase regular que se dicta un día fijo de la semana:
 - `dayOfWeek`: día de la semana en que se dicta (ej. todos los martes).
 - `startDate` / `endDate`: ventana del dictado. `endDate` puede ser null → se asume 1 año desde `startDate` al generar occurrences.
 - `excludedDates` (tabla `evento_recurrente_fecha_excluida`): fechas puntuales en que NO hay clase. Origen típico: suspensiones de clases, feriados/días no laborables, receso invernal (relevante para eventos anuales). Ver `calendario-academico.md` en esta carpeta.
-- `subjectId` / `commissionId`: qué materia y qué comisión cursan. Ambos nullable (un recurrente podría no estar atado a materia/comisión). Son **IDs planos** al módulo `academic` (la FK física sigue en BD); los datos se piden a la fachada del otro módulo (deuda del `@ManyToOne` cross-módulo ya saldada).
 
 Generación de occurrences (`toOccurrences()`): parte de `startDate` ajustada al **próximo `dayOfWeek` igual o posterior**, avanza de a 7 días hasta `endDate` inclusive, y saltea las `excludedDates`. Cada occurrence nace en estado `SCHEDULED` — **las occurrences nacen sin aula**; `toOccurrences()` nunca las crea en otro estado.
 
@@ -42,7 +42,7 @@ Nota de calendario: la facultad opera coloquialmente por **cuatrimestres**, pero
 
 ### `UniqueEvent`
 
-Ocurre una sola vez: `date` + `description`. Genera exactamente 1 occurrence. Excepción rara del negocio: mesa especial pedida por alumno, fuera de calendario — sigue siendo un `UniqueEvent` con otra fecha.
+Ocurre una sola vez: `date` + `kind` (`UniqueEventKind`: `PARCIAL` / `TRABAJO_PRACTICO` / `EXAMEN_FINAL` / `OTRO`) + `description` (texto libre adicional, opcional). Genera exactamente 1 occurrence. Usa `subjectId`/`commissionId` del padre igual que `RecurringEvent`, con una regla asimétrica (validada en el service, no en la entidad — ver ADR-011): `subjectId` es obligatorio para `PARCIAL`/`TRABAJO_PRACTICO`/`EXAMEN_FINAL` (tengan o no comisión); `commissionId` nunca es obligatorio por sí solo, pero no puede venir sin `subjectId` (ni siquiera en `OTRO`). Excepción rara del negocio: mesa especial pedida por alumno, fuera de calendario — sigue siendo un `UniqueEvent` con otra fecha.
 
 ## Occurrence
 
@@ -223,6 +223,8 @@ package "allocation" {
         enrolled : Integer
         startTime : LocalTime
         duration : Duration
+        subjectId : Long
+        commissionId : Long
         endTime() : LocalTime
         {abstract} toOccurrences() : List<Occurrence>
     }
@@ -232,13 +234,19 @@ package "allocation" {
         startDate : LocalDate
         endDate : LocalDate
         excludedDates : List<LocalDate>
-        subjectId : Long
-        commissionId : Long
     }
 
     class UniqueEvent {
         date : LocalDate
+        kind : UniqueEventKind
         description : String
+    }
+
+    enum UniqueEventKind {
+        PARCIAL
+        TRABAJO_PRACTICO
+        EXAMEN_FINAL
+        OTRO
     }
 
     class Occurrence {
@@ -296,8 +304,8 @@ Allocation --> AllocationSource : source
 
 ' cruces entre módulos: referencias por ID plano (sin @ManyToOne cross-módulo);
 ' la FK física sigue en BD, los datos se piden a la fachada del otro módulo
-RecurringEvent "*" ..> "0..1" Subject : subjectId
-RecurringEvent "*" ..> "0..1" Commission : commissionId
+AcademicEvent "*" ..> "0..1" Subject : subjectId
+AcademicEvent "*" ..> "0..1" Commission : commissionId
 Allocation "*" ..> "1" Classroom : classroomId
 @enduml
 ```
@@ -306,4 +314,5 @@ Notas de lectura del diagrama:
 
 - Herencia `AcademicEvent` → `RecurringEvent`/`UniqueEvent` es JPA `JOINED` con discriminador `tipo_evento` (valores del enum `EventType`).
 - `TermType` no está mapeado en columna: enum de apoyo (dictado anual/cuatrimestral) que deriva fechas de inicio/fin por año.
-- Las flechas punteadas `RecurringEvent..>Subject/Commission` y `Allocation..>Classroom` cruzan módulos **por ID plano** (`subjectId`/`commissionId`/`classroomId`): no hay `@ManyToOne` cross-módulo compartiendo entidades JPA; la FK física sigue en la BD y los datos se piden a la fachada (`::api`) del otro módulo. El módulo `solver` sigue el mismo criterio con sus modelos propios.
+- `UniqueEventKind` (`tipo_actividad`) es un enum de negocio propio de `UniqueEvent`, sin relación con `EventType` (que es el discriminador de la herencia recurrente/único).
+- Las flechas punteadas `AcademicEvent..>Subject/Commission` y `Allocation..>Classroom` cruzan módulos **por ID plano** (`subjectId`/`commissionId`/`classroomId`): no hay `@ManyToOne` cross-módulo compartiendo entidades JPA; la FK física sigue en la BD y los datos se piden a la fachada (`::api`) del otro módulo. El módulo `solver` sigue el mismo criterio con sus modelos propios.

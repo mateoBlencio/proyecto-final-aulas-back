@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
 
 /**
  * Compone el DTO de un evento académico resolviendo datos ajenos a la entidad: materia y
- * comisión (recurrentes) o estado/aula/sobrecupo de la única ocurrencia (únicos).
+ * comisión (ambos subtipos) y, para únicos, además estado/aula/sobrecupo de su única ocurrencia.
  */
 @Component
 @RequiredArgsConstructor
@@ -69,14 +69,13 @@ public class AcademicEventComposer {
         Set<Long> commissionIds = new LinkedHashSet<>();
         List<UniqueEvent> uniqueEvents = new ArrayList<>();
         for (AcademicEvent event : realEvents) {
-            if (event instanceof RecurringEvent r) {
-                if (r.getSubjectId() != null) {
-                    subjectIds.add(r.getSubjectId());
-                }
-                if (r.getCommissionId() != null) {
-                    commissionIds.add(r.getCommissionId());
-                }
-            } else if (event instanceof UniqueEvent u) {
+            if (event.getSubjectId() != null) {
+                subjectIds.add(event.getSubjectId());
+            }
+            if (event.getCommissionId() != null) {
+                commissionIds.add(event.getCommissionId());
+            }
+            if (event instanceof UniqueEvent u) {
                 uniqueEvents.add(u);
             }
         }
@@ -87,18 +86,19 @@ public class AcademicEventComposer {
 
         List<AcademicEventResponseDto> result = new ArrayList<>(realEvents.size());
         for (AcademicEvent event : realEvents) {
+            SubjectResponseDto subject = event.getSubjectId() != null ? subjectsById.get(event.getSubjectId()) : null;
+            CommissionResponseDto commission = event.getCommissionId() != null ? commissionsById.get(event.getCommissionId()) : null;
             if (event instanceof RecurringEvent r) {
-                SubjectResponseDto subject = r.getSubjectId() != null ? subjectsById.get(r.getSubjectId()) : null;
-                CommissionResponseDto commission = r.getCommissionId() != null ? commissionsById.get(r.getCommissionId()) : null;
                 result.add(mapper.toDto(r, subject, commission));
             } else {
-                result.add(composeUnique((UniqueEvent) event, occupancy));
+                result.add(composeUnique((UniqueEvent) event, subject, commission, occupancy));
             }
         }
         return result;
     }
 
-    private AcademicEventResponseDto composeUnique(UniqueEvent event, UniqueEventOccupancy occupancy) {
+    private AcademicEventResponseDto composeUnique(UniqueEvent event, SubjectResponseDto subject,
+            CommissionResponseDto commission, UniqueEventOccupancy occupancy) {
         Occurrence occurrence = occupancy.occurrenceByEventId().get(event.getId());
         Allocation allocation = occurrence != null ? occupancy.allocationByOccurrenceId().get(occurrence.getId()) : null;
         ClassroomResponseDto classroom = allocation != null ? occupancy.classroomById().get(allocation.getClassroomId()) : null;
@@ -107,7 +107,7 @@ public class AcademicEventComposer {
                 : null;
         String observation = allocation != null ? allocation.getObservation() : null;
         OccurrenceStatus status = occurrence != null ? occurrence.getStatus() : null;
-        return mapper.toDto(event, status, classroom, overcrowdedBy, observation);
+        return mapper.toDto(event, subject, commission, status, classroom, overcrowdedBy, observation);
     }
 
     private record UniqueEventOccupancy(Map<Long, Occurrence> occurrenceByEventId,

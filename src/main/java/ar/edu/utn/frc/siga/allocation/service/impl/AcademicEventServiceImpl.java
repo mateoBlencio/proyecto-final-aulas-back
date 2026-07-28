@@ -12,8 +12,10 @@ import ar.edu.utn.frc.siga.allocation.mapper.OccurrenceMapper;
 import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.Occurrence;
 import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.allocation.exception.MissingAcademicReferenceException;
 import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
+import ar.edu.utn.frc.siga.allocation.model.UniqueEventKind;
 import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
@@ -142,10 +144,18 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     @Override
     @Transactional
     public AcademicEventResponseDto createUniqueEvent(CreateUniqueEventRequestDto dto) {
-        log.debug("Creando evento único: date={}, classroomId={}", dto.date(), dto.classroomId());
+        log.debug("Creando evento único: eventType={}, subjectId={}, commissionId={}, date={}, classroomId={}",
+                dto.eventType(), dto.subjectId(), dto.commissionId(), dto.date(), dto.classroomId());
 
         Duration duration = Duration.ofMinutes(dto.durationMinutes());
         allocationValidator.validateBusinessHours(dto.startTime(), dto.startTime().plus(duration));
+        validateAcademicReference(dto.eventType(), dto.subjectId(), dto.commissionId());
+        if (dto.subjectId() != null) {
+            subjectService.findById(dto.subjectId());
+        }
+        if (dto.commissionId() != null) {
+            commissionService.findById(dto.commissionId());
+        }
 
         UniqueEvent event = UniqueEvent.builder()
                 .enrolled(dto.enrolled())
@@ -153,6 +163,9 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 .duration(duration)
                 .date(dto.date())
                 .description(dto.description())
+                .kind(dto.eventType())
+                .subjectId(dto.subjectId())
+                .commissionId(dto.commissionId())
                 .build();
 
         AcademicEvent saved = eventRepository.save(event);
@@ -161,10 +174,25 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         Occurrence occurrence = occurrences.getFirst();
 
         allocationService.allocateManually(occurrence.getId(),
-                new AllocateOccurrenceRequestDto(dto.classroomId(), dto.observation()));
+                new AllocateOccurrenceRequestDto(dto.classroomId(), null));
 
         log.info("Evento único creado: id={}, classroomId={}", saved.getId(), dto.classroomId());
         return composer.compose(saved);
+    }
+
+    /**
+     * {@code subjectId} es obligatorio para Parcial/Trabajo Práctico/Examen final (tengan o no
+     * comisión); para {@code OTRO} puede faltar. {@code commissionId} nunca es obligatorio por
+     * sí solo, pero no puede existir sin {@code subjectId} (una comisión siempre pertenece a
+     * una materia) — por eso un {@code OTRO} con comisión también exige materia.
+     */
+    private void validateAcademicReference(UniqueEventKind eventType, Long subjectId, Long commissionId) {
+        boolean subjectRequired = eventType != UniqueEventKind.OTRO || commissionId != null;
+        if (subjectRequired && subjectId == null) {
+            throw new MissingAcademicReferenceException(
+                    "subjectId es obligatorio para eventType=" + eventType
+                            + (commissionId != null ? " cuando se indica commissionId" : ""));
+        }
     }
 
     /** Lista todos los eventos únicos (parciales, TPs, mesas especiales, etc.). */
@@ -195,15 +223,25 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
         Duration duration = Duration.ofMinutes(dto.durationMinutes());
         allocationValidator.validateBusinessHours(dto.startTime(), dto.startTime().plus(duration));
+        validateAcademicReference(dto.eventType(), dto.subjectId(), dto.commissionId());
+        if (dto.subjectId() != null) {
+            subjectService.findById(dto.subjectId());
+        }
+        if (dto.commissionId() != null) {
+            commissionService.findById(dto.commissionId());
+        }
 
         event.setEnrolled(dto.enrolled());
         event.setStartTime(dto.startTime());
         event.setDuration(duration);
         event.setDate(dto.date());
         event.setDescription(dto.description());
+        event.setKind(dto.eventType());
+        event.setSubjectId(dto.subjectId());
+        event.setCommissionId(dto.commissionId());
         occurrence.setDate(dto.date());
 
-        AllocateOccurrenceRequestDto allocationDto = new AllocateOccurrenceRequestDto(dto.classroomId(), dto.observation());
+        AllocateOccurrenceRequestDto allocationDto = new AllocateOccurrenceRequestDto(dto.classroomId(), null);
         allocationRepository.findByOccurrence_Id(occurrence.getId())
                 .ifPresentOrElse(
                         existing -> allocationService.reallocate(existing.getId(), allocationDto),

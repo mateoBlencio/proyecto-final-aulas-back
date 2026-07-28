@@ -12,13 +12,15 @@ post {
 
 body:json {
   {
-    "enrolled": 45,
+    "eventType": "EXAMEN_FINAL",
+    "subjectId": 1,
+    "commissionId": 1,
+    "date": "2026-06-27",
     "startTime": "19:55",
     "durationMinutes": 180,
-    "date": "2026-06-27",
-    "description": "Examen Final Ingeniería Civil I",
+    "enrolled": 45,
     "classroomId": 1,
-    "observation": "Reservado por Secretaría Académica"
+    "description": "Mesa de examen final, turno julio"
   }
 }
 
@@ -26,7 +28,13 @@ docs {
   Crea un evento único, genera su única ocurrencia y le asigna el aula indicada
   en la misma operación (atómica, source = MANUAL). El aula es obligatoria.
 
+  eventType: PARCIAL | TRABAJO_PRACTICO | EXAMEN_FINAL | OTRO.
+  subjectId es obligatorio salvo para eventType=OTRO. commissionId nunca es
+  obligatorio por sí solo, pero no puede venir sin subjectId (ver ADR-011). Si
+  vienen, ambos se validan contra sus fachadas (404 si materia/comisión no existen).
+
   Valida ventana horaria (08:00-23:00 por defecto), disponibilidad del aula y
   solapamiento antes de guardar. Si el aula no existe/no está disponible o hay
-  solapamiento → 409. Horario fuera de ventana o fin <= inicio → 400.
+  solapamiento → 409. Horario fuera de ventana o fin <= inicio → 400. Falta
+  subjectId con eventType distinto de OTRO, o commissionId sin subjectId → 400.
 }

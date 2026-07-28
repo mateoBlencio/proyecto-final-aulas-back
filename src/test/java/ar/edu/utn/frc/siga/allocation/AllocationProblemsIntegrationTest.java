@@ -102,6 +102,7 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
         UniqueEvent event = UniqueEvent.builder()
                 .enrolled(enrolled).startTime(START).duration(java.time.Duration.ofMinutes(DURATION))
                 .date(date).description("Evento en el límite del período")
+                .kind(ar.edu.utn.frc.siga.allocation.model.UniqueEventKind.OTRO)
                 .build();
         AcademicEvent saved = uniqueEventRepository.save(event);
         occurrenceRepository.saveAll(saved.toOccurrences());
