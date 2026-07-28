@@ -122,4 +122,24 @@ class SubjectCommissionServiceImplTest {
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("SubjectCommission not found with id: 99");
     }
+
+    @Test
+    @DisplayName("findBySubjectId: mapea las comisiones vinculadas a esa materia")
+    void findBySubjectIdMapsRelations() {
+        SubjectCommission relation = SubjectCommission.builder().id(5L).subject(subject).commission(commission)
+                .enrolledCount(30).build();
+        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(5L, 1L, 2L, 30);
+        when(subjectCommissionRepository.findBySubject_Id(1L)).thenReturn(List.of(relation));
+        when(subjectCommissionMapper.toDto(relation)).thenReturn(dto);
+
+        assertThat(service.findBySubjectId(1L)).containsExactly(dto);
+    }
+
+    @Test
+    @DisplayName("findBySubjectId: sin comisiones vinculadas, devuelve lista vacía (no lanza)")
+    void findBySubjectIdWithoutMatchesReturnsEmptyList() {
+        when(subjectCommissionRepository.findBySubject_Id(99L)).thenReturn(List.of());
+
+        assertThat(service.findBySubjectId(99L)).isEmpty();
+    }
 }

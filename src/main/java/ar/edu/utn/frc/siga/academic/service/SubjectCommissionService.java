@@ -18,4 +18,10 @@ public interface SubjectCommissionService {
     List<SubjectCommissionResponseDto> findAll();
 
     SubjectCommissionResponseDto findById(Long id);
+
+    /**
+     * Comisiones vinculadas a una materia (filtro, no valida que la materia exista: sin
+     * resultados devuelve lista vacía, igual que {@code findAll} sin filtro).
+     */
+    List<SubjectCommissionResponseDto> findBySubjectId(Long subjectId);
 }

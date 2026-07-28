@@ -5,7 +5,17 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/subjects
+  url: {{baseUrl}}/v1/subjects?specialtyCode=1
   body: none
   auth: inherit
+}
+
+params:query {
+  specialtyCode: 1
+}
+
+docs {
+  Sin specialtyCode devuelve el catálogo completo de materias. Con specialtyCode,
+  filtra las materias de todos los planes de esa especialidad (no valida que la
+  especialidad exista: código inexistente devuelve lista vacía).
 }

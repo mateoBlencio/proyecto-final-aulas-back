@@ -25,4 +25,8 @@ public interface SubjectRepository extends JpaRepository<Subject, Long> {
     @Override
     @EntityGraph(attributePaths = {"studyPlan", "studyPlan.specialty"})
     List<Subject> findAllById(Iterable<Long> ids);
+
+    /** Materias de todos los planes de una especialidad (por su código público). */
+    @EntityGraph(attributePaths = {"studyPlan", "studyPlan.specialty"})
+    List<Subject> findByStudyPlan_Specialty_SpecialtyCode(Integer specialtyCode);
 }

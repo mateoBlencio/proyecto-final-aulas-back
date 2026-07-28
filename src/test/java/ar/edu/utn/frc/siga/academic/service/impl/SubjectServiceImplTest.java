@@ -94,6 +94,25 @@ class SubjectServiceImplTest {
     }
 
     @Test
+    @DisplayName("findBySpecialtyCode: mapea las materias de todos los planes de esa especialidad")
+    void findBySpecialtyCodeMapsAllSubjects() {
+        Subject subject = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
+        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null);
+        when(subjectRepository.findByStudyPlan_Specialty_SpecialtyCode(10)).thenReturn(List.of(subject));
+        when(subjectMapper.toDto(subject)).thenReturn(dto);
+
+        assertThat(service.findBySpecialtyCode(10)).containsExactly(dto);
+    }
+
+    @Test
+    @DisplayName("findBySpecialtyCode: sin materias vinculadas, devuelve lista vacía (no lanza)")
+    void findBySpecialtyCodeWithoutMatchesReturnsEmptyList() {
+        when(subjectRepository.findByStudyPlan_Specialty_SpecialtyCode(999)).thenReturn(List.of());
+
+        assertThat(service.findBySpecialtyCode(999)).isEmpty();
+    }
+
+    @Test
     @DisplayName("findByCodeAndStudyPlan: devuelve el DTO mapeado cuando la materia existe para ese plan")
     void findByCodeAndStudyPlanReturnsMappedDto() {
         Subject existing = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();

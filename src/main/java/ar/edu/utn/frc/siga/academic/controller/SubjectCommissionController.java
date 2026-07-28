@@ -11,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -29,10 +30,16 @@ public class SubjectCommissionController {
     private final SubjectCommissionService subjectCommissionService;
 
     @GetMapping
-    @Operation(summary = "Listar materia-comisión")
-    public ResponseEntity<List<SubjectCommissionResponseDto>> findAll() {
-        log.debug("GET /v1/subject-commissions");
-        return ResponseEntity.ok(subjectCommissionService.findAll());
+    @Operation(summary = "Listar materia-comisión",
+               description = "Sin parámetros devuelve el catálogo completo. Con subjectId, "
+                       + "filtra las comisiones vinculadas a esa materia.")
+    public ResponseEntity<List<SubjectCommissionResponseDto>> findAll(
+            @RequestParam(required = false) Long subjectId) {
+        log.debug("GET /v1/subject-commissions?subjectId={}", subjectId);
+        List<SubjectCommissionResponseDto> result = subjectId != null
+                ? subjectCommissionService.findBySubjectId(subjectId)
+                : subjectCommissionService.findAll();
+        return ResponseEntity.ok(result);
     }
 
     @GetMapping("/{id}")

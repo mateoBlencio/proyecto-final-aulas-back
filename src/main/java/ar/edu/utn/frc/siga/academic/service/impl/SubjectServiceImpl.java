@@ -54,6 +54,13 @@ public class SubjectServiceImpl implements SubjectService {
                 .orElseThrow(() -> ResourceNotFoundException.of("Subject", code)));
     }
 
+    @Override
+    public List<SubjectResponseDto> findBySpecialtyCode(Integer specialtyCode) {
+        return subjectRepository.findByStudyPlan_Specialty_SpecialtyCode(specialtyCode).stream()
+                .map(subjectMapper::toDto)
+                .toList();
+    }
+
     private StudyPlan requireStudyPlan(Integer studyPlanCode, Integer specialtyCode) {
         Specialty specialty = specialtyRepository.findBySpecialtyCode(specialtyCode)
                 .orElseThrow(() -> ResourceNotFoundException.of("Specialty", specialtyCode));
