@@ -54,7 +54,7 @@ class SubjectCommissionServiceImplTest {
     void findWithExistingRelationReturnsMappedDto() {
         SubjectCommission existing = SubjectCommission.builder().id(5L).subject(subject).commission(commission)
                 .enrolledCount(30).build();
-        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(5L, 1L, 2L, 30);
+        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(5L, 1L, 2L, null, 30);
         when(subjectRepository.findById(1L)).thenReturn(Optional.of(subject));
         when(commissionRepository.findById(2L)).thenReturn(Optional.of(commission));
         when(subjectCommissionRepository.findBySubjectAndCommission(subject, commission)).thenReturn(Optional.of(existing));
@@ -92,7 +92,7 @@ class SubjectCommissionServiceImplTest {
     void findAllMapsAllRelations() {
         SubjectCommission relation = SubjectCommission.builder().id(5L).subject(subject).commission(commission)
                 .enrolledCount(30).build();
-        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(5L, 1L, 2L, 30);
+        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(5L, 1L, 2L, null, 30);
         when(subjectCommissionRepository.findAll()).thenReturn(List.of(relation));
         when(subjectCommissionMapper.toDto(relation)).thenReturn(dto);
 
@@ -106,7 +106,7 @@ class SubjectCommissionServiceImplTest {
     void findByIdReturnsMappedDto() {
         SubjectCommission relation = SubjectCommission.builder().id(5L).subject(subject).commission(commission)
                 .enrolledCount(30).build();
-        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(5L, 1L, 2L, 30);
+        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(5L, 1L, 2L, null, 30);
         when(subjectCommissionRepository.findById(5L)).thenReturn(Optional.of(relation));
         when(subjectCommissionMapper.toDto(relation)).thenReturn(dto);
 
@@ -128,7 +128,7 @@ class SubjectCommissionServiceImplTest {
     void findBySubjectIdMapsRelations() {
         SubjectCommission relation = SubjectCommission.builder().id(5L).subject(subject).commission(commission)
                 .enrolledCount(30).build();
-        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(5L, 1L, 2L, 30);
+        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(5L, 1L, 2L, null, 30);
         when(subjectCommissionRepository.findBySubject_Id(1L)).thenReturn(List.of(relation));
         when(subjectCommissionMapper.toDto(relation)).thenReturn(dto);
 

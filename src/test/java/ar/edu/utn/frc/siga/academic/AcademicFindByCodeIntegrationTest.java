@@ -3,11 +3,17 @@ package ar.edu.utn.frc.siga.academic;
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
 import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.StudyPlanResponseDto;
+import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
+import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
+import ar.edu.utn.frc.siga.academic.model.Commission;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
+import ar.edu.utn.frc.siga.academic.model.Subject;
+import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.service.SpecialtyService;
 import ar.edu.utn.frc.siga.academic.service.StudyPlanService;
+import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
@@ -16,6 +22,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -37,6 +45,8 @@ class AcademicFindByCodeIntegrationTest extends AbstractIntegrationTest {
     private StudyPlanService studyPlanService;
     @Autowired
     private SubjectService subjectService;
+    @Autowired
+    private SubjectCommissionService subjectCommissionService;
 
     @Test
     @DisplayName("cadena Specialty->StudyPlan->Subject existente: cada find devuelve el DTO correspondiente")
@@ -82,5 +92,27 @@ class AcademicFindByCodeIntegrationTest extends AbstractIntegrationTest {
 
         assertThatThrownBy(() -> subjectService.findByCodeAndStudyPlan(-1, plan.getPlanCode(), specialty.getSpecialtyCode()))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("findBySubjectId: el DTO trae la comisión completa (con período), no solo el ID")
+    void findBySubjectId_returnsCommissionWithFullDetail() {
+        Specialty specialty = testData.especialidad((int) IntegrationTestData.nextSeq());
+        StudyPlan plan = testData.planDeEstudio((int) IntegrationTestData.nextSeq(), specialty);
+        Subject subject = testData.materia((int) IntegrationTestData.nextSeq(), "Materia IT", plan, "Anual");
+        AcademicPeriod period = testData.periodoAcademico(2100 + (int) (IntegrationTestData.nextSeq() % 500), TermType.ANUAL);
+        Commission commission = testData.comision("CUR-" + IntegrationTestData.nextSeq(), 1, period);
+        testData.materiaComision(subject, commission, 30);
+
+        List<SubjectCommissionResponseDto> result = subjectCommissionService.findBySubjectId(subject.getId());
+
+        assertThat(result).hasSize(1);
+        SubjectCommissionResponseDto dto = result.getFirst();
+        assertThat(dto.subjectId()).isEqualTo(subject.getId());
+        assertThat(dto.commissionId()).isEqualTo(commission.getId());
+        assertThat(dto.commission()).isNotNull();
+        assertThat(dto.commission().courseCode()).isEqualTo(commission.getCourseCode());
+        assertThat(dto.commission().academicPeriod()).isNotNull();
+        assertThat(dto.commission().academicPeriod().year()).isEqualTo(period.getYear());
     }
 }

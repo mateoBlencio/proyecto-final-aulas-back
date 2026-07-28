@@ -324,7 +324,7 @@ class AcademicEventServiceImplTest {
         when(subjectService.findById(1L)).thenReturn(AllocationTestData.subjectResponseDto(1L));
         when(commissionService.findById(1L)).thenReturn(AllocationTestData.commissionResponseDto(1L));
         when(subjectCommissionService.findBySubjectAndCommission(1L, 1L))
-                .thenReturn(new SubjectCommissionResponseDto(1L, 1L, 1L, 30));
+                .thenReturn(new SubjectCommissionResponseDto(1L, 1L, 1L, null, 30));
         when(eventRepository.save(any())).thenReturn(saved);
         when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyUniqueResponseDto(3L));
 

@@ -303,7 +303,7 @@ class ExcelImportServiceImplTest {
             .thenReturn(commission);
 
         SubjectCommissionResponseDto subjectCommission = new SubjectCommissionResponseDto(30L, 10L, 20L,
-            row.enrolledCount());
+            commission, row.enrolledCount());
         when(subjectCommissionService.findBySubjectAndCommission(10L, 20L))
             .thenReturn(subjectCommission);
 
@@ -341,7 +341,7 @@ class ExcelImportServiceImplTest {
             .thenReturn(commission);
 
         SubjectCommissionResponseDto subjectCommission =
-            new SubjectCommissionResponseDto(subjectCommissionId, subjectId, commissionId, 30);
+            new SubjectCommissionResponseDto(subjectCommissionId, subjectId, commissionId, commission, 30);
         when(subjectCommissionService.findBySubjectAndCommission(subjectId, commissionId))
             .thenReturn(subjectCommission);
 
@@ -366,7 +366,7 @@ class ExcelImportServiceImplTest {
 
         // Misma comisión (cacheada de la primera fila, id 30L) pero materia distinta (21L):
         // clave de subjectCommission distinta a la de la primera fila, requiere su propio stub.
-        SubjectCommissionResponseDto subjectCommission = new SubjectCommissionResponseDto(41L, 21L, 30L, 30);
+        SubjectCommissionResponseDto subjectCommission = new SubjectCommissionResponseDto(41L, 21L, 30L, null, 30);
         when(subjectCommissionService.findBySubjectAndCommission(21L, 30L))
             .thenReturn(subjectCommission);
     }
