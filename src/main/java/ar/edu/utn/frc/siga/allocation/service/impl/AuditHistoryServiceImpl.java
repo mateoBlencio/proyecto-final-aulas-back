@@ -146,7 +146,8 @@ public class AuditHistoryServiceImpl implements AuditHistoryService {
                     recurring.getEndDate(), recurring.getSubjectId(), recurring.getCommissionId());
             case UniqueEvent unique -> new UniqueEventHistorySnapshotDto(
                     unique.getId(), unique.getType(), unique.getEnrolled(), unique.getStartTime(),
-                    unique.getDuration().toMinutes(), unique.getDate(), unique.getDescription());
+                    unique.getDuration().toMinutes(), unique.getDate(), unique.getDescription(),
+                    unique.getKind(), unique.getSubjectId(), unique.getCommissionId());
             default -> throw new IllegalStateException("Subtipo de evento no soportado: " + event.getClass());
         };
     }

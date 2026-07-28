@@ -19,6 +19,7 @@ import ar.edu.utn.frc.siga.allocation.model.Occurrence;
 import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
+import ar.edu.utn.frc.siga.allocation.model.UniqueEventKind;
 import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
@@ -109,7 +110,7 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
         for (ClassroomResponseDto room : classroomService.findAllAvailable()) {
             UniqueEvent blocker = eventRepository.save(UniqueEvent.builder()
                     .enrolled(1).startTime(start).duration(Duration.ofMinutes(durationMinutes))
-                    .date(date).description("blocker").build());
+                    .date(date).description("blocker").kind(UniqueEventKind.OTRO).build());
             Occurrence occ = occurrenceRepository.save(Occurrence.builder()
                     .event(blocker).date(date).status(OccurrenceStatus.ASSIGNED).build());
             allocationRepository.save(Allocation.builder()
@@ -265,8 +266,10 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isConflict());
 
         Classroom aulaUnico = testData.aula(testData.edificio());
+        var scUnico = testData.materiaYComision();
         var uniqueDto = new CreateUniqueEventRequestDto(
-                20, START, DURATION, LocalDate.now().plusDays(104), "Evento unico IT", aulaUnico.getId(), null);
+                UniqueEventKind.EXAMEN_FINAL, scUnico.subjectId(), scUnico.commissionId(),
+                LocalDate.now().plusDays(104), START, DURATION, 20, aulaUnico.getId(), null);
         Long uniqueEventId = academicEventService.createUniqueEvent(uniqueDto).id();
 
         mockMvc.perform(post("/v1/allocations/auto-preview")

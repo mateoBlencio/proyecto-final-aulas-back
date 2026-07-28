@@ -26,4 +26,10 @@ public interface SubjectService {
      * si la materia, el plan o la especialidad no existen.
      */
     SubjectResponseDto findByCodeAndStudyPlan(Integer code, Integer studyPlanCode, Integer specialtyCode);
+
+    /**
+     * Materias de todos los planes de una especialidad (filtro, no valida que la especialidad
+     * exista: sin resultados devuelve lista vacía, igual que {@code findAll} sin filtro).
+     */
+    List<SubjectResponseDto> findBySpecialtyCode(Integer specialtyCode);
 }

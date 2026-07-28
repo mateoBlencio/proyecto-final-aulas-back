@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.allocation.model.Occurrence;
 import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
+import ar.edu.utn.frc.siga.allocation.model.UniqueEventKind;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -59,6 +60,9 @@ public final class AllocationTestData {
                 .duration(duration)
                 .date(date)
                 .description("evento de prueba")
+                .kind(UniqueEventKind.EXAMEN_FINAL)
+                .subjectId(1L)
+                .commissionId(1L)
                 .build();
     }
 

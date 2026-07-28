@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.academic.repository;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.Commission;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -11,4 +12,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface SubjectCommissionRepository extends JpaRepository<SubjectCommission, Long> {
     Optional<SubjectCommission> findBySubjectAndCommission(Subject subject, Commission commission);
+
+    /** Comisiones vinculadas a una materia (por su ID). */
+    List<SubjectCommission> findBySubject_Id(Long subjectId);
 }
