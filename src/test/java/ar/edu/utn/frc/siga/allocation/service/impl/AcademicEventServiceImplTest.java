@@ -1,6 +1,8 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
+import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
+import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.allocation.AllocationTestData;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
@@ -12,6 +14,7 @@ import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.UniqueEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
+import ar.edu.utn.frc.siga.allocation.exception.InvalidCommissionForSubjectException;
 import ar.edu.utn.frc.siga.allocation.exception.MissingAcademicReferenceException;
 import ar.edu.utn.frc.siga.allocation.mapper.AcademicEventComposer;
 import ar.edu.utn.frc.siga.allocation.mapper.OccurrenceMapper;
@@ -83,6 +86,8 @@ class AcademicEventServiceImplTest {
     @Mock
     private CommissionService commissionService;
     @Mock
+    private SubjectCommissionService subjectCommissionService;
+    @Mock
     private AllocationService allocationService;
     @Mock
     private AllocationValidator allocationValidator;
@@ -93,13 +98,13 @@ class AcademicEventServiceImplTest {
     void setUp() {
         service = new AcademicEventServiceImpl(eventRepository, recurringEventRepository, uniqueEventRepository,
                 occurrenceRepository, allocationRepository, composer, occurrenceMapper, subjectService,
-                commissionService, allocationService, allocationValidator);
+                commissionService, subjectCommissionService, allocationService, allocationValidator);
     }
 
     // ---------- createRecurringEvent ----------
 
     @Test
-    @DisplayName("createRecurringEvent: valida materia y comisión vía fachada, persiste el evento y sus ocurrencias generadas")
+    @DisplayName("createRecurringEvent: valida materia y comisión vía fachada (cada una por separado, SIN cruzar que estén vinculadas — ver ADR-011), persiste el evento y sus ocurrencias generadas")
     void createRecurringEventFeliz() {
         CreateRecurringEventRequestDto dto = recurringDto(DayOfWeek.MONDAY,
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19)); // 3 semanas → 3 ocurrencias
@@ -114,6 +119,7 @@ class AcademicEventServiceImplTest {
         assertThat(result).isNotNull();
         verify(subjectService).findById(1L);
         verify(commissionService).findById(1L);
+        verify(subjectCommissionService, never()).findBySubjectAndCommission(any(), any());
 
         ArgumentCaptor<RecurringEvent> eventCaptor = ArgumentCaptor.forClass(RecurringEvent.class);
         verify(eventRepository).save(eventCaptor.capture());
@@ -280,6 +286,43 @@ class AcademicEventServiceImplTest {
         assertThatThrownBy(() -> service.createUniqueEvent(dto))
                 .isInstanceOf(MissingAcademicReferenceException.class);
         verify(eventRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("createUniqueEvent: commissionId no pertenece a subjectId → InvalidCommissionForSubjectException, no persiste nada")
+    void createUniqueEventCommissionNoPerteneceASubjectLanzaExcepcion() {
+        CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
+                UniqueEventKind.EXAMEN_FINAL, 1L, 2L, LocalDate.of(2026, 3, 10),
+                LocalTime.of(10, 0), 60, 20, 5, null);
+        when(subjectService.findById(1L)).thenReturn(AllocationTestData.subjectResponseDto(1L));
+        when(commissionService.findById(2L)).thenReturn(AllocationTestData.commissionResponseDto(2L));
+        when(subjectCommissionService.findBySubjectAndCommission(1L, 2L))
+                .thenThrow(ResourceNotFoundException.of("SubjectCommission", "1-2"));
+
+        assertThatThrownBy(() -> service.createUniqueEvent(dto))
+                .isInstanceOf(InvalidCommissionForSubjectException.class);
+        verify(eventRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("createUniqueEvent: commissionId sí pertenece a subjectId → persiste sin problema")
+    void createUniqueEventCommissionPerteneceASubjectPersiste() {
+        CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
+                UniqueEventKind.EXAMEN_FINAL, 1L, 1L, LocalDate.of(2026, 3, 10),
+                LocalTime.of(10, 0), 60, 20, 5, null);
+        UniqueEvent saved = AllocationTestData.uniqueEvent(3L, dto.date(), dto.startTime(),
+                Duration.ofMinutes(dto.durationMinutes()));
+        when(subjectService.findById(1L)).thenReturn(AllocationTestData.subjectResponseDto(1L));
+        when(commissionService.findById(1L)).thenReturn(AllocationTestData.commissionResponseDto(1L));
+        when(subjectCommissionService.findBySubjectAndCommission(1L, 1L))
+                .thenReturn(new SubjectCommissionResponseDto(1L, 1L, 1L, 30));
+        when(eventRepository.save(any())).thenReturn(saved);
+        when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyUniqueResponseDto(3L));
+
+        AcademicEventResponseDto result = service.createUniqueEvent(dto);
+
+        assertThat(result).isNotNull();
+        verify(subjectCommissionService).findBySubjectAndCommission(1L, 1L);
     }
 
     // ---------- findUniqueEvents ----------

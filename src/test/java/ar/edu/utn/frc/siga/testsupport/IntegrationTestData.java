@@ -169,7 +169,10 @@ public class IntegrationTestData {
      * no hay findOrCreate para estas entidades) y encadena AcademicPeriod (find-or-create)
      * ->Commission (catálogo, guardado directo) para obtener un par subjectId/commissionId
      * válido, el mínimo que {@code AcademicEventService.createRecurringEvent} necesita
-     * (valida existencia de ambos por ID contra las fachadas de {@code academic}).
+     * (valida existencia de ambos por ID contra las fachadas de {@code academic}). También
+     * los vincula vía {@code SubjectCommission} (materiaComision): {@code createUniqueEvent}
+     * además valida que la comisión pertenezca a la materia (ver ADR-011), a diferencia del
+     * recurrente.
      */
     public SubjectAndCommission materiaYComision() {
         int specialtyCode = (int) nextSeq();
@@ -177,13 +180,14 @@ public class IntegrationTestData {
         int subjectCode = (int) nextSeq();
         Specialty specialty = especialidad(specialtyCode);
         StudyPlan plan = planDeEstudio(planCode, specialty);
-        Long subjectId = materia(subjectCode, "Materia-IT", plan, TermType.ANUAL.getLabel()).getId();
+        Subject subject = materia(subjectCode, "Materia-IT", plan, TermType.ANUAL.getLabel());
 
         int year = 2100 + (int) (nextSeq() % 500);
         AcademicPeriod period = periodoAcademico(year, TermType.ANUAL);
-        Long commissionId = comision("CUR-" + nextSeq(), 1, period).getId();
+        Commission commission = comision("CUR-" + nextSeq(), 1, period);
+        materiaComision(subject, commission, 30);
 
-        return new SubjectAndCommission(subjectId, commissionId);
+        return new SubjectAndCommission(subject.getId(), commission.getId());
     }
 
     /** Encuentra o crea el {@link AcademicPeriod} por (year, term) y devuelve la entidad. */

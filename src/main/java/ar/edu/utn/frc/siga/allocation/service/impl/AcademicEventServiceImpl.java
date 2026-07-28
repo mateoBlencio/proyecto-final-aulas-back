@@ -12,6 +12,7 @@ import ar.edu.utn.frc.siga.allocation.mapper.OccurrenceMapper;
 import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.Occurrence;
 import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.allocation.exception.InvalidCommissionForSubjectException;
 import ar.edu.utn.frc.siga.allocation.exception.MissingAcademicReferenceException;
 import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
@@ -25,6 +26,7 @@ import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
+import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
@@ -59,6 +61,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     private final OccurrenceMapper occurrenceMapper;
     private final SubjectService subjectService;
     private final CommissionService commissionService;
+    private final SubjectCommissionService subjectCommissionService;
     private final AllocationService allocationService;
     private final AllocationValidator allocationValidator;
 
@@ -156,6 +159,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         if (dto.commissionId() != null) {
             commissionService.findById(dto.commissionId());
         }
+        validateCommissionBelongsToSubject(dto.subjectId(), dto.commissionId());
 
         UniqueEvent event = UniqueEvent.builder()
                 .enrolled(dto.enrolled())
@@ -195,6 +199,28 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         }
     }
 
+    /**
+     * Valida que {@code commissionId} sea realmente una comisión de {@code subjectId} (existe
+     * un {@code SubjectCommission} que los vincula). Exclusivo de {@code UniqueEvent}: a
+     * diferencia de {@code createRecurringEvent}, que solo valida que materia y comisión
+     * existan cada una por separado (ver ADR-011), acá además se cruza que estén vinculadas —
+     * es la validación completa que el ADR original prometía y que no llegó a implementarse en
+     * el evento recurrente. No se llama con {@code subjectId}/{@code commissionId} nulos: en
+     * ese punto ya pasó {@link #validateAcademicReference} y, si {@code commissionId} no es
+     * null, {@code subjectId} tampoco lo es.
+     */
+    private void validateCommissionBelongsToSubject(Long subjectId, Long commissionId) {
+        if (commissionId == null) {
+            return;
+        }
+        try {
+            subjectCommissionService.findBySubjectAndCommission(subjectId, commissionId);
+        } catch (ResourceNotFoundException e) {
+            throw new InvalidCommissionForSubjectException(
+                    "La comisión " + commissionId + " no pertenece a la materia " + subjectId + ".");
+        }
+    }
+
     /** Lista todos los eventos únicos (parciales, TPs, mesas especiales, etc.). */
     @Override
     @Transactional(readOnly = true)
@@ -230,6 +256,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         if (dto.commissionId() != null) {
             commissionService.findById(dto.commissionId());
         }
+        validateCommissionBelongsToSubject(dto.subjectId(), dto.commissionId());
 
         event.setEnrolled(dto.enrolled());
         event.setStartTime(dto.startTime());

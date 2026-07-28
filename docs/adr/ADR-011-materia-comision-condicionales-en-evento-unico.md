@@ -64,6 +64,47 @@ No hizo falta ningún cambio de esquema: `evento_academico.id_materia`/`id_comis
 son columnas nullable (se agregaron así al mover el campo desde `evento_recurrente`),
 la restricción de obligatoriedad condicional vive solo en el service.
 
+### Validación adicional (solo en `UniqueEvent`): la comisión tiene que pertenecer a la materia
+
+Lo de arriba valida que ambos campos existan cada uno por su lado (`subjectService
+.findById`, `commissionService.findById`), pero no que estén realmente vinculados: se
+podía mandar una materia real y una comisión real, sin ninguna relación entre sí (ej.
+la comisión de otra materia completamente distinta), y el sistema lo aceptaba igual.
+**Esto también aplica hoy a `createRecurringEvent`: es una deuda pre-existente que no
+se toca en este ADR.** Acá se agrega, exclusivamente para `UniqueEvent`, un chequeo
+extra apoyado en la fachada ya existente `SubjectCommissionService`
+(`academic::api`), que resuelve el catálogo materia×comisión:
+
+```java
+private void validateCommissionBelongsToSubject(Long subjectId, Long commissionId) {
+    if (commissionId == null) {
+        return;
+    }
+    try {
+        subjectCommissionService.findBySubjectAndCommission(subjectId, commissionId);
+    } catch (ResourceNotFoundException e) {
+        throw new InvalidCommissionForSubjectException(
+                "La comisión " + commissionId + " no pertenece a la materia " + subjectId + ".");
+    }
+}
+```
+
+Se llama después de `validateAcademicReference` y de los `findById` individuales, en
+`createUniqueEvent`/`updateUniqueEvent` — nunca en `createRecurringEvent`. El
+`catch` es seguro: para cuando se llega a esta línea, `subjectId`/`commissionId` ya
+se validó que existen cada uno por separado, así que la única razón por la que
+`findBySubjectAndCommission` puede tirar `ResourceNotFoundException` en este punto es
+que el par materia-comisión no está vinculado (no que falte alguno de los dos) — se
+traduce a una excepción de dominio propia (`InvalidCommissionForSubjectException`,
+400) con un mensaje específico, en vez de dejar pasar el `"SubjectCommission not
+found with id: 42-7"` genérico de `academic`.
+
+**Por qué solo en `UniqueEvent` y no también en `RecurringEvent`:** decisión explícita
+de alcance — se pidió puntualmente para esta parte del trabajo (eventos únicos).
+Extenderlo a `RecurringEvent` (y de paso a `excelimport`, que ya usa esta misma
+fachada para otro propósito) queda pendiente como mejora futura, no como parte de
+este ADR.
+
 ## Consecuencias
 
 - Parcial/Trabajo Práctico/Examen final sin `subjectId` → 400
@@ -77,6 +118,11 @@ la restricción de obligatoriedad condicional vive solo en el service.
   sí), no expresable con `@NotNull` simple a nivel de campo — vive como chequeo
   explícito en `AcademicEventServiceImpl`, mismo lugar donde ya vive
   `validateBusinessHours`.
+- Cualquier `commissionId` que exista pero no pertenezca al `subjectId` indicado → 400
+  (`InvalidCommissionForSubjectException`), **solo para `UniqueEvent`**.
+  `createRecurringEvent` sigue sin este cruce — sigue siendo posible crear un evento
+  recurrente con una materia y una comisión válidas pero no relacionadas entre sí.
+  Es una asimetría deliberada de alcance entre los dos subtipos, no un descuido.
 
 ## Alternativas consideradas
 
