@@ -2,20 +2,20 @@ package ar.edu.utn.frc.siga.allocation.service.impl;
 
 import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
-import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.allocation.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ClassroomOverlapDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OvercrowdedAllocationDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.RecurringEventResponseDto;
-import ar.edu.utn.frc.siga.allocation.mapper.AcademicEventComposer;
-import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
+import ar.edu.utn.frc.siga.allocation.events.dto.response.RecurringEventResponseDto;
+import ar.edu.utn.frc.siga.allocation.events.mapper.AcademicEventComposer;
+import ar.edu.utn.frc.siga.allocation.events.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
-import ar.edu.utn.frc.siga.allocation.model.EventType;
-import ar.edu.utn.frc.siga.allocation.model.Occurrence;
-import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
-import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
+import ar.edu.utn.frc.siga.allocation.events.model.EventType;
+import ar.edu.utn.frc.siga.allocation.events.model.Occurrence;
+import ar.edu.utn.frc.siga.allocation.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.allocation.events.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
-import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
+import ar.edu.utn.frc.siga.allocation.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.common.exception.InvalidDateRangeException;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
@@ -91,10 +91,10 @@ class AllocationProblemServiceImplTest {
     @Test
     @DisplayName("Detecta sobrecupo cuando los inscriptos superan la capacidad del aula")
     void detectaSobrecupo() {
-        LocalDate from = LocalDate.of(2026, 8, 1);
-        LocalDate to = LocalDate.of(2026, 8, 31);
+        LocalDate from = futureDate(0);
+        LocalDate to = futureDate(30);
         RecurringEvent event = recurringEvent(1L, 40, LocalTime.of(8, 0), 60);
-        Allocation allocation = allocation(100L, occurrence(10L, event, LocalDate.of(2026, 8, 3)), 5);
+        Allocation allocation = allocation(100L, occurrence(10L, event, futureDate(2)), 5);
 
         when(allocationRepository.findOccupancyBetween(from, to, OccurrenceStatus.ASSIGNED))
                 .thenReturn(List.of(allocation));
@@ -107,16 +107,16 @@ class AllocationProblemServiceImplTest {
         assertThat(overcrowded.enrolled()).isEqualTo(40);
         assertThat(overcrowded.capacity()).isEqualTo(30);
         assertThat(overcrowded.excess()).isEqualTo(10);
-        assertThat(overcrowded.dates()).containsExactly(LocalDate.of(2026, 8, 3));
+        assertThat(overcrowded.dates()).containsExactly(futureDate(2));
     }
 
     @Test
     @DisplayName("No detecta sobrecupo cuando los inscriptos no superan la capacidad")
     void noDetectaSobrecupoCuandoHayLugar() {
-        LocalDate from = LocalDate.of(2026, 8, 1);
-        LocalDate to = LocalDate.of(2026, 8, 31);
+        LocalDate from = futureDate(0);
+        LocalDate to = futureDate(30);
         RecurringEvent event = recurringEvent(1L, 20, LocalTime.of(8, 0), 60);
-        Allocation allocation = allocation(100L, occurrence(10L, event, LocalDate.of(2026, 8, 3)), 5);
+        Allocation allocation = allocation(100L, occurrence(10L, event, futureDate(2)), 5);
 
         when(allocationRepository.findOccupancyBetween(from, to, OccurrenceStatus.ASSIGNED))
                 .thenReturn(List.of(allocation));
@@ -128,10 +128,10 @@ class AllocationProblemServiceImplTest {
     @Test
     @DisplayName("No detecta sobrecupo cuando 'enrolled' es null (se trata como 0)")
     void noDetectaSobrecupoConEnrolledNull() {
-        LocalDate from = LocalDate.of(2026, 8, 1);
-        LocalDate to = LocalDate.of(2026, 8, 31);
+        LocalDate from = futureDate(0);
+        LocalDate to = futureDate(30);
         RecurringEvent event = recurringEvent(1L, null, LocalTime.of(8, 0), 60);
-        Allocation allocation = allocation(100L, occurrence(10L, event, LocalDate.of(2026, 8, 3)), 5);
+        Allocation allocation = allocation(100L, occurrence(10L, event, futureDate(2)), 5);
 
         when(allocationRepository.findOccupancyBetween(from, to, OccurrenceStatus.ASSIGNED))
                 .thenReturn(List.of(allocation));
@@ -143,9 +143,9 @@ class AllocationProblemServiceImplTest {
     @Test
     @DisplayName("Detecta superposición cuando dos eventos comparten aula y fecha con horarios cruzados")
     void detectaSolapeMismaAulaMismaFecha() {
-        LocalDate from = LocalDate.of(2026, 8, 1);
-        LocalDate to = LocalDate.of(2026, 8, 31);
-        LocalDate date = LocalDate.of(2026, 8, 3);
+        LocalDate from = futureDate(0);
+        LocalDate to = futureDate(30);
+        LocalDate date = futureDate(2);
         RecurringEvent eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
         RecurringEvent eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
         Allocation allocA = allocation(100L, occurrence(10L, eventA, date), 5);
@@ -168,9 +168,9 @@ class AllocationProblemServiceImplTest {
     @Test
     @DisplayName("No detecta superposición cuando los eventos están en aulas distintas")
     void noDetectaSolapeEnAulasDistintas() {
-        LocalDate from = LocalDate.of(2026, 8, 1);
-        LocalDate to = LocalDate.of(2026, 8, 31);
-        LocalDate date = LocalDate.of(2026, 8, 3);
+        LocalDate from = futureDate(0);
+        LocalDate to = futureDate(30);
+        LocalDate date = futureDate(2);
         RecurringEvent eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
         RecurringEvent eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
         Allocation allocA = allocation(100L, occurrence(10L, eventA, date), 5);
@@ -186,12 +186,12 @@ class AllocationProblemServiceImplTest {
     @Test
     @DisplayName("No detecta superposición cuando los eventos son en fechas distintas")
     void noDetectaSolapeEnFechasDistintas() {
-        LocalDate from = LocalDate.of(2026, 8, 1);
-        LocalDate to = LocalDate.of(2026, 8, 31);
+        LocalDate from = futureDate(0);
+        LocalDate to = futureDate(30);
         RecurringEvent eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
         RecurringEvent eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
-        Allocation allocA = allocation(100L, occurrence(10L, eventA, LocalDate.of(2026, 8, 3)), 5);
-        Allocation allocB = allocation(101L, occurrence(11L, eventB, LocalDate.of(2026, 8, 4)), 5);
+        Allocation allocA = allocation(100L, occurrence(10L, eventA, futureDate(2)), 5);
+        Allocation allocB = allocation(101L, occurrence(11L, eventB, futureDate(3)), 5);
 
         when(allocationRepository.findOccupancyBetween(from, to, OccurrenceStatus.ASSIGNED))
                 .thenReturn(List.of(allocA, allocB));
@@ -203,9 +203,9 @@ class AllocationProblemServiceImplTest {
     @Test
     @DisplayName("No detecta superposición cuando las franjas son adyacentes (fin de una = inicio de la otra)")
     void noDetectaSolapeEnFranjasAdyacentes() {
-        LocalDate from = LocalDate.of(2026, 8, 1);
-        LocalDate to = LocalDate.of(2026, 8, 31);
-        LocalDate date = LocalDate.of(2026, 8, 3);
+        LocalDate from = futureDate(0);
+        LocalDate to = futureDate(30);
+        LocalDate date = futureDate(2);
         RecurringEvent eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
         RecurringEvent eventB = recurringEvent(2L, 10, LocalTime.of(9, 0), 60);
         Allocation allocA = allocation(100L, occurrence(10L, eventA, date), 5);
@@ -221,10 +221,10 @@ class AllocationProblemServiceImplTest {
     @Test
     @DisplayName("Agrega todas las fechas de un par recurrente en conflicto en una sola fila")
     void agregaFechasDeParRecurrenteEnUnaFila() {
-        LocalDate from = LocalDate.of(2026, 8, 1);
-        LocalDate to = LocalDate.of(2026, 8, 31);
-        LocalDate date1 = LocalDate.of(2026, 8, 3);
-        LocalDate date2 = LocalDate.of(2026, 8, 10);
+        LocalDate from = futureDate(0);
+        LocalDate to = futureDate(30);
+        LocalDate date1 = futureDate(2);
+        LocalDate date2 = futureDate(9);
         RecurringEvent eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
         RecurringEvent eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
 
@@ -300,6 +300,11 @@ class AllocationProblemServiceImplTest {
 
         assertThat(ids).containsExactly(1L, 2L);
         verify(academicEventService).findUnassignedEventIds(eq(LocalDate.now()), any(), eq(false));
+    }
+
+    /** Fecha relativa a hoy: evita que los tests de solapamiento/sobrecupo (isPast() filtra por reloj real) rompan con el paso del calendario. */
+    private LocalDate futureDate(int daysFromNow) {
+        return LocalDate.now().plusDays(daysFromNow);
     }
 
     private RecurringEvent recurringEvent(long id, Integer enrolled, LocalTime startTime, int durationMinutes) {
