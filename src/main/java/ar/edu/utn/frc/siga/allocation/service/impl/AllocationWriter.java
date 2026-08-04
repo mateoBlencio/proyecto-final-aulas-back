@@ -1,9 +1,9 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
+import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
-import ar.edu.utn.frc.siga.allocation.events.model.Occurrence;
-import ar.edu.utn.frc.siga.allocation.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.allocation.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import lombok.RequiredArgsConstructor;
@@ -27,16 +27,17 @@ class AllocationWriter {
 
     private final AllocationRepository allocationRepository;
     private final AllocationValidator validator;
+    private final OccurrenceService occurrenceService;
 
     /**
      * Crea o actualiza la asignación de cada ocurrencia de la lista al aula indicada,
      * y la pasa a ASSIGNED. Las no-asignables (CANCELLED/SUSPENDED, o pasadas cuando
      * {@code skipPast}) se saltean por diseño, no son un fallo parcial.
-     * Corre siempre dentro de la transacción del caller: occurrence y allocation existente
-     * llegan managed, así que las actualizaciones se persisten por dirty checking sin
-     * necesidad de {@code save()} explícito; solo las allocations nuevas lo requieren.
+     * Corre siempre dentro de la transacción del caller: la allocation existente llega
+     * managed, así que las actualizaciones se persisten por dirty checking sin necesidad
+     * de {@code save()} explícito; solo las allocations nuevas lo requieren.
      */
-    List<Allocation> apply(List<Occurrence> occurrences, Integer classroomId, String observation,
+    List<Allocation> apply(List<OccurrenceSlotDto> occurrences, Integer classroomId, String observation,
                             AllocationSource source, boolean skipPast) {
         return apply(occurrences, o -> classroomId, observation, source, skipPast);
     }
@@ -47,19 +48,20 @@ class AllocationWriter {
      * evento) en una sola pasada, con una única query de asignaciones existentes en vez de una
      * por evento (evita N+1 cuando el caller agrupa por evento, p. ej. confirm de auto-preview).
      */
-    List<Allocation> apply(List<Occurrence> occurrences, Function<Occurrence, Integer> classroomIdResolver,
+    List<Allocation> apply(List<OccurrenceSlotDto> occurrences, Function<OccurrenceSlotDto, Integer> classroomIdResolver,
                             String observation, AllocationSource source, boolean skipPast) {
         Map<Long, Allocation> existingByOccurrence = allocationRepository
-                .findByOccurrence_IdIn(occurrences.stream().map(Occurrence::getId).toList())
-                .stream().collect(Collectors.toMap(a -> a.getOccurrence().getId(), a -> a));
+                .findByOccurrenceIdIn(occurrences.stream().map(OccurrenceSlotDto::occurrenceId).toList())
+                .stream().collect(Collectors.toMap(Allocation::getOccurrenceId, a -> a));
 
         List<Allocation> saved = new ArrayList<>();
-        for (Occurrence occurrence : occurrences) {
+        List<Long> assignedOccurrenceIds = new ArrayList<>();
+        for (OccurrenceSlotDto occurrence : occurrences) {
             if (skipPast && occurrence.isPast()) continue;
             if (!validator.isAssignable(occurrence)) continue;
 
             Integer classroomId = classroomIdResolver.apply(occurrence);
-            Allocation existing = existingByOccurrence.get(occurrence.getId());
+            Allocation existing = existingByOccurrence.get(occurrence.occurrenceId());
             Allocation allocation;
             if (existing != null) {
                 existing.setClassroomId(classroomId);
@@ -68,7 +70,7 @@ class AllocationWriter {
                 allocation = existing;
             } else {
                 allocation = allocationRepository.save(Allocation.builder()
-                        .occurrence(occurrence)
+                        .occurrenceId(occurrence.occurrenceId())
                         .classroomId(classroomId)
                         .source(source)
                         .createdAt(LocalDateTime.now())
@@ -76,8 +78,10 @@ class AllocationWriter {
                         .build());
             }
             saved.add(allocation);
-
-            occurrence.setStatus(OccurrenceStatus.ASSIGNED);
+            assignedOccurrenceIds.add(occurrence.occurrenceId());
+        }
+        if (!assignedOccurrenceIds.isEmpty()) {
+            occurrenceService.markAssigned(assignedOccurrenceIds);
         }
         return saved;
     }

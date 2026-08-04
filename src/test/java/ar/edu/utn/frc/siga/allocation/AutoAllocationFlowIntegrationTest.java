@@ -95,7 +95,7 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
     /** Ocupación firme sembrada por repositorio, bypasseando validateNoOverlap (evento ajeno, no seleccionado). */
     private void allocateDirect(Occurrence occurrence, Integer classroomId) {
         allocationRepository.save(Allocation.builder()
-                .occurrence(occurrence).classroomId(classroomId).source(AllocationSource.MANUAL)
+                .occurrenceId(occurrence.getId()).classroomId(classroomId).source(AllocationSource.MANUAL)
                 .createdAt(LocalDateTime.now()).build());
         occurrence.setStatus(OccurrenceStatus.ASSIGNED);
         occurrenceRepository.save(occurrence);
@@ -114,7 +114,7 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
             Occurrence occ = occurrenceRepository.save(Occurrence.builder()
                     .event(blocker).date(date).status(OccurrenceStatus.ASSIGNED).build());
             allocationRepository.save(Allocation.builder()
-                    .occurrence(occ).classroomId(room.id()).source(AllocationSource.MANUAL)
+                    .occurrenceId(occ.getId()).classroomId(room.id()).source(AllocationSource.MANUAL)
                     .createdAt(LocalDateTime.now()).build());
         }
     }
@@ -362,12 +362,12 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
         assertThat(confirmResponse.applied()).hasSize(1);
         assertThat(confirmResponse.skippedEventIds()).isEmpty();
 
-        Allocation persisted = allocationRepository.findByOccurrence_Id(occurrence.getId()).orElseThrow();
+        Allocation persisted = allocationRepository.findByOccurrenceId(occurrence.getId()).orElseThrow();
         assertThat(persisted.getClassroomId()).isEqualTo(proposedRoom);
         assertThat(persisted.getSource()).isEqualTo(AllocationSource.AUTOMATIC);
         assertThat(occurrenceRepository.findById(occurrence.getId()).orElseThrow().getStatus())
                 .isEqualTo(OccurrenceStatus.ASSIGNED);
-        assertThat(allocationRepository.findByOccurrence_IdIn(List.of(occurrence.getId()))).hasSize(1);
+        assertThat(allocationRepository.findByOccurrenceIdIn(List.of(occurrence.getId()))).hasSize(1);
 
         mockMvc.perform(post("/v1/allocations/auto-preview/{id}/confirm", preview.previewId())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -401,7 +401,7 @@ class AutoAllocationFlowIntegrationTest extends AbstractIntegrationTest {
                                 List.of(new PreviewAllocationDto(eventId, proposedRoom))))))
                 .andExpect(status().isConflict());
 
-        assertThat(allocationRepository.findByOccurrence_Id(occurrence.getId())).isEmpty();
+        assertThat(allocationRepository.findByOccurrenceId(occurrence.getId())).isEmpty();
         assertThat(occurrenceRepository.findById(occurrence.getId()).orElseThrow().getStatus())
                 .isEqualTo(OccurrenceStatus.SCHEDULED);
     }

@@ -128,10 +128,10 @@ public class AcademicEventComposer {
         }
 
         Set<Long> occurrenceIds = occurrences.stream().map(Occurrence::getId).collect(Collectors.toCollection(LinkedHashSet::new));
-        List<Allocation> allocations = occurrenceIds.isEmpty() ? List.of() : allocationRepository.findByOccurrence_IdIn(occurrenceIds);
+        List<Allocation> allocations = occurrenceIds.isEmpty() ? List.of() : allocationRepository.findByOccurrenceIdIn(occurrenceIds);
         Map<Long, Allocation> allocationByOccurrenceId = new LinkedHashMap<>();
         for (Allocation allocation : allocations) {
-            allocationByOccurrenceId.put(allocation.getOccurrence().getId(), allocation);
+            allocationByOccurrenceId.put(allocation.getOccurrenceId(), allocation);
         }
 
         Set<Integer> classroomIds = allocations.stream().map(Allocation::getClassroomId).collect(Collectors.toCollection(LinkedHashSet::new));

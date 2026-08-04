@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.allocation.events.dto.request.CreateUniqueEventReques
 import ar.edu.utn.frc.siga.allocation.events.dto.request.UpdateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceResponseDto;
+import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.allocation.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.events.dto.response.UniqueEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
@@ -30,6 +31,7 @@ import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.events.repository.RecurringEventRepository;
 import ar.edu.utn.frc.siga.allocation.events.repository.UniqueEventRepository;
+import ar.edu.utn.frc.siga.allocation.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
@@ -76,6 +78,8 @@ class AcademicEventServiceImplTest {
     @Mock
     private OccurrenceRepository occurrenceRepository;
     @Mock
+    private OccurrenceService occurrenceService;
+    @Mock
     private AllocationRepository allocationRepository;
     @Mock
     private AcademicEventComposer composer;
@@ -97,7 +101,7 @@ class AcademicEventServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new AcademicEventServiceImpl(eventRepository, recurringEventRepository, uniqueEventRepository,
-                occurrenceRepository, allocationRepository, composer, occurrenceMapper, subjectService,
+                occurrenceRepository, occurrenceService, allocationRepository, composer, occurrenceMapper, subjectService,
                 commissionService, eventScheduleValidator, allocationService, allocationValidator);
     }
 
@@ -355,17 +359,19 @@ class AcademicEventServiceImplTest {
     void updateUniqueEventConAllocationExistenteReasigna() {
         UniqueEvent event = AllocationTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
         Occurrence occurrence = AllocationTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.ASSIGNED);
-        Allocation existing = Allocation.builder().id(50L).occurrence(occurrence).classroomId(5).build();
+        OccurrenceSlotDto slot = occurrenceSlot(occurrence);
+        Allocation existing = Allocation.builder().id(50L).occurrenceId(10L).classroomId(5).build();
         when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
         when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
-        when(allocationRepository.findByOccurrence_Id(10L)).thenReturn(Optional.of(existing));
+        when(occurrenceService.findSlot(10L)).thenReturn(slot);
+        when(allocationRepository.findByOccurrenceId(10L)).thenReturn(Optional.of(existing));
         when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyUniqueResponseDto(3L));
 
         UpdateUniqueEventRequestDto dto = updateDto();
         AcademicEventResponseDto result = service.updateUniqueEvent(3L, dto);
 
         assertThat(result).isNotNull();
-        verify(allocationValidator).validateNotPast(occurrence);
+        verify(allocationValidator).validateNotPast(slot);
         // description es del evento (ver más abajo), no una observación: reallocate no la recibe.
         verify(allocationService).reallocate(50L, new AllocateOccurrenceRequestDto(dto.classroomId(), null));
         verify(allocationService, never()).allocateManually(any(), any());
@@ -381,7 +387,8 @@ class AcademicEventServiceImplTest {
         Occurrence occurrence = AllocationTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.SCHEDULED);
         when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
         when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
-        when(allocationRepository.findByOccurrence_Id(10L)).thenReturn(Optional.empty());
+        when(occurrenceService.findSlot(10L)).thenReturn(occurrenceSlot(occurrence));
+        when(allocationRepository.findByOccurrenceId(10L)).thenReturn(Optional.empty());
         when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyUniqueResponseDto(3L));
 
         UpdateUniqueEventRequestDto dto = updateDto();
@@ -396,9 +403,11 @@ class AcademicEventServiceImplTest {
     void updateUniqueEventOccurrencePasada() {
         UniqueEvent event = AllocationTestData.uniqueEvent(3L, LocalDate.of(2020, 1, 1), LocalTime.of(10, 0), Duration.ofMinutes(60));
         Occurrence occurrence = AllocationTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.ASSIGNED);
+        OccurrenceSlotDto slot = occurrenceSlot(occurrence);
         when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
         when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
-        doThrow(new AllocationConflictException("ya ocurrió")).when(allocationValidator).validateNotPast(occurrence);
+        when(occurrenceService.findSlot(10L)).thenReturn(slot);
+        doThrow(new AllocationConflictException("ya ocurrió")).when(allocationValidator).validateNotPast(slot);
 
         assertThatThrownBy(() -> service.updateUniqueEvent(3L, updateDto()))
                 .isInstanceOf(AllocationConflictException.class);
@@ -435,9 +444,11 @@ class AcademicEventServiceImplTest {
     void cancelUniqueEventOccurrencePasada() {
         UniqueEvent event = AllocationTestData.uniqueEvent(3L, LocalDate.of(2020, 1, 1), LocalTime.of(10, 0), Duration.ofMinutes(60));
         Occurrence occurrence = AllocationTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.ASSIGNED);
+        OccurrenceSlotDto slot = occurrenceSlot(occurrence);
         when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
         when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
-        doThrow(new AllocationConflictException("ya ocurrió")).when(allocationValidator).validateNotPast(occurrence);
+        when(occurrenceService.findSlot(10L)).thenReturn(slot);
+        doThrow(new AllocationConflictException("ya ocurrió")).when(allocationValidator).validateNotPast(slot);
 
         assertThatThrownBy(() -> service.cancelUniqueEvent(3L))
                 .isInstanceOf(AllocationConflictException.class);
@@ -596,5 +607,10 @@ class AcademicEventServiceImplTest {
         return new UpdateUniqueEventRequestDto(
                 UniqueEventKind.PARCIAL, 1L, 1L, LocalDate.of(2026, 3, 15),
                 LocalTime.of(11, 0), 90, 25, 7, "descripcion actualizada");
+    }
+
+    private OccurrenceSlotDto occurrenceSlot(Occurrence occurrence) {
+        return new OccurrenceSlotDto(occurrence.getId(), occurrence.getEvent().getId(), occurrence.getDate(),
+                occurrence.startTime(), occurrence.endTime(), occurrence.getStatus(), occurrence.getEvent().getEnrolled());
     }
 }

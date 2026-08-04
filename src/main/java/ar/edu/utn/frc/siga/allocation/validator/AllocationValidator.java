@@ -5,13 +5,13 @@ import ar.edu.utn.frc.siga.allocation.dto.request.ValidateMoveRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto.ConflictOrigin;
 import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceConflictDto;
+import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.exception.ReassignConflictException;
-import ar.edu.utn.frc.siga.allocation.events.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
-import ar.edu.utn.frc.siga.allocation.events.model.Occurrence;
 import ar.edu.utn.frc.siga.allocation.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.events.model.RecurringEvent;
+import ar.edu.utn.frc.siga.allocation.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import ar.edu.utn.frc.siga.common.util.TimeRanges;
@@ -41,19 +41,19 @@ public class AllocationValidator {
 
     private final ClassroomService classroomService;
     private final AllocationRepository allocationRepository;
+    private final OccurrenceService occurrenceService;
 
     /** Ocurrencia a (re)asignar y el aula destino que se le quiere dar. */
-    public record AllocationCandidate(Occurrence occurrence, Integer classroomId) {
+    public record AllocationCandidate(OccurrenceSlotDto occurrence, Integer classroomId) {
     }
 
     /** Franja ocupada, sea de BD o de un snapshot automático. */
     public record OccupiedSlot(Integer classroomId, LocalDate date, LocalTime startTime, LocalTime endTime,
                                 Long eventId, Long allocationId) {
 
-        public static OccupiedSlot from(Allocation a) {
-            AcademicEvent occupant = a.getOccurrence().getEvent();
-            return new OccupiedSlot(a.getClassroomId(), a.getOccurrence().getDate(),
-                    occupant.getStartTime(), occupant.endTime(), occupant.getId(), a.getId());
+        public static OccupiedSlot from(Allocation a, OccurrenceSlotDto occurrence) {
+            return new OccupiedSlot(a.getClassroomId(), occurrence.date(),
+                    occurrence.startTime(), occurrence.endTime(), occurrence.eventId(), a.getId());
         }
     }
 
@@ -80,14 +80,18 @@ public class AllocationValidator {
         List<AllocationCandidate> future = candidates.stream().filter(c -> !c.occurrence().isPast()).toList();
         if (future.isEmpty()) return;
 
-        LocalDate min = future.stream().map(c -> c.occurrence().getDate()).min(Comparator.naturalOrder()).orElseThrow();
-        LocalDate max = future.stream().map(c -> c.occurrence().getDate()).max(Comparator.naturalOrder()).orElseThrow();
-        Set<Long> ownOccurrenceIds = future.stream().map(c -> c.occurrence().getId()).collect(Collectors.toSet());
+        LocalDate min = future.stream().map(c -> c.occurrence().date()).min(Comparator.naturalOrder()).orElseThrow();
+        LocalDate max = future.stream().map(c -> c.occurrence().date()).max(Comparator.naturalOrder()).orElseThrow();
+        Set<Long> ownOccurrenceIds = future.stream().map(c -> c.occurrence().occurrenceId()).collect(Collectors.toSet());
 
-        List<OccupiedSlot> occupancy = allocationRepository.findOccupancyBetween(min, max, OccurrenceStatus.ASSIGNED)
+        Map<Long, OccurrenceSlotDto> slotByOccurrenceId = Maps.byId(
+                occurrenceService.findSlotsByStatusBetween(OccurrenceStatus.ASSIGNED, min, max),
+                OccurrenceSlotDto::occurrenceId);
+
+        List<OccupiedSlot> occupancy = allocationRepository.findByOccurrenceIdIn(slotByOccurrenceId.keySet())
                 .stream()
-                .filter(a -> !ownOccurrenceIds.contains(a.getOccurrence().getId()))
-                .map(OccupiedSlot::from)
+                .filter(a -> !ownOccurrenceIds.contains(a.getOccurrenceId()))
+                .map(a -> OccupiedSlot.from(a, slotByOccurrenceId.get(a.getOccurrenceId())))
                 .toList();
 
         validateNoOverlap(future, occupancy);
@@ -124,9 +128,9 @@ public class AllocationValidator {
             LocalTime end = candidate.occurrence().endTime();
             for (OccupiedSlot occupied : occupancy) {
                 if (!occupied.classroomId().equals(candidate.classroomId())) continue;
-                if (!occupied.date().equals(candidate.occurrence().getDate())) continue;
+                if (!occupied.date().equals(candidate.occurrence().date())) continue;
                 if (!TimeRanges.overlaps(start, end, occupied.startTime(), occupied.endTime())) continue;
-                conflicts.add(new OccurrenceConflictDto(candidate.occurrence().getId(), candidate.occurrence().getDate(),
+                conflicts.add(new OccurrenceConflictDto(candidate.occurrence().occurrenceId(), candidate.occurrence().date(),
                         start, end, candidate.classroomId(), occupied.eventId(), occupied.allocationId()));
             }
         }
@@ -145,16 +149,16 @@ public class AllocationValidator {
             AllocationCandidate a = candidates.get(i);
             for (int j = i + 1; j < candidates.size(); j++) {
                 AllocationCandidate b = candidates.get(j);
-                if (a.occurrence().getEvent().getId().equals(b.occurrence().getEvent().getId())) continue;
+                if (a.occurrence().eventId().equals(b.occurrence().eventId())) continue;
                 if (!a.classroomId().equals(b.classroomId())) continue;
-                if (!a.occurrence().getDate().equals(b.occurrence().getDate())) continue;
+                if (!a.occurrence().date().equals(b.occurrence().date())) continue;
                 LocalTime aStart = a.occurrence().startTime();
                 LocalTime aEnd = a.occurrence().endTime();
                 LocalTime bStart = b.occurrence().startTime();
                 LocalTime bEnd = b.occurrence().endTime();
                 if (!TimeRanges.overlaps(aStart, aEnd, bStart, bEnd)) continue;
-                conflicts.add(new OccurrenceConflictDto(a.occurrence().getId(), a.occurrence().getDate(),
-                        aStart, aEnd, a.classroomId(), b.occurrence().getEvent().getId(), null));
+                conflicts.add(new OccurrenceConflictDto(a.occurrence().occurrenceId(), a.occurrence().date(),
+                        aStart, aEnd, a.classroomId(), b.occurrence().eventId(), null));
             }
         }
         return conflicts;
@@ -163,37 +167,37 @@ public class AllocationValidator {
     // ---------- estado de la ocurrencia ----------
 
     /** Ocurrencia ya ocurrida → no se puede modificar su asignación. */
-    public void validateNotPast(Occurrence occurrence) {
+    public void validateNotPast(OccurrenceSlotDto occurrence) {
         if (occurrence.isPast()) {
             throw new AllocationConflictException(
-                    "Cannot modify allocation: occurrence on " + occurrence.getDate() + " has already taken place.");
+                    "Cannot modify allocation: occurrence on " + occurrence.date() + " has already taken place.");
         }
     }
 
     /** Evento sin ocurrencias futuras (todas ya sucedieron) → no se puede reasignar. */
-    public void validateEventNotFinished(List<Occurrence> occurrences) {
-        if (occurrences.stream().allMatch(Occurrence::isPast)) {
+    public void validateEventNotFinished(List<OccurrenceSlotDto> occurrences) {
+        if (occurrences.stream().allMatch(OccurrenceSlotDto::isPast)) {
             throw new AllocationConflictException(
                     "Cannot reassign event: all its occurrences have already taken place.");
         }
     }
 
     /** Ocurrencia CANCELLED/SUSPENDED → no se le puede asignar aula. */
-    public void validateAssignable(Occurrence occurrence) {
+    public void validateAssignable(OccurrenceSlotDto occurrence) {
         if (!isAssignable(occurrence)) {
             throw new AllocationConflictException(
-                    "Cannot assign classroom: occurrence " + occurrence.getId() + " is " + occurrence.getStatus() + ".");
+                    "Cannot assign classroom: occurrence " + occurrence.occurrenceId() + " is " + occurrence.status() + ".");
         }
     }
 
     /** Ocurrencia asignable: no CANCELLED ni SUSPENDED. */
-    public boolean isAssignable(Occurrence occurrence) {
-        return occurrence.getStatus() != OccurrenceStatus.CANCELLED
-                && occurrence.getStatus() != OccurrenceStatus.SUSPENDED;
+    public boolean isAssignable(OccurrenceSlotDto occurrence) {
+        return occurrence.status() != OccurrenceStatus.CANCELLED
+                && occurrence.status() != OccurrenceStatus.SUSPENDED;
     }
 
     /** Ocurrencia aplicable a un lote: no pasada y asignable. */
-    public boolean isApplicable(Occurrence occurrence) {
+    public boolean isApplicable(OccurrenceSlotDto occurrence) {
         return !occurrence.isPast() && isAssignable(occurrence);
     }
 

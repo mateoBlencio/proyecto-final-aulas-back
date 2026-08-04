@@ -6,12 +6,13 @@ import ar.edu.utn.frc.siga.allocation.dto.request.ValidateMoveRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto.ConflictOrigin;
 import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceConflictDto;
+import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.exception.ReassignConflictException;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
-import ar.edu.utn.frc.siga.allocation.events.model.Occurrence;
 import ar.edu.utn.frc.siga.allocation.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.events.model.RecurringEvent;
+import ar.edu.utn.frc.siga.allocation.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.AllocationCandidate;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.OccupiedSlot;
@@ -47,12 +48,14 @@ class AllocationValidatorTest {
     private ClassroomService classroomService;
     @Mock
     private AllocationRepository allocationRepository;
+    @Mock
+    private OccurrenceService occurrenceService;
 
     private AllocationValidator validator;
 
     @BeforeEach
     void setUp() {
-        validator = new AllocationValidator(classroomService, allocationRepository);
+        validator = new AllocationValidator(classroomService, allocationRepository, occurrenceService);
     }
 
     // ---------- databaseConflicts / validateNoOverlap ----------
@@ -61,7 +64,7 @@ class AllocationValidatorTest {
     @DisplayName("databaseConflicts: misma aula, misma fecha, franjas que se pisan → conflicto")
     void databaseConflictsSolapa() {
         RecurringEvent event = AllocationTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90));
-        Occurrence occurrence = AllocationTestData.occurrence(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
+        OccurrenceSlotDto occurrence =AllocationTestData.occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
         AllocationCandidate candidate = new AllocationCandidate(occurrence, 5);
         OccupiedSlot occupied = new OccupiedSlot(5, futureDate(1), LocalTime.of(8, 30), LocalTime.of(9, 0), 99L, 500L);
 
@@ -76,7 +79,7 @@ class AllocationValidatorTest {
     @DisplayName("databaseConflicts: distinta aula o distinta fecha → sin conflicto")
     void databaseConflictsSinSolape() {
         RecurringEvent event = AllocationTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90));
-        Occurrence occurrence = AllocationTestData.occurrence(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
+        OccurrenceSlotDto occurrence =AllocationTestData.occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
         AllocationCandidate candidate = new AllocationCandidate(occurrence, 5);
         OccupiedSlot distintaAula = new OccupiedSlot(6, futureDate(1), LocalTime.of(8, 30), LocalTime.of(9, 0), 99L, 500L);
         OccupiedSlot distintaFecha = new OccupiedSlot(5, futureDate(2), LocalTime.of(8, 30), LocalTime.of(9, 0), 99L, 500L);
@@ -88,7 +91,7 @@ class AllocationValidatorTest {
     @DisplayName("Borde: fin del nuevo == inicio del ocupante no es solapamiento")
     void bordeFinIgualInicioNoSolapa() {
         RecurringEvent event = AllocationTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90)); // 08:00-09:30
-        Occurrence occurrence = AllocationTestData.occurrence(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
+        OccurrenceSlotDto occurrence =AllocationTestData.occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
         AllocationCandidate candidate = new AllocationCandidate(occurrence, 5);
         OccupiedSlot adyacente = new OccupiedSlot(5, futureDate(1), LocalTime.of(9, 30), LocalTime.of(10, 30), 99L, 500L);
 
@@ -101,8 +104,8 @@ class AllocationValidatorTest {
         RecurringEvent event1 = AllocationTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90));
         RecurringEvent event2 = AllocationTestData.recurringEvent(2L, LocalTime.of(8, 30), Duration.ofMinutes(60));
         LocalDate date = futureDate(1);
-        AllocationCandidate a = new AllocationCandidate(AllocationTestData.occurrence(10L, event1, date, OccurrenceStatus.SCHEDULED), 5);
-        AllocationCandidate b = new AllocationCandidate(AllocationTestData.occurrence(11L, event2, date, OccurrenceStatus.SCHEDULED), 5);
+        AllocationCandidate a = new AllocationCandidate(AllocationTestData.occurrenceSlot(10L, event1, date, OccurrenceStatus.SCHEDULED), 5);
+        AllocationCandidate b = new AllocationCandidate(AllocationTestData.occurrenceSlot(11L, event2, date, OccurrenceStatus.SCHEDULED), 5);
 
         List<OccurrenceConflictDto> conflicts = validator.internalConflicts(List.of(a, b));
 
@@ -117,8 +120,8 @@ class AllocationValidatorTest {
         RecurringEvent event = AllocationTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90));
         LocalDate date = futureDate(1);
         // Mismo evento, misma fecha/aula (caso artificial para forzar el chequeo del skip).
-        AllocationCandidate a = new AllocationCandidate(AllocationTestData.occurrence(10L, event, date, OccurrenceStatus.SCHEDULED), 5);
-        AllocationCandidate b = new AllocationCandidate(AllocationTestData.occurrence(11L, event, date, OccurrenceStatus.SCHEDULED), 5);
+        AllocationCandidate a = new AllocationCandidate(AllocationTestData.occurrenceSlot(10L, event, date, OccurrenceStatus.SCHEDULED), 5);
+        AllocationCandidate b = new AllocationCandidate(AllocationTestData.occurrenceSlot(11L, event, date, OccurrenceStatus.SCHEDULED), 5);
 
         assertThat(validator.internalConflicts(List.of(a, b))).isEmpty();
     }
@@ -127,7 +130,7 @@ class AllocationValidatorTest {
     @DisplayName("validateNoOverlap: sin conflictos no lanza")
     void validateNoOverlapSinConflictosNoLanza() {
         RecurringEvent event = AllocationTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90));
-        Occurrence occurrence = AllocationTestData.occurrence(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
+        OccurrenceSlotDto occurrence =AllocationTestData.occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
         AllocationCandidate candidate = new AllocationCandidate(occurrence, 5);
 
         assertThatCode(() -> validator.validateNoOverlap(List.of(candidate), List.of())).doesNotThrowAnyException();
@@ -137,7 +140,7 @@ class AllocationValidatorTest {
     @DisplayName("validateNoOverlap: con conflictos lanza ReassignConflictException con el detalle")
     void validateNoOverlapConConflictosLanza() {
         RecurringEvent event = AllocationTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90));
-        Occurrence occurrence = AllocationTestData.occurrence(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
+        OccurrenceSlotDto occurrence =AllocationTestData.occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
         AllocationCandidate candidate = new AllocationCandidate(occurrence, 5);
         OccupiedSlot occupied = new OccupiedSlot(5, futureDate(1), LocalTime.of(8, 30), LocalTime.of(9, 0), 99L, 500L);
 
@@ -151,13 +154,14 @@ class AllocationValidatorTest {
     void validateNoOverlapCargaBdYDetecta() {
         LocalDate date = futureDate(1);
         RecurringEvent event = AllocationTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90));
-        Occurrence occurrence = AllocationTestData.occurrence(10L, event, date, OccurrenceStatus.SCHEDULED);
+        OccurrenceSlotDto occurrence =AllocationTestData.occurrenceSlot(10L, event, date, OccurrenceStatus.SCHEDULED);
         AllocationCandidate candidate = new AllocationCandidate(occurrence, 5);
 
         RecurringEvent occupantEvent = AllocationTestData.recurringEvent(2L, LocalTime.of(8, 30), Duration.ofMinutes(60));
-        Occurrence occupantOcc = AllocationTestData.occurrence(20L, occupantEvent, date, OccurrenceStatus.ASSIGNED);
-        Allocation occupied = Allocation.builder().id(500L).occurrence(occupantOcc).classroomId(5).build();
-        when(allocationRepository.findOccupancyBetween(any(), any(), any())).thenReturn(List.of(occupied));
+        OccurrenceSlotDto occupantOcc = AllocationTestData.occurrenceSlot(20L, occupantEvent, date, OccurrenceStatus.ASSIGNED);
+        Allocation occupied = Allocation.builder().id(500L).occurrenceId(20L).classroomId(5).build();
+        when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of(occupantOcc));
+        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(occupied));
 
         assertThatThrownBy(() -> validator.validateNoOverlap(List.of(candidate)))
                 .isInstanceOf(ReassignConflictException.class)
@@ -168,7 +172,7 @@ class AllocationValidatorTest {
     @DisplayName("validateNoOverlap(candidates): solo ocurrencias pasadas → no consulta BD ni lanza")
     void validateNoOverlapSoloPasadasNoConsultaBd() {
         RecurringEvent event = AllocationTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90));
-        Occurrence pasada = AllocationTestData.occurrence(10L, event, LocalDate.now().minusDays(1), OccurrenceStatus.SCHEDULED);
+        OccurrenceSlotDto pasada = AllocationTestData.occurrenceSlot(10L, event, LocalDate.now().minusDays(1), OccurrenceStatus.SCHEDULED);
 
         assertThatCode(() -> validator.validateNoOverlap(List.of(new AllocationCandidate(pasada, 5))))
                 .doesNotThrowAnyException();
@@ -181,7 +185,7 @@ class AllocationValidatorTest {
     @DisplayName("validateNotPast: ocurrencia pasada lanza AllocationConflictException")
     void validateNotPastOcurrenciaPasadaLanza() {
         RecurringEvent event = AllocationTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90));
-        Occurrence occurrence = AllocationTestData.occurrence(10L, event, LocalDate.now().minusDays(1), OccurrenceStatus.SCHEDULED);
+        OccurrenceSlotDto occurrence =AllocationTestData.occurrenceSlot(10L, event, LocalDate.now().minusDays(1), OccurrenceStatus.SCHEDULED);
 
         assertThatThrownBy(() -> validator.validateNotPast(occurrence))
                 .isInstanceOf(AllocationConflictException.class);
@@ -191,7 +195,7 @@ class AllocationValidatorTest {
     @DisplayName("validateNotPast: ocurrencia futura no lanza")
     void validateNotPastOcurrenciaFuturaNoLanza() {
         RecurringEvent event = AllocationTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90));
-        Occurrence occurrence = AllocationTestData.occurrence(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
+        OccurrenceSlotDto occurrence =AllocationTestData.occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
 
         assertThatCode(() -> validator.validateNotPast(occurrence)).doesNotThrowAnyException();
     }
@@ -200,8 +204,8 @@ class AllocationValidatorTest {
     @DisplayName("validateAssignable: CANCELLED y SUSPENDED lanzan AllocationConflictException")
     void validateAssignableNoAsignableLanza() {
         RecurringEvent event = AllocationTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90));
-        Occurrence cancelled = AllocationTestData.occurrence(10L, event, futureDate(1), OccurrenceStatus.CANCELLED);
-        Occurrence suspended = AllocationTestData.occurrence(11L, event, futureDate(1), OccurrenceStatus.SUSPENDED);
+        OccurrenceSlotDto cancelled = AllocationTestData.occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.CANCELLED);
+        OccurrenceSlotDto suspended = AllocationTestData.occurrenceSlot(11L, event, futureDate(1), OccurrenceStatus.SUSPENDED);
 
         assertThatThrownBy(() -> validator.validateAssignable(cancelled)).isInstanceOf(AllocationConflictException.class);
         assertThatThrownBy(() -> validator.validateAssignable(suspended)).isInstanceOf(AllocationConflictException.class);
@@ -211,7 +215,7 @@ class AllocationValidatorTest {
     @DisplayName("validateAssignable: SCHEDULED/ASSIGNED no lanzan")
     void validateAssignableAsignableNoLanza() {
         RecurringEvent event = AllocationTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90));
-        Occurrence scheduled = AllocationTestData.occurrence(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
+        OccurrenceSlotDto scheduled = AllocationTestData.occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
 
         assertThatCode(() -> validator.validateAssignable(scheduled)).doesNotThrowAnyException();
     }
@@ -220,9 +224,9 @@ class AllocationValidatorTest {
     @DisplayName("isApplicable: combina no-pasada + asignable")
     void isApplicableCombinado() {
         RecurringEvent event = AllocationTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90));
-        Occurrence futuraAsignable = AllocationTestData.occurrence(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
-        Occurrence futuraCancelada = AllocationTestData.occurrence(11L, event, futureDate(1), OccurrenceStatus.CANCELLED);
-        Occurrence pasadaAsignable = AllocationTestData.occurrence(12L, event, LocalDate.now().minusDays(1), OccurrenceStatus.SCHEDULED);
+        OccurrenceSlotDto futuraAsignable = AllocationTestData.occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
+        OccurrenceSlotDto futuraCancelada = AllocationTestData.occurrenceSlot(11L, event, futureDate(1), OccurrenceStatus.CANCELLED);
+        OccurrenceSlotDto pasadaAsignable = AllocationTestData.occurrenceSlot(12L, event, LocalDate.now().minusDays(1), OccurrenceStatus.SCHEDULED);
 
         assertThat(validator.isApplicable(futuraAsignable)).isTrue();
         assertThat(validator.isApplicable(futuraCancelada)).isFalse();
@@ -233,7 +237,7 @@ class AllocationValidatorTest {
     @DisplayName("validateEventNotFinished: todas las ocurrencias pasadas lanza AllocationConflictException")
     void validateEventNotFinishedTodasPasadasLanza() {
         RecurringEvent event = AllocationTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90));
-        Occurrence pasada = AllocationTestData.occurrence(10L, event, LocalDate.now().minusDays(1), OccurrenceStatus.SCHEDULED);
+        OccurrenceSlotDto pasada = AllocationTestData.occurrenceSlot(10L, event, LocalDate.now().minusDays(1), OccurrenceStatus.SCHEDULED);
 
         assertThatThrownBy(() -> validator.validateEventNotFinished(List.of(pasada)))
                 .isInstanceOf(AllocationConflictException.class);
@@ -243,8 +247,8 @@ class AllocationValidatorTest {
     @DisplayName("validateEventNotFinished: al menos una ocurrencia futura no lanza")
     void validateEventNotFinishedConFuturaNoLanza() {
         RecurringEvent event = AllocationTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90));
-        Occurrence pasada = AllocationTestData.occurrence(10L, event, LocalDate.now().minusDays(1), OccurrenceStatus.SCHEDULED);
-        Occurrence futura = AllocationTestData.occurrence(11L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
+        OccurrenceSlotDto pasada = AllocationTestData.occurrenceSlot(10L, event, LocalDate.now().minusDays(1), OccurrenceStatus.SCHEDULED);
+        OccurrenceSlotDto futura = AllocationTestData.occurrenceSlot(11L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
 
         assertThatCode(() -> validator.validateEventNotFinished(List.of(pasada, futura))).doesNotThrowAnyException();
     }

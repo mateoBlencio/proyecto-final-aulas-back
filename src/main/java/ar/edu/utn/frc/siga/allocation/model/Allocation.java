@@ -1,16 +1,12 @@
 package ar.edu.utn.frc.siga.allocation.model;
 
-import ar.edu.utn.frc.siga.allocation.events.model.Occurrence;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -45,9 +41,13 @@ public class Allocation {
     @Column(name = "id_asignacion")
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_ocurrencia")
-    private Occurrence occurrence;
+    /**
+     * ID de la ocurrencia asignada (events::Occurrence). Referencia por ID plano en vez de
+     * {@code @OneToOne}: la FK física sigue en la BD, pero la integridad referencial a
+     * nivel de módulo la garantiza solo el esquema, no una relación JPA cross-módulo.
+     */
+    @Column(name = "id_ocurrencia", nullable = false)
+    private Long occurrenceId;
 
     /**
      * ID del aula asignada (space::Classroom). Referencia por ID plano en vez de

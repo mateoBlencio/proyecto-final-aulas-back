@@ -231,7 +231,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.conflicts").isArray());
 
-        assertThat(allocationRepository.findByOccurrence_IdIn(
+        assertThat(allocationRepository.findByOccurrenceIdIn(
                 occurrenceRepository.findByEvent_Id(eventId).stream().map(Occurrence::getId).toList()))
                 .isEmpty();
     }
@@ -256,7 +256,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
 
         List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId);
         assertThat(occurrences).allSatisfy(o -> assertThat(o.getStatus()).isEqualTo(OccurrenceStatus.ASSIGNED));
-        assertThat(allocationRepository.findByOccurrence_IdIn(
+        assertThat(allocationRepository.findByOccurrenceIdIn(
                 occurrences.stream().map(Occurrence::getId).toList()))
                 .hasSize(3)
                 .allSatisfy(a -> {
@@ -287,7 +287,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
                 .status(OccurrenceStatus.ASSIGNED)
                 .build());
         long pastAllocationId = allocationRepository.save(Allocation.builder()
-                .occurrence(past)
+                .occurrenceId(past.getId())
                 .classroomId(aulaOriginal.getId())
                 .source(AllocationSource.MANUAL)
                 .createdAt(java.time.LocalDateTime.now())
@@ -300,7 +300,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(3));
 
         List<Occurrence> futureOccurrences = occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eventId, LocalDate.now());
-        assertThat(allocationRepository.findByOccurrence_IdIn(futureOccurrences.stream().map(Occurrence::getId).toList()))
+        assertThat(allocationRepository.findByOccurrenceIdIn(futureOccurrences.stream().map(Occurrence::getId).toList()))
                 .hasSize(3)
                 .allSatisfy(a -> assertThat(a.getClassroomId()).isEqualTo(aulaNueva.getId()));
 

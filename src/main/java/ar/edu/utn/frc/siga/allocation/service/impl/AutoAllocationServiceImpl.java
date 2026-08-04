@@ -12,15 +12,15 @@ import ar.edu.utn.frc.siga.allocation.dto.response.ProposedAllocationDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.UnresolvedAllocationDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ValidateMoveResponseDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
+import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.allocation.events.mapper.AcademicEventComposer;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationComposer;
 import ar.edu.utn.frc.siga.allocation.events.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
-import ar.edu.utn.frc.siga.allocation.events.model.Occurrence;
 import ar.edu.utn.frc.siga.allocation.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.events.model.RecurringEvent;
-import ar.edu.utn.frc.siga.allocation.events.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.allocation.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationProblemService;
 import ar.edu.utn.frc.siga.allocation.service.AutoAllocationService;
 import ar.edu.utn.frc.siga.allocation.service.impl.AutoAllocationDataLoader.AutoPreviewInputs;
@@ -64,7 +64,7 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
     private final ClassroomService classroomService;
     private final AcademicEventComposer academicEventComposer;
     private final SolverService solverService;
-    private final OccurrenceRepository occurrenceRepository;
+    private final OccurrenceService occurrenceService;
     private final AllocationComposer allocationComposer;
     private final AllocationValidator validator;
     private final AllocationWriter writer;
@@ -178,8 +178,8 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
         Set<Integer> classroomIds = eventIdsWithClassroom.stream().map(classroomByEvent::get).collect(Collectors.toSet());
         validator.validateClassroomsAvailable(classroomIds);
 
-        List<Occurrence> targetOccurrences = occurrenceRepository
-                .findByEvent_IdInAndStatusInAndDateGreaterThanEqual(
+        List<OccurrenceSlotDto> targetOccurrences = occurrenceService
+                .findSlotsByEventsAndStatuses(
                         eventIdsWithClassroom, List.of(OccurrenceStatus.SCHEDULED, OccurrenceStatus.ASSIGNED),
                         LocalDate.now())
                 .stream()
@@ -187,14 +187,14 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
                 .toList();
 
         List<AllocationCandidate> candidates = targetOccurrences.stream()
-                .map(o -> new AllocationCandidate(o, classroomByEvent.get(o.getEvent().getId())))
+                .map(o -> new AllocationCandidate(o, classroomByEvent.get(o.eventId())))
                 .toList();
         validator.validateNoOverlap(candidates, inputs.databaseOccupancy());
 
         // Aula distinta por evento, pero una sola pasada de escritura (una sola query de
         // asignaciones existentes) en vez de una por evento: evita N+1 con muchos eventos.
         List<Allocation> saved = writer.apply(targetOccurrences,
-                o -> classroomByEvent.get(o.getEvent().getId()), null, AllocationSource.AUTOMATIC, true);
+                o -> classroomByEvent.get(o.eventId()), null, AllocationSource.AUTOMATIC, true);
         solverService.invalidatePreview(previewId);
 
         log.info("Confirm aplicado: previewId={}, applied={}, skipped={}",

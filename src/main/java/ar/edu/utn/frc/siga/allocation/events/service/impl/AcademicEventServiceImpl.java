@@ -20,6 +20,7 @@ import ar.edu.utn.frc.siga.allocation.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.events.repository.RecurringEventRepository;
 import ar.edu.utn.frc.siga.allocation.events.repository.UniqueEventRepository;
 import ar.edu.utn.frc.siga.allocation.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.allocation.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.events.validator.EventScheduleValidator;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
@@ -54,6 +55,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     private final RecurringEventRepository recurringEventRepository;
     private final UniqueEventRepository uniqueEventRepository;
     private final OccurrenceRepository occurrenceRepository;
+    private final OccurrenceService occurrenceService;
     private final AllocationRepository allocationRepository;
     private final AcademicEventComposer composer;
     private final OccurrenceMapper occurrenceMapper;
@@ -209,7 +211,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
         // Se valida el estado ANTES de mutar la occurrence: isPast() debe evaluarse contra
         // la fecha/hora vigente, no la nueva que se está por escribir.
-        allocationValidator.validateNotPast(occurrence);
+        allocationValidator.validateNotPast(occurrenceService.findSlot(occurrence.getId()));
 
         Duration duration = Duration.ofMinutes(dto.durationMinutes());
         eventScheduleValidator.validateBusinessHours(dto.startTime(), dto.startTime().plus(duration));
@@ -233,7 +235,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         occurrence.setDate(dto.date());
 
         AllocateOccurrenceRequestDto allocationDto = new AllocateOccurrenceRequestDto(dto.classroomId(), null);
-        allocationRepository.findByOccurrence_Id(occurrence.getId())
+        allocationRepository.findByOccurrenceId(occurrence.getId())
                 .ifPresentOrElse(
                         existing -> allocationService.reallocate(existing.getId(), allocationDto),
                         () -> allocationService.allocateManually(occurrence.getId(), allocationDto));
@@ -254,7 +256,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
         Finder.orThrow(uniqueEventRepository::findById, id, "UniqueEvent");
         Occurrence occurrence = occurrenceRepository.findByEvent_Id(id).getFirst();
-        allocationValidator.validateNotPast(occurrence);
+        allocationValidator.validateNotPast(occurrenceService.findSlot(occurrence.getId()));
 
         occurrence.setStatus(OccurrenceStatus.CANCELLED);
 

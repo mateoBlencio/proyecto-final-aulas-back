@@ -1,16 +1,18 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
+import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.events.model.AcademicEvent;
-import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.events.model.Occurrence;
 import ar.edu.utn.frc.siga.allocation.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.events.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.events.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.events.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.allocation.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.OccupiedSlot;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.util.Maps;
 import ar.edu.utn.frc.siga.solver.model.SolverOccupancy;
 import ar.edu.utn.frc.siga.solver.model.SolverRoom;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
@@ -43,6 +45,7 @@ class AutoAllocationDataLoader {
     private final AcademicEventRepository eventRepository;
     private final OccurrenceRepository occurrenceRepository;
     private final AllocationRepository allocationRepository;
+    private final OccurrenceService occurrenceService;
     private final ClassroomService classroomService;
 
     /**
@@ -65,21 +68,17 @@ class AutoAllocationDataLoader {
                 .map(this::toSolverRoom)
                 .toList();
 
-        List<Allocation> occupancyInRange = loadOccupancyInRange(events);
+        List<OccupiedSlot> occupancyInRange = loadOccupancyInRange(events);
         // Ocupación ajena (pinned): excluye los eventos seleccionados → sus aulas quedan libres.
-        List<Allocation> databaseAllocations = occupancyInRange.stream()
-                .filter(a -> !eventIds.contains(a.getOccurrence().getEvent().getId()))
+        List<OccupiedSlot> databaseOccupancy = occupancyInRange.stream()
+                .filter(o -> !eventIds.contains(o.eventId()))
                 .toList();
         // Aula previa de cada evento seleccionado que ya estaba asignado (floor de no-regresión).
         Map<Long, Integer> priorRoomByEvent = occupancyInRange.stream()
-                .filter(a -> eventIds.contains(a.getOccurrence().getEvent().getId()))
-                .collect(Collectors.toMap(
-                        a -> a.getOccurrence().getEvent().getId(), Allocation::getClassroomId, (x, y) -> x));
+                .filter(o -> eventIds.contains(o.eventId()))
+                .collect(Collectors.toMap(OccupiedSlot::eventId, OccupiedSlot::classroomId, (x, y) -> x));
 
-        List<SolverOccupancy> occupancy = databaseAllocations.stream().map(this::toOccupancy).toList();
-        List<OccupiedSlot> databaseOccupancy = databaseAllocations.stream()
-                .map(OccupiedSlot::from)
-                .toList();
+        List<SolverOccupancy> occupancy = databaseOccupancy.stream().map(this::toOccupancy).toList();
         return new AutoPreviewInputs(events, datesByEvent, rooms, occupancy, databaseOccupancy, priorRoomByEvent);
     }
 
@@ -121,11 +120,9 @@ class AutoAllocationDataLoader {
     /**
      * Ocupación existente (ASSIGNED) en el rango de fechas de los eventos seleccionados, sin
      * filtrar por evento: quien llama separa la ajena (pinned) de la de los propios eventos
-     * (que da el aula previa para el floor de no-regresión). Se devuelve la entidad completa
-     * (no un record del solver) para derivar tanto la ocupación pinned como el detalle con
-     * eventId que necesita validate-move.
+     * (que da el aula previa para el floor de no-regresión).
      */
-    private List<Allocation> loadOccupancyInRange(List<RecurringEvent> events) {
+    private List<OccupiedSlot> loadOccupancyInRange(List<RecurringEvent> events) {
         if (events.isEmpty()) {
             return List.of();
         }
@@ -135,15 +132,15 @@ class AutoAllocationDataLoader {
                 .map(e -> e.getEndDate() != null ? e.getEndDate() : e.getStartDate().plusYears(1))
                 .max(Comparator.naturalOrder()).orElseThrow();
 
-        return allocationRepository.findOccupancyBetween(from, to, OccurrenceStatus.ASSIGNED);
+        Map<Long, OccurrenceSlotDto> slotByOccurrenceId = Maps.byId(
+                occurrenceService.findSlotsByStatusBetween(OccurrenceStatus.ASSIGNED, from, to),
+                OccurrenceSlotDto::occurrenceId);
+        return allocationRepository.findByOccurrenceIdIn(slotByOccurrenceId.keySet()).stream()
+                .map(a -> OccupiedSlot.from(a, slotByOccurrenceId.get(a.getOccurrenceId())))
+                .toList();
     }
 
-    private SolverOccupancy toOccupancy(Allocation a) {
-        AcademicEvent occupant = a.getOccurrence().getEvent();
-        return new SolverOccupancy(
-                a.getClassroomId(),
-                a.getOccurrence().getDate(),
-                occupant.getStartTime(),
-                occupant.endTime());
+    private SolverOccupancy toOccupancy(OccupiedSlot slot) {
+        return new SolverOccupancy(slot.classroomId(), slot.date(), slot.startTime(), slot.endTime());
     }
 }

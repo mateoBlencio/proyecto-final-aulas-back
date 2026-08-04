@@ -25,9 +25,11 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
      * las fechas de eventos ya asignados que el usuario quiere re-resolver; el filtro de
      * fecha evita re-resolver clases ya dictadas.
      */
+    @EntityGraph(attributePaths = "event")
     List<Occurrence> findByEvent_IdInAndStatusInAndDateGreaterThanEqual(
             Collection<Long> eventIds, Collection<OccurrenceStatus> statuses, LocalDate date);
 
+    @EntityGraph(attributePaths = "event")
     List<Occurrence> findByEvent_IdAndDateGreaterThanEqual(Long eventId, LocalDate date);
 
     /**
@@ -36,6 +38,7 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
      * caller filtra en memoria si cada evento tiene su propia fecha desde (acá se pasa la
      * más antigua de todas y se sobre-trae).
      */
+    @EntityGraph(attributePaths = "event")
     List<Occurrence> findByEvent_IdInAndDateGreaterThanEqual(Collection<Long> eventIds, LocalDate date);
 
     @EntityGraph(attributePaths = "event")
@@ -45,4 +48,8 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
     @EntityGraph(attributePaths = "event")
     List<Occurrence> findByStatusAndDateBetweenOrderByEvent_IdAscDateAsc(
             OccurrenceStatus status, LocalDate from, LocalDate to);
+
+    /** Todas las occurrences (cualquier estado) de una fecha puntual — usado por {@code allocation} para listar por fecha. */
+    @EntityGraph(attributePaths = "event")
+    List<Occurrence> findByDate(LocalDate date);
 }

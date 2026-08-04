@@ -171,7 +171,7 @@ class ExcelImportIntegrationTest extends AbstractIntegrationTest {
         // Año 2026 de la plantilla con "hoy" en julio de 2026: el rango Anual (marzo-noviembre) ya generó fechas pasadas.
         assertThat(occurrences1).anySatisfy(o -> assertThat(o.getDate()).isBefore(LocalDate.now()));
 
-        List<Allocation> allocations1 = allocationRepository.findByOccurrence_IdIn(
+        List<Allocation> allocations1 = allocationRepository.findByOccurrenceIdIn(
                 occurrences1.stream().map(Occurrence::getId).toList());
         assertThat(allocations1).hasSameSizeAs(occurrences1);
         assertThat(allocations1).allSatisfy(a -> {

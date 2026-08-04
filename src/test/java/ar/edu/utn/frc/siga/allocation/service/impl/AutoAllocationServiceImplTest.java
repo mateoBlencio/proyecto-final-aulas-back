@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.allocation.dto.response.AutoPreviewResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ConfirmAutoPreviewResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto.ConflictOrigin;
+import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.allocation.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ValidateMoveResponseDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
@@ -26,6 +27,7 @@ import ar.edu.utn.frc.siga.allocation.events.model.UniqueEvent;
 import ar.edu.utn.frc.siga.allocation.events.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.events.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.allocation.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationProblemService;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.common.exception.InvalidSelectionException;
@@ -63,6 +65,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -79,6 +82,8 @@ class AutoAllocationServiceImplTest {
     private OccurrenceRepository occurrenceRepository;
     @Mock
     private AllocationRepository allocationRepository;
+    @Mock
+    private OccurrenceService occurrenceService;
     @Mock
     private ClassroomService classroomService;
     @Mock
@@ -106,15 +111,16 @@ class AutoAllocationServiceImplTest {
         // El loader es package-private y vive en el mismo paquete: se instancia real con
         // los repos mockeados para ejercitar dedup/pinned/fechas a través del servicio.
         AutoAllocationDataLoader dataLoader = new AutoAllocationDataLoader(
-                eventRepository, occurrenceRepository, allocationRepository, classroomService);
-        AllocationValidator validator = new AllocationValidator(classroomService, allocationRepository);
-        AllocationWriter writer = new AllocationWriter(allocationRepository, validator);
+                eventRepository, occurrenceRepository, allocationRepository, occurrenceService, classroomService);
+        AllocationValidator validator = new AllocationValidator(classroomService, allocationRepository, occurrenceService);
+        AllocationWriter writer = new AllocationWriter(allocationRepository, validator, occurrenceService);
         service = new AutoAllocationServiceImpl(dataLoader, classroomService, academicEventComposer, solverService,
-                occurrenceRepository, allocationComposer, validator, writer, allocationProblemService);
+                occurrenceService, allocationComposer, validator, writer, allocationProblemService);
 
         lenient().when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5, 100)));
         lenient().when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 100)));
-        lenient().when(allocationRepository.findOccupancyBetween(any(), any(), any())).thenReturn(List.of());
+        lenient().when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of());
+        lenient().when(occurrenceService.findSlotsByEventsAndStatuses(any(), any(), any())).thenReturn(List.of());
         lenient().when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
                 .thenReturn(List.of());
         lenient().when(solverService.preview(any(), any(), any(), anyInt()))
@@ -130,7 +136,7 @@ class AutoAllocationServiceImplTest {
             return result;
         });
         lenient().when(allocationComposer.composeAll(any())).thenReturn(List.of());
-        lenient().when(allocationRepository.findByOccurrence_IdIn(any())).thenReturn(List.of());
+        lenient().when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of());
     }
 
     @Test
@@ -183,13 +189,17 @@ class AutoAllocationServiceImplTest {
         RecurringEvent selected = recurringEvent(1L);
         RecurringEvent foreign = recurringEvent(2L);
         LocalDate date = futureDate(1);
-        Allocation selectedAllocation = allocation(100L, occurrence(10L, selected, date, OccurrenceStatus.ASSIGNED), 5);
-        Allocation foreignAllocation = allocation(101L, occurrence(11L, foreign, date, OccurrenceStatus.ASSIGNED), 7);
+        OccurrenceSlotDto selectedSlot = occurrenceSlot(10L, selected, date, OccurrenceStatus.ASSIGNED);
+        OccurrenceSlotDto foreignSlot = occurrenceSlot(11L, foreign, date, OccurrenceStatus.ASSIGNED);
+        Allocation selectedAllocation = allocation(100L, 10L, 5);
+        Allocation foreignAllocation = allocation(101L, 11L, 7);
 
         when(eventRepository.findAllById(any())).thenReturn(List.of(selected));
         when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
                 .thenReturn(List.of(occurrence(10L, selected, date, OccurrenceStatus.ASSIGNED)));
-        when(allocationRepository.findOccupancyBetween(any(), any(), eq(OccurrenceStatus.ASSIGNED)))
+        when(occurrenceService.findSlotsByStatusBetween(any(), any(), any()))
+                .thenReturn(List.of(selectedSlot, foreignSlot));
+        when(allocationRepository.findByOccurrenceIdIn(any()))
                 .thenReturn(List.of(selectedAllocation, foreignAllocation));
 
         service.autoPreview(new AutoPreviewRequestDto(List.of(1L), null, null, null));
@@ -252,8 +262,8 @@ class AutoAllocationServiceImplTest {
         RecurringEvent unresolvedEvent = recurringEvent(2L); // mismo horario, sin aula
         RecurringEvent foreignEvent = recurringEvent(99L);
         LocalDate date = futureDate(1);
-        Allocation foreignAllocation = allocation(500L,
-                occurrence(50L, foreignEvent, date, OccurrenceStatus.ASSIGNED), 5);
+        OccurrenceSlotDto foreignSlot = occurrenceSlot(50L, foreignEvent, date, OccurrenceStatus.ASSIGNED);
+        Allocation foreignAllocation = allocation(500L, 50L, 5);
 
         when(eventRepository.findAllById(any())).thenReturn(List.of(resolved, unresolvedEvent));
         when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
@@ -261,8 +271,8 @@ class AutoAllocationServiceImplTest {
                         occurrence(10L, resolved, date, OccurrenceStatus.SCHEDULED),
                         occurrence(11L, unresolvedEvent, date, OccurrenceStatus.SCHEDULED)));
         when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5, 100), classroom(6, 100)));
-        when(allocationRepository.findOccupancyBetween(any(), any(), eq(OccurrenceStatus.ASSIGNED)))
-                .thenReturn(List.of(foreignAllocation));
+        when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of(foreignSlot));
+        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(foreignAllocation));
         when(classroomService.findByIds(any())).thenReturn(List.of(classroom(6, 100)));
         when(solverService.preview(any(), any(), any(), anyInt())).thenReturn(new SolverPreview("prev_unresolved",
                 List.of(new SolverAllocation("1", 6), new SolverAllocation("2", null))));
@@ -373,8 +383,8 @@ class AutoAllocationServiceImplTest {
 
         ArgumentCaptor<LocalDate> fromCaptor = ArgumentCaptor.forClass(LocalDate.class);
         ArgumentCaptor<LocalDate> toCaptor = ArgumentCaptor.forClass(LocalDate.class);
-        verify(allocationRepository).findOccupancyBetween(
-                fromCaptor.capture(), toCaptor.capture(), eq(OccurrenceStatus.ASSIGNED));
+        verify(occurrenceService).findSlotsByStatusBetween(
+                eq(OccurrenceStatus.ASSIGNED), fromCaptor.capture(), toCaptor.capture());
         assertThat(fromCaptor.getValue()).isEqualTo(start1);
         assertThat(toCaptor.getValue()).isEqualTo(end2);
     }
@@ -443,12 +453,13 @@ class AutoAllocationServiceImplTest {
     void floorEventoYaAsignadoConservaAulaPrevia() {
         RecurringEvent event = recurringEvent(1L);
         LocalDate date = futureDate(1);
-        Allocation prior = allocation(100L, occurrence(10L, event, date, OccurrenceStatus.ASSIGNED), 3);
+        OccurrenceSlotDto priorSlot = occurrenceSlot(10L, event, date, OccurrenceStatus.ASSIGNED);
+        Allocation prior = allocation(100L, 10L, 3);
         when(eventRepository.findAllById(any())).thenReturn(List.of(event));
         when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
                 .thenReturn(List.of(occurrence(10L, event, date, OccurrenceStatus.ASSIGNED)));
-        when(allocationRepository.findOccupancyBetween(any(), any(), eq(OccurrenceStatus.ASSIGNED)))
-                .thenReturn(List.of(prior));
+        when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of(priorSlot));
+        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(prior));
         when(classroomService.findByIds(any())).thenReturn(List.of(classroom(3, 100)));
         when(solverService.preview(any(), any(), any(), anyInt())).thenReturn(new SolverPreview("prev_floor",
                 List.of(new SolverAllocation("1", null)))); // el solver no ubicó el evento
@@ -510,8 +521,8 @@ class AutoAllocationServiceImplTest {
         RecurringEvent event2 = recurringEvent(2L);
         RecurringEvent foreignEvent = recurringEvent(99L);
         LocalDate date = futureDate(1);
-        Allocation foreignAllocation = allocation(500L,
-                occurrence(50L, foreignEvent, date, OccurrenceStatus.ASSIGNED), 9);
+        OccurrenceSlotDto foreignSlot = occurrenceSlot(50L, foreignEvent, date, OccurrenceStatus.ASSIGNED);
+        Allocation foreignAllocation = allocation(500L, 50L, 9);
         when(solverService.getPreview("prev_move")).thenReturn(new SolverPreview("prev_move",
                 List.of(new SolverAllocation("1", 5), new SolverAllocation("2", 7))));
         when(eventRepository.findAllById(any())).thenReturn(List.of(event1, event2));
@@ -519,8 +530,8 @@ class AutoAllocationServiceImplTest {
                 .thenReturn(List.of(
                         occurrence(10L, event1, date, OccurrenceStatus.SCHEDULED),
                         occurrence(11L, event2, date, OccurrenceStatus.SCHEDULED)));
-        when(allocationRepository.findOccupancyBetween(any(), any(), eq(OccurrenceStatus.ASSIGNED)))
-                .thenReturn(List.of(foreignAllocation));
+        when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of(foreignSlot));
+        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(foreignAllocation));
 
         ValidateMoveRequestDto request = new ValidateMoveRequestDto(1L, 9,
                 List.of(new PreviewAllocationDto(1L, 9), new PreviewAllocationDto(2L, 7)));
@@ -570,8 +581,8 @@ class AutoAllocationServiceImplTest {
         RecurringEvent event1 = recurringEvent(1L);
         RecurringEvent event2 = recurringEvent(2L);
         LocalDate date = futureDate(1);
-        Allocation event2Allocation = allocation(600L,
-                occurrence(60L, event2, date, OccurrenceStatus.ASSIGNED), 9);
+        OccurrenceSlotDto event2Slot = occurrenceSlot(60L, event2, date, OccurrenceStatus.ASSIGNED);
+        Allocation event2Allocation = allocation(600L, 60L, 9);
         when(solverService.getPreview("prev_move")).thenReturn(new SolverPreview("prev_move",
                 List.of(new SolverAllocation("1", 5), new SolverAllocation("2", 7))));
         when(eventRepository.findAllById(any())).thenReturn(List.of(event1, event2));
@@ -579,8 +590,8 @@ class AutoAllocationServiceImplTest {
                 .thenReturn(List.of(
                         occurrence(10L, event1, date, OccurrenceStatus.SCHEDULED),
                         occurrence(11L, event2, date, OccurrenceStatus.SCHEDULED)));
-        when(allocationRepository.findOccupancyBetween(any(), any(), eq(OccurrenceStatus.ASSIGNED)))
-                .thenReturn(List.of(event2Allocation));
+        when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of(event2Slot));
+        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(event2Allocation));
 
         ValidateMoveRequestDto request = new ValidateMoveRequestDto(1L, 9,
                 List.of(new PreviewAllocationDto(1L, 9), new PreviewAllocationDto(2L, 7)));
@@ -619,15 +630,15 @@ class AutoAllocationServiceImplTest {
         RecurringEvent event1 = recurringEvent(1L);
         RecurringEvent adjacentEvent = recurringEvent(99L, LocalTime.of(9, 30), Duration.ofMinutes(60));
         LocalDate date = futureDate(1);
-        Allocation adjacentAllocation = allocation(700L,
-                occurrence(70L, adjacentEvent, date, OccurrenceStatus.ASSIGNED), 9);
+        OccurrenceSlotDto adjacentSlot = occurrenceSlot(70L, adjacentEvent, date, OccurrenceStatus.ASSIGNED);
+        Allocation adjacentAllocation = allocation(700L, 70L, 9);
         when(solverService.getPreview("prev_move")).thenReturn(new SolverPreview("prev_move",
                 List.of(new SolverAllocation("1", 5))));
         when(eventRepository.findAllById(any())).thenReturn(List.of(event1));
         when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
                 .thenReturn(List.of(occurrence(10L, event1, date, OccurrenceStatus.SCHEDULED)));
-        when(allocationRepository.findOccupancyBetween(any(), any(), eq(OccurrenceStatus.ASSIGNED)))
-                .thenReturn(List.of(adjacentAllocation));
+        when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of(adjacentSlot));
+        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(adjacentAllocation));
 
         ValidateMoveRequestDto request = new ValidateMoveRequestDto(1L, 9, List.of(new PreviewAllocationDto(1L, 9)));
         ValidateMoveResponseDto result = service.validateMove("prev_move", request);
@@ -643,17 +654,20 @@ class AutoAllocationServiceImplTest {
         RecurringEvent event2 = recurringEvent(2L, LocalTime.of(14, 0), Duration.ofMinutes(60));
         LocalDate date1 = futureDate(1);
         LocalDate date2 = futureDate(2);
-        Occurrence occ1 = occurrence(10L, event1, date1, OccurrenceStatus.SCHEDULED);
-        Occurrence occ2 = occurrence(11L, event2, date2, OccurrenceStatus.ASSIGNED);
-        Allocation existingForOcc2 = allocation(900L, occ2, 3);
+        OccurrenceSlotDto occ1 = occurrenceSlot(10L, event1, date1, OccurrenceStatus.SCHEDULED);
+        OccurrenceSlotDto occ2 = occurrenceSlot(11L, event2, date2, OccurrenceStatus.ASSIGNED);
+        Allocation existingForOcc2 = allocation(900L, 11L, 3);
 
         when(solverService.getPreview("prev_confirm")).thenReturn(new SolverPreview("prev_confirm",
                 List.of(new SolverAllocation("1", 5), new SolverAllocation("2", 7))));
         when(eventRepository.findAllById(any())).thenReturn(List.of(event1, event2));
-        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+        when(occurrenceService.findSlotsByEventsAndStatuses(any(), any(), any()))
                 .thenReturn(List.of(occ1, occ2));
         when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 100), classroom(7, 100)));
-        when(allocationRepository.findByOccurrence_IdIn(any())).thenReturn(List.of(existingForOcc2));
+        // El mismo repo lo consulta también dataLoader.load() para la ocupación (con el set vacío
+        // del default lenient); el argThat evita que esa llamada reciba por error la allocation existente.
+        when(allocationRepository.findByOccurrenceIdIn(argThat(ids -> ids.contains(11L))))
+                .thenReturn(List.of(existingForOcc2));
         when(allocationRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ConfirmAutoPreviewRequestDto request = new ConfirmAutoPreviewRequestDto(
@@ -664,8 +678,8 @@ class AutoAllocationServiceImplTest {
 
         List<Allocation> saved = savedCaptor.getValue();
         assertThat(saved).hasSize(2);
-        Allocation savedForOcc1 = saved.stream().filter(a -> a.getOccurrence().getId().equals(10L)).findFirst().orElseThrow();
-        Allocation savedForOcc2 = saved.stream().filter(a -> a.getOccurrence().getId().equals(11L)).findFirst().orElseThrow();
+        Allocation savedForOcc1 = saved.stream().filter(a -> a.getOccurrenceId().equals(10L)).findFirst().orElseThrow();
+        Allocation savedForOcc2 = saved.stream().filter(a -> a.getOccurrenceId().equals(11L)).findFirst().orElseThrow();
 
         assertThat(savedForOcc1.getId()).isNull(); // nueva, todavía sin id asignado por la BD
         assertThat(savedForOcc1.getClassroomId()).isEqualTo(5);
@@ -675,9 +689,8 @@ class AutoAllocationServiceImplTest {
         assertThat(savedForOcc2.getClassroomId()).isEqualTo(7);
         assertThat(savedForOcc2.getSource()).isEqualTo(AllocationSource.AUTOMATIC);
 
-        // occ1/occ2 llegan managed; el writer ya no llama save() explícito (dirty checking).
-        assertThat(occ1.getStatus()).isEqualTo(OccurrenceStatus.ASSIGNED);
-        assertThat(occ2.getStatus()).isEqualTo(OccurrenceStatus.ASSIGNED);
+        // el writer pasa las occurrences asignadas a ASSIGNED vía el servicio, no mutando entidades.
+        verify(occurrenceService).markAssigned(List.of(10L, 11L));
     }
 
     @Test
@@ -685,22 +698,23 @@ class AutoAllocationServiceImplTest {
     void confirmOccurrenceAssignedConservaEstadoConAulaNueva() {
         RecurringEvent event = recurringEvent(1L);
         LocalDate date = futureDate(1);
-        Occurrence occ = occurrence(10L, event, date, OccurrenceStatus.ASSIGNED);
-        Allocation existing = allocation(900L, occ, 3);
+        OccurrenceSlotDto occ = occurrenceSlot(10L, event, date, OccurrenceStatus.ASSIGNED);
+        Allocation existing = allocation(900L, 10L, 3);
 
         when(solverService.getPreview("prev_confirm")).thenReturn(new SolverPreview("prev_confirm",
                 List.of(new SolverAllocation("1", 5))));
         when(eventRepository.findAllById(any())).thenReturn(List.of(event));
-        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+        when(occurrenceService.findSlotsByEventsAndStatuses(any(), any(), any()))
                 .thenReturn(List.of(occ));
-        when(allocationRepository.findByOccurrence_IdIn(any())).thenReturn(List.of(existing));
+        when(allocationRepository.findByOccurrenceIdIn(argThat(ids -> ids.contains(10L))))
+                .thenReturn(List.of(existing));
 
         ConfirmAutoPreviewRequestDto request = new ConfirmAutoPreviewRequestDto(
                 List.of(new PreviewAllocationDto(1L, 5)));
 
         service.confirm("prev_confirm", request);
 
-        assertThat(occ.getStatus()).isEqualTo(OccurrenceStatus.ASSIGNED);
+        verify(occurrenceService).markAssigned(List.of(10L));
         assertThat(existing.getClassroomId()).isEqualTo(5);
         assertThat(existing.getSource()).isEqualTo(AllocationSource.AUTOMATIC);
     }
@@ -709,11 +723,11 @@ class AutoAllocationServiceImplTest {
     @DisplayName("confirm: invalida el preview tras aplicar la propuesta")
     void confirmInvalidaElPreviewTrasAplicar() {
         RecurringEvent event = recurringEvent(1L);
-        Occurrence occ = occurrence(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
+        OccurrenceSlotDto occ = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
         when(solverService.getPreview("prev_confirm")).thenReturn(new SolverPreview("prev_confirm",
                 List.of(new SolverAllocation("1", 5))));
         when(eventRepository.findAllById(any())).thenReturn(List.of(event));
-        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+        when(occurrenceService.findSlotsByEventsAndStatuses(any(), any(), any()))
                 .thenReturn(List.of(occ));
         when(allocationRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -781,24 +795,24 @@ class AutoAllocationServiceImplTest {
         RecurringEvent event = recurringEvent(1L);
         RecurringEvent foreignEvent = recurringEvent(99L);
         LocalDate date = futureDate(1);
-        Occurrence occ = occurrence(10L, event, date, OccurrenceStatus.SCHEDULED);
-        Allocation foreignAllocation = allocation(500L,
-                occurrence(50L, foreignEvent, date, OccurrenceStatus.ASSIGNED), 5);
+        OccurrenceSlotDto occ = occurrenceSlot(10L, event, date, OccurrenceStatus.SCHEDULED);
+        OccurrenceSlotDto foreignSlot = occurrenceSlot(50L, foreignEvent, date, OccurrenceStatus.ASSIGNED);
+        Allocation foreignAllocation = allocation(500L, 50L, 5);
 
         when(solverService.getPreview("prev_confirm")).thenReturn(new SolverPreview("prev_confirm",
                 List.of(new SolverAllocation("1", 5))));
         when(eventRepository.findAllById(any())).thenReturn(List.of(event));
-        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+        when(occurrenceService.findSlotsByEventsAndStatuses(any(), any(), any()))
                 .thenReturn(List.of(occ));
-        when(allocationRepository.findOccupancyBetween(any(), any(), eq(OccurrenceStatus.ASSIGNED)))
-                .thenReturn(List.of(foreignAllocation));
+        when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of(foreignSlot));
+        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(foreignAllocation));
 
         assertThatThrownBy(() -> service.confirm("prev_confirm",
                 new ConfirmAutoPreviewRequestDto(List.of(new PreviewAllocationDto(1L, 5)))))
                 .isInstanceOf(ReassignConflictException.class);
 
         verify(allocationRepository, never()).save(any());
-        verify(occurrenceRepository, never()).save(any());
+        verify(occurrenceService, never()).markAssigned(any());
         verify(solverService, never()).invalidatePreview(any());
     }
 
@@ -808,13 +822,13 @@ class AutoAllocationServiceImplTest {
         RecurringEvent event1 = recurringEvent(1L);
         RecurringEvent event2 = recurringEvent(2L);
         LocalDate date = futureDate(1);
-        Occurrence occ1 = occurrence(10L, event1, date, OccurrenceStatus.SCHEDULED);
-        Occurrence occ2 = occurrence(11L, event2, date, OccurrenceStatus.SCHEDULED);
+        OccurrenceSlotDto occ1 = occurrenceSlot(10L, event1, date, OccurrenceStatus.SCHEDULED);
+        OccurrenceSlotDto occ2 = occurrenceSlot(11L, event2, date, OccurrenceStatus.SCHEDULED);
 
         when(solverService.getPreview("prev_confirm")).thenReturn(new SolverPreview("prev_confirm",
                 List.of(new SolverAllocation("1", 9), new SolverAllocation("2", 9))));
         when(eventRepository.findAllById(any())).thenReturn(List.of(event1, event2));
-        when(occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(any(), any(), any()))
+        when(occurrenceService.findSlotsByEventsAndStatuses(any(), any(), any()))
                 .thenReturn(List.of(occ1, occ2));
         when(classroomService.findByIds(any())).thenReturn(List.of(classroom(9, 100)));
 
@@ -865,10 +879,14 @@ class AutoAllocationServiceImplTest {
                 .build();
     }
 
-    private Allocation allocation(long id, Occurrence occurrence, Integer classroomId) {
+    private OccurrenceSlotDto occurrenceSlot(long id, AcademicEvent event, LocalDate date, OccurrenceStatus status) {
+        return new OccurrenceSlotDto(id, event.getId(), date, event.getStartTime(), event.endTime(), status, event.getEnrolled());
+    }
+
+    private Allocation allocation(long id, Long occurrenceId, Integer classroomId) {
         return Allocation.builder()
                 .id(id)
-                .occurrence(occurrence)
+                .occurrenceId(occurrenceId)
                 .classroomId(classroomId)
                 .source(AllocationSource.MANUAL)
                 .createdAt(LocalDateTime.now())

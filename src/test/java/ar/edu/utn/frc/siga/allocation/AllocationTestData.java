@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.allocation;
 
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
+import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.allocation.events.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.events.model.Occurrence;
 import ar.edu.utn.frc.siga.allocation.events.model.OccurrenceStatus;
@@ -73,6 +74,11 @@ public final class AllocationTestData {
                 .date(date)
                 .status(status)
                 .build();
+    }
+
+    /** Franja de una occurrence (lo que hoy expone {@code OccurrenceService}), derivada de {@code event}. */
+    public static OccurrenceSlotDto occurrenceSlot(Long id, AcademicEvent event, LocalDate date, OccurrenceStatus status) {
+        return new OccurrenceSlotDto(id, event.getId(), date, event.getStartTime(), event.endTime(), status, event.getEnrolled());
     }
 
     public static SubjectResponseDto subjectResponseDto(Long id) {

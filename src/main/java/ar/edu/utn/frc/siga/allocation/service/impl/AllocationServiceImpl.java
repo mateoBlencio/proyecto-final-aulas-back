@@ -4,21 +4,21 @@ import ar.edu.utn.frc.siga.allocation.dto.request.AllocateFromDateRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.BatchReassignRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
+import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationComposer;
 import ar.edu.utn.frc.siga.allocation.events.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
-import ar.edu.utn.frc.siga.allocation.events.model.Occurrence;
-import ar.edu.utn.frc.siga.allocation.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.events.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.events.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
-import ar.edu.utn.frc.siga.allocation.events.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.allocation.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.AllocationCandidate;
 import ar.edu.utn.frc.siga.common.util.Finder;
+import ar.edu.utn.frc.siga.common.util.Maps;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
@@ -44,7 +44,7 @@ import java.util.stream.Collectors;
 public class AllocationServiceImpl implements AllocationService {
 
     private final AllocationRepository allocationRepository;
-    private final OccurrenceRepository occurrenceRepository;
+    private final OccurrenceService occurrenceService;
     private final AcademicEventRepository eventRepository;
     private final AllocationComposer composer;
     private final AllocationValidator validator;
@@ -53,7 +53,7 @@ public class AllocationServiceImpl implements AllocationService {
     @Override
     @Transactional(readOnly = true)
     public AllocationResponseDto findById(Long allocationId) {
-        Allocation allocation = Finder.orThrow(allocationRepository::findByIdEager, allocationId, "Allocation");
+        Allocation allocation = findAllocation(allocationId);
         return composer.compose(allocation);
     }
 
@@ -67,11 +67,11 @@ public class AllocationServiceImpl implements AllocationService {
     public AllocationResponseDto allocateManually(Long occurrenceId, AllocateOccurrenceRequestDto dto) {
         log.debug("Asignando ocurrencia={} a aula={}", occurrenceId, dto.classroomId());
 
-        Occurrence occurrence = findOccurrence(occurrenceId);
+        OccurrenceSlotDto occurrence = occurrenceService.findSlot(occurrenceId);
         validator.validateNotPast(occurrence);
         validator.validateAssignable(occurrence);
 
-        if (allocationRepository.findByOccurrence_Id(occurrenceId).isPresent()) {
+        if (allocationRepository.findByOccurrenceId(occurrenceId).isPresent()) {
             throw new AllocationConflictException("Occurrence " + occurrenceId + " already has an allocation.");
         }
 
@@ -79,16 +79,13 @@ public class AllocationServiceImpl implements AllocationService {
         validator.validateBatch(List.of(new AllocationCandidate(occurrence, classroomId)));
 
         Allocation saved = allocationRepository.save(Allocation.builder()
-                .occurrence(occurrence)
+                .occurrenceId(occurrenceId)
                 .classroomId(classroomId)
                 .source(AllocationSource.MANUAL)
                 .createdAt(LocalDateTime.now())
                 .observation(dto.observation())
                 .build());
-
-        // occurrence llega managed (findOccurrence en esta misma tx): dirty checking la
-        // persiste, no hace falta save() explícito.
-        occurrence.setStatus(OccurrenceStatus.ASSIGNED);
+        occurrenceService.markAssigned(List.of(occurrenceId));
 
         log.info("Asignación creada: id={}, occurrenceId={}, classroomId={}", saved.getId(), occurrenceId, dto.classroomId());
         return composer.compose(saved);
@@ -104,10 +101,11 @@ public class AllocationServiceImpl implements AllocationService {
         log.debug("Reasignando asignación={} a aula={}", allocationId, dto.classroomId());
 
         Allocation allocation = findAllocation(allocationId);
-        validator.validateNotPast(allocation.getOccurrence());
+        OccurrenceSlotDto occurrence = occurrenceService.findSlot(allocation.getOccurrenceId());
+        validator.validateNotPast(occurrence);
 
         Integer classroomId = dto.classroomId();
-        validator.validateBatch(List.of(new AllocationCandidate(allocation.getOccurrence(), classroomId)));
+        validator.validateBatch(List.of(new AllocationCandidate(occurrence, classroomId)));
 
         allocation.setClassroomId(classroomId);
         allocation.setSource(AllocationSource.MANUAL);
@@ -127,16 +125,21 @@ public class AllocationServiceImpl implements AllocationService {
     public List<AllocationResponseDto> batchReallocate(BatchReassignRequestDto dto) {
         log.debug("batchReallocate: moves={}", dto.moves().size());
 
+        List<Allocation> allocations = new ArrayList<>();
+        for (BatchReassignRequestDto.MoveDto move : dto.moves()) {
+            allocations.add(findAllocation(move.allocationId()));
+        }
+        Map<Long, OccurrenceSlotDto> slotsByOccurrenceId = Maps.byId(
+                occurrenceService.findSlots(allocations.stream().map(Allocation::getOccurrenceId).toList()),
+                OccurrenceSlotDto::occurrenceId);
+
         // Primero se resuelven y validan TODOS los moves (contra BD y entre sí); nada
         // se escribe hasta que el lote completo esté libre de solapamientos.
-        List<Allocation> allocations = new ArrayList<>();
         List<AllocationCandidate> candidates = new ArrayList<>();
-        for (BatchReassignRequestDto.MoveDto move : dto.moves()) {
-            Allocation allocation = findAllocation(move.allocationId());
-            validator.validateNotPast(allocation.getOccurrence());
-            Integer classroomId = move.classroomId();
-            allocations.add(allocation);
-            candidates.add(new AllocationCandidate(allocation.getOccurrence(), classroomId));
+        for (int i = 0; i < allocations.size(); i++) {
+            OccurrenceSlotDto occurrence = slotsByOccurrenceId.get(allocations.get(i).getOccurrenceId());
+            validator.validateNotPast(occurrence);
+            candidates.add(new AllocationCandidate(occurrence, dto.moves().get(i).classroomId()));
         }
 
         validator.validateBatch(candidates);
@@ -166,8 +169,7 @@ public class AllocationServiceImpl implements AllocationService {
 
         findRecurringEvent(recurringEventId, "reassignEvent");
 
-        List<Occurrence> occurrences = occurrenceRepository
-                .findByEvent_IdAndDateGreaterThanEqual(recurringEventId, LocalDate.now());
+        List<OccurrenceSlotDto> occurrences = occurrenceService.findSlotsByEvent(recurringEventId, LocalDate.now());
 
         validator.validateEventNotFinished(occurrences);
 
@@ -245,13 +247,13 @@ public class AllocationServiceImpl implements AllocationService {
                 .collect(Collectors.toMap(AllocateFromDateRequestDto::recurringEventId, AllocateFromDateRequestDto::fromDate));
         LocalDate earliestFromDate = fromDateByEvent.values().stream().min(LocalDate::compareTo).orElseThrow();
 
-        List<Occurrence> occurrences = occurrenceRepository
-                .findByEvent_IdInAndDateGreaterThanEqual(classroomByEvent.keySet(), earliestFromDate).stream()
-                .filter(o -> !o.getDate().isBefore(fromDateByEvent.get(o.getEvent().getId())))
+        List<OccurrenceSlotDto> occurrences = occurrenceService
+                .findSlotsByEvents(classroomByEvent.keySet(), earliestFromDate).stream()
+                .filter(o -> !o.date().isBefore(fromDateByEvent.get(o.eventId())))
                 .toList();
 
         List<Allocation> saved = writer.apply(occurrences,
-                o -> classroomByEvent.get(o.getEvent().getId()),
+                o -> classroomByEvent.get(o.eventId()),
                 items.getFirst().observation(), AllocationSource.IMPORTED, false);
 
         log.info("importAllocationsBatch completo: events={}, allocated={}", classroomByEvent.size(), saved.size());
@@ -279,8 +281,7 @@ public class AllocationServiceImpl implements AllocationService {
      */
     private List<Allocation> allocateEventFromDate(Long eventId, LocalDate fromDate, Integer classroomId,
             String observation, AllocationSource source, boolean validateOverlap, boolean skipPast) {
-        List<Occurrence> occurrences = occurrenceRepository
-                .findByEvent_IdAndDateGreaterThanEqual(eventId, fromDate);
+        List<OccurrenceSlotDto> occurrences = occurrenceService.findSlotsByEvent(eventId, fromDate);
 
         if (validateOverlap) {
             validator.validateNoOverlap(
@@ -297,11 +298,9 @@ public class AllocationServiceImpl implements AllocationService {
     @Transactional(readOnly = true)
     public List<AllocationResponseDto> findByDate(LocalDate date) {
         log.debug("findByDate: date={}", date);
-        return composer.composeAll(allocationRepository.findByDateEager(date));
-    }
-
-    private Occurrence findOccurrence(Long id) {
-        return Finder.orThrow(occurrenceRepository::findById, id, "Occurrence");
+        List<Long> occurrenceIds = occurrenceService.findSlotsByDate(date).stream()
+                .map(OccurrenceSlotDto::occurrenceId).toList();
+        return composer.composeAll(allocationRepository.findByOccurrenceIdIn(occurrenceIds));
     }
 
     private Allocation findAllocation(Long id) {

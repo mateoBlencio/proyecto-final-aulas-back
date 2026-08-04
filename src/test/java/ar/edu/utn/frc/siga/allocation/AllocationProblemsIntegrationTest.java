@@ -86,7 +86,7 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
     /** Segunda allocation en la misma franja/aula por repositorio directo: la API bloquea el solape (validateNoOverlap). */
     private void allocateDirect(Occurrence occurrence, Integer classroomId) {
         allocationRepository.save(Allocation.builder()
-                .occurrence(occurrence).classroomId(classroomId).source(AllocationSource.MANUAL)
+                .occurrenceId(occurrence.getId()).classroomId(classroomId).source(AllocationSource.MANUAL)
                 .createdAt(LocalDateTime.now()).build());
         occurrence.setStatus(OccurrenceStatus.ASSIGNED);
         occurrenceRepository.save(occurrence);
