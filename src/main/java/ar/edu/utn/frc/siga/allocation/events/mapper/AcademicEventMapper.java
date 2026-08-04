@@ -4,20 +4,17 @@ import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.allocation.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.events.dto.response.UniqueEventResponseDto;
-import ar.edu.utn.frc.siga.allocation.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.events.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.events.model.UniqueEvent;
 import ar.edu.utn.frc.siga.common.mapper.CentralMapperConfig;
-import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 /**
  * Mapea cada subtipo de {@code AcademicEvent} a su DTO sellado correspondiente. El
  * despacho polimórfico (¿qué subtipo es?) y la resolución de datos ajenos (materia,
- * comisión, aula, estado de la ocurrencia) los hace {@link AcademicEventComposer}, que
- * conoce el tipo concreto vía {@code instanceof} y llama al método específico: acá solo
- * vive el mapeo puro campo a campo.
+ * comisión) los hace {@link AcademicEventComposer}, que conoce el tipo concreto vía
+ * {@code instanceof} y llama al método específico: acá solo vive el mapeo puro campo a campo.
  */
 @Mapper(config = CentralMapperConfig.class)
 public interface AcademicEventMapper {
@@ -37,10 +34,5 @@ public interface AcademicEventMapper {
     @Mapping(target = "durationMinutes", expression = "java(event.getDuration().toMinutes())")
     @Mapping(target = "subject", source = "subject")
     @Mapping(target = "commission", source = "commission")
-    @Mapping(target = "status", source = "status")
-    @Mapping(target = "classroom", source = "classroom")
-    @Mapping(target = "overcrowdedBy", source = "overcrowdedBy")
-    @Mapping(target = "observation", source = "observation")
-    UniqueEventResponseDto toDto(UniqueEvent event, SubjectResponseDto subject, CommissionResponseDto commission,
-            OccurrenceStatus status, ClassroomResponseDto classroom, Integer overcrowdedBy, String observation);
+    UniqueEventResponseDto toDto(UniqueEvent event, SubjectResponseDto subject, CommissionResponseDto commission);
 }

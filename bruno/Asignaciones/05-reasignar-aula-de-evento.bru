@@ -1,11 +1,11 @@
 meta {
   name: Reasignar aula de un evento
   type: http
-  seq: 6
+  seq: 14
 }
 
 put {
-  url: {{baseUrl}}/v1/events/:id/classroom
+  url: {{baseUrl}}/v1/allocations/events/:id/classroom
   body: json
   auth: inherit
 }

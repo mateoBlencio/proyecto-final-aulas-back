@@ -26,6 +26,9 @@ public interface OccurrenceService {
     /** Igual que {@link #findSlotsByEvent} pero para varios eventos a la vez (sin N+1). */
     List<OccurrenceSlotDto> findSlotsByEvents(Collection<Long> eventIds, LocalDate from);
 
+    /** Todas las occurrences de varios eventos, sin filtro de fecha (p. ej. la única occurrence de cada evento único). */
+    List<OccurrenceSlotDto> findSlotsByEvents(Collection<Long> eventIds);
+
     /** Occurrences de varios eventos, en alguno de los estados dados, desde una fecha. */
     List<OccurrenceSlotDto> findSlotsByEventsAndStatuses(
             Collection<Long> eventIds, Collection<OccurrenceStatus> statuses, LocalDate from);

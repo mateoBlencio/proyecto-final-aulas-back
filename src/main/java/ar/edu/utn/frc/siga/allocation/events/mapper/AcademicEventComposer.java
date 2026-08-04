@@ -6,16 +6,9 @@ import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.allocation.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.events.model.AcademicEvent;
-import ar.edu.utn.frc.siga.allocation.model.Allocation;
-import ar.edu.utn.frc.siga.allocation.events.model.Occurrence;
-import ar.edu.utn.frc.siga.allocation.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.events.model.RecurringEvent;
 import ar.edu.utn.frc.siga.allocation.events.model.UniqueEvent;
-import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
-import ar.edu.utn.frc.siga.allocation.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.common.util.Maps;
-import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
-import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
 import org.springframework.stereotype.Component;
@@ -27,12 +20,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
-/**
- * Compone el DTO de un evento académico resolviendo datos ajenos a la entidad: materia y
- * comisión (ambos subtipos) y, para únicos, además estado/aula/sobrecupo de su única ocurrencia.
- */
+/** Compone el DTO de un evento académico resolviendo datos ajenos a la entidad: materia y comisión (ambos subtipos). */
 @Component
 @RequiredArgsConstructor
 public class AcademicEventComposer {
@@ -40,9 +29,6 @@ public class AcademicEventComposer {
     private final AcademicEventMapper mapper;
     private final SubjectService subjectService;
     private final CommissionService commissionService;
-    private final OccurrenceRepository occurrenceRepository;
-    private final AllocationRepository allocationRepository;
-    private final ClassroomService classroomService;
 
     /** Composición de un único evento (delega en el batch con una lista de un elemento). */
     public AcademicEventResponseDto compose(AcademicEvent event) {
@@ -59,7 +45,7 @@ public class AcademicEventComposer {
         return byId;
     }
 
-    /** Composición por lote: prefetch de materias/comisiones/ocupación distintas, sin N+1. */
+    /** Composición por lote: prefetch de materias/comisiones distintas, sin N+1. */
     public List<AcademicEventResponseDto> compose(Collection<? extends AcademicEvent> events) {
         List<AcademicEvent> realEvents = events.stream()
                 .map(e -> (AcademicEvent) Hibernate.unproxy(e))
@@ -67,7 +53,6 @@ public class AcademicEventComposer {
 
         Set<Long> subjectIds = new LinkedHashSet<>();
         Set<Long> commissionIds = new LinkedHashSet<>();
-        List<UniqueEvent> uniqueEvents = new ArrayList<>();
         for (AcademicEvent event : realEvents) {
             if (event.getSubjectId() != null) {
                 subjectIds.add(event.getSubjectId());
@@ -75,14 +60,10 @@ public class AcademicEventComposer {
             if (event.getCommissionId() != null) {
                 commissionIds.add(event.getCommissionId());
             }
-            if (event instanceof UniqueEvent u) {
-                uniqueEvents.add(u);
-            }
         }
 
         Map<Long, SubjectResponseDto> subjectsById = Maps.byId(subjectService.findByIds(subjectIds), SubjectResponseDto::id);
         Map<Long, CommissionResponseDto> commissionsById = Maps.byId(commissionService.findByIds(commissionIds), CommissionResponseDto::id);
-        UniqueEventOccupancy occupancy = loadUniqueEventOccupancy(uniqueEvents);
 
         List<AcademicEventResponseDto> result = new ArrayList<>(realEvents.size());
         for (AcademicEvent event : realEvents) {
@@ -91,52 +72,9 @@ public class AcademicEventComposer {
             if (event instanceof RecurringEvent r) {
                 result.add(mapper.toDto(r, subject, commission));
             } else {
-                result.add(composeUnique((UniqueEvent) event, subject, commission, occupancy));
+                result.add(mapper.toDto((UniqueEvent) event, subject, commission));
             }
         }
         return result;
-    }
-
-    private AcademicEventResponseDto composeUnique(UniqueEvent event, SubjectResponseDto subject,
-            CommissionResponseDto commission, UniqueEventOccupancy occupancy) {
-        Occurrence occurrence = occupancy.occurrenceByEventId().get(event.getId());
-        Allocation allocation = occurrence != null ? occupancy.allocationByOccurrenceId().get(occurrence.getId()) : null;
-        ClassroomResponseDto classroom = allocation != null ? occupancy.classroomById().get(allocation.getClassroomId()) : null;
-        Integer overcrowdedBy = (classroom != null && classroom.capacity() != null && event.getEnrolled() != null)
-                ? Math.max(0, event.getEnrolled() - classroom.capacity())
-                : null;
-        String observation = allocation != null ? allocation.getObservation() : null;
-        OccurrenceStatus status = occurrence != null ? occurrence.getStatus() : null;
-        return mapper.toDto(event, subject, commission, status, classroom, overcrowdedBy, observation);
-    }
-
-    private record UniqueEventOccupancy(Map<Long, Occurrence> occurrenceByEventId,
-            Map<Long, Allocation> allocationByOccurrenceId, Map<Integer, ClassroomResponseDto> classroomById) {
-    }
-
-    /** Carga, en batch, la única occurrence de cada evento, su allocation (si tiene) y el aula. */
-    private UniqueEventOccupancy loadUniqueEventOccupancy(List<UniqueEvent> uniqueEvents) {
-        if (uniqueEvents.isEmpty()) {
-            return new UniqueEventOccupancy(Map.of(), Map.of(), Map.of());
-        }
-
-        Set<Long> eventIds = uniqueEvents.stream().map(UniqueEvent::getId).collect(Collectors.toCollection(LinkedHashSet::new));
-        List<Occurrence> occurrences = occurrenceRepository.findByEvent_IdIn(eventIds);
-        Map<Long, Occurrence> occurrenceByEventId = new LinkedHashMap<>();
-        for (Occurrence occurrence : occurrences) {
-            occurrenceByEventId.put(occurrence.getEvent().getId(), occurrence);
-        }
-
-        Set<Long> occurrenceIds = occurrences.stream().map(Occurrence::getId).collect(Collectors.toCollection(LinkedHashSet::new));
-        List<Allocation> allocations = occurrenceIds.isEmpty() ? List.of() : allocationRepository.findByOccurrenceIdIn(occurrenceIds);
-        Map<Long, Allocation> allocationByOccurrenceId = new LinkedHashMap<>();
-        for (Allocation allocation : allocations) {
-            allocationByOccurrenceId.put(allocation.getOccurrenceId(), allocation);
-        }
-
-        Set<Integer> classroomIds = allocations.stream().map(Allocation::getClassroomId).collect(Collectors.toCollection(LinkedHashSet::new));
-        Map<Integer, ClassroomResponseDto> classroomById = Maps.byId(classroomService.findByIds(classroomIds), ClassroomResponseDto::id);
-
-        return new UniqueEventOccupancy(occurrenceByEventId, allocationByOccurrenceId, classroomById);
     }
 }

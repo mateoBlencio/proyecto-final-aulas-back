@@ -5,6 +5,8 @@ import ar.edu.utn.frc.siga.allocation.events.config.EventScheduleProperties;
 import ar.edu.utn.frc.siga.allocation.events.exception.InvalidCommissionForSubjectException;
 import ar.edu.utn.frc.siga.allocation.events.exception.InvalidEventScheduleException;
 import ar.edu.utn.frc.siga.allocation.events.exception.MissingAcademicReferenceException;
+import ar.edu.utn.frc.siga.allocation.events.exception.OccurrenceAlreadyPastException;
+import ar.edu.utn.frc.siga.allocation.events.model.Occurrence;
 import ar.edu.utn.frc.siga.allocation.events.model.UniqueEventKind;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -70,6 +72,14 @@ public class EventScheduleValidator {
         } catch (ResourceNotFoundException e) {
             throw new InvalidCommissionForSubjectException(
                     "La comisión " + commissionId + " no pertenece a la materia " + subjectId + ".");
+        }
+    }
+
+    /** Ocurrencia ya ocurrida → no se puede modificar ni cancelar. */
+    public void validateNotPast(Occurrence occurrence) {
+        if (occurrence.isPast()) {
+            throw new OccurrenceAlreadyPastException(
+                    "La ocurrencia del " + occurrence.getDate() + " ya ocurrió.");
         }
     }
 }

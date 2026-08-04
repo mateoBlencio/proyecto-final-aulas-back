@@ -1,11 +1,11 @@
 meta {
-  name: Modificar evento único
+  name: Modificar evento único con aula
   type: http
-  seq: 8
+  seq: 13
 }
 
 put {
-  url: {{baseUrl}}/v1/events/unique/:id
+  url: {{baseUrl}}/v1/allocations/events/unique/:id
   body: json
   auth: inherit
 }

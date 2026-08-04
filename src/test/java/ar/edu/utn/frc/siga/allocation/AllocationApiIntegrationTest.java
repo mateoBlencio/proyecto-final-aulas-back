@@ -266,7 +266,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("PUT /v1/events/{eventId}/classroom reasigna las ocurrencias futuras y deja intactas las pasadas")
+    @DisplayName("PUT /v1/allocations/events/{eventId}/classroom reasigna las ocurrencias futuras y deja intactas las pasadas")
     void reassignEvent_happyPath_reassignsFutureOnly() throws Exception {
         var sc = testData.materiaYComision();
         var edificio = testData.edificio();
@@ -293,7 +293,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
                 .createdAt(java.time.LocalDateTime.now())
                 .build()).getId();
 
-        mockMvc.perform(put("/v1/events/{eventId}/classroom", eventId)
+        mockMvc.perform(put("/v1/allocations/events/{eventId}/classroom", eventId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new AllocateOccurrenceRequestDto(aulaNueva.getId(), "reasignación de evento"))))
                 .andExpect(status().isOk())
@@ -310,7 +310,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("PUT /v1/events/{eventId}/classroom sobre un evento ya finalizado responde 409")
+    @DisplayName("PUT /v1/allocations/events/{eventId}/classroom sobre un evento ya finalizado responde 409")
     void reassignEvent_finishedEvent_returns409() throws Exception {
         Classroom aula = testData.aula(testData.edificio());
         LocalDate yesterday = LocalDate.now().minusDays(1);
@@ -322,7 +322,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
         occurrenceRepository.save(Occurrence.builder()
                 .event(event).date(yesterday).status(OccurrenceStatus.SCHEDULED).build());
 
-        mockMvc.perform(put("/v1/events/{eventId}/classroom", event.getId())
+        mockMvc.perform(put("/v1/allocations/events/{eventId}/classroom", event.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new AllocateOccurrenceRequestDto(aula.getId(), null))))
                 .andExpect(status().isConflict())

@@ -16,7 +16,8 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
 
     List<Occurrence> findByEvent_Id(Long eventId);
 
-    /** Batch por ids de evento (sin N+1) — usado por el composer para resolver estado/aula de eventos únicos. */
+    /** Batch por ids de evento (sin N+1). */
+    @EntityGraph(attributePaths = "event")
     List<Occurrence> findByEvent_IdIn(Collection<Long> eventIds);
 
     /**

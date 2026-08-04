@@ -1,17 +1,13 @@
 package ar.edu.utn.frc.siga.allocation.controller;
 
-import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.siga.allocation.events.dto.request.CreateRecurringEventRequestDto;
-import ar.edu.utn.frc.siga.allocation.events.dto.request.CreateUniqueEventRequestDto;
-import ar.edu.utn.frc.siga.allocation.events.dto.request.UpdateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.events.dto.response.AcademicEventResponseDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.events.dto.response.EventHistorySnapshotDto;
+import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceHistorySnapshotDto;
 import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceResponseDto;
 import ar.edu.utn.frc.siga.common.dto.response.RevisionDto;
 import ar.edu.utn.frc.siga.allocation.events.service.AcademicEventService;
-import ar.edu.utn.frc.siga.allocation.service.AllocationService;
-import ar.edu.utn.frc.siga.allocation.service.AuditHistoryService;
+import ar.edu.utn.frc.siga.allocation.events.service.EventAuditHistoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -23,14 +19,18 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/** Endpoints de eventos académicos (recurrentes/únicos): alta, consulta y sus ocurrencias. */
+/**
+ * Endpoints de eventos académicos (recurrentes/únicos): alta, consulta y sus ocurrencias.
+ * No conoce aulas: el alta/modificación de un evento único con aula, y la reasignación de
+ * aula de un evento recurrente, viven en {@code /v1/allocations/events/**}
+ * ({@link ar.edu.utn.frc.siga.allocation.service.UniqueEventAllocationService}).
+ */
 @Slf4j
 @RestController
 @RequestMapping("${siga.api.base-path}/events")
@@ -39,8 +39,7 @@ import java.util.List;
 public class AcademicEventController {
 
     private final AcademicEventService academicEventService;
-    private final AllocationService allocationService;
-    private final AuditHistoryService auditHistoryService;
+    private final EventAuditHistoryService eventAuditHistoryService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
@@ -81,7 +80,18 @@ public class AcademicEventController {
                        + "El snapshot es null en revisiones DELETED.")
     public ResponseEntity<List<RevisionDto<EventHistorySnapshotDto>>> findHistory(@PathVariable Long id) {
         log.debug("GET /v1/events/{}/history", id);
-        return ResponseEntity.ok(auditHistoryService.findEventHistory(id));
+        return ResponseEntity.ok(eventAuditHistoryService.findEventHistory(id));
+    }
+
+    @GetMapping("/occurrences/{occurrenceId}/history")
+    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @Operation(summary = "Historial de auditoría de una ocurrencia",
+               description = "Devuelve las revisiones de auditoría (Envers) de la ocurrencia en orden ascendente: "
+                       + "cambios de estado (cuándo se canceló/suspendió y quién). El snapshot es null en revisiones DELETED.")
+    public ResponseEntity<List<RevisionDto<OccurrenceHistorySnapshotDto>>> findOccurrenceHistory(
+            @PathVariable Long occurrenceId) {
+        log.debug("GET /v1/events/occurrences/{}/history", occurrenceId);
+        return ResponseEntity.ok(eventAuditHistoryService.findOccurrenceHistory(occurrenceId));
     }
 
     @PostMapping("/recurring")
@@ -96,42 +106,16 @@ public class AcademicEventController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @PostMapping("/unique")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
-    @Operation(summary = "Crea un evento único",
-               description = "Crea un evento que ocurre una única vez, genera su única ocurrencia y le asigna "
-                       + "el aula indicada en la misma operación (atómica): si el aula no está disponible o "
-                       + "hay solapamiento, no se crea el evento.")
-    public ResponseEntity<AcademicEventResponseDto> createUnique(
-            @Valid @RequestBody CreateUniqueEventRequestDto dto) {
-        log.debug("POST /v1/events/unique: date={}, classroomId={}", dto.date(), dto.classroomId());
-        AcademicEventResponseDto response = academicEventService.createUniqueEvent(dto);
-        log.info("Evento único creado vía controller: id={}", response.id());
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
-
     @GetMapping("/unique")
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     @Operation(summary = "Listar eventos únicos",
-               description = "Devuelve todos los eventos únicos (parciales, trabajos prácticos, mesas especiales, etc.).")
+               description = "Devuelve todos los eventos únicos (parciales, trabajos prácticos, mesas especiales, etc.), "
+                       + "sin datos de aula. Para la vista con aula/estado/sobrecupo ver GET /v1/allocations/events/unique.")
     public ResponseEntity<List<AcademicEventResponseDto>> findUniqueEvents() {
         log.debug("GET /v1/events/unique");
         List<AcademicEventResponseDto> events = academicEventService.findUniqueEvents();
         log.info("Eventos únicos listados: count={}", events.size());
         return ResponseEntity.ok(events);
-    }
-
-    @PutMapping("/unique/{id}")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
-    @Operation(summary = "Modificar un evento único",
-               description = "Actualiza fecha, horario, cantidad de alumnos, aula y observaciones de un evento "
-                       + "único existente, revalidando disponibilidad, solapamiento y capacidad antes de guardar.")
-    public ResponseEntity<AcademicEventResponseDto> updateUnique(
-            @PathVariable Long id, @Valid @RequestBody UpdateUniqueEventRequestDto dto) {
-        log.debug("PUT /v1/events/unique/{}: classroomId={}", id, dto.classroomId());
-        AcademicEventResponseDto response = academicEventService.updateUniqueEvent(id, dto);
-        log.info("Evento único actualizado vía controller: id={}", id);
-        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/unique/{id}/cancel")
@@ -144,18 +128,5 @@ public class AcademicEventController {
         academicEventService.cancelUniqueEvent(id);
         log.info("Evento único cancelado vía controller: id={}", id);
         return ResponseEntity.noContent().build();
-    }
-
-    @PutMapping("/{eventId}/classroom")
-    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
-    @Operation(summary = "Reasignar aula de un evento",
-               description = "Cambia el aula de todas las ocurrencias futuras de un evento recurrente. Las ocurrencias ya pasadas quedan intactas. Falla si el evento no es recurrente o si ya finalizó.")
-    public ResponseEntity<List<AllocationResponseDto>> reassignEvent(
-            @PathVariable Long eventId,
-            @Valid @RequestBody AllocateOccurrenceRequestDto dto) {
-        log.debug("PUT /v1/events/{}/classroom: classroomId={}", eventId, dto.classroomId());
-        List<AllocationResponseDto> response = allocationService.reassignEvent(eventId, dto);
-        log.info("Evento reasignado: eventId={}, count={}", eventId, response.size());
-        return ResponseEntity.ok(response);
     }
 }

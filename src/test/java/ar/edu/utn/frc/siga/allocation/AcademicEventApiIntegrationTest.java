@@ -9,7 +9,6 @@ import ar.edu.utn.frc.siga.allocation.events.model.UniqueEventKind;
 import ar.edu.utn.frc.siga.allocation.events.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.events.service.AcademicEventService;
-import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 
@@ -101,14 +100,13 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /v1/events/unique crea el evento, exactamente 1 ocurrencia ASSIGNED y su allocation")
+    @DisplayName("POST /v1/events/unique crea el evento (bare, sin aula) y exactamente 1 ocurrencia SCHEDULED")
     void createUnique_persistsSingleOccurrence() throws Exception {
         LocalDate date = LocalDate.now().plusDays(5);
-        Classroom classroom = testData.aula(testData.edificio());
         IntegrationTestData.SubjectAndCommission sc = testData.materiaYComision();
         CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
                 UniqueEventKind.EXAMEN_FINAL, sc.subjectId(), sc.commissionId(),
-                date, LocalTime.of(10, 0), 60, 20, classroom.getId(), null);
+                date, LocalTime.of(10, 0), 60, 20, null);
 
         MvcResult result = mockMvc.perform(post("/v1/events/unique")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -123,23 +121,21 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
         List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId);
         assertThat(occurrences).hasSize(1);
         assertThat(occurrences.getFirst().getDate()).isEqualTo(date);
-        assertThat(occurrences.getFirst().getStatus()).isEqualTo(OccurrenceStatus.ASSIGNED);
+        assertThat(occurrences.getFirst().getStatus()).isEqualTo(OccurrenceStatus.SCHEDULED);
     }
 
     @Test
     @DisplayName("POST /v1/events/unique sin eventType responde 400 (tipo_actividad no puede ser null)")
     void createUnique_missingEventType_returns400() throws Exception {
         LocalDate date = LocalDate.now().plusDays(6);
-        Classroom classroom = testData.aula(testData.edificio());
         String bodyWithoutEventType = """
                 {
                   "date": "%s",
                   "startTime": "10:00",
                   "durationMinutes": 60,
-                  "enrolled": 20,
-                  "classroomId": %d
+                  "enrolled": 20
                 }
-                """.formatted(date, classroom.getId());
+                """.formatted(date);
 
         mockMvc.perform(post("/v1/events/unique")
                         .contentType(MediaType.APPLICATION_JSON)

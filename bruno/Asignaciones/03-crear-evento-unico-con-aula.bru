@@ -1,11 +1,11 @@
 meta {
-  name: Crear evento único
+  name: Crear evento único con aula
   type: http
-  seq: 4
+  seq: 12
 }
 
 post {
-  url: {{baseUrl}}/v1/events/unique
+  url: {{baseUrl}}/v1/allocations/events/unique
   body: json
   auth: inherit
 }
@@ -27,6 +27,8 @@ body:json {
 docs {
   Crea un evento único, genera su única ocurrencia y le asigna el aula indicada
   en la misma operación (atómica, source = MANUAL). El aula es obligatoria.
+  Vive en /allocations porque orquesta events::api + AllocationService en la
+  misma transacción; la creación sin aula está en POST /v1/events/unique.
 
   eventType: PARCIAL | TRABAJO_PRACTICO | EXAMEN_FINAL | OTRO.
   subjectId es obligatorio salvo para eventType=OTRO. commissionId nunca es

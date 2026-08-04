@@ -48,6 +48,13 @@ public class OccurrenceServiceImpl implements OccurrenceService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<OccurrenceSlotDto> findSlotsByEvents(Collection<Long> eventIds) {
+        return occurrenceRepository.findByEvent_IdIn(eventIds).stream()
+                .map(OccurrenceServiceImpl::toSlot).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<OccurrenceSlotDto> findSlotsByEventsAndStatuses(
             Collection<Long> eventIds, Collection<OccurrenceStatus> statuses, LocalDate from) {
         return occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(eventIds, statuses, from)
