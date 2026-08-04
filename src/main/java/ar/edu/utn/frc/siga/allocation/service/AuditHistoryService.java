@@ -1,9 +1,9 @@
 package ar.edu.utn.frc.siga.allocation.service;
 
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationHistorySnapshotDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.EventHistorySnapshotDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceHistorySnapshotDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.RevisionDto;
+import ar.edu.utn.frc.siga.allocation.events.dto.response.EventHistorySnapshotDto;
+import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceHistorySnapshotDto;
+import ar.edu.utn.frc.siga.common.dto.response.RevisionDto;
 
 import java.util.List;
 

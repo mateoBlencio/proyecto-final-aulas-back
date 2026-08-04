@@ -1,32 +1,31 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
-import ar.edu.utn.frc.siga.allocation.config.EventScheduleProperties;
 import ar.edu.utn.frc.siga.allocation.dto.request.AutoPreviewRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.ConfirmAutoPreviewRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.PreviewAllocationDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.ValidateMoveRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.allocation.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AutoPreviewResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ConfirmAutoPreviewResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto.ConflictOrigin;
-import ar.edu.utn.frc.siga.allocation.dto.response.RecurringEventResponseDto;
+import ar.edu.utn.frc.siga.allocation.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ValidateMoveResponseDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.exception.ReassignConflictException;
-import ar.edu.utn.frc.siga.allocation.mapper.AcademicEventComposer;
+import ar.edu.utn.frc.siga.allocation.events.mapper.AcademicEventComposer;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationComposer;
-import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
+import ar.edu.utn.frc.siga.allocation.events.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
-import ar.edu.utn.frc.siga.allocation.model.EventType;
-import ar.edu.utn.frc.siga.allocation.model.Occurrence;
-import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
-import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
-import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
-import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
+import ar.edu.utn.frc.siga.allocation.events.model.EventType;
+import ar.edu.utn.frc.siga.allocation.events.model.Occurrence;
+import ar.edu.utn.frc.siga.allocation.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.allocation.events.model.RecurringEvent;
+import ar.edu.utn.frc.siga.allocation.events.model.UniqueEvent;
+import ar.edu.utn.frc.siga.allocation.events.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
-import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.allocation.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.allocation.service.AllocationProblemService;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.common.exception.InvalidSelectionException;
@@ -108,7 +107,7 @@ class AutoAllocationServiceImplTest {
         // los repos mockeados para ejercitar dedup/pinned/fechas a través del servicio.
         AutoAllocationDataLoader dataLoader = new AutoAllocationDataLoader(
                 eventRepository, occurrenceRepository, allocationRepository, classroomService);
-        AllocationValidator validator = new AllocationValidator(classroomService, allocationRepository, new EventScheduleProperties());
+        AllocationValidator validator = new AllocationValidator(classroomService, allocationRepository);
         AllocationWriter writer = new AllocationWriter(allocationRepository, validator);
         service = new AutoAllocationServiceImpl(dataLoader, classroomService, academicEventComposer, solverService,
                 occurrenceRepository, allocationComposer, validator, writer, allocationProblemService);

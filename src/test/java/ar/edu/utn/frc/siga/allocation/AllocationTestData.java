@@ -2,12 +2,12 @@ package ar.edu.utn.frc.siga.allocation;
 
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
-import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
-import ar.edu.utn.frc.siga.allocation.model.Occurrence;
-import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
-import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
-import ar.edu.utn.frc.siga.allocation.model.UniqueEvent;
-import ar.edu.utn.frc.siga.allocation.model.UniqueEventKind;
+import ar.edu.utn.frc.siga.allocation.events.model.AcademicEvent;
+import ar.edu.utn.frc.siga.allocation.events.model.Occurrence;
+import ar.edu.utn.frc.siga.allocation.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.allocation.events.model.RecurringEvent;
+import ar.edu.utn.frc.siga.allocation.events.model.UniqueEvent;
+import ar.edu.utn.frc.siga.allocation.events.model.UniqueEventKind;
 
 import java.time.DayOfWeek;
 import java.time.Duration;

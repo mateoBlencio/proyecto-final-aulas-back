@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.allocation.dto.response;
 
+import ar.edu.utn.frc.siga.allocation.events.dto.response.AcademicEventResponseDto;
+
 import java.time.LocalDate;
 import java.util.List;
 

@@ -1,15 +1,15 @@
 package ar.edu.utn.frc.siga.allocation.controller;
 
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.request.CreateRecurringEventRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.request.CreateUniqueEventRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.request.UpdateUniqueEventRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.allocation.events.dto.request.CreateRecurringEventRequestDto;
+import ar.edu.utn.frc.siga.allocation.events.dto.request.CreateUniqueEventRequestDto;
+import ar.edu.utn.frc.siga.allocation.events.dto.request.UpdateUniqueEventRequestDto;
+import ar.edu.utn.frc.siga.allocation.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.EventHistorySnapshotDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceResponseDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.RevisionDto;
-import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
+import ar.edu.utn.frc.siga.allocation.events.dto.response.EventHistorySnapshotDto;
+import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceResponseDto;
+import ar.edu.utn.frc.siga.common.dto.response.RevisionDto;
+import ar.edu.utn.frc.siga.allocation.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.service.AuditHistoryService;
 import io.swagger.v3.oas.annotations.Operation;

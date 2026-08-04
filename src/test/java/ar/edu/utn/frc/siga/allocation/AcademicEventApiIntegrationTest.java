@@ -1,14 +1,14 @@
 package ar.edu.utn.frc.siga.allocation;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
-import ar.edu.utn.frc.siga.allocation.dto.request.CreateRecurringEventRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.request.CreateUniqueEventRequestDto;
-import ar.edu.utn.frc.siga.allocation.model.Occurrence;
-import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
-import ar.edu.utn.frc.siga.allocation.model.UniqueEventKind;
-import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
-import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
-import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
+import ar.edu.utn.frc.siga.allocation.events.dto.request.CreateRecurringEventRequestDto;
+import ar.edu.utn.frc.siga.allocation.events.dto.request.CreateUniqueEventRequestDto;
+import ar.edu.utn.frc.siga.allocation.events.model.Occurrence;
+import ar.edu.utn.frc.siga.allocation.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.allocation.events.model.UniqueEventKind;
+import ar.edu.utn.frc.siga.allocation.events.repository.AcademicEventRepository;
+import ar.edu.utn.frc.siga.allocation.events.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.allocation.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;

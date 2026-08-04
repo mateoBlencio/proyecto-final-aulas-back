@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.allocation.model;
 
+import ar.edu.utn.frc.siga.allocation.events.model.Occurrence;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
