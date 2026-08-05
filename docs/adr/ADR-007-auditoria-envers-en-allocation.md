@@ -126,6 +126,18 @@ estado `pendiente` hasta que se aplique en la base de datos compartida.
   transaccional); si en el futuro se vuelve un problema, es un cambio
   acotado (política de purga por antigüedad) sin impacto en el modelo.
 
+> **Actualización (2026-08-05)**: [ADR-012](ADR-012-desacople-events-allocation.md)
+> separó `AcademicEvent`/`RecurringEvent`/`UniqueEvent`/`Occurrence` de `allocation`
+> hacia un módulo `events` propio. Las 5 entidades siguen `@Audited` igual que acá se
+> decidió, y el DDL de las tablas `_aud` no cambió — pero la consulta de historial se
+> partió en dos servicios según dónde vive cada entidad ahora:
+> `EventAuditHistoryService` (evento + ocurrencia, en `events`) y
+> `AllocationAuditHistoryService` (asignación, en `allocation`). `Allocation` dejó de
+> tener una relación JPA hacia `Occurrence` (pasó a `occurrenceId` plano), así que su
+> consulta de historial cambió de `AuditEntity.relatedId("occurrence")` a
+> `AuditEntity.property("occurrenceId")` — mismo dato auditado, filtro distinto
+> porque ya no es una FK con relación mapeada.
+
 ## Alternativas consideradas
 
 - **Auditar también `academic` y/o `space`**: se descartó porque no hay hoy

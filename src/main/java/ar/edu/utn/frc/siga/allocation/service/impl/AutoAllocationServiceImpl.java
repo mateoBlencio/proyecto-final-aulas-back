@@ -4,7 +4,7 @@ import ar.edu.utn.frc.siga.allocation.dto.request.AutoPreviewRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.ConfirmAutoPreviewRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.PreviewAllocationDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.ValidateMoveRequestDto;
-import ar.edu.utn.frc.siga.allocation.events.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AutoPreviewResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ConfirmAutoPreviewResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto;
@@ -12,15 +12,13 @@ import ar.edu.utn.frc.siga.allocation.dto.response.ProposedAllocationDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.UnresolvedAllocationDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ValidateMoveResponseDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
-import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceSlotDto;
-import ar.edu.utn.frc.siga.allocation.events.mapper.AcademicEventComposer;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationComposer;
-import ar.edu.utn.frc.siga.allocation.events.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
-import ar.edu.utn.frc.siga.allocation.events.model.OccurrenceStatus;
-import ar.edu.utn.frc.siga.allocation.events.model.RecurringEvent;
-import ar.edu.utn.frc.siga.allocation.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationProblemService;
 import ar.edu.utn.frc.siga.allocation.service.AutoAllocationService;
 import ar.edu.utn.frc.siga.allocation.service.impl.AutoAllocationDataLoader.AutoPreviewInputs;
@@ -62,7 +60,6 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
 
     private final AutoAllocationDataLoader dataLoader;
     private final ClassroomService classroomService;
-    private final AcademicEventComposer academicEventComposer;
     private final SolverService solverService;
     private final OccurrenceService occurrenceService;
     private final AllocationComposer allocationComposer;
@@ -77,7 +74,7 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
         AutoPreviewInputs inputs = dataLoader.load(eventIds);
 
         List<SolverEvent> solverEvents = inputs.events().stream()
-                .map(e -> toSolverEvent(e, inputs.datesByEvent().getOrDefault(e.getId(), List.of())))
+                .map(e -> toSolverEvent(e, inputs.datesByEvent().getOrDefault(e.id(), List.of())))
                 .filter(e -> !e.occurrenceDates().isEmpty())
                 .toList();
         if (solverEvents.isEmpty()) {
@@ -122,11 +119,11 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
         validator.validateBelongsToPreview(request, previewEventIds);
 
         AutoPreviewInputs inputs = dataLoader.load(previewEventIds);
-        Map<Long, RecurringEvent> eventsById = Maps.byId(inputs.events(), AcademicEvent::getId);
+        Map<Long, RecurringEventResponseDto> eventsById = Maps.byId(inputs.events(), RecurringEventResponseDto::id);
 
-        RecurringEvent movedEvent = eventsById.get(request.eventId());
+        RecurringEventResponseDto movedEvent = eventsById.get(request.eventId());
         Set<LocalDate> movedDates = Set.copyOf(inputs.datesByEvent().getOrDefault(request.eventId(), List.of()));
-        LocalTime movedStart = movedEvent.getStartTime();
+        LocalTime movedStart = movedEvent.startTime();
         LocalTime movedEnd = movedEvent.endTime();
 
         List<MoveConflictDto> conflicts = new ArrayList<>();
@@ -225,10 +222,10 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
                 .collect(Collectors.toSet());
     }
 
-    private SolverEvent toSolverEvent(RecurringEvent e, List<LocalDate> dates) {
-        String commissionKey = e.getCommissionId() != null ? String.valueOf(e.getCommissionId()) : null;
-        return new SolverEvent(String.valueOf(e.getId()), commissionKey, e.getEnrolled(),
-                e.getStartTime(), e.endTime(), Set.copyOf(dates));
+    private SolverEvent toSolverEvent(RecurringEventResponseDto e, List<LocalDate> dates) {
+        String commissionKey = e.commission() != null ? String.valueOf(e.commission().id()) : null;
+        return new SolverEvent(String.valueOf(e.id()), commissionKey, e.enrolled(),
+                e.startTime(), e.endTime(), Set.copyOf(dates));
     }
 
     /**
@@ -240,11 +237,11 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
      * conflictos que explican por qué ninguna aula candidata ({@code rooms}) le sirvió, contra
      * el estado final: ocupación firme de BD ({@code databaseOccupancy}) + los propios resueltos.
      */
-    private AutoPreviewResponseDto compose(SolverPreview preview, List<RecurringEvent> events,
+    private AutoPreviewResponseDto compose(SolverPreview preview, List<RecurringEventResponseDto> events,
                                             Map<Long, List<LocalDate>> datesByEvent,
                                             Map<Long, Integer> priorRoomByEvent,
                                             List<SolverRoom> rooms, List<OccupiedSlot> databaseOccupancy) {
-        Map<Long, RecurringEvent> eventsById = Maps.byId(events, AcademicEvent::getId);
+        Map<Long, RecurringEventResponseDto> eventsById = Maps.byId(events, RecurringEventResponseDto::id);
 
         List<SolverAllocation> resolved = new ArrayList<>();
         List<SolverAllocation> unresolved = new ArrayList<>();
@@ -262,11 +259,11 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
             }
         }
 
-        List<RecurringEvent> referencedEvents = preview.allocations().stream()
-                .map(a -> eventsById.get(Long.valueOf(a.eventId())))
+        List<AcademicEventResponseDto> referencedEvents = preview.allocations().stream()
+                .<AcademicEventResponseDto>map(a -> eventsById.get(Long.valueOf(a.eventId())))
                 .filter(Objects::nonNull)
                 .toList();
-        Map<Long, AcademicEventResponseDto> eventDtoById = academicEventComposer.composeById(referencedEvents);
+        Map<Long, AcademicEventResponseDto> eventDtoById = Maps.byId(referencedEvents, AcademicEventResponseDto::id);
 
         Set<Integer> classroomIds = Set.copyOf(effectiveRoomByEventId.values());
         Map<Integer, ClassroomResponseDto> classroomDtoById = Maps.byId(classroomService.findByIds(classroomIds), ClassroomResponseDto::id);
@@ -288,14 +285,14 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
 
     /** Las propuestas ya resueltas del preview, en la forma que espera {@code validator.unresolvedConflicts}. */
     private List<ResolvedProposal> buildResolvedProposals(Map<String, Integer> effectiveRoomByEventId,
-            Map<Long, RecurringEvent> eventsById, Map<Long, List<LocalDate>> datesByEvent) {
+            Map<Long, RecurringEventResponseDto> eventsById, Map<Long, List<LocalDate>> datesByEvent) {
         List<ResolvedProposal> proposals = new ArrayList<>();
         for (Map.Entry<String, Integer> entry : effectiveRoomByEventId.entrySet()) {
             Long eventId = Long.valueOf(entry.getKey());
-            RecurringEvent event = eventsById.get(eventId);
+            RecurringEventResponseDto event = eventsById.get(eventId);
             if (event == null) continue;
             proposals.add(new ResolvedProposal(eventId, entry.getValue(),
-                    datesByEvent.getOrDefault(eventId, List.of()), event.getStartTime(), event.endTime()));
+                    datesByEvent.getOrDefault(eventId, List.of()), event.startTime(), event.endTime()));
         }
         return proposals;
     }
@@ -319,15 +316,15 @@ public class AutoAllocationServiceImpl implements AutoAllocationService {
      */
     private UnresolvedAllocationDto toUnresolvedAllocationDto(SolverAllocation allocation,
             Map<Long, AcademicEventResponseDto> eventDtoById, Map<Long, List<LocalDate>> datesByEvent,
-            Map<Long, RecurringEvent> eventsById, Set<Integer> candidateRoomIds,
+            Map<Long, RecurringEventResponseDto> eventsById, Set<Integer> candidateRoomIds,
             List<OccupiedSlot> databaseOccupancy, List<ResolvedProposal> resolvedProposals) {
         Long eventId = Long.valueOf(allocation.eventId());
         AcademicEventResponseDto event = eventDtoById.get(eventId);
         List<LocalDate> dates = datesByEvent.getOrDefault(eventId, List.of());
-        RecurringEvent recurringEvent = eventsById.get(eventId);
+        RecurringEventResponseDto recurringEvent = eventsById.get(eventId);
         List<MoveConflictDto> conflicts = recurringEvent == null ? List.of()
                 : validator.unresolvedConflicts(candidateRoomIds, Set.copyOf(dates),
-                        recurringEvent.getStartTime(), recurringEvent.endTime(), databaseOccupancy, resolvedProposals);
+                        recurringEvent.startTime(), recurringEvent.endTime(), databaseOccupancy, resolvedProposals);
         return new UnresolvedAllocationDto(event, dates, conflicts);
     }
 

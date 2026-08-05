@@ -5,13 +5,13 @@ import ar.edu.utn.frc.siga.allocation.dto.request.ValidateMoveRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.MoveConflictDto.ConflictOrigin;
 import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceConflictDto;
-import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.exception.ReassignConflictException;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
-import ar.edu.utn.frc.siga.allocation.events.model.OccurrenceStatus;
-import ar.edu.utn.frc.siga.allocation.events.model.RecurringEvent;
-import ar.edu.utn.frc.siga.allocation.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
+import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import ar.edu.utn.frc.siga.common.util.TimeRanges;
@@ -284,7 +284,7 @@ public class AllocationValidator {
      * también por {@link #unresolvedConflicts}.
      */
     public List<MoveConflictDto> movePreviewConflicts(ValidateMoveRequestDto request,
-            Map<Long, RecurringEvent> eventsById, Map<Long, List<LocalDate>> datesByEvent,
+            Map<Long, RecurringEventResponseDto> eventsById, Map<Long, List<LocalDate>> datesByEvent,
             Set<LocalDate> movedDates, LocalTime movedStart, LocalTime movedEnd) {
         List<ResolvedProposal> proposals = request.currentAllocations().stream()
                 .filter(allocation -> !allocation.eventId().equals(request.eventId()))
@@ -296,11 +296,11 @@ public class AllocationValidator {
 
     /** {@link PreviewAllocationDto} + horarios/fechas de su evento → {@link ResolvedProposal}, o null si el evento es ajeno al mapa cargado. */
     private ResolvedProposal toResolvedProposal(PreviewAllocationDto allocation,
-            Map<Long, RecurringEvent> eventsById, Map<Long, List<LocalDate>> datesByEvent) {
-        RecurringEvent event = eventsById.get(allocation.eventId());
+            Map<Long, RecurringEventResponseDto> eventsById, Map<Long, List<LocalDate>> datesByEvent) {
+        RecurringEventResponseDto event = eventsById.get(allocation.eventId());
         if (event == null) return null;
         return new ResolvedProposal(allocation.eventId(), allocation.classroomId(),
-                datesByEvent.getOrDefault(allocation.eventId(), List.of()), event.getStartTime(), event.endTime());
+                datesByEvent.getOrDefault(allocation.eventId(), List.of()), event.startTime(), event.endTime());
     }
 
     // ---------- conflictos de unresolved (flujo automático, post-solve) ----------

@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.siga.allocation.dto.request;
 
-import ar.edu.utn.frc.siga.allocation.events.model.UniqueEventKind;
+import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 

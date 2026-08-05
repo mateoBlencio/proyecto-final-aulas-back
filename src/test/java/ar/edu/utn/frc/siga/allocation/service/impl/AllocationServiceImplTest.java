@@ -4,18 +4,20 @@ import ar.edu.utn.frc.siga.allocation.dto.request.AllocateFromDateRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.BatchReassignRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
-import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.UniqueEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.exception.ReassignConflictException;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationComposer;
-import ar.edu.utn.frc.siga.allocation.events.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
-import ar.edu.utn.frc.siga.allocation.events.model.OccurrenceStatus;
-import ar.edu.utn.frc.siga.allocation.events.model.RecurringEvent;
-import ar.edu.utn.frc.siga.allocation.events.model.UniqueEvent;
-import ar.edu.utn.frc.siga.allocation.events.repository.AcademicEventRepository;
-import ar.edu.utn.frc.siga.allocation.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.events.model.EventType;
+import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
+import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
@@ -57,7 +59,7 @@ class AllocationServiceImplTest {
     @Mock
     private OccurrenceService occurrenceService;
     @Mock
-    private AcademicEventRepository eventRepository;
+    private AcademicEventService academicEventService;
     @Mock
     private ClassroomService classroomService;
     @Mock
@@ -69,7 +71,7 @@ class AllocationServiceImplTest {
     void setUp() {
         AllocationValidator validator = new AllocationValidator(classroomService, allocationRepository, occurrenceService);
         AllocationWriter writer = new AllocationWriter(allocationRepository, validator, occurrenceService);
-        service = new AllocationServiceImpl(allocationRepository, occurrenceService, eventRepository, composer, validator, writer);
+        service = new AllocationServiceImpl(allocationRepository, occurrenceService, academicEventService, composer, validator, writer);
 
         lenient().when(classroomService.findByIds(any())).thenAnswer(invocation -> {
             java.util.Collection<Integer> ids = invocation.getArgument(0);
@@ -92,7 +94,7 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("allocateManually: aula libre, crea la asignación")
     void allocateManuallyAulaLibre() {
-        RecurringEvent event = recurringEvent(1L);
+        RecurringEventResponseDto event = recurringEvent(1L);
         OccurrenceSlotDto occurrence = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
         when(occurrenceService.findSlot(10L)).thenReturn(occurrence);
 
@@ -108,7 +110,7 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("allocateManually: ocurrencia ya pasada → conflicto, no persiste")
     void allocateManuallyOcurrenciaPasada() {
-        RecurringEvent event = recurringEvent(1L);
+        RecurringEventResponseDto event = recurringEvent(1L);
         OccurrenceSlotDto occurrence = occurrenceSlot(10L, event, LocalDate.now().minusDays(1), OccurrenceStatus.SCHEDULED);
         when(occurrenceService.findSlot(10L)).thenReturn(occurrence);
 
@@ -121,7 +123,7 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("allocateManually: ocurrencia CANCELLED o SUSPENDED → conflicto, no persiste")
     void allocateManuallyOcurrenciaNoAsignable() {
-        RecurringEvent event = recurringEvent(1L);
+        RecurringEventResponseDto event = recurringEvent(1L);
         OccurrenceSlotDto cancelled = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.CANCELLED);
         OccurrenceSlotDto suspended = occurrenceSlot(11L, event, futureDate(1), OccurrenceStatus.SUSPENDED);
         when(occurrenceService.findSlot(10L)).thenReturn(cancelled);
@@ -138,7 +140,7 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("allocateManually: ocurrencia que ya tiene asignación → conflicto, no persiste")
     void allocateManuallyOcurrenciaYaAsignada() {
-        RecurringEvent event = recurringEvent(1L);
+        RecurringEventResponseDto event = recurringEvent(1L);
         OccurrenceSlotDto occurrence = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.ASSIGNED);
         when(occurrenceService.findSlot(10L)).thenReturn(occurrence);
         when(allocationRepository.findByOccurrenceId(10L))
@@ -153,7 +155,7 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("allocateManually: aula inexistente → conflicto 409")
     void allocateManuallyAulaInexistente() {
-        RecurringEvent event = recurringEvent(1L);
+        RecurringEventResponseDto event = recurringEvent(1L);
         OccurrenceSlotDto occurrence = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
         when(occurrenceService.findSlot(10L)).thenReturn(occurrence);
         when(classroomService.findByIds(any())).thenReturn(List.of());
@@ -167,7 +169,7 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("allocateManually: aula existe pero no está disponible → 409 (cierra el FIXME: antes solo se validaba existencia)")
     void allocateManuallyAulaNoDisponibleRechaza() {
-        RecurringEvent event = recurringEvent(1L);
+        RecurringEventResponseDto event = recurringEvent(1L);
         OccurrenceSlotDto occurrence = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
         when(occurrenceService.findSlot(10L)).thenReturn(occurrence);
         when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 100, false)));
@@ -181,9 +183,9 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("allocateManually: aula ocupada por otro evento en la misma franja horaria → 409, no persiste")
     void allocateManuallyConSolape() {
-        RecurringEvent event = recurringEvent(1L);
+        RecurringEventResponseDto event = recurringEvent(1L);
         OccurrenceSlotDto occurrence = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
-        RecurringEvent foreignEvent = recurringEvent(99L);
+        RecurringEventResponseDto foreignEvent = recurringEvent(99L);
         OccurrenceSlotDto foreignOccurrence = occurrenceSlot(50L, foreignEvent, futureDate(1), OccurrenceStatus.ASSIGNED);
         Allocation foreignAllocation = allocation(500L, foreignOccurrence, 5);
 
@@ -202,9 +204,9 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("allocateManually: franjas adyacentes (fin del nuevo == inicio del ocupante) no conflictúan")
     void allocateManuallyFranjasAdyacentesNoConflictuan() {
-        RecurringEvent event = recurringEvent(1L); // 08:00-09:30
+        RecurringEventResponseDto event = recurringEvent(1L); // 08:00-09:30
         OccurrenceSlotDto occurrence = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
-        RecurringEvent adjacentEvent = recurringEvent(99L, LocalTime.of(9, 30), Duration.ofMinutes(60)); // 09:30-10:30
+        RecurringEventResponseDto adjacentEvent = recurringEvent(99L, LocalTime.of(9, 30), Duration.ofMinutes(60)); // 09:30-10:30
         OccurrenceSlotDto adjacentOccurrence = occurrenceSlot(70L, adjacentEvent, futureDate(1), OccurrenceStatus.ASSIGNED);
         Allocation adjacentAllocation = allocation(700L, adjacentOccurrence, 5);
 
@@ -223,10 +225,10 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("reallocate: aula ocupada por otro evento en la misma franja → 409, no persiste")
     void reallocateConSolape() {
-        RecurringEvent event = recurringEvent(1L);
+        RecurringEventResponseDto event = recurringEvent(1L);
         OccurrenceSlotDto occurrence = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
         Allocation allocation = allocation(900L, occurrence, 3);
-        RecurringEvent foreignEvent = recurringEvent(99L);
+        RecurringEventResponseDto foreignEvent = recurringEvent(99L);
         OccurrenceSlotDto foreignOccurrence = occurrenceSlot(50L, foreignEvent, futureDate(1), OccurrenceStatus.ASSIGNED);
         Allocation foreignAllocation = allocation(500L, foreignOccurrence, 5);
 
@@ -244,7 +246,7 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("reallocate: la aula que ya tenía la propia asignación no conflictúa consigo misma")
     void reallocateMismaAulaNoConflictuaConsigoMisma() {
-        RecurringEvent event = recurringEvent(1L);
+        RecurringEventResponseDto event = recurringEvent(1L);
         OccurrenceSlotDto occurrence = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.ASSIGNED);
         Allocation allocation = allocation(900L, occurrence, 5);
 
@@ -266,8 +268,8 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("batchReallocate: dos moves a aulas libres, ambos se aplican")
     void batchReallocateFeliz() {
-        RecurringEvent event1 = recurringEvent(1L);
-        RecurringEvent event2 = recurringEvent(2L, LocalTime.of(14, 0), Duration.ofMinutes(60));
+        RecurringEventResponseDto event1 = recurringEvent(1L);
+        RecurringEventResponseDto event2 = recurringEvent(2L, LocalTime.of(14, 0), Duration.ofMinutes(60));
         OccurrenceSlotDto occ1 = occurrenceSlot(10L, event1, futureDate(1), OccurrenceStatus.ASSIGNED);
         OccurrenceSlotDto occ2 = occurrenceSlot(11L, event2, futureDate(2), OccurrenceStatus.ASSIGNED);
         Allocation alloc1 = allocation(100L, occ1, 3);
@@ -293,11 +295,11 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("batchReallocate: un move choca contra ocupación firme de BD ajena al lote → 409 sin ningún save")
     void batchReallocateConflictoContraBd() {
-        RecurringEvent event1 = recurringEvent(1L);
+        RecurringEventResponseDto event1 = recurringEvent(1L);
         OccurrenceSlotDto occ1 = occurrenceSlot(10L, event1, futureDate(1), OccurrenceStatus.SCHEDULED);
         Allocation alloc1 = allocation(100L, occ1, 3);
 
-        RecurringEvent foreignEvent = recurringEvent(99L);
+        RecurringEventResponseDto foreignEvent = recurringEvent(99L);
         OccurrenceSlotDto foreignOccurrence = occurrenceSlot(50L, foreignEvent, futureDate(1), OccurrenceStatus.ASSIGNED);
         Allocation foreignAllocation = allocation(500L, foreignOccurrence, 5);
 
@@ -316,8 +318,8 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("batchReallocate: dos moves del propio lote chocan entre sí (misma aula, misma fecha, franjas que se pisan) → 409")
     void batchReallocateConflictoInternoEntreDosMoves() {
-        RecurringEvent event1 = recurringEvent(1L);
-        RecurringEvent event2 = recurringEvent(2L);
+        RecurringEventResponseDto event1 = recurringEvent(1L);
+        RecurringEventResponseDto event2 = recurringEvent(2L);
         LocalDate date = futureDate(1);
         OccurrenceSlotDto occ1 = occurrenceSlot(10L, event1, date, OccurrenceStatus.SCHEDULED);
         OccurrenceSlotDto occ2 = occurrenceSlot(11L, event2, date, OccurrenceStatus.SCHEDULED);
@@ -340,13 +342,13 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("allocateManuallyFromDate: aula libre para todas las ocurrencias futuras, se asignan")
     void allocateManuallyFromDateFeliz() {
-        RecurringEvent event = recurringEvent(1L);
+        RecurringEventResponseDto event = recurringEvent(1L);
         LocalDate date1 = futureDate(1);
         LocalDate date2 = futureDate(8);
         OccurrenceSlotDto occ1 = occurrenceSlot(10L, event, date1, OccurrenceStatus.SCHEDULED);
         OccurrenceSlotDto occ2 = occurrenceSlot(11L, event, date2, OccurrenceStatus.SCHEDULED);
 
-        when(eventRepository.findById(1L)).thenReturn(Optional.of(event));
+        when(academicEventService.findById(1L)).thenReturn(event);
         when(occurrenceService.findSlotsByEvent(eq(1L), any()))
                 .thenReturn(List.of(occ1, occ2));
 
@@ -361,15 +363,15 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("allocateManuallyFromDate: una ocurrencia futura choca contra otro evento → 409, nada se aplica")
     void allocateManuallyFromDateConSolape() {
-        RecurringEvent event = recurringEvent(1L);
+        RecurringEventResponseDto event = recurringEvent(1L);
         LocalDate date1 = futureDate(1);
         OccurrenceSlotDto occ1 = occurrenceSlot(10L, event, date1, OccurrenceStatus.SCHEDULED);
 
-        RecurringEvent foreignEvent = recurringEvent(99L);
+        RecurringEventResponseDto foreignEvent = recurringEvent(99L);
         OccurrenceSlotDto foreignOccurrence = occurrenceSlot(50L, foreignEvent, date1, OccurrenceStatus.ASSIGNED);
         Allocation foreignAllocation = allocation(500L, foreignOccurrence, 5);
 
-        when(eventRepository.findById(1L)).thenReturn(Optional.of(event));
+        when(academicEventService.findById(1L)).thenReturn(event);
         when(occurrenceService.findSlotsByEvent(eq(1L), any()))
                 .thenReturn(List.of(occ1));
         when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of(foreignOccurrence));
@@ -386,14 +388,10 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("allocateManuallyFromDate: evento UniqueEvent → conflicto, no soportado")
     void allocateManuallyFromDateEventoUnico() {
-        UniqueEvent uniqueEvent = UniqueEvent.builder()
-                .id(1L)
-                .enrolled(20)
-                .startTime(LocalTime.of(18, 0))
-                .duration(Duration.ofMinutes(120))
-                .date(futureDate(2))
-                .build();
-        when(eventRepository.findById(1L)).thenReturn(Optional.of(uniqueEvent));
+        UniqueEventResponseDto uniqueEvent = new UniqueEventResponseDto(
+                1L, EventType.UNIQUE_EVENT, UniqueEventKind.PARCIAL, 20, LocalTime.of(18, 0), 120,
+                futureDate(2), null, null, null);
+        when(academicEventService.findById(1L)).thenReturn(uniqueEvent);
 
         assertThatThrownBy(() -> service.allocateManuallyFromDate(
                 new AllocateFromDateRequestDto(1L, futureDate(1), 5, null)))
@@ -405,8 +403,8 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("allocateManuallyFromDate: fromDate pasada se clampea a hoy")
     void allocateManuallyFromDateFromDatePasadaSeClampeaAHoy() {
-        RecurringEvent event = recurringEvent(1L);
-        when(eventRepository.findById(1L)).thenReturn(Optional.of(event));
+        RecurringEventResponseDto event = recurringEvent(1L);
+        when(academicEventService.findById(1L)).thenReturn(event);
         when(occurrenceService.findSlotsByEvent(any(), any())).thenReturn(List.of());
 
         service.allocateManuallyFromDate(new AllocateFromDateRequestDto(1L, LocalDate.now().minusDays(5), 5, null));
@@ -421,11 +419,11 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("reassignEvent: evento en curso, asigna las ocurrencias futuras devueltas por el repo")
     void reassignEventFeliz() {
-        RecurringEvent event = recurringEvent(1L);
+        RecurringEventResponseDto event = recurringEvent(1L);
         OccurrenceSlotDto occ1 = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
         OccurrenceSlotDto occ2 = occurrenceSlot(11L, event, futureDate(8), OccurrenceStatus.SCHEDULED);
 
-        when(eventRepository.findById(1L)).thenReturn(Optional.of(event));
+        when(academicEventService.findById(1L)).thenReturn(event);
         when(occurrenceService.findSlotsByEvent(eq(1L), any()))
                 .thenReturn(List.of(occ1, occ2));
 
@@ -438,10 +436,10 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("reassignEvent: evento finalizado (sin ocurrencias futuras) → conflicto, no persiste")
     void reassignEventFinalizado() {
-        RecurringEvent event = recurringEvent(1L);
+        RecurringEventResponseDto event = recurringEvent(1L);
         OccurrenceSlotDto pastOcc = occurrenceSlot(10L, event, LocalDate.now().minusDays(1), OccurrenceStatus.SCHEDULED);
 
-        when(eventRepository.findById(1L)).thenReturn(Optional.of(event));
+        when(academicEventService.findById(1L)).thenReturn(event);
         when(occurrenceService.findSlotsByEvent(eq(1L), any()))
                 .thenReturn(List.of(pastOcc));
 
@@ -454,14 +452,10 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("reassignEvent: evento no recurrente (UniqueEvent) → conflicto, no soportado")
     void reassignEventEventoUnico() {
-        UniqueEvent uniqueEvent = UniqueEvent.builder()
-                .id(1L)
-                .enrolled(20)
-                .startTime(LocalTime.of(18, 0))
-                .duration(Duration.ofMinutes(120))
-                .date(futureDate(2))
-                .build();
-        when(eventRepository.findById(1L)).thenReturn(Optional.of(uniqueEvent));
+        UniqueEventResponseDto uniqueEvent = new UniqueEventResponseDto(
+                1L, EventType.UNIQUE_EVENT, UniqueEventKind.PARCIAL, 20, LocalTime.of(18, 0), 120,
+                futureDate(2), null, null, null);
+        when(academicEventService.findById(1L)).thenReturn(uniqueEvent);
 
         assertThatThrownBy(() -> service.reassignEvent(1L, new AllocateOccurrenceRequestDto(5, null)))
                 .isInstanceOf(AllocationConflictException.class);
@@ -472,7 +466,7 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("reassignEvent: evento inexistente → ResourceNotFoundException")
     void reassignEventEventoInexistente() {
-        when(eventRepository.findById(1L)).thenReturn(Optional.empty());
+        when(academicEventService.findById(1L)).thenThrow(ResourceNotFoundException.of("AcademicEvent", 1L));
 
         assertThatThrownBy(() -> service.reassignEvent(1L, new AllocateOccurrenceRequestDto(5, null)))
                 .isInstanceOf(ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException.class);
@@ -485,9 +479,9 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("importAllocationsFromDate: incluye ocurrencias pasadas (no las saltea)")
     void importAssignmentsFromDateIncluyeOcurrenciasPasadas() {
-        RecurringEvent event = recurringEvent(1L);
+        RecurringEventResponseDto event = recurringEvent(1L);
         OccurrenceSlotDto pastOcc = occurrenceSlot(10L, event, LocalDate.now().minusDays(3), OccurrenceStatus.SCHEDULED);
-        when(eventRepository.findById(1L)).thenReturn(Optional.of(event));
+        when(academicEventService.findById(1L)).thenReturn(event);
         when(occurrenceService.findSlotsByEvent(eq(1L), any()))
                 .thenReturn(List.of(pastOcc));
 
@@ -502,9 +496,9 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("importAllocationsFromDate: estampa source=IMPORTED en la asignación nueva")
     void importAssignmentsFromDateSourceImported() {
-        RecurringEvent event = recurringEvent(1L);
+        RecurringEventResponseDto event = recurringEvent(1L);
         OccurrenceSlotDto occ = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
-        when(eventRepository.findById(1L)).thenReturn(Optional.of(event));
+        when(academicEventService.findById(1L)).thenReturn(event);
         when(occurrenceService.findSlotsByEvent(eq(1L), any()))
                 .thenReturn(List.of(occ));
 
@@ -516,10 +510,10 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("importAllocationsFromDate: reusa la asignación existente de la ocurrencia (upsert, no duplica)")
     void importAssignmentsFromDateUpsertReusaExistente() {
-        RecurringEvent event = recurringEvent(1L);
+        RecurringEventResponseDto event = recurringEvent(1L);
         OccurrenceSlotDto occ = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.ASSIGNED);
         Allocation existing = allocation(900L, occ, 3);
-        when(eventRepository.findById(1L)).thenReturn(Optional.of(event));
+        when(academicEventService.findById(1L)).thenReturn(event);
         when(occurrenceService.findSlotsByEvent(eq(1L), any()))
                 .thenReturn(List.of(occ));
         when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(existing));
@@ -534,10 +528,10 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("importAllocationsFromDate: saltea ocurrencias CANCELLED/SUSPENDED")
     void importAssignmentsFromDateSalteaNoAsignables() {
-        RecurringEvent event = recurringEvent(1L);
+        RecurringEventResponseDto event = recurringEvent(1L);
         OccurrenceSlotDto cancelled = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.CANCELLED);
         OccurrenceSlotDto suspended = occurrenceSlot(11L, event, futureDate(2), OccurrenceStatus.SUSPENDED);
-        when(eventRepository.findById(1L)).thenReturn(Optional.of(event));
+        when(academicEventService.findById(1L)).thenReturn(event);
         when(occurrenceService.findSlotsByEvent(eq(1L), any()))
                 .thenReturn(List.of(cancelled, suspended));
 
@@ -554,8 +548,8 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("importAllocationsBatch: aplica occurrences de varios eventos con su propia aula, en un solo pase")
     void importAllocationsBatchVariosEventos() {
-        RecurringEvent event1 = recurringEvent(1L);
-        RecurringEvent event2 = recurringEvent(2L);
+        RecurringEventResponseDto event1 = recurringEvent(1L);
+        RecurringEventResponseDto event2 = recurringEvent(2L);
         OccurrenceSlotDto occ1 = occurrenceSlot(10L, event1, futureDate(1), OccurrenceStatus.SCHEDULED);
         OccurrenceSlotDto occ2 = occurrenceSlot(20L, event2, futureDate(1), OccurrenceStatus.SCHEDULED);
         when(occurrenceService.findSlotsByEvents(any(), any()))
@@ -573,8 +567,8 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("importAllocationsBatch: filtra en memoria las occurrences anteriores a la fecha propia de cada evento")
     void importAllocationsBatchFiltraPorFromDatePropio() {
-        RecurringEvent event1 = recurringEvent(1L);
-        RecurringEvent event2 = recurringEvent(2L);
+        RecurringEventResponseDto event1 = recurringEvent(1L);
+        RecurringEventResponseDto event2 = recurringEvent(2L);
         // occ1 es anterior al fromDate de event1 (2do cuatrimestre vs 1ro): la query trae de más
         // (usa la fecha más antigua de todo el batch), el filtro en memoria la debe descartar.
         OccurrenceSlotDto occ1 = occurrenceSlot(10L, event1, futureDate(1), OccurrenceStatus.SCHEDULED);
@@ -601,24 +595,18 @@ class AllocationServiceImplTest {
 
     // ---------- helpers ----------
 
-    private RecurringEvent recurringEvent(long id) {
+    private RecurringEventResponseDto recurringEvent(long id) {
         return recurringEvent(id, LocalTime.of(8, 0), Duration.ofMinutes(90));
     }
 
-    private RecurringEvent recurringEvent(long id, LocalTime startTime, Duration duration) {
-        return RecurringEvent.builder()
-                .id(id)
-                .enrolled(30)
-                .startTime(startTime)
-                .duration(duration)
-                .dayOfWeek(DayOfWeek.MONDAY)
-                .startDate(LocalDate.now().minusMonths(1))
-                .endDate(LocalDate.now().plusMonths(4))
-                .build();
+    private RecurringEventResponseDto recurringEvent(long id, LocalTime startTime, Duration duration) {
+        return new RecurringEventResponseDto(
+                id, EventType.RECURRING, 30, startTime, duration.toMinutes(), DayOfWeek.MONDAY,
+                LocalDate.now().minusMonths(1), LocalDate.now().plusMonths(4), null, null);
     }
 
-    private OccurrenceSlotDto occurrenceSlot(long id, AcademicEvent event, LocalDate date, OccurrenceStatus status) {
-        return new OccurrenceSlotDto(id, event.getId(), date, event.getStartTime(), event.endTime(), status, event.getEnrolled());
+    private OccurrenceSlotDto occurrenceSlot(long id, RecurringEventResponseDto event, LocalDate date, OccurrenceStatus status) {
+        return new OccurrenceSlotDto(id, event.id(), date, event.startTime(), event.endTime(), status, event.enrolled());
     }
 
     private Allocation allocation(long id, OccurrenceSlotDto occurrence, Integer classroomId) {

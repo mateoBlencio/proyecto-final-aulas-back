@@ -1,9 +1,9 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
-import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
-import ar.edu.utn.frc.siga.allocation.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import lombok.RequiredArgsConstructor;

@@ -1,15 +1,13 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
-import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
-import ar.edu.utn.frc.siga.allocation.events.model.AcademicEvent;
-import ar.edu.utn.frc.siga.allocation.events.model.Occurrence;
-import ar.edu.utn.frc.siga.allocation.events.model.OccurrenceStatus;
-import ar.edu.utn.frc.siga.allocation.events.model.RecurringEvent;
-import ar.edu.utn.frc.siga.allocation.events.repository.AcademicEventRepository;
+import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
-import ar.edu.utn.frc.siga.allocation.events.repository.OccurrenceRepository;
-import ar.edu.utn.frc.siga.allocation.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.OccupiedSlot;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.Maps;
@@ -18,7 +16,6 @@ import ar.edu.utn.frc.siga.solver.model.SolverRoom;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.Hibernate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,10 +28,9 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /**
- * Carga todo lo que necesita el auto-preview en una única transacción corta y lo
- * devuelve materializado (entidades des-proxeadas con {@link Hibernate#unproxy}, con
- * OSIV off un proxy lazy fuera de transacción explota). Existe para que
- * {@code AutoAllocationServiceImpl#autoPreview} pueda dejar de ser transaccional: la
+ * Carga todo lo que necesita el auto-preview en una única transacción corta, resolviendo
+ * evento y occurrences vía las fachadas de {@code events} (DTOs, no entidades). Existe para
+ * que {@code AutoAllocationServiceImpl#autoPreview} pueda dejar de ser transaccional: la
  * corrida del solver (hasta varios minutos) no debe retener una conexión JDBC del pool
  * (deuda B3).
  */
@@ -42,10 +38,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 class AutoAllocationDataLoader {
 
-    private final AcademicEventRepository eventRepository;
-    private final OccurrenceRepository occurrenceRepository;
-    private final AllocationRepository allocationRepository;
+    private final AcademicEventService academicEventService;
     private final OccurrenceService occurrenceService;
+    private final AllocationRepository allocationRepository;
     private final ClassroomService classroomService;
 
     /**
@@ -54,7 +49,7 @@ class AutoAllocationDataLoader {
      * (si tenía): garantiza que un evento previamente asignado nunca regrese a
      * {@code unresolved} — si el solver no lo ubica, conserva su aula previa.
      */
-    record AutoPreviewInputs(List<RecurringEvent> events, Map<Long, List<LocalDate>> datesByEvent,
+    record AutoPreviewInputs(List<RecurringEventResponseDto> events, Map<Long, List<LocalDate>> datesByEvent,
                               List<SolverRoom> rooms, List<SolverOccupancy> occupancy,
                               List<OccupiedSlot> databaseOccupancy,
                               Map<Long, Integer> priorRoomByEvent) {
@@ -62,7 +57,7 @@ class AutoAllocationDataLoader {
 
     @Transactional(readOnly = true)
     AutoPreviewInputs load(Set<Long> eventIds) {
-        List<RecurringEvent> events = loadRecurringEvents(eventIds);
+        List<RecurringEventResponseDto> events = loadRecurringEvents(eventIds);
         Map<Long, List<LocalDate>> datesByEvent = datesByEvent(eventIds);
         List<SolverRoom> rooms = classroomService.findAllAvailable().stream()
                 .map(this::toSolverRoom)
@@ -82,16 +77,15 @@ class AutoAllocationDataLoader {
         return new AutoPreviewInputs(events, datesByEvent, rooms, occupancy, databaseOccupancy, priorRoomByEvent);
     }
 
-    private List<RecurringEvent> loadRecurringEvents(Set<Long> eventIds) {
-        List<AcademicEvent> found = eventRepository.findAllById(eventIds);
+    private List<RecurringEventResponseDto> loadRecurringEvents(Set<Long> eventIds) {
+        List<AcademicEventResponseDto> found = academicEventService.findByIds(eventIds);
         if (found.size() != eventIds.size()) {
             throw ResourceNotFoundException.of("AcademicEvent", eventIds);
         }
         return found.stream().map(e -> {
-            AcademicEvent unproxied = (AcademicEvent) Hibernate.unproxy(e);
-            if (!(unproxied instanceof RecurringEvent recurring)) {
+            if (!(e instanceof RecurringEventResponseDto recurring)) {
                 throw new AllocationConflictException(
-                        "auto-preview solo soporta eventos recurrentes por ahora (evento " + e.getId() + ")");
+                        "auto-preview solo soporta eventos recurrentes por ahora (evento " + e.id() + ")");
             }
             return recurring;
         }).toList();
@@ -103,12 +97,12 @@ class AutoAllocationDataLoader {
      * de fecha evita re-resolver clases ya dictadas.
      */
     private Map<Long, List<LocalDate>> datesByEvent(Set<Long> eventIds) {
-        return occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(
+        return occurrenceService.findSlotsByEventsAndStatuses(
                         eventIds, List.of(OccurrenceStatus.SCHEDULED, OccurrenceStatus.ASSIGNED), LocalDate.now())
                 .stream()
                 .collect(Collectors.groupingBy(
-                        o -> o.getEvent().getId(),
-                        Collectors.mapping(Occurrence::getDate,
+                        OccurrenceSlotDto::eventId,
+                        Collectors.mapping(OccurrenceSlotDto::date,
                                 Collectors.collectingAndThen(Collectors.toCollection(TreeSet::new),
                                         List::copyOf))));
     }
@@ -122,14 +116,14 @@ class AutoAllocationDataLoader {
      * filtrar por evento: quien llama separa la ajena (pinned) de la de los propios eventos
      * (que da el aula previa para el floor de no-regresión).
      */
-    private List<OccupiedSlot> loadOccupancyInRange(List<RecurringEvent> events) {
+    private List<OccupiedSlot> loadOccupancyInRange(List<RecurringEventResponseDto> events) {
         if (events.isEmpty()) {
             return List.of();
         }
-        LocalDate from = events.stream().map(RecurringEvent::getStartDate)
+        LocalDate from = events.stream().map(RecurringEventResponseDto::startDate)
                 .min(Comparator.naturalOrder()).orElseThrow();
         LocalDate to = events.stream()
-                .map(e -> e.getEndDate() != null ? e.getEndDate() : e.getStartDate().plusYears(1))
+                .map(e -> e.endDate() != null ? e.endDate() : e.startDate().plusYears(1))
                 .max(Comparator.naturalOrder()).orElseThrow();
 
         Map<Long, OccurrenceSlotDto> slotByOccurrenceId = Maps.byId(

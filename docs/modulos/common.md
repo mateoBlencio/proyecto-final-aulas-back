@@ -80,5 +80,6 @@ Ninguna (base del grafo). Todos dependen de `common`.
 - `GlobalExceptionHandler`: cada excepción mapeada devuelve el status y el `ProblemDetail`
   esperado (body válido, tipo de contenido `application/problem+json`).
 - `SigaRevision`: al tocar una entidad `@Audited` se crea una fila en `revinfo` con
-  timestamp `LocalDateTime` legible (junto con los tests de Envers de `allocation`).
+  timestamp `LocalDateTime` legible (junto con los tests de Envers de `events` y
+  `allocation`).
 </content>

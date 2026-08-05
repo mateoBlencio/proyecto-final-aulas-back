@@ -2,33 +2,27 @@
 
 ## Responsabilidad
 
-Corazón del dominio. Modela **eventos académicos** (recurrentes/únicos), sus
-**ocurrencias** (fechas concretas con máquina de estados) y las **asignaciones de aula**
-(allocations). Orquesta la asignación manual, la asignación "desde una fecha", la
-detección de problemas de asignación (sobrecupo/superposiciones) y el flujo completo de
+Capa de **asignación de aula**: modela la `Allocation` (aula + ocurrencia + origen),
+orquesta la asignación manual, la asignación "desde una fecha", la detección de
+problemas de asignación (sobrecupo/superposiciones) y el flujo completo de
 **asignación automática** vía `solver`: preview con re-resolución, validación de
-movimiento sobre el preview y confirmación atómica. Ver
-[`../modelo-dominio.md`](../modelo-dominio.md).
+movimiento sobre el preview y confirmación atómica. También orquesta el alta/
+modificación **atómica** de un evento único con aula (crea/actualiza el evento en
+`events` y le asigna aula en la misma transacción).
+
+No modela el evento académico en sí (calendario, horario, ocurrencias) — eso vive en
+`events`, que este módulo consume por ID + DTO. Ver
+[`../modelo-dominio.md`](../modelo-dominio.md) y
+[ADR-012](../adr/ADR-012-desacople-events-allocation.md) (por qué se separaron).
 
 ## API pública (`::api`)
 
-Servicios: `AcademicEventService`, `AllocationService` (ambos `@NamedInterface("api")`,
-consumidos por `excelimport`), `AllocationProblemService` y `AutoAllocationService`
-(ambos solo internos, sin `::api`).
+Servicio: `AllocationService` (`@NamedInterface("api")`, consumido por `excelimport`
+para `importAllocationsBatch`). `AllocationProblemService`, `AutoAllocationService`,
+`UniqueEventAllocationService` y `AllocationAuditHistoryService` son internos, sin
+`::api` — no tienen consumidores fuera de `allocation`.
 
 ### Endpoints
-
-**Eventos** (`/v1/events`):
-
-| Método | Path | Descripción |
-|---|---|---|
-| GET | `/v1/events` | Todos los eventos |
-| GET | `/v1/events/{id}` | Evento por ID |
-| GET | `/v1/events/{id}/occurrences` | Ocurrencias del evento |
-| POST | `/v1/events/recurring` | Crea evento recurrente + genera ocurrencias |
-| POST | `/v1/events/unique` | Crea evento único (1 ocurrencia) |
-| GET | `/v1/events/{id}/history` | Historial de auditoría del evento (Envers, ver más abajo) |
-| PUT | `/v1/events/{eventId}/classroom` | Reasignación permanente: cambia el aula de **todas las ocurrencias futuras** de un evento recurrente (las pasadas quedan intactas). **409** si el evento no es recurrente, si ya finalizó, o si alguna ocurrencia solapa |
 
 **Asignaciones** (`/v1/allocations`, `AllocationController`):
 
@@ -39,15 +33,17 @@ consumidos por `excelimport`), `AllocationProblemService` y `AutoAllocationServi
 | GET | `/v1/allocations/overlaps?from&to` | Superposiciones de horario-aula en el rango (ver más abajo) |
 | GET | `/v1/allocations?date` | Asignaciones de un día |
 | GET | `/v1/allocations/{id}` | Por ID |
+| GET | `/v1/allocations/occurrences/{occurrenceId}/allocation-history` | Historial de auditoría de las asignaciones de la ocurrencia (Envers, ver más abajo) |
 | POST | `/v1/allocations/occurrences/{occurrenceId}` | Asignación manual (falla si ya tiene aula, si ya pasó, o **409** si solapa con otra asignación) |
 | PUT | `/v1/allocations/{id}` | Reasignar aula (**409** si solapa) |
 | PUT | `/v1/allocations/batch` | Reasignación en lote, atómica (**409** si algún move solapa con BD o con otro move del propio lote) |
 | POST | `/v1/allocations/from-date` | Asigna aula a todas las ocurrencias futuras de un recurrente desde `fromDate` (clamped a hoy si es pasada; **409** si solapa) |
-| GET | `/v1/allocations/occurrences/{occurrenceId}/history` | Historial de auditoría de la ocurrencia (Envers, ver más abajo) |
-| GET | `/v1/allocations/occurrences/{occurrenceId}/allocation-history` | Historial de auditoría de las asignaciones de la ocurrencia (Envers, ver más abajo) |
+| PUT | `/v1/allocations/events/{eventId}/classroom` | Reasignación permanente: cambia el aula de **todas las ocurrencias futuras** de un evento recurrente (las pasadas quedan intactas). **409** si el evento no es recurrente, si ya finalizó, o si alguna ocurrencia solapa |
+| GET | `/v1/allocations/events/unique` | Eventos únicos **con** aula/estado/sobrecupo (para la vista sin aula, ver `GET /v1/events/unique`) |
+| POST | `/v1/allocations/events/unique` | Crea evento único + le asigna el aula indicada, atómico |
+| PUT | `/v1/allocations/events/unique/{id}` | Modifica un evento único existente y reasigna su aula, atómico |
 
-**Asignación automática** (`/v1/allocations/auto-preview`, `AutoAllocationController`,
-propio de `AutoAllocationService`):
+**Asignación automática** (`/v1/allocations/auto-preview`, `AutoAllocationController`):
 
 | Método | Path | Descripción |
 |---|---|---|
@@ -58,42 +54,52 @@ propio de `AutoAllocationService`):
 
 ## Estructura interna
 
-Capas estándar + `mapper` con **composers** (`AllocationComposer`, `AcademicEventComposer`):
-arman los DTOs trayendo datos de `space`/`academic` por `findByIds` (batch, sin N+1).
+Capas estándar + `mapper` con **composers** (`AllocationComposer`,
+`EventAllocationComposer`): arman los DTOs trayendo eventos de `events` y aulas de
+`space` por `findByIds`/`findByIds` (batch, sin N+1).
 
 ### Modelo
 
-- **`AcademicEvent`** — abstracta, herencia `JOINED`, discriminador `tipo_evento`.
-  Auditada con Envers. `subjectId`/`commissionId` (IDs planos cross-módulo, ambos nullable)
-  viven acá, compartidos por los dos subtipos. Subtipos:
-  - **`RecurringEvent`** — `dayOfWeek`, `startDate`, `endDate`. `toOccurrences()` genera
-    semanalmente desde `startDate` hasta `endDate` (o `startDate + 1 año` si es null).
-  - **`UniqueEvent`** — `date`, `kind` (`UniqueEventKind`: `PARCIAL`/`TRABAJO_PRACTICO`/
-    `EXAMEN_FINAL`/`OTRO`), `description`; genera 1 ocurrencia. `subjectId` obligatorio
-    salvo `kind=OTRO`; `commissionId` nunca obligatorio por sí solo, pero no puede venir
-    sin `subjectId` (validado en el service, ver ADR-011).
-- **`Occurrence`** — fecha + `OccurrenceStatus` (`SCHEDULED`/`ASSIGNED`/`CANCELLED`/`SUSPENDED`).
-  `isPast()` compara contra `LocalDateTime.now()`.
-- **`Allocation`** — `classroomId` (ID plano a `space`), `source`
-  (`MANUAL`/`AUTOMATIC`/`IMPORTED`), `createdAt`, `observation`. `@OneToOne` con `Occurrence`.
+- **`Allocation`** — `occurrenceId` (ID plano a la `Occurrence` de `events`, no
+  relación JPA — ver F2 de ADR-012), `classroomId` (ID plano a `space`), `source`
+  (`MANUAL`/`AUTOMATIC`/`IMPORTED`), `createdAt`, `observation`. Auditada con Envers
+  ([ADR-007](../adr/ADR-007-auditoria-envers-en-allocation.md)).
+
+### `EventAllocationComposer`
+
+Enriquece la vista de un `UniqueEventResponseDto` (de `events`, sin aula) con
+aula/estado/sobrecupo, resolviendo `Occurrence`/`Allocation`/`Classroom` en batch —
+la parte que `events` no conoce.
+
+### `UniqueEventAllocationServiceImpl`
+
+Orquesta *crear evento único + asignar aula* y *modificar + reasignar* llamando a
+`AcademicEventService` (`events :: api`) y a `AllocationService` dentro de la misma
+transacción (propagación `REQUIRED`, mismo datasource): si el aula no está disponible
+o hay solapamiento, no queda ningún registro persistido — la atomicidad documentada en
+`docs/modelo-dominio.md` cruza ahora la frontera de módulo, pero se preserva porque
+ambos servicios comparten transacción Spring, no hay `@ApplicationModuleListener` de
+por medio.
 
 ### Validaciones de negocio (`validator/AllocationValidator`)
 
 Submódulo privado (fuera de todo `::api`) que **centraliza todas las reglas de negocio de
 asignación**, compartidas entre el flujo manual (`AllocationServiceImpl`) y el automático
-(`AutoAllocationServiceImpl`). Los services solo orquestan (cargan entidades, persisten,
-componen DTOs) y delegan cada validación acá:
+(`AutoAllocationServiceImpl`). Los services solo orquestan (piden slots a `events`,
+persisten, componen DTOs) y delegan cada validación acá:
 
-- `validateNoOverlap` — ningún candidato (`AllocationCandidate` = ocurrencia + aula
-  destino) solapa con ocupación `ASSIGNED` firme de BD ni con otros candidatos del lote.
-  Filtra las ocurrencias ya pasadas, hace **una sola** consulta de ocupación
-  (`findOccupancyBetween`) sobre el rango `[min, max]` de fechas, excluyendo las
-  ocurrencias propias de la operación. Dos frentes: `databaseConflicts` (vs. BD) e
-  `internalConflicts` (candidatos entre sí — relevante para lotes, que se validan
-  **juntos antes de escribir ninguno**; dos ocurrencias del mismo evento nunca
-  conflictúan entre sí). Cualquier conflicto → `ReassignConflictException` (**409**) con
-  `List<OccurrenceConflictDto>`; nada se persiste. Franjas **adyacentes** (fin == inicio)
-  **no** conflictúan (`overlaps` usa `<`/`<` estricto).
+- `validateNoOverlap` — ningún candidato (`AllocationCandidate` = `OccurrenceSlotDto` +
+  aula destino) solapa con ocupación `ASSIGNED` firme de BD ni con otros candidatos del
+  lote. Filtra las ocurrencias ya pasadas (`OccurrenceSlotDto.isPast()`), lee la
+  ocupación vía `OccurrenceService.findSlotsByStatusBetween` + `AllocationRepository
+  .findByOccurrenceIdIn` (dos queries acotadas por rango de fecha, batch por `IN`, sin
+  N+1 — reemplazan el antiguo `JOIN FETCH` de F2), excluyendo las ocurrencias propias de
+  la operación. Dos frentes: `databaseConflicts` (vs. BD) e `internalConflicts`
+  (candidatos entre sí — relevante para lotes, que se validan **juntos antes de escribir
+  ninguno**; dos ocurrencias del mismo evento nunca conflictúan entre sí). Cualquier
+  conflicto → `ReassignConflictException` (**409**) con `List<OccurrenceConflictDto>`;
+  nada se persiste. Franjas **adyacentes** (fin == inicio) **no** conflictúan (`overlaps`
+  usa `<`/`<` estricto).
 - `validateClassroomsAvailable` — batch: toda aula referenciada existe y está
   `available = true` (vía fachada `ClassroomService` de `space`).
 - `validateNotPast` / `isApplicable` — ocurrencia ya sucedida no se modifica.
@@ -101,7 +107,8 @@ componen DTOs) y delegan cada validación acá:
 - `validateEventNotFinished` — evento con todas sus ocurrencias pasadas no se reasigna.
 - `validateNoDuplicateEventIds` / `validateAllocationsBelongToPreview` /
   `validateBelongsToPreview` / `moveDatabaseConflicts` / `movePreviewConflicts` — reglas
-  del flujo automático (confirm y validate-move).
+  del flujo automático (confirm y validate-move); trabajan sobre `RecurringEventResponseDto`
+  (de `events`), no sobre la entidad.
 
 ### Intent methods de asignación (en `AllocationServiceImpl`)
 
@@ -113,39 +120,36 @@ componen DTOs) y delegan cada validación acá:
   entre sí) antes de escribir nada.
 - `reassignEvent`: **reasignación permanente** — cambia el aula de todas las ocurrencias
   con `date >= hoy` de un evento recurrente (las pasadas quedan intactas). Rechaza evento
-  no recurrente o finalizado (`validateEventNotFinished`). Expuesto como
-  `PUT /v1/events/{eventId}/classroom`.
+  no recurrente (`instanceof RecurringEventResponseDto` sobre el DTO de `events`) o
+  finalizado (`validateEventNotFinished`). Expuesto como
+  `PUT /v1/allocations/events/{eventId}/classroom`.
 - `allocateManuallyFromDate`: solo recurrentes; además de `validateNoOverlap`, hace
   **clamp** de `fromDate` a hoy si viene en el pasado (`effectiveFrom = max(fromDate, today)`).
 - `importAllocationsFromDate`: variante para excel (source `IMPORTED`, no saltea pasado,
   **sin** `validateNoOverlap` — la carga masiva no se bloquea por solapamientos).
-- `allocateToOccurrences`: upsert (reusa allocation existente o crea), setea estado `ASSIGNED`.
+- `allocateToOccurrences`: upsert (reusa allocation existente o crea), setea estado
+  `ASSIGNED` vía `OccurrenceService.markAssigned` (dirty checking, misma transacción).
 
-### Historial de auditoría (`AuditHistoryServiceImpl`)
+### Historial de auditoría de asignaciones (`AllocationAuditHistoryServiceImpl`)
 
-Consulta de solo lectura sobre las tablas `_aud` de Envers (ADR-007) vía `AuditReader`
-(`AuditReaderFactory.get(entityManager)`), tres métodos `@Transactional(readOnly=true)`:
+Consulta de solo lectura sobre `asignacion_aula_aud` vía `AuditReader`:
 
-- **`findEventHistory(eventId)`** — `forRevisionsOfEntity(AcademicEvent.class, ...)`;
-  con herencia JOINED la query devuelve el subtipo real, mapeado al snapshot polimórfico
-  por `type` (`EventHistorySnapshotDto` sealed, mismo patrón que `AcademicEventResponseDto`).
-- **`findOccurrenceHistory(occurrenceId)`** — revisiones de la ocurrencia (cambios de estado).
-- **`findAllocationHistory(occurrenceId)`** — filtra por la FK auditada con
-  `AuditEntity.relatedId("occurrence")` sin cargar la ocurrencia; por ocurrencia y no por
-  `allocationId` porque la allocation puede borrarse/recrearse.
+- **`findAllocationHistory(occurrenceId)`** — filtra por la columna plana
+  `occurrenceId` (`AuditEntity.property`, no `relatedId` — ya no es una relación JPA
+  desde F2) sin cargar la ocurrencia; por ocurrencia y no por `allocationId` porque la
+  allocation puede borrarse/recrearse. El ancla del 404 (historial vacío + ocurrencia
+  inexistente) es `OccurrenceService.existsOccurrence(occurrenceId)`, de `events`.
 
-Contrato común `RevisionDto<T>{revision, date, user, kind, snapshot}` (orden ascendente);
-`kind` mapea `RevisionType` ADD/MOD/DEL → CREATED/MODIFIED/DELETED; en DELETED el snapshot
-va en null (Envers devuelve la entidad solo con el id). Historial vacío + entidad
-inexistente hoy ⇒ **404** (si la entidad existe, el INSERT siempre auditó). Snapshots con
-IDs planos sin componer contra otros módulos (el dato histórico crudo; el front resuelve
-nombres). Ver [`../para-front.md`](../para-front.md).
+Expuesto en `GET /v1/allocations/occurrences/{occurrenceId}/allocation-history`. El
+historial del evento y de la ocurrencia en sí (`EventAuditHistoryService`) vive en
+`events` — ver [events.md](events.md).
 
 ### Escritura única (`service/impl/AllocationWriter`)
 
 Componente package-private (sin interfaz) que es el **único punto de escritura de
 asignaciones**: upsert por ocurrencia (reusa la allocation existente o crea una nueva) +
-pase a `ASSIGNED`, con prefetch batch de las allocations existentes (sin N+1). Saltea
+pase a `ASSIGNED` (un único `OccurrenceService.markAssigned(ids)` por lote, no por
+ítem), con prefetch batch de las allocations existentes (sin N+1). Saltea
 no-asignables (`CANCELLED`/`SUSPENDED`, o pasadas cuando `skipPast`) por diseño — no es
 fallo parcial. Todos los flujos (manual, importado y el `confirm` automático) pasan por
 acá; el intent method que llama decide las validaciones previas y estampa su `source`.
@@ -163,18 +167,21 @@ la misma resolución de rango:
   `from + 6 meses` si no hay período activo con `endDate`. `to < from` (efectivo) ⇒
   `InvalidDateRangeException` (**400**).
 - **`GET /v1/allocations/unassigned`** — eventos con ocurrencias `SCHEDULED` (sin aula);
-  delega en `AcademicEventService.findUnassignedEvents` con el rango ya resuelto.
-- **`GET /v1/allocations/overcrowded`** — sobre una lectura de la ocupación `ASSIGNED`
-  (`findOccupancyBetween`), agrupa por (evento, aula) y compara `enrolled` (`null` ⇒ `0`)
-  contra `classroom.capacity()`; agrupa todas las fechas en conflicto de un mismo par
+  delega en `AcademicEventService.findUnassignedEvents` (de `events`) con el rango ya
+  resuelto.
+- **`GET /v1/allocations/overcrowded`** — sobre `OccurrenceService
+  .findSlotsByStatusBetween(ASSIGNED, ...)` + `AllocationRepository.findByOccurrenceIdIn`,
+  agrupa por (evento, aula) y compara `enrolled` (`null` ⇒ `0`) contra
+  `classroom.capacity()`; agrupa todas las fechas en conflicto de un mismo par
   evento-aula en una sola fila (`OvercrowdedAllocationDto`).
 - **`GET /v1/allocations/overlaps`** — sobre la misma lectura de ocupación, agrupa por
   (aula, fecha), ordena por hora de inicio y barre con corte temprano (mismo patrón que
   `SolverServiceImpl.computeConflicts`) para evitar el producto cartesiano; los pares en
   conflicto se agregan por (eventoA, eventoB, aula) acumulando todas las fechas en que
   chocan (`ClassroomOverlapDto`). Franjas adyacentes no cuentan (criterio `<`/`<`).
-- En `overcrowded`/`overlaps`, eventos y aulas ajenos se resuelven en **un solo batch cada
-  uno** (`findByIds`) — sin N+1. Cada endpoint hace su propia lectura de ocupación
+- En `overcrowded`/`overlaps`, los eventos ajenos se resuelven con
+  `AcademicEventService.findByIds` y las aulas con `ClassroomService.findByIds` — **un
+  solo batch cada uno**, sin N+1. Cada endpoint hace su propia lectura de ocupación
   (independientes; si el front pide los dos, son dos lecturas).
 
 ### Asignación automática (`AutoAllocationServiceImpl`)
@@ -184,13 +191,13 @@ Flujo completo de tres pasos sobre un `SolverPreview` cacheado por `solver`
 
 1. **`autoPreview` — preview con re-resolución**. `eventIds` del request se
    deduplican vía `Set`. **Sin `@Transactional`**: la carga de datos vive en una
-   transacción corta propia (`AutoAllocationDataLoader`, deuda B3 resuelta); el solve
-   (hasta varios minutos) y la composición final corren **sin conexión JDBC retenida**.
-   - Solo eventos recurrentes: si algún id resuelve a un `UniqueEvent`,
+   transacción corta propia (`AutoAllocationDataLoader`); el solve (hasta varios
+   minutos) y la composición final corren **sin conexión JDBC retenida**.
+   - Solo eventos recurrentes: si algún id resuelve a un `UniqueEventResponseDto`,
      `AllocationConflictException` (**409**).
    - Toma occurrences `SCHEDULED` **o** `ASSIGNED` con `date >= hoy` de los eventos
      seleccionados (incluir `ASSIGNED` permite re-resolver eventos ya asignados con
-     sobrecupo/superposición).
+     sobrecupo/superposición), vía `OccurrenceService.findSlotsByEventsAndStatuses`.
    - La ocupación pinned que se le pasa al solver **excluye** las allocations de los
      propios eventos seleccionados (sus aulas quedan libres para que el solver las
      reasigne); el resto de la ocupación firme de BD sigue pinned.
@@ -240,24 +247,23 @@ Flujo completo de tres pasos sobre un `SolverPreview` cacheado por `solver`
      del mismo `previewId` da **410** (protección natural contra doble submit).
 
 Los tres métodos reusan `AutoAllocationDataLoader.load(eventIds)`: carga eventos
-recurrentes, fechas por evento, aulas disponibles y ocupación de BD (excluyendo los
-eventos seleccionados) en una única transacción corta, materializando entidades
-(`Hibernate.unproxy`) para que el resto del flujo pueda correr fuera de transacción.
+recurrentes (`AcademicEventService.findByIds` + filtro `instanceof
+RecurringEventResponseDto`), fechas por evento (`OccurrenceService
+.findSlotsByEventsAndStatuses`), aulas disponibles y ocupación de BD (excluyendo los
+eventos seleccionados) en una única transacción corta — sin tocar entidades ni
+repositorios de `events`.
 
 ## Dependencias
 
-`space::api`, `academic::api`, `solver::api`, `common`. Es el módulo con más
-dependencias (agrega el dominio).
+`events :: api`, `space :: api`, `academic :: api`, `solver :: api`, `common`. Es el
+módulo con más dependencias (agrega la orquestación del dominio).
 
 ## Gaps y oportunidades
 
 - **`auto-preview` solo eventos recurrentes.** Los `UniqueEvent` no entran (lanza 409).
 - **Sin transiciones de estado por API.** El enum tiene `CANCELLED`/`SUSPENDED` pero no hay
-  endpoint para cancelar/suspender una ocurrencia ni para borrar una asignación.
-- **`RecurringEvent.excludedDates` muerto.** Nunca se escribe (marcado obsoleto en el
-  código); `toOccurrences` lo lee siempre vacío. Candidato a eliminar (entidad + tabla).
-- **`isPast()` acoplado a `LocalDateTime.now()`.** No hay `Clock` inyectable → la lógica
-  temporal (núcleo de las validaciones) es difícil de testear de forma determinista.
+  endpoint para cancelar/suspender una ocurrencia ni para borrar una asignación (la
+  cancelación de un evento único vive en `events`, ver [events.md](events.md)).
 
 ## Testing
 
@@ -265,19 +271,15 @@ Módulo con cobertura unitaria e integración (Testcontainers):
 
 **Unitarias:**
 
-- `model/` — `RecurringEventTest` (`toOccurrences()`: primer día, paso semanal, `endDate`
-  null ⇒ `+1 año`, fechas excluidas), `UniqueEventTest`, `OccurrenceTest`
-  (`isPast()`/`startTime()`/`endTime()`).
 - `AllocationServiceImplTest` — `allocateManually`/`reallocate`/`batchReallocate`/
   `allocateManuallyFromDate` felices y en conflicto (409), `batchReallocate` no persiste
   nada si un move choca, `reassignEvent` (feliz solo-futuras, evento finalizado, evento
   único, inexistente).
-- `AllocationValidatorTest` — todas las reglas del validator: solape BD/interno, franjas
-  adyacentes, aulas disponibles, no-pasado, asignable, `validateEventNotFinished`,
+- `validator/AllocationValidatorTest` — todas las reglas del validator: solape BD/interno,
+  franjas adyacentes, aulas disponibles, no-pasado, asignable, `validateEventNotFinished`,
   pertenencia al preview, conflictos de move.
-- `AcademicEventServiceImplTest`, `AllocationProblemServiceImplTest` — sobrecupo (con y
-  sin `enrolled` null), superposición, agregación de fechas por par, rango por defecto,
-  `InvalidDateRangeException`.
+- `AllocationProblemServiceImplTest` — sobrecupo (con y sin `enrolled` null), superposición,
+  agregación de fechas por par, rango por defecto, `InvalidDateRangeException`.
 - `AutoAllocationServiceImplTest` — dedup de `eventIds`, exclusión de la ocupación pinned
   de los eventos seleccionados, inclusión de occurrences `ASSIGNED` futuras
   (re-resolución), separación `allocations`/`unresolved`, 409 por `UniqueEvent`,
@@ -285,40 +287,18 @@ Módulo con cobertura unitaria e integración (Testcontainers):
   409, franjas adyacentes), `confirm` (alta y update sin duplicar, conserva `ASSIGNED`,
   invalida preview, 410 en re-confirm, 409 por duplicados/ajeno al preview/aula
   inexistente o no disponible/conflicto BD/conflicto interno, `skippedEventIds`).
+- `UniqueEventAllocationServiceImplTest` — atomicidad evento+aula (rollback si el aula no
+  está disponible), alta y modificación.
 
-- `AuditHistoryApiIntegrationTest` (Testcontainers, commits reales) — los 3 endpoints de
-  historial: asignar → reasignar → borrar refleja CREATED/MODIFIED/DELETED (snapshot null
-  en DELETED), transición SCHEDULED→ASSIGNED de la ocurrencia, alta del evento con campos
-  del subtipo, usuario capturado, orden ascendente, lista vacía y 404.
+**Integración (Testcontainers):** `AllocationApiIntegrationTest` (incluye
+`reassignEvent` end-to-end: reasigna solo futuras), `AllocationProblemsIntegrationTest`,
+`AutoAllocationFlowIntegrationTest` (flujo preview → validate-move → confirm contra BD
+real), `AuditHistoryApiIntegrationTest` (los 3 endpoints de historial: asignar →
+reasignar → borrar refleja CREATED/MODIFIED/DELETED, ver también [events.md](events.md)).
 
-Sin cobertura: `RecurringEvent.toOccurrences()`, `Occurrence.isPast()`, composers,
-`AcademicEventServiceImpl`, y toda la capa de integración (Testcontainers).
+Sin cobertura: composers (`AllocationComposer`, `EventAllocationComposer`).
 
-### Unitarios recomendados (pendientes, alta prioridad)
-- `RecurringEvent.toOccurrences()`: primer día = `nextOrSame(dayOfWeek)`, paso semanal,
-  `endDate` null ⇒ `+1 año`, exclusión de fechas.
-- `Occurrence.isPast()` / `startTime()` / `endTime()` (inyectar `Clock` primero).
-- `AcademicEvent.endTime()` = `startTime + duration`.
-- `allocateToOccurrences`: upsert (reusa vs crea), salteo de pasadas (`skipPast`), salteo
-  de `CANCELLED`/`SUSPENDED`.
+### Recomendados (pendientes)
 - Composers: armado de DTO sin N+1 (mockear `findByIds`).
-
-### Integración (Testcontainers) recomendados
-- Flujo completo `POST recurring` → ocurrencias generadas en BD.
-- `assignManually` feliz + 409 por ocurrencia ya asignada + 409 por pasada.
-- `from-date` con conflicto real → 409 con `OccurrenceConflictDto` correcto.
-- `batchReassign` atómico: si una falla, ninguna se persiste.
-- `confirm` atómico end-to-end: si una validación falla, nada persiste en BD.
-- **Auditoría Envers**: verificar filas en `*_aud` tras crear/modificar.
-  de los eventos seleccionados, re-resolución de `ASSIGNED` futuras, separación
-  `allocations`/`unresolved`, 409 por `UniqueEvent`, `validateMove` completo, `confirm`
-  completo (atómico, 410 en re-confirm, `skippedEventIds`).
-
-**Integración (Testcontainers):** `AcademicEventApiIntegrationTest`,
-`AllocationApiIntegrationTest` (incluye `reassignEvent` end-to-end: reasigna solo
-futuras), `AllocationProblemsIntegrationTest`, `AutoAllocationFlowIntegrationTest`
-(flujo preview → validate-move → confirm contra BD real).
-
-Pendiente: composers (armado de DTO sin N+1), auditoría Envers (filas en `*_aud`),
-`Clock` inyectable para testear `isPast()` determinista.
-</content>
+- `allocateToOccurrences`: upsert (reusa vs crea), salteo de pasadas (`skipPast`), salteo
+  de `CANCELLED`/`SUSPENDED`, como test unitario aislado de `AllocationWriter`.

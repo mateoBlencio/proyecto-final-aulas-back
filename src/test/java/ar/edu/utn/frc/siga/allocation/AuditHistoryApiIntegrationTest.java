@@ -2,11 +2,11 @@ package ar.edu.utn.frc.siga.allocation;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
-import ar.edu.utn.frc.siga.allocation.events.dto.request.CreateRecurringEventRequestDto;
-import ar.edu.utn.frc.siga.allocation.events.model.Occurrence;
+import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
+import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
-import ar.edu.utn.frc.siga.allocation.events.repository.OccurrenceRepository;
-import ar.edu.utn.frc.siga.allocation.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 

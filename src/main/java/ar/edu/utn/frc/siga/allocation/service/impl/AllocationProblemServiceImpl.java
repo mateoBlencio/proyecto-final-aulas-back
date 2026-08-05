@@ -2,16 +2,13 @@ package ar.edu.utn.frc.siga.allocation.service.impl;
 
 import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
-import ar.edu.utn.frc.siga.allocation.events.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ClassroomOverlapDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OvercrowdedAllocationDto;
-import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceSlotDto;
-import ar.edu.utn.frc.siga.allocation.events.mapper.AcademicEventComposer;
-import ar.edu.utn.frc.siga.allocation.events.model.AcademicEvent;
-import ar.edu.utn.frc.siga.allocation.events.model.OccurrenceStatus;
-import ar.edu.utn.frc.siga.allocation.events.repository.AcademicEventRepository;
-import ar.edu.utn.frc.siga.allocation.events.service.AcademicEventService;
-import ar.edu.utn.frc.siga.allocation.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.service.AllocationProblemService;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.OccupiedSlot;
@@ -53,11 +50,9 @@ public class AllocationProblemServiceImpl implements AllocationProblemService {
 
     private final AllocationRepository allocationRepository;
     private final OccurrenceService occurrenceService;
-    private final AcademicEventRepository academicEventRepository;
     private final ClassroomService classroomService;
     private final AcademicEventService academicEventService;
     private final AcademicPeriodService academicPeriodService;
-    private final AcademicEventComposer academicEventComposer;
 
     @Override
     public Page<AcademicEventResponseDto> findUnassigned(LocalDate from, LocalDate to, boolean includePast, Pageable pageable) {
@@ -143,8 +138,7 @@ public class AllocationProblemServiceImpl implements AllocationProblemService {
     }
 
     private Map<Long, AcademicEventResponseDto> fetchEventsById(Set<Long> eventIds) {
-        List<AcademicEvent> events = academicEventRepository.findAllById(eventIds);
-        return academicEventComposer.composeById(events);
+        return Maps.byId(academicEventService.findByIds(eventIds), AcademicEventResponseDto::id);
     }
 
     private Map<Integer, ClassroomResponseDto> fetchClassroomsById(Set<Integer> ids) {

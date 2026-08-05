@@ -1,12 +1,10 @@
 package ar.edu.utn.frc.siga.allocation.mapper;
 
-import ar.edu.utn.frc.siga.allocation.events.dto.response.AcademicEventResponseDto;
-import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceResponseDto;
-import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceSlotDto;
-import ar.edu.utn.frc.siga.allocation.events.mapper.AcademicEventComposer;
-import ar.edu.utn.frc.siga.allocation.events.model.AcademicEvent;
-import ar.edu.utn.frc.siga.allocation.events.repository.AcademicEventRepository;
-import ar.edu.utn.frc.siga.allocation.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.common.util.Maps;
@@ -28,9 +26,8 @@ import java.util.stream.Collectors;
 public class AllocationComposer {
 
     private final AllocationMapper mapper;
-    private final AcademicEventComposer eventComposer;
+    private final AcademicEventService academicEventService;
     private final OccurrenceService occurrenceService;
-    private final AcademicEventRepository eventRepository;
     private final ClassroomService classroomService;
 
     /** Composición de una única asignación (delega en el batch con una lista de un elemento). */
@@ -47,8 +44,8 @@ public class AllocationComposer {
 
         Set<Long> eventIds = slotByOccurrenceId.values().stream()
                 .map(OccurrenceSlotDto::eventId).collect(Collectors.toCollection(LinkedHashSet::new));
-        List<AcademicEvent> events = eventRepository.findAllById(eventIds);
-        Map<Long, AcademicEventResponseDto> eventDtoById = eventComposer.composeById(events);
+        Map<Long, AcademicEventResponseDto> eventDtoById = Maps.byId(
+                academicEventService.findByIds(eventIds), AcademicEventResponseDto::id);
 
         Set<Integer> classroomIds = allocations.stream()
                 .map(Allocation::getClassroomId)

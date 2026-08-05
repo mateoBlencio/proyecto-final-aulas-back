@@ -17,7 +17,8 @@ Un archivo por módulo. Cada ficha sigue la misma estructura:
 |---|---|---|---|
 | `space` | [space.md](space.md) | Sí (parcial) | Aulas, edificios, tipos |
 | `academic` | [academic.md](academic.md) | **No** | Materias/comisiones/planes (solo `::api`) |
-| `allocation` | [allocation.md](allocation.md) | Sí | Eventos, ocurrencias, asignaciones |
+| `events` | [events.md](events.md) | Sí | Eventos académicos (recurrentes/únicos) y sus ocurrencias |
+| `allocation` | [allocation.md](allocation.md) | Sí | Asignaciones de aula, problemas de asignación, auto-asignación |
 | `solver` | [solver.md](solver.md) | No (vía allocation) | Optimización Timefold |
 | `excelimport` | [excelimport.md](excelimport.md) | Sí | Carga masiva Excel |
 | `common` | [common.md](common.md) | No (OPEN) | Config, excepciones, converters, auditoría |

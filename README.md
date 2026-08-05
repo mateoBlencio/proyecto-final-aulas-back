@@ -19,9 +19,10 @@ través de esa interfaz, nunca compartiendo entidades JPA.
 |---|---|---|
 | `space` | `common` | Aulas, edificios, tipos de aula |
 | `academic` | `common` | Materias, comisiones, planes, períodos |
-| `allocation` | `space::api`, `academic::api`, `solver::api`, `common` | Eventos académicos (recurrentes/únicos), ocurrencias, asignaciones de aula |
+| `events` | `academic::api`, `common` | Eventos académicos (recurrentes/únicos) y sus ocurrencias |
+| `allocation` | `events::api`, `space::api`, `academic::api`, `solver::api`, `common` | Asignaciones de aula, problemas de asignación, auto-asignación |
 | `solver` | `common` | Asignación automática con Timefold Solver |
-| `excelimport` | `academic::api`, `space::api`, `allocation::api`, `common` | Importación masiva desde Excel |
+| `excelimport` | `academic::api`, `space::api`, `allocation::api`, `events::api`, `common` | Importación masiva desde Excel |
 | `common` | (OPEN) | Config, excepciones globales, converters |
 
 Documentación de detalle:

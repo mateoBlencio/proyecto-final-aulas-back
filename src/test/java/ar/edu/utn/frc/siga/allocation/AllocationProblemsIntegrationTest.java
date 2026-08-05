@@ -4,20 +4,20 @@ import ar.edu.utn.frc.siga.AbstractIntegrationTest;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
-import ar.edu.utn.frc.siga.allocation.events.dto.request.CreateRecurringEventRequestDto;
-import ar.edu.utn.frc.siga.allocation.events.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
+import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ClassroomOverlapDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OvercrowdedAllocationDto;
-import ar.edu.utn.frc.siga.allocation.events.model.AcademicEvent;
+import ar.edu.utn.frc.siga.events.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
-import ar.edu.utn.frc.siga.allocation.events.model.Occurrence;
-import ar.edu.utn.frc.siga.allocation.events.model.OccurrenceStatus;
-import ar.edu.utn.frc.siga.allocation.events.model.UniqueEvent;
+import ar.edu.utn.frc.siga.events.model.Occurrence;
+import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.model.UniqueEvent;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
-import ar.edu.utn.frc.siga.allocation.events.repository.OccurrenceRepository;
-import ar.edu.utn.frc.siga.allocation.events.repository.UniqueEventRepository;
-import ar.edu.utn.frc.siga.allocation.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.events.repository.UniqueEventRepository;
+import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 
@@ -102,7 +102,7 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
         UniqueEvent event = UniqueEvent.builder()
                 .enrolled(enrolled).startTime(START).duration(java.time.Duration.ofMinutes(DURATION))
                 .date(date).description("Evento en el límite del período")
-                .kind(ar.edu.utn.frc.siga.allocation.events.model.UniqueEventKind.OTRO)
+                .kind(ar.edu.utn.frc.siga.events.model.UniqueEventKind.OTRO)
                 .build();
         AcademicEvent saved = uniqueEventRepository.save(event);
         occurrenceRepository.saveAll(saved.toOccurrences());

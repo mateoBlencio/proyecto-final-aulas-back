@@ -9,25 +9,18 @@ SIGA — Sistema Inteligente de Gestión Áulica (backend). Gestión y asignaci�
 ## Comandos
 
 ```bash
-# Compilar
 ./mvnw compile
 
-# Correr la app (desarrollo habitual: perfil dev + variables DB_* como env vars, sin Docker)
-# Variables requeridas: DB_HOST, DB_PORT, DB_NAME, DB_USERNAME, DB_PASSWORD (ver .env.example)
+# Perfil dev: variables DB_* como env vars, sin Docker (ver .env.example)
 SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
 
-# Alternativa autocontenida: Postgres efímero vía Docker Compose (create-drop + data.sql)
+# Perfil dev-local: Postgres efímero vía Docker Compose (create-drop + data.sql)
 SPRING_PROFILES_ACTIVE=dev-local ./mvnw spring-boot:run
 
-# Toda la suite (los tests de integración usan Testcontainers → requieren Docker corriendo)
-./mvnw test
-
-# Un solo test / un solo método
-./mvnw test -Dtest=SolverServiceImplTest
-./mvnw test -Dtest=SolverServiceImplTest#nombreDelMetodo
-
-# Verificar fronteras entre módulos (correr SIEMPRE tras cambios estructurales)
-./mvnw test -Dtest=ModularityTests
+./mvnw test                                          # toda la suite (Testcontainers, requiere Docker)
+./mvnw test -Dtest=SolverServiceImplTest             # un solo test
+./mvnw test -Dtest=SolverServiceImplTest#metodo      # un solo método
+./mvnw test -Dtest=ModularityTests                   # fronteras entre módulos, correr tras cambios estructurales
 ```
 
 - La API cuelga de context-path `/api`. Swagger UI habilitado solo en dev/dev-local/test (`/api/swagger-ui.html`).
@@ -38,25 +31,12 @@ SPRING_PROFILES_ACTIVE=dev-local ./mvnw spring-boot:run
 
 Un solo deployable, una sola BD, pero módulos con fronteras vigiladas. `ModularityTests.verifyBoundaries()` **rompe el build** si un módulo accede a internals de otro.
 
-Módulos (paquetes de primer nivel bajo `ar.edu.utn.frc.siga`) y sus dependencias declaradas en cada `package-info.java`:
-
-| Módulo | Depende de | Responsabilidad |
-|---|---|---|
-| `space` | `common` | Aulas, edificios, tipos de aula |
-| `academic` | `common` | Materias, comisiones, planes, períodos |
-| `allocation` | `space::api`, `academic::api`, `common` | Eventos académicos (recurrentes/únicos), ocurrencias, asignaciones de aula |
-| `solver` | `common` | Asignación automática con Timefold Solver |
-| `excelimport` | `academic::api`, `space::api`, `allocation::api`, `common` | Importación masiva desde Excel (Apache POI) |
-| `common` | (OPEN) | Config, excepciones globales, converters |
+Módulos (paquetes de primer nivel bajo `ar.edu.utn.frc.siga`) y sus dependencias declaradas en cada `package-info.java`: `space`→common (aulas, edificios, tipos de aula), `academic`→common (materias, comisiones, planes, períodos), `events`→academic::api+common (eventos académicos recurrentes/únicos y sus ocurrencias, sin conocer aulas), `allocation`→events::api+space::api+academic::api+solver::api+common (asignaciones de aula, problemas de asignación, auto-asignación), `solver`→common (asignación automática con Timefold Solver), `excelimport`→academic::api+space::api+allocation::api+events::api+common (importación masiva desde Excel), `auth`→common (autenticación y usuarios), `common`→OPEN (config, excepciones globales, converters).
 
 Reglas del paradigma:
 - Lo público de un módulo se marca con `@NamedInterface("api")`; el consumidor lo declara en `allowedDependencies` de su `package-info.java`. Todo lo demás es privado.
-- **Comunicación entre módulos: por ID + DTO a través de la interfaz pública, nunca compartiendo entidades JPA.** Refactor en curso (ver `.claude/plans/plan-refactor.md`) para eliminar el acoplamiento histórico (`allocation` mapeaba `Classroom` y `Commission` como `@ManyToOne` de otros módulos). **El código nuevo no debe agregar deuda de este tipo**: referenciar por ID plano y pedir datos a la fachada del otro módulo. El módulo `solver` es el ejemplo limpio: define sus propios records de entrada/salida (`SolverEvent`, `SolverRoom`, `SolverOccupancy`, `SolverPreview`) y `allocation` le mapea los datos; no consume entidades ni DTOs de otros módulos.
-- Dentro de cada módulo la estructura es por capas: `controller` / `dto` / `mapper` / `model` / `repository` / `service` (interfaz) / `service/impl`.
-
-### Solver (Timefold)
-
-`solver/optimization` contiene el `ConstraintProvider` (restricciones hard/soft) y `solver/model` las entidades de planificación (`SolverEvent`, `SolverRoom`) — son modelos propios del solver, no entidades JPA. Configuración en `siga.solver.*` de `application.yaml` (paralelismo, límite de segundos sin mejora, environment-mode).
+- **Comunicación entre módulos: por ID + DTO a través de la interfaz pública, nunca compartiendo entidades JPA.** Refactor en curso (ver `.claude/plans/plan-refactor.md`) para eliminar acoplamiento histórico; **código nuevo no debe agregar deuda de este tipo**. `solver` es el ejemplo limpio: define sus propios records (`SolverEvent`, `SolverRoom`, `SolverOccupancy`, `SolverPreview`, en `solver/model`, no entidades JPA) y `allocation` le mapea los datos.
+- Dentro de cada módulo la estructura es por capas: `controller` / `dto` / `mapper` / `model` / `repository` / `service` (interfaz) / `service/impl`. Config del solver en `siga.solver.*` de `application.yaml`.
 
 ## Base de datos: esquema externo, sin migraciones
 
@@ -67,13 +47,7 @@ Reglas del paradigma:
 
 ## Perfiles
 
-| Perfil | Uso |
-|---|---|
-| `dev` | Desarrollo habitual: Postgres propio, credenciales por env vars |
-| `dev-local` | Postgres efímero por Docker Compose, esquema autogenerado |
-| `test` | Servidor de pruebas desplegado |
-| `integration` | Solo tests (`src/test/resources/application-integration.yaml`, Testcontainers) |
-| `prod` | Producción |
+`dev` (Postgres propio, credenciales por env vars) · `dev-local` (Postgres efímero por Docker Compose, esquema autogenerado) · `test` (servidor de pruebas desplegado) · `integration` (solo tests, Testcontainers) · `prod` (producción).
 
 ## Convenciones
 
@@ -81,5 +55,4 @@ Reglas del paradigma:
 - Código y comentarios en el estilo existente: nombres de clases en inglés, comentarios y mensajes en español.
 - Lombok en todo el proyecto.
 - Zona horaria fija UTC (`-Duser.timezone=UTC` en el plugin de Boot).
-- Documentación del dominio y los módulos en `docs/`: `adr/` (decisiones arquitectónicas), `modelo-dominio.md` (modelo Evento/Occurrence/Allocation), `modulos/` (una ficha por módulo), `restricciones-asignacion.md` (mapa completo de reglas de asignación), `calendario-academico-2026.md` (referencia calendario académico UTN).
-- Contexto vivo de trabajo en curso (no versionado) en `.claude/plans/`: `plan-refactor.md` (plan activo de este refactor), `asignacion-automatica-preview.md`.
+- Documentación en `docs/`: `adr/`, `modelo-dominio.md`, `modulos/`, `restricciones-asignacion.md`, `calendario-academico-2026.md`. Contexto vivo de trabajo en curso (no versionado) en `.claude/plans/`.

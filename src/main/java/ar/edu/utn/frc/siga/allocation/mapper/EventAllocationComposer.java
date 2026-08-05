@@ -2,10 +2,10 @@ package ar.edu.utn.frc.siga.allocation.mapper;
 
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.UniqueEventAllocationResponseDto;
-import ar.edu.utn.frc.siga.allocation.events.dto.response.AcademicEventResponseDto;
-import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceSlotDto;
-import ar.edu.utn.frc.siga.allocation.events.dto.response.UniqueEventResponseDto;
-import ar.edu.utn.frc.siga.allocation.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.dto.response.UniqueEventResponseDto;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.common.util.Maps;

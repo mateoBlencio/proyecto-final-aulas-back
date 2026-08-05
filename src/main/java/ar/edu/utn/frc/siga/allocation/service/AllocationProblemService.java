@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.siga.allocation.service;
 
-import ar.edu.utn.frc.siga.allocation.events.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ClassroomOverlapDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OvercrowdedAllocationDto;
 import org.springframework.data.domain.Page;

@@ -1,7 +1,7 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationHistorySnapshotDto;
-import ar.edu.utn.frc.siga.allocation.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.service.AllocationAuditHistoryService;
 import ar.edu.utn.frc.siga.common.audit.SigaRevision;

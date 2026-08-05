@@ -5,7 +5,7 @@ import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.BatchReassignRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.CreateUniqueEventAllocationRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.UpdateUniqueEventAllocationRequestDto;
-import ar.edu.utn.frc.siga.allocation.events.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationHistorySnapshotDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ClassroomOverlapDto;

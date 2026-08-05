@@ -3,9 +3,10 @@
 ## Responsabilidad
 
 Carga masiva desde planilla Excel (Apache POI). Lee la plantilla oficial, valida su
-formato y, fila por fila, **materializa** el árbol académico y sus asignaciones llamando
-a los `findOrCreate` de `academic`, `space` y `allocation`. Punto de entrada de datos del
-sistema.
+formato y, fila por fila, **materializa** el árbol académico, el evento recurrente
+(`findOrCreateRecurringEvent` de `events`) y su asignación de aula (`allocation`)
+llamando a los `findOrCreate` de `academic`, `space`, `events` y `allocation`. Punto de
+entrada de datos del sistema.
 
 ## API pública (`::api`)
 
@@ -29,12 +30,12 @@ Endpoint REST:
   repetir llamadas por entidades que se repiten entre filas.
 - **`ExcelImportServiceImpl`** — orquestador (204 líneas). `@Transactional` sobre toda la
   importación (**all-or-nothing**). Recorre desde la fila índice 6 hasta `getLastRowNum()`,
-  hoja fija `"Hoja1"`. Inyecta 11 servicios de 4 módulos.
+  hoja fija `"Hoja1"`. Inyecta 11 servicios de 5 módulos.
 
 ## Dependencias
 
-`academic::api`, `space::api`, `allocation::api`, `common`. Junto con `allocation`, uno de
-los dos únicos módulos que agregan a varios otros.
+`academic::api`, `space::api`, `allocation::api`, `events::api`, `common`. Junto con
+`allocation`, uno de los dos únicos módulos que agregan a varios otros.
 
 ## Gaps y oportunidades
 

@@ -4,16 +4,15 @@ import ar.edu.utn.frc.siga.allocation.dto.request.AllocateFromDateRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.BatchReassignRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
-import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationComposer;
-import ar.edu.utn.frc.siga.allocation.events.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
-import ar.edu.utn.frc.siga.allocation.events.model.RecurringEvent;
-import ar.edu.utn.frc.siga.allocation.events.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
-import ar.edu.utn.frc.siga.allocation.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.AllocationCandidate;
@@ -21,7 +20,6 @@ import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.Hibernate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,7 +43,7 @@ public class AllocationServiceImpl implements AllocationService {
 
     private final AllocationRepository allocationRepository;
     private final OccurrenceService occurrenceService;
-    private final AcademicEventRepository eventRepository;
+    private final AcademicEventService academicEventService;
     private final AllocationComposer composer;
     private final AllocationValidator validator;
     private final AllocationWriter writer;
@@ -266,9 +264,7 @@ public class AllocationServiceImpl implements AllocationService {
      * (cada intent method preserva su propio texto, aunque la causa sea la misma).
      */
     private void findRecurringEvent(Long eventId, String operation) {
-        AcademicEvent event = Finder.orThrow(eventRepository::findById, eventId, "AcademicEvent");
-
-        if (!(Hibernate.unproxy(event) instanceof RecurringEvent)) {
+        if (!(academicEventService.findById(eventId) instanceof RecurringEventResponseDto)) {
             throw new AllocationConflictException(operation + " is only supported for recurring events");
         }
     }

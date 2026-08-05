@@ -2,22 +2,17 @@ package ar.edu.utn.frc.siga.allocation.service.impl;
 
 import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
-import ar.edu.utn.frc.siga.allocation.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ClassroomOverlapDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OvercrowdedAllocationDto;
-import ar.edu.utn.frc.siga.allocation.events.dto.response.OccurrenceSlotDto;
-import ar.edu.utn.frc.siga.allocation.events.dto.response.RecurringEventResponseDto;
-import ar.edu.utn.frc.siga.allocation.events.mapper.AcademicEventComposer;
-import ar.edu.utn.frc.siga.allocation.events.model.AcademicEvent;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
-import ar.edu.utn.frc.siga.allocation.events.model.EventType;
-import ar.edu.utn.frc.siga.allocation.events.model.OccurrenceStatus;
-import ar.edu.utn.frc.siga.allocation.events.model.RecurringEvent;
-import ar.edu.utn.frc.siga.allocation.events.repository.AcademicEventRepository;
+import ar.edu.utn.frc.siga.events.model.EventType;
+import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
-import ar.edu.utn.frc.siga.allocation.events.service.AcademicEventService;
-import ar.edu.utn.frc.siga.allocation.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.common.exception.InvalidDateRangeException;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
@@ -27,7 +22,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -35,13 +29,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.time.DayOfWeek;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -63,15 +54,11 @@ class AllocationProblemServiceImplTest {
     @Mock
     private OccurrenceService occurrenceService;
     @Mock
-    private AcademicEventRepository academicEventRepository;
-    @Mock
     private ClassroomService classroomService;
     @Mock
     private AcademicEventService academicEventService;
     @Mock
     private AcademicPeriodService academicPeriodService;
-    @Mock
-    private AcademicEventComposer academicEventComposer;
 
     @InjectMocks
     private AllocationProblemServiceImpl service;
@@ -80,20 +67,10 @@ class AllocationProblemServiceImplTest {
     void setUp() {
         lenient().when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of());
         lenient().when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of());
-        lenient().when(academicEventRepository.findAllById(any())).thenReturn(List.of());
+        lenient().when(academicEventService.findByIds(any())).thenReturn(List.of());
         lenient().when(academicEventService.findUnassignedEvents(any(), any(), anyBoolean())).thenReturn(List.of());
         lenient().when(academicPeriodService.findActive()).thenReturn(List.of());
         lenient().when(classroomService.findByIds(any())).thenReturn(List.of());
-        lenient().when(academicEventComposer.composeById(ArgumentMatchers.<List<? extends AcademicEvent>>any()))
-                .thenAnswer(invocation -> {
-            List<AcademicEvent> events = invocation.getArgument(0);
-            Map<Long, AcademicEventResponseDto> result = new LinkedHashMap<>();
-            for (AcademicEvent event : events) {
-                result.put(event.getId(), new RecurringEventResponseDto(event.getId(), EventType.RECURRING, event.getEnrolled(),
-                        event.getStartTime(), event.getDuration().toMinutes(), null, null, null, null, null));
-            }
-            return result;
-        });
     }
 
     @Test
@@ -101,7 +78,7 @@ class AllocationProblemServiceImplTest {
     void detectaSobrecupo() {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
-        RecurringEvent event = recurringEvent(1L, 40, LocalTime.of(8, 0), 60);
+        RecurringEventResponseDto event = recurringEvent(1L, 40, LocalTime.of(8, 0), 60);
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         Allocation allocation = allocation(100L, 10L, 5);
         mockOccupancy(from, to, List.of(slot), List.of(allocation), List.of(event));
@@ -122,7 +99,7 @@ class AllocationProblemServiceImplTest {
     void noDetectaSobrecupoCuandoHayLugar() {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
-        RecurringEvent event = recurringEvent(1L, 20, LocalTime.of(8, 0), 60);
+        RecurringEventResponseDto event = recurringEvent(1L, 20, LocalTime.of(8, 0), 60);
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         Allocation allocation = allocation(100L, 10L, 5);
         mockOccupancy(from, to, List.of(slot), List.of(allocation), List.of(event));
@@ -136,7 +113,7 @@ class AllocationProblemServiceImplTest {
     void noDetectaSobrecupoConEnrolledNull() {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
-        RecurringEvent event = recurringEvent(1L, null, LocalTime.of(8, 0), 60);
+        RecurringEventResponseDto event = recurringEvent(1L, null, LocalTime.of(8, 0), 60);
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         Allocation allocation = allocation(100L, 10L, 5);
         mockOccupancy(from, to, List.of(slot), List.of(allocation), List.of(event));
@@ -151,8 +128,8 @@ class AllocationProblemServiceImplTest {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
         LocalDate date = futureDate(2);
-        RecurringEvent eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
-        RecurringEvent eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
+        RecurringEventResponseDto eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
+        RecurringEventResponseDto eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
         OccurrenceSlotDto slotA = occurrenceSlot(10L, eventA, date);
         OccurrenceSlotDto slotB = occurrenceSlot(11L, eventB, date);
         Allocation allocA = allocation(100L, 10L, 5);
@@ -176,8 +153,8 @@ class AllocationProblemServiceImplTest {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
         LocalDate date = futureDate(2);
-        RecurringEvent eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
-        RecurringEvent eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
+        RecurringEventResponseDto eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
+        RecurringEventResponseDto eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
         OccurrenceSlotDto slotA = occurrenceSlot(10L, eventA, date);
         OccurrenceSlotDto slotB = occurrenceSlot(11L, eventB, date);
         Allocation allocA = allocation(100L, 10L, 5);
@@ -193,8 +170,8 @@ class AllocationProblemServiceImplTest {
     void noDetectaSolapeEnFechasDistintas() {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
-        RecurringEvent eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
-        RecurringEvent eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
+        RecurringEventResponseDto eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
+        RecurringEventResponseDto eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
         OccurrenceSlotDto slotA = occurrenceSlot(10L, eventA, futureDate(2));
         OccurrenceSlotDto slotB = occurrenceSlot(11L, eventB, futureDate(3));
         Allocation allocA = allocation(100L, 10L, 5);
@@ -211,8 +188,8 @@ class AllocationProblemServiceImplTest {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
         LocalDate date = futureDate(2);
-        RecurringEvent eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
-        RecurringEvent eventB = recurringEvent(2L, 10, LocalTime.of(9, 0), 60);
+        RecurringEventResponseDto eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
+        RecurringEventResponseDto eventB = recurringEvent(2L, 10, LocalTime.of(9, 0), 60);
         OccurrenceSlotDto slotA = occurrenceSlot(10L, eventA, date);
         OccurrenceSlotDto slotB = occurrenceSlot(11L, eventB, date);
         Allocation allocA = allocation(100L, 10L, 5);
@@ -230,8 +207,8 @@ class AllocationProblemServiceImplTest {
         LocalDate to = futureDate(30);
         LocalDate date1 = futureDate(2);
         LocalDate date2 = futureDate(9);
-        RecurringEvent eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
-        RecurringEvent eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
+        RecurringEventResponseDto eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
+        RecurringEventResponseDto eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
 
         OccurrenceSlotDto slotA1 = occurrenceSlot(10L, eventA, date1);
         OccurrenceSlotDto slotB1 = occurrenceSlot(11L, eventB, date1);
@@ -311,10 +288,10 @@ class AllocationProblemServiceImplTest {
     }
 
     private void mockOccupancy(LocalDate from, LocalDate to, List<OccurrenceSlotDto> slots,
-            List<Allocation> allocations, List<AcademicEvent> events) {
+            List<Allocation> allocations, List<RecurringEventResponseDto> events) {
         when(occurrenceService.findSlotsByStatusBetween(OccurrenceStatus.ASSIGNED, from, to)).thenReturn(slots);
         when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(allocations);
-        when(academicEventRepository.findAllById(any())).thenReturn(events);
+        when(academicEventService.findByIds(any())).thenReturn(List.copyOf(events));
     }
 
     /** Fecha relativa a hoy: evita que los tests de solapamiento/sobrecupo (isPast() filtra por reloj real) rompan con el paso del calendario. */
@@ -322,20 +299,14 @@ class AllocationProblemServiceImplTest {
         return LocalDate.now().plusDays(daysFromNow);
     }
 
-    private RecurringEvent recurringEvent(long id, Integer enrolled, LocalTime startTime, int durationMinutes) {
-        return RecurringEvent.builder()
-                .id(id)
-                .enrolled(enrolled)
-                .startTime(startTime)
-                .duration(Duration.ofMinutes(durationMinutes))
-                .dayOfWeek(DayOfWeek.MONDAY)
-                .startDate(LocalDate.of(2026, 1, 1))
-                .build();
+    private RecurringEventResponseDto recurringEvent(long id, Integer enrolled, LocalTime startTime, int durationMinutes) {
+        return new RecurringEventResponseDto(id, EventType.RECURRING, enrolled, startTime, durationMinutes,
+                DayOfWeek.MONDAY, LocalDate.of(2026, 1, 1), null, null, null);
     }
 
-    private OccurrenceSlotDto occurrenceSlot(long id, AcademicEvent event, LocalDate date) {
-        return new OccurrenceSlotDto(id, event.getId(), date, event.getStartTime(), event.endTime(),
-                OccurrenceStatus.ASSIGNED, event.getEnrolled());
+    private OccurrenceSlotDto occurrenceSlot(long id, RecurringEventResponseDto event, LocalDate date) {
+        return new OccurrenceSlotDto(id, event.id(), date, event.startTime(), event.endTime(),
+                OccurrenceStatus.ASSIGNED, event.enrolled());
     }
 
     private Allocation allocation(long id, Long occurrenceId, Integer classroomId) {
