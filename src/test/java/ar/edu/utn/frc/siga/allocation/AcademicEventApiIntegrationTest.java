@@ -53,8 +53,6 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("POST /v1/events/recurring crea el evento y genera ocurrencias SCHEDULED con las fechas esperadas")
     void createRecurring_persistsEventAndOccurrencesWithExpectedDates() throws Exception {
         IntegrationTestData.SubjectAndCommission sc = testData.materiaYComision();
-        // dayOfWeek == startDate.getDayOfWeek(): nextOrSame(dayOfWeek) devuelve startDate exacto,
-        // así la primera ocurrencia esperada es determinística.
         LocalDate startDate = LocalDate.now().plusDays(1);
         DayOfWeek dayOfWeek = startDate.getDayOfWeek();
         LocalDate endDate = startDate.plusWeeks(3);
