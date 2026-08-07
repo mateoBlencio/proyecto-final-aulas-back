@@ -94,7 +94,7 @@ class AllocationProblemServiceImplTest {
         LocalDate from = LocalDate.of(2026, 8, 1);
         LocalDate to = LocalDate.of(2026, 8, 31);
         RecurringEvent event = recurringEvent(1L, 40, LocalTime.of(8, 0), 60);
-        Allocation allocation = allocation(100L, occurrence(10L, event, LocalDate.of(2026, 8, 8)), 5);
+        Allocation allocation = allocation(100L, occurrence(10L, event, LocalDate.of(2026, 8, 3)), 5);
 
         when(allocationRepository.findOccupancyBetween(from, to, OccurrenceStatus.ASSIGNED))
                 .thenReturn(List.of(allocation));
@@ -107,7 +107,7 @@ class AllocationProblemServiceImplTest {
         assertThat(overcrowded.enrolled()).isEqualTo(40);
         assertThat(overcrowded.capacity()).isEqualTo(30);
         assertThat(overcrowded.excess()).isEqualTo(10);
-        assertThat(overcrowded.dates()).containsExactly(LocalDate.of(2026, 8, 8));
+        assertThat(overcrowded.dates()).containsExactly(LocalDate.of(2026, 8, 3));
     }
 
     @Test
@@ -116,7 +116,7 @@ class AllocationProblemServiceImplTest {
         LocalDate from = LocalDate.of(2026, 8, 1);
         LocalDate to = LocalDate.of(2026, 8, 31);
         RecurringEvent event = recurringEvent(1L, 20, LocalTime.of(8, 0), 60);
-        Allocation allocation = allocation(100L, occurrence(10L, event, LocalDate.of(2026, 8, 8)), 5);
+        Allocation allocation = allocation(100L, occurrence(10L, event, LocalDate.of(2026, 8, 3)), 5);
 
         when(allocationRepository.findOccupancyBetween(from, to, OccurrenceStatus.ASSIGNED))
                 .thenReturn(List.of(allocation));
@@ -131,7 +131,7 @@ class AllocationProblemServiceImplTest {
         LocalDate from = LocalDate.of(2026, 8, 1);
         LocalDate to = LocalDate.of(2026, 8, 31);
         RecurringEvent event = recurringEvent(1L, null, LocalTime.of(8, 0), 60);
-        Allocation allocation = allocation(100L, occurrence(10L, event, LocalDate.of(2026, 8, 8)), 5);
+        Allocation allocation = allocation(100L, occurrence(10L, event, LocalDate.of(2026, 8, 3)), 5);
 
         when(allocationRepository.findOccupancyBetween(from, to, OccurrenceStatus.ASSIGNED))
                 .thenReturn(List.of(allocation));
@@ -145,7 +145,7 @@ class AllocationProblemServiceImplTest {
     void detectaSolapeMismaAulaMismaFecha() {
         LocalDate from = LocalDate.of(2026, 8, 1);
         LocalDate to = LocalDate.of(2026, 8, 31);
-        LocalDate date = LocalDate.of(2026, 8, 8);
+        LocalDate date = LocalDate.of(2026, 8, 3);
         RecurringEvent eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
         RecurringEvent eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
         Allocation allocA = allocation(100L, occurrence(10L, eventA, date), 5);
@@ -170,7 +170,7 @@ class AllocationProblemServiceImplTest {
     void noDetectaSolapeEnAulasDistintas() {
         LocalDate from = LocalDate.of(2026, 8, 1);
         LocalDate to = LocalDate.of(2026, 8, 31);
-        LocalDate date = LocalDate.of(2026, 8, 8);
+        LocalDate date = LocalDate.of(2026, 8, 3);
         RecurringEvent eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
         RecurringEvent eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
         Allocation allocA = allocation(100L, occurrence(10L, eventA, date), 5);
@@ -190,7 +190,7 @@ class AllocationProblemServiceImplTest {
         LocalDate to = LocalDate.of(2026, 8, 31);
         RecurringEvent eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
         RecurringEvent eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
-        Allocation allocA = allocation(100L, occurrence(10L, eventA, LocalDate.of(2026, 8, 8)), 5);
+        Allocation allocA = allocation(100L, occurrence(10L, eventA, LocalDate.of(2026, 8, 3)), 5);
         Allocation allocB = allocation(101L, occurrence(11L, eventB, LocalDate.of(2026, 8, 4)), 5);
 
         when(allocationRepository.findOccupancyBetween(from, to, OccurrenceStatus.ASSIGNED))
@@ -205,7 +205,7 @@ class AllocationProblemServiceImplTest {
     void noDetectaSolapeEnFranjasAdyacentes() {
         LocalDate from = LocalDate.of(2026, 8, 1);
         LocalDate to = LocalDate.of(2026, 8, 31);
-        LocalDate date = LocalDate.of(2026, 8, 8);
+        LocalDate date = LocalDate.of(2026, 8, 3);
         RecurringEvent eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
         RecurringEvent eventB = recurringEvent(2L, 10, LocalTime.of(9, 0), 60);
         Allocation allocA = allocation(100L, occurrence(10L, eventA, date), 5);
@@ -223,7 +223,7 @@ class AllocationProblemServiceImplTest {
     void agregaFechasDeParRecurrenteEnUnaFila() {
         LocalDate from = LocalDate.of(2026, 8, 1);
         LocalDate to = LocalDate.of(2026, 8, 31);
-        LocalDate date1 = LocalDate.of(2026, 8, 8);
+        LocalDate date1 = LocalDate.of(2026, 8, 3);
         LocalDate date2 = LocalDate.of(2026, 8, 10);
         RecurringEvent eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
         RecurringEvent eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
