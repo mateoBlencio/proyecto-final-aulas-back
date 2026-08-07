@@ -56,6 +56,12 @@ class AllocationProblemServiceImplTest {
 
     private static final Pageable PAGEABLE = PageRequest.of(0, 20);
 
+    private static final LocalDate TODAY = LocalDate.now();
+    private static final LocalDate FROM = TODAY;
+    private static final LocalDate TO = TODAY.plusMonths(1);
+    private static final LocalDate DATE_1 = TODAY.plusDays(2);
+    private static final LocalDate DATE_2 = TODAY.plusDays(9);
+
     @Mock
     private AllocationRepository allocationRepository;
     @Mock
@@ -91,10 +97,10 @@ class AllocationProblemServiceImplTest {
     @Test
     @DisplayName("Detecta sobrecupo cuando los inscriptos superan la capacidad del aula")
     void detectaSobrecupo() {
-        LocalDate from = LocalDate.of(2026, 8, 1);
-        LocalDate to = LocalDate.of(2026, 8, 31);
+        LocalDate from = FROM;
+        LocalDate to = TO;
         RecurringEvent event = recurringEvent(1L, 40, LocalTime.of(8, 0), 60);
-        Allocation allocation = allocation(100L, occurrence(10L, event, LocalDate.of(2026, 8, 3)), 5);
+        Allocation allocation = allocation(100L, occurrence(10L, event, DATE_1), 5);
 
         when(allocationRepository.findOccupancyBetween(from, to, OccurrenceStatus.ASSIGNED))
                 .thenReturn(List.of(allocation));
@@ -107,16 +113,16 @@ class AllocationProblemServiceImplTest {
         assertThat(overcrowded.enrolled()).isEqualTo(40);
         assertThat(overcrowded.capacity()).isEqualTo(30);
         assertThat(overcrowded.excess()).isEqualTo(10);
-        assertThat(overcrowded.dates()).containsExactly(LocalDate.of(2026, 8, 3));
+        assertThat(overcrowded.dates()).containsExactly(DATE_1);
     }
 
     @Test
     @DisplayName("No detecta sobrecupo cuando los inscriptos no superan la capacidad")
     void noDetectaSobrecupoCuandoHayLugar() {
-        LocalDate from = LocalDate.of(2026, 8, 1);
-        LocalDate to = LocalDate.of(2026, 8, 31);
+        LocalDate from = FROM;
+        LocalDate to = TO;
         RecurringEvent event = recurringEvent(1L, 20, LocalTime.of(8, 0), 60);
-        Allocation allocation = allocation(100L, occurrence(10L, event, LocalDate.of(2026, 8, 3)), 5);
+        Allocation allocation = allocation(100L, occurrence(10L, event, DATE_1), 5);
 
         when(allocationRepository.findOccupancyBetween(from, to, OccurrenceStatus.ASSIGNED))
                 .thenReturn(List.of(allocation));
@@ -128,10 +134,10 @@ class AllocationProblemServiceImplTest {
     @Test
     @DisplayName("No detecta sobrecupo cuando 'enrolled' es null (se trata como 0)")
     void noDetectaSobrecupoConEnrolledNull() {
-        LocalDate from = LocalDate.of(2026, 8, 1);
-        LocalDate to = LocalDate.of(2026, 8, 31);
+        LocalDate from = FROM;
+        LocalDate to = TO;
         RecurringEvent event = recurringEvent(1L, null, LocalTime.of(8, 0), 60);
-        Allocation allocation = allocation(100L, occurrence(10L, event, LocalDate.of(2026, 8, 3)), 5);
+        Allocation allocation = allocation(100L, occurrence(10L, event, DATE_1), 5);
 
         when(allocationRepository.findOccupancyBetween(from, to, OccurrenceStatus.ASSIGNED))
                 .thenReturn(List.of(allocation));
@@ -143,9 +149,9 @@ class AllocationProblemServiceImplTest {
     @Test
     @DisplayName("Detecta superposición cuando dos eventos comparten aula y fecha con horarios cruzados")
     void detectaSolapeMismaAulaMismaFecha() {
-        LocalDate from = LocalDate.of(2026, 8, 1);
-        LocalDate to = LocalDate.of(2026, 8, 31);
-        LocalDate date = LocalDate.of(2026, 8, 3);
+        LocalDate from = FROM;
+        LocalDate to = TO;
+        LocalDate date = DATE_1;
         RecurringEvent eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
         RecurringEvent eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
         Allocation allocA = allocation(100L, occurrence(10L, eventA, date), 5);
@@ -168,9 +174,9 @@ class AllocationProblemServiceImplTest {
     @Test
     @DisplayName("No detecta superposición cuando los eventos están en aulas distintas")
     void noDetectaSolapeEnAulasDistintas() {
-        LocalDate from = LocalDate.of(2026, 8, 1);
-        LocalDate to = LocalDate.of(2026, 8, 31);
-        LocalDate date = LocalDate.of(2026, 8, 3);
+        LocalDate from = FROM;
+        LocalDate to = TO;
+        LocalDate date = DATE_1;
         RecurringEvent eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
         RecurringEvent eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
         Allocation allocA = allocation(100L, occurrence(10L, eventA, date), 5);
@@ -186,12 +192,12 @@ class AllocationProblemServiceImplTest {
     @Test
     @DisplayName("No detecta superposición cuando los eventos son en fechas distintas")
     void noDetectaSolapeEnFechasDistintas() {
-        LocalDate from = LocalDate.of(2026, 8, 1);
-        LocalDate to = LocalDate.of(2026, 8, 31);
+        LocalDate from = FROM;
+        LocalDate to = TO;
         RecurringEvent eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
         RecurringEvent eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
-        Allocation allocA = allocation(100L, occurrence(10L, eventA, LocalDate.of(2026, 8, 3)), 5);
-        Allocation allocB = allocation(101L, occurrence(11L, eventB, LocalDate.of(2026, 8, 4)), 5);
+        Allocation allocA = allocation(100L, occurrence(10L, eventA, DATE_1), 5);
+        Allocation allocB = allocation(101L, occurrence(11L, eventB, DATE_2), 5);
 
         when(allocationRepository.findOccupancyBetween(from, to, OccurrenceStatus.ASSIGNED))
                 .thenReturn(List.of(allocA, allocB));
@@ -203,9 +209,9 @@ class AllocationProblemServiceImplTest {
     @Test
     @DisplayName("No detecta superposición cuando las franjas son adyacentes (fin de una = inicio de la otra)")
     void noDetectaSolapeEnFranjasAdyacentes() {
-        LocalDate from = LocalDate.of(2026, 8, 1);
-        LocalDate to = LocalDate.of(2026, 8, 31);
-        LocalDate date = LocalDate.of(2026, 8, 3);
+        LocalDate from = FROM;
+        LocalDate to = TO;
+        LocalDate date = DATE_1;
         RecurringEvent eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
         RecurringEvent eventB = recurringEvent(2L, 10, LocalTime.of(9, 0), 60);
         Allocation allocA = allocation(100L, occurrence(10L, eventA, date), 5);
@@ -221,10 +227,10 @@ class AllocationProblemServiceImplTest {
     @Test
     @DisplayName("Agrega todas las fechas de un par recurrente en conflicto en una sola fila")
     void agregaFechasDeParRecurrenteEnUnaFila() {
-        LocalDate from = LocalDate.of(2026, 8, 1);
-        LocalDate to = LocalDate.of(2026, 8, 31);
-        LocalDate date1 = LocalDate.of(2026, 8, 3);
-        LocalDate date2 = LocalDate.of(2026, 8, 10);
+        LocalDate from = FROM;
+        LocalDate to = TO;
+        LocalDate date1 = DATE_1;
+        LocalDate date2 = DATE_2;
         RecurringEvent eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
         RecurringEvent eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
 
@@ -260,7 +266,7 @@ class AllocationProblemServiceImplTest {
     @Test
     @DisplayName("Usa 'from' + 6 meses como fallback cuando no hay período académico activo")
     void usaFallbackSeisMesesSinPeriodoActivo() {
-        LocalDate from = LocalDate.of(2026, 8, 1);
+        LocalDate from = FROM;
 
         service.findOvercrowded(from, null, false, PAGEABLE);
 
@@ -272,8 +278,8 @@ class AllocationProblemServiceImplTest {
     @Test
     @DisplayName("Lanza InvalidDateRangeException cuando 'to' es anterior a 'from'")
     void lanzaExcepcionCuandoToEsAnteriorAFrom() {
-        LocalDate from = LocalDate.of(2026, 8, 10);
-        LocalDate to = LocalDate.of(2026, 8, 1);
+        LocalDate from = TO;
+        LocalDate to = FROM;
 
         assertThatThrownBy(() -> service.findOvercrowded(from, to, false, PAGEABLE))
                 .isInstanceOf(InvalidDateRangeException.class);
@@ -282,7 +288,7 @@ class AllocationProblemServiceImplTest {
     @Test
     @DisplayName("findUnassigned delega en findUnassignedEvents con el 'to' por defecto ya resuelto")
     void findUnassignedDelegaConToResuelto() {
-        LocalDate from = LocalDate.of(2026, 8, 1);
+        LocalDate from = FROM;
 
         service.findUnassigned(from, null, false, PAGEABLE);
 
@@ -309,7 +315,7 @@ class AllocationProblemServiceImplTest {
                 .startTime(startTime)
                 .duration(Duration.ofMinutes(durationMinutes))
                 .dayOfWeek(DayOfWeek.MONDAY)
-                .startDate(LocalDate.of(2026, 1, 1))
+                .startDate(TODAY.minusMonths(1))
                 .build();
     }
 
