@@ -37,8 +37,6 @@ public class AllocationAuditHistoryServiceImpl implements AllocationAuditHistory
     @Override
     @Transactional(readOnly = true)
     public List<RevisionDto<AllocationHistorySnapshotDto>> findAllocationHistory(Long occurrenceId) {
-        // occurrenceId es una columna plana (no una relación JPA, ver F2): se filtra por
-        // property, no por relatedId (que es solo para FKs de association).
         List<?> results = auditReader()
                 .createQuery()
                 .forRevisionsOfEntity(Allocation.class, false, true)

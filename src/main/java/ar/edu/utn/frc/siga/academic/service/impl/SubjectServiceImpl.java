@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.util.Finder;
 import java.util.Collection;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -36,8 +37,7 @@ public class SubjectServiceImpl implements SubjectService {
 
     @Override
     public SubjectResponseDto findById(Long id) {
-        return subjectMapper.toDto(subjectRepository.findById(id)
-                .orElseThrow(() -> ResourceNotFoundException.of("Subject", id)));
+        return subjectMapper.toDto(Finder.orThrow(subjectRepository::findById, id, "Subject"));
     }
 
     @Override
@@ -62,8 +62,7 @@ public class SubjectServiceImpl implements SubjectService {
     }
 
     private StudyPlan requireStudyPlan(Integer studyPlanCode, Integer specialtyCode) {
-        Specialty specialty = specialtyRepository.findBySpecialtyCode(specialtyCode)
-                .orElseThrow(() -> ResourceNotFoundException.of("Specialty", specialtyCode));
+        Specialty specialty = Finder.orThrow(specialtyRepository::findBySpecialtyCode, specialtyCode, "Specialty");
         return studyPlanRepository.findByPlanCodeAndSpecialty(studyPlanCode, specialty)
                 .orElseThrow(() -> ResourceNotFoundException.of("StudyPlan", studyPlanCode));
     }
