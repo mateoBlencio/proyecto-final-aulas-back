@@ -125,7 +125,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
     @Override
     public ClassroomResponseDto findByRoomNumberAndBuilding(String roomNumber, Integer buildingId) {
-        Building building = requireBuilding(buildingId);
+        Building building = findBuildingById(buildingId);
         return classroomMapper.toDto(classroomRepository.findByRoomNumberAndBuilding(roomNumber, building)
                 .or(() -> fallbackByRoomNumberOnly(roomNumber, buildingId))
                 .orElseThrow(() -> ResourceNotFoundException.of("Classroom", roomNumber)));
@@ -150,18 +150,18 @@ public class ClassroomServiceImpl implements ClassroomService {
                 });
     }
 
-    private Building findActiveBuilding(Integer id) {
-        return buildingRepository.findById(id)
-                .filter(Building::getActive)
-                .orElseThrow(() -> {
-                    log.warn("Edificio no encontrado: id={}", id);
-                    return ResourceNotFoundException.of("Building", id);
-                });
-    }
-
-    private Building requireBuilding(Integer id) {
+    private Building findBuildingById(Integer id) {
         return buildingRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("Building", id));
+    }
+
+    private Building findActiveBuilding(Integer id) {
+        Building building = findBuildingById(id);
+        if (!building.getActive()) {
+            log.warn("Edificio no encontrado: id={}", id);
+            throw ResourceNotFoundException.of("Building", id);
+        }
+        return building;
     }
 
     private void validateFloor(ClassroomRequestDto dto, Building building) {
