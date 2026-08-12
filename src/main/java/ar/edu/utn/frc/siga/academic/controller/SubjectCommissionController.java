@@ -16,9 +16,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/**
- * Consulta de la relación materia-comisión (inscriptos por materia dictada en una comisión).
- */
 @Slf4j
 @RestController
 @RequestMapping("${siga.api.base-path}/subject-commissions")

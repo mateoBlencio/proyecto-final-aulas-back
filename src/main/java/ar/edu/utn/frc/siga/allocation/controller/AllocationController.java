@@ -42,13 +42,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 
-/**
- * Endpoints de asignación manual de aulas: tres verbos en lote (asignar/reasignar/desasignar),
- * todos atómicos, source MANUAL siempre. Direccionar por occurrences puntuales o por evento
- * completo es un detalle del item, no del endpoint (ver {@code AllocationTarget}). También
- * expone la vista de eventos únicos ya compuesta con aula/estado/sobrecupo (lectura), que
- * combina datos de {@code events} y {@code allocation}.
- */
 @Slf4j
 @RestController
 @RequestMapping("${siga.api.base-path}/allocations")

@@ -5,11 +5,6 @@ import java.util.List;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 
-/**
- * Un item del lote de asignación/reasignación: exactamente uno de {@code occurrenceIds} /
- * {@code eventId} debe venir informado — nombra el {@code AllocationTarget} (occurrences
- * puntuales o evento completo) al que se le quiere dar {@code classroomId}.
- */
 public record AllocationItemRequestDto(
         List<Long> occurrenceIds,
         Long eventId,

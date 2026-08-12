@@ -27,14 +27,6 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-/**
- * Implementación de la importación masiva desde Excel: valida la plantilla y recorre las
- * filas de datos (fila 7 hasta la primera vacía), delegando la resolución de catálogo de
- * cada una a {@link ExcelRowResolver} (transacción propia por fila — necesario para poder
- * saltear filas inconsistentes sin perder el resto, ver su javadoc) y acumulando las
- * asignaciones de aula para aplicarlas en un solo batch al final. Usa {@link ImportCache}
- * para no repetir búsquedas de la misma entidad entre filas de la misma importación.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -62,10 +54,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         List<RowIssueDto> skippedRows = new ArrayList<>();
         List<RowIssueDto> rowWarnings = new ArrayList<>();
 
-        // Se acumulan los items de asignación de todas las filas y se aplican en un solo
-        // batch al final: el cuello del import (~2 min con 1300 filas) era repetir, fila por
-        // fila, las mismas 4 queries (evento, aula, occurrences, asignaciones existentes) que
-        // una sola vez para todo el archivo.
         List<AllocationItem> pendingAllocations = new ArrayList<>();
 
         for (int rowIndex = 6; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
@@ -81,12 +69,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             LocalDate startDate = termType.startDate(year);
             LocalDate endDate = termType.endDate(year);
 
-            // Specialty/StudyPlan/Subject/Commission/SubjectCommission/Building/Classroom son
-            // catálogo cargado por fuera de esta app: se buscan (fallan si no existen), nunca
-            // se crean desde el import. AcademicPeriod y RecurringEvent sí se crean acá si no
-            // existen (varias filas de la planilla pueden describir el mismo evento). Una fila
-            // que no resuelve contra el catálogo (dato inconsistente en el origen) se saltea y
-            // se reporta en vez de abortar el import completo.
             try {
                 ExcelRowResolver.ResolvedRow resolved = rowResolver.resolve(dto, termType, year, startDate, endDate, cache, periodsCreated);
                 if (resolved.eventCreated()) eventsCreated.incrementAndGet();

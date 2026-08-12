@@ -12,11 +12,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
 
-/**
- * Cache de deduplicación por fila de Excel: evita repetir la búsqueda de la misma
- * entidad ya resuelta en filas anteriores. Cachea DTOs, no entidades: las fachadas
- * {@code api} de {@code academic} y {@code space} solo devuelven DTOs.
- */
 class ImportCache {
 
     private final Map<Integer, SpecialtyResponseDto> specialties = new HashMap<>();

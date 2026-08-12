@@ -58,7 +58,6 @@ class ClassroomServiceImplTest {
         service = new ClassroomServiceImpl(classroomRepository, buildingRepository, classroomTypeService, classroomMapper);
     }
 
-    // ---- create ----
 
     @Test
     @DisplayName("create: si roomNumber ya existe, lanza SpaceDomainException y no guarda")
@@ -179,7 +178,6 @@ class ClassroomServiceImplTest {
         assertThat(toSave.getClassroomType()).isEqualTo(type);
     }
 
-    // ---- findById ----
 
     @Test
     @DisplayName("findById: devuelve el DTO mapeado cuando el aula existe")
@@ -202,7 +200,6 @@ class ClassroomServiceImplTest {
                 .hasMessage("Classroom not found with id: 99");
     }
 
-    // ---- findAllAvailable / findByIds / findAll ----
 
     @Test
     @DisplayName("findAllAvailable: mapea solo las aulas disponibles devueltas por el repositorio")
@@ -243,7 +240,6 @@ class ClassroomServiceImplTest {
         assertThat(result.getContent()).containsExactly(dto);
     }
 
-    // ---- update ----
 
     @Test
     @DisplayName("update: si roomNumber pasa a coincidir con otra aula, no valida duplicado (solo create lo hace)")
@@ -323,7 +319,6 @@ class ClassroomServiceImplTest {
                 .hasMessage("Building not found with id: 1");
     }
 
-    // ---- delete ----
 
     @Test
     @DisplayName("delete: marca el aula como eliminada (soft-delete) sin borrado físico")
@@ -348,7 +343,6 @@ class ClassroomServiceImplTest {
                 .hasMessage("Classroom not found with id: 1");
     }
 
-    // ---- findByRoomNumberAndBuilding ----
 
     @Test
     @DisplayName("findByRoomNumberAndBuilding: si el aula existe en el edificio, devuelve el DTO mapeado")
@@ -385,7 +379,7 @@ class ClassroomServiceImplTest {
     @DisplayName("findByRoomNumberAndBuilding: si no está en el edificio informado, hace fallback a buscar solo por número")
     void findByRoomNumberAndBuildingFallsBackToRoomNumberOnly() {
         Building informedBuilding = SpaceTestData.building().id(2).name("Edif. Ing.Inchaurrondo").build();
-        Classroom actual = SpaceTestData.classroom().build(); // vive en el building real, id=1
+        Classroom actual = SpaceTestData.classroom().build();
         ClassroomResponseDto dto = new ClassroomResponseDto(1, "101", 1, 40, true, 1, "Edificio Central", 1, "Normal");
         when(buildingRepository.findById(2)).thenReturn(Optional.of(informedBuilding));
         when(classroomRepository.findByRoomNumberAndBuilding("101", informedBuilding)).thenReturn(Optional.empty());

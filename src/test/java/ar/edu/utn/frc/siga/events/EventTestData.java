@@ -15,12 +15,6 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
-/**
- * Fixture compartida de entidades/DTOs de {@code events} para tests unitarios de {@code events}
- * y {@code allocation}. Los tests de allocation con fixtures propias (AllocationServiceImplTest,
- * AllocationProblemServiceImplTest, AutoAllocationServiceImplTest) construyen sus datos inline
- * y no usan esta clase.
- */
 public final class EventTestData {
 
     private EventTestData() {
@@ -77,7 +71,6 @@ public final class EventTestData {
                 .build();
     }
 
-    /** Franja de una occurrence (lo que hoy expone {@code OccurrenceService}), derivada de {@code event}. */
     public static OccurrenceSlotDto occurrenceSlot(Long id, AcademicEvent event, LocalDate date, OccurrenceStatus status) {
         return new OccurrenceSlotDto(id, event.getId(), date, event.getStartTime(), event.endTime(), status, event.getEnrolled());
     }

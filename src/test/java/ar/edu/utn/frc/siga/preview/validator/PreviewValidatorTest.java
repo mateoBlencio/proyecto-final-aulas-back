@@ -30,7 +30,6 @@ class PreviewValidatorTest {
         validator = new PreviewValidator();
     }
 
-    // ---------- pertenencia al preview ----------
 
     @Test
     @DisplayName("validateNoDuplicateEventIds: eventId repetido lanza AllocationConflictException")
@@ -69,7 +68,6 @@ class PreviewValidatorTest {
                 .doesNotThrowAnyException();
     }
 
-    // ---------- unresolvedConflicts ----------
 
     @Test
     @DisplayName("unresolvedConflicts: aula bloqueada por BD y aula bloqueada por propuesta del preview → un conflicto por aula, origin correcto")
@@ -110,7 +108,7 @@ class PreviewValidatorTest {
                 List.of(slot1, slot2), List.of());
 
         assertThat(conflicts).hasSize(1);
-        assertThat(conflicts.getFirst().date()).isEqualTo(date1); // el primero por fecha
+        assertThat(conflicts.getFirst().date()).isEqualTo(date1);
     }
 
     @Test
@@ -142,7 +140,6 @@ class PreviewValidatorTest {
         assertThat(conflicts).isEmpty();
     }
 
-    // ---------- helpers ----------
 
     private LocalDate futureDate(int daysFromNow) {
         return LocalDate.now().plusDays(daysFromNow);

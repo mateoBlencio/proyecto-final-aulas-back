@@ -29,12 +29,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.function.Function;
 
-/**
- * Implementación de la consulta del historial de auditoría de evento/occurrence sobre las
- * tablas {@code _aud} vía {@code AuditReader}. Cada query devuelve tuplas {entidad,
- * {@link SigaRevision}, {@link RevisionType}} en orden de revisión ascendente; en
- * revisiones DELETED el snapshot va en null por contrato.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -80,11 +74,6 @@ public class EventAuditHistoryServiceImpl implements EventAuditHistoryService {
         return AuditReaderFactory.get(entityManager);
     }
 
-    /**
-     * Mapea las tuplas de Envers al contrato {@link RevisionDto}. Si el historial está vacío
-     * y la entidad ancla tampoco existe hoy, el id nunca existió → 404 (historial vacío no
-     * puede darse si la entidad existe: el INSERT siempre audita).
-     */
     private <T> List<RevisionDto<T>> toRevisions(List<?> results, JpaRepository<?, Long> anchorRepository,
                                                  String anchorName, Long anchorId, Function<Object, T> snapshotMapper) {
         if (results.isEmpty() && !anchorRepository.existsById(anchorId)) {
@@ -113,7 +102,6 @@ public class EventAuditHistoryServiceImpl implements EventAuditHistoryService {
         };
     }
 
-    /** Con herencia JOINED la query devuelve el subtipo real; se mapea a la variante del snapshot polimórfico. */
     private EventHistorySnapshotDto toEventSnapshot(AcademicEvent event) {
         return switch (event) {
             case RecurringEvent recurring -> new RecurringEventHistorySnapshotDto(

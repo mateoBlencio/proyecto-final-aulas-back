@@ -24,11 +24,6 @@ import java.time.Duration;
 import java.time.LocalTime;
 import java.util.List;
 
-/**
- * Evento académico base (recurrente o único). Auditada con Hibernate Envers, junto
- * con sus subtipos {@link RecurringEvent} y {@link UniqueEvent}: los cambios quedan registrados
- * en {@code evento_academico_aud} y sus tablas {@code _aud} de subclase (herencia JOINED).
- */
 @Entity
 @Table(name = "evento_academico")
 @Inheritance(strategy = InheritanceType.JOINED)
@@ -60,27 +55,19 @@ public abstract class AcademicEvent {
     @Column(name = "duracion_minutos", nullable = false)
     protected Duration duration;
 
-    /** ID de la materia (academic::Subject). Referencia por ID plano, sin relación JPA cross-módulo. */
     @Setter
     @Column(name = "id_materia")
     protected Long subjectId;
 
-    /** ID de la comisión (academic::Commission). Referencia por ID plano, sin relación JPA cross-módulo. */
     @Setter
     @Column(name = "id_comision")
     protected Long commissionId;
 
-    /** Hora de fin derivada: {@code startTime + duration}. El horario vive en el evento, no en la occurrence. */
     public LocalTime endTime() {
         return startTime.plus(duration);
     }
 
-    /** Tipo concreto del evento (espejo del discriminador de herencia); la subclase es la fuente de verdad. */
     public abstract EventType getType();
 
-    /**
-     * Genera todas las {@link Occurrence} de este evento (una vez, no bajo demanda), cada
-     * una nacida en estado {@code SCHEDULED} sin aula asignada.
-     */
     public abstract List<Occurrence> toOccurrences();
 }

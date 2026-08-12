@@ -7,7 +7,6 @@ import org.springframework.modulith.NamedInterface;
 
 import java.time.LocalTime;
 
-/** Ocurrencia a (re)asignar y el aula destino que se le quiere dar. */
 @NamedInterface("api")
 public record AllocationCandidate(OccurrenceSlotDto occurrence, Integer classroomId) implements TimeSpan {
 

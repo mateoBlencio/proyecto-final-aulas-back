@@ -9,11 +9,6 @@ import org.springframework.modulith.NamedInterface;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
-/**
- * Vista de respuesta de un {@code UniqueEvent}: evento que ocurre una sola vez en {@code date}.
- * Sin aula/estado/sobrecupo: esa vista enriquecida la compone {@code allocation}
- * ({@code UniqueEventAllocationResponseDto}), que sabe de asignaciones.
- */
 @NamedInterface("api")
 public record UniqueEventResponseDto(
         Long id,

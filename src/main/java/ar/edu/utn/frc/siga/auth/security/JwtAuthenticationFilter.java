@@ -13,12 +13,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/**
- * JWT stateless de verdad: valida firma + expiración y construye el {@link SecurityUser}
- * directamente desde los claims del token, sin volver a la base de datos en cada request.
- * Esto implica que un cambio de rol o de {@code habilitado} no se refleja hasta que el
- * access token vigente expira.
- */
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
@@ -52,22 +46,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    /**
-     * Re-autenticar también en el dispatch de ERROR. Sin esto, cuando un request autenticado
-     * produce un error (400/404/500), Spring MVC hace un forward interno a {@code /error}; como
-     * {@code OncePerRequestFilter} se saltea los dispatches de ERROR por default, la auth se
-     * perdería y {@code /error} (que exige autenticación) respondería 401, enmascarando el
-     * status real. El header Authorization sigue presente en el forward, así que revalidamos.
-     */
     @Override
     protected boolean shouldNotFilterErrorDispatch() {
         return false;
     }
 
-    /**
-     * Ídem para dispatches ASYNC: si un endpoint pasa a ser asíncrono, la auth debe
-     * re-establecerse en el thread del dispatch async para no perderse.
-     */
     @Override
     protected boolean shouldNotFilterAsyncDispatch() {
         return false;

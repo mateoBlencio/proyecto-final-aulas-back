@@ -10,17 +10,9 @@ import ar.edu.utn.frc.siga.common.mapper.CentralMapperConfig;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-/**
- * Mapea cada subtipo de {@code AcademicEvent} a su DTO sellado correspondiente. El
- * despacho polimórfico (¿qué subtipo es?) y la resolución de datos ajenos (materia,
- * comisión) los hace {@link AcademicEventComposer}, que conoce el tipo concreto vía
- * {@code instanceof} y llama al método específico: acá solo vive el mapeo puro campo a campo.
- */
 @Mapper(config = CentralMapperConfig.class)
 public interface AcademicEventMapper {
 
-    // "subject"/"commission" se fuerzan a mapear el parámetro entero: el evento solo
-    // tiene sus ids (Long), los DTOs siempre vienen resueltos por el composer.
     @Mapping(target = "id", source = "event.id")
     @Mapping(target = "type", constant = "RECURRING")
     @Mapping(target = "durationMinutes", expression = "java(event.getDuration().toMinutes())")

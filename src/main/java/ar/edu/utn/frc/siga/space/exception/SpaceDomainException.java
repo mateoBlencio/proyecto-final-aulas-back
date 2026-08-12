@@ -5,9 +5,6 @@ import org.springframework.http.HttpStatus;
 
 import java.io.Serial;
 
-/**
- * Violación de una regla de negocio del dominio de espacios físicos (edificios, aulas, tipos de aula).
- */
 public class SpaceDomainException extends SigaAppException {
 
     @Serial

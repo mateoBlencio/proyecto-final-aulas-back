@@ -18,7 +18,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Endpoints del flujo de asignación automática (preview interactivo y confirm) orquestado sobre el solver. */
 @Slf4j
 @RestController
 @RequestMapping("${siga.api.base-path}/previews")

@@ -6,10 +6,6 @@ import org.springframework.modulith.NamedInterface;
 
 import java.io.Serial;
 
-/**
- * Una asignación manual no puede aplicarse porque el aula ya está ocupada
- * en ese horario por otra ocurrencia.
- */
 @NamedInterface("api")
 public class AllocationConflictException extends SigaAppException {
 

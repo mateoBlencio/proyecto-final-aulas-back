@@ -14,15 +14,8 @@ import org.springframework.mock.web.MockMultipartFile;
 
 import lombok.Builder;
 
-/**
- * Fixture reusable (unitarios + integración) que construye en memoria un {@link XSSFWorkbook}
- * que respeta la plantilla oficial esperada por {@code ExcelTemplateValidator}: hoja
- * {@code "Hoja1"}, año en fila índice 3, los 16 headers exactos en fila índice 5, datos desde
- * fila índice 6. Ofrece mutadores para romper deliberadamente cada regla de la plantilla.
- */
 public final class ExcelTestWorkbooks {
 
-    /** Headers exactos esperados por ExcelTemplateValidator, en orden de columna. */
     public static final List<String> HEADERS = List.of(
         "Curso", "Comisión", "Aula", "Nombre Edificio", "Día", "Dictado",
         "Hora Comienzo", "Hora Fin", "Rango Horario", "Durac[min]",
@@ -44,7 +37,6 @@ public final class ExcelTestWorkbooks {
         this.sheet = workbook.createSheet(SHEET_NAME);
     }
 
-    /** Plantilla completamente válida (año 2026, headers), todavía sin filas de datos. */
     public static ExcelTestWorkbooks validTemplate() {
         return validTemplate(2026);
     }
@@ -56,12 +48,10 @@ public final class ExcelTestWorkbooks {
         return fixture;
     }
 
-    /** Workbook vacío, sin siquiera la hoja "Hoja1" con datos: para probar el caso "sin hoja". */
     public static ExcelTestWorkbooks blankWorkbook() {
         return new ExcelTestWorkbooks();
     }
 
-    // ---------- filas de datos ----------
 
     public ExcelTestWorkbooks withValidDataRow() {
         return withDataRow(DataRow.defaultRow());
@@ -77,11 +67,9 @@ public final class ExcelTestWorkbooks {
         setString(r, 5, row.termType());
         setNumeric(r, 6, row.startTime());
         setNumeric(r, 7, row.endTime());
-        // columna 8 "Rango Horario" no la lee ExcelRowMapper, se deja en blanco.
         if (row.durationMinutes() != null) {
             setNumeric(r, 9, row.durationMinutes());
         }
-        // columna 10 "Duracion[hs]" no la lee ExcelRowMapper, se deja en blanco.
         setNumeric(r, 11, row.specialtyCode());
         setNumeric(r, 12, row.studyPlanCode());
         setNumeric(r, 13, row.subjectCode());
@@ -90,13 +78,11 @@ public final class ExcelTestWorkbooks {
         return this;
     }
 
-    /** Fila creada pero sin celdas: corta el parseo (isRowEmpty == true). */
     public ExcelTestWorkbooks withEmptyRow() {
         sheet.createRow(nextDataRowIndex++);
         return this;
     }
 
-    // ---------- mutadores para romper la plantilla ----------
 
     public ExcelTestWorkbooks renameSheet(String newName) {
         workbook.setSheetName(workbook.getSheetIndex(sheet), newName);
@@ -140,7 +126,6 @@ public final class ExcelTestWorkbooks {
         return this;
     }
 
-    /** Deja el header row con menos de {@code columnCount} columnas. */
     public ExcelTestWorkbooks truncateHeaderColumns(int columnCount) {
         Row headerRow = sheet.getRow(HEADER_ROW_INDEX);
         for (int i = headerRow.getLastCellNum() - 1; i >= columnCount; i--) {
@@ -152,7 +137,6 @@ public final class ExcelTestWorkbooks {
         return this;
     }
 
-    // ---------- acceso / conversión ----------
 
     public Workbook workbook() {
         return workbook;
@@ -162,7 +146,6 @@ public final class ExcelTestWorkbooks {
         return sheet;
     }
 
-    /** Fila de datos, offset 0-based desde la primera fila de datos (índice 6). */
     public Row dataRow(int offsetFromFirst) {
         return sheet.getRow(FIRST_DATA_ROW_INDEX + offsetFromFirst);
     }
@@ -182,7 +165,6 @@ public final class ExcelTestWorkbooks {
         }
     }
 
-    // ---------- helpers privados ----------
 
     private void writeYearRow(int year) {
         Row row = sheet.createRow(YEAR_ROW_INDEX);
@@ -220,12 +202,6 @@ public final class ExcelTestWorkbooks {
         }
     }
 
-    /**
-     * Datos tipados de una fila válida (los 14 campos que efectivamente lee ExcelRowMapper,
-     * de las 16 columnas de la plantilla). Usar {@link #defaultRow()} y ajustar solo lo
-     * necesario vía {@code toBuilder()}. {@code roomNumber} acepta {@code Integer} (aula
-     * numérica) o {@code String} (aula alfanumérica).
-     */
     @Builder(toBuilder = true)
     public record DataRow(
         String courseCode,

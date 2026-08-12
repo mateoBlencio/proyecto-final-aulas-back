@@ -7,7 +7,6 @@ import org.springframework.modulith.NamedInterface;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
-/** Snapshot histórico de un {@code UniqueEvent}: estado del evento único en esa revisión, con IDs planos de materia/comisión. */
 @NamedInterface("api")
 public record UniqueEventHistorySnapshotDto(
         Long id,

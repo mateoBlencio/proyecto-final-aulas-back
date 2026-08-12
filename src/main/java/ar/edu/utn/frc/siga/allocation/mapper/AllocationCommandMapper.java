@@ -13,7 +13,6 @@ import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
 
-/** Traduce los DTOs HTTP de escritura a los comandos de {@code AllocationService}. Siempre estampa {@code source = MANUAL}: es el único source que un DTO HTTP puede producir. */
 @Component
 public class AllocationCommandMapper {
 

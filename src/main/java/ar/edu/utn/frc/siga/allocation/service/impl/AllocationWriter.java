@@ -15,27 +15,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-/**
- * Único punto de escritura de asignaciones: por cada (occurrence, aula) ya resuelto por
- * {@link AllocationTargetResolver}, crea o actualiza la fila. Toda fuente (manual,
- * importada, automática) pasa por acá; el verbo que llama ({@code allocate} estricto vs
- * {@code reallocate} upsert) decide qué hacer si ya existía. No toca {@code Occurrence}:
- * "tiene aula" es {@code existe fila acá}, no un estado que sincronizar (ver
- * {@code OccurrenceStatus}). Corre siempre dentro de la transacción del caller: la
- * allocation existente llega managed, así que las actualizaciones se persisten por dirty
- * checking sin {@code save()} explícito; solo las allocations nuevas lo requieren.
- */
 @Component
 @RequiredArgsConstructor
 class AllocationWriter {
 
     private final AllocationRepository allocationRepository;
 
-    /**
-     * Crea la asignación de cada occurrence de {@code classroomByOccurrence}. Corta con 409
-     * si CUALQUIERA ya tiene asignación — nada se escribe (se chequea el lote completo antes
-     * de la primera escritura).
-     */
     List<Allocation> create(Map<OccurrenceSlotDto, Integer> classroomByOccurrence, String observation, AllocationSource source) {
         List<Long> occurrenceIds = classroomByOccurrence.keySet().stream().map(OccurrenceSlotDto::occurrenceId).toList();
         List<Allocation> existing = allocationRepository.findByOccurrenceIdIn(occurrenceIds);
@@ -46,7 +31,6 @@ class AllocationWriter {
         return write(classroomByOccurrence, observation, source);
     }
 
-    /** Crea o actualiza (upsert) la asignación de cada occurrence de {@code classroomByOccurrence}. */
     List<Allocation> upsert(Map<OccurrenceSlotDto, Integer> classroomByOccurrence, String observation, AllocationSource source) {
         return write(classroomByOccurrence, observation, source);
     }
@@ -83,7 +67,6 @@ class AllocationWriter {
         return saved;
     }
 
-    /** Borra la asignación de cada occurrence indicada, si existe. Occurrences sin asignación se ignoran. */
     List<DeallocatedOccurrence> delete(List<OccurrenceSlotDto> occurrences) {
         List<Long> occurrenceIds = occurrences.stream().map(OccurrenceSlotDto::occurrenceId).toList();
         List<Allocation> existing = allocationRepository.findByOccurrenceIdIn(occurrenceIds);
@@ -93,6 +76,5 @@ class AllocationWriter {
         return existing.stream().map(a -> new DeallocatedOccurrence(a.getOccurrenceId(), a.getClassroomId())).toList();
     }
 
-    /** Occurrence liberada y el aula que tenía hasta ahora. */
     record DeallocatedOccurrence(Long occurrenceId, Integer classroomId) {}
 }

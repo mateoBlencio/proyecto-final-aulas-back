@@ -18,12 +18,6 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Clase regular que se dicta un día fijo de la semana (cursada) dentro de una ventana de
- * fechas, generando una {@link Occurrence} semanal. {@code subjectId}/{@code commissionId}
- * (referencia a {@code academic} por ID plano) viven en {@link AcademicEvent}, compartidos
- * con {@link UniqueEvent}.
- */
 @Entity
 @Table(name = "evento_recurrente")
 @DiscriminatorValue("RECURRING")
@@ -48,11 +42,6 @@ public class RecurringEvent extends AcademicEvent {
         return EventType.RECURRING;
     }
 
-    /**
-     * Genera una occurrence por cada semana desde {@code startDate} (ajustada al próximo
-     * {@code dayOfWeek} igual o posterior) hasta {@code endDate} inclusive (o un año desde
-     * {@code startDate} si es null).
-     */
     @Override
     public List<Occurrence> toOccurrences() {
         List<Occurrence> result = new ArrayList<>();

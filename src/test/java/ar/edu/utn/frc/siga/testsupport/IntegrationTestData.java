@@ -32,29 +32,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.TestConfiguration;
 
-/**
- * Seeds idempotentes para tests de integración. No corre {@code data.sql} (perfil
- * {@code integration}, ver {@code AbstractIntegrationTest}), así que lo que otros perfiles dan
- * por sentado (tipo de aula por defecto, etc.) hay que sembrarlo acá.
- *
- * <p>Sin rollback entre tests (Envers necesita commits reales): cada seed que crea una fila usa
- * una clave natural con sufijo único ({@link #nextSeq()}, contador atómico sembrado con
- * {@code nanoTime}) para no colisionar entre tests ni entre clases.
- *
- * <p>{@code @TestConfiguration} en lugar de {@code @Component}: así el classpath scanning de
- * {@code @SpringBootTest} no la recoge sola (queda excluida por el filtro de test-slices);
- * cada test que la necesita la trae explícitamente con {@code @Import(IntegrationTestData.class)}.
- *
- * <p>Commission/SubjectCommission/RecurringEvent son catálogo (find-only, no se crean desde
- * la app): estos seeds los guardan directo o vía {@code AcademicEventService.createRecurringEvent}
- * (para generar también las occurrences), simulando la carga externa que en producción hace el DBA.
- */
 @TestConfiguration
 @RequiredArgsConstructor
 public class IntegrationTestData {
 
-    // % 1_000_000_000L acota a 9 dígitos: nanoTime() crudo (~19 dígitos) rompe columnas angostas
-    // como aula.num_aula (varchar(20)) al concatenarle un prefijo ("AULA-" + nextSeq()).
     private static final AtomicLong SEQ = new AtomicLong(System.nanoTime() % 1_000_000_000L);
 
     private final BuildingRepository buildingRepository;
@@ -73,16 +54,10 @@ public class IntegrationTestData {
     @Value("${siga.space.default-classroom-type:Normal}")
     private String defaultClassroomTypeDescription;
 
-    /** Sufijo único para claves naturales (roomNumber, nombre de edificio, etc.). */
     public static long nextSeq() {
         return SEQ.incrementAndGet();
     }
 
-    /**
-     * Tipo de aula "Normal" ({@code siga.space.default-classroom-type}), usado como
-     * fixture genérico por los tests que necesitan un {@code ClassroomType} válido.
-     * El perfil {@code integration} no corre {@code data.sql}, de ahí el seed manual.
-     */
     public ClassroomType tipoAulaNormal() {
         return classroomTypeRepository.findByDescriptionIgnoreCase(defaultClassroomTypeDescription)
                 .orElseGet(() -> classroomTypeRepository.save(
@@ -101,12 +76,10 @@ public class IntegrationTestData {
                 .build());
     }
 
-    /** Edificio activo con 5 pisos, nombre único. */
     public Building edificio() {
         return edificio("Edificio-IT", 5, true);
     }
 
-    /** Edificio activo con 5 pisos, con el nombre exacto dado (sin sufijo). */
     public Building edificioConNombre(String name) {
         return buildingRepository.save(Building.builder()
                 .name(name)
@@ -120,12 +93,10 @@ public class IntegrationTestData {
         return aulaConNumero("AULA-" + nextSeq(), building, tipo, floor, capacity, available);
     }
 
-    /** Aula disponible, piso 1, capacidad 40, con el tipo de aula por defecto, número único. */
     public Classroom aula(Building building) {
         return aula(building, tipoAulaNormal(), 1, 40, true);
     }
 
-    /** Aula con {@code roomNumber} exacto (sin sufijo), para tests que necesitan buscarla por clave natural. */
     public Classroom aulaConNumero(String roomNumber, Building building, ClassroomType tipo, int floor, int capacity, boolean available) {
         return classroomRepository.save(Classroom.builder()
                 .roomNumber(roomNumber)
@@ -161,19 +132,8 @@ public class IntegrationTestData {
                 .build());
     }
 
-    /** Materia + comisión resultantes del seed {@link #materiaYComision()}. */
     public record SubjectAndCommission(Long subjectId, Long commissionId) {}
 
-    /**
-     * Siembra Specialty->StudyPlan->Subject (catálogo, guardado directo por repository:
-     * no hay findOrCreate para estas entidades) y encadena AcademicPeriod (find-or-create)
-     * ->Commission (catálogo, guardado directo) para obtener un par subjectId/commissionId
-     * válido, el mínimo que {@code AcademicEventService.createRecurringEvent} necesita
-     * (valida existencia de ambos por ID contra las fachadas de {@code academic}). También
-     * los vincula vía {@code SubjectCommission} (materiaComision): {@code createUniqueEvent}
-     * además valida que la comisión pertenezca a la materia (ver ADR-011), a diferencia del
-     * recurrente.
-     */
     public SubjectAndCommission materiaYComision() {
         int specialtyCode = (int) nextSeq();
         int planCode = (int) nextSeq();
@@ -190,13 +150,11 @@ public class IntegrationTestData {
         return new SubjectAndCommission(subject.getId(), commission.getId());
     }
 
-    /** Encuentra o crea el {@link AcademicPeriod} por (year, term) y devuelve la entidad. */
     public AcademicPeriod periodoAcademico(int year, TermType termType) {
         academicPeriodService.findOrCreate(year, termType);
         return academicPeriodRepository.findByYearAndSemester(year, termType.getSemester()).orElseThrow();
     }
 
-    /** Comisión (catálogo): guardado directo por repository, sin find-or-create. */
     public Commission comision(String courseCode, int commissionNumber, AcademicPeriod period) {
         return commissionRepository.save(Commission.builder()
                 .courseCode(courseCode)
@@ -206,7 +164,6 @@ public class IntegrationTestData {
                 .build());
     }
 
-    /** Materia-comisión (catálogo): guardado directo por repository, sin find-or-create. */
     public SubjectCommission materiaComision(Subject subject, Commission commission, int enrolledCount) {
         return subjectCommissionRepository.save(SubjectCommission.builder()
                 .subject(subject)
@@ -215,10 +172,6 @@ public class IntegrationTestData {
                 .build());
     }
 
-    /**
-     * Evento recurrente (catálogo): usa {@code AcademicEventService.createRecurringEvent}
-     * para generar también sus occurrences, en vez de guardar la entidad a mano.
-     */
     public Long eventoRecurrente(Long subjectId, Long commissionId, DayOfWeek dayOfWeek, LocalTime startTime,
             int durationMinutes, LocalDate startDate, LocalDate endDate, int enrolled) {
         CreateRecurringEventRequestDto dto = new CreateRecurringEventRequestDto(

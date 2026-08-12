@@ -5,10 +5,6 @@ import org.springframework.http.HttpStatus;
 
 import java.io.Serial;
 
-/**
- * El horario de un evento (hora de inicio/fin) es inválido: fuera de la ventana horaria
- * permitida, o la hora de fin no es posterior a la de inicio.
- */
 public class InvalidEventScheduleException extends SigaAppException {
 
     @Serial

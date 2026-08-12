@@ -15,12 +15,6 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Set;
 
-/**
- * Verifica las constraints de {@link ClassroomConstraintProvider} de forma aislada
- * (cada verifyThat evalúa una sola constraint). Los ClassAllocation se arman a mano:
- * conflictingEventIds replica el formato simétrico que produce
- * {@code OptimizerServiceImpl.computeConflicts}.
- */
 @DisplayName("ClassroomConstraintProvider")
 class ClassroomConstraintProviderTest {
 
@@ -153,14 +147,8 @@ class ClassroomConstraintProviderTest {
         @Test
         @DisplayName("sin aula asignada no penaliza sobreocupación (lo cubre allocateAllPossible, no esta constraint)")
         void noRoomAssigned() {
-            // Un evento sin aula (classroom null) NO penaliza sobreocupación: forEach lo excluye,
-            // así que la rama `classroom == null → enrolled` de getOvercrowding() no corre durante
-            // el scoring. Antes esto era "false-feasible" (un evento inubicable no dejaba rastro en
-            // el score); ahora `allocateAllPossible` (MEDIUM) sí lo penaliza —ver su @Nested— y con
-            // allowsUnassigned el solver deja el evento sin aula → viaja en `unresolved`, no oculto.
             OptimizerEvent e = event("a", null, 12, LocalTime.of(8, 0), LocalTime.of(10, 0));
             ClassAllocation alloc = new ClassAllocation(e, List.of(), Set.of());
-            // classroom queda null: sin aula asignada.
 
             verifier.verifyThat(ClassroomConstraintProvider::minimizeOvercrowding)
                     .given(alloc)
@@ -177,7 +165,6 @@ class ClassroomConstraintProviderTest {
         void unassignedPenalizes() {
             OptimizerEvent e = event("a", null, 10, LocalTime.of(8, 0), LocalTime.of(10, 0));
             ClassAllocation alloc = new ClassAllocation(e, List.of(), Set.of());
-            // classroom queda null.
 
             verifier.verifyThat(ClassroomConstraintProvider::allocateAllPossible)
                     .given(alloc)

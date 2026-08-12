@@ -25,17 +25,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Resuelve una fila de Excel contra el catálogo, en su propia transacción
- * ({@code REQUIRES_NEW} implícito: no hay transacción activa al invocarla desde
- * {@link ExcelImportServiceImpl}, que ya no envuelve el import completo). Necesario porque
- * cada fila puede fallar contra el catálogo (dato inconsistente en el origen) y el import
- * debe poder saltear esa fila sin perder el trabajo de las demás: si la resolución
- * corriera dentro de la transacción del import completo, una fila fallida marcaría toda
- * la transacción como rollback-only (comportamiento estándar de Spring ante una excepción
- * no capturada por un método transaccional), y el commit final abortaría igual aunque el
- * error se haya atrapado a nivel de Java.
- */
 @Component
 @RequiredArgsConstructor
 class ExcelRowResolver {

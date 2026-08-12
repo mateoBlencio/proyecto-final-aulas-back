@@ -16,11 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * AcademicPeriod es dato propio de cada import/dictado (find-or-create), a diferencia de
- * Specialty/StudyPlan/Subject que ya son catálogo (ver {@link AcademicFindByCodeIntegrationTest}).
- * Sin endpoint HTTP propio: se inyecta el service directamente.
- */
 @DisplayName("AcademicPeriod findOrCreate (integración)")
 class AcademicFindOrCreateIntegrationTest extends AbstractIntegrationTest {
 

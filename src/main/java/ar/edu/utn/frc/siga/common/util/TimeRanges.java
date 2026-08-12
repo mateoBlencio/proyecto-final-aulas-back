@@ -2,7 +2,6 @@ package ar.edu.utn.frc.siga.common.util;
 
 import java.time.LocalTime;
 
-/** Solapamiento de franjas horarias medio-abiertas: fin == inicio no es solapamiento. */
 public final class TimeRanges {
 
     private TimeRanges() {

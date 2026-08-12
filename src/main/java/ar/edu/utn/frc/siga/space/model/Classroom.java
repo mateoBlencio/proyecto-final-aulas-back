@@ -9,11 +9,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
-/**
- * Aula física asignable a eventos académicos: pertenece a un {@link Building}, tiene
- * capacidad y un {@link ClassroomType}, y puede marcarse {@code available = false}
- * para excluirla de la asignación (manual o automática) sin eliminarla.
- */
 @Entity
 @Table(name = "aula", uniqueConstraints = @UniqueConstraint(columnNames = {"id_edificio", "num_aula"}))
 @SQLRestriction("eliminado = false")

@@ -16,9 +16,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/**
- * Consulta de materias (catálogo cargado por fuera de la app, ver {@code excelimport}).
- */
 @Slf4j
 @RestController
 @RequestMapping("${siga.api.base-path}/subjects")

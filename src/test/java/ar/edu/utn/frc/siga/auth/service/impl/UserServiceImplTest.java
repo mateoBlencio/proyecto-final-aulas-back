@@ -71,8 +71,6 @@ class UserServiceImplTest {
         return user;
     }
 
-    // ---- create ----
-
     @Test
     @DisplayName("create: email institucional nuevo → hashea password, guarda con el rol y devuelve DTO")
     void createHappyPath() {
@@ -118,8 +116,6 @@ class UserServiceImplTest {
         verify(userRepository, never()).save(any());
     }
 
-    // ---- setEnabled ----
-
     @Test
     @DisplayName("setEnabled(false): inhabilita y revoca los refresh tokens")
     void disableRevokesTokens() {
@@ -157,8 +153,6 @@ class UserServiceImplTest {
         assertThatThrownBy(() -> service.setEnabled(99, false))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
-
-    // ---- changeRole ----
 
     @Test
     @DisplayName("changeRole: cambia el rol y revoca los refresh tokens")

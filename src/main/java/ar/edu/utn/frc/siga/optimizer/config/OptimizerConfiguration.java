@@ -14,21 +14,12 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Wiring de Timefold: define el modelo de planificación, el {@code ConstraintProvider}
- * y los beans {@link SolverFactory}/{@link SolverManager} que orquestan los solves.
- */
 @Configuration
 @EnableConfigurationProperties(OptimizerProperties.class)
 public class OptimizerConfiguration {
 
-    /**
-     * Tope de seguridad si un solve llega sin terminación por request;
-     * coincide con el máximo permitido en PreviewRequestDto (@Max(300)).
-     */
     private static final long DEFAULT_SECONDS_LIMIT = 300L;
 
-    /** Fábrica de solvers configurada con el modelo, las restricciones y el modo de entorno. */
     @Bean
     public SolverFactory<ScheduleSolution> scheduleSolverFactory(OptimizerProperties properties) {
         OptimizerProperties.Weights weights = properties.getWeights();
@@ -48,7 +39,6 @@ public class OptimizerConfiguration {
         return SolverFactory.create(config);
     }
 
-    /** Administra los solves concurrentes (uno por preview) sobre la fábrica configurada. */
     @Bean
     public SolverManager<ScheduleSolution> scheduleSolverManager(
             SolverFactory<ScheduleSolution> solverFactory, OptimizerProperties properties) {

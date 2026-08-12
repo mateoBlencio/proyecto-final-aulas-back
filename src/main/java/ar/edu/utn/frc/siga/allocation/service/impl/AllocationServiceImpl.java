@@ -24,12 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Implementación de los tres verbos: resuelve el/los {@code AllocationTarget} de cada item
- * contra el estado actual de BD ({@link AllocationTargetResolver}), valida (aulas
- * existentes/disponibles siempre; solapamiento solo si {@code source == MANUAL}, ver
- * {@link AllocationValidator}) y delega la escritura atómica al {@link AllocationWriter}.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -91,14 +85,6 @@ public class AllocationServiceImpl implements AllocationService {
                 .toList();
     }
 
-    /**
-     * Clampea por source ({@code IMPORTED} incluye pasadas, el resto no —
-     * {@link AllocationTargetResolver}), resuelve el aula de cada occurrence del lote, valida
-     * aulas existentes/disponibles y —solo para {@code MANUAL}— que nada choque contra la
-     * ocupación firme de BD ni entre sí. Un lote que no resuelve a ninguna occurrence
-     * aplicable (evento sin ocurrencias futuras, todas canceladas/suspendidas) es un no-op:
-     * mismo criterio que ya tenía {@code AllocationWriter} al saltear no-aplicables.
-     */
     private Map<OccurrenceSlotDto, Integer> resolveAndValidate(AllocationCommand command) {
         LocalDate clampFrom = command.source() == AllocationSource.IMPORTED ? null : LocalDate.now();
         Map<OccurrenceSlotDto, Integer> classroomByOccurrence =

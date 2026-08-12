@@ -9,11 +9,6 @@ import java.time.LocalTime;
 
 import org.springframework.modulith.NamedInterface;
 
-/**
- * Pedido de alta de un evento recurrente (clase regular): día de la semana, ventana de
- * dictado y materia/comisión que cursa. Genera una occurrence por semana entre
- * {@code startDate} y {@code endDate} (o un año desde {@code startDate} si es null).
- */
 @NamedInterface("api")
 public record CreateRecurringEventRequestDto(
         @NotNull @Min(1) Integer enrolled,

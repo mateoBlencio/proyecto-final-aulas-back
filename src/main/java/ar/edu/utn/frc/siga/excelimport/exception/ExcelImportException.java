@@ -5,9 +5,6 @@ import org.springframework.http.HttpStatus;
 
 import java.io.Serial;
 
-/**
- * Falla el procesamiento de una fila o del archivo Excel durante la importación masiva.
- */
 public class ExcelImportException extends SigaAppException {
 
     @Serial

@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** Compone el DTO de un evento académico resolviendo datos ajenos a la entidad: materia y comisión (ambos subtipos). */
 @Component
 @RequiredArgsConstructor
 public class AcademicEventComposer {
@@ -30,12 +29,10 @@ public class AcademicEventComposer {
     private final SubjectService subjectService;
     private final CommissionService commissionService;
 
-    /** Composición de un único evento (delega en el batch con una lista de un elemento). */
     public AcademicEventResponseDto compose(AcademicEvent event) {
         return compose(List.of(event)).getFirst();
     }
 
-    /** Composición por lote indexada por id de evento, para lookups posteriores por id. */
     public Map<Long, AcademicEventResponseDto> composeById(List<? extends AcademicEvent> events) {
         List<AcademicEventResponseDto> composed = compose(events);
         Map<Long, AcademicEventResponseDto> byId = new LinkedHashMap<>();
@@ -45,7 +42,6 @@ public class AcademicEventComposer {
         return byId;
     }
 
-    /** Composición por lote: prefetch de materias/comisiones distintas, sin N+1. */
     public List<AcademicEventResponseDto> compose(Collection<? extends AcademicEvent> events) {
         List<AcademicEvent> realEvents = events.stream()
                 .map(e -> (AcademicEvent) Hibernate.unproxy(e))

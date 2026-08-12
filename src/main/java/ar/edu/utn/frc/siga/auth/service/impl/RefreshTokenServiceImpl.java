@@ -86,8 +86,6 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
             return new RefreshResult(user, child);
         }
 
-        // Otro request concurrente ya consumió el token: descartamos el hijo emitido de más
-        // y caemos en la misma lógica de gracia/cascada que un reuso detectado en el paso anterior.
         refreshTokenRepository.delete(childEntity);
         RefreshToken reloaded = refreshTokenRepository.findByTokenHash(token.getTokenHash())
                 .orElseThrow(InvalidRefreshTokenException::new);
@@ -100,9 +98,6 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
                         .compareTo(Duration.ofSeconds(jwtProperties.getRefreshGraceSeconds())) <= 0;
 
         if (token.getRevocationReason() == RevocationReason.ROTATION && withinGrace) {
-            // El token viejo ya está revocado (fue rotado antes) — no se re-consume, se emite
-            // directo un par fresco. Reintentar consumeByTokenHash acá siempre devolvería 0
-            // filas (la condición revoked=false ya no matchea) y recursionaría sin fin.
             log.info("Refresh token reutilizado dentro de la ventana de gracia, tratado como reintento de red");
             return new RefreshResult(token.getUser(), issue(token.getUser()));
         }

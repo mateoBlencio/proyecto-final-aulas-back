@@ -15,9 +15,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/**
- * Consulta de planes de estudio (catálogo cargado por fuera de la app, ver {@code excelimport}).
- */
 @Slf4j
 @RestController
 @RequestMapping("${siga.api.base-path}/study-plans")

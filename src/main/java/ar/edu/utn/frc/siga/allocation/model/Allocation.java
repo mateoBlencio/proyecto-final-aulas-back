@@ -19,10 +19,6 @@ import org.hibernate.envers.Audited;
 
 import java.time.LocalDateTime;
 
-/**
- * Asignación de un aula a una ocurrencia. Auditada con Hibernate Envers: cada
- * creación/modificación/baja queda registrada en {@code asignacion_aula_aud}.
- */
 @Entity
 @Table(name = "asignacion_aula")
 @Audited
@@ -41,19 +37,9 @@ public class Allocation {
     @Column(name = "id_asignacion")
     private Long id;
 
-    /**
-     * ID de la ocurrencia asignada (events::Occurrence). Referencia por ID plano en vez de
-     * {@code @OneToOne}: la FK física sigue en la BD, pero la integridad referencial a
-     * nivel de módulo la garantiza solo el esquema, no una relación JPA cross-módulo.
-     */
     @Column(name = "id_ocurrencia", nullable = false)
     private Long occurrenceId;
 
-    /**
-     * ID del aula asignada (space::Classroom). Referencia por ID plano en vez de
-     * {@code @ManyToOne}: la FK física sigue en la BD, pero la integridad referencial
-     * a nivel de módulo la garantiza solo el esquema, no una relación JPA cross-módulo.
-     */
     @Column(name = "id_aula", nullable = false)
     private Integer classroomId;
 

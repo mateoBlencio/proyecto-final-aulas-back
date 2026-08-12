@@ -45,13 +45,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-/**
- * Cada tipo de conflicto se calcula por separado (algoritmos distintos) y se mezcla en un
- * único listado paginado. Sobrecupo, superposición y "sin aula" se calculan en memoria
- * (O(n log n) o anti-join lineal) sobre una única lectura de la ocupación/ocurrencias del
- * rango. Sin joins cross-módulo ni N+1: eventos, aulas y ocupación se resuelven en un
- * batch cada uno.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -139,13 +132,6 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         return buildOverlaps(overlapAccs, fetchEventsById(eventIds), fetchClassroomsById(classroomIds));
     }
 
-    /**
-     * Anti-join en memoria: ocurrencias NEEDS_ROOM del rango que no tienen fila en
-     * {@code asignacion_aula}. "Tiene aula" es {@code existe Allocation}, ya no un estado
-     * del enum — por eso el join contra la propia tabla en vez de delegar en {@code events}.
-     * Orden de inserción = orden de {@code occurrenceService.findSlotsByStatusBetween}
-     * (event_id asc, date asc), un evento cuenta una sola vez (su primera ocurrencia sin aula).
-     */
     private Set<Long> unassignedEventIds(Range range, boolean includePast) {
         List<OccurrenceSlotDto> occurrences =
                 occurrenceService.findSlotsByStatusBetween(OccurrenceStatus.NEEDS_ROOM, range.from(), range.to());
@@ -180,7 +166,6 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         return Maps.byId(classroomService.findByIds(ids), ClassroomResponseDto::id);
     }
 
-    /** Resuelve el rango efectivo compartido por los tres tipos de conflicto y valida {@code to >= from}. */
     private Range resolveRange(LocalDate from, LocalDate to) {
         LocalDate effectiveFrom = DateRanges.defaultFrom(from);
         LocalDate effectiveTo = to != null ? to : resolveDefaultTo(effectiveFrom);
@@ -189,10 +174,6 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         return new Range(effectiveFrom, effectiveTo);
     }
 
-    /**
-     * Máximo {@code endDate} de los períodos académicos activos; si no hay período
-     * activo o ninguno tiene {@code endDate}, {@code from + 6 meses}.
-     */
     private LocalDate resolveDefaultTo(LocalDate from) {
         return academicPeriodService.findActive().stream()
                 .map(AcademicPeriodResponseDto::endDate)
@@ -201,15 +182,9 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
                 .orElseGet(() -> from.plusMonths(6));
     }
 
-    /** Un par en conflicto (normalizado por min/max id) chocando en una fecha puntual. */
     private record OverlapHit(OverlapKey key, LocalDate date) {
     }
 
-    /**
-     * Superposiciones: {@link Clashes#within} agrupa por (aula, fecha), ordena por hora de
-     * inicio y barre con corte temprano, evitando el producto cartesiano. Los hits se agregan
-     * acá por (eventoA, eventoB, aula), acumulando todas las fechas en que chocan.
-     */
     private Map<OverlapKey, OverlapAcc> computeOverlaps(List<OccupiedSlot> occupancy) {
         List<OverlapHit> hits = Clashes.within(occupancy,
                 slot -> List.of(new RoomDate(slot.classroomId(), slot.date())),
@@ -261,11 +236,9 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         return overlaps;
     }
 
-    /** Rango efectivo resuelto (ambos extremos no nulos, {@code to >= from}). */
     private record Range(LocalDate from, LocalDate to) {
     }
 
-    /** Clave de agrupación para sobrecupo: un evento puede tener sobrecupo en más de un aula a lo largo del rango. */
     private record OvercrowdKey(Long eventId, Integer classroomId) {
     }
 
@@ -280,7 +253,6 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         }
     }
 
-    /** Clave de agregación de un par en conflicto: normalizada por (min id, max id, aula). */
     private record OverlapKey(Long eventIdA, Long eventIdB, Integer classroomId) {
     }
 

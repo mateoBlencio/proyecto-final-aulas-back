@@ -9,7 +9,6 @@ import ar.edu.utn.frc.siga.allocation.service.AllocationOccupancyService;
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
 import lombok.RequiredArgsConstructor;
 
-/** Delega en {@link AllocationOccupancyReader}, ya usado internamente para el mismo cálculo. */
 @Service
 @RequiredArgsConstructor
 public class AllocationOccupancyServiceImpl implements AllocationOccupancyService {

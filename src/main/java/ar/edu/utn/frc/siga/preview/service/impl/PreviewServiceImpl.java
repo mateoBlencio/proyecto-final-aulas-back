@@ -34,7 +34,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Arma los modelos del solver, delega la optimización y compone/valida el resultado (preview y confirm). */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -78,13 +77,6 @@ public class PreviewServiceImpl implements PreviewService {
                 inputs.rooms(), inputs.databaseOccupancy());
     }
 
-    /**
-     * Confirma atómicamente la propuesta final ajustada: TODAS las validaciones corren
-     * antes de la primera escritura (preview vigente, sin duplicados, subconjunto del
-     * preview, aulas existentes/disponibles, sin solapamiento nuevo contra BD ni dentro
-     * del propio set). {@code source = AUTOMATIC} se estampa siempre acá adentro, nunca
-     * lo decide el cliente. Invalida el preview al final: un re-confirm da 410.
-     */
     @Override
     @Transactional
     public ConfirmPreviewResponseDto confirm(String previewId, ConfirmPreviewRequestDto request) {
@@ -96,8 +88,6 @@ public class PreviewServiceImpl implements PreviewService {
         previewValidator.validateNoDuplicateEventIds(request.allocations());
         previewValidator.validateAllocationsBelongToPreview(request.allocations(), previewEventIds);
 
-        // Collectors.toMap no admite valores null (Map.merge los rechaza) y classroomId
-        // puede serlo (evento sin aula propuesta) → se construye el mapa a mano.
         Map<Long, Integer> classroomByEvent = new LinkedHashMap<>();
         for (PreviewAllocationDto allocation : request.allocations()) {
             classroomByEvent.put(allocation.eventId(), allocation.classroomId());
@@ -131,9 +121,6 @@ public class PreviewServiceImpl implements PreviewService {
                 .toList();
         validator.validateNoOverlap(candidates, inputs.databaseOccupancy());
 
-        // Un item por evento (no por occurrence): allocationService.reallocate resuelve él
-        // mismo, por AllocationTarget.Event, las occurrences aplicables de cada uno en una
-        // sola pasada de escritura — evita N+1 con muchos eventos.
         List<AllocationItem> items = eventIdsWithClassroom.stream()
                 .map(eventId -> new AllocationItem(new AllocationTarget.Event(eventId), classroomByEvent.get(eventId)))
                 .toList();
@@ -145,11 +132,6 @@ public class PreviewServiceImpl implements PreviewService {
         return new ConfirmPreviewResponseDto(saved, skippedEventIds);
     }
 
-    /**
-     * Dos modos excluyentes: {@code eventIds} explícito, o {@code selectAll=true} para
-     * resolver todos los eventos sin aula ({@link AllocationConflictService#resolveAllUnassignedEventIds})
-     * descontando {@code excludedIds}. Ninguno o ambos a la vez es un request inválido.
-     */
     private Set<Long> resolveEventIds(PreviewRequestDto request) {
         boolean selectAll = Boolean.TRUE.equals(request.selectAll());
         boolean hasExplicitIds = request.eventIds() != null && !request.eventIds().isEmpty();

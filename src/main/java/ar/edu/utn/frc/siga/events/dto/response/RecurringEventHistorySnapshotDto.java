@@ -7,7 +7,6 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
-/** Snapshot histórico de un {@code RecurringEvent}: estado del evento recurrente en esa revisión, con IDs planos de materia/comisión. */
 @NamedInterface("api")
 public record RecurringEventHistorySnapshotDto(
         Long id,

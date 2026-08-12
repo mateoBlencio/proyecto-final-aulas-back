@@ -32,14 +32,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Implementación de alta y consulta de eventos académicos (recurrentes/únicos): valida
- * la existencia de materia/comisión ajenas vía sus fachadas y genera las occurrences del
- * evento al crearlo. No conoce aulas ni asignaciones: {@code createUniqueEvent}/
- * {@code updateUniqueEvent} crean o modifican el evento y su occurrence, nada más — asignar
- * o reasignar el aula es una llamada aparte, no atómica, a {@code allocation}
- * ({@code POST}/{@code PUT /v1/allocations}).
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -85,17 +77,12 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Crea un evento recurrente (validando primero que materia y comisión existan vía sus
-     * fachadas) y genera de una vez todas sus occurrences semanales, sin aula (NEEDS_ROOM).
-     */
     @Override
     @Transactional
     public AcademicEventResponseDto createRecurringEvent(CreateRecurringEventRequestDto dto) {
         log.debug("Creando evento recurrente: subjectId={}, commissionId={}, dayOfWeek={}, startDate={}",
                 dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startDate());
 
-        // Solo se valida existencia vía la fachada (404 si no existe); no se necesita el DTO completo.
         subjectService.findById(dto.subjectId());
         commissionService.findById(dto.commissionId());
 
@@ -118,11 +105,6 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         return composer.compose(saved);
     }
 
-    /**
-     * Reutiliza un evento recurrente idéntico (misma materia/comisión/día/horario/ventana
-     * de fechas) si ya existe; si no, lo crea. Pensado para importaciones donde varias
-     * filas de la planilla describen el mismo evento.
-     */
     @Override
     @Transactional
     public FindOrCreateResult<Long> findOrCreateRecurringEvent(CreateRecurringEventRequestDto dto) {
@@ -137,7 +119,6 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 .orElseGet(() -> new FindOrCreateResult<>(createRecurringEvent(dto).id(), true));
     }
 
-    /** Crea un evento único y genera su única occurrence (NEEDS_ROOM, sin aula). */
     @Override
     @Transactional
     public AcademicEventResponseDto createUniqueEvent(CreateUniqueEventRequestDto dto) {
@@ -174,7 +155,6 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         return composer.compose(saved);
     }
 
-    /** Lista todos los eventos únicos (parciales, TPs, mesas especiales, etc.). */
     @Override
     @Transactional(readOnly = true)
     public List<AcademicEventResponseDto> findUniqueEvents() {
@@ -182,12 +162,6 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         return composer.compose(uniqueEventRepository.findAll());
     }
 
-    /**
-     * Modifica un evento único existente y la fecha de su occurrence, revalidando ventana
-     * horaria y referencia académica (mismo camino que el alta). {@code id} que no corresponde
-     * a un evento único (inexistente o recurrente) → 404, ya que {@link UniqueEventRepository}
-     * solo resuelve filas de {@code evento_unico_academico}. Rechaza si la occurrence ya ocurrió.
-     */
     @Override
     @Transactional
     public AcademicEventResponseDto updateUniqueEvent(Long id, UpdateUniqueEventRequestDto dto) {
@@ -196,8 +170,6 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         UniqueEvent event = Finder.orThrow(uniqueEventRepository::findById, id, "UniqueEvent");
         Occurrence occurrence = occurrenceRepository.findByEvent_Id(id).getFirst();
 
-        // Se valida el estado ANTES de mutar la occurrence: isPast() debe evaluarse contra
-        // la fecha/hora vigente, no la nueva que se está por escribir.
         eventScheduleValidator.validateNotPast(occurrence);
 
         Duration duration = Duration.ofMinutes(dto.durationMinutes());

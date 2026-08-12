@@ -41,15 +41,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Integración end-to-end de la carga masiva desde Excel: sube un {@code .xlsx} en memoria
- * (fixture {@link ExcelTestWorkbooks}) contra Postgres real y verifica la cadena completa.
- * Specialty/studyPlan/subject/building/classroom son catálogo (el import solo busca, no
- * crea): cada test los siembra con {@link IntegrationTestData} antes de subir el archivo,
- * con las mismas claves naturales que la fila de Excel referencia. Verifica también
- * period → commission → evento → ocurrencias → asignaciones IMPORTED, idempotencia, y
- * atomicidad de la transacción única.
- */
 @Import(IntegrationTestData.class)
 @DisplayName("Excel Import (integración)")
 class ExcelImportIntegrationTest extends AbstractIntegrationTest {
@@ -77,7 +68,6 @@ class ExcelImportIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private IntegrationTestData integrationTestData;
 
-    /** Fila válida con claves naturales únicas (courseCode arranca con '6', año fijo de la plantilla = 2026). */
     private DataRow uniqueRow(String buildingName) {
         long seq = IntegrationTestData.nextSeq();
         int code = (int) seq;
@@ -103,13 +93,6 @@ class ExcelImportIntegrationTest extends AbstractIntegrationTest {
         return "Edificio-IT-" + IntegrationTestData.nextSeq();
     }
 
-    /**
-     * Specialty/studyPlan/subject/commission/subjectCommission/recurringEvent/building/
-     * classroom son catálogo: el import solo los busca, no los crea. Siembra cada uno con
-     * la misma clave natural que {@code row} referencia (más el año fijo de la plantilla,
-     * 2026, y el día/horario codificados en {@link #uniqueRow}), para que el import los
-     * encuentre.
-     */
     private void seedCatalog(DataRow row) {
         var specialty = integrationTestData.especialidad(row.specialtyCode());
         var plan = integrationTestData.planDeEstudio(row.studyPlanCode(), specialty);
@@ -118,7 +101,7 @@ class ExcelImportIntegrationTest extends AbstractIntegrationTest {
         integrationTestData.aulaConNumero((String) row.roomNumber(), building,
                 integrationTestData.tipoAulaNormal(), 1, row.enrolledCount(), true);
 
-        int year = 2026; // año fijo de ExcelTestWorkbooks.validTemplate()
+        int year = 2026;
         TermType termType = TermType.fromLabel(row.termType()).orElseThrow();
         AcademicPeriod period = integrationTestData.periodoAcademico(year, termType);
         Commission commission = integrationTestData.comision(row.courseCode(), row.commissionNumber(), period);
@@ -148,12 +131,10 @@ class ExcelImportIntegrationTest extends AbstractIntegrationTest {
                 result.getResponse().getContentAsString(), ImportResultDto.class);
         assertThat(response.processedRows()).isEqualTo(2);
 
-        // Commission/RecurringEvent son catálogo pre-sembrado por seedCatalog: el import solo los busca.
         assertThat(commissionRepository.count()).isEqualTo(commissionsBefore);
         assertThat(eventRepository.count()).isEqualTo(eventsBefore);
         assertThat(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester())).isPresent();
 
-        // Cadena completa de la fila 1: aula sembrada -> evento -> ocurrencias -> asignaciones IMPORTED.
         Classroom classroom1 = classroomRepository.findByRoomNumber((String) row1.roomNumber()).orElseThrow();
         assertThat(classroom1.getCapacity()).isEqualTo(row1.enrolledCount());
 
@@ -168,7 +149,6 @@ class ExcelImportIntegrationTest extends AbstractIntegrationTest {
         List<Occurrence> occurrences1 = occurrenceRepository.findByEvent_Id(eventId1);
         assertThat(occurrences1).isNotEmpty();
         assertThat(occurrences1).allSatisfy(o -> assertThat(o.getStatus()).isEqualTo(OccurrenceStatus.ASSIGNED));
-        // Año 2026 de la plantilla con "hoy" en julio de 2026: el rango Anual (marzo-noviembre) ya generó fechas pasadas.
         assertThat(occurrences1).anySatisfy(o -> assertThat(o.getDate()).isBefore(LocalDate.now()));
 
         List<Allocation> allocations1 = allocationRepository.findByOccurrenceIdIn(

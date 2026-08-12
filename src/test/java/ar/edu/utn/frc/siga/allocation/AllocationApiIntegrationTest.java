@@ -37,11 +37,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Integración de asignaciones manuales contra Postgres real: validación de solapamiento
- * ({@code validateNoOverlap}) con la query de ocupación real, atomicidad de
- * {@code @Transactional} en el lote, y auditoría Envers con commits reales.
- */
 @Import(IntegrationTestData.class)
 @DisplayName("Allocation API (integración)")
 class AllocationApiIntegrationTest extends AbstractIntegrationTest {
@@ -64,10 +59,6 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    /**
-     * Evento recurrente de 1 sola ocurrencia en {@code date} (dayOfWeek == date.getDayOfWeek()),
-     * creado por el servicio real (valida materia/comisión contra las fachadas).
-     */
     private Occurrence seedOccurrence(IntegrationTestData.SubjectAndCommission sc, LocalDate date) {
         var dto = new CreateRecurringEventRequestDto(
                 30, START, DURATION, date.getDayOfWeek(), date, date, sc.subjectId(), sc.commissionId());
@@ -125,8 +116,6 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("Asignar una ocurrencia pasada responde 409")
     void assignManually_pastOccurrence_returns409() throws Exception {
         Classroom aula = testData.aula(testData.edificio());
-        // Sembrada por repositorio (el endpoint de creación no genera ocurrencias pasadas):
-        // ids de materia/comisión planos sin FK, no hacen falta filas reales de academic.
         LocalDate yesterday = LocalDate.now().minusDays(1);
         RecurringEvent event = eventRepository.save(RecurringEvent.builder()
                 .enrolled(30).startTime(START).duration(Duration.ofMinutes(DURATION))
@@ -149,7 +138,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
         Classroom aula = testData.aula(testData.edificio());
         LocalDate date = LocalDate.now().plusDays(9);
         Occurrence first = seedOccurrence(sc, date);
-        Occurrence second = seedOccurrence(sc, date); // mismo día y hora, otro evento
+        Occurrence second = seedOccurrence(sc, date);
 
         assignOk(first.getId(), aula.getId());
 
@@ -194,9 +183,8 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
 
         long alloc1 = allocationIdFrom(assignOk(seedOccurrence(sc, date).getId(), aulaA.getId()));
         long alloc2 = allocationIdFrom(assignOk(seedOccurrence(sc, date).getId(), aulaB.getId()));
-        assignOk(seedOccurrence(sc, date).getId(), aulaC.getId()); // ocupa C en la misma franja
+        assignOk(seedOccurrence(sc, date).getId(), aulaC.getId());
 
-        // move1 es válido (a aula libre); move2 choca contra la ocupación firme de aulaC.
         var dto = new BatchReallocateRequestDto(List.of(
                 new BatchReallocateRequestDto.MoveDto(alloc1, aulaLibre.getId()),
                 new BatchReallocateRequestDto.MoveDto(alloc2, aulaC.getId())));
@@ -206,7 +194,6 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(dto)))
                 .andExpect(status().isConflict());
 
-        // Atomicidad real de @Transactional: ninguno de los dos moves quedó aplicado.
         assertThat(allocationRepository.findById(alloc1).orElseThrow().getClassroomId()).isEqualTo(aulaA.getId());
         assertThat(allocationRepository.findById(alloc2).orElseThrow().getClassroomId()).isEqualTo(aulaB.getId());
     }
@@ -217,7 +204,6 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
         var sc = testData.materiaYComision();
         Classroom aula = testData.aula(testData.edificio());
         LocalDate date = LocalDate.now().plusDays(12);
-        // Ocupación firme en la primera semana del rango del evento a asignar.
         assignOk(seedOccurrence(sc, date).getId(), aula.getId());
 
         var dto = new CreateRecurringEventRequestDto(
@@ -278,9 +264,6 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
                 30, START, DURATION, date.getDayOfWeek(), date, date.plusWeeks(2), sc.subjectId(), sc.commissionId());
         Long eventId = academicEventService.createRecurringEvent(dto).id();
 
-        // Ocurrencia pasada del mismo evento, sembrada directo por repositorio (la creación
-        // vía servicio solo genera ocurrencias desde hoy en adelante); se le asigna el aula
-        // original para verificar que reallocateEvent no la toca.
         Occurrence past = occurrenceRepository.save(Occurrence.builder()
                 .event(eventRepository.findById(eventId).orElseThrow())
                 .date(LocalDate.now().minusDays(7))
@@ -304,7 +287,6 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
                 .hasSize(3)
                 .allSatisfy(a -> assertThat(a.getClassroomId()).isEqualTo(aulaNueva.getId()));
 
-        // La ocurrencia pasada queda intacta.
         assertThat(allocationRepository.findById(pastAllocationId).orElseThrow().getClassroomId())
                 .isEqualTo(aulaOriginal.getId());
     }

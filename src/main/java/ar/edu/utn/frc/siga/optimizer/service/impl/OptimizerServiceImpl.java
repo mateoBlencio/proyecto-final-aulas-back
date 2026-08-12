@@ -30,12 +30,6 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
-/**
- * Orquesta una corrida del solver: arma el modelo de planificación (eventos nuevos + ocupación
- * existente pinned), lo somete al {@link SolverManager} de Timefold con límite de tiempo, y
- * devuelve el resultado. No persiste nada: guardar/recuperar/invalidar la preview es
- * responsabilidad del caller (módulo {@code preview}, dueño del {@code PreviewStore}).
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -44,7 +38,6 @@ public class OptimizerServiceImpl implements OptimizerService {
     private final SolverManager<ScheduleSolution> solverManager;
     private final OptimizerProperties optimizerProperties;
 
-    /** Ocupación existente ya resuelta a un aula concreta del conjunto de candidatas. */
     private record ExistingOccupancy(OptimizerEvent event, OptimizerRoom room) {
     }
 
@@ -55,8 +48,6 @@ public class OptimizerServiceImpl implements OptimizerService {
                 .collect(Collectors.toMap(OptimizerRoom::id, r -> r));
         List<ExistingOccupancy> existing = buildExistingOccupancy(occupancy, roomsById);
 
-        // Conflictos calculados sobre nuevos + existentes → adyacencia simétrica que
-        // permite que el noOverlap bloquee un aula ocupada para los eventos nuevos.
         List<OptimizerEvent> allEvents = new ArrayList<>(events);
         existing.forEach(e -> allEvents.add(e.event()));
         Map<String, Set<String>> conflictsByEventId = computeConflicts(allEvents);
@@ -83,14 +74,6 @@ public class OptimizerServiceImpl implements OptimizerService {
         return new OptimizationResult(previewId, allocations);
     }
 
-    /**
-     * Cada ocupación existente cuya aula sea candidata se vuelve una asignación pinned.
-     * Si el aula ocupada no es candidata (no disponible), no puede colisionar con ningún
-     * evento nuevo y se descarta.
-     * Deduplicada por planningId: si en BD hay dos allocations preexistentes conflictivas
-     * (mismo aula/fecha/hora), generarían el mismo {@code @PlanningId} y Timefold explota.
-     * Se conserva solo la primera y se loguea la duplicada descartada.
-     */
     private List<ExistingOccupancy> buildExistingOccupancy(List<OptimizerOccupancy> occupancy,
                                                            Map<Integer, OptimizerRoom> roomsById) {
         if (occupancy == null || occupancy.isEmpty()) return List.of();
@@ -165,16 +148,9 @@ public class OptimizerServiceImpl implements OptimizerService {
         return termination;
     }
 
-    /** Un par de eventos que comparten fecha y cuyas franjas se pisan. */
     private record Edge(String from, String to) {
     }
 
-    /**
-     * Construye la adyacencia de conflictos horarios (eventId → eventIds que solapan) vía
-     * {@link Clashes#within}, que agrupa por fecha de ocurrencia y barre ordenado por hora
-     * de inicio con corte temprano. El Set de cada evento deduplica los pares hallados en
-     * múltiples fechas compartidas.
-     */
     private Map<String, Set<String>> computeConflicts(List<OptimizerEvent> events) {
         List<Edge> edges = Clashes.within(events, OptimizerEvent::occurrenceDates,
                 (a, b) -> !a.planningId().equals(b.planningId()),

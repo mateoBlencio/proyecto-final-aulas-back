@@ -7,10 +7,6 @@ import org.springframework.modulith.NamedInterface;
 
 import java.time.LocalTime;
 
-/**
- * Vista de respuesta de un {@code AcademicEvent}, polimórfica por {@code type}
- * ({@code RECURRING}/{@code UNIQUE_EVENT}) sobre sus dos variantes concretas.
- */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.EXISTING_PROPERTY, property = "type", visible = true)
 @JsonSubTypes({
         @JsonSubTypes.Type(value = RecurringEventResponseDto.class, name = "RECURRING"),

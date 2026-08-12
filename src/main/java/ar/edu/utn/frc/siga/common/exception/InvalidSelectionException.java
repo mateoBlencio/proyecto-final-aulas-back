@@ -4,10 +4,6 @@ import org.springframework.http.HttpStatus;
 
 import java.io.Serial;
 
-/**
- * La selección de eventos de un request es inválida (ej. ni {@code eventIds} ni
- * {@code selectAll}, o ambos a la vez).
- */
 public class InvalidSelectionException extends SigaAppException {
 
     @Serial

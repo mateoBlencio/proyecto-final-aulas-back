@@ -5,9 +5,6 @@ import org.springframework.http.HttpStatus;
 
 import java.io.Serial;
 
-/**
- * Falla inesperada del solver al calcular una asignación automática.
- */
 public class SchedulingException extends SigaAppException {
 
     @Serial

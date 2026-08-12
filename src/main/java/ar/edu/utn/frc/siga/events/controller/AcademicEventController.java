@@ -29,13 +29,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/**
- * Endpoints de eventos académicos (recurrentes/únicos): alta, modificación, consulta y sus
- * ocurrencias. Dueño del ciclo de vida completo del evento en sí (datos, horario, ocurrencias);
- * nunca conoce aulas. Asignar, reasignar o desasignar el aula de una ocurrencia es un asunto
- * aparte que vive en {@code allocation} ({@code POST /v1/allocations} y verbos relacionados):
- * un evento recién creado o modificado queda sin aula hasta esa llamada separada.
- */
 @Slf4j
 @RestController
 @RequestMapping("${siga.api.base-path}/events")

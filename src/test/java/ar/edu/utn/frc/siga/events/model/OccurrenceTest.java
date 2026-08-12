@@ -31,11 +31,6 @@ class OccurrenceTest {
         assertThat(occurrence.isPast()).isFalse();
     }
 
-    /**
-     * Se parte de LocalDateTime.now() y se separa en fecha/hora recién al construir la
-     * ocurrencia: si "ahora - 2h" cruza medianoche, la fecha resultante ya es la de ayer,
-     * así que el caso sigue siendo válido sin necesidad de ramificar según la hora del día.
-     */
     @Test
     @DisplayName("startTime 2 horas antes de ahora (mismo día, o ayer si cruza medianoche) → pasado")
     void horarioDosHorasAntesEsPasado() {

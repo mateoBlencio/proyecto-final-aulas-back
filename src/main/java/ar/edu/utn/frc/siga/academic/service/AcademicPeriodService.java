@@ -8,17 +8,11 @@ import java.util.List;
 
 import org.springframework.modulith.NamedInterface;
 
-/**
- * Fachada del período académico: resolución idempotente (find-or-create) por año y
- * cuatrimestre, y consulta de los períodos activos usados como rango por defecto en
- * otras pantallas.
- */
 @NamedInterface("api")
 public interface AcademicPeriodService {
 
     FindOrCreateResult<AcademicPeriodResponseDto> findOrCreate(Integer year, TermType termType);
 
-    /** Períodos académicos activos, usados por {@code allocation} para resolver el rango por defecto de "problems". */
     List<AcademicPeriodResponseDto> findActive();
 
     List<AcademicPeriodResponseDto> findAll();

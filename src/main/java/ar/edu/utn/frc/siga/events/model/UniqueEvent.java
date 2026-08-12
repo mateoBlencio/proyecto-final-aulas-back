@@ -16,12 +16,6 @@ import org.hibernate.envers.Audited;
 import java.time.LocalDate;
 import java.util.List;
 
-/**
- * Evento académico que ocurre una sola vez (mesa de examen final, parcial, trabajo
- * práctico, o una mesa especial fuera de calendario). Genera exactamente una {@link Occurrence}.
- * {@code subjectId}/{@code commissionId} viven en {@link AcademicEvent}, compartidos con
- * {@link RecurringEvent}.
- */
 @Entity
 @Table(name = "evento_unico_academico")
 @DiscriminatorValue("UNIQUE_EVENT")
@@ -39,7 +33,6 @@ public final class UniqueEvent extends AcademicEvent {
     @Column(name = "descripcion")
     private String description;
 
-    /** Tipo de actividad: Parcial, Trabajo Práctico, Examen final u Otro. */
     @Setter
     @Enumerated(EnumType.STRING)
     @Column(name = "tipo_actividad", nullable = false)

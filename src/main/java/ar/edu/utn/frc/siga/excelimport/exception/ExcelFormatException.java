@@ -5,9 +5,6 @@ import org.springframework.http.HttpStatus;
 
 import java.io.Serial;
 
-/**
- * El archivo Excel no respeta el formato de plantilla esperado (columnas, hoja, encabezados).
- */
 public class ExcelFormatException extends SigaAppException {
 
     @Serial

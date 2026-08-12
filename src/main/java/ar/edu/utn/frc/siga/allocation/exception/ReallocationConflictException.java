@@ -8,10 +8,6 @@ import org.springframework.http.HttpStatus;
 import java.io.Serial;
 import java.util.List;
 
-/**
- * Una reasignación en masa no puede aplicarse porque una o más ocurrencias solapan
- * con asignaciones existentes. Lleva el detalle de cuáles.
- */
 @Getter
 public final class ReallocationConflictException extends SigaAppException {
 

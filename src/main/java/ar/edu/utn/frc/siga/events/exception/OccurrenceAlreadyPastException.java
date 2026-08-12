@@ -5,7 +5,6 @@ import org.springframework.http.HttpStatus;
 
 import java.io.Serial;
 
-/** La occurrence ya ocurrió (fecha + hora de inicio ya pasó): no se puede modificar ni cancelar. */
 public class OccurrenceAlreadyPastException extends SigaAppException {
 
     @Serial

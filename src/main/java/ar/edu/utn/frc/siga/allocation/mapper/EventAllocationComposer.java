@@ -22,7 +22,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Enriquece la vista de un {@code UniqueEvent} con aula/estado/sobrecupo: la parte que {@code events} no conoce. */
 @Component
 @RequiredArgsConstructor
 public class EventAllocationComposer {
@@ -31,7 +30,6 @@ public class EventAllocationComposer {
     private final AllocationRepository allocationRepository;
     private final ClassroomService classroomService;
 
-    /** Composición desde una {@link AllocationResponseDto} ya resuelta (alta/modificación: la trae completa). */
     public UniqueEventAllocationResponseDto compose(UniqueEventResponseDto event, AllocationResponseDto allocation) {
         return new UniqueEventAllocationResponseDto(
                 event,
@@ -41,7 +39,6 @@ public class EventAllocationComposer {
                 allocation.observation());
     }
 
-    /** Composición por lote: prefetch de occurrence/allocation/aula, sin N+1. */
     public List<UniqueEventAllocationResponseDto> composeAll(List<AcademicEventResponseDto> events) {
         List<UniqueEventResponseDto> uniqueEvents = events.stream().map(UniqueEventResponseDto.class::cast).toList();
         if (uniqueEvents.isEmpty()) {

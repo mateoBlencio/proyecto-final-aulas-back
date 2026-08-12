@@ -11,12 +11,6 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-/**
- * Envuelve {@link User} por composición para exponerlo como {@link UserDetails}.
- * {@code @NamedInterface("api")} deja el terreno preparado para que un módulo de negocio
- * inyecte {@code @AuthenticationPrincipal SecurityUser} el día que lo necesite (agregando
- * "auth :: api" a su propio allowedDependencies) — hoy ningún módulo de negocio lo consume.
- */
 @NamedInterface("api")
 @Getter
 public class SecurityUser implements UserDetails {

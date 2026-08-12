@@ -5,7 +5,6 @@ import org.springframework.modulith.NamedInterface;
 
 import java.time.LocalDate;
 
-/** Snapshot histórico de una {@code Occurrence} en una revisión de auditoría: fecha y estado en ese momento. */
 @NamedInterface("api")
 public record OccurrenceHistorySnapshotDto(
         Long id,

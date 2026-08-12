@@ -10,12 +10,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/**
- * Primer uso de eventos de aplicación de Spring Modulith en este proyecto: reacciona a que una
- * occurrence liberó su aula, desasignándola del lado de {@code allocation} — separado de la
- * transacción que cambia el status en {@code events}, con reintento automático si falla
- * (registro de publicación de Modulith).
- */
 @Component
 @RequiredArgsConstructor
 class OccurrenceVacatedListener {

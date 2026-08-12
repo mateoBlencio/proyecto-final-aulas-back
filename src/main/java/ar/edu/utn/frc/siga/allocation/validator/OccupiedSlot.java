@@ -9,7 +9,6 @@ import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.common.util.TimeSpan;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 
-/** Franja ocupada, sea de BD o de un snapshot automático. */
 @NamedInterface("api")
 public record OccupiedSlot(Integer classroomId, LocalDate date, LocalTime startTime, LocalTime endTime,
                             Long eventId, Long allocationId) implements TimeSpan {

@@ -13,12 +13,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.function.Function;
 
-/**
- * Lector genérico del historial de auditoría de Envers: dado un tipo de entidad, una propiedad
- * por la que filtrar y una función de mapeo a snapshot, arma la lista de {@link RevisionDto} en
- * orden de revisión ascendente. Reutilizable por cualquier módulo que audite una entidad propia,
- * sin exponer tipos de Envers (ni entidades JPA) fuera de esta clase.
- */
 @Component
 @RequiredArgsConstructor
 public class RevisionReader {
@@ -36,12 +30,6 @@ public class RevisionReader {
         return toRevisionDtos(results, toSnapshot);
     }
 
-    /**
-     * Como {@link #read(Class, String, Object, Function)} pero filtrando por varios valores de la
-     * misma propiedad a la vez (IN en vez de =), con orden de revisión ascendente global entre
-     * todos los valores — no por valor. Útil para fusionar el historial de varias entidades
-     * relacionadas (p. ej. todas las occurrences de un mismo evento) en una sola línea de tiempo.
-     */
     public <E, S> List<RevisionDto<S>> read(Class<E> entityClass, String property, Collection<?> values, Function<E, S> toSnapshot) {
         if (values.isEmpty()) {
             return List.of();

@@ -4,7 +4,6 @@ import java.util.List;
 
 import jakarta.validation.constraints.AssertTrue;
 
-/** Un target del lote de desasignación: exactamente uno de {@code occurrenceIds} / {@code eventId}. Sin classroomId. */
 public record DeallocationTargetRequestDto(
         List<Long> occurrenceIds,
         Long eventId

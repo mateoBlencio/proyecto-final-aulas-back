@@ -28,7 +28,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Compone {@link PreviewResponseDto} a partir del resultado crudo del solver, resolviendo evento y aula. */
 @Component
 @RequiredArgsConstructor
 public class PreviewComposer {
@@ -36,15 +35,6 @@ public class PreviewComposer {
     private final ClassroomService classroomService;
     private final PreviewValidator previewValidator;
 
-    /**
-     * Compone el DTO propio de preview a partir de la preview cruda del solver: separa
-     * resueltos (con aula) de {@code unresolved} (sin aula, revisión manual), y resuelve
-     * evento y aula en un solo batch cada uno. Floor de no-regresión: un evento sin aula del
-     * solver que YA estaba asignado ({@code priorRoomByEvent}) conserva esa aula previa y
-     * queda en resueltos; sólo los eventos sin aula previa caen en {@code unresolved}, con los
-     * conflictos que explican por qué ninguna aula candidata ({@code rooms}) le sirvió, contra
-     * el estado final: ocupación firme de BD ({@code databaseOccupancy}) + los propios resueltos.
-     */
     public PreviewResponseDto compose(OptimizationResult preview, List<RecurringEventResponseDto> events,
                                             Map<Long, List<LocalDate>> datesByEvent,
                                             Map<Long, Integer> priorRoomByEvent,
@@ -91,7 +81,6 @@ public class PreviewComposer {
         return new PreviewResponseDto(preview.previewId(), allocations, unresolvedDtos);
     }
 
-    /** Las propuestas ya resueltas del preview, en la forma que espera {@code previewValidator.unresolvedConflicts}. */
     private List<ResolvedProposal> buildResolvedProposals(Map<String, Integer> effectiveRoomByEventId,
             Map<Long, RecurringEventResponseDto> eventsById, Map<Long, List<LocalDate>> datesByEvent) {
         List<ResolvedProposal> proposals = new ArrayList<>();
@@ -118,12 +107,6 @@ public class PreviewComposer {
                 unchanged);
     }
 
-    /**
-     * Fila {@code unresolved}: evento sin aula + los conflictos que explican por qué ninguna
-     * aula candidata sirvió (delegado en {@code previewValidator.unresolvedConflicts}). Sin horario
-     * del evento (evento borrado entre el solve y la composición, caso extremo) no hay franja
-     * contra la que comparar y viaja sin conflictos.
-     */
     private UnresolvedAllocationDto toUnresolvedAllocationDto(OptimizerAllocation allocation,
             Map<Long, AcademicEventResponseDto> eventDtoById, Map<Long, List<LocalDate>> datesByEvent,
             Map<Long, RecurringEventResponseDto> eventsById, Set<Integer> candidateRoomIds,
@@ -138,7 +121,6 @@ public class PreviewComposer {
         return new UnresolvedAllocationDto(event, dates, conflicts);
     }
 
-    /** El solver usa {@code eventId} como {@code String} (tipos propios, sin acoplarse a {@code Long} del dominio). */
     private static Long eventIdOf(OptimizerAllocation allocation) {
         return Long.valueOf(allocation.eventId());
     }

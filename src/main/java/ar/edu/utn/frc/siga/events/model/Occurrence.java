@@ -25,10 +25,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
-/**
- * Ocurrencia concreta (fecha) de un {@link AcademicEvent}. Auditada con Hibernate Envers:
- * los cambios de estado quedan registrados en {@code ocurrencia_aud}.
- */
 @Entity
 @Table(name = "ocurrencia")
 @Audited
@@ -67,7 +63,6 @@ public class Occurrence {
         return event.endTime();
     }
 
-    /** true si ya pasó el momento de inicio (fecha + hora de inicio del evento vs. ahora). */
     public boolean isPast() {
         return LocalDateTime.now().isAfter(date.atTime(event.getStartTime()));
     }

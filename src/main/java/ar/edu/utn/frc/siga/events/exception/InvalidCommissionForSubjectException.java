@@ -5,10 +5,6 @@ import org.springframework.http.HttpStatus;
 
 import java.io.Serial;
 
-/**
- * {@code subjectId} y {@code commissionId} existen individualmente, pero esa comisión no
- * corresponde a esa materia (no hay un {@code SubjectCommission} que los vincule).
- */
 public class InvalidCommissionForSubjectException extends SigaAppException {
 
     @Serial

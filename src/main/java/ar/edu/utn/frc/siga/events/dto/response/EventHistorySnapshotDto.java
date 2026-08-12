@@ -7,12 +7,6 @@ import org.springframework.modulith.NamedInterface;
 
 import java.time.LocalTime;
 
-/**
- * Snapshot histórico de un {@code AcademicEvent} en una revisión de auditoría, polimórfico
- * por {@code type} ({@code RECURRING}/{@code UNIQUE_EVENT}) como {@link AcademicEventResponseDto}.
- * IDs planos sin resolver contra el catálogo actual: el historial muestra el dato crudo de
- * ese momento.
- */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.EXISTING_PROPERTY, property = "type", visible = true)
 @JsonSubTypes({
         @JsonSubTypes.Type(value = RecurringEventHistorySnapshotDto.class, name = "RECURRING"),

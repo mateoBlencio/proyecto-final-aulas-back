@@ -89,13 +89,12 @@ class AcademicEventServiceImplTest {
                 occurrenceRepository, composer, occurrenceMapper, subjectService, commissionService, eventScheduleValidator);
     }
 
-    // ---------- createRecurringEvent ----------
 
     @Test
     @DisplayName("createRecurringEvent: valida materia y comisión vía fachada (cada una por separado, SIN cruzar que estén vinculadas — ver ADR-011), persiste el evento y sus ocurrencias generadas")
     void createRecurringEventFeliz() {
         CreateRecurringEventRequestDto dto = recurringDto(DayOfWeek.MONDAY,
-                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19)); // 3 semanas → 3 ocurrencias
+                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19));
         RecurringEvent saved = EventTestData.recurringEvent(1L, dto.dayOfWeek(), dto.startDate(), dto.endDate());
         when(subjectService.findById(1L)).thenReturn(EventTestData.subjectResponseDto(1L));
         when(commissionService.findById(1L)).thenReturn(EventTestData.commissionResponseDto(1L));
@@ -126,7 +125,6 @@ class AcademicEventServiceImplTest {
         assertThat(occurrences).allSatisfy(o -> assertThat(o.getStatus()).isEqualTo(OccurrenceStatus.SCHEDULED));
     }
 
-    // ---------- findOrCreateRecurringEvent ----------
 
     @Test
     @DisplayName("findOrCreateRecurringEvent: existe uno con la misma sextupla → lo reusa, no crea")
@@ -169,7 +167,6 @@ class AcademicEventServiceImplTest {
         verify(eventRepository).save(any());
     }
 
-    // ---------- createUniqueEvent ----------
 
     @Test
     @DisplayName("createUniqueEvent: persiste el evento (con su description) y su única ocurrencia SCHEDULED, sin aula")
@@ -289,7 +286,6 @@ class AcademicEventServiceImplTest {
         verify(eventScheduleValidator).validateCommissionBelongsToSubject(1L, 1L);
     }
 
-    // ---------- findUniqueEvents ----------
 
     @Test
     @DisplayName("findUniqueEvents: delega en el composer sobre todos los eventos únicos")
@@ -304,7 +300,6 @@ class AcademicEventServiceImplTest {
         verify(composer).compose(anyCollection());
     }
 
-    // ---------- updateUniqueEvent ----------
 
     @Test
     @DisplayName("updateUniqueEvent: evento inexistente → 404")
@@ -348,7 +343,6 @@ class AcademicEventServiceImplTest {
                 .isInstanceOf(OccurrenceAlreadyPastException.class);
     }
 
-    // ---------- cancelUniqueEvent ----------
 
     @Test
     @DisplayName("cancelUniqueEvent: pasa la única occurrence a CANCELLED")
@@ -386,7 +380,6 @@ class AcademicEventServiceImplTest {
         assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.ASSIGNED);
     }
 
-    // ---------- findUnassignedEvents ----------
 
     @Test
     @DisplayName("findUnassignedEvents: 'to' anterior a 'from' → InvalidDateRangeException")
@@ -456,7 +449,6 @@ class AcademicEventServiceImplTest {
         verifyNoInteractions(composer);
     }
 
-    // ---------- findAll / findById / findOccurrencesByEventId ----------
 
     @Test
     @DisplayName("findAll: delega en el composer sobre todos los eventos")
@@ -517,7 +509,6 @@ class AcademicEventServiceImplTest {
         assertThat(result.getFirst().id()).isEqualTo(10L);
     }
 
-    // ---------- helpers ----------
 
     private CreateRecurringEventRequestDto recurringDto(DayOfWeek dayOfWeek, LocalDate startDate, LocalDate endDate) {
         return new CreateRecurringEventRequestDto(30, LocalTime.of(8, 0), 90, dayOfWeek, startDate, endDate, 1L, 1L);

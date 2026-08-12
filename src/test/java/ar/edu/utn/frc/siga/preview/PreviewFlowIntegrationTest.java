@@ -47,13 +47,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Integración end-to-end del flujo de preview de asignación automática (solver real de
- * Timefold, {@code timeLimitSeconds=2}, {@code unimproved-seconds-limit=1} del perfil
- * integration): generar preview con re-resolución, recuperarlo y confirmarlo de forma
- * atómica contra Postgres real. El endpoint {@code validate-move} fue eliminado del módulo
- * {@code preview} (no reemplazado): esos casos no viajan a este test.
- */
 @Import(IntegrationTestData.class)
 @DisplayName("Preview Flow (integración, solver real)")
 class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
@@ -95,7 +88,6 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated());
     }
 
-    /** Ocupación firme sembrada por repositorio, bypasseando validateNoOverlap (evento ajeno, no seleccionado). */
     private void allocateDirect(Occurrence occurrence, Integer classroomId) {
         allocationRepository.save(Allocation.builder()
                 .occurrenceId(occurrence.getId()).classroomId(classroomId).source(AllocationSource.MANUAL)
@@ -104,11 +96,6 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
         occurrenceRepository.save(occurrence);
     }
 
-    /**
-     * Bloquea TODAS las aulas disponibles del sistema (pool global compartido entre clases de
-     * test) en la fecha/franja dada, para forzar de forma determinística "sin aula posible" sin
-     * depender de cuántas aulas hayan sembrado otras clases antes de esta.
-     */
     private void blockAllAvailableRooms(LocalDate date, LocalTime start, int durationMinutes) {
         for (ClassroomResponseDto room : classroomService.findAllAvailable()) {
             UniqueEvent blocker = eventRepository.save(UniqueEvent.builder()
@@ -152,10 +139,6 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("POST /v1/previews con todas las aulas ocupadas: el evento (nuevo, sin aula previa) queda en unresolved")
     void autoPreview_allRoomsOccupied_leavesEventUnresolved() throws Exception {
-        // Con classroom `allowsUnassigned` + la constraint MEDIUM "asignar todo lo posible",
-        // el solver deja el evento sin aula (0 hard) en vez de forzar una que se solapa
-        // (−1 hard): ya no hay false-feasible. Como es un evento nuevo (sin aula previa en BD),
-        // no aplica el floor de no-regresión → viaja explícito en `unresolved`.
         var sc = testData.materiaYComision();
         LocalDate date = LocalDate.now().plusDays(101);
         blockAllAvailableRooms(date, START, DURATION);
@@ -166,8 +149,6 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
         assertThat(preview.allocations()).isEmpty();
         assertThat(preview.unresolved()).hasSize(1);
         assertThat(preview.unresolved().getFirst().event().id()).isEqualTo(eventId);
-        // Todas las aulas del sistema están bloqueadas por "blockers" en BD: cada conflicto
-        // reportado debe apuntar a la ocupación firme que le tomó esa aula.
         assertThat(preview.unresolved().getFirst().conflicts()).isNotEmpty();
         assertThat(preview.unresolved().getFirst().conflicts())
                 .allSatisfy(c -> assertThat(c.origin()).isEqualTo(MoveConflictDto.ConflictOrigin.DATABASE));
@@ -179,14 +160,13 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
         var sc = testData.materiaYComision();
         var edificio = testData.edificio();
         Classroom aulaActual = testData.aula(edificio);
-        testData.aula(edificio); // alternativa libre garantizada para que el solver pueda reubicar
+        testData.aula(edificio);
         LocalDate date = LocalDate.now().plusDays(102);
 
         Long eventId = createEvent(sc, date, START, DURATION);
         Occurrence occurrence = occurrenceOf(eventId);
         assignOk(occurrence.getId(), aulaActual.getId());
 
-        // Ocupación firme ajena (evento NO seleccionado) que pisa la aula actual del evento en la misma franja.
         var scForeign = testData.materiaYComision();
         Long foreignEventId = createEvent(scForeign, date, START, DURATION);
         allocateDirect(occurrenceOf(foreignEventId), aulaActual.getId());
@@ -283,7 +263,7 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
 
         Long eventId = createEvent(sc, date, START, DURATION);
         Occurrence occurrence = occurrenceOf(eventId);
-        assignOk(occurrence.getId(), aulaOriginal.getId()); // ya asignada: confirm debe actualizar, no duplicar
+        assignOk(occurrence.getId(), aulaOriginal.getId());
 
         PreviewResponseDto preview = autoPreview(List.of(eventId));
         assertThat(preview.allocations()).hasSize(1);
@@ -328,7 +308,6 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
         assertThat(preview.allocations()).hasSize(1);
         Integer proposedRoom = preview.allocations().getFirst().classroom().id();
 
-        // Conflicto inyectado DESPUÉS del preview: otro evento toma exactamente esa aula/franja.
         var scForeign = testData.materiaYComision();
         Long foreignEventId = createEvent(scForeign, date, START, DURATION);
         allocateDirect(occurrenceOf(foreignEventId), proposedRoom);

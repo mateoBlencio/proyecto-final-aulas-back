@@ -14,9 +14,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/**
- * Expone la consulta de edificios activos, usada para poblar filtros de asignación de aulas.
- */
 @Slf4j
 @RestController
 @RequestMapping("${siga.api.base-path}/buildings")

@@ -15,11 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-/**
- * Implementación de la consulta del historial de auditoría de asignaciones sobre
- * {@code asignacion_aula_aud}, delegando el recorrido genérico de revisiones de Envers a
- * {@link RevisionReader}; en revisiones DELETED el snapshot va en null por contrato.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -32,7 +27,7 @@ public class AllocationAuditHistoryServiceImpl implements AllocationAuditHistory
     @Override
     @Transactional(readOnly = true)
     public List<RevisionDto<AllocationHistorySnapshotDto>> findAllocationHistory(Long eventId) {
-        academicEventService.findById(eventId); // 404 vía Finder.orThrow si no existe; descartamos el DTO, solo valida existencia
+        academicEventService.findById(eventId);
 
         List<Long> occurrenceIds = occurrenceService.findSlotsByEvent(eventId, null).stream()
                 .map(OccurrenceSlotDto::occurrenceId)

@@ -6,12 +6,6 @@ import jakarta.validation.constraints.Min;
 
 import java.util.List;
 
-/**
- * Pedido de preview de asignación automática: qué eventos asignar y cuánto tiempo darle al
- * solver. Dos modos mutuamente excluyentes para elegir los eventos: lista explícita en
- * {@code eventIds}, o {@code selectAll=true} para resolver contra todos los eventos sin aula
- * (mismo criterio que {@code GET /unassigned} sin filtros), descontando {@code excludedIds}.
- */
 @Schema(description = "Solicitud de preview automático: eventos a asignar + tiempo del solver")
 public record PreviewRequestDto(
 

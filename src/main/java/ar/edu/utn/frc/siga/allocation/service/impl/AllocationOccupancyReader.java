@@ -12,7 +12,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
-/** Lectura de ocupación (occurrences con {@code Allocation}) compartida por detección de problemas y carga de auto-asignación. */
 @Component
 @RequiredArgsConstructor
 class AllocationOccupancyReader {

@@ -36,7 +36,6 @@ class EventScheduleValidatorTest {
         validator = new EventScheduleValidator(new EventScheduleProperties(), subjectCommissionService);
     }
 
-    // ---------- validateBusinessHours ----------
 
     @Test
     @DisplayName("validateBusinessHours: horario dentro de la ventana y fin > inicio → no lanza")
@@ -66,7 +65,6 @@ class EventScheduleValidatorTest {
                 .isInstanceOf(InvalidEventScheduleException.class);
     }
 
-    // ---------- validateAcademicReference ----------
 
     @Test
     @DisplayName("validateAcademicReference: OTRO sin subjectId ni commissionId → no lanza")
@@ -96,7 +94,6 @@ class EventScheduleValidatorTest {
                 .doesNotThrowAnyException();
     }
 
-    // ---------- validateCommissionBelongsToSubject ----------
 
     @Test
     @DisplayName("validateCommissionBelongsToSubject: commissionId null → no consulta la fachada, no lanza")

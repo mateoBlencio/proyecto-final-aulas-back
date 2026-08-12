@@ -14,46 +14,25 @@ import lombok.experimental.FieldDefaults;
 import java.util.List;
 import java.util.Set;
 
-/**
- * Entidad de planificación del solver: la asignación aula↔evento que Timefold ajusta
- * durante el solve. Cada instancia representa un evento (nuevo o una ocupación existente
- * pinned) y su variable de planificación es el aula elegida.
- */
 @Getter
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @PlanningEntity
 public class ClassAllocation {
 
-    /** Identificador de planificación: el {@code planningId} del evento. */
     @PlanningId
     String id;
 
-    /** Evento del solver que esta entidad representa. */
     OptimizerEvent event;
 
-    /**
-     * Value range por entidad: las aulas que este evento puede recibir
-     * (todas, o solo la fijada si viene pinneado).
-     */
     @ValueRangeProvider
     List<OptimizerRoom> candidates;
 
-    /** IDs de eventos cuyo horario se solapa con este (precalculado antes del solve). */
     Set<String> conflictingEventIds;
 
-    /**
-     * Asignación existente inmovible: representa ocupación previa que el solver no
-     * puede cambiar; solo participa del no-solapamiento para bloquear a los nuevos.
-     */
     @PlanningPin
     boolean pinned;
 
-    /**
-     * Variable de planificación: aula asignada a este evento. {@code allowsUnassigned}: el
-     * solver puede dejarla null cuando no hay aula sin solape (0 hard) en vez de forzar una
-     * que se superpone (−1 hard). Un null final = evento inubicable, va a {@code unresolved}.
-     */
     @Setter
     @PlanningVariable(allowsUnassigned = true)
     OptimizerRoom classroom;
@@ -66,7 +45,6 @@ public class ClassAllocation {
         this.pinned = false;
     }
 
-    /** Ocupación existente: aula fija, no planificable. */
     public static ClassAllocation pinned(OptimizerEvent event, OptimizerRoom classroom, Set<String> conflictingEventIds) {
         ClassAllocation allocation = new ClassAllocation(event, List.of(classroom), conflictingEventIds);
         allocation.pinned = true;
@@ -88,12 +66,10 @@ public class ClassAllocation {
         return conflictingEventIds.contains(eventId);
     }
 
-    /** Comisión del evento, para la preferencia soft de agrupamiento. */
     public String getCommissionKey() {
         return event.commissionKey();
     }
 
-    /** Edificio del aula asignada (null si sin asignar). */
     public Integer getBuildingId() {
         return classroom != null ? classroom.buildingId() : null;
     }

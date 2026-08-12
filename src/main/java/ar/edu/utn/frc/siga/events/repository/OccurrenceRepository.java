@@ -10,22 +10,14 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 
-/** Acceso a {@code Occurrence} (fechas concretas generadas por un {@code AcademicEvent}). */
 @Repository
 public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
 
     List<Occurrence> findByEvent_Id(Long eventId);
 
-    /** Batch por ids de evento (sin N+1). */
     @EntityGraph(attributePaths = "event")
     List<Occurrence> findByEvent_IdIn(Collection<Long> eventIds);
 
-    /**
-     * Occurrences futuras de un conjunto de eventos en alguno de los estados dados. Se usa
-     * para el auto-preview con re-resolución: incluir ASSIGNED (además de SCHEDULED) trae
-     * las fechas de eventos ya asignados que el usuario quiere re-resolver; el filtro de
-     * fecha evita re-resolver clases ya dictadas.
-     */
     @EntityGraph(attributePaths = "event")
     List<Occurrence> findByEvent_IdInAndStatusInAndDateGreaterThanEqual(
             Collection<Long> eventIds, Collection<OccurrenceStatus> statuses, LocalDate date);
@@ -33,12 +25,6 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
     @EntityGraph(attributePaths = "event")
     List<Occurrence> findByEvent_IdAndDateGreaterThanEqual(Long eventId, LocalDate date);
 
-    /**
-     * Igual que {@link #findByEvent_IdAndDateGreaterThanEqual} pero para varios eventos a
-     * la vez: una sola query en vez de una por evento (import masivo desde Excel). El
-     * caller filtra en memoria si cada evento tiene su propia fecha desde (acá se pasa la
-     * más antigua de todas y se sobre-trae).
-     */
     @EntityGraph(attributePaths = "event")
     List<Occurrence> findByEvent_IdInAndDateGreaterThanEqual(Collection<Long> eventIds, LocalDate date);
 
@@ -50,11 +36,9 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
     List<Occurrence> findByStatusAndDateBetweenOrderByEvent_IdAscDateAsc(
             OccurrenceStatus status, LocalDate from, LocalDate to);
 
-    /** Todas las occurrences (cualquier estado) de una fecha puntual — usado por {@code allocation} para listar por fecha. */
     @EntityGraph(attributePaths = "event")
     List<Occurrence> findByDate(LocalDate date);
 
-    /** Todas las occurrences (cualquier estado) entre dos fechas (inclusive), sin filtro de estado. */
     @EntityGraph(attributePaths = "event")
     List<Occurrence> findByDateBetween(LocalDate from, LocalDate to);
 }

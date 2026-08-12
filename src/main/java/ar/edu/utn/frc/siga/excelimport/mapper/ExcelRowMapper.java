@@ -10,10 +10,6 @@ import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
 import org.springframework.stereotype.Component;
 
-/**
- * Convierte una fila cruda del Excel de importación en un {@link ExcelRowDto},
- * parseando y validando cada columna esperada.
- */
 @Component
 public class ExcelRowMapper {
 

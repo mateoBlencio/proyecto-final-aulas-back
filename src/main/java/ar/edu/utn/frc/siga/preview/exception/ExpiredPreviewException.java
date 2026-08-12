@@ -5,10 +5,6 @@ import org.springframework.http.HttpStatus;
 
 import java.io.Serial;
 
-/**
- * Preview inexistente o expirada. 410 GONE: el cliente debe re-generar el preview
- * para trabajar contra el estado actual de la BD.
- */
 public class ExpiredPreviewException extends SigaAppException {
 
     @Serial

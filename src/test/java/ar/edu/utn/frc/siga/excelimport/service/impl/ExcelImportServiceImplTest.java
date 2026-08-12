@@ -84,10 +84,6 @@ class ExcelImportServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        // validator y rowMapper reales: son la unidad de POI que se ejercita de punta a punta,
-        // solo se mockean las fachadas de los otros módulos. ExcelRowResolver se instancia real
-        // (no mock): es un simple orquestador de esas fachadas, la anotación @Transactional no
-        // aplica fuera de un contexto Spring.
         ExcelRowResolver rowResolver = new ExcelRowResolver(specialtyService, studyPlanService, subjectService,
             academicPeriodService, commissionService, subjectCommissionService, academicEventService,
             buildingService, classroomService);
@@ -123,7 +119,7 @@ class ExcelImportServiceImplTest {
         assertThat(eventDto.commissionId()).isEqualTo(20L);
         assertThat(eventDto.dayOfWeek()).isEqualTo(DayOfWeek.MONDAY);
         assertThat(eventDto.startDate()).isEqualTo(LocalDate.of(2026, 3, 1));
-        assertThat(eventDto.endDate()).isEqualTo(LocalDate.of(2026, 11, 30)); // TermType.ANUAL
+        assertThat(eventDto.endDate()).isEqualTo(LocalDate.of(2026, 11, 30));
 
         ArgumentCaptor<List<AllocateFromDateRequestDto>> allocationCaptor = ArgumentCaptor.forClass(List.class);
         verify(allocationService).importAllocationsBatch(allocationCaptor.capture());
@@ -140,8 +136,6 @@ class ExcelImportServiceImplTest {
         when(specialtyService.findBySpecialtyCode(1)).thenReturn(specialty);
         stubRestOfChain(specialty, 100, "Análisis Matemático", 20L,
             "6301", 1, 30L, "105", 5, 40L, 1L);
-        // Segunda fila: mismo curso/comisión (misma clave de comisión) pero distinta materia,
-        // para no chocar con la clave de subject cacheada por otro código.
         stubForSecondSubject(specialty);
 
         MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026)
@@ -173,7 +167,6 @@ class ExcelImportServiceImplTest {
     @Test
     @DisplayName("Durac[min] vacía → duración se calcula como fin - inicio")
     void duracionConFallbackFinInicio() {
-        // 18:30 a 20:00 = 90 minutos, sin Durac[min] explícita.
         stubHappyPath(DataRow.defaultRow().toBuilder().durationMinutes(null).build());
         MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow().toMultipartFile();
 
@@ -192,7 +185,7 @@ class ExcelImportServiceImplTest {
         MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026)
             .withValidDataRow()
             .withEmptyRow()
-            .withDataRow(DataRow.defaultRow().toBuilder().subjectCode(999).build()) // nunca debería procesarse
+            .withDataRow(DataRow.defaultRow().toBuilder().subjectCode(999).build())
             .toMultipartFile();
 
         ImportResultDto result = service.importExcel(file);
@@ -225,8 +218,6 @@ class ExcelImportServiceImplTest {
     @DisplayName("aula resuelta en un edificio distinto al informado → importa igual pero reporta la advertencia")
     void aulaEnEdificioDistintoReportaWarning() {
         stubHappyPath(DataRow.defaultRow());
-        // El aula existe, pero en un edificio distinto al informado por la fila (fallback
-        // por número de ClassroomService.findByRoomNumberAndBuilding).
         ClassroomResponseDto classroomEnOtroEdificio = new ClassroomResponseDto(5, "105", 1, 40,
             true, 7, "Otro Edificio", 1, "Aula");
         when(classroomService.findByRoomNumberAndBuilding("105", 5)).thenReturn(classroomEnOtroEdificio);
@@ -272,7 +263,6 @@ class ExcelImportServiceImplTest {
         assertThat(startLog).contains("planilla-2026.xlsx");
     }
 
-    // ---------- helpers de stubbing ----------
 
     private void stubHappyPath(DataRow row) {
         stubHappyPath(row, true);
@@ -322,7 +312,6 @@ class ExcelImportServiceImplTest {
             .thenReturn(new FindOrCreateResult<>(event.id(), true));
     }
 
-    /** Variante de {@link #stubHappyPath} con ids explícitos, usada por el test de dedupe. */
     private void stubRestOfChain(SpecialtyResponseDto specialty, int subjectCode, String subjectName,
             long subjectId, String courseCode, int commissionNumber, long commissionId, String roomNumber,
             int buildingId, long subjectCommissionId, long eventId) {
@@ -364,8 +353,6 @@ class ExcelImportServiceImplTest {
         SubjectResponseDto subject = new SubjectResponseDto(21L, 101, "Álgebra", "Anual", plan);
         when(subjectService.findByCodeAndStudyPlan(101, 1, 1)).thenReturn(subject);
 
-        // Misma comisión (cacheada de la primera fila, id 30L) pero materia distinta (21L):
-        // clave de subjectCommission distinta a la de la primera fila, requiere su propio stub.
         SubjectCommissionResponseDto subjectCommission = new SubjectCommissionResponseDto(41L, 21L, 30L, null, 30);
         when(subjectCommissionService.findBySubjectAndCommission(21L, 30L))
             .thenReturn(subjectCommission);

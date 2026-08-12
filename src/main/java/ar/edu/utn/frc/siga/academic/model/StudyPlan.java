@@ -17,10 +17,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
-/**
- * Plan de estudio de una {@link Specialty}, identificado por su código dentro de esa
- * especialidad. Agrupa las materias que se dictan bajo ese plan.
- */
 @Entity
 @Table(name = "plan_estudio",
        uniqueConstraints = @UniqueConstraint(columnNames = {"codigo_plan", "id_especialidad"}))

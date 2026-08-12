@@ -9,7 +9,6 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
-/** Vista de respuesta de un {@code RecurringEvent}: clase regular con día fijo de la semana y ventana de dictado. */
 @NamedInterface("api")
 public record RecurringEventResponseDto(
         Long id,

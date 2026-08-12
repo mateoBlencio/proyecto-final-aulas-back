@@ -30,13 +30,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/**
- * El solve real de Timefold ({@code SolverManager.solveBuilder()...run().getFinalBestSolution()})
- * se reemplaza por un mock que "hace eco": devuelve tal cual el {@link ScheduleSolution} armado por
- * {@code OptimizerServiceImpl.solve(...)} (capturado en {@code withProblem}), sin optimizar nada. Esto
- * deja testear computeConflicts/buildExistingOccupancy/toResult vía el flujo público {@code optimize()}
- * inspeccionando el problema armado y el resultado, sin acoplarse a los métodos privados.
- */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("OptimizerServiceImpl")
 class OptimizerServiceImplTest {

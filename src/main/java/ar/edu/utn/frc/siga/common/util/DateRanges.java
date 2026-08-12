@@ -4,7 +4,6 @@ import ar.edu.utn.frc.siga.common.exception.InvalidDateRangeException;
 
 import java.time.LocalDate;
 
-/** Rango de fechas opcional: {@code from} default a hoy, {@code to} no puede ser anterior a {@code from}. */
 public final class DateRanges {
 
     private DateRanges() {

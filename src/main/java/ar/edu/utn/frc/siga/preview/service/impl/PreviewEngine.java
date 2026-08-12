@@ -29,13 +29,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-/**
- * Carga todo lo que necesita el auto-preview en una única transacción corta, resolviendo
- * evento y occurrences vía las fachadas de {@code events} (DTOs, no entidades), y corre el
- * solver sobre esos datos. Existe para que {@code PreviewServiceImpl#autoPreview} pueda
- * mantenerse sin transacción larga: la corrida del solver (hasta varios minutos) no debe
- * retener una conexión JDBC del pool (deuda B3).
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -47,12 +40,6 @@ class PreviewEngine {
     private final AllocationOccupancyService occupancyService;
     private final OptimizerService optimizerService;
 
-    /**
-     * Todo lo que compone una preview necesita, ya materializado fuera de la sesión de
-     * Hibernate. {@code priorRoomByEvent} es el aula que cada evento seleccionado ya tenía
-     * asignada (si tenía): garantiza que un evento previamente asignado nunca regrese a
-     * {@code unresolved} — si el solver no lo ubica, conserva su aula previa.
-     */
     record Inputs(List<RecurringEventResponseDto> events, Map<Long, List<LocalDate>> datesByEvent,
                   List<OptimizerRoom> rooms, List<OptimizerOccupancy> occupancy,
                   List<OccupiedSlot> databaseOccupancy, Map<Long, Integer> priorRoomByEvent) {
@@ -67,11 +54,9 @@ class PreviewEngine {
                 .toList();
 
         List<OccupiedSlot> occupancyInRange = loadOccupancyInRange(events);
-        // Ocupación ajena (pinned): excluye los eventos seleccionados → sus aulas quedan libres.
         List<OccupiedSlot> databaseOccupancy = occupancyInRange.stream()
                 .filter(o -> !eventIds.contains(o.eventId()))
                 .toList();
-        // Aula previa de cada evento seleccionado que ya estaba asignado (floor de no-regresión).
         Map<Long, Integer> priorRoomByEvent = occupancyInRange.stream()
                 .filter(o -> eventIds.contains(o.eventId()))
                 .collect(Collectors.toMap(OccupiedSlot::eventId, OccupiedSlot::classroomId, (x, y) -> x));
@@ -80,10 +65,6 @@ class PreviewEngine {
         return new Inputs(events, datesByEvent, rooms, occupancy, databaseOccupancy, priorRoomByEvent);
     }
 
-    /**
-     * Corre el solver: carga inputs, arma los {@link OptimizerEvent}, invoca {@link OptimizerService}.
-     * NO guarda la preview — eso lo decide el caller (separar calcular de guardar).
-     */
     OptimizationResult generate(Set<Long> eventIds, int timeLimitSeconds) {
         Inputs inputs = loadInputs(eventIds);
         List<OptimizerEvent> optimizerEvents = inputs.events().stream()
@@ -121,11 +102,6 @@ class PreviewEngine {
         }).toList();
     }
 
-    /**
-     * Fechas futuras de occurrences por evento, sin filtrar por estado: "tiene aula" ya no
-     * es un estado, así que re-resolver un evento ya asignado no requiere distinguirlo
-     * de uno sin asignar; el filtro de fecha evita re-resolver clases ya dictadas.
-     */
     private Map<Long, List<LocalDate>> datesByEvent(Set<Long> eventIds) {
         return occurrenceService.findSlotsByEvents(eventIds, LocalDate.now())
                 .stream()
@@ -140,11 +116,6 @@ class PreviewEngine {
         return new OptimizerRoom(c.id(), c.capacity(), c.buildingId());
     }
 
-    /**
-     * Ocupación existente (ASSIGNED) en el rango de fechas de los eventos seleccionados, sin
-     * filtrar por evento: quien llama separa la ajena (pinned) de la de los propios eventos
-     * (que da el aula previa para el floor de no-regresión).
-     */
     private List<OccupiedSlot> loadOccupancyInRange(List<RecurringEventResponseDto> events) {
         if (events.isEmpty()) {
             return List.of();
