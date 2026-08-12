@@ -14,7 +14,7 @@ import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationConflictService;
-import ar.edu.utn.frc.siga.allocation.service.ConflictType;
+import ar.edu.utn.frc.siga.allocation.model.ConflictType;
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
 import ar.edu.utn.frc.siga.common.util.Clashes;
 import ar.edu.utn.frc.siga.common.util.DateRanges;

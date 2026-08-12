@@ -13,7 +13,7 @@ import ar.edu.utn.frc.siga.common.dto.response.RevisionDto;
 import ar.edu.utn.frc.siga.allocation.service.AllocationAuditHistoryService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationConflictService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
-import ar.edu.utn.frc.siga.allocation.service.ConflictType;
+import ar.edu.utn.frc.siga.allocation.model.ConflictType;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -119,7 +119,8 @@ public class AllocationController {
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Asignar aulas en lote",
                description = "Asigna aula a cada item del lote (occurrences puntuales o evento completo). "
-                       + "409 si alguna occurrence del lote ya tiene asignación. Atómico.")
+                       + "409 si alguna occurrence del lote ya tiene asignación, si algún aula no existe/no está "
+                       + "disponible, o si hay solapamiento de horario con otra asignación. Atómico.")
     public ResponseEntity<List<AllocationResponseDto>> allocate(@Valid @RequestBody AllocationBatchRequestDto dto) {
         log.debug("POST /v1/allocations: items={}", dto.items().size());
         List<AllocationResponseDto> response = allocationService.allocate(commandMapper.toManualCommand(dto));
@@ -130,7 +131,9 @@ public class AllocationController {
     @PutMapping
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Reasignar aulas en lote",
-               description = "Cambia el aula de cada item del lote (upsert: crea la asignación si no existía). Atómico.")
+               description = "Cambia el aula de cada item del lote (upsert: crea la asignación si no existía). "
+                       + "409 si algún aula no existe/no está disponible, o si hay solapamiento de horario con "
+                       + "otra asignación. Atómico.")
     public ResponseEntity<List<AllocationResponseDto>> reallocate(@Valid @RequestBody AllocationBatchRequestDto dto) {
         log.debug("PUT /v1/allocations: items={}", dto.items().size());
         List<AllocationResponseDto> response = allocationService.reallocate(commandMapper.toManualCommand(dto));
@@ -141,7 +144,8 @@ public class AllocationController {
     @DeleteMapping
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Desasignar aulas en lote",
-               description = "Libera el aula de cada item del lote (borra la asignación). Atómico.")
+               description = "Libera el aula de cada item del lote (borra la asignación). "
+                       + "409 si alguna ocurrencia del lote ya pasó. Atómico.")
     public ResponseEntity<List<DeallocatedOccurrenceDto>> deallocate(@Valid @RequestBody DeallocationBatchRequestDto dto) {
         log.debug("DELETE /v1/allocations: items={}", dto.items().size());
         List<DeallocatedOccurrenceDto> response = allocationService.deallocate(commandMapper.toDeallocationCommand(dto));

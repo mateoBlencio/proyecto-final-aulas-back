@@ -29,7 +29,9 @@ public class PreviewController {
 
     @PostMapping
     @Operation(summary = "Generar preview de asignación automática",
-               description = "Corre el solver con las aulas disponibles y la ocupación existente; devuelve una preview con su previewId, sin persistir asignaciones.")
+               description = "Corre el solver con las aulas disponibles y la ocupación existente; devuelve una "
+                       + "preview con su previewId, sin persistir asignaciones. 400 si no se indica eventIds ni "
+                       + "selectAll, o si se indican ambos.")
     public ResponseEntity<PreviewResponseDto> autoPreview(@Valid @RequestBody PreviewRequestDto request) {
         log.debug("POST /v1/previews: eventIds={}, selectAll={}, excludedIds={}",
                 request.eventIds(), request.selectAll(), request.excludedIds());
@@ -51,7 +53,9 @@ public class PreviewController {
     @Operation(summary = "Confirmar el preview de asignación automática",
                description = "Persiste de forma atómica la propuesta final ajustada por el usuario, re-validando "
                        + "todo contra la BD actual antes de escribir. Eventos sin aula propuesta quedan en "
-                       + "skippedEventIds (revisión manual). Invalida el preview: un re-confirm da 410.")
+                       + "skippedEventIds (revisión manual). 410 si el preview expiró o no existe (incluye "
+                       + "re-confirm). 409 si la propuesta tiene eventos duplicados o ajenos al preview, si algún "
+                       + "aula no existe/no está disponible, o si hay solapamiento de horario con otra asignación.")
     public ResponseEntity<ConfirmPreviewResponseDto> confirm(
             @PathVariable String previewId, @Valid @RequestBody ConfirmPreviewRequestDto request) {
         log.debug("POST /v1/previews/{}/confirm: allocations={}", previewId, request.allocations().size());

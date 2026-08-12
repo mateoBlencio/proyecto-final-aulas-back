@@ -45,7 +45,6 @@ public class AllocationServiceImpl implements AllocationService {
     @Override
     @Transactional(readOnly = true)
     public List<AllocationResponseDto> findByDate(LocalDate date) {
-        log.debug("findByDate: date={}", date);
         List<Long> occurrenceIds = occurrenceService.findSlotsByDate(date).stream()
                 .map(OccurrenceSlotDto::occurrenceId).toList();
         return composer.composeAll(allocationRepository.findByOccurrenceIdIn(occurrenceIds));
@@ -54,32 +53,29 @@ public class AllocationServiceImpl implements AllocationService {
     @Override
     @Transactional
     public List<AllocationResponseDto> allocate(AllocationCommand command) {
-        log.debug("allocate: source={}, items={}", command.source(), command.items().size());
         Map<OccurrenceSlotDto, Integer> classroomByOccurrence = resolveAndValidate(command);
         List<Allocation> saved = writer.create(classroomByOccurrence, command.observation(), command.source());
-        log.info("allocate completo: source={}, allocated={}", command.source(), saved.size());
+        log.info("Asignación creada: source={}, count={}", command.source(), saved.size());
         return composer.composeAll(saved);
     }
 
     @Override
     @Transactional
     public List<AllocationResponseDto> reallocate(AllocationCommand command) {
-        log.debug("reallocate: source={}, items={}", command.source(), command.items().size());
         Map<OccurrenceSlotDto, Integer> classroomByOccurrence = resolveAndValidate(command);
         List<Allocation> saved = writer.upsert(classroomByOccurrence, command.observation(), command.source());
-        log.info("reallocate completo: source={}, allocated={}", command.source(), saved.size());
+        log.info("Asignación actualizada: source={}, count={}", command.source(), saved.size());
         return composer.composeAll(saved);
     }
 
     @Override
     @Transactional
     public List<DeallocatedOccurrenceDto> deallocate(DeallocationCommand command) {
-        log.debug("deallocate: targets={}", command.targets().size());
         List<OccurrenceSlotDto> occurrences = targetResolver.resolveAll(command.targets(), null);
         occurrences.forEach(validator::validateNotPast);
 
         List<AllocationWriter.DeallocatedOccurrence> deallocated = writer.delete(occurrences);
-        log.info("deallocate completo: freed={}", deallocated.size());
+        log.info("Asignación liberada: count={}", deallocated.size());
         return deallocated.stream()
                 .map(d -> new DeallocatedOccurrenceDto(d.occurrenceId(), d.classroomId()))
                 .toList();
