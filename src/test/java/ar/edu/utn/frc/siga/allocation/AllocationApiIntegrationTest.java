@@ -3,7 +3,7 @@ package ar.edu.utn.frc.siga.allocation;
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateFromDateRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.request.BatchReassignRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.BatchReallocateRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
@@ -157,13 +157,13 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new AllocateOccurrenceRequestDto(aula.getId(), null))))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.title").value("Reassign conflict"))
+                .andExpect(jsonPath("$.title").value("Reallocation conflict"))
                 .andExpect(jsonPath("$.conflicts").isArray());
     }
 
     @Test
     @DisplayName("PUT /v1/allocations/{id} reasigna el aula y persiste el cambio")
-    void reassign_changesClassroomInDatabase() throws Exception {
+    void reallocate_changesClassroomInDatabase() throws Exception {
         var sc = testData.materiaYComision();
         var edificio = testData.edificio();
         Classroom aulaOriginal = testData.aula(edificio);
@@ -183,7 +183,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     @DisplayName("PUT /v1/allocations/batch con un move en conflicto responde 409 y NO aplica ningún move")
-    void batchReassign_oneConflictingMove_appliesNothing() throws Exception {
+    void batchReallocate_oneConflictingMove_appliesNothing() throws Exception {
         var sc = testData.materiaYComision();
         var edificio = testData.edificio();
         Classroom aulaA = testData.aula(edificio);
@@ -197,9 +197,9 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
         assignOk(seedOccurrence(sc, date).getId(), aulaC.getId()); // ocupa C en la misma franja
 
         // move1 es válido (a aula libre); move2 choca contra la ocupación firme de aulaC.
-        var dto = new BatchReassignRequestDto(List.of(
-                new BatchReassignRequestDto.MoveDto(alloc1, aulaLibre.getId()),
-                new BatchReassignRequestDto.MoveDto(alloc2, aulaC.getId())));
+        var dto = new BatchReallocateRequestDto(List.of(
+                new BatchReallocateRequestDto.MoveDto(alloc1, aulaLibre.getId()),
+                new BatchReallocateRequestDto.MoveDto(alloc2, aulaC.getId())));
 
         mockMvc.perform(put("/v1/allocations/batch")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -267,7 +267,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     @DisplayName("PUT /v1/allocations/events/{eventId}/classroom reasigna las ocurrencias futuras y deja intactas las pasadas")
-    void reassignEvent_happyPath_reassignsFutureOnly() throws Exception {
+    void reallocateEvent_happyPath_reallocatesFutureOnly() throws Exception {
         var sc = testData.materiaYComision();
         var edificio = testData.edificio();
         Classroom aulaOriginal = testData.aula(edificio);
@@ -280,7 +280,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
 
         // Ocurrencia pasada del mismo evento, sembrada directo por repositorio (la creación
         // vía servicio solo genera ocurrencias desde hoy en adelante); se le asigna el aula
-        // original para verificar que reassignEvent no la toca.
+        // original para verificar que reallocateEvent no la toca.
         Occurrence past = occurrenceRepository.save(Occurrence.builder()
                 .event(eventRepository.findById(eventId).orElseThrow())
                 .date(LocalDate.now().minusDays(7))
@@ -311,7 +311,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     @DisplayName("PUT /v1/allocations/events/{eventId}/classroom sobre un evento ya finalizado responde 409")
-    void reassignEvent_finishedEvent_returns409() throws Exception {
+    void reallocateEvent_finishedEvent_returns409() throws Exception {
         Classroom aula = testData.aula(testData.edificio());
         LocalDate yesterday = LocalDate.now().minusDays(1);
         RecurringEvent event = eventRepository.save(RecurringEvent.builder()

@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.events.dto.response;
 
+import ar.edu.utn.frc.siga.common.util.TimeSpan;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import org.springframework.modulith.NamedInterface;
 
@@ -22,7 +23,7 @@ public record OccurrenceSlotDto(
         LocalTime endTime,
         OccurrenceStatus status,
         Integer enrolled
-) {
+) implements TimeSpan {
     /** true si ya pasó el momento de inicio (fecha + hora de inicio vs. ahora). */
     public boolean isPast() {
         return LocalDateTime.now().isAfter(date.atTime(startTime));

@@ -1,0 +1,31 @@
+meta {
+  name: Desasignar aulas en lote
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/v1/allocations
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "items": [
+      { "occurrenceIds": [1, 2] },
+      { "eventId": 7 }
+    ],
+    "observation": "Aula liberada"
+  }
+}
+
+docs {
+  Libera el aula de cada item del lote (borra la asignación). Atómico: si algo falla,
+  no se libera nada. Occurrences sin asignación se ignoran (no es error). Cada item es
+  occurrenceIds explícitas O eventId (todas las ocurrencias aplicables del evento),
+  nunca ambos ni ninguno. Sin classroomId: no hace falta indicar qué aula tenía.
+
+  Respuesta 200: [ { "occurrenceId": 1, "classroomId": 5 }, ... ] — cada ocurrencia
+  liberada y el aula que tenía hasta el momento de liberarla.
+}

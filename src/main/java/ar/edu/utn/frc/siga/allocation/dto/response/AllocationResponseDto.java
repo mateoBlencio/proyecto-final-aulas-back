@@ -7,7 +7,10 @@ import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 
 import java.time.LocalDateTime;
 
+import org.springframework.modulith.NamedInterface;
+
 /** Vista de respuesta de una {@code Allocation}: qué aula tiene asignada una occurrence, su origen ({@code source}) y auditoría básica. */
+@NamedInterface("api")
 public record AllocationResponseDto(
         Long id,
         AllocationSource source,

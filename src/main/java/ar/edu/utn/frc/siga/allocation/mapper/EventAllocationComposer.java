@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.common.util.Maps;
+import ar.edu.utn.frc.siga.common.util.Overcrowding;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +37,7 @@ public class EventAllocationComposer {
                 event,
                 allocation.occurrence() != null ? allocation.occurrence().status() : null,
                 allocation.classroom(),
-                overcrowdedBy(event.enrolled(), allocation.classroom()),
+                Overcrowding.by(event.enrolled(), allocation.classroom() != null ? allocation.classroom().capacity() : null),
                 allocation.observation());
     }
 
@@ -71,16 +72,9 @@ public class EventAllocationComposer {
                     event,
                     slot != null ? slot.status() : null,
                     classroom,
-                    overcrowdedBy(event.enrolled(), classroom),
+                    Overcrowding.by(event.enrolled(), classroom != null ? classroom.capacity() : null),
                     allocation != null ? allocation.getObservation() : null));
         }
         return result;
-    }
-
-    private Integer overcrowdedBy(Integer enrolled, ClassroomResponseDto classroom) {
-        if (classroom == null || classroom.capacity() == null || enrolled == null) {
-            return null;
-        }
-        return Math.max(0, enrolled - classroom.capacity());
     }
 }

@@ -1,6 +1,8 @@
 package ar.edu.utn.frc.siga.events.controller;
 
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
+import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
+import ar.edu.utn.frc.siga.events.dto.request.UpdateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.EventHistorySnapshotDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceHistorySnapshotDto;
@@ -8,6 +10,7 @@ import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
 import ar.edu.utn.frc.siga.common.dto.response.RevisionDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.EventAuditHistoryService;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -19,6 +22,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,10 +30,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * Endpoints de eventos académicos (recurrentes/únicos): alta, consulta y sus ocurrencias.
- * No conoce aulas: el alta/modificación de un evento único con aula, y la reasignación de
- * aula de un evento recurrente, viven en {@code /v1/allocations/events/**}
- * ({@link ar.edu.utn.frc.siga.allocation.service.UniqueEventAllocationService}).
+ * Endpoints de eventos académicos (recurrentes/únicos): alta, modificación, consulta y sus
+ * ocurrencias. Dueño del ciclo de vida completo del evento en sí (datos, horario, ocurrencias);
+ * nunca conoce aulas. Asignar, reasignar o desasignar el aula de una ocurrencia es un asunto
+ * aparte que vive en {@code allocation} ({@code POST /v1/allocations} y verbos relacionados):
+ * un evento recién creado o modificado queda sin aula hasta esa llamada separada.
  */
 @Slf4j
 @RestController
@@ -40,6 +45,7 @@ public class AcademicEventController {
 
     private final AcademicEventService academicEventService;
     private final EventAuditHistoryService eventAuditHistoryService;
+    private final OccurrenceService occurrenceService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
@@ -118,15 +124,55 @@ public class AcademicEventController {
         return ResponseEntity.ok(events);
     }
 
-    @PostMapping("/unique/{id}/cancel")
+    @PostMapping("/unique")
     @PreAuthorize("hasRole('SUBSECRETARIA')")
-    @Operation(summary = "Cancelar un evento único",
-               description = "Baja lógica: cancela la ocurrencia del evento sin borrarlo físicamente. "
-                       + "Deja de bloquear el aula para nuevas asignaciones.")
-    public ResponseEntity<Void> cancelUnique(@PathVariable Long id) {
-        log.debug("POST /v1/events/unique/{}/cancel", id);
-        academicEventService.cancelUniqueEvent(id);
-        log.info("Evento único cancelado vía controller: id={}", id);
+    @Operation(summary = "Crear evento único",
+               description = "Crea un evento que ocurre una única vez y genera su única ocurrencia, sin asignarle "
+                       + "aula: la ocurrencia queda en NEEDS_ROOM. Para asignarle un aula, llamar por separado a "
+                       + "POST /v1/allocations con la ocurrencia generada.")
+    public ResponseEntity<AcademicEventResponseDto> createUnique(
+            @Valid @RequestBody CreateUniqueEventRequestDto dto) {
+        log.debug("POST /v1/events/unique: eventType={}, date={}", dto.eventType(), dto.date());
+        AcademicEventResponseDto response = academicEventService.createUniqueEvent(dto);
+        log.info("Evento único creado vía controller: id={}", response.id());
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PutMapping("/unique/{id}")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Modificar un evento único",
+               description = "Actualiza fecha, horario, cantidad de alumnos y descripción de un evento único "
+                       + "existente, sin tocar su aula asignada. Para reasignar el aula, llamar por separado a "
+                       + "PUT /v1/allocations.")
+    public ResponseEntity<AcademicEventResponseDto> updateUnique(
+            @PathVariable Long id, @Valid @RequestBody UpdateUniqueEventRequestDto dto) {
+        log.debug("PUT /v1/events/unique/{}", id);
+        AcademicEventResponseDto response = academicEventService.updateUniqueEvent(id, dto);
+        log.info("Evento único actualizado vía controller: id={}", id);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/occurrences/{occurrenceId}/release")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Liberar el aula de una ocurrencia",
+               description = "Marca la ocurrencia como ROOM_RELEASED (libera el aula a propósito, "
+                       + "reasignable en cualquier momento). Rechaza ocurrencias ya pasadas.")
+    public ResponseEntity<Void> release(@PathVariable Long occurrenceId) {
+        log.debug("POST /v1/events/occurrences/{}/release", occurrenceId);
+        occurrenceService.release(occurrenceId);
+        log.info("Ocurrencia liberada: occurrenceId={}", occurrenceId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/occurrences/{occurrenceId}/request-room")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Volver a pedir aula para una ocurrencia",
+               description = "Vuelve a marcar la ocurrencia como necesitada de aula (NEEDS_ROOM). No implica "
+                       + "que se reactive nada: la ocurrencia nunca dejó de dictarse. Rechaza ocurrencias ya pasadas.")
+    public ResponseEntity<Void> requestRoom(@PathVariable Long occurrenceId) {
+        log.debug("POST /v1/events/occurrences/{}/request-room", occurrenceId);
+        occurrenceService.requestRoom(occurrenceId);
+        log.info("Ocurrencia vuelta a marcar como NEEDS_ROOM: occurrenceId={}", occurrenceId);
         return ResponseEntity.noContent().build();
     }
 }

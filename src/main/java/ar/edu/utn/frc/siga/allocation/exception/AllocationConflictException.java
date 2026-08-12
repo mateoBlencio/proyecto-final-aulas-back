@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.allocation.exception;
 
 import ar.edu.utn.frc.siga.common.exception.SigaAppException;
 import org.springframework.http.HttpStatus;
+import org.springframework.modulith.NamedInterface;
 
 import java.io.Serial;
 
@@ -9,6 +10,7 @@ import java.io.Serial;
  * Una asignación manual no puede aplicarse porque el aula ya está ocupada
  * en ese horario por otra ocurrencia.
  */
+@NamedInterface("api")
 public class AllocationConflictException extends SigaAppException {
 
     @Serial

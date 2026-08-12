@@ -90,7 +90,7 @@ class AuditHistoryApiIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     @DisplayName("GET /v1/allocations/occurrences/{id}/allocation-history refleja asignación, reasignación y baja")
-    void allocationHistory_reflectsAssignReassignAndDelete() throws Exception {
+    void allocationHistory_reflectsAssignReallocateAndDelete() throws Exception {
         Classroom aulaA = testData.aula(testData.edificio());
         Classroom aulaB = testData.aula(testData.edificio());
         Occurrence occurrence = seedOccurrence(LocalDate.now().plusDays(21));

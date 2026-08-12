@@ -1,27 +1,23 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
-import ar.edu.utn.frc.siga.allocation.dto.request.AllocateFromDateRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.request.BatchReassignRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
-import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
-import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
-import ar.edu.utn.frc.siga.events.dto.response.UniqueEventResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
-import ar.edu.utn.frc.siga.allocation.exception.ReassignConflictException;
+import ar.edu.utn.frc.siga.allocation.exception.ReallocationConflictException;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationComposer;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
-import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
-import ar.edu.utn.frc.siga.events.model.EventType;
-import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
-import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
-import ar.edu.utn.frc.siga.events.service.AcademicEventService;
-import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
+import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
+import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
+import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
+import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
+import ar.edu.utn.frc.siga.allocation.validator.AllocationCandidate;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
-import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
-import ar.edu.utn.frc.siga.space.service.ClassroomService;
+import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,25 +27,35 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.DayOfWeek;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Unit tests de {@link AllocationServiceImpl}: exercita la orquestación (no la lógica de
+ * {@link AllocationTargetResolver}/{@link AllocationWriter}/{@link AllocationValidator}, que
+ * están mockeados acá) para los tres verbos ({@code allocate}/{@code reallocate}/{@code deallocate})
+ * cruzados con las dos formas de {@link AllocationTarget} y batch-de-1/batch-de-N.
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AllocationServiceImpl")
 class AllocationServiceImplTest {
@@ -59,576 +65,403 @@ class AllocationServiceImplTest {
     @Mock
     private OccurrenceService occurrenceService;
     @Mock
-    private AcademicEventService academicEventService;
-    @Mock
-    private ClassroomService classroomService;
-    @Mock
     private AllocationComposer composer;
+    @Mock
+    private AllocationValidator validator;
+    @Mock
+    private AllocationTargetResolver targetResolver;
+    @Mock
+    private AllocationWriter writer;
 
     private AllocationServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        AllocationValidator validator = new AllocationValidator(classroomService, allocationRepository, occurrenceService);
-        AllocationWriter writer = new AllocationWriter(allocationRepository, validator, occurrenceService);
-        service = new AllocationServiceImpl(allocationRepository, occurrenceService, academicEventService, composer, validator, writer);
-
-        lenient().when(classroomService.findByIds(any())).thenAnswer(invocation -> {
-            java.util.Collection<Integer> ids = invocation.getArgument(0);
-            if (ids == null) return List.of();
-            return ids.stream().map(id -> classroom(id, 100)).toList();
-        });
-        lenient().when(allocationRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        lenient().when(composer.compose(any())).thenReturn(dummyResponseDto());
-        lenient().when(composer.composeAll(any())).thenAnswer(invocation -> {
-            List<Allocation> allocations = invocation.getArgument(0);
-            return allocations.stream().map(a -> dummyResponseDto()).toList();
-        });
-        lenient().when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of());
-        lenient().when(allocationRepository.findByOccurrenceId(any())).thenReturn(Optional.empty());
-        lenient().when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of());
+        service = new AllocationServiceImpl(allocationRepository, occurrenceService, composer, validator, targetResolver, writer);
     }
 
-    // ---------- allocateManually ----------
+    // ---------- allocate ----------
 
     @Test
-    @DisplayName("allocateManually: aula libre, crea la asignación")
-    void allocateManuallyAulaLibre() {
-        RecurringEventResponseDto event = recurringEvent(1L);
-        OccurrenceSlotDto occurrence = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
-        when(occurrenceService.findSlot(10L)).thenReturn(occurrence);
+    @DisplayName("allocate: target Occurrences, batch de 1, aula libre → crea y valida solapamiento (MANUAL)")
+    void allocateOccurrencesTargetBatchDeUnoCrea() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
+        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ, 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
+        Allocation saved = allocation(100L, 10L, 5, AllocationSource.MANUAL);
+        when(writer.create(resolved, "obs", AllocationSource.MANUAL)).thenReturn(List.of(saved));
+        when(composer.composeAll(List.of(saved))).thenReturn(List.of(dummyResponseDto()));
 
-        AllocationResponseDto result = service.allocateManually(10L, new AllocateOccurrenceRequestDto(5, "obs"));
+        List<AllocationResponseDto> result = service.allocate(command);
 
-        assertThat(result).isNotNull();
-        verify(allocationRepository).save(argThat(
-                a -> a.getClassroomId().equals(5) && a.getOccurrenceId().equals(10L)
-                        && a.getSource() == AllocationSource.MANUAL));
-        verify(occurrenceService).markAssigned(List.of(10L));
+        assertThat(result).hasSize(1);
+        verify(validator).validateClassroomsAvailable(Set.of(5));
+        ArgumentCaptor<List<AllocationCandidate>> captor = ArgumentCaptor.forClass(List.class);
+        verify(validator).validateNoOverlap(captor.capture());
+        assertThat(captor.getValue()).containsExactly(new AllocationCandidate(occ, 5));
+        verify(writer).create(resolved, "obs", AllocationSource.MANUAL);
     }
 
     @Test
-    @DisplayName("allocateManually: ocurrencia ya pasada → conflicto, no persiste")
-    void allocateManuallyOcurrenciaPasada() {
-        RecurringEventResponseDto event = recurringEvent(1L);
-        OccurrenceSlotDto occurrence = occurrenceSlot(10L, event, LocalDate.now().minusDays(1), OccurrenceStatus.SCHEDULED);
-        when(occurrenceService.findSlot(10L)).thenReturn(occurrence);
+    @DisplayName("allocate: target Event, batch de N (una sola occurrence del evento se resuelve en varias) → crea todas")
+    void allocateEventTargetBatchDeNCrea() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        OccurrenceSlotDto occ1 = occurrenceSlot(10L, 1L, futureDate(1));
+        OccurrenceSlotDto occ2 = occurrenceSlot(11L, 1L, futureDate(8));
+        OccurrenceSlotDto occ3 = occurrenceSlot(12L, 1L, futureDate(15));
+        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ1, 5, occ2, 5, occ3, 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
+        List<Allocation> saved = List.of(
+                allocation(100L, 10L, 5, AllocationSource.MANUAL),
+                allocation(101L, 11L, 5, AllocationSource.MANUAL),
+                allocation(102L, 12L, 5, AllocationSource.MANUAL));
+        when(writer.create(resolved, "obs", AllocationSource.MANUAL)).thenReturn(saved);
+        when(composer.composeAll(saved)).thenReturn(List.of(dummyResponseDto(), dummyResponseDto(), dummyResponseDto()));
 
-        assertThatThrownBy(() -> service.allocateManually(10L, new AllocateOccurrenceRequestDto(5, null)))
-                .isInstanceOf(AllocationConflictException.class);
+        List<AllocationResponseDto> result = service.allocate(command);
 
-        verify(allocationRepository, never()).save(any());
+        assertThat(result).hasSize(3);
+        verify(writer).create(resolved, "obs", AllocationSource.MANUAL);
     }
 
     @Test
-    @DisplayName("allocateManually: ocurrencia CANCELLED o SUSPENDED → conflicto, no persiste")
-    void allocateManuallyOcurrenciaNoAsignable() {
-        RecurringEventResponseDto event = recurringEvent(1L);
-        OccurrenceSlotDto cancelled = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.CANCELLED);
-        OccurrenceSlotDto suspended = occurrenceSlot(11L, event, futureDate(1), OccurrenceStatus.SUSPENDED);
-        when(occurrenceService.findSlot(10L)).thenReturn(cancelled);
-        when(occurrenceService.findSlot(11L)).thenReturn(suspended);
+    @DisplayName("allocate: múltiples items en el lote (batch de N a nivel comando) → resuelve juntos y crea juntos")
+    void allocateMultiplesItemsBatchDeN() {
+        AllocationItem item1 = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5);
+        AllocationItem item2 = new AllocationItem(new AllocationTarget.Occurrences(List.of(11L)), 6);
+        AllocationCommand command = AllocationCommand.manual(List.of(item1, item2), "obs");
+        OccurrenceSlotDto occ1 = occurrenceSlot(10L, 1L, futureDate(1));
+        OccurrenceSlotDto occ2 = occurrenceSlot(11L, 2L, futureDate(2));
+        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ1, 5, occ2, 6);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
+        List<Allocation> saved = List.of(allocation(100L, 10L, 5, AllocationSource.MANUAL), allocation(101L, 11L, 6, AllocationSource.MANUAL));
+        when(writer.create(resolved, "obs", AllocationSource.MANUAL)).thenReturn(saved);
+        when(composer.composeAll(saved)).thenReturn(List.of(dummyResponseDto(), dummyResponseDto()));
 
-        assertThatThrownBy(() -> service.allocateManually(10L, new AllocateOccurrenceRequestDto(5, null)))
-                .isInstanceOf(AllocationConflictException.class);
-        assertThatThrownBy(() -> service.allocateManually(11L, new AllocateOccurrenceRequestDto(5, null)))
-                .isInstanceOf(AllocationConflictException.class);
+        List<AllocationResponseDto> result = service.allocate(command);
 
-        verify(allocationRepository, never()).save(any());
+        assertThat(result).hasSize(2);
+        verify(validator).validateClassroomsAvailable(Set.of(5, 6));
     }
 
     @Test
-    @DisplayName("allocateManually: ocurrencia que ya tiene asignación → conflicto, no persiste")
-    void allocateManuallyOcurrenciaYaAsignada() {
-        RecurringEventResponseDto event = recurringEvent(1L);
-        OccurrenceSlotDto occurrence = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.ASSIGNED);
-        when(occurrenceService.findSlot(10L)).thenReturn(occurrence);
-        when(allocationRepository.findByOccurrenceId(10L))
-                .thenReturn(Optional.of(allocation(999L, occurrence, 3)));
+    @DisplayName("allocate: lote que no resuelve a ninguna occurrence es un no-op (sin validar aulas ni solapamiento)")
+    void allocateTargetVacioEsNoOp() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(Map.of());
+        when(writer.create(Map.of(), "obs", AllocationSource.MANUAL)).thenReturn(List.of());
 
-        assertThatThrownBy(() -> service.allocateManually(10L, new AllocateOccurrenceRequestDto(5, null)))
-                .isInstanceOf(AllocationConflictException.class);
+        List<AllocationResponseDto> result = service.allocate(command);
 
-        verify(allocationRepository, never()).save(any());
+        assertThat(result).isEmpty();
+        verify(validator, never()).validateClassroomsAvailable(any());
+        verify(validator, never()).validateNoOverlap(anyList());
+        verify(writer).create(Map.of(), "obs", AllocationSource.MANUAL);
     }
 
     @Test
-    @DisplayName("allocateManually: aula inexistente → conflicto 409")
-    void allocateManuallyAulaInexistente() {
-        RecurringEventResponseDto event = recurringEvent(1L);
-        OccurrenceSlotDto occurrence = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
-        when(occurrenceService.findSlot(10L)).thenReturn(occurrence);
-        when(classroomService.findByIds(any())).thenReturn(List.of());
+    @DisplayName("allocate: aula no disponible → el validator corta antes de escribir")
+    void allocateAulaNoDisponibleNoEscribe() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 999);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
+        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ, 999);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
+        doThrow(new AllocationConflictException("aula 999 no existe")).when(validator).validateClassroomsAvailable(Set.of(999));
 
-        assertThatThrownBy(() -> service.allocateManually(10L, new AllocateOccurrenceRequestDto(999, null)))
-                .isInstanceOf(AllocationConflictException.class);
+        assertThatThrownBy(() -> service.allocate(command)).isInstanceOf(AllocationConflictException.class);
 
-        verify(allocationRepository, never()).save(any());
+        verify(writer, never()).create(any(), any(), any());
+        verify(validator, never()).validateNoOverlap(anyList());
     }
 
     @Test
-    @DisplayName("allocateManually: aula existe pero no está disponible → 409 (cierra el FIXME: antes solo se validaba existencia)")
-    void allocateManuallyAulaNoDisponibleRechaza() {
-        RecurringEventResponseDto event = recurringEvent(1L);
-        OccurrenceSlotDto occurrence = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
-        when(occurrenceService.findSlot(10L)).thenReturn(occurrence);
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 100, false)));
+    @DisplayName("allocate: source MANUAL con solapamiento → el validator corta, writer.create nunca se llama (409, nada se escribe)")
+    void allocateManualConSolapeNoEscribe() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
+        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ, 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
+        doThrow(new ReallocationConflictException(List.of())).when(validator).validateNoOverlap(anyList());
 
-        assertThatThrownBy(() -> service.allocateManually(10L, new AllocateOccurrenceRequestDto(5, null)))
-                .isInstanceOf(AllocationConflictException.class);
+        assertThatThrownBy(() -> service.allocate(command)).isInstanceOf(ReallocationConflictException.class);
 
-        verify(allocationRepository, never()).save(any());
+        verify(writer, never()).create(any(), any(), any());
     }
 
     @Test
-    @DisplayName("allocateManually: aula ocupada por otro evento en la misma franja horaria → 409, no persiste")
-    void allocateManuallyConSolape() {
-        RecurringEventResponseDto event = recurringEvent(1L);
-        OccurrenceSlotDto occurrence = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
-        RecurringEventResponseDto foreignEvent = recurringEvent(99L);
-        OccurrenceSlotDto foreignOccurrence = occurrenceSlot(50L, foreignEvent, futureDate(1), OccurrenceStatus.ASSIGNED);
-        Allocation foreignAllocation = allocation(500L, foreignOccurrence, 5);
+    @DisplayName("allocate: source AUTOMATIC no valida solapamiento (ya lo validó el preview contra su propio snapshot)")
+    void allocateAutomaticNoValidaSolapamiento() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5);
+        AllocationCommand command = AllocationCommand.automatic(List.of(item));
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
+        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ, 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
+        when(writer.create(resolved, null, AllocationSource.AUTOMATIC)).thenReturn(List.of(allocation(100L, 10L, 5, AllocationSource.AUTOMATIC)));
 
-        when(occurrenceService.findSlot(10L)).thenReturn(occurrence);
-        when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of(foreignOccurrence));
-        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(foreignAllocation));
+        service.allocate(command);
 
-        assertThatThrownBy(() -> service.allocateManually(10L, new AllocateOccurrenceRequestDto(5, null)))
-                .isInstanceOf(ReassignConflictException.class)
-                .satisfies(ex -> assertThat(((ReassignConflictException) ex).getConflicts()).hasSize(1));
-
-        verify(allocationRepository, never()).save(any());
-        verify(occurrenceService, never()).markAssigned(any());
+        verify(validator).validateClassroomsAvailable(Set.of(5));
+        verify(validator, never()).validateNoOverlap(anyList());
     }
 
     @Test
-    @DisplayName("allocateManually: franjas adyacentes (fin del nuevo == inicio del ocupante) no conflictúan")
-    void allocateManuallyFranjasAdyacentesNoConflictuan() {
-        RecurringEventResponseDto event = recurringEvent(1L); // 08:00-09:30
-        OccurrenceSlotDto occurrence = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
-        RecurringEventResponseDto adjacentEvent = recurringEvent(99L, LocalTime.of(9, 30), Duration.ofMinutes(60)); // 09:30-10:30
-        OccurrenceSlotDto adjacentOccurrence = occurrenceSlot(70L, adjacentEvent, futureDate(1), OccurrenceStatus.ASSIGNED);
-        Allocation adjacentAllocation = allocation(700L, adjacentOccurrence, 5);
+    @DisplayName("allocate: source IMPORTED clampea a null (incluye pasadas) y no valida solapamiento")
+    void allocateImportedClampeaNullYNoValidaSolapamiento() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5);
+        AllocationCommand command = AllocationCommand.imported(List.of(item), "Importado de Excel");
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, LocalDate.now().minusDays(3));
+        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ, 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), isNull())).thenReturn(resolved);
+        when(writer.create(resolved, "Importado de Excel", AllocationSource.IMPORTED))
+                .thenReturn(List.of(allocation(100L, 10L, 5, AllocationSource.IMPORTED)));
 
-        when(occurrenceService.findSlot(10L)).thenReturn(occurrence);
-        when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of(adjacentOccurrence));
-        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(adjacentAllocation));
+        service.allocate(command);
 
-        AllocationResponseDto result = service.allocateManually(10L, new AllocateOccurrenceRequestDto(5, null));
+        verify(targetResolver).resolveClassroomByOccurrence(command.items(), null);
+        verify(validator, never()).validateNoOverlap(anyList());
+    }
 
-        assertThat(result).isNotNull();
-        verify(allocationRepository).save(any());
+    @Test
+    @DisplayName("allocate: source MANUAL clampea a hoy (no toca el pasado)")
+    void allocateManualClampeaHoy() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(Map.of());
+
+        service.allocate(command);
+
+        verify(targetResolver).resolveClassroomByOccurrence(command.items(), LocalDate.now());
     }
 
     // ---------- reallocate ----------
 
     @Test
-    @DisplayName("reallocate: aula ocupada por otro evento en la misma franja → 409, no persiste")
-    void reallocateConSolape() {
-        RecurringEventResponseDto event = recurringEvent(1L);
-        OccurrenceSlotDto occurrence = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
-        Allocation allocation = allocation(900L, occurrence, 3);
-        RecurringEventResponseDto foreignEvent = recurringEvent(99L);
-        OccurrenceSlotDto foreignOccurrence = occurrenceSlot(50L, foreignEvent, futureDate(1), OccurrenceStatus.ASSIGNED);
-        Allocation foreignAllocation = allocation(500L, foreignOccurrence, 5);
+    @DisplayName("reallocate: target Occurrences, batch de 1 → upsert (no create)")
+    void reallocateOccurrencesTargetBatchDeUnoHaceUpsert() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "cambio de aula");
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
+        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ, 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
+        Allocation saved = allocation(900L, 10L, 5, AllocationSource.MANUAL);
+        when(writer.upsert(resolved, "cambio de aula", AllocationSource.MANUAL)).thenReturn(List.of(saved));
+        when(composer.composeAll(List.of(saved))).thenReturn(List.of(dummyResponseDto()));
 
-        when(allocationRepository.findById(900L)).thenReturn(Optional.of(allocation));
-        when(occurrenceService.findSlot(10L)).thenReturn(occurrence);
-        when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of(foreignOccurrence));
-        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(foreignAllocation));
+        List<AllocationResponseDto> result = service.reallocate(command);
 
-        assertThatThrownBy(() -> service.reallocate(900L, new AllocateOccurrenceRequestDto(5, null)))
-                .isInstanceOf(ReassignConflictException.class);
-
-        verify(allocationRepository, never()).save(any());
+        assertThat(result).hasSize(1);
+        verify(writer).upsert(resolved, "cambio de aula", AllocationSource.MANUAL);
+        verify(writer, never()).create(any(), any(), any());
     }
 
     @Test
-    @DisplayName("reallocate: la aula que ya tenía la propia asignación no conflictúa consigo misma")
-    void reallocateMismaAulaNoConflictuaConsigoMisma() {
-        RecurringEventResponseDto event = recurringEvent(1L);
-        OccurrenceSlotDto occurrence = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.ASSIGNED);
-        Allocation allocation = allocation(900L, occurrence, 5);
+    @DisplayName("reallocate: target Event, batch de N → upsert de todas las occurrences resueltas")
+    void reallocateEventTargetBatchDeN() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 7);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        OccurrenceSlotDto occ1 = occurrenceSlot(10L, 1L, futureDate(1));
+        OccurrenceSlotDto occ2 = occurrenceSlot(11L, 1L, futureDate(8));
+        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ1, 7, occ2, 7);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
+        List<Allocation> saved = List.of(allocation(900L, 10L, 7, AllocationSource.MANUAL), allocation(901L, 11L, 7, AllocationSource.MANUAL));
+        when(writer.upsert(resolved, "obs", AllocationSource.MANUAL)).thenReturn(saved);
+        when(composer.composeAll(saved)).thenReturn(List.of(dummyResponseDto(), dummyResponseDto()));
 
-        when(allocationRepository.findById(900L)).thenReturn(Optional.of(allocation));
-        when(occurrenceService.findSlot(10L)).thenReturn(occurrence);
-        // La ocupación de BD trae la propia allocation (misma occurrence) en el aula 5.
-        when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of(occurrence));
-        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(allocation));
+        List<AllocationResponseDto> result = service.reallocate(command);
 
-        AllocationResponseDto result = service.reallocate(900L, new AllocateOccurrenceRequestDto(5, "misma aula"));
+        assertThat(result).hasSize(2);
+        verify(writer).upsert(resolved, "obs", AllocationSource.MANUAL);
+    }
+
+    @Test
+    @DisplayName("reallocate: lote vacío es un no-op")
+    void reallocateTargetVacioEsNoOp() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(Map.of());
+        when(writer.upsert(Map.of(), "obs", AllocationSource.MANUAL)).thenReturn(List.of());
+
+        List<AllocationResponseDto> result = service.reallocate(command);
+
+        assertThat(result).isEmpty();
+        verify(validator, never()).validateClassroomsAvailable(any());
+        verify(validator, never()).validateNoOverlap(anyList());
+    }
+
+    @Test
+    @DisplayName("reallocate: source MANUAL con solapamiento → 409, writer.upsert nunca se llama")
+    void reallocateManualConSolapeNoEscribe() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
+        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ, 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
+        doThrow(new ReallocationConflictException(List.of())).when(validator).validateNoOverlap(anyList());
+
+        assertThatThrownBy(() -> service.reallocate(command)).isInstanceOf(ReallocationConflictException.class);
+
+        verify(writer, never()).upsert(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("reallocate: source AUTOMATIC no valida solapamiento")
+    void reallocateAutomaticNoValidaSolapamiento() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5);
+        AllocationCommand command = AllocationCommand.automatic(List.of(item));
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
+        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ, 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
+        when(writer.upsert(resolved, null, AllocationSource.AUTOMATIC)).thenReturn(List.of(allocation(900L, 10L, 5, AllocationSource.AUTOMATIC)));
+
+        service.reallocate(command);
+
+        verify(validator, never()).validateNoOverlap(anyList());
+    }
+
+    // ---------- deallocate ----------
+
+    @Test
+    @DisplayName("deallocate: target Occurrences, batch de 1 → valida no-pasado y libera")
+    void deallocateOccurrencesTargetBatchDeUno() {
+        DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(10L))), "obs");
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
+        when(targetResolver.resolveAll(command.targets(), null)).thenReturn(List.of(occ));
+        when(writer.delete(List.of(occ))).thenReturn(List.of(new AllocationWriter.DeallocatedOccurrence(10L, 5)));
+
+        List<DeallocatedOccurrenceDto> result = service.deallocate(command);
+
+        assertThat(result).containsExactly(new DeallocatedOccurrenceDto(10L, 5));
+        verify(validator).validateNotPast(occ);
+        verify(writer).delete(List.of(occ));
+    }
+
+    @Test
+    @DisplayName("deallocate: target Event, batch de N → valida y libera todas las occurrences resueltas")
+    void deallocateEventTargetBatchDeN() {
+        DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Event(1L)), "obs");
+        OccurrenceSlotDto occ1 = occurrenceSlot(10L, 1L, futureDate(1));
+        OccurrenceSlotDto occ2 = occurrenceSlot(11L, 1L, futureDate(8));
+        when(targetResolver.resolveAll(command.targets(), null)).thenReturn(List.of(occ1, occ2));
+        when(writer.delete(List.of(occ1, occ2))).thenReturn(List.of(
+                new AllocationWriter.DeallocatedOccurrence(10L, 5),
+                new AllocationWriter.DeallocatedOccurrence(11L, 6)));
+
+        List<DeallocatedOccurrenceDto> result = service.deallocate(command);
+
+        assertThat(result).containsExactly(new DeallocatedOccurrenceDto(10L, 5), new DeallocatedOccurrenceDto(11L, 6));
+        verify(validator).validateNotPast(occ1);
+        verify(validator).validateNotPast(occ2);
+    }
+
+    @Test
+    @DisplayName("deallocate: occurrence ya pasada → el validator corta, writer.delete nunca se llama")
+    void deallocateOcurrenciaPasadaNoLibera() {
+        DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(10L))), "obs");
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, LocalDate.now().minusDays(1));
+        when(targetResolver.resolveAll(command.targets(), null)).thenReturn(List.of(occ));
+        doThrow(new AllocationConflictException("ya ocurrió")).when(validator).validateNotPast(occ);
+
+        assertThatThrownBy(() -> service.deallocate(command)).isInstanceOf(AllocationConflictException.class);
+
+        verify(writer, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("deallocate: sin occurrences que liberar (occurrences sin asignación se ignoran) → lista vacía")
+    void deallocateSinOccurrencesEsNoOp() {
+        DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(10L))), "obs");
+        when(targetResolver.resolveAll(command.targets(), null)).thenReturn(List.of());
+        when(writer.delete(List.of())).thenReturn(List.of());
+
+        List<DeallocatedOccurrenceDto> result = service.deallocate(command);
+
+        assertThat(result).isEmpty();
+        verifyNoInteractions(validator);
+    }
+
+    // ---------- findById / findByDate ----------
+
+    @Test
+    @DisplayName("findById: existente → compone el dto")
+    void findByIdExistente() {
+        Allocation alloc = allocation(1L, 10L, 5, AllocationSource.MANUAL);
+        when(allocationRepository.findById(1L)).thenReturn(Optional.of(alloc));
+        when(composer.compose(alloc)).thenReturn(dummyResponseDto());
+
+        AllocationResponseDto result = service.findById(1L);
 
         assertThat(result).isNotNull();
-        // allocation llega managed; el service ya no llama save() explícito (dirty checking).
-        assertThat(allocation.getClassroomId()).isEqualTo(5);
-    }
-
-    // ---------- batchReallocate ----------
-
-    @Test
-    @DisplayName("batchReallocate: dos moves a aulas libres, ambos se aplican")
-    void batchReallocateFeliz() {
-        RecurringEventResponseDto event1 = recurringEvent(1L);
-        RecurringEventResponseDto event2 = recurringEvent(2L, LocalTime.of(14, 0), Duration.ofMinutes(60));
-        OccurrenceSlotDto occ1 = occurrenceSlot(10L, event1, futureDate(1), OccurrenceStatus.ASSIGNED);
-        OccurrenceSlotDto occ2 = occurrenceSlot(11L, event2, futureDate(2), OccurrenceStatus.ASSIGNED);
-        Allocation alloc1 = allocation(100L, occ1, 3);
-        Allocation alloc2 = allocation(101L, occ2, 4);
-
-        when(allocationRepository.findById(100L)).thenReturn(Optional.of(alloc1));
-        when(allocationRepository.findById(101L)).thenReturn(Optional.of(alloc2));
-        when(occurrenceService.findSlots(any())).thenReturn(List.of(occ1, occ2));
-        // Las propias allocations del batch aparecen en la ocupación de BD (ocupan su aula
-        // actual): deben excluirse porque justamente se están moviendo en esta operación.
-        when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of(occ1, occ2));
-        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(alloc1, alloc2));
-
-        List<AllocationResponseDto> results = service.batchReallocate(new BatchReassignRequestDto(
-                List.of(new BatchReassignRequestDto.MoveDto(100L, 5), new BatchReassignRequestDto.MoveDto(101L, 6))));
-
-        assertThat(results).hasSize(2);
-        // Ambas allocations llegan managed; el service ya no llama save() explícito (dirty checking).
-        assertThat(alloc1.getClassroomId()).isEqualTo(5);
-        assertThat(alloc2.getClassroomId()).isEqualTo(6);
     }
 
     @Test
-    @DisplayName("batchReallocate: un move choca contra ocupación firme de BD ajena al lote → 409 sin ningún save")
-    void batchReallocateConflictoContraBd() {
-        RecurringEventResponseDto event1 = recurringEvent(1L);
-        OccurrenceSlotDto occ1 = occurrenceSlot(10L, event1, futureDate(1), OccurrenceStatus.SCHEDULED);
-        Allocation alloc1 = allocation(100L, occ1, 3);
+    @DisplayName("findById: inexistente → ResourceNotFoundException")
+    void findByIdInexistente() {
+        when(allocationRepository.findById(1L)).thenReturn(Optional.empty());
 
-        RecurringEventResponseDto foreignEvent = recurringEvent(99L);
-        OccurrenceSlotDto foreignOccurrence = occurrenceSlot(50L, foreignEvent, futureDate(1), OccurrenceStatus.ASSIGNED);
-        Allocation foreignAllocation = allocation(500L, foreignOccurrence, 5);
-
-        when(allocationRepository.findById(100L)).thenReturn(Optional.of(alloc1));
-        when(occurrenceService.findSlots(any())).thenReturn(List.of(occ1));
-        when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of(foreignOccurrence));
-        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(foreignAllocation));
-
-        assertThatThrownBy(() -> service.batchReallocate(new BatchReassignRequestDto(
-                List.of(new BatchReassignRequestDto.MoveDto(100L, 5)))))
-                .isInstanceOf(ReassignConflictException.class);
-
-        verify(allocationRepository, never()).save(any());
+        assertThatThrownBy(() -> service.findById(1L)).isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
-    @DisplayName("batchReallocate: dos moves del propio lote chocan entre sí (misma aula, misma fecha, franjas que se pisan) → 409")
-    void batchReallocateConflictoInternoEntreDosMoves() {
-        RecurringEventResponseDto event1 = recurringEvent(1L);
-        RecurringEventResponseDto event2 = recurringEvent(2L);
+    @DisplayName("findByDate: resuelve occurrences de la fecha y compone sus asignaciones")
+    void findByDateComponeAsignaciones() {
         LocalDate date = futureDate(1);
-        OccurrenceSlotDto occ1 = occurrenceSlot(10L, event1, date, OccurrenceStatus.SCHEDULED);
-        OccurrenceSlotDto occ2 = occurrenceSlot(11L, event2, date, OccurrenceStatus.SCHEDULED);
-        Allocation alloc1 = allocation(100L, occ1, 3);
-        Allocation alloc2 = allocation(101L, occ2, 4);
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, date);
+        Allocation alloc = allocation(1L, 10L, 5, AllocationSource.MANUAL);
+        when(occurrenceService.findSlotsByDate(date)).thenReturn(List.of(occ));
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of(alloc));
+        when(composer.composeAll(List.of(alloc))).thenReturn(List.of(dummyResponseDto()));
 
-        when(allocationRepository.findById(100L)).thenReturn(Optional.of(alloc1));
-        when(allocationRepository.findById(101L)).thenReturn(Optional.of(alloc2));
-        when(occurrenceService.findSlots(any())).thenReturn(List.of(occ1, occ2));
+        List<AllocationResponseDto> result = service.findByDate(date);
 
-        assertThatThrownBy(() -> service.batchReallocate(new BatchReassignRequestDto(
-                List.of(new BatchReassignRequestDto.MoveDto(100L, 9), new BatchReassignRequestDto.MoveDto(101L, 9)))))
-                .isInstanceOf(ReassignConflictException.class);
-
-        verify(allocationRepository, never()).save(any());
-    }
-
-    // ---------- allocateManuallyFromDate (comportamiento previo intacto) ----------
-
-    @Test
-    @DisplayName("allocateManuallyFromDate: aula libre para todas las ocurrencias futuras, se asignan")
-    void allocateManuallyFromDateFeliz() {
-        RecurringEventResponseDto event = recurringEvent(1L);
-        LocalDate date1 = futureDate(1);
-        LocalDate date2 = futureDate(8);
-        OccurrenceSlotDto occ1 = occurrenceSlot(10L, event, date1, OccurrenceStatus.SCHEDULED);
-        OccurrenceSlotDto occ2 = occurrenceSlot(11L, event, date2, OccurrenceStatus.SCHEDULED);
-
-        when(academicEventService.findById(1L)).thenReturn(event);
-        when(occurrenceService.findSlotsByEvent(eq(1L), any()))
-                .thenReturn(List.of(occ1, occ2));
-
-        List<AllocationResponseDto> results = service.allocateManuallyFromDate(
-                new AllocateFromDateRequestDto(1L, date1, 5, "obs"));
-
-        assertThat(results).hasSize(2);
-        verify(allocationRepository, times(2)).save(any());
-        verify(occurrenceService).markAssigned(List.of(10L, 11L));
-    }
-
-    @Test
-    @DisplayName("allocateManuallyFromDate: una ocurrencia futura choca contra otro evento → 409, nada se aplica")
-    void allocateManuallyFromDateConSolape() {
-        RecurringEventResponseDto event = recurringEvent(1L);
-        LocalDate date1 = futureDate(1);
-        OccurrenceSlotDto occ1 = occurrenceSlot(10L, event, date1, OccurrenceStatus.SCHEDULED);
-
-        RecurringEventResponseDto foreignEvent = recurringEvent(99L);
-        OccurrenceSlotDto foreignOccurrence = occurrenceSlot(50L, foreignEvent, date1, OccurrenceStatus.ASSIGNED);
-        Allocation foreignAllocation = allocation(500L, foreignOccurrence, 5);
-
-        when(academicEventService.findById(1L)).thenReturn(event);
-        when(occurrenceService.findSlotsByEvent(eq(1L), any()))
-                .thenReturn(List.of(occ1));
-        when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of(foreignOccurrence));
-        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(foreignAllocation));
-
-        assertThatThrownBy(() -> service.allocateManuallyFromDate(
-                new AllocateFromDateRequestDto(1L, date1, 5, null)))
-                .isInstanceOf(ReassignConflictException.class);
-
-        verify(allocationRepository, never()).save(any());
-        verify(occurrenceService, never()).markAssigned(any());
-    }
-
-    @Test
-    @DisplayName("allocateManuallyFromDate: evento UniqueEvent → conflicto, no soportado")
-    void allocateManuallyFromDateEventoUnico() {
-        UniqueEventResponseDto uniqueEvent = new UniqueEventResponseDto(
-                1L, EventType.UNIQUE_EVENT, UniqueEventKind.PARCIAL, 20, LocalTime.of(18, 0), 120,
-                futureDate(2), null, null, null);
-        when(academicEventService.findById(1L)).thenReturn(uniqueEvent);
-
-        assertThatThrownBy(() -> service.allocateManuallyFromDate(
-                new AllocateFromDateRequestDto(1L, futureDate(1), 5, null)))
-                .isInstanceOf(AllocationConflictException.class);
-
-        verify(allocationRepository, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("allocateManuallyFromDate: fromDate pasada se clampea a hoy")
-    void allocateManuallyFromDateFromDatePasadaSeClampeaAHoy() {
-        RecurringEventResponseDto event = recurringEvent(1L);
-        when(academicEventService.findById(1L)).thenReturn(event);
-        when(occurrenceService.findSlotsByEvent(any(), any())).thenReturn(List.of());
-
-        service.allocateManuallyFromDate(new AllocateFromDateRequestDto(1L, LocalDate.now().minusDays(5), 5, null));
-
-        ArgumentCaptor<LocalDate> dateCaptor = ArgumentCaptor.forClass(LocalDate.class);
-        verify(occurrenceService).findSlotsByEvent(eq(1L), dateCaptor.capture());
-        assertThat(dateCaptor.getValue()).isEqualTo(LocalDate.now());
-    }
-
-    // ---------- reassignEvent ----------
-
-    @Test
-    @DisplayName("reassignEvent: evento en curso, asigna las ocurrencias futuras devueltas por el repo")
-    void reassignEventFeliz() {
-        RecurringEventResponseDto event = recurringEvent(1L);
-        OccurrenceSlotDto occ1 = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
-        OccurrenceSlotDto occ2 = occurrenceSlot(11L, event, futureDate(8), OccurrenceStatus.SCHEDULED);
-
-        when(academicEventService.findById(1L)).thenReturn(event);
-        when(occurrenceService.findSlotsByEvent(eq(1L), any()))
-                .thenReturn(List.of(occ1, occ2));
-
-        List<AllocationResponseDto> results = service.reassignEvent(1L, new AllocateOccurrenceRequestDto(5, "obs"));
-
-        assertThat(results).hasSize(2);
-        verify(allocationRepository, times(2)).save(any());
-    }
-
-    @Test
-    @DisplayName("reassignEvent: evento finalizado (sin ocurrencias futuras) → conflicto, no persiste")
-    void reassignEventFinalizado() {
-        RecurringEventResponseDto event = recurringEvent(1L);
-        OccurrenceSlotDto pastOcc = occurrenceSlot(10L, event, LocalDate.now().minusDays(1), OccurrenceStatus.SCHEDULED);
-
-        when(academicEventService.findById(1L)).thenReturn(event);
-        when(occurrenceService.findSlotsByEvent(eq(1L), any()))
-                .thenReturn(List.of(pastOcc));
-
-        assertThatThrownBy(() -> service.reassignEvent(1L, new AllocateOccurrenceRequestDto(5, null)))
-                .isInstanceOf(AllocationConflictException.class);
-
-        verify(allocationRepository, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("reassignEvent: evento no recurrente (UniqueEvent) → conflicto, no soportado")
-    void reassignEventEventoUnico() {
-        UniqueEventResponseDto uniqueEvent = new UniqueEventResponseDto(
-                1L, EventType.UNIQUE_EVENT, UniqueEventKind.PARCIAL, 20, LocalTime.of(18, 0), 120,
-                futureDate(2), null, null, null);
-        when(academicEventService.findById(1L)).thenReturn(uniqueEvent);
-
-        assertThatThrownBy(() -> service.reassignEvent(1L, new AllocateOccurrenceRequestDto(5, null)))
-                .isInstanceOf(AllocationConflictException.class);
-
-        verify(allocationRepository, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("reassignEvent: evento inexistente → ResourceNotFoundException")
-    void reassignEventEventoInexistente() {
-        when(academicEventService.findById(1L)).thenThrow(ResourceNotFoundException.of("AcademicEvent", 1L));
-
-        assertThatThrownBy(() -> service.reassignEvent(1L, new AllocateOccurrenceRequestDto(5, null)))
-                .isInstanceOf(ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException.class);
-
-        verify(allocationRepository, never()).save(any());
-    }
-
-    // ---------- importAllocationsFromDate ----------
-
-    @Test
-    @DisplayName("importAllocationsFromDate: incluye ocurrencias pasadas (no las saltea)")
-    void importAssignmentsFromDateIncluyeOcurrenciasPasadas() {
-        RecurringEventResponseDto event = recurringEvent(1L);
-        OccurrenceSlotDto pastOcc = occurrenceSlot(10L, event, LocalDate.now().minusDays(3), OccurrenceStatus.SCHEDULED);
-        when(academicEventService.findById(1L)).thenReturn(event);
-        when(occurrenceService.findSlotsByEvent(eq(1L), any()))
-                .thenReturn(List.of(pastOcc));
-
-        int count = service.importAllocationsFromDate(
-                new AllocateFromDateRequestDto(1L, LocalDate.now().minusDays(3), 5, null));
-
-        assertThat(count).isEqualTo(1);
-        verify(allocationRepository).save(any());
-        verify(occurrenceService).markAssigned(List.of(10L));
-    }
-
-    @Test
-    @DisplayName("importAllocationsFromDate: estampa source=IMPORTED en la asignación nueva")
-    void importAssignmentsFromDateSourceImported() {
-        RecurringEventResponseDto event = recurringEvent(1L);
-        OccurrenceSlotDto occ = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.SCHEDULED);
-        when(academicEventService.findById(1L)).thenReturn(event);
-        when(occurrenceService.findSlotsByEvent(eq(1L), any()))
-                .thenReturn(List.of(occ));
-
-        service.importAllocationsFromDate(new AllocateFromDateRequestDto(1L, futureDate(1), 5, null));
-
-        verify(allocationRepository).save(argThat(a -> a.getSource() == AllocationSource.IMPORTED));
-    }
-
-    @Test
-    @DisplayName("importAllocationsFromDate: reusa la asignación existente de la ocurrencia (upsert, no duplica)")
-    void importAssignmentsFromDateUpsertReusaExistente() {
-        RecurringEventResponseDto event = recurringEvent(1L);
-        OccurrenceSlotDto occ = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.ASSIGNED);
-        Allocation existing = allocation(900L, occ, 3);
-        when(academicEventService.findById(1L)).thenReturn(event);
-        when(occurrenceService.findSlotsByEvent(eq(1L), any()))
-                .thenReturn(List.of(occ));
-        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(existing));
-
-        service.importAllocationsFromDate(new AllocateFromDateRequestDto(1L, futureDate(1), 5, null));
-
-        // existing llega managed; el writer ya no llama save() explícito (dirty checking).
-        assertThat(existing.getClassroomId()).isEqualTo(5);
-        assertThat(existing.getSource()).isEqualTo(AllocationSource.IMPORTED);
-    }
-
-    @Test
-    @DisplayName("importAllocationsFromDate: saltea ocurrencias CANCELLED/SUSPENDED")
-    void importAssignmentsFromDateSalteaNoAsignables() {
-        RecurringEventResponseDto event = recurringEvent(1L);
-        OccurrenceSlotDto cancelled = occurrenceSlot(10L, event, futureDate(1), OccurrenceStatus.CANCELLED);
-        OccurrenceSlotDto suspended = occurrenceSlot(11L, event, futureDate(2), OccurrenceStatus.SUSPENDED);
-        when(academicEventService.findById(1L)).thenReturn(event);
-        when(occurrenceService.findSlotsByEvent(eq(1L), any()))
-                .thenReturn(List.of(cancelled, suspended));
-
-        int count = service.importAllocationsFromDate(
-                new AllocateFromDateRequestDto(1L, futureDate(1), 5, null));
-
-        assertThat(count).isZero();
-        verify(allocationRepository, never()).save(any());
-        verify(occurrenceService, never()).markAssigned(any());
-    }
-
-    // ---------- importAllocationsBatch ----------
-
-    @Test
-    @DisplayName("importAllocationsBatch: aplica occurrences de varios eventos con su propia aula, en un solo pase")
-    void importAllocationsBatchVariosEventos() {
-        RecurringEventResponseDto event1 = recurringEvent(1L);
-        RecurringEventResponseDto event2 = recurringEvent(2L);
-        OccurrenceSlotDto occ1 = occurrenceSlot(10L, event1, futureDate(1), OccurrenceStatus.SCHEDULED);
-        OccurrenceSlotDto occ2 = occurrenceSlot(20L, event2, futureDate(1), OccurrenceStatus.SCHEDULED);
-        when(occurrenceService.findSlotsByEvents(any(), any()))
-                .thenReturn(List.of(occ1, occ2));
-
-        int count = service.importAllocationsBatch(List.of(
-                new AllocateFromDateRequestDto(1L, futureDate(1), 5, "Importado de Excel"),
-                new AllocateFromDateRequestDto(2L, futureDate(1), 7, "Importado de Excel")));
-
-        assertThat(count).isEqualTo(2);
-        verify(allocationRepository).save(argThat(a -> a.getOccurrenceId().equals(10L) && a.getClassroomId() == 5));
-        verify(allocationRepository).save(argThat(a -> a.getOccurrenceId().equals(20L) && a.getClassroomId() == 7));
-    }
-
-    @Test
-    @DisplayName("importAllocationsBatch: filtra en memoria las occurrences anteriores a la fecha propia de cada evento")
-    void importAllocationsBatchFiltraPorFromDatePropio() {
-        RecurringEventResponseDto event1 = recurringEvent(1L);
-        RecurringEventResponseDto event2 = recurringEvent(2L);
-        // occ1 es anterior al fromDate de event1 (2do cuatrimestre vs 1ro): la query trae de más
-        // (usa la fecha más antigua de todo el batch), el filtro en memoria la debe descartar.
-        OccurrenceSlotDto occ1 = occurrenceSlot(10L, event1, futureDate(1), OccurrenceStatus.SCHEDULED);
-        OccurrenceSlotDto occ2 = occurrenceSlot(20L, event2, futureDate(5), OccurrenceStatus.SCHEDULED);
-        when(occurrenceService.findSlotsByEvents(any(), any()))
-                .thenReturn(List.of(occ1, occ2));
-
-        int count = service.importAllocationsBatch(List.of(
-                new AllocateFromDateRequestDto(1L, futureDate(3), 5, "Importado de Excel"),
-                new AllocateFromDateRequestDto(2L, futureDate(1), 7, "Importado de Excel")));
-
-        assertThat(count).isEqualTo(1);
-        verify(allocationRepository).save(argThat(a -> a.getOccurrenceId().equals(20L)));
-    }
-
-    @Test
-    @DisplayName("importAllocationsBatch: lista vacía no consulta nada y devuelve 0")
-    void importAllocationsBatchListaVacia() {
-        int count = service.importAllocationsBatch(List.of());
-
-        assertThat(count).isZero();
-        verify(occurrenceService, never()).findSlotsByEvents(any(), any());
+        assertThat(result).hasSize(1);
     }
 
     // ---------- helpers ----------
 
-    private RecurringEventResponseDto recurringEvent(long id) {
-        return recurringEvent(id, LocalTime.of(8, 0), Duration.ofMinutes(90));
+    private OccurrenceSlotDto occurrenceSlot(long id, long eventId, LocalDate date) {
+        return new OccurrenceSlotDto(id, eventId, date, LocalTime.of(8, 0), LocalTime.of(9, 30), OccurrenceStatus.NEEDS_ROOM, 30);
     }
 
-    private RecurringEventResponseDto recurringEvent(long id, LocalTime startTime, Duration duration) {
-        return new RecurringEventResponseDto(
-                id, EventType.RECURRING, 30, startTime, duration.toMinutes(), DayOfWeek.MONDAY,
-                LocalDate.now().minusMonths(1), LocalDate.now().plusMonths(4), null, null);
-    }
-
-    private OccurrenceSlotDto occurrenceSlot(long id, RecurringEventResponseDto event, LocalDate date, OccurrenceStatus status) {
-        return new OccurrenceSlotDto(id, event.id(), date, event.startTime(), event.endTime(), status, event.enrolled());
-    }
-
-    private Allocation allocation(long id, OccurrenceSlotDto occurrence, Integer classroomId) {
+    private Allocation allocation(long id, Long occurrenceId, Integer classroomId, AllocationSource source) {
         return Allocation.builder()
                 .id(id)
-                .occurrenceId(occurrence.occurrenceId())
+                .occurrenceId(occurrenceId)
                 .classroomId(classroomId)
-                .source(AllocationSource.MANUAL)
+                .source(source)
                 .createdAt(LocalDateTime.now())
                 .build();
     }
 
-    private ClassroomResponseDto classroom(Integer id, Integer capacity) {
-        return classroom(id, capacity, true);
-    }
-
-    private ClassroomResponseDto classroom(Integer id, Integer capacity, boolean available) {
-        return new ClassroomResponseDto(id, "Aula " + id, 1, capacity, available, 1, "Edificio 1", 1, "Tipo");
-    }
-
     private AllocationResponseDto dummyResponseDto() {
         return new AllocationResponseDto(1L, AllocationSource.MANUAL, LocalDateTime.now(), null, null, null, null);
+    }
+
+    private Map<OccurrenceSlotDto, Integer> mapOf(OccurrenceSlotDto occ, Integer classroomId) {
+        Map<OccurrenceSlotDto, Integer> map = new LinkedHashMap<>();
+        map.put(occ, classroomId);
+        return map;
+    }
+
+    private Map<OccurrenceSlotDto, Integer> mapOf(OccurrenceSlotDto occ1, Integer classroomId1, OccurrenceSlotDto occ2, Integer classroomId2) {
+        Map<OccurrenceSlotDto, Integer> map = new LinkedHashMap<>();
+        map.put(occ1, classroomId1);
+        map.put(occ2, classroomId2);
+        return map;
+    }
+
+    private Map<OccurrenceSlotDto, Integer> mapOf(OccurrenceSlotDto occ1, Integer classroomId1, OccurrenceSlotDto occ2, Integer classroomId2,
+            OccurrenceSlotDto occ3, Integer classroomId3) {
+        Map<OccurrenceSlotDto, Integer> map = new LinkedHashMap<>();
+        map.put(occ1, classroomId1);
+        map.put(occ2, classroomId2);
+        map.put(occ3, classroomId3);
+        return map;
     }
 
     private LocalDate futureDate(int daysFromNow) {

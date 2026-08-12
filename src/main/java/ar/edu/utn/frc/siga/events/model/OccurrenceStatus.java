@@ -3,18 +3,15 @@ package ar.edu.utn.frc.siga.events.model;
 import org.springframework.modulith.NamedInterface;
 
 /**
- * Máquina de estados de una {@link Occurrence}. Las transiciones están centralizadas en
- * los servicios de asignación: pasar a {@code ASSIGNED} ocurre al asignar/reasignar aula.
- * No hay, hoy, ningún camino de vuelta a {@code SCHEDULED}.
+ * Máquina de estados de una {@link Occurrence}: responde una sola pregunta —¿necesita aula
+ * ahora mismo?. Tener aula NO es un estado acá: es {@code existe fila en asignacion_aula},
+ * ortogonal a este enum (ver {@code Allocation}). Las transiciones las dispara
+ * {@code events} (release/request-room); ninguna las dispara {@code allocation}.
  */
 @NamedInterface("api")
 public enum OccurrenceStatus {
-    /** Programada, sin aula asignada. Estado inicial. */
-    SCHEDULED,
-    /** Tiene aula: existe una {@link Allocation} vigente para esta occurrence. */
-    ASSIGNED,
-    /** Cancelada. */
-    CANCELLED,
-    /** Suspendida intencionalmente: liberó su aula pero, a diferencia de {@code SCHEDULED}, no queda pendiente de asignación. */
-    SUSPENDED
+    /** Necesita aula. Estado inicial. */
+    NEEDS_ROOM,
+    /** El aula fue liberada a propósito. Reasignable en cualquier momento. */
+    ROOM_RELEASED
 }

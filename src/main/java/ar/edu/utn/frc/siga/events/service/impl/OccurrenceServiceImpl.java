@@ -3,10 +3,13 @@ package ar.edu.utn.frc.siga.events.service.impl;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.model.OccurrenceVacated;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.events.validator.EventScheduleValidator;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +22,8 @@ import java.util.List;
 public class OccurrenceServiceImpl implements OccurrenceService {
 
     private final OccurrenceRepository occurrenceRepository;
+    private final EventScheduleValidator eventScheduleValidator;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional(readOnly = true)
@@ -35,8 +40,10 @@ public class OccurrenceServiceImpl implements OccurrenceService {
     @Override
     @Transactional(readOnly = true)
     public List<OccurrenceSlotDto> findSlotsByEvent(Long eventId, LocalDate from) {
-        return occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eventId, from).stream()
-                .map(OccurrenceServiceImpl::toSlot).toList();
+        List<Occurrence> occurrences = from == null
+                ? occurrenceRepository.findByEvent_Id(eventId)
+                : occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eventId, from);
+        return occurrences.stream().map(OccurrenceServiceImpl::toSlot).toList();
     }
 
     @Override
@@ -55,16 +62,15 @@ public class OccurrenceServiceImpl implements OccurrenceService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<OccurrenceSlotDto> findSlotsByEventsAndStatuses(
-            Collection<Long> eventIds, Collection<OccurrenceStatus> statuses, LocalDate from) {
-        return occurrenceRepository.findByEvent_IdInAndStatusInAndDateGreaterThanEqual(eventIds, statuses, from)
-                .stream().map(OccurrenceServiceImpl::toSlot).toList();
+    public List<OccurrenceSlotDto> findSlotsByStatusBetween(OccurrenceStatus status, LocalDate from, LocalDate to) {
+        return occurrenceRepository.findByStatusAndDateBetweenOrderByEvent_IdAscDateAsc(status, from, to).stream()
+                .map(OccurrenceServiceImpl::toSlot).toList();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<OccurrenceSlotDto> findSlotsByStatusBetween(OccurrenceStatus status, LocalDate from, LocalDate to) {
-        return occurrenceRepository.findByStatusAndDateBetweenOrderByEvent_IdAscDateAsc(status, from, to).stream()
+    public List<OccurrenceSlotDto> findSlotsBetween(LocalDate from, LocalDate to) {
+        return occurrenceRepository.findByDateBetween(from, to).stream()
                 .map(OccurrenceServiceImpl::toSlot).toList();
     }
 
@@ -82,9 +88,19 @@ public class OccurrenceServiceImpl implements OccurrenceService {
 
     @Override
     @Transactional
-    public void markAssigned(Collection<Long> occurrenceIds) {
-        occurrenceRepository.findAllById(occurrenceIds)
-                .forEach(occurrence -> occurrence.setStatus(OccurrenceStatus.ASSIGNED));
+    public void release(Long occurrenceId) {
+        Occurrence occurrence = Finder.orThrow(occurrenceRepository::findById, occurrenceId, "Occurrence");
+        eventScheduleValidator.validateNotPast(occurrence);
+        occurrence.setStatus(OccurrenceStatus.ROOM_RELEASED);
+        eventPublisher.publishEvent(new OccurrenceVacated(occurrenceId));
+    }
+
+    @Override
+    @Transactional
+    public void requestRoom(Long occurrenceId) {
+        Occurrence occurrence = Finder.orThrow(occurrenceRepository::findById, occurrenceId, "Occurrence");
+        eventScheduleValidator.validateNotPast(occurrence);
+        occurrence.setStatus(OccurrenceStatus.NEEDS_ROOM);
     }
 
     private static OccurrenceSlotDto toSlot(Occurrence occurrence) {

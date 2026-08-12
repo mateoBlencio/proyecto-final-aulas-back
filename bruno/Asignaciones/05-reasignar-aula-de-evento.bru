@@ -5,33 +5,41 @@ meta {
 }
 
 put {
-  url: {{baseUrl}}/v1/allocations/events/:id/classroom
+  url: {{baseUrl}}/v1/allocations
   body: json
   auth: inherit
 }
 
-params:path {
-  id: 1
-}
-
 body:json {
   {
-    "classroomId": 2,
+    "items": [
+      { "eventId": 1, "classroomId": 2 }
+    ],
     "observation": "Cambio de aula por conflicto de capacidad"
   }
 }
 
 docs {
-  Cambia el aula de TODAS las ocurrencias futuras de un evento recurrente
-  (source = MANUAL). Las ocurrencias ya pasadas quedan intactas.
-  
-  Falla si el evento no es recurrente, o si ya finalizó (ninguna ocurrencia
-  futura). Valida que ninguna ocurrencia choque contra ocupación firme de BD
-  antes de aplicar el lote completo. Si hay solapamiento → 409 con:
+  Cambia el aula de TODAS las ocurrencias aplicables de un evento en un solo
+  item usando "eventId" en vez de "occurrenceIds" (source = MANUAL, modo
+  upsert: crea la asignación si no existía, o actualiza si ya existía).
+
+  A diferencia de un item con "occurrenceIds" explícitas (que falla con 409
+  si alguna de las ocurrencias indicadas ya pasó), un item con "eventId" NO
+  falla por ocurrencias pasadas: simplemente las salta en silencio y aplica
+  desde la primera fecha aún modificable en adelante. Ya no existe un
+  parámetro "fromDate" — el punto de corte se calcula automáticamente.
+
+  Falla si el evento no existe, o si no tiene ninguna ocurrencia aplicable
+  (todas pasadas). Valida que ninguna ocurrencia choque contra ocupación
+  firme de BD antes de aplicar el lote completo. Si hay solapamiento → 409
+  con:
   {
     "conflicts": [
       { "occurrenceId", "date", "startTime", "endTime", "classroomId",
         "conflictingEventId", "conflictingAllocationId" }
     ]
   }
+
+  Respuesta 200: List<AllocationResponseDto> con las ocurrencias afectadas.
 }

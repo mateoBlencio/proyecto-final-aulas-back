@@ -14,8 +14,8 @@ import java.time.LocalTime;
  * {@code commissionId} nunca es obligatorio por sí solo, pero no puede venir sin {@code subjectId}.
  * {@code description} es la descripción propia del evento (texto libre).
  *
- * <p>No incluye aula: la asignación es responsabilidad de {@code allocation}
- * (ver {@code UniqueEventAllocationService#createUniqueEvent}).
+ * <p>No incluye aula: la asignación es responsabilidad de {@code allocation}, en una llamada
+ * aparte a {@code POST /v1/allocations} luego de creado el evento.
  */
 @NamedInterface("api")
 public record CreateUniqueEventRequestDto(

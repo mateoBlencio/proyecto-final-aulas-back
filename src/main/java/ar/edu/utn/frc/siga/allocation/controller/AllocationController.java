@@ -1,21 +1,20 @@
 package ar.edu.utn.frc.siga.allocation.controller;
 
-import ar.edu.utn.frc.siga.allocation.dto.request.AllocateFromDateRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.request.BatchReassignRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.request.CreateUniqueEventAllocationRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.request.UpdateUniqueEventAllocationRequestDto;
-import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.AllocationBatchRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.DeallocationBatchRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.AllocationConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationHistorySnapshotDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.ClassroomOverlapDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.OvercrowdedAllocationDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.UniqueEventAllocationResponseDto;
+import ar.edu.utn.frc.siga.allocation.mapper.AllocationCommandMapper;
+import ar.edu.utn.frc.siga.allocation.mapper.EventAllocationComposer;
 import ar.edu.utn.frc.siga.common.dto.response.RevisionDto;
 import ar.edu.utn.frc.siga.allocation.service.AllocationAuditHistoryService;
-import ar.edu.utn.frc.siga.allocation.service.AllocationProblemService;
+import ar.edu.utn.frc.siga.allocation.service.AllocationConflictService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
-import ar.edu.utn.frc.siga.allocation.service.UniqueEventAllocationService;
+import ar.edu.utn.frc.siga.allocation.service.ConflictType;
+import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,6 +27,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,11 +40,14 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 
 import java.util.List;
+import java.util.Set;
 
 /**
- * Endpoints de asignación manual de aulas (individual, en lote, desde una fecha), de
- * detección de problemas de asignación, y del alta/modificación de evento único + reasignación
- * de evento recurrente que necesitan aula (por eso viven acá y no en {@code /v1/events}).
+ * Endpoints de asignación manual de aulas: tres verbos en lote (asignar/reasignar/desasignar),
+ * todos atómicos, source MANUAL siempre. Direccionar por occurrences puntuales o por evento
+ * completo es un detalle del item, no del endpoint (ver {@code AllocationTarget}). También
+ * expone la vista de eventos únicos ya compuesta con aula/estado/sobrecupo (lectura), que
+ * combina datos de {@code events} y {@code allocation}.
  */
 @Slf4j
 @RestController
@@ -55,52 +58,11 @@ import java.util.List;
 public class AllocationController {
 
     private final AllocationService allocationService;
-    private final AllocationProblemService allocationProblemService;
     private final AllocationAuditHistoryService allocationAuditHistoryService;
-    private final UniqueEventAllocationService uniqueEventAllocationService;
-
-    @GetMapping("/unassigned")
-    @Operation(summary = "Listar eventos sin aula asignada",
-               description = "Devuelve, agrupados por evento, las ocurrencias SCHEDULED (sin aula) en el rango "
-                       + "indicado. Por defecto 'from' es hoy y 'to' es el fin del período académico activo "
-                       + "(o 'from' + 6 meses si no hay período activo con fecha de fin). Excluye ocurrencias "
-                       + "ya pasadas (fecha+hora de inicio) salvo que 'includePast' sea true.")
-    public ResponseEntity<Page<AcademicEventResponseDto>> findUnassigned(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false, defaultValue = "false") boolean includePast,
-            @PageableDefault(size = 20) Pageable pageable) {
-        log.debug("GET /v1/allocations/unassigned: from={}, to={}, includePast={}", from, to, includePast);
-        return ResponseEntity.ok(allocationProblemService.findUnassigned(from, to, includePast, pageable));
-    }
-
-    @GetMapping("/overcrowded")
-    @Operation(summary = "Listar aulas con sobrecupo",
-               description = "Devuelve los pares evento-aula donde la cantidad de inscriptos supera la capacidad "
-                       + "del aula asignada, en el rango indicado. Mismo rango por defecto que /unassigned. "
-                       + "Excluye ocurrencias ya pasadas salvo que 'includePast' sea true.")
-    public ResponseEntity<Page<OvercrowdedAllocationDto>> findOvercrowded(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false, defaultValue = "false") boolean includePast,
-            @PageableDefault(size = 20) Pageable pageable) {
-        log.debug("GET /v1/allocations/overcrowded: from={}, to={}, includePast={}", from, to, includePast);
-        return ResponseEntity.ok(allocationProblemService.findOvercrowded(from, to, includePast, pageable));
-    }
-
-    @GetMapping("/overlaps")
-    @Operation(summary = "Listar superposiciones de horario-aula",
-               description = "Devuelve los pares de eventos cuyos horarios se superponen en la misma aula, "
-                       + "en el rango indicado. Mismo rango por defecto que /unassigned. "
-                       + "Excluye ocurrencias ya pasadas salvo que 'includePast' sea true.")
-    public ResponseEntity<Page<ClassroomOverlapDto>> findOverlaps(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false, defaultValue = "false") boolean includePast,
-            @PageableDefault(size = 20) Pageable pageable) {
-        log.debug("GET /v1/allocations/overlaps: from={}, to={}, includePast={}", from, to, includePast);
-        return ResponseEntity.ok(allocationProblemService.findOverlaps(from, to, includePast, pageable));
-    }
+    private final AllocationConflictService allocationConflictService;
+    private final AllocationCommandMapper commandMapper;
+    private final EventAllocationComposer eventAllocationComposer;
+    private final AcademicEventService academicEventService;
 
     @GetMapping
     @Operation(summary = "Listar asignaciones por fecha",
@@ -121,116 +83,76 @@ public class AllocationController {
         return ResponseEntity.ok(allocationService.findById(id));
     }
 
-    @GetMapping("/occurrences/{occurrenceId}/allocation-history")
-    @Operation(summary = "Historial de asignaciones de una ocurrencia",
-               description = "Devuelve las revisiones de auditoría (Envers) de la(s) asignación(es) de la ocurrencia "
-                       + "en orden ascendente: qué aula tuvo en cada momento, origen (MANUAL/AUTOMATIC/IMPORTED) y "
-                       + "quién la cambió. Se consulta por ocurrencia porque la asignación puede borrarse y recrearse. "
-                       + "Lista vacía si la ocurrencia existe pero nunca tuvo asignación.")
-    public ResponseEntity<List<RevisionDto<AllocationHistorySnapshotDto>>> findAllocationHistory(
-            @PathVariable Long occurrenceId) {
-        log.debug("GET /v1/allocations/occurrences/{}/allocation-history", occurrenceId);
-        return ResponseEntity.ok(allocationAuditHistoryService.findAllocationHistory(occurrenceId));
-    }
-
-    @PostMapping("/occurrences/{occurrenceId}")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
-    @Operation(summary = "Asignar aula a ocurrencia",
-               description = "Asigna manualmente un aula a una ocurrencia específica. Falla si la ocurrencia ya tiene asignación o si ya ocurrió.")
-    public ResponseEntity<AllocationResponseDto> allocateManually(
-            @PathVariable Long occurrenceId,
-            @Valid @RequestBody AllocateOccurrenceRequestDto dto) {
-        log.debug("POST /v1/allocations/occurrences/{}: classroomId={}", occurrenceId, dto.classroomId());
-        AllocationResponseDto response = allocationService.allocateManually(occurrenceId, dto);
-        log.info("Asignación creada: id={}, occurrenceId={}", response.id(), occurrenceId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
-
-    @PutMapping("/{id}")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
-    @Operation(summary = "Reasignar aula",
-               description = "Cambia el aula de una asignación existente. Falla si la ocurrencia ya ocurrió.")
-    public ResponseEntity<AllocationResponseDto> reassign(
-            @PathVariable Long id,
-            @Valid @RequestBody AllocateOccurrenceRequestDto dto) {
-        log.debug("PUT /v1/allocations/{}: classroomId={}", id, dto.classroomId());
-        AllocationResponseDto response = allocationService.reallocate(id, dto);
-        log.info("Asignación reasignada: id={}", id);
-        return ResponseEntity.ok(response);
-    }
-
-    @PutMapping("/batch")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
-    @Operation(summary = "Reasignar aulas en lote",
-               description = "Cambia el aula de múltiples asignaciones en una sola operación atómica. Falla si cualquier ocurrencia ya ocurrió.")
-    public ResponseEntity<List<AllocationResponseDto>> batchReassign(
-            @Valid @RequestBody BatchReassignRequestDto dto) {
-        log.debug("PUT /v1/allocations/batch: moves={}", dto.moves().size());
-        List<AllocationResponseDto> response = allocationService.batchReallocate(dto);
-        log.info("Reasignación en lote completa: moved={}", response.size());
-        return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/from-date")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
-    @Operation(summary = "Asignar aula desde una fecha",
-               description = "Asigna un aula a todas las ocurrencias futuras de un evento recurrente a partir de la fecha indicada. Crea nuevas asignaciones o actualiza las existentes.")
-    public ResponseEntity<List<AllocationResponseDto>> assignManuallyFromDate(
-            @Valid @RequestBody AllocateFromDateRequestDto dto) {
-        log.debug("POST /v1/allocations/from-date: recurringEventId={}, classroomId={}, fromDate={}",
-                dto.recurringEventId(), dto.classroomId(), dto.fromDate());
-        List<AllocationResponseDto> response = allocationService.allocateManuallyFromDate(dto);
-        log.info("Asignaciones creadas desde fecha: recurringEventId={}, count={}", dto.recurringEventId(), response.size());
-        return ResponseEntity.ok(response);
-    }
-
-    @PutMapping("/events/{eventId}/classroom")
-    @Operation(summary = "Reasignar aula de un evento",
-               description = "Cambia el aula de todas las ocurrencias futuras de un evento recurrente. Las ocurrencias ya pasadas quedan intactas. Falla si el evento no es recurrente o si ya finalizó.")
-    public ResponseEntity<List<AllocationResponseDto>> reassignEvent(
-            @PathVariable Long eventId,
-            @Valid @RequestBody AllocateOccurrenceRequestDto dto) {
-        log.debug("PUT /v1/allocations/events/{}/classroom: classroomId={}", eventId, dto.classroomId());
-        List<AllocationResponseDto> response = allocationService.reassignEvent(eventId, dto);
-        log.info("Evento reasignado: eventId={}, count={}", eventId, response.size());
-        return ResponseEntity.ok(response);
-    }
-
     @GetMapping("/events/unique")
     @Operation(summary = "Listar eventos únicos con aula",
                description = "Devuelve todos los eventos únicos con su aula asignada, estado y sobrecupo. "
                        + "Para la vista sin aula ver GET /v1/events/unique.")
     public ResponseEntity<List<UniqueEventAllocationResponseDto>> findUniqueEvents() {
         log.debug("GET /v1/allocations/events/unique");
-        List<UniqueEventAllocationResponseDto> events = uniqueEventAllocationService.findAll();
+        List<UniqueEventAllocationResponseDto> events = eventAllocationComposer.composeAll(academicEventService.findUniqueEvents());
         log.info("Eventos únicos con aula listados: count={}", events.size());
         return ResponseEntity.ok(events);
     }
 
-    @PostMapping("/events/unique")
+    @GetMapping("/history")
+    @Operation(summary = "Historial de asignaciones de un evento",
+               description = "Devuelve las revisiones de auditoría (Envers) de la(s) asignación(es) de TODAS las "
+                       + "occurrences del evento, fusionadas en una sola línea de tiempo ascendente: qué aula tuvo "
+                       + "cada occurrence en cada momento, origen (MANUAL/AUTOMATIC/IMPORTED) y quién la cambió. "
+                       + "404 si el evento no existe. Lista vacía si existe pero nunca tuvo asignación.")
+    public ResponseEntity<List<RevisionDto<AllocationHistorySnapshotDto>>> findAllocationHistory(
+            @RequestParam Long eventId) {
+        log.debug("GET /v1/allocations/history: eventId={}", eventId);
+        return ResponseEntity.ok(allocationAuditHistoryService.findAllocationHistory(eventId));
+    }
+
+    @GetMapping("/conflicts")
+    @Operation(summary = "Listar conflictos de asignación",
+               description = "Devuelve, mezclados y paginados, los conflictos pedidos en 'types' (los tres si se omite): "
+                       + "eventos sin aula, aulas con sobrecupo, superposiciones de horario-aula. Mismos defaults de "
+                       + "rango que antes: 'from' hoy, 'to' fin del período académico activo (o +6 meses). Excluye "
+                       + "ocurrencias ya pasadas salvo 'includePast=true'.")
+    public ResponseEntity<Page<AllocationConflictDto>> findConflicts(
+            @RequestParam(required = false) Set<ConflictType> types,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false, defaultValue = "false") boolean includePast,
+            @PageableDefault(size = 20) Pageable pageable) {
+        log.debug("GET /v1/allocations/conflicts: types={}, from={}, to={}, includePast={}", types, from, to, includePast);
+        return ResponseEntity.ok(allocationConflictService.findConflicts(types, from, to, includePast, pageable));
+    }
+
+    @PostMapping
     @PreAuthorize("hasRole('SUBSECRETARIA')")
-    @Operation(summary = "Crea un evento único con aula",
-               description = "Crea un evento que ocurre una única vez, genera su única ocurrencia y le asigna "
-                       + "el aula indicada en la misma operación (atómica): si el aula no está disponible o "
-                       + "hay solapamiento, no se crea el evento.")
-    public ResponseEntity<UniqueEventAllocationResponseDto> createUnique(
-            @Valid @RequestBody CreateUniqueEventAllocationRequestDto dto) {
-        log.debug("POST /v1/allocations/events/unique: date={}, classroomId={}", dto.date(), dto.classroomId());
-        UniqueEventAllocationResponseDto response = uniqueEventAllocationService.createUniqueEvent(dto);
-        log.info("Evento único con aula creado vía controller: id={}", response.event().id());
+    @Operation(summary = "Asignar aulas en lote",
+               description = "Asigna aula a cada item del lote (occurrences puntuales o evento completo). "
+                       + "409 si alguna occurrence del lote ya tiene asignación. Atómico.")
+    public ResponseEntity<List<AllocationResponseDto>> allocate(@Valid @RequestBody AllocationBatchRequestDto dto) {
+        log.debug("POST /v1/allocations: items={}", dto.items().size());
+        List<AllocationResponseDto> response = allocationService.allocate(commandMapper.toManualCommand(dto));
+        log.info("Asignación en lote completa: allocated={}", response.size());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @PutMapping("/events/unique/{id}")
+    @PutMapping
     @PreAuthorize("hasRole('SUBSECRETARIA')")
-    @Operation(summary = "Modificar un evento único con aula",
-               description = "Actualiza fecha, horario, cantidad de alumnos, aula y descripción de un evento "
-                       + "único existente, revalidando disponibilidad, solapamiento y capacidad antes de guardar.")
-    public ResponseEntity<UniqueEventAllocationResponseDto> updateUnique(
-            @PathVariable Long id, @Valid @RequestBody UpdateUniqueEventAllocationRequestDto dto) {
-        log.debug("PUT /v1/allocations/events/unique/{}: classroomId={}", id, dto.classroomId());
-        UniqueEventAllocationResponseDto response = uniqueEventAllocationService.updateUniqueEvent(id, dto);
-        log.info("Evento único con aula actualizado vía controller: id={}", id);
+    @Operation(summary = "Reasignar aulas en lote",
+               description = "Cambia el aula de cada item del lote (upsert: crea la asignación si no existía). Atómico.")
+    public ResponseEntity<List<AllocationResponseDto>> reallocate(@Valid @RequestBody AllocationBatchRequestDto dto) {
+        log.debug("PUT /v1/allocations: items={}", dto.items().size());
+        List<AllocationResponseDto> response = allocationService.reallocate(commandMapper.toManualCommand(dto));
+        log.info("Reasignación en lote completa: allocated={}", response.size());
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Desasignar aulas en lote",
+               description = "Libera el aula de cada item del lote (borra la asignación). Atómico.")
+    public ResponseEntity<List<DeallocatedOccurrenceDto>> deallocate(@Valid @RequestBody DeallocationBatchRequestDto dto) {
+        log.debug("DELETE /v1/allocations: items={}", dto.items().size());
+        List<DeallocatedOccurrenceDto> response = allocationService.deallocate(commandMapper.toDeallocationCommand(dto));
+        log.info("Desasignación en lote completa: freed={}", response.size());
         return ResponseEntity.ok(response);
     }
 }

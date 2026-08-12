@@ -13,10 +13,13 @@ import java.util.List;
 public interface AllocationAuditHistoryService {
 
     /**
-     * Revisiones de la(s) allocation de una ocurrencia: qué aula tuvo en cada momento, origen y
-     * quién la cambió. Por ocurrencia y no por allocationId porque la allocation puede
-     * borrarse/recrearse; la ocurrencia es el ancla estable. 404 si la ocurrencia no existe ni existió;
-     * lista vacía si existe pero nunca tuvo asignación.
+     * Revisiones de la(s) allocation de TODAS las occurrences de un evento, fusionadas en una sola
+     * línea de tiempo en orden de revisión ascendente: qué aula tuvo cada occurrence en cada
+     * momento, origen y quién la cambió. Por evento y no por occurrenceId/allocationId porque la
+     * allocation puede borrarse/recrearse y un evento recurrente tiene muchas occurrences; un
+     * evento único tiene exactamente una occurrence, así que en ese caso esto degenera en el mismo
+     * comportamiento de siempre para una sola ocurrencia. 404 si el evento no existe; lista vacía
+     * si existe pero ninguna de sus occurrences tuvo nunca asignación.
      */
-    List<RevisionDto<AllocationHistorySnapshotDto>> findAllocationHistory(Long occurrenceId);
+    List<RevisionDto<AllocationHistorySnapshotDto>> findAllocationHistory(Long eventId);
 }

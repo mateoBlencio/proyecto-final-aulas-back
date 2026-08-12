@@ -5,12 +5,10 @@ import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.UpdateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
-import ar.edu.utn.frc.siga.common.util.DateRanges;
 import ar.edu.utn.frc.siga.events.mapper.AcademicEventComposer;
 import ar.edu.utn.frc.siga.events.mapper.OccurrenceMapper;
 import ar.edu.utn.frc.siga.events.model.AcademicEvent;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
-import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.model.RecurringEvent;
 import ar.edu.utn.frc.siga.events.model.UniqueEvent;
 import ar.edu.utn.frc.siga.events.repository.AcademicEventRepository;
@@ -30,20 +28,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
-import java.time.LocalDate;
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
  * Implementación de alta y consulta de eventos académicos (recurrentes/únicos): valida
- * la existencia de materia/comisión ajenas vía sus fachadas, genera las occurrences del
- * evento al crearlo, y resuelve el listado de eventos pendientes de asignación de aula.
- * No conoce aulas ni asignaciones: {@code createUniqueEvent}/{@code updateUniqueEvent} crean
- * o modifican el evento y su occurrence, nada más — la asignación atómica de aula la
- * orquesta {@code allocation} (ver {@code UniqueEventAllocationService}).
+ * la existencia de materia/comisión ajenas vía sus fachadas y genera las occurrences del
+ * evento al crearlo. No conoce aulas ni asignaciones: {@code createUniqueEvent}/
+ * {@code updateUniqueEvent} crean o modifican el evento y su occurrence, nada más — asignar
+ * o reasignar el aula es una llamada aparte, no atómica, a {@code allocation}
+ * ({@code POST}/{@code PUT /v1/allocations}).
  */
 @Slf4j
 @Service
@@ -92,7 +87,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
     /**
      * Crea un evento recurrente (validando primero que materia y comisión existan vía sus
-     * fachadas) y genera de una vez todas sus occurrences semanales, sin aula (SCHEDULED).
+     * fachadas) y genera de una vez todas sus occurrences semanales, sin aula (NEEDS_ROOM).
      */
     @Override
     @Transactional
@@ -142,7 +137,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 .orElseGet(() -> new FindOrCreateResult<>(createRecurringEvent(dto).id(), true));
     }
 
-    /** Crea un evento único y genera su única occurrence (SCHEDULED, sin aula). */
+    /** Crea un evento único y genera su única occurrence (NEEDS_ROOM, sin aula). */
     @Override
     @Transactional
     public AcademicEventResponseDto createUniqueEvent(CreateUniqueEventRequestDto dto) {
@@ -230,63 +225,4 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         return composer.compose(event);
     }
 
-    /**
-     * Baja lógica: cancela la única occurrence del evento (sin borrado físico). Una vez
-     * CANCELLED, deja de contar como ocupación y libera el aula para nuevas asignaciones
-     * sin tocar el registro histórico.
-     */
-    @Override
-    @Transactional
-    public void cancelUniqueEvent(Long id) {
-        log.debug("Cancelando evento único: id={}", id);
-
-        Finder.orThrow(uniqueEventRepository::findById, id, "UniqueEvent");
-        Occurrence occurrence = occurrenceRepository.findByEvent_Id(id).getFirst();
-        eventScheduleValidator.validateNotPast(occurrence);
-
-        occurrence.setStatus(OccurrenceStatus.CANCELLED);
-
-        log.info("Evento único cancelado: id={}", id);
-    }
-
-    /**
-     * Agrupa por evento las occurrences en SCHEDULED entre {@code from} (default hoy) y
-     * {@code to} (sin límite superior si es null); excluye ASSIGNED/CANCELLED/SUSPENDED y
-     * las ya pasadas (fecha+hora de inicio, ver {@link Occurrence#isPast()}).
-     * Rechaza el rango si {@code to} es anterior a {@code from}.
-     */
-    @Override
-    @Transactional(readOnly = true)
-    public List<AcademicEventResponseDto> findUnassignedEvents(LocalDate from, LocalDate to, boolean includePast) {
-        return composer.compose(groupUnassignedEvents(from, to, includePast).values());
-    }
-
-    /**
-     * Igual criterio, pero devuelve solo los IDs sin componer el DTO completo (subject,
-     * comisión): pensado para resolver selecciones masivas.
-     */
-    @Override
-    @Transactional(readOnly = true)
-    public List<Long> findUnassignedEventIds(LocalDate from, LocalDate to, boolean includePast) {
-        return List.copyOf(groupUnassignedEvents(from, to, includePast).keySet());
-    }
-
-    private Map<Long, AcademicEvent> groupUnassignedEvents(LocalDate from, LocalDate to, boolean includePast) {
-        LocalDate effectiveFrom = DateRanges.defaultFrom(from);
-        DateRanges.requireNotBefore(to, effectiveFrom);
-
-        List<Occurrence> occurrences = to != null
-                ? occurrenceRepository.findByStatusAndDateBetweenOrderByEvent_IdAscDateAsc(
-                        OccurrenceStatus.SCHEDULED, effectiveFrom, to)
-                : occurrenceRepository.findByStatusAndDateGreaterThanEqualOrderByEvent_IdAscDateAsc(
-                        OccurrenceStatus.SCHEDULED, effectiveFrom);
-
-        Map<Long, AcademicEvent> eventById = new LinkedHashMap<>();
-        for (Occurrence occurrence : occurrences) {
-            if (!includePast && occurrence.isPast()) continue;
-            AcademicEvent event = occurrence.getEvent();
-            eventById.putIfAbsent(event.getId(), event);
-        }
-        return eventById;
-    }
 }

@@ -7,16 +7,12 @@ import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 
-import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 
 import org.springframework.modulith.NamedInterface;
 
-/**
- * Fachada pública de eventos académicos (recurrentes y únicos) y sus occurrences: alta,
- * consulta y el listado de eventos pendientes de asignación de aula.
- */
+/** Fachada pública de eventos académicos (recurrentes y únicos) y sus occurrences: alta y consulta. */
 @NamedInterface("api")
 public interface AcademicEventService {
     List<AcademicEventResponseDto> findAll();
@@ -37,9 +33,8 @@ public interface AcademicEventService {
     FindOrCreateResult<Long> findOrCreateRecurringEvent(CreateRecurringEventRequestDto dto);
 
     /**
-     * Crea un evento único, genera su única occurrence y le asigna el aula indicada en la
-     * misma transacción (atómico): si el aula no está disponible o hay solapamiento, no
-     * queda ningún registro persistido.
+     * Crea un evento único y genera su única occurrence, sin aula (queda NEEDS_ROOM). Asignarle
+     * un aula es una llamada aparte a {@code allocation}.
      */
     AcademicEventResponseDto createUniqueEvent(CreateUniqueEventRequestDto dto);
 
@@ -47,30 +42,8 @@ public interface AcademicEventService {
     List<AcademicEventResponseDto> findUniqueEvents();
 
     /**
-     * Modifica un evento único existente y reasigna su aula, revalidando disponibilidad,
-     * solapamiento, capacidad y ventana horaria antes de guardar. Rechaza si ya ocurrió, o
-     * si {@code id} no corresponde a un evento único (404).
+     * Modifica un evento único existente (fecha, horario, alumnos, descripción), sin tocar su
+     * aula. Rechaza si ya ocurrió, o si {@code id} no corresponde a un evento único (404).
      */
     AcademicEventResponseDto updateUniqueEvent(Long id, UpdateUniqueEventRequestDto dto);
-
-    /**
-     * Baja lógica de un evento único: cancela su única occurrence (sin borrado físico). Una
-     * vez cancelada, deja de bloquear el aula para nuevas asignaciones.
-     */
-    void cancelUniqueEvent(Long id);
-
-    /**
-     * Lista, agrupados por evento, los eventos con occurrences en SCHEDULED entre
-     * {@code from} (default hoy) y {@code to} (sin límite superior si es null). Excluye
-     * occurrences ASSIGNED/CANCELLED/SUSPENDED, y las ya pasadas salvo que
-     * {@code includePast} sea true.
-     */
-    List<AcademicEventResponseDto> findUnassignedEvents(LocalDate from, LocalDate to, boolean includePast);
-
-    /**
-     * Igual criterio que {@link #findUnassignedEvents}, pero devuelve solo los IDs: pensado
-     * para resolver una selección masiva (ej. "seleccionar todas") sin componer el DTO
-     * completo de cada evento.
-     */
-    List<Long> findUnassignedEventIds(LocalDate from, LocalDate to, boolean includePast);
 }

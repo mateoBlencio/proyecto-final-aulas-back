@@ -8,11 +8,10 @@ import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
+import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator.OccupiedSlot;
 import ar.edu.utn.frc.siga.events.model.EventType;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
-import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
-import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.common.exception.InvalidDateRangeException;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
@@ -33,6 +32,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -50,9 +51,7 @@ class AllocationProblemServiceImplTest {
     private static final Pageable PAGEABLE = PageRequest.of(0, 20);
 
     @Mock
-    private AllocationRepository allocationRepository;
-    @Mock
-    private OccurrenceService occurrenceService;
+    private AllocationOccupancyReader occupancyReader;
     @Mock
     private ClassroomService classroomService;
     @Mock
@@ -65,8 +64,7 @@ class AllocationProblemServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of());
-        lenient().when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of());
+        lenient().when(occupancyReader.loadAssigned(any(), any())).thenReturn(List.of());
         lenient().when(academicEventService.findByIds(any())).thenReturn(List.of());
         lenient().when(academicEventService.findUnassignedEvents(any(), any(), anyBoolean())).thenReturn(List.of());
         lenient().when(academicPeriodService.findActive()).thenReturn(List.of());
@@ -238,7 +236,7 @@ class AllocationProblemServiceImplTest {
         service.findOvercrowded(null, null, false, PAGEABLE);
 
         ArgumentCaptor<LocalDate> toCaptor = ArgumentCaptor.forClass(LocalDate.class);
-        verify(occurrenceService).findSlotsByStatusBetween(eq(OccurrenceStatus.ASSIGNED), any(), toCaptor.capture());
+        verify(occupancyReader).loadAssigned(any(), toCaptor.capture());
         assertThat(toCaptor.getValue()).isEqualTo(endDate);
     }
 
@@ -250,7 +248,7 @@ class AllocationProblemServiceImplTest {
         service.findOvercrowded(from, null, false, PAGEABLE);
 
         ArgumentCaptor<LocalDate> toCaptor = ArgumentCaptor.forClass(LocalDate.class);
-        verify(occurrenceService).findSlotsByStatusBetween(eq(OccurrenceStatus.ASSIGNED), eq(from), toCaptor.capture());
+        verify(occupancyReader).loadAssigned(eq(from), toCaptor.capture());
         assertThat(toCaptor.getValue()).isEqualTo(from.plusMonths(6));
     }
 
@@ -289,8 +287,12 @@ class AllocationProblemServiceImplTest {
 
     private void mockOccupancy(LocalDate from, LocalDate to, List<OccurrenceSlotDto> slots,
             List<Allocation> allocations, List<RecurringEventResponseDto> events) {
-        when(occurrenceService.findSlotsByStatusBetween(OccurrenceStatus.ASSIGNED, from, to)).thenReturn(slots);
-        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(allocations);
+        Map<Long, OccurrenceSlotDto> slotByOccurrenceId = slots.stream()
+                .collect(Collectors.toMap(OccurrenceSlotDto::occurrenceId, s -> s));
+        List<OccupiedSlot> occupied = allocations.stream()
+                .map(a -> OccupiedSlot.from(a, slotByOccurrenceId.get(a.getOccurrenceId())))
+                .toList();
+        lenient().when(occupancyReader.loadAssigned(any(), any())).thenReturn(occupied);
         when(academicEventService.findByIds(any())).thenReturn(List.copyOf(events));
     }
 

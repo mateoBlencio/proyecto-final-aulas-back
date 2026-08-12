@@ -197,6 +197,14 @@
 			<artifactId>spring-modulith-starter-core</artifactId>
 		</dependency>
 
+		<!-- Publicación de eventos de aplicación (OccurrenceVacated) con registro persistido
+		     (tabla event_publication, autocreada) para reintento at-least-once vía
+		     @ApplicationModuleListener. Primer uso de este mecanismo en el proyecto. -->
+		<dependency>
+			<groupId>org.springframework.modulith</groupId>
+			<artifactId>spring-modulith-starter-jpa</artifactId>
+		</dependency>
+
 		<dependency>
 			<groupId>org.springframework.modulith</groupId>
 			<artifactId>spring-modulith-starter-test</artifactId>

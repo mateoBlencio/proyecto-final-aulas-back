@@ -1,11 +1,11 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
-import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
-import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
+import ar.edu.utn.frc.siga.common.util.Maps;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -13,54 +13,55 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.Map.Entry;
 
 /**
- * Único punto de escritura de asignaciones: upsert por ocurrencia + pase a ASSIGNED.
- * Toda fuente (manual, importada, automática) pasa por acá; el intent method que llama
- * decide validaciones previas y estampa su source.
+ * Único punto de escritura de asignaciones: por cada (occurrence, aula) ya resuelto por
+ * {@link AllocationTargetResolver}, crea o actualiza la fila. Toda fuente (manual,
+ * importada, automática) pasa por acá; el verbo que llama ({@code allocate} estricto vs
+ * {@code reallocate} upsert) decide qué hacer si ya existía. No toca {@code Occurrence}:
+ * "tiene aula" es {@code existe fila acá}, no un estado que sincronizar (ver
+ * {@code OccurrenceStatus}). Corre siempre dentro de la transacción del caller: la
+ * allocation existente llega managed, así que las actualizaciones se persisten por dirty
+ * checking sin {@code save()} explícito; solo las allocations nuevas lo requieren.
  */
 @Component
 @RequiredArgsConstructor
 class AllocationWriter {
 
     private final AllocationRepository allocationRepository;
-    private final AllocationValidator validator;
-    private final OccurrenceService occurrenceService;
 
     /**
-     * Crea o actualiza la asignación de cada ocurrencia de la lista al aula indicada,
-     * y la pasa a ASSIGNED. Las no-asignables (CANCELLED/SUSPENDED, o pasadas cuando
-     * {@code skipPast}) se saltean por diseño, no son un fallo parcial.
-     * Corre siempre dentro de la transacción del caller: la allocation existente llega
-     * managed, así que las actualizaciones se persisten por dirty checking sin necesidad
-     * de {@code save()} explícito; solo las allocations nuevas lo requieren.
+     * Crea la asignación de cada occurrence de {@code classroomByOccurrence}. Corta con 409
+     * si CUALQUIERA ya tiene asignación — nada se escribe (se chequea el lote completo antes
+     * de la primera escritura).
      */
-    List<Allocation> apply(List<OccurrenceSlotDto> occurrences, Integer classroomId, String observation,
-                            AllocationSource source, boolean skipPast) {
-        return apply(occurrences, o -> classroomId, observation, source, skipPast);
+    List<Allocation> create(Map<OccurrenceSlotDto, Integer> classroomByOccurrence, String observation, AllocationSource source) {
+        List<Long> occurrenceIds = classroomByOccurrence.keySet().stream().map(OccurrenceSlotDto::occurrenceId).toList();
+        List<Allocation> existing = allocationRepository.findByOccurrenceIdIn(occurrenceIds);
+        if (!existing.isEmpty()) {
+            throw new AllocationConflictException(
+                    "La(s) ocurrencia(s) " + existing.stream().map(Allocation::getOccurrenceId).toList() + " ya tiene(n) una asignación.");
+        }
+        return write(classroomByOccurrence, observation, source);
     }
 
-    /**
-     * Igual que {@link #apply(List, Integer, String, AllocationSource, boolean)} pero con aula
-     * resuelta por ocurrencia: permite aplicar occurrences de varios eventos (aula distinta por
-     * evento) en una sola pasada, con una única query de asignaciones existentes en vez de una
-     * por evento (evita N+1 cuando el caller agrupa por evento, p. ej. confirm de auto-preview).
-     */
-    List<Allocation> apply(List<OccurrenceSlotDto> occurrences, Function<OccurrenceSlotDto, Integer> classroomIdResolver,
-                            String observation, AllocationSource source, boolean skipPast) {
-        Map<Long, Allocation> existingByOccurrence = allocationRepository
-                .findByOccurrenceIdIn(occurrences.stream().map(OccurrenceSlotDto::occurrenceId).toList())
-                .stream().collect(Collectors.toMap(Allocation::getOccurrenceId, a -> a));
+    /** Crea o actualiza (upsert) la asignación de cada occurrence de {@code classroomByOccurrence}. */
+    List<Allocation> upsert(Map<OccurrenceSlotDto, Integer> classroomByOccurrence, String observation, AllocationSource source) {
+        return write(classroomByOccurrence, observation, source);
+    }
+
+    private List<Allocation> write(Map<OccurrenceSlotDto, Integer> classroomByOccurrence, String observation, AllocationSource source) {
+        if (classroomByOccurrence.isEmpty()) return List.of();
+
+        List<Long> occurrenceIds = classroomByOccurrence.keySet().stream().map(OccurrenceSlotDto::occurrenceId).toList();
+        Map<Long, Allocation> existingByOccurrence = Maps.byId(
+                allocationRepository.findByOccurrenceIdIn(occurrenceIds), Allocation::getOccurrenceId);
 
         List<Allocation> saved = new ArrayList<>();
-        List<Long> assignedOccurrenceIds = new ArrayList<>();
-        for (OccurrenceSlotDto occurrence : occurrences) {
-            if (skipPast && occurrence.isPast()) continue;
-            if (!validator.isAssignable(occurrence)) continue;
-
-            Integer classroomId = classroomIdResolver.apply(occurrence);
+        for (Entry<OccurrenceSlotDto, Integer> entry : classroomByOccurrence.entrySet()) {
+            OccurrenceSlotDto occurrence = entry.getKey();
+            Integer classroomId = entry.getValue();
             Allocation existing = existingByOccurrence.get(occurrence.occurrenceId());
             Allocation allocation;
             if (existing != null) {
@@ -78,11 +79,20 @@ class AllocationWriter {
                         .build());
             }
             saved.add(allocation);
-            assignedOccurrenceIds.add(occurrence.occurrenceId());
-        }
-        if (!assignedOccurrenceIds.isEmpty()) {
-            occurrenceService.markAssigned(assignedOccurrenceIds);
         }
         return saved;
     }
+
+    /** Borra la asignación de cada occurrence indicada, si existe. Occurrences sin asignación se ignoran. */
+    List<DeallocatedOccurrence> delete(List<OccurrenceSlotDto> occurrences) {
+        List<Long> occurrenceIds = occurrences.stream().map(OccurrenceSlotDto::occurrenceId).toList();
+        List<Allocation> existing = allocationRepository.findByOccurrenceIdIn(occurrenceIds);
+        if (existing.isEmpty()) return List.of();
+
+        allocationRepository.deleteAll(existing);
+        return existing.stream().map(a -> new DeallocatedOccurrence(a.getOccurrenceId(), a.getClassroomId())).toList();
+    }
+
+    /** Occurrence liberada y el aula que tenía hasta ahora. */
+    record DeallocatedOccurrence(Long occurrenceId, Integer classroomId) {}
 }

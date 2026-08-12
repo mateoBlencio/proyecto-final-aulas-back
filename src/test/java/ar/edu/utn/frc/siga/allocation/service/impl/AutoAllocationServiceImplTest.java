@@ -13,8 +13,9 @@ import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ValidateMoveResponseDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
-import ar.edu.utn.frc.siga.allocation.exception.ReassignConflictException;
+import ar.edu.utn.frc.siga.allocation.exception.ReallocationConflictException;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationComposer;
+import ar.edu.utn.frc.siga.allocation.mapper.AutoPreviewComposer;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.events.dto.response.UniqueEventResponseDto;
@@ -26,6 +27,7 @@ import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationProblemService;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
+import ar.edu.utn.frc.siga.allocation.validator.AutoPreviewValidator;
 import ar.edu.utn.frc.siga.common.exception.InvalidSelectionException;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.solver.exception.ExpiredPreviewException;
@@ -102,12 +104,15 @@ class AutoAllocationServiceImplTest {
     void setUp() {
         // El loader es package-private y vive en el mismo paquete: se instancia real con
         // las fachadas mockeadas para ejercitar dedup/pinned/fechas a través del servicio.
+        AllocationOccupancyReader occupancyReader = new AllocationOccupancyReader(occurrenceService, allocationRepository);
         AutoAllocationDataLoader dataLoader = new AutoAllocationDataLoader(
-                academicEventService, occurrenceService, allocationRepository, classroomService);
+                academicEventService, occurrenceService, classroomService, occupancyReader);
         AllocationValidator validator = new AllocationValidator(classroomService, allocationRepository, occurrenceService);
+        AutoPreviewValidator autoPreviewValidator = new AutoPreviewValidator();
         AllocationWriter writer = new AllocationWriter(allocationRepository, validator, occurrenceService);
-        service = new AutoAllocationServiceImpl(dataLoader, classroomService, solverService,
-                occurrenceService, allocationComposer, validator, writer, allocationProblemService);
+        AutoPreviewComposer autoPreviewComposer = new AutoPreviewComposer(classroomService, autoPreviewValidator);
+        service = new AutoAllocationServiceImpl(dataLoader, solverService, occurrenceService,
+                allocationComposer, autoPreviewComposer, validator, autoPreviewValidator, writer, allocationProblemService);
 
         lenient().when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5, 100)));
         lenient().when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 100)));
@@ -784,7 +789,7 @@ class AutoAllocationServiceImplTest {
 
         assertThatThrownBy(() -> service.confirm("prev_confirm",
                 new ConfirmAutoPreviewRequestDto(List.of(new PreviewAllocationDto(1L, 5)))))
-                .isInstanceOf(ReassignConflictException.class);
+                .isInstanceOf(ReallocationConflictException.class);
 
         verify(allocationRepository, never()).save(any());
         verify(occurrenceService, never()).markAssigned(any());
@@ -809,7 +814,7 @@ class AutoAllocationServiceImplTest {
 
         assertThatThrownBy(() -> service.confirm("prev_confirm", new ConfirmAutoPreviewRequestDto(
                 List.of(new PreviewAllocationDto(1L, 9), new PreviewAllocationDto(2L, 9)))))
-                .isInstanceOf(ReassignConflictException.class);
+                .isInstanceOf(ReallocationConflictException.class);
 
         verify(allocationRepository, never()).save(any());
     }

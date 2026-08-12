@@ -55,7 +55,7 @@ public final class UniqueEvent extends AcademicEvent {
         return List.of(Occurrence.builder()
                 .event(this)
                 .date(date)
-                .status(OccurrenceStatus.SCHEDULED)
+                .status(OccurrenceStatus.NEEDS_ROOM)
                 .build());
     }
 }

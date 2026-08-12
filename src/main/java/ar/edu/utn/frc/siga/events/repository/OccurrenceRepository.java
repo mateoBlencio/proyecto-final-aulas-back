@@ -53,4 +53,8 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
     /** Todas las occurrences (cualquier estado) de una fecha puntual — usado por {@code allocation} para listar por fecha. */
     @EntityGraph(attributePaths = "event")
     List<Occurrence> findByDate(LocalDate date);
+
+    /** Todas las occurrences (cualquier estado) entre dos fechas (inclusive), sin filtro de estado. */
+    @EntityGraph(attributePaths = "event")
+    List<Occurrence> findByDateBetween(LocalDate from, LocalDate to);
 }

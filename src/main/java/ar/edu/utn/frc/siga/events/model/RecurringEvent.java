@@ -62,7 +62,7 @@ public class RecurringEvent extends AcademicEvent {
             result.add(Occurrence.builder()
                     .event(this)
                     .date(current)
-                    .status(OccurrenceStatus.SCHEDULED)
+                    .status(OccurrenceStatus.NEEDS_ROOM)
                     .build());
             current = current.plusWeeks(1);
         }

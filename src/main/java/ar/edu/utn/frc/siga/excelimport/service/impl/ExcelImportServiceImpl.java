@@ -1,8 +1,10 @@
 package ar.edu.utn.frc.siga.excelimport.service.impl;
 
 import ar.edu.utn.frc.siga.academic.model.TermType;
-import ar.edu.utn.frc.siga.allocation.dto.request.AllocateFromDateRequestDto;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
+import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
+import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
+import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.excelimport.dto.ExcelRowDto;
 import ar.edu.utn.frc.siga.excelimport.dto.ImportResultDto;
@@ -60,11 +62,11 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         List<RowIssueDto> skippedRows = new ArrayList<>();
         List<RowIssueDto> rowWarnings = new ArrayList<>();
 
-        // Se acumulan las requests de asignación de todas las filas y se aplican en un solo
+        // Se acumulan los items de asignación de todas las filas y se aplican en un solo
         // batch al final: el cuello del import (~2 min con 1300 filas) era repetir, fila por
         // fila, las mismas 4 queries (evento, aula, occurrences, asignaciones existentes) que
-        // una sola vez para todo el archivo. Ver AllocationService#importAllocationsBatch.
-        List<AllocateFromDateRequestDto> pendingAllocations = new ArrayList<>();
+        // una sola vez para todo el archivo.
+        List<AllocationItem> pendingAllocations = new ArrayList<>();
 
         for (int rowIndex = 6; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
             Row row = sheet.getRow(rowIndex);
@@ -94,11 +96,9 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                         + "informado ('" + dto.buildingName() + "'); se usó su edificio real ('" + resolved.classroom().buildingName() + "')"));
                 }
 
-                pendingAllocations.add(new AllocateFromDateRequestDto(
-                    resolved.eventId(),
-                    startDate,
-                    resolved.classroom().id(),
-                    "Importado de Excel"
+                pendingAllocations.add(new AllocationItem(
+                    new AllocationTarget.Event(resolved.eventId()),
+                    resolved.classroom().id()
                 ));
 
                 processedRows++;
@@ -110,7 +110,9 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             }
         }
 
-        allocationService.importAllocationsBatch(pendingAllocations);
+        if (!pendingAllocations.isEmpty()) {
+            allocationService.reallocate(AllocationCommand.imported(pendingAllocations, "Importado de Excel"));
+        }
 
         log.info("Importación completada: {} filas, {} períodos creados, {} eventos creados, {} filas salteadas, {} advertencias",
             processedRows, periodsCreated.get(), eventsCreated.get(), skippedRows.size(), rowWarnings.size());
