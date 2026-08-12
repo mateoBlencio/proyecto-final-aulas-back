@@ -1,66 +1,75 @@
 package ar.edu.utn.frc.siga.ingest.service.impl;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
-import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("IngestCache")
 class IngestCacheTest {
 
-    private final IngestCache cache = new IngestCache();
-
     @Test
-    @DisplayName("misma clave: el loader se invoca una sola vez y se devuelve el valor cacheado")
-    void computeIfAbsentDedupeaPorClave() {
+    @DisplayName("get: primera llamada invoca el loader y cachea el resultado")
+    void primeraLlamadaInvocaElLoader() {
+        IngestCache cache = new IngestCache();
         AtomicInteger calls = new AtomicInteger();
-        SpecialtyResponseDto expected = new SpecialtyResponseDto(1, "Ingeniería en Sistemas");
 
-        SpecialtyResponseDto first = cache.get(SpecialtyResponseDto.class, 1, () -> {
+        String value = cache.get(String.class, "k1", () -> {
             calls.incrementAndGet();
-            return expected;
-        });
-        SpecialtyResponseDto second = cache.get(SpecialtyResponseDto.class, 1, () -> {
-            calls.incrementAndGet();
-            return new SpecialtyResponseDto(1, "no debería llamarse");
+            return "valor";
         });
 
-        assertThat(first).isEqualTo(expected);
-        assertThat(second).isEqualTo(expected);
+        assertThat(value).isEqualTo("valor");
         assertThat(calls.get()).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("claves distintas: el loader se invoca una vez por cada clave")
-    void clavesDistintasNoComparteCache() {
+    @DisplayName("get: segunda llamada con la misma clave no vuelve a invocar el loader")
+    void segundaLlamadaConMismaClaveNoReinvoca() {
+        IngestCache cache = new IngestCache();
         AtomicInteger calls = new AtomicInteger();
 
-        cache.get(SpecialtyResponseDto.class, 1, () -> {
+        cache.get(String.class, "k1", () -> {
             calls.incrementAndGet();
-            return new SpecialtyResponseDto(1, "Ingeniería en Sistemas");
+            return "valor";
         });
-        cache.get(SpecialtyResponseDto.class, 2, () -> {
+        cache.get(String.class, "k1", () -> {
             calls.incrementAndGet();
-            return new SpecialtyResponseDto(2, "Ingeniería Civil");
+            return "otro valor";
         });
 
-        assertThat(calls.get()).isEqualTo(2);
+        assertThat(calls.get()).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("tipos distintos con la misma clave no colisionan (namespace por Class)")
-    void tiposDistintosNoColisionan() {
-        cache.get(SpecialtyResponseDto.class, "1", () -> new SpecialtyResponseDto(1, "Ingeniería en Sistemas"));
+    @DisplayName("get: misma clave pero distinto tipo no comparte entrada")
+    void mismaClaveDistintoTipoNoComparteEntrada() {
+        IngestCache cache = new IngestCache();
 
-        AtomicInteger buildingCalls = new AtomicInteger();
-        cache.get(BuildingResponseDto.class, "1", () -> {
-            buildingCalls.incrementAndGet();
-            return new BuildingResponseDto(1, "Edificio Central", 5, true);
+        String asString = cache.get(String.class, 1, () -> "string");
+        Integer asInt = cache.get(Integer.class, 1, () -> 99);
+
+        assertThat(asString).isEqualTo("string");
+        assertThat(asInt).isEqualTo(99);
+    }
+
+    @Test
+    @DisplayName("get: distinta clave, mismo tipo, invoca el loader por separado")
+    void distintaClaveInvocaPorSeparado() {
+        IngestCache cache = new IngestCache();
+        AtomicInteger calls = new AtomicInteger();
+
+        cache.get(String.class, "k1", () -> {
+            calls.incrementAndGet();
+            return "a";
+        });
+        cache.get(String.class, "k2", () -> {
+            calls.incrementAndGet();
+            return "b";
         });
 
-        assertThat(buildingCalls.get()).isEqualTo(1);
+        assertThat(calls.get()).isEqualTo(2);
     }
 }

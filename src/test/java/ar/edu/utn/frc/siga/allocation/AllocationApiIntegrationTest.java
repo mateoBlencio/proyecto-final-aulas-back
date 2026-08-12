@@ -1,9 +1,8 @@
 package ar.edu.utn.frc.siga.allocation;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
-import ar.edu.utn.frc.siga.allocation.dto.request.AllocateFromDateRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.request.BatchReallocateRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.AllocationBatchRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.AllocationItemRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
@@ -68,21 +67,31 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
         return occurrences.getFirst();
     }
 
+    private static AllocationBatchRequestDto byOccurrence(Long occurrenceId, Integer classroomId) {
+        return new AllocationBatchRequestDto(
+                List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, classroomId)), null);
+    }
+
+    private static AllocationBatchRequestDto byEvent(Long eventId, Integer classroomId, String observation) {
+        return new AllocationBatchRequestDto(
+                List.of(new AllocationItemRequestDto(null, eventId, classroomId)), observation);
+    }
+
     private MvcResult assignOk(Long occurrenceId, Integer classroomId) throws Exception {
-        return mockMvc.perform(post("/v1/allocations/occurrences/{id}", occurrenceId)
+        return mockMvc.perform(post("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AllocateOccurrenceRequestDto(classroomId, null))))
+                        .content(objectMapper.writeValueAsString(byOccurrence(occurrenceId, classroomId))))
                 .andExpect(status().isCreated())
                 .andReturn();
     }
 
     private long allocationIdFrom(MvcResult result) throws Exception {
-        return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get(0).get("id").asLong();
     }
 
     @Test
-    @DisplayName("POST /v1/allocations/occurrences/{id} crea la asignación MANUAL y la ocurrencia pasa a ASSIGNED")
-    void assignManually_persistsManualAllocationAndMarksOccurrenceAssigned() throws Exception {
+    @DisplayName("POST /v1/allocations crea la asignación MANUAL; el estado de la ocurrencia no cambia (es derivado, ortogonal al enum)")
+    void assignManually_persistsManualAllocationWithoutChangingOccurrenceStatus() throws Exception {
         var sc = testData.materiaYComision();
         Classroom aula = testData.aula(testData.edificio());
         Occurrence occurrence = seedOccurrence(sc, LocalDate.now().plusDays(7));
@@ -93,7 +102,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(saved.getClassroomId()).isEqualTo(aula.getId());
         assertThat(saved.getSource()).isEqualTo(AllocationSource.MANUAL);
         assertThat(occurrenceRepository.findById(occurrence.getId()).orElseThrow().getStatus())
-                .isEqualTo(OccurrenceStatus.ASSIGNED);
+                .isEqualTo(OccurrenceStatus.NEEDS_ROOM);
     }
 
     @Test
@@ -105,9 +114,9 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
 
         assignOk(occurrence.getId(), aula.getId());
 
-        mockMvc.perform(post("/v1/allocations/occurrences/{id}", occurrence.getId())
+        mockMvc.perform(post("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AllocateOccurrenceRequestDto(aula.getId(), null))))
+                        .content(objectMapper.writeValueAsString(byOccurrence(occurrence.getId(), aula.getId()))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.title").value("Allocation error"));
     }
@@ -123,11 +132,11 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
                 .subjectId(999_999L).commissionId(999_999L)
                 .build());
         Occurrence past = occurrenceRepository.save(Occurrence.builder()
-                .event(event).date(yesterday).status(OccurrenceStatus.SCHEDULED).build());
+                .event(event).date(yesterday).status(OccurrenceStatus.NEEDS_ROOM).build());
 
-        mockMvc.perform(post("/v1/allocations/occurrences/{id}", past.getId())
+        mockMvc.perform(post("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AllocateOccurrenceRequestDto(aula.getId(), null))))
+                        .content(objectMapper.writeValueAsString(byOccurrence(past.getId(), aula.getId()))))
                 .andExpect(status().isConflict());
     }
 
@@ -142,16 +151,16 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
 
         assignOk(first.getId(), aula.getId());
 
-        mockMvc.perform(post("/v1/allocations/occurrences/{id}", second.getId())
+        mockMvc.perform(post("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AllocateOccurrenceRequestDto(aula.getId(), null))))
+                        .content(objectMapper.writeValueAsString(byOccurrence(second.getId(), aula.getId()))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.title").value("Reallocation conflict"))
                 .andExpect(jsonPath("$.conflicts").isArray());
     }
 
     @Test
-    @DisplayName("PUT /v1/allocations/{id} reasigna el aula y persiste el cambio")
+    @DisplayName("PUT /v1/allocations reasigna el aula de una ocurrencia y persiste el cambio")
     void reallocate_changesClassroomInDatabase() throws Exception {
         var sc = testData.materiaYComision();
         var edificio = testData.edificio();
@@ -161,9 +170,9 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
 
         long allocationId = allocationIdFrom(assignOk(occurrence.getId(), aulaOriginal.getId()));
 
-        mockMvc.perform(put("/v1/allocations/{id}", allocationId)
+        mockMvc.perform(put("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AllocateOccurrenceRequestDto(aulaNueva.getId(), null))))
+                        .content(objectMapper.writeValueAsString(byOccurrence(occurrence.getId(), aulaNueva.getId()))))
                 .andExpect(status().isOk());
 
         assertThat(allocationRepository.findById(allocationId).orElseThrow().getClassroomId())
@@ -171,7 +180,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("PUT /v1/allocations/batch con un move en conflicto responde 409 y NO aplica ningún move")
+    @DisplayName("PUT /v1/allocations con un item del lote en conflicto responde 409 y NO aplica ningún cambio")
     void batchReallocate_oneConflictingMove_appliesNothing() throws Exception {
         var sc = testData.materiaYComision();
         var edificio = testData.edificio();
@@ -181,15 +190,18 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
         Classroom aulaLibre = testData.aula(edificio);
         LocalDate date = LocalDate.now().plusDays(11);
 
-        long alloc1 = allocationIdFrom(assignOk(seedOccurrence(sc, date).getId(), aulaA.getId()));
-        long alloc2 = allocationIdFrom(assignOk(seedOccurrence(sc, date).getId(), aulaB.getId()));
-        assignOk(seedOccurrence(sc, date).getId(), aulaC.getId());
+        Occurrence occ1 = seedOccurrence(sc, date);
+        Occurrence occ2 = seedOccurrence(sc, date);
+        Occurrence occ3 = seedOccurrence(sc, date);
+        long alloc1 = allocationIdFrom(assignOk(occ1.getId(), aulaA.getId()));
+        long alloc2 = allocationIdFrom(assignOk(occ2.getId(), aulaB.getId()));
+        assignOk(occ3.getId(), aulaC.getId());
 
-        var dto = new BatchReallocateRequestDto(List.of(
-                new BatchReallocateRequestDto.MoveDto(alloc1, aulaLibre.getId()),
-                new BatchReallocateRequestDto.MoveDto(alloc2, aulaC.getId())));
+        var dto = new AllocationBatchRequestDto(List.of(
+                new AllocationItemRequestDto(List.of(occ1.getId()), null, aulaLibre.getId()),
+                new AllocationItemRequestDto(List.of(occ2.getId()), null, aulaC.getId())), null);
 
-        mockMvc.perform(put("/v1/allocations/batch")
+        mockMvc.perform(put("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(dto)))
                 .andExpect(status().isConflict());
@@ -199,8 +211,8 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /v1/allocations/from-date con solape responde 409 con el detalle del conflicto")
-    void allocateFromDate_withOverlap_returns409WithDetail() throws Exception {
+    @DisplayName("PUT /v1/allocations por evento con solape responde 409 con el detalle del conflicto")
+    void reallocateByEvent_withOverlap_returns409WithDetail() throws Exception {
         var sc = testData.materiaYComision();
         Classroom aula = testData.aula(testData.edificio());
         LocalDate date = LocalDate.now().plusDays(12);
@@ -210,10 +222,9 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
                 30, START, DURATION, date.getDayOfWeek(), date, date.plusWeeks(2), sc.subjectId(), sc.commissionId());
         Long eventId = academicEventService.createRecurringEvent(dto).id();
 
-        mockMvc.perform(post("/v1/allocations/from-date")
+        mockMvc.perform(put("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new AllocateFromDateRequestDto(eventId, date, aula.getId(), null))))
+                        .content(objectMapper.writeValueAsString(byEvent(eventId, aula.getId(), null))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.conflicts").isArray());
 
@@ -223,8 +234,8 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /v1/allocations/from-date sin solape asigna todas las ocurrencias futuras")
-    void allocateFromDate_withoutOverlap_assignsFutureOccurrences() throws Exception {
+    @DisplayName("PUT /v1/allocations por evento sin solape asigna todas las ocurrencias futuras")
+    void reallocateByEvent_withoutOverlap_assignsFutureOccurrences() throws Exception {
         var sc = testData.materiaYComision();
         Classroom aula = testData.aula(testData.edificio());
         LocalDate date = LocalDate.now().plusDays(13);
@@ -233,15 +244,14 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
                 30, START, DURATION, date.getDayOfWeek(), date, date.plusWeeks(2), sc.subjectId(), sc.commissionId());
         Long eventId = academicEventService.createRecurringEvent(dto).id();
 
-        mockMvc.perform(post("/v1/allocations/from-date")
+        mockMvc.perform(put("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new AllocateFromDateRequestDto(eventId, date, aula.getId(), null))))
+                        .content(objectMapper.writeValueAsString(byEvent(eventId, aula.getId(), null))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(3));
 
         List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId);
-        assertThat(occurrences).allSatisfy(o -> assertThat(o.getStatus()).isEqualTo(OccurrenceStatus.ASSIGNED));
+        assertThat(occurrences).allSatisfy(o -> assertThat(o.getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM));
         assertThat(allocationRepository.findByOccurrenceIdIn(
                 occurrences.stream().map(Occurrence::getId).toList()))
                 .hasSize(3)
@@ -252,8 +262,8 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("PUT /v1/allocations/events/{eventId}/classroom reasigna las ocurrencias futuras y deja intactas las pasadas")
-    void reallocateEvent_happyPath_reallocatesFutureOnly() throws Exception {
+    @DisplayName("PUT /v1/allocations por evento reasigna solo las ocurrencias futuras y deja intactas las pasadas")
+    void reallocateByEvent_happyPath_reallocatesFutureOnly() throws Exception {
         var sc = testData.materiaYComision();
         var edificio = testData.edificio();
         Classroom aulaOriginal = testData.aula(edificio);
@@ -267,7 +277,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
         Occurrence past = occurrenceRepository.save(Occurrence.builder()
                 .event(eventRepository.findById(eventId).orElseThrow())
                 .date(LocalDate.now().minusDays(7))
-                .status(OccurrenceStatus.ASSIGNED)
+                .status(OccurrenceStatus.NEEDS_ROOM)
                 .build());
         long pastAllocationId = allocationRepository.save(Allocation.builder()
                 .occurrenceId(past.getId())
@@ -276,9 +286,9 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
                 .createdAt(java.time.LocalDateTime.now())
                 .build()).getId();
 
-        mockMvc.perform(put("/v1/allocations/events/{eventId}/classroom", eventId)
+        mockMvc.perform(put("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AllocateOccurrenceRequestDto(aulaNueva.getId(), "reasignación de evento"))))
+                        .content(objectMapper.writeValueAsString(byEvent(eventId, aulaNueva.getId(), "reasignación de evento"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(3));
 
@@ -292,8 +302,8 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("PUT /v1/allocations/events/{eventId}/classroom sobre un evento ya finalizado responde 409")
-    void reallocateEvent_finishedEvent_returns409() throws Exception {
+    @DisplayName("PUT /v1/allocations por evento sin ocurrencias futuras es un no-op (no toca el pasado, KB: no modificar el pasado)")
+    void reallocateByEvent_onlyPastOccurrences_isNoOp() throws Exception {
         Classroom aula = testData.aula(testData.edificio());
         LocalDate yesterday = LocalDate.now().minusDays(1);
         RecurringEvent event = eventRepository.save(RecurringEvent.builder()
@@ -301,14 +311,16 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
                 .dayOfWeek(yesterday.getDayOfWeek()).startDate(yesterday).endDate(yesterday)
                 .subjectId(999_999L).commissionId(999_999L)
                 .build());
-        occurrenceRepository.save(Occurrence.builder()
-                .event(event).date(yesterday).status(OccurrenceStatus.SCHEDULED).build());
+        Occurrence past = occurrenceRepository.save(Occurrence.builder()
+                .event(event).date(yesterday).status(OccurrenceStatus.NEEDS_ROOM).build());
 
-        mockMvc.perform(put("/v1/allocations/events/{eventId}/classroom", event.getId())
+        mockMvc.perform(put("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AllocateOccurrenceRequestDto(aula.getId(), null))))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.title").value("Allocation error"));
+                        .content(objectMapper.writeValueAsString(byEvent(event.getId(), aula.getId(), null))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        assertThat(allocationRepository.findByOccurrenceIdIn(List.of(past.getId()))).isEmpty();
     }
 
     @Test
@@ -330,7 +342,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
                 "SELECT COUNT(*) FROM asignacion_aula_aud WHERE id_asignacion = ?", Integer.class, allocationId);
 
         assertThat(eventRevs).isGreaterThanOrEqualTo(1);          // ADD al crear
-        assertThat(occurrenceRevs).isGreaterThanOrEqualTo(2);     // ADD al crear + MOD al pasar a ASSIGNED
+        assertThat(occurrenceRevs).isGreaterThanOrEqualTo(1);     // ADD al crear (asignar ya no muta la ocurrencia)
         assertThat(allocationRevs).isGreaterThanOrEqualTo(1);     // ADD al asignar
 
         String usuario = jdbcTemplate.queryForObject(

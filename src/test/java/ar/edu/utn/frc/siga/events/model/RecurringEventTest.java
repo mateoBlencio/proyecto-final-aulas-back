@@ -88,7 +88,7 @@ class RecurringEventTest {
         List<Occurrence> occurrences = event.toOccurrences();
 
         assertThat(occurrences).allSatisfy(o -> {
-            assertThat(o.getStatus()).isEqualTo(OccurrenceStatus.SCHEDULED);
+            assertThat(o.getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM);
             assertThat(o.getEvent()).isSameAs(event);
         });
     }

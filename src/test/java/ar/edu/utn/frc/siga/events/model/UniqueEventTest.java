@@ -26,7 +26,7 @@ class UniqueEventTest {
         assertThat(occurrences).hasSize(1);
         Occurrence occurrence = occurrences.getFirst();
         assertThat(occurrence.getDate()).isEqualTo(date);
-        assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.SCHEDULED);
+        assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM);
         assertThat(occurrence.getEvent()).isSameAs(event);
     }
 

@@ -92,8 +92,6 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
         allocationRepository.save(Allocation.builder()
                 .occurrenceId(occurrence.getId()).classroomId(classroomId).source(AllocationSource.MANUAL)
                 .createdAt(LocalDateTime.now()).build());
-        occurrence.setStatus(OccurrenceStatus.ASSIGNED);
-        occurrenceRepository.save(occurrence);
     }
 
     private void blockAllAvailableRooms(LocalDate date, LocalTime start, int durationMinutes) {
@@ -102,7 +100,7 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
                     .enrolled(1).startTime(start).duration(Duration.ofMinutes(durationMinutes))
                     .date(date).description("blocker").kind(UniqueEventKind.OTRO).build());
             Occurrence occ = occurrenceRepository.save(Occurrence.builder()
-                    .event(blocker).date(date).status(OccurrenceStatus.ASSIGNED).build());
+                    .event(blocker).date(date).status(OccurrenceStatus.NEEDS_ROOM).build());
             allocationRepository.save(Allocation.builder()
                     .occurrenceId(occ.getId()).classroomId(room.id()).source(AllocationSource.MANUAL)
                     .createdAt(LocalDateTime.now()).build());
@@ -231,7 +229,7 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
                 .dayOfWeek(pastDate.getDayOfWeek()).startDate(pastDate).endDate(pastDate)
                 .subjectId(999_999L).commissionId(999_999L).build());
         occurrenceRepository.save(Occurrence.builder()
-                .event(pastEvent).date(pastDate).status(OccurrenceStatus.SCHEDULED).build());
+                .event(pastEvent).date(pastDate).status(OccurrenceStatus.NEEDS_ROOM).build());
 
         mockMvc.perform(post("/v1/previews")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -284,7 +282,7 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
         assertThat(persisted.getClassroomId()).isEqualTo(proposedRoom);
         assertThat(persisted.getSource()).isEqualTo(AllocationSource.AUTOMATIC);
         assertThat(occurrenceRepository.findById(occurrence.getId()).orElseThrow().getStatus())
-                .isEqualTo(OccurrenceStatus.ASSIGNED);
+                .isEqualTo(OccurrenceStatus.NEEDS_ROOM);
         assertThat(allocationRepository.findByOccurrenceIdIn(List.of(occurrence.getId()))).hasSize(1);
 
         mockMvc.perform(post("/v1/previews/{id}/confirm", preview.previewId())
@@ -320,6 +318,6 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(allocationRepository.findByOccurrenceId(occurrence.getId())).isEmpty();
         assertThat(occurrenceRepository.findById(occurrence.getId()).orElseThrow().getStatus())
-                .isEqualTo(OccurrenceStatus.SCHEDULED);
+                .isEqualTo(OccurrenceStatus.NEEDS_ROOM);
     }
 }

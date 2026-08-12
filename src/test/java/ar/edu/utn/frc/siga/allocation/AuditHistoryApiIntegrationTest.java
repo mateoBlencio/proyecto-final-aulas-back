@@ -1,7 +1,8 @@
 package ar.edu.utn.frc.siga.allocation;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
-import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.AllocationBatchRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.AllocationItemRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
@@ -80,30 +81,39 @@ class AuditHistoryApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     private long assignOk(Long occurrenceId, Integer classroomId) throws Exception {
-        MvcResult result = mockMvc.perform(post("/v1/allocations/occurrences/{id}", occurrenceId)
+        var dto = new AllocationBatchRequestDto(
+                List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, classroomId)), null);
+        MvcResult result = mockMvc.perform(post("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AllocateOccurrenceRequestDto(classroomId, null))))
+                        .content(objectMapper.writeValueAsString(dto)))
                 .andExpect(status().isCreated())
                 .andReturn();
-        return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get(0).get("id").asLong();
+    }
+
+    private void reallocateOk(Long occurrenceId, Integer classroomId) throws Exception {
+        var dto = new AllocationBatchRequestDto(
+                List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, classroomId)), null);
+        mockMvc.perform(put("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isOk());
     }
 
     @Test
-    @DisplayName("GET /v1/allocations/occurrences/{id}/allocation-history refleja asignación, reasignación y baja")
+    @DisplayName("GET /v1/allocations/history?eventId= refleja asignación, reasignación y baja")
     void allocationHistory_reflectsAssignReallocateAndDelete() throws Exception {
         Classroom aulaA = testData.aula(testData.edificio());
         Classroom aulaB = testData.aula(testData.edificio());
         Occurrence occurrence = seedOccurrence(LocalDate.now().plusDays(21));
+        Long eventId = occurrence.getEvent().getId();
 
         long allocationId = assignOk(occurrence.getId(), aulaA.getId());
-        mockMvc.perform(put("/v1/allocations/{id}", allocationId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AllocateOccurrenceRequestDto(aulaB.getId(), null))))
-                .andExpect(status().isOk());
+        reallocateOk(occurrence.getId(), aulaB.getId());
         // Baja directa por repositorio (no hay endpoint de delete): commit real, Envers registra DEL.
         allocationRepository.deleteById(allocationId);
 
-        mockMvc.perform(get("/v1/allocations/occurrences/{id}/allocation-history", occurrence.getId()))
+        mockMvc.perform(get("/v1/allocations/history").param("eventId", eventId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(3)))
                 .andExpect(jsonPath("$[0].kind").value("CREATED"))
@@ -123,15 +133,12 @@ class AuditHistoryApiIntegrationTest extends AbstractIntegrationTest {
         Classroom aulaA = testData.aula(testData.edificio());
         Classroom aulaB = testData.aula(testData.edificio());
         Occurrence occurrence = seedOccurrence(LocalDate.now().plusDays(22));
+        Long eventId = occurrence.getEvent().getId();
 
-        long allocationId = assignOk(occurrence.getId(), aulaA.getId());
-        mockMvc.perform(put("/v1/allocations/{id}", allocationId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AllocateOccurrenceRequestDto(aulaB.getId(), null))))
-                .andExpect(status().isOk());
+        assignOk(occurrence.getId(), aulaA.getId());
+        reallocateOk(occurrence.getId(), aulaB.getId());
 
-        MvcResult result = mockMvc.perform(
-                        get("/v1/allocations/occurrences/{id}/allocation-history", occurrence.getId()))
+        MvcResult result = mockMvc.perform(get("/v1/allocations/history").param("eventId", eventId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].date").exists())
                 .andReturn();
@@ -142,20 +149,21 @@ class AuditHistoryApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /v1/allocations/occurrences/{id}/history muestra el cambio de estado SCHEDULED → ASSIGNED")
+    @DisplayName("GET /v1/events/occurrences/{occurrenceId}/history muestra el cambio de estado NEEDS_ROOM → ROOM_RELEASED")
     void occurrenceHistory_showsStatusTransition() throws Exception {
-        Classroom aula = testData.aula(testData.edificio());
         Occurrence occurrence = seedOccurrence(LocalDate.now().plusDays(23));
-        assignOk(occurrence.getId(), aula.getId());
 
-        mockMvc.perform(get("/v1/allocations/occurrences/{id}/history", occurrence.getId()))
+        mockMvc.perform(post("/v1/events/occurrences/{occurrenceId}/release", occurrence.getId()))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/v1/events/occurrences/{occurrenceId}/history", occurrence.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].kind").value("CREATED"))
-                .andExpect(jsonPath("$[0].snapshot.status").value("SCHEDULED"))
+                .andExpect(jsonPath("$[0].snapshot.status").value("NEEDS_ROOM"))
                 .andExpect(jsonPath("$[0].snapshot.eventId").value(occurrence.getEvent().getId()))
                 .andExpect(jsonPath("$[1].kind").value("MODIFIED"))
-                .andExpect(jsonPath("$[1].snapshot.status").value("ASSIGNED"))
+                .andExpect(jsonPath("$[1].snapshot.status").value("ROOM_RELEASED"))
                 .andExpect(jsonPath("$[1].user").value(USER));
     }
 
@@ -178,11 +186,12 @@ class AuditHistoryApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("Historial de una ocurrencia existente sin asignaciones devuelve lista vacía")
-    void allocationHistory_occurrenceWithoutAllocations_returnsEmptyList() throws Exception {
+    @DisplayName("Historial de un evento existente sin asignaciones devuelve lista vacía")
+    void allocationHistory_eventWithoutAllocations_returnsEmptyList() throws Exception {
         Occurrence occurrence = seedOccurrence(LocalDate.now().plusDays(25));
+        Long eventId = occurrence.getEvent().getId();
 
-        mockMvc.perform(get("/v1/allocations/occurrences/{id}/allocation-history", occurrence.getId()))
+        mockMvc.perform(get("/v1/allocations/history").param("eventId", eventId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(0)));
     }
@@ -192,9 +201,9 @@ class AuditHistoryApiIntegrationTest extends AbstractIntegrationTest {
     void history_nonExistentIds_return404() throws Exception {
         mockMvc.perform(get("/v1/events/{id}/history", 999_999_999L))
                 .andExpect(status().isNotFound());
-        mockMvc.perform(get("/v1/allocations/occurrences/{id}/history", 999_999_999L))
+        mockMvc.perform(get("/v1/events/occurrences/{occurrenceId}/history", 999_999_999L))
                 .andExpect(status().isNotFound());
-        mockMvc.perform(get("/v1/allocations/occurrences/{id}/allocation-history", 999_999_999L))
+        mockMvc.perform(get("/v1/allocations/history").param("eventId", "999999999"))
                 .andExpect(status().isNotFound());
     }
 }

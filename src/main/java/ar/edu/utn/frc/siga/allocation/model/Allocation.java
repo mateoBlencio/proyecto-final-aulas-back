@@ -33,7 +33,7 @@ public class Allocation {
     @EqualsAndHashCode.Include
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "asignacion_aula_seq")
-    @SequenceGenerator(name = "asignacion_aula_seq", sequenceName = "asignacion_aula_id_asignacion_seq", allocationSize = 50)
+    @SequenceGenerator(name = "asignacion_aula_seq", sequenceName = "asignacion_aula_id_asignacion_seq", allocationSize = 1)
     @Column(name = "id_asignacion")
     private Long id;
 

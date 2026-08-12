@@ -7,7 +7,9 @@ import org.springframework.modulith.NamedInterface;
 @NamedInterface("api")
 public sealed interface AllocationTarget {
 
+    @NamedInterface("api")
     record Occurrences(List<Long> occurrenceIds) implements AllocationTarget {}
 
+    @NamedInterface("api")
     record Event(Long eventId) implements AllocationTarget {}
 }

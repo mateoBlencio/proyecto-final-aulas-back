@@ -21,7 +21,9 @@ import ar.edu.utn.frc.siga.academic.service.SpecialtyService;
 import ar.edu.utn.frc.siga.academic.service.StudyPlanService;
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
-import ar.edu.utn.frc.siga.allocation.dto.request.AllocateFromDateRequestDto;
+import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
+import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
+import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.model.EventType;
@@ -123,12 +125,12 @@ class IngestServiceImplTest {
         assertThat(eventDto.startDate()).isEqualTo(LocalDate.of(2026, 3, 1));
         assertThat(eventDto.endDate()).isEqualTo(LocalDate.of(2026, 11, 30));
 
-        ArgumentCaptor<List<AllocateFromDateRequestDto>> allocationCaptor = ArgumentCaptor.forClass(List.class);
-        verify(allocationService).importAllocationsBatch(allocationCaptor.capture());
-        AllocateFromDateRequestDto allocationDto = allocationCaptor.getValue().getFirst();
-        assertThat(allocationDto.recurringEventId()).isEqualTo(1L);
-        assertThat(allocationDto.classroomId()).isEqualTo(5);
-        assertThat(allocationDto.observation()).isEqualTo("Importado de Excel");
+        ArgumentCaptor<AllocationCommand> allocationCaptor = ArgumentCaptor.forClass(AllocationCommand.class);
+        verify(allocationService).reallocate(allocationCaptor.capture());
+        AllocationItem item = allocationCaptor.getValue().items().getFirst();
+        assertThat(item.target()).isEqualTo(new AllocationTarget.Event(1L));
+        assertThat(item.classroomId()).isEqualTo(5);
+        assertThat(allocationCaptor.getValue().observation()).isEqualTo("Importado de Excel");
     }
 
     @Test
@@ -213,7 +215,7 @@ class IngestServiceImplTest {
         assertThat(result.processedRows()).isZero();
         assertThat(result.skippedRows()).hasSize(1);
         assertThat(result.skippedRows().getFirst().message()).contains("Subject not found with id: 100");
-        verify(allocationService).importAllocationsBatch(List.of());
+        verify(allocationService, never()).reallocate(any());
     }
 
     @Test

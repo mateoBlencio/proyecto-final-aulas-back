@@ -70,6 +70,6 @@ class OccurrenceTest {
 
     private Occurrence occurrence(LocalDate date, LocalTime startTime, Duration duration) {
         UniqueEvent event = EventTestData.uniqueEvent(1L, date, startTime, duration);
-        return EventTestData.occurrence(10L, event, date, OccurrenceStatus.SCHEDULED);
+        return EventTestData.occurrence(10L, event, date, OccurrenceStatus.NEEDS_ROOM);
     }
 }

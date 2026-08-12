@@ -74,7 +74,7 @@ class UserServiceImplTest {
     @Test
     @DisplayName("create: email institucional nuevo → hashea password, guarda con el rol y devuelve DTO")
     void createHappyPath() {
-        when(authDomainProperties.getALLOWED_DOMAIN()).thenReturn("frc.utn.edu.ar");
+        when(authDomainProperties.isAllowedEmail(any())).thenReturn(true);
         when(userRepository.existsByEmail("nuevo@frc.utn.edu.ar")).thenReturn(false);
         when(passwordEncoder.encode("supersegura")).thenReturn("HASH");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -95,7 +95,7 @@ class UserServiceImplTest {
     @Test
     @DisplayName("create: email ya existente → UserDomainException y no guarda")
     void createDuplicateEmailThrows() {
-        when(authDomainProperties.getALLOWED_DOMAIN()).thenReturn("frc.utn.edu.ar");
+        when(authDomainProperties.isAllowedEmail(any())).thenReturn(true);
         when(userRepository.existsByEmail("dup@frc.utn.edu.ar")).thenReturn(true);
 
         assertThatThrownBy(() -> service.create(createDto("dup@frc.utn.edu.ar")))
@@ -107,8 +107,6 @@ class UserServiceImplTest {
     @Test
     @DisplayName("create: dominio no institucional → UserDomainException y no consulta existencia")
     void createNonInstitutionalDomainThrows() {
-        when(authDomainProperties.getALLOWED_DOMAIN()).thenReturn("frc.utn.edu.ar");
-
         assertThatThrownBy(() -> service.create(createDto("ajeno@gmail.com")))
                 .isInstanceOf(UserDomainException.class);
 

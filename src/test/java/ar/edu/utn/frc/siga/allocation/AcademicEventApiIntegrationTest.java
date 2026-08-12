@@ -50,7 +50,7 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
     private ObjectMapper objectMapper;
 
     @Test
-    @DisplayName("POST /v1/events/recurring crea el evento y genera ocurrencias SCHEDULED con las fechas esperadas")
+    @DisplayName("POST /v1/events/recurring crea el evento y genera ocurrencias NEEDS_ROOM con las fechas esperadas")
     void createRecurring_persistsEventAndOccurrencesWithExpectedDates() throws Exception {
         IntegrationTestData.SubjectAndCommission sc = testData.materiaYComision();
         LocalDate startDate = LocalDate.now().plusDays(1);
@@ -77,7 +77,7 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
         List<LocalDate> expectedDates = List.of(
                 startDate, startDate.plusWeeks(1), startDate.plusWeeks(2), startDate.plusWeeks(3));
         assertThat(occurrences).extracting(Occurrence::getDate).containsExactlyInAnyOrderElementsOf(expectedDates);
-        assertThat(occurrences).allSatisfy(o -> assertThat(o.getStatus()).isEqualTo(OccurrenceStatus.SCHEDULED));
+        assertThat(occurrences).allSatisfy(o -> assertThat(o.getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM));
     }
 
     @Test
@@ -98,7 +98,7 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /v1/events/unique crea el evento (bare, sin aula) y exactamente 1 ocurrencia SCHEDULED")
+    @DisplayName("POST /v1/events/unique crea el evento (bare, sin aula) y exactamente 1 ocurrencia NEEDS_ROOM")
     void createUnique_persistsSingleOccurrence() throws Exception {
         LocalDate date = LocalDate.now().plusDays(5);
         IntegrationTestData.SubjectAndCommission sc = testData.materiaYComision();
@@ -119,7 +119,7 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
         List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId);
         assertThat(occurrences).hasSize(1);
         assertThat(occurrences.getFirst().getDate()).isEqualTo(date);
-        assertThat(occurrences.getFirst().getStatus()).isEqualTo(OccurrenceStatus.SCHEDULED);
+        assertThat(occurrences.getFirst().getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM);
     }
 
     @Test

@@ -120,7 +120,7 @@ class ClashesTest {
     @DisplayName("within: extra permite excluir (ej. mismo evento nunca choca consigo mismo)")
     void withinExtraExcluye() {
         Slot a = new Slot("a", 5, DAY, LocalTime.of(8, 0), LocalTime.of(9, 30));
-        Slot b = new Slot("b", 5, DAY, LocalTime.of(9, 0), LocalTime.of(10, 0));
+        Slot b = new Slot("a", 5, DAY, LocalTime.of(9, 0), LocalTime.of(10, 0));
 
         List<Hit> hits = Clashes.within(List.of(a, b), ClashesTest::key,
                 (x, y) -> !x.id().equals(y.id()), (x, y, k) -> new Hit(x.id(), y.id()));

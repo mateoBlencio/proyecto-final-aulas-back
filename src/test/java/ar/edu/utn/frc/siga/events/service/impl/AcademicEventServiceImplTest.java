@@ -28,7 +28,6 @@ import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.events.repository.RecurringEventRepository;
 import ar.edu.utn.frc.siga.events.repository.UniqueEventRepository;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
-import ar.edu.utn.frc.siga.common.exception.InvalidDateRangeException;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -51,7 +50,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -122,7 +120,7 @@ class AcademicEventServiceImplTest {
         verify(occurrenceRepository).saveAll(occurrencesCaptor.capture());
         List<Occurrence> occurrences = occurrencesCaptor.getValue();
         assertThat(occurrences).hasSize(3);
-        assertThat(occurrences).allSatisfy(o -> assertThat(o.getStatus()).isEqualTo(OccurrenceStatus.SCHEDULED));
+        assertThat(occurrences).allSatisfy(o -> assertThat(o.getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM));
     }
 
 
@@ -197,7 +195,7 @@ class AcademicEventServiceImplTest {
         verify(occurrenceRepository).saveAll(occurrencesCaptor.capture());
         Occurrence occurrence = occurrencesCaptor.getValue().getFirst();
         assertThat(occurrencesCaptor.getValue()).hasSize(1);
-        assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.SCHEDULED);
+        assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM);
     }
 
     @Test
@@ -315,7 +313,7 @@ class AcademicEventServiceImplTest {
     @DisplayName("updateUniqueEvent: actualiza los campos del evento y la fecha de su occurrence")
     void updateUniqueEventFeliz() {
         UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
-        Occurrence occurrence = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.SCHEDULED);
+        Occurrence occurrence = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.NEEDS_ROOM);
         when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
         when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
         when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyUniqueResponseDto(3L));
@@ -334,119 +332,13 @@ class AcademicEventServiceImplTest {
     @DisplayName("updateUniqueEvent: occurrence ya pasada → propaga la excepción del validator, sin escribir")
     void updateUniqueEventOccurrencePasada() {
         UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2020, 1, 1), LocalTime.of(10, 0), Duration.ofMinutes(60));
-        Occurrence occurrence = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.ASSIGNED);
+        Occurrence occurrence = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.NEEDS_ROOM);
         when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
         when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
         doThrow(new OccurrenceAlreadyPastException("ya ocurrió")).when(eventScheduleValidator).validateNotPast(occurrence);
 
         assertThatThrownBy(() -> service.updateUniqueEvent(3L, updateDto()))
                 .isInstanceOf(OccurrenceAlreadyPastException.class);
-    }
-
-
-    @Test
-    @DisplayName("cancelUniqueEvent: pasa la única occurrence a CANCELLED")
-    void cancelUniqueEventFeliz() {
-        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
-        Occurrence occurrence = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.ASSIGNED);
-        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
-        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
-
-        service.cancelUniqueEvent(3L);
-
-        assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.CANCELLED);
-    }
-
-    @Test
-    @DisplayName("cancelUniqueEvent: evento inexistente → 404")
-    void cancelUniqueEventInexistente() {
-        when(uniqueEventRepository.findById(99L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.cancelUniqueEvent(99L))
-                .isInstanceOf(ResourceNotFoundException.class);
-    }
-
-    @Test
-    @DisplayName("cancelUniqueEvent: occurrence ya pasada → propaga la excepción del validator")
-    void cancelUniqueEventOccurrencePasada() {
-        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2020, 1, 1), LocalTime.of(10, 0), Duration.ofMinutes(60));
-        Occurrence occurrence = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.ASSIGNED);
-        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
-        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
-        doThrow(new OccurrenceAlreadyPastException("ya ocurrió")).when(eventScheduleValidator).validateNotPast(occurrence);
-
-        assertThatThrownBy(() -> service.cancelUniqueEvent(3L))
-                .isInstanceOf(OccurrenceAlreadyPastException.class);
-        assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.ASSIGNED);
-    }
-
-
-    @Test
-    @DisplayName("findUnassignedEvents: 'to' anterior a 'from' → InvalidDateRangeException")
-    void findUnassignedRangoInvalido() {
-        LocalDate from = LocalDate.of(2026, 3, 10);
-        LocalDate to = from.minusDays(1);
-
-        assertThatThrownBy(() -> service.findUnassignedEvents(from, to, false))
-                .isInstanceOf(InvalidDateRangeException.class);
-    }
-
-    @Test
-    @DisplayName("findUnassignedEvents: 'from' null → usa hoy como default")
-    void findUnassignedFromNullUsaHoy() {
-        when(occurrenceRepository.findByStatusAndDateGreaterThanEqualOrderByEvent_IdAscDateAsc(
-                eq(OccurrenceStatus.SCHEDULED), eq(LocalDate.now())))
-                .thenReturn(List.of());
-        when(composer.compose(anyCollection())).thenReturn(List.of());
-
-        service.findUnassignedEvents(null, null, false);
-
-        verify(occurrenceRepository).findByStatusAndDateGreaterThanEqualOrderByEvent_IdAscDateAsc(
-                OccurrenceStatus.SCHEDULED, LocalDate.now());
-    }
-
-    @Test
-    @DisplayName("findUnassignedEvents: varias ocurrencias del mismo evento se dedupean preservando el orden de aparición")
-    void findUnassignedDedupePreservandoOrden() {
-        LocalDate from = LocalDate.of(2026, 3, 1);
-        LocalDate to = LocalDate.of(2026, 3, 31);
-        RecurringEvent eventA = EventTestData.recurringEvent(1L, DayOfWeek.MONDAY, from, to);
-        RecurringEvent eventB = EventTestData.recurringEvent(2L, DayOfWeek.TUESDAY, from, to);
-        Occurrence occA1 = EventTestData.occurrence(10L, eventA, from, OccurrenceStatus.SCHEDULED);
-        Occurrence occB1 = EventTestData.occurrence(11L, eventB, from.plusDays(1), OccurrenceStatus.SCHEDULED);
-        Occurrence occA2 = EventTestData.occurrence(12L, eventA, from.plusDays(7), OccurrenceStatus.SCHEDULED);
-
-        when(occurrenceRepository.findByStatusAndDateBetweenOrderByEvent_IdAscDateAsc(OccurrenceStatus.SCHEDULED, from, to))
-                .thenReturn(List.of(occA1, occB1, occA2));
-        when(composer.compose(anyCollection())).thenAnswer(invocation -> {
-            Collection<AcademicEvent> events = invocation.getArgument(0);
-            return events.stream().map(e -> dummyRecurringResponseDto(e.getId())).toList();
-        });
-
-        List<AcademicEventResponseDto> result = service.findUnassignedEvents(from, to, true);
-
-        assertThat(result).hasSize(2);
-        assertThat(result.get(0).id()).isEqualTo(1L);
-        assertThat(result.get(1).id()).isEqualTo(2L);
-    }
-
-    @Test
-    @DisplayName("findUnassignedEventIds: mismo criterio que findUnassignedEvents pero sin componer DTOs")
-    void findUnassignedEventIdsNoComponeDto() {
-        LocalDate from = LocalDate.of(2026, 3, 1);
-        LocalDate to = LocalDate.of(2026, 3, 31);
-        RecurringEvent eventA = EventTestData.recurringEvent(1L, DayOfWeek.MONDAY, from, to);
-        RecurringEvent eventB = EventTestData.recurringEvent(2L, DayOfWeek.TUESDAY, from, to);
-        Occurrence occA = EventTestData.occurrence(10L, eventA, from, OccurrenceStatus.SCHEDULED);
-        Occurrence occB = EventTestData.occurrence(11L, eventB, from.plusDays(1), OccurrenceStatus.SCHEDULED);
-
-        when(occurrenceRepository.findByStatusAndDateBetweenOrderByEvent_IdAscDateAsc(OccurrenceStatus.SCHEDULED, from, to))
-                .thenReturn(List.of(occA, occB));
-
-        List<Long> result = service.findUnassignedEventIds(from, to, true);
-
-        assertThat(result).containsExactly(1L, 2L);
-        verifyNoInteractions(composer);
     }
 
 
@@ -496,11 +388,11 @@ class AcademicEventServiceImplTest {
     @DisplayName("findOccurrencesByEventId: evento existente → mapea sus ocurrencias")
     void findOccurrencesEventoExistente() {
         RecurringEvent event = EventTestData.recurringEvent(1L, DayOfWeek.MONDAY, LocalDate.of(2026, 1, 5), null);
-        Occurrence occurrence = EventTestData.occurrence(10L, event, LocalDate.of(2026, 1, 5), OccurrenceStatus.SCHEDULED);
+        Occurrence occurrence = EventTestData.occurrence(10L, event, LocalDate.of(2026, 1, 5), OccurrenceStatus.NEEDS_ROOM);
         when(eventRepository.existsById(1L)).thenReturn(true);
         when(occurrenceRepository.findByEvent_Id(1L)).thenReturn(List.of(occurrence));
         when(occurrenceMapper.toDto(occurrence)).thenReturn(
-                new OccurrenceResponseDto(10L, 1L, occurrence.getDate(), OccurrenceStatus.SCHEDULED,
+                new OccurrenceResponseDto(10L, 1L, occurrence.getDate(), OccurrenceStatus.NEEDS_ROOM,
                         LocalTime.of(8, 0), LocalTime.of(9, 30)));
 
         List<OccurrenceResponseDto> result = service.findOccurrencesByEventId(1L);

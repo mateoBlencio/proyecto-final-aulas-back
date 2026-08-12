@@ -148,7 +148,7 @@ class IngestIntegrationTest extends AbstractIntegrationTest {
 
         List<Occurrence> occurrences1 = occurrenceRepository.findByEvent_Id(eventId1);
         assertThat(occurrences1).isNotEmpty();
-        assertThat(occurrences1).allSatisfy(o -> assertThat(o.getStatus()).isEqualTo(OccurrenceStatus.ASSIGNED));
+        assertThat(occurrences1).allSatisfy(o -> assertThat(o.getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM));
         assertThat(occurrences1).anySatisfy(o -> assertThat(o.getDate()).isBefore(LocalDate.now()));
 
         List<Allocation> allocations1 = allocationRepository.findByOccurrenceIdIn(
