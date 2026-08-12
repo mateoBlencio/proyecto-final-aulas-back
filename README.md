@@ -27,9 +27,9 @@ través de esa interfaz, nunca compartiendo entidades JPA.
 
 Documentación de detalle:
 
-- [docs/modulos/](docs/modulos/) — ficha técnica por módulo: responsabilidad, API pública, invariantes, gaps y testing.
-- [docs/adr/](docs/adr/) — decisiones arquitectónicas (manejo de errores, MapStruct/composers, DTOs como records, fronteras de módulo, OSIV off, soft-delete, auditoría Envers).
-- [docs/modelo-dominio.md](docs/modelo-dominio.md) — modelo Evento → Ocurrencia → Asignación.
+- [docs/modulos/](.claude/docs/modulos/) — ficha técnica por módulo: responsabilidad, API pública, invariantes, gaps y testing.
+- [docs/adr/](.claude/docs/adr/) — decisiones arquitectónicas (manejo de errores, MapStruct/composers, DTOs como records, fronteras de módulo, OSIV off, soft-delete, auditoría Envers).
+- [docs/modelo-dominio.md](.claude/docs/modelo-dominio.md) — modelo Evento → Ocurrencia → Asignación.
 
 ## Setup
 

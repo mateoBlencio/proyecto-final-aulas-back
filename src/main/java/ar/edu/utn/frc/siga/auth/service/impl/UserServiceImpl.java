@@ -43,7 +43,7 @@ public class UserServiceImpl implements UserService {
         log.debug("Creando usuario: email={}, rol={}", email, dto.rol());
         Role parsedRole = parseRole(dto.rol());
 
-        if (!email.toLowerCase().endsWith("@" + authDomainProperties.getAllowedEmailDomain().toLowerCase())) {
+        if (!authDomainProperties.isAllowedEmail(email)) {
             log.warn("Alta de usuario rechazada: dominio no institucional, email={}", email);
             throw new UserDomainException("User email domain not allowed: " + email);
         }
