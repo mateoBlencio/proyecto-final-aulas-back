@@ -38,7 +38,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
-
 import java.util.List;
 import java.util.Set;
 
@@ -89,10 +88,8 @@ public class AllocationController {
 
     @GetMapping("/history")
     @Operation(summary = "Historial de asignaciones de un evento",
-               description = "Devuelve las revisiones de auditoría (Envers) de la(s) asignación(es) de TODAS las "
-                       + "occurrences del evento, fusionadas en una sola línea de tiempo ascendente: qué aula tuvo "
-                       + "cada occurrence en cada momento, origen (MANUAL/AUTOMATIC/IMPORTED) y quién la cambió. "
-                       + "404 si el evento no existe. Lista vacía si existe pero nunca tuvo asignación.")
+               description = "Devuelve las revisiones de auditoría de la(s) asignación(es) de todas las ocurrencias"
+                       + " del evento. Devuelve 404 si el evento no existe y una lista vacía si existe pero nunca fue asignada.")
     public ResponseEntity<List<RevisionDto<AllocationHistorySnapshotDto>>> findAllocationHistory(
             @RequestParam Long eventId) {
         log.debug("GET /v1/allocations/history: eventId={}", eventId);

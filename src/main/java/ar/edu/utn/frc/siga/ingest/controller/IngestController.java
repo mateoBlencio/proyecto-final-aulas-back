@@ -17,7 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @RestController
-@RequestMapping("${siga.api.base-path}/excelimports")
+@RequestMapping("${siga.api.base-path}/imports")
 @RequiredArgsConstructor
 @Tag(name = "Importación masiva", description = "Carga masiva de horarios/comisiones desde un archivo")
 @PreAuthorize("hasRole('SUBSECRETARIA')")
@@ -34,7 +34,7 @@ public class IngestController {
                        + "dictado desconocido, columna requerida vacía) — aborta el import completo.")
     public ResponseEntity<IngestResultDto> ingestFile(
             @RequestParam("file") MultipartFile file) {
-        log.debug("POST /v1/excelimports: filename={}, size={}", file.getOriginalFilename(), file.getSize());
+        log.debug("POST /v1/imports: filename={}, size={}", file.getOriginalFilename(), file.getSize());
         IngestResultDto result = ingestService.ingestFile(file);
         log.info("Importación completada: filename={}", file.getOriginalFilename());
         return ResponseEntity.ok(result);

@@ -51,7 +51,7 @@ public class AcademicEventController {
         return ResponseEntity.ok(events);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{id:\\d+}")
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     @Operation(summary = "Obtener evento académico por ID",
                description = "Devuelve los datos de un evento académico existente.")

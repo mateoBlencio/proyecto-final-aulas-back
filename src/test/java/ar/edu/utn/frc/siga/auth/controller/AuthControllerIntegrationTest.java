@@ -139,7 +139,7 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
-    void excelImport_shouldReturn403_forAuxiliarAulico() throws Exception {
+    void import_shouldReturn403_forAuxiliarAulico() throws Exception {
         String token = (String) parseMap(login(AUXILIAR_EMAIL, PASSWORD)).get("accessToken");
 
         HttpHeaders headers = new HttpHeaders();
@@ -155,7 +155,7 @@ class AuthControllerIntegrationTest {
         });
 
         ResponseEntity<String> response = restTemplate.exchange(
-                baseUrl + "/v1/excelimports", HttpMethod.POST, new HttpEntity<>(body, headers), String.class);
+                baseUrl + "/v1/imports", HttpMethod.POST, new HttpEntity<>(body, headers), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }

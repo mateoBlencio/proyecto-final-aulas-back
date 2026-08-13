@@ -25,11 +25,11 @@ docs {
   "types" (los tres si se omite). Cada fila trae un discriminador "type" en el JSON
   (UNASSIGNED / OVERCROWDED / OVERLAP) con forma distinta según el tipo — ver el
   ejemplo de respuesta en la descripción del endpoint en el backend.
-
+  
   Rango por defecto: from=hoy, to=fin del período académico activo (o from + 6 meses
   si no hay uno con fecha de fin). 'to' anterior a 'from' → 400.
   includePast (default false): excluye ocurrencias ya pasadas salvo que se pida
   explícitamente (auditoría).
-
+  
   Paginado estándar (page/size, default size=20).
 }

@@ -111,7 +111,7 @@ class IngestIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /v1/excelimports importa 2 filas válidas y persiste toda la cadena académica y de asignación, incluidas fechas pasadas")
+    @DisplayName("POST /v1/imports importa 2 filas válidas y persiste toda la cadena académica y de asignación, incluidas fechas pasadas")
     void importExcel_validRows_persistsFullChain() throws Exception {
         DataRow row1 = uniqueRow(uniqueBuilding());
         DataRow row2 = uniqueRow(uniqueBuilding());
@@ -123,7 +123,7 @@ class IngestIntegrationTest extends AbstractIntegrationTest {
 
         var workbook = ExcelTestWorkbooks.validTemplate().withDataRow(row1).withDataRow(row2);
 
-        MvcResult result = mockMvc.perform(multipart("/v1/excelimports").file(workbook.toMultipartFile()))
+        MvcResult result = mockMvc.perform(multipart("/v1/imports").file(workbook.toMultipartFile()))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -167,7 +167,7 @@ class IngestIntegrationTest extends AbstractIntegrationTest {
         seedCatalog(row);
         MockMultipartFile file = ExcelTestWorkbooks.validTemplate().withDataRow(row).toMultipartFile();
 
-        mockMvc.perform(multipart("/v1/excelimports").file(file)).andExpect(status().isOk());
+        mockMvc.perform(multipart("/v1/imports").file(file)).andExpect(status().isOk());
 
         long specialtiesAfterFirst = specialtyRepository.count();
         long eventsAfterFirst = eventRepository.count();
@@ -175,7 +175,7 @@ class IngestIntegrationTest extends AbstractIntegrationTest {
         long allocationsAfterFirst = allocationRepository.count();
         long classroomsAfterFirst = classroomRepository.count();
 
-        MvcResult second = mockMvc.perform(multipart("/v1/excelimports").file(file))
+        MvcResult second = mockMvc.perform(multipart("/v1/imports").file(file))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -201,7 +201,7 @@ class IngestIntegrationTest extends AbstractIntegrationTest {
                 .withDataRow(uniqueRow(uniqueBuilding()))
                 .renameSheet("OtraHoja");
 
-        mockMvc.perform(multipart("/v1/excelimports").file(workbook.toMultipartFile()))
+        mockMvc.perform(multipart("/v1/imports").file(workbook.toMultipartFile()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("Invalid file format"));
 
@@ -222,7 +222,7 @@ class IngestIntegrationTest extends AbstractIntegrationTest {
 
         var workbook = ExcelTestWorkbooks.validTemplate().withDataRow(validRow).withDataRow(invalidRow);
 
-        mockMvc.perform(multipart("/v1/excelimports").file(workbook.toMultipartFile()))
+        mockMvc.perform(multipart("/v1/imports").file(workbook.toMultipartFile()))
                 .andExpect(status().is(422))
                 .andExpect(jsonPath("$.title").value("Import error"));
 
