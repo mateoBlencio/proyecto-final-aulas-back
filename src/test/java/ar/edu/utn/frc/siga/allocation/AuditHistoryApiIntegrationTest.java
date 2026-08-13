@@ -69,7 +69,7 @@ class AuditHistoryApiIntegrationTest extends AbstractIntegrationTest {
                 30, START, DURATION, date.getDayOfWeek(), date, date, sc.subjectId(), sc.commissionId());
         Long eventId;
         SecurityContextHolder.getContext().setAuthentication(
-                new TestingAuthenticationToken(USER, null, "ROLE_SUBSECRETARIA"));
+                new TestingAuthenticationToken(USER, "", "ROLE_SUBSECRETARIA"));
         try {
             eventId = academicEventService.createRecurringEvent(dto).id();
         } finally {
@@ -80,7 +80,7 @@ class AuditHistoryApiIntegrationTest extends AbstractIntegrationTest {
         return occurrences.getFirst();
     }
 
-    private long assignOk(Long occurrenceId, Integer classroomId) throws Exception {
+    private long allocateOk(Long occurrenceId, Integer classroomId) throws Exception {
         var dto = new AllocationBatchRequestDto(
                 List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, classroomId)), null);
         MvcResult result = mockMvc.perform(post("/v1/allocations")
@@ -102,13 +102,13 @@ class AuditHistoryApiIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     @DisplayName("GET /v1/allocations/history?eventId= refleja asignación, reasignación y baja")
-    void allocationHistory_reflectsAssignReallocateAndDelete() throws Exception {
+    void allocationHistory_reflectsAllocateReallocateAndDelete() throws Exception {
         Classroom aulaA = testData.aula(testData.edificio());
         Classroom aulaB = testData.aula(testData.edificio());
         Occurrence occurrence = seedOccurrence(LocalDate.now().plusDays(21));
         Long eventId = occurrence.getEvent().getId();
 
-        long allocationId = assignOk(occurrence.getId(), aulaA.getId());
+        long allocationId = allocateOk(occurrence.getId(), aulaA.getId());
         reallocateOk(occurrence.getId(), aulaB.getId());
         // Baja directa por repositorio (no hay endpoint de delete): commit real, Envers registra DEL.
         allocationRepository.deleteById(allocationId);
@@ -135,7 +135,7 @@ class AuditHistoryApiIntegrationTest extends AbstractIntegrationTest {
         Occurrence occurrence = seedOccurrence(LocalDate.now().plusDays(22));
         Long eventId = occurrence.getEvent().getId();
 
-        assignOk(occurrence.getId(), aulaA.getId());
+        allocateOk(occurrence.getId(), aulaA.getId());
         reallocateOk(occurrence.getId(), aulaB.getId());
 
         MvcResult result = mockMvc.perform(get("/v1/allocations/history").param("eventId", eventId.toString()))

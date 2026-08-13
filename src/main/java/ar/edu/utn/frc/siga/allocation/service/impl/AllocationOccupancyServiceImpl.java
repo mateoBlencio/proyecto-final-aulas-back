@@ -17,6 +17,6 @@ public class AllocationOccupancyServiceImpl implements AllocationOccupancyServic
 
     @Override
     public List<OccupiedSlot> findOccupancy(LocalDate from, LocalDate to) {
-        return occupancyReader.loadAssigned(from, to);
+        return occupancyReader.loadAllocated(from, to);
     }
 }

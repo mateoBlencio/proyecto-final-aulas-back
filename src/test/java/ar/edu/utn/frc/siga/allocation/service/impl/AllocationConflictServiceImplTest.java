@@ -5,7 +5,7 @@ import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OverlapConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OvercrowdedConflictDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.UnassignedConflictDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.UnallocatedConflictDto;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.allocation.model.ConflictType;
@@ -71,7 +71,7 @@ class AllocationConflictServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(occupancyReader.loadAssigned(any(), any())).thenReturn(List.of());
+        lenient().when(occupancyReader.loadAllocated(any(), any())).thenReturn(List.of());
         lenient().when(academicEventService.findByIds(any())).thenReturn(List.of());
         lenient().when(academicPeriodService.findActive()).thenReturn(List.of());
         lenient().when(classroomService.findByIds(any())).thenReturn(List.of());
@@ -84,7 +84,7 @@ class AllocationConflictServiceImplTest {
     void typesVacioDevuelveLosTresTipos() {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
-        RecurringEventResponseDto event = recurringEvent(1L, 40, LocalTime.of(8, 0), 60);
+        RecurringEventResponseDto event = recurringEvent(1L, 40, LocalTime.of(8, 0));
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         Allocation allocation = allocation(100L, 10L, 5);
         mockOccupancy(List.of(slot), List.of(allocation), List.of(event));
@@ -101,7 +101,7 @@ class AllocationConflictServiceImplTest {
     void detectaSobrecupo() {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
-        RecurringEventResponseDto event = recurringEvent(1L, 40, LocalTime.of(8, 0), 60);
+        RecurringEventResponseDto event = recurringEvent(1L, 40, LocalTime.of(8, 0));
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         Allocation allocation = allocation(100L, 10L, 5);
         mockOccupancy(List.of(slot), List.of(allocation), List.of(event));
@@ -123,7 +123,7 @@ class AllocationConflictServiceImplTest {
     void noDetectaSobrecupoSinCapacidad() {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
-        RecurringEventResponseDto event = recurringEvent(1L, 40, LocalTime.of(8, 0), 60);
+        RecurringEventResponseDto event = recurringEvent(1L, 40, LocalTime.of(8, 0));
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         Allocation allocation = allocation(100L, 10L, 5);
         mockOccupancy(List.of(slot), List.of(allocation), List.of(event));
@@ -137,7 +137,7 @@ class AllocationConflictServiceImplTest {
     void noDetectaSobrecupoConEnrolledNull() {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
-        RecurringEventResponseDto event = recurringEvent(1L, null, LocalTime.of(8, 0), 60);
+        RecurringEventResponseDto event = recurringEvent(1L, null, LocalTime.of(8, 0));
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         Allocation allocation = allocation(100L, 10L, 5);
         mockOccupancy(List.of(slot), List.of(allocation), List.of(event));
@@ -152,8 +152,8 @@ class AllocationConflictServiceImplTest {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
         LocalDate date = futureDate(2);
-        RecurringEventResponseDto eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
-        RecurringEventResponseDto eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
+        RecurringEventResponseDto eventA = recurringEvent(1L, 10, LocalTime.of(8, 0));
+        RecurringEventResponseDto eventB = recurringEvent(2L, 10, LocalTime.of(8, 30));
         OccurrenceSlotDto slotA = occurrenceSlot(10L, eventA, date);
         OccurrenceSlotDto slotB = occurrenceSlot(11L, eventB, date);
         Allocation allocA = allocation(100L, 10L, 5);
@@ -178,8 +178,8 @@ class AllocationConflictServiceImplTest {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
         LocalDate date = futureDate(2);
-        RecurringEventResponseDto eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
-        RecurringEventResponseDto eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
+        RecurringEventResponseDto eventA = recurringEvent(1L, 10, LocalTime.of(8, 0));
+        RecurringEventResponseDto eventB = recurringEvent(2L, 10, LocalTime.of(8, 30));
         OccurrenceSlotDto slotA = occurrenceSlot(10L, eventA, date);
         OccurrenceSlotDto slotB = occurrenceSlot(11L, eventB, date);
         Allocation allocA = allocation(100L, 10L, 5);
@@ -196,8 +196,8 @@ class AllocationConflictServiceImplTest {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
         LocalDate date = futureDate(2);
-        RecurringEventResponseDto eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
-        RecurringEventResponseDto eventB = recurringEvent(2L, 10, LocalTime.of(9, 0), 60);
+        RecurringEventResponseDto eventA = recurringEvent(1L, 10, LocalTime.of(8, 0));
+        RecurringEventResponseDto eventB = recurringEvent(2L, 10, LocalTime.of(9, 0));
         OccurrenceSlotDto slotA = occurrenceSlot(10L, eventA, date);
         OccurrenceSlotDto slotB = occurrenceSlot(11L, eventB, date);
         Allocation allocA = allocation(100L, 10L, 5);
@@ -215,8 +215,8 @@ class AllocationConflictServiceImplTest {
         LocalDate to = futureDate(30);
         LocalDate date1 = futureDate(2);
         LocalDate date2 = futureDate(9);
-        RecurringEventResponseDto eventA = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
-        RecurringEventResponseDto eventB = recurringEvent(2L, 10, LocalTime.of(8, 30), 60);
+        RecurringEventResponseDto eventA = recurringEvent(1L, 10, LocalTime.of(8, 0));
+        RecurringEventResponseDto eventB = recurringEvent(2L, 10, LocalTime.of(8, 30));
 
         OccurrenceSlotDto slotA1 = occurrenceSlot(10L, eventA, date1);
         OccurrenceSlotDto slotB1 = occurrenceSlot(11L, eventB, date1);
@@ -242,7 +242,7 @@ class AllocationConflictServiceImplTest {
     void detectaSinAula() {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
-        RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
+        RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0));
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         when(occurrenceService.findSlotsByStatusBetween(eq(OccurrenceStatus.NEEDS_ROOM), any(), any()))
                 .thenReturn(List.of(slot));
@@ -250,10 +250,10 @@ class AllocationConflictServiceImplTest {
         when(academicEventService.findByIds(any())).thenReturn(List.of(event));
 
         List<AllocationConflictDto> result =
-                service.findConflicts(Set.of(ConflictType.UNASSIGNED), from, to, false, PAGEABLE).getContent();
+                service.findConflicts(Set.of(ConflictType.UNALLOCATED), from, to, false, PAGEABLE).getContent();
 
         assertThat(result).hasSize(1);
-        assertThat(((UnassignedConflictDto) result.getFirst()).event().id()).isEqualTo(1L);
+        assertThat(((UnallocatedConflictDto) result.getFirst()).event().id()).isEqualTo(1L);
     }
 
     @Test
@@ -261,13 +261,13 @@ class AllocationConflictServiceImplTest {
     void noDetectaSinAulaSiTieneAllocation() {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
-        RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
+        RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0));
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         when(occurrenceService.findSlotsByStatusBetween(eq(OccurrenceStatus.NEEDS_ROOM), any(), any()))
                 .thenReturn(List.of(slot));
         when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(allocation(100L, 10L, 5)));
 
-        assertThat(service.findConflicts(Set.of(ConflictType.UNASSIGNED), from, to, false, PAGEABLE)).isEmpty();
+        assertThat(service.findConflicts(Set.of(ConflictType.UNALLOCATED), from, to, false, PAGEABLE)).isEmpty();
     }
 
     @Test
@@ -280,7 +280,7 @@ class AllocationConflictServiceImplTest {
         service.findConflicts(Set.of(ConflictType.OVERCROWDED), null, null, false, PAGEABLE);
 
         ArgumentCaptor<LocalDate> toCaptor = ArgumentCaptor.forClass(LocalDate.class);
-        verify(occupancyReader).loadAssigned(any(), toCaptor.capture());
+        verify(occupancyReader).loadAllocated(any(), toCaptor.capture());
         assertThat(toCaptor.getValue()).isEqualTo(endDate);
     }
 
@@ -292,7 +292,7 @@ class AllocationConflictServiceImplTest {
         service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, null, false, PAGEABLE);
 
         ArgumentCaptor<LocalDate> toCaptor = ArgumentCaptor.forClass(LocalDate.class);
-        verify(occupancyReader).loadAssigned(eq(from), toCaptor.capture());
+        verify(occupancyReader).loadAllocated(eq(from), toCaptor.capture());
         assertThat(toCaptor.getValue()).isEqualTo(from.plusMonths(6));
     }
 
@@ -307,15 +307,15 @@ class AllocationConflictServiceImplTest {
     }
 
     @Test
-    @DisplayName("resolveAllUnassignedEventIds delega en unassignedEventIds con el rango por defecto")
-    void resolveAllUnassignedEventIdsDelegaConRangoPorDefecto() {
-        RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0), 60);
+    @DisplayName("resolveAllUnallocatedEventIds delega en unallocatedEventIds con el rango por defecto")
+    void resolveAllUnallocatedEventIdsDelegaConRangoPorDefecto() {
+        RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0));
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         when(occurrenceService.findSlotsByStatusBetween(eq(OccurrenceStatus.NEEDS_ROOM), any(), any()))
                 .thenReturn(List.of(slot));
         when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of());
 
-        List<Long> ids = service.resolveAllUnassignedEventIds();
+        List<Long> ids = service.resolveAllUnallocatedEventIds();
 
         assertThat(ids).containsExactly(1L);
     }
@@ -326,7 +326,7 @@ class AllocationConflictServiceImplTest {
                 .map(a -> OccupiedSlot.from(a, slots.stream()
                         .filter(s -> s.occurrenceId().equals(a.getOccurrenceId())).findFirst().orElseThrow()))
                 .toList();
-        lenient().when(occupancyReader.loadAssigned(any(), any())).thenReturn(occupied);
+        lenient().when(occupancyReader.loadAllocated(any(), any())).thenReturn(occupied);
         when(academicEventService.findByIds(any())).thenReturn(List.copyOf(events));
     }
 
@@ -335,8 +335,8 @@ class AllocationConflictServiceImplTest {
         return LocalDate.now().plusDays(daysFromNow);
     }
 
-    private RecurringEventResponseDto recurringEvent(long id, Integer enrolled, LocalTime startTime, int durationMinutes) {
-        return new RecurringEventResponseDto(id, EventType.RECURRING, enrolled, startTime, durationMinutes,
+    private RecurringEventResponseDto recurringEvent(long id, Integer enrolled, LocalTime startTime) {
+        return new RecurringEventResponseDto(id, EventType.RECURRING, enrolled, startTime, 60,
                 DayOfWeek.MONDAY, LocalDate.of(2026, 1, 1), null, null, null);
     }
 

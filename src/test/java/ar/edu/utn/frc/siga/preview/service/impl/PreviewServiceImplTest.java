@@ -92,7 +92,7 @@ class PreviewServiceImplTest {
     @Test
     @DisplayName("autoPreview: selectAll=true resta excludedIds de los conflictos sin aula")
     void autoPreviewSelectAllRestaExcludedIds() {
-        when(allocationConflictService.resolveAllUnassignedEventIds()).thenReturn(List.of(1L, 2L, 3L));
+        when(allocationConflictService.resolveAllUnallocatedEventIds()).thenReturn(List.of(1L, 2L, 3L));
         when(previewEngine.generate(any(), anyInt())).thenReturn(new OptimizationResult("prev_x", List.of()));
 
         service.autoPreview(new PreviewRequestDto(null, true, List.of(2L), null));

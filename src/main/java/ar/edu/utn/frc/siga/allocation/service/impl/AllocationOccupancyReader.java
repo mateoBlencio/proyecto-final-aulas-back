@@ -19,7 +19,7 @@ class AllocationOccupancyReader {
     private final OccurrenceService occurrenceService;
     private final AllocationRepository allocationRepository;
 
-    List<OccupiedSlot> loadAssigned(LocalDate from, LocalDate to) {
+    List<OccupiedSlot> loadAllocated(LocalDate from, LocalDate to) {
         Map<Long, OccurrenceSlotDto> slotByOccurrenceId = Maps.byId(
                 occurrenceService.findSlotsBetween(from, to),
                 OccurrenceSlotDto::occurrenceId);

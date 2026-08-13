@@ -145,7 +145,7 @@ public class PreviewServiceImpl implements PreviewService {
         }
 
         Set<Long> excludedIds = request.excludedIds() != null ? Set.copyOf(request.excludedIds()) : Set.of();
-        return allocationConflictService.resolveAllUnassignedEventIds().stream()
+        return allocationConflictService.resolveAllUnallocatedEventIds().stream()
                 .filter(id -> !excludedIds.contains(id))
                 .collect(Collectors.toSet());
     }

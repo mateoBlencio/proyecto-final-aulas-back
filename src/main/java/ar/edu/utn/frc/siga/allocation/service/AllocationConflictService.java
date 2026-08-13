@@ -14,5 +14,5 @@ import java.util.Set;
 public interface AllocationConflictService {
 
     Page<AllocationConflictDto> findConflicts(Set<ConflictType> types, LocalDate from, LocalDate to, boolean includePast, Pageable pageable);
-    List<Long> resolveAllUnassignedEventIds();
+    List<Long> resolveAllUnallocatedEventIds();
 }

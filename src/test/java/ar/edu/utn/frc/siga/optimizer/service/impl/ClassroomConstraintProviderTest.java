@@ -146,7 +146,7 @@ class ClassroomConstraintProviderTest {
 
         @Test
         @DisplayName("sin aula asignada no penaliza sobreocupación (lo cubre allocateAllPossible, no esta constraint)")
-        void noRoomAssigned() {
+        void noRoomAllocated() {
             OptimizerEvent e = event("a", null, 12, LocalTime.of(8, 0), LocalTime.of(10, 0));
             ClassAllocation alloc = new ClassAllocation(e, List.of(), Set.of());
 
@@ -162,7 +162,7 @@ class ClassroomConstraintProviderTest {
 
         @Test
         @DisplayName("evento no-pinned sin aula penaliza 1 (empuja a asignar)")
-        void unassignedPenalizes() {
+        void unallocatedPenalizes() {
             OptimizerEvent e = event("a", null, 10, LocalTime.of(8, 0), LocalTime.of(10, 0));
             ClassAllocation alloc = new ClassAllocation(e, List.of(), Set.of());
 

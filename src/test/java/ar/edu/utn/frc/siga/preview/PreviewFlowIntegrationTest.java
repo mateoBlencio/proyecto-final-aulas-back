@@ -69,9 +69,9 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    private Long createEvent(IntegrationTestData.SubjectAndCommission sc, LocalDate date, LocalTime start, int duration) {
+    private Long createEvent(IntegrationTestData.SubjectAndCommission sc, LocalDate date) {
         var dto = new CreateRecurringEventRequestDto(
-                30, start, duration, date.getDayOfWeek(), date, date, sc.subjectId(), sc.commissionId());
+                30, START, DURATION, date.getDayOfWeek(), date, date, sc.subjectId(), sc.commissionId());
         return academicEventService.createRecurringEvent(dto).id();
     }
 
@@ -79,7 +79,7 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
         return occurrenceRepository.findByEvent_Id(eventId).getFirst();
     }
 
-    private void assignOk(Long occurrenceId, Integer classroomId) throws Exception {
+    private void allocateOk(Long occurrenceId, Integer classroomId) throws Exception {
         var dto = new AllocationBatchRequestDto(
                 List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, classroomId)), null);
         mockMvc.perform(post("/v1/allocations")
@@ -94,10 +94,10 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
                 .createdAt(LocalDateTime.now()).build());
     }
 
-    private void blockAllAvailableRooms(LocalDate date, LocalTime start, int durationMinutes) {
+    private void blockAllAvailableRooms(LocalDate date) {
         for (ClassroomResponseDto room : classroomService.findAllAvailable()) {
             UniqueEvent blocker = eventRepository.save(UniqueEvent.builder()
-                    .enrolled(1).startTime(start).duration(Duration.ofMinutes(durationMinutes))
+                    .enrolled(1).startTime(START).duration(Duration.ofMinutes(DURATION))
                     .date(date).description("blocker").kind(UniqueEventKind.OTRO).build());
             Occurrence occ = occurrenceRepository.save(Occurrence.builder()
                     .event(blocker).date(date).status(OccurrenceStatus.NEEDS_ROOM).build());
@@ -122,7 +122,7 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
         var sc = testData.materiaYComision();
         testData.aula(testData.edificio());
         LocalDate date = LocalDate.now().plusDays(100);
-        Long eventId = createEvent(sc, date, START, DURATION);
+        Long eventId = createEvent(sc, date);
 
         PreviewResponseDto preview = autoPreview(List.of(eventId));
 
@@ -139,8 +139,8 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
     void autoPreview_allRoomsOccupied_leavesEventUnresolved() throws Exception {
         var sc = testData.materiaYComision();
         LocalDate date = LocalDate.now().plusDays(101);
-        blockAllAvailableRooms(date, START, DURATION);
-        Long eventId = createEvent(sc, date, START, DURATION);
+        blockAllAvailableRooms(date);
+        Long eventId = createEvent(sc, date);
 
         PreviewResponseDto preview = autoPreview(List.of(eventId));
 
@@ -154,19 +154,19 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     @DisplayName("POST /v1/previews con re-resolución: evento ya asignado cambia de aula si la actual quedó tomada por un ajeno; el aula pinned ajena no se pisa")
-    void autoPreview_reResolvesAssignedEventAwayFromPinnedForeignRoom() throws Exception {
+    void autoPreview_reResolvesAllocatedEventAwayFromPinnedForeignRoom() throws Exception {
         var sc = testData.materiaYComision();
         var edificio = testData.edificio();
         Classroom aulaActual = testData.aula(edificio);
         testData.aula(edificio);
         LocalDate date = LocalDate.now().plusDays(102);
 
-        Long eventId = createEvent(sc, date, START, DURATION);
+        Long eventId = createEvent(sc, date);
         Occurrence occurrence = occurrenceOf(eventId);
-        assignOk(occurrence.getId(), aulaActual.getId());
+        allocateOk(occurrence.getId(), aulaActual.getId());
 
         var scForeign = testData.materiaYComision();
-        Long foreignEventId = createEvent(scForeign, date, START, DURATION);
+        Long foreignEventId = createEvent(scForeign, date);
         allocateDirect(occurrenceOf(foreignEventId), aulaActual.getId());
 
         PreviewResponseDto preview = autoPreview(List.of(eventId));
@@ -183,11 +183,11 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("POST /v1/previews: evento ya asignado a la única aula factible conserva esa aula; unchanged=true")
     void autoPreview_keepsSameRoom_marksUnchangedTrue() throws Exception {
         LocalDate date = LocalDate.now().plusDays(104);
-        blockAllAvailableRooms(date, START, DURATION);
+        blockAllAvailableRooms(date);
         Classroom unicaAula = testData.aula(testData.edificio());
         var sc = testData.materiaYComision();
-        Long eventId = createEvent(sc, date, START, DURATION);
-        assignOk(occurrenceOf(eventId).getId(), unicaAula.getId());
+        Long eventId = createEvent(sc, date);
+        allocateOk(occurrenceOf(eventId).getId(), unicaAula.getId());
 
         PreviewResponseDto preview = autoPreview(List.of(eventId));
 
@@ -203,7 +203,7 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
         var sc = testData.materiaYComision();
         testData.aula(testData.edificio());
         LocalDate date = LocalDate.now().plusDays(103);
-        Long eventId = createEvent(sc, date, START, DURATION);
+        Long eventId = createEvent(sc, date);
 
         PreviewResponseDto original = autoPreview(List.of(eventId));
 
@@ -259,9 +259,9 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
         Classroom aulaOriginal = testData.aula(testData.edificio());
         LocalDate date = LocalDate.now().plusDays(106);
 
-        Long eventId = createEvent(sc, date, START, DURATION);
+        Long eventId = createEvent(sc, date);
         Occurrence occurrence = occurrenceOf(eventId);
-        assignOk(occurrence.getId(), aulaOriginal.getId());
+        allocateOk(occurrence.getId(), aulaOriginal.getId());
 
         PreviewResponseDto preview = autoPreview(List.of(eventId));
         assertThat(preview.allocations()).hasSize(1);
@@ -299,7 +299,7 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
         testData.aula(testData.edificio());
         testData.aula(testData.edificio());
         LocalDate date = LocalDate.now().plusDays(107);
-        Long eventId = createEvent(sc, date, START, DURATION);
+        Long eventId = createEvent(sc, date);
         Occurrence occurrence = occurrenceOf(eventId);
 
         PreviewResponseDto preview = autoPreview(List.of(eventId));
@@ -307,7 +307,7 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
         Integer proposedRoom = preview.allocations().getFirst().classroom().id();
 
         var scForeign = testData.materiaYComision();
-        Long foreignEventId = createEvent(scForeign, date, START, DURATION);
+        Long foreignEventId = createEvent(scForeign, date);
         allocateDirect(occurrenceOf(foreignEventId), proposedRoom);
 
         mockMvc.perform(post("/v1/previews/{id}/confirm", preview.previewId())

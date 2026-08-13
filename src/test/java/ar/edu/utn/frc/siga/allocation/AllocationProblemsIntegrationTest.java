@@ -40,7 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Integración de {@code GET /v1/allocations/conflicts} contra Postgres real: los tres tipos
- * de conflicto (unassigned/overcrowded/overlap) filtrados por {@code types}, el rango por
+ * de conflicto (unallocated/overcrowded/overlap) filtrados por {@code types}, el rango por
  * defecto (fin del período académico activo) y el 400 por rango inválido.
  */
 @Import(IntegrationTestData.class)
@@ -72,7 +72,7 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
         return occurrenceRepository.findByEvent_Id(eventId).getFirst();
     }
 
-    private void assignOk(Long occurrenceId, Integer classroomId) throws Exception {
+    private void allocateOk(Long occurrenceId, Integer classroomId) throws Exception {
         var dto = new AllocationBatchRequestDto(
                 List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, classroomId)), null);
         mockMvc.perform(post("/v1/allocations")
@@ -91,12 +91,12 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
     /**
      * Siembra un evento único SCHEDULED sin aula, directo por repositorio: el endpoint
      * {@code POST /v1/events/unique} exige aula obligatoria (alta atómica), así que este
-     * caso -pensado solo para ejercitar el listado de "unassigned"- construye la entidad a
+     * caso -pensado solo para ejercitar el listado de "unallocated"- construye la entidad a
      * mano en vez de pasar por el service.
      */
-    private Long seedUniqueEventWithoutClassroom(LocalDate date, Integer enrolled) {
+    private Long seedUniqueEventWithoutClassroom(LocalDate date) {
         UniqueEvent event = UniqueEvent.builder()
-                .enrolled(enrolled).startTime(START).duration(java.time.Duration.ofMinutes(DURATION))
+                .enrolled(20).startTime(START).duration(java.time.Duration.ofMinutes(DURATION))
                 .date(date).description("Evento en el límite del período")
                 .kind(ar.edu.utn.frc.siga.events.model.UniqueEventKind.OTRO)
                 .build();
@@ -115,17 +115,17 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("types=UNASSIGNED devuelve el evento sembrado sin ninguna asignación")
-    void unassignedConflicts_returnSeededEvent() throws Exception {
+    @DisplayName("types=UNALLOCATED devuelve el evento sembrado sin ninguna asignación")
+    void unallocatedConflicts_returnSeededEvent() throws Exception {
         LocalDate from = LocalDate.now().plusDays(60);
         LocalDate to = LocalDate.now().plusDays(70);
         var sc = testData.materiaYComision();
-        Occurrence unassignedOcc = seedOccurrence(sc, from.plusDays(1), 30);
-        Long unassignedEventId = unassignedOcc.getEvent().getId();
+        Occurrence unallocatedOcc = seedOccurrence(sc, from.plusDays(1), 30);
+        Long unallocatedEventId = unallocatedOcc.getEvent().getId();
 
-        JsonNode content = conflictsContent("UNASSIGNED", from, to);
+        JsonNode content = conflictsContent("UNALLOCATED", from, to);
 
-        assertThat(content).anySatisfy(node -> assertThat(node.get("event").get("id").asLong()).isEqualTo(unassignedEventId));
+        assertThat(content).anySatisfy(node -> assertThat(node.get("event").get("id").asLong()).isEqualTo(unallocatedEventId));
     }
 
     @Test
@@ -137,7 +137,7 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
         Classroom aulaChica = testData.aula(testData.edificio(), testData.tipoAulaNormal(), 1, 10, true);
         Occurrence overcrowdOcc = seedOccurrence(sc, from.plusDays(2), 50);
         Long overcrowdEventId = overcrowdOcc.getEvent().getId();
-        assignOk(overcrowdOcc.getId(), aulaChica.getId());
+        allocateOk(overcrowdOcc.getId(), aulaChica.getId());
 
         JsonNode content = conflictsContent("OVERCROWDED", from, to);
 
@@ -161,7 +161,7 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
         LocalDate overlapDate = from.plusDays(3);
         Occurrence overlapOccA = seedOccurrence(scOverlapA, overlapDate, 20);
         Occurrence overlapOccB = seedOccurrence(scOverlapB, overlapDate, 20);
-        assignOk(overlapOccA.getId(), aulaOverlap.getId());
+        allocateOk(overlapOccA.getId(), aulaOverlap.getId());
         allocateDirect(overlapOccB, aulaOverlap.getId());
         Long overlapEventAId = overlapOccA.getEvent().getId();
         Long overlapEventBId = overlapOccB.getEvent().getId();
@@ -183,9 +183,9 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
         int year = 9000 + (int) (IntegrationTestData.nextSeq() % 500);
         var period = academicPeriodService.findOrCreate(year, TermType.ANUAL).value();
 
-        Long eventId = seedUniqueEventWithoutClassroom(period.endDate(), 20);
+        Long eventId = seedUniqueEventWithoutClassroom(period.endDate());
 
-        mockMvc.perform(get("/v1/allocations/conflicts").param("types", "UNASSIGNED"))
+        mockMvc.perform(get("/v1/allocations/conflicts").param("types", "UNALLOCATED"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[?(@.event.id == " + eventId + ")]").exists());
     }

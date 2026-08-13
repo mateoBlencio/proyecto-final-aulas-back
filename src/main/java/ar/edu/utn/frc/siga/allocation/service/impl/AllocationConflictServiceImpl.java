@@ -7,7 +7,7 @@ import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OverlapConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OvercrowdedConflictDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.UnassignedConflictDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.UnallocatedConflictDto;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
@@ -66,8 +66,8 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         Range range = resolveRange(from, to);
 
         List<AllocationConflictDto> merged = new ArrayList<>();
-        if (effectiveTypes.contains(ConflictType.UNASSIGNED)) {
-            merged.addAll(buildUnassignedConflicts(range, includePast));
+        if (effectiveTypes.contains(ConflictType.UNALLOCATED)) {
+            merged.addAll(buildUnallocatedConflicts(range, includePast));
         }
         if (effectiveTypes.contains(ConflictType.OVERCROWDED)) {
             merged.addAll(buildOvercrowdedConflicts(range, includePast));
@@ -80,20 +80,20 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
     }
 
     @Override
-    public List<Long> resolveAllUnassignedEventIds() {
+    public List<Long> resolveAllUnallocatedEventIds() {
         Range range = resolveRange(null, null);
-        List<Long> ids = List.copyOf(unassignedEventIds(range, false));
+        List<Long> ids = List.copyOf(unallocatedEventIds(range, false));
         log.info("Resolución de selección masiva: eventos sin aula count={}", ids.size());
         return ids;
     }
 
-    private List<UnassignedConflictDto> buildUnassignedConflicts(Range range, boolean includePast) {
-        Set<Long> eventIds = unassignedEventIds(range, includePast);
+    private List<UnallocatedConflictDto> buildUnallocatedConflicts(Range range, boolean includePast) {
+        Set<Long> eventIds = unallocatedEventIds(range, includePast);
         Map<Long, AcademicEventResponseDto> eventById = fetchEventsById(eventIds);
         return eventIds.stream()
                 .map(eventById::get)
                 .filter(Objects::nonNull)
-                .map(UnassignedConflictDto::new)
+                .map(UnallocatedConflictDto::new)
                 .toList();
     }
 
@@ -132,7 +132,7 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         return buildOverlaps(overlapAccs, fetchEventsById(eventIds), fetchClassroomsById(classroomIds));
     }
 
-    private Set<Long> unassignedEventIds(Range range, boolean includePast) {
+    private Set<Long> unallocatedEventIds(Range range, boolean includePast) {
         List<OccurrenceSlotDto> occurrences =
                 occurrenceService.findSlotsByStatusBetween(OccurrenceStatus.NEEDS_ROOM, range.from(), range.to());
         Set<Long> occurrenceIds = occurrences.stream().map(OccurrenceSlotDto::occurrenceId).collect(Collectors.toSet());
@@ -149,7 +149,7 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
     }
 
     private List<OccupiedSlot> readOccupancy(Range range, boolean includePast) {
-        return occupancyReader.loadAssigned(range.from(), range.to()).stream()
+        return occupancyReader.loadAllocated(range.from(), range.to()).stream()
                 .filter(slot -> includePast || !isPast(slot))
                 .toList();
     }
@@ -190,8 +190,8 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
                 slot -> List.of(new RoomDate(slot.classroomId(), slot.date())),
                 (a, b) -> !a.eventId().equals(b.eventId()),
                 (a, b, key) -> {
-                    Long firstId = a.eventId() <= b.eventId() ? a.eventId() : b.eventId();
-                    Long secondId = a.eventId() <= b.eventId() ? b.eventId() : a.eventId();
+                    Long firstId = Math.min(a.eventId(), b.eventId());
+                    Long secondId = Math.max(a.eventId(), b.eventId());
                     return new OverlapHit(new OverlapKey(firstId, secondId, key.classroomId()), key.date());
                 });
 
@@ -212,7 +212,7 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
             if (classroom == null || classroom.capacity() == null) continue;
 
             AcademicEventResponseDto event = eventDtoById.get(acc.eventId);
-            Integer enrolled = event != null && event.enrolled() != null ? event.enrolled() : 0;
+            int enrolled = event != null && event.enrolled() != null ? event.enrolled() : 0;
             Integer capacity = classroom.capacity();
             Integer overcrowdedBy = Overcrowding.by(enrolled, capacity);
             if (overcrowdedBy == null || overcrowdedBy == 0) continue;

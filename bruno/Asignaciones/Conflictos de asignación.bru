@@ -5,13 +5,13 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/allocations/conflicts?types=UNASSIGNED,OVERCROWDED,OVERLAP&from=2026-01-01&to=2026-12-31&includePast=false&page=0&size=20
+  url: {{baseUrl}}/v1/allocations/conflicts?types=UNALLOCATED,OVERCROWDED,OVERLAP&from=2026-01-01&to=2026-12-31&includePast=false&page=0&size=20
   body: none
   auth: inherit
 }
 
 params:query {
-  types: UNASSIGNED,OVERCROWDED,OVERLAP
+  types: UNALLOCATED,OVERCROWDED,OVERLAP
   from: 2026-01-01
   to: 2026-12-31
   includePast: false
@@ -23,7 +23,7 @@ docs {
   Unifica los tres listados que antes eran endpoints separados (eventos sin aula,
   aulas con sobrecupo, superposiciones de horario-aula) en uno solo, filtrable por
   "types" (los tres si se omite). Cada fila trae un discriminador "type" en el JSON
-  (UNASSIGNED / OVERCROWDED / OVERLAP) con forma distinta según el tipo — ver el
+  (UNALLOCATED / OVERCROWDED / OVERLAP) con forma distinta según el tipo — ver el
   ejemplo de respuesta en la descripción del endpoint en el backend.
   
   Rango por defecto: from=hoy, to=fin del período académico activo (o from + 6 meses
