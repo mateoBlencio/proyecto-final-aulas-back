@@ -1,0 +1,22 @@
+meta {
+  name: Historial de asignaciones de un evento
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/v1/allocations/history?eventId=1
+  body: none
+  auth: inherit
+}
+
+params:query {
+  eventId: 1
+}
+
+docs {
+  Fusiona el historial de auditoría de TODAS las occurrences del evento en una
+  sola línea de tiempo ascendente. Un evento único tiene una sola occurrence
+  (mismo comportamiento de siempre); uno recurrente fusiona N. 404 si el
+  evento no existe.
+}

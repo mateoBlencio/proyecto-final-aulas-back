@@ -6,10 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.Optional;
 import java.util.function.Function;
 
-/**
- * Centraliza el patrón {@code repo.findById(id).orElseThrow(...)}: loguea un warning y arma
- * la {@link ResourceNotFoundException} con mensaje estándar.
- */
 @Slf4j
 public final class Finder {
 

@@ -7,11 +7,6 @@ import java.util.Optional;
 import lombok.Getter;
 import org.springframework.modulith.NamedInterface;
 
-/**
- * Modalidad de dictado de una materia/comisión (anual o por cuatrimestre); deriva las
- * fechas estándar de inicio/fin de un {@link AcademicPeriod} para un año dado. No está
- * mapeado a columna: es lógica de apoyo usada, por ejemplo, en la importación desde Excel.
- */
 @Getter
 @NamedInterface("api")
 public enum TermType {
@@ -27,7 +22,6 @@ public enum TermType {
         this.semester = semester;
     }
 
-    /** Fecha de inicio estándar del período para este tipo de dictado en el año dado. */
     public LocalDate startDate(int year) {
         return switch (this) {
             case ANUAL, PRIMER_CUATRIMESTRE -> LocalDate.of(year, 3, 1);
@@ -35,7 +29,6 @@ public enum TermType {
         };
     }
 
-    /** Fecha de fin estándar del período para este tipo de dictado en el año dado. */
     public LocalDate endDate(int year) {
         return switch (this) {
             case PRIMER_CUATRIMESTRE -> LocalDate.of(year, 7, 31);
@@ -43,11 +36,6 @@ public enum TermType {
         };
     }
 
-    /**
-     * Resuelve el {@link TermType} a partir de su etiqueta legible (p. ej. "1 Cuat."), usada al importar desde
-     * Excel. La comparación es tolerante a mayúsculas/minúsculas, espacios y punto final, para no romper con
-     * datos de origen inconsistentes.
-     */
     public static Optional<TermType> fromLabel(String label) {
         if (label == null) return Optional.empty();
         String normalized = normalize(label);

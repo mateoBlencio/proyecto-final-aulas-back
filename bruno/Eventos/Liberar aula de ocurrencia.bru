@@ -1,0 +1,19 @@
+meta {
+  name: Liberar aula de una ocurrencia
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/v1/events/occurrences/:occurrenceId/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  occurrenceId: 1
+}
+
+docs {
+  Marca la ocurrencia como ROOM_RELEASED (libera el aula a propósito, reasignable en cualquier momento). Rechaza ocurrencias pasadas.
+}

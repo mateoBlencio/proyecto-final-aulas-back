@@ -77,8 +77,6 @@ class AuthControllerIntegrationTest {
         return restTemplate.exchange(baseUrl + path, HttpMethod.GET, new HttpEntity<>(headers), String.class);
     }
 
-    // ─── LOGIN ────────────────────────────────────────────────────────────────
-
     @Test
     void login_shouldReturn200WithTokens_whenCredentialsAreValid() throws Exception {
         ResponseEntity<String> response = login(ADMIN_EMAIL, PASSWORD);
@@ -92,8 +90,6 @@ class AuthControllerIntegrationTest {
 
     @Test
     void login_shouldReturn401_whenPasswordIsWrong() {
-        // Email dedicado (no ADMIN_EMAIL) para no gastar su contador de LoginRateLimiter,
-        // que es un bean singleton compartido entre todos los tests de este contexto.
         ResponseEntity<String> response = login("wrongpass.test@frc.utn.edu.ar", "wrong-password");
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
@@ -114,7 +110,6 @@ class AuthControllerIntegrationTest {
 
     @Test
     void login_sixthFailedAttempt_shouldReturn429() {
-        // Email dedicado, aislado del resto de los tests (ver nota más arriba).
         String email = "ratelimited.test@frc.utn.edu.ar";
         for (int i = 0; i < 5; i++) {
             ResponseEntity<String> response = login(email, "wrong-password");
@@ -123,8 +118,6 @@ class AuthControllerIntegrationTest {
         ResponseEntity<String> sixth = login(email, "wrong-password");
         assertThat(sixth.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
     }
-
-    // ─── ACCESO A /v1/** ────────────────────────────────────────────────────
 
     @Test
     void buildings_shouldReturn401_withoutToken() {
@@ -145,10 +138,8 @@ class AuthControllerIntegrationTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
-    // ─── CA6: control de acceso por rol ────────────────────────────────────
-
     @Test
-    void excelImport_shouldReturn403_forAuxiliarAulico() throws Exception {
+    void import_shouldReturn403_forAuxiliarAulico() throws Exception {
         String token = (String) parseMap(login(AUXILIAR_EMAIL, PASSWORD)).get("accessToken");
 
         HttpHeaders headers = new HttpHeaders();
@@ -164,12 +155,10 @@ class AuthControllerIntegrationTest {
         });
 
         ResponseEntity<String> response = restTemplate.exchange(
-                baseUrl + "/v1/excelimports", HttpMethod.POST, new HttpEntity<>(body, headers), String.class);
+                baseUrl + "/v1/imports", HttpMethod.POST, new HttpEntity<>(body, headers), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
-
-    // ─── REFRESH / LOGOUT ───────────────────────────────────────────────────
 
     @Test
     void refresh_shouldReturnFreshPair_whenTokenIsValid() throws Exception {
@@ -191,12 +180,10 @@ class AuthControllerIntegrationTest {
         Map<String, Object> loginBody = parseMap(login(ADMIN_EMAIL, PASSWORD));
         String refreshToken = (String) loginBody.get("refreshToken");
 
-        // Primera rotación.
         postJson("/auth/refresh", """
                 {"refreshToken":"%s"}
                 """.formatted(refreshToken));
 
-        // Reintento inmediato con el token viejo (ya rotado) dentro de la ventana de gracia.
         ResponseEntity<String> retry = postJson("/auth/refresh", """
                 {"refreshToken":"%s"}
                 """.formatted(refreshToken));

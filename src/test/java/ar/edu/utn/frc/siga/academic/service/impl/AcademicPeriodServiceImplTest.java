@@ -37,7 +37,6 @@ class AcademicPeriodServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        // AcademicPeriodMapperImpl no tiene dependencias (uses ninguno): se instancia real.
         service = new AcademicPeriodServiceImpl(academicPeriodRepository, new AcademicPeriodMapperImpl());
     }
 

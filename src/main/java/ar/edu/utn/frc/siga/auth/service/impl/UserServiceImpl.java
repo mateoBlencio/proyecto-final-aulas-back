@@ -28,7 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
-    /** El listado de usuarios se pagina siempre de a 15, sin importar el {@code size} del cliente. */
     private static final int PAGE_SIZE = 15;
 
     private final UserRepository userRepository;
@@ -44,7 +43,7 @@ public class UserServiceImpl implements UserService {
         log.debug("Creando usuario: email={}, rol={}", email, dto.rol());
         Role parsedRole = parseRole(dto.rol());
 
-        if (!email.toLowerCase().endsWith("@" + authDomainProperties.getAllowedEmailDomain().toLowerCase())) {
+        if (!authDomainProperties.isAllowedEmail(email)) {
             log.warn("Alta de usuario rechazada: dominio no institucional, email={}", email);
             throw new UserDomainException("User email domain not allowed: " + email);
         }
@@ -128,12 +127,10 @@ public class UserServiceImpl implements UserService {
                 });
     }
 
-    /** Fuerza el tamaño de página a {@link #PAGE_SIZE}, conservando número de página y orden del cliente. */
     private Pageable fixedSize(Pageable pageable) {
         return PageRequest.of(pageable.getPageNumber(), PAGE_SIZE, pageable.getSort());
     }
 
-    /** {@code @ElementCollection} exige una colección mutable que Hibernate pueda administrar. */
     private Set<Role> mutableRoleSet(Role rol) {
         Set<Role> roles = new HashSet<>();
         roles.add(rol);

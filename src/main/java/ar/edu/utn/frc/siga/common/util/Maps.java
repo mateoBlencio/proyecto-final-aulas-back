@@ -5,7 +5,6 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/** Indexa una lista por id. */
 public final class Maps {
 
     private Maps() {

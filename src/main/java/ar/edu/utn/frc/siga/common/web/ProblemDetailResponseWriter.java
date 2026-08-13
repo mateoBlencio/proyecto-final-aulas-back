@@ -7,10 +7,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 
-/**
- * Escribe un {@link ProblemDetail} directo en la response para los puntos del filter chain
- * (401/403/429) que corren antes de que el {@code @RestControllerAdvice} pueda intervenir.
- */
 public final class ProblemDetailResponseWriter {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();

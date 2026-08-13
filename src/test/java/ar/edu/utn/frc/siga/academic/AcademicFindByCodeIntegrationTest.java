@@ -28,10 +28,6 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Specialty/StudyPlan/Subject son catálogo (el import solo busca, no crea): sin
- * endpoint HTTP propio (lo consume {@code excelimport}), se inyectan los services directamente.
- */
 @Import(IntegrationTestData.class)
 @DisplayName("Academic find-only: Specialty/StudyPlan/Subject (integración)")
 class AcademicFindByCodeIntegrationTest extends AbstractIntegrationTest {

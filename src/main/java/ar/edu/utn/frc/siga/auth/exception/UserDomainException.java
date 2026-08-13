@@ -5,9 +5,6 @@ import org.springframework.http.HttpStatus;
 
 import java.io.Serial;
 
-/**
- * Violación de una regla de negocio del dominio de usuarios (alta, cambio de rol, habilitación).
- */
 public class UserDomainException extends SigaAppException {
 
     @Serial

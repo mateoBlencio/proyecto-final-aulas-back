@@ -9,9 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Implementación de {@link ClassroomTypeService}.
- */
 @Slf4j
 @Service
 @Transactional(readOnly = true)

@@ -1,0 +1,50 @@
+meta {
+  name: Crear evento único
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/v1/events/unique
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "eventType": "EXAMEN_FINAL",
+    "subjectId": 1,
+    "commissionId": 1,
+    "date": "2026-06-27",
+    "startTime": "19:55",
+    "durationMinutes": 180,
+    "enrolled": 45,
+    "description": "Mesa de examen final, turno julio"
+  }
+}
+
+docs {
+  Crea un evento único BARE (sin aula) y genera su única ocurrencia. Ya no
+  asigna aula en la misma operación: eso ahora es un paso 2 aparte y NO
+  atómico con este POST. Para asignarle aula al evento recién creado, ver
+  03b-asignar-aula-a-evento-unico-creado.bru:
+  POST /v1/allocations con
+  { "items": [ { "occurrenceIds": [<el occurrenceId de la única ocurrencia
+  del evento nuevo, obtenido con GET /v1/events/:id/occurrences>],
+  "classroomId": <id> } ] }
+
+  eventType: PARCIAL | TRABAJO_PRACTICO | EXAMEN_FINAL | OTRO.
+  subjectId es obligatorio salvo para eventType=OTRO. commissionId nunca es
+  obligatorio por sí solo, pero no puede venir sin subjectId (ver ADR-011). Si
+  vienen, ambos se validan contra sus fachadas (404 si materia/comisión no existen).
+
+  Valida ventana horaria (08:00-23:00 por defecto) antes de guardar. La
+  disponibilidad de aula y el solapamiento ya NO se validan acá (no hay aula
+  en este call); esa validación corre en el paso 2, al asignar aula. Horario
+  fuera de ventana o fin <= inicio → 400. Falta subjectId con eventType
+  distinto de OTRO, o commissionId sin subjectId → 400.
+
+  Respuesta 201: AcademicEventResponseDto del evento recién creado, sin
+  información de aula (esa solo aparece vía GET /v1/allocations/events/unique
+  una vez que se le asigna una).
+}

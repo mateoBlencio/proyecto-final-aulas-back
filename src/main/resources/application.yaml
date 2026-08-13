@@ -73,16 +73,16 @@ cors:
 siga:
   api:
     base-path: /v1
-  solver:
+  optimizer:
     parallel-solver-count: AUTO
     unimproved-seconds-limit: 1000
     environment-mode: PHASE_ASSERT
-    preview:
-      ttl-minutes: 30
     weights:
       overcrowding: 100000
       same-commission-diff-room: 2000
       same-commission-diff-building: 4000
+  preview:
+    ttl-minutes: 30
   space:
     default-classroom-type: Normal
   events:

@@ -13,14 +13,12 @@ public class JwtProperties {
 
     private static final int MIN_SECRET_BYTES = 32;
 
-    /** Sin default: el arranque falla si no está seteada (salvo en dev-local). */
     private String secret;
 
     private int accessExpirationMinutes = 20;
 
     private int refreshExpirationDays = 30;
 
-    /** Ventana de gracia para tolerar reintentos de red de un refresh recién rotado. */
     private int refreshGraceSeconds = 10;
 
     @PostConstruct

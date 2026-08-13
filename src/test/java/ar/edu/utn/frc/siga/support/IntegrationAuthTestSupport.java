@@ -10,11 +10,6 @@ import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
 
-/**
- * Helper de test cross-módulo: hace login real contra {@code /auth/login} para que los tests
- * de integración sigan probando la cadena JWT de punta a punta, en vez de desactivar seguridad
- * en el profile de test.
- */
 public final class IntegrationAuthTestSupport {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();

@@ -46,7 +46,7 @@ public class AuthServiceImpl implements AuthService {
         String email = request.email();
         String ip = httpRequest.getRemoteAddr();
 
-        if (!email.toLowerCase().endsWith("@" + authDomainProperties.getAllowedEmailDomain().toLowerCase())) {
+        if (!authDomainProperties.isAllowedEmail(email)) {
             log.warn("Login rechazado, dominio no institucional: email={}, ip={}", email, ip);
             throw new InvalidCredentialsException();
         }

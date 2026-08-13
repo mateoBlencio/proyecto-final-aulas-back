@@ -15,10 +15,6 @@ import org.springframework.context.annotation.Import;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * {@code ClassroomService.findByRoomNumberAndBuilding} es catálogo (no crea): sin
- * endpoint HTTP (lo usa {@code excelimport}), así que se inyecta el service directamente.
- */
 @Import(IntegrationTestData.class)
 @DisplayName("ClassroomService.findByRoomNumberAndBuilding (integración)")
 class ClassroomFindByRoomNumberIntegrationTest extends AbstractIntegrationTest {

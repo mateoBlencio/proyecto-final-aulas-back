@@ -17,9 +17,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
-/**
- * Materia dictada dentro de un {@link StudyPlan}. El código es único por plan de estudio.
- */
 @Entity
 @Table(name = "materia",
        uniqueConstraints = @UniqueConstraint(columnNames = {"codigo_materia", "id_plan"}))

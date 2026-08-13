@@ -1,0 +1,69 @@
+meta {
+  name: Confirmar preview
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/v1/previews/:previewId/confirm
+  body: json
+  auth: bearer
+}
+
+params:path {
+  previewId: prev_961560f8
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJhZG1pbkBmcmMudXRuLmVkdS5hciIsInJvbGVzIjpbIlNVQlNFQ1JFVEFSSUEiXSwiaWF0IjoxNzg1MTE0NTc1LCJleHAiOjE3ODUxMTU3NzV9.X-EjQOMqzdQbdcABQ3BubqKjeZHNDvvuohGpXe1eGu3uN9Oifsl_FojTuPEDvWLS
+}
+
+body:json {
+  {
+    "allocations": [
+      { "eventId": 1, "classroomId": 9 },
+      { "eventId": 2, "classroomId": 7 },
+      { "eventId": 3, "classroomId": null }
+    ]
+  }
+}
+
+docs {
+  Confirma la propuesta final: persiste de forma atómica lo que quedó tras los
+  ajustes del usuario en el front (drag-and-drop de aula incluido). TODA la
+  validación corre ANTES de escribir nada; si algo falla, la BD queda intacta.
+  
+  Flujo esperado: POST /v1/previews (o GET /v1/previews/{id}) → el usuario
+  ajusta aulas en el front → confirm con la lista FINAL.
+  
+  Body:
+  - allocations: propuesta final { eventId, classroomId }. Debe ser un
+    subconjunto de los eventos del preview, sin duplicados. classroomId puede
+    ser null para un evento que el usuario decide dejar sin resolver.
+  
+  classroomId == null → el evento va a skippedEventIds, no se aplica (queda
+  para revisión manual). Si TODOS los items vienen con classroomId null,
+  responde 200 con applied vacío y skipped completo (no es un error).
+  
+  Respuesta 200:
+  { "applied": [ { id, source: "AUTOMATIC", createdAt, observation,
+  occurrence, event, classroom } ], "skippedEventIds": [3] }
+  
+  source siempre queda AUTOMATIC (lo estampa el backend, nunca lo decide el
+  cliente). Las occurrences ya ALLOCATED conservan su estado con el aula
+  nueva; las que no tenían asignación pasan a ALLOCATED. No se duplican
+  allocations: si la ocurrencia ya tenía una, se actualiza.
+  
+  Errores:
+  - 410 Gone: el previewId no existe o expiró (TTL). Generá un preview nuevo.
+  - 409 Conflict: algún eventId del body no pertenece al preview, o hay
+    eventIds duplicados en el body.
+  - 409 Conflict: un aula del body no existe o no está disponible.
+  - 409 Conflict (ReallocationConflictException, con "conflicts"): la propuesta
+    genera una superposición nueva — contra una asignación firme de BD, o
+    entre dos ítems del propio body (misma aula, misma fecha, franja que se
+    pisa). Nada persiste en ningún caso.
+  
+  IMPORTANTE: tras un confirm exitoso el preview se invalida — un re-confirm
+  con el mismo previewId da 410 (protección natural contra doble submit).
+}

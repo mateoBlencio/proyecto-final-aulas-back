@@ -8,11 +8,6 @@ import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/**
- * Corte duro de 5 intentos fallidos por email cada 15 minutos, ventana deslizante.
- * No es rate-limit por IP (falsos positivos por NAT compartido) ni account lockout
- * (DoS trivial contra un email ajeno).
- */
 @Component
 @RequiredArgsConstructor
 public class LoginRateLimiter {

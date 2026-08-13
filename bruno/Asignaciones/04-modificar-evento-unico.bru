@@ -1,0 +1,46 @@
+meta {
+  name: Modificar evento único
+  type: http
+  seq: 13
+}
+
+put {
+  url: {{baseUrl}}/v1/events/unique/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: 1
+}
+
+body:json {
+  {
+    "eventType": "EXAMEN_FINAL",
+    "subjectId": 1,
+    "commissionId": 1,
+    "date": "2026-06-28",
+    "startTime": "20:00",
+    "durationMinutes": 120,
+    "enrolled": 50,
+    "description": "Mesa de examen final, turno julio (reprogramada)"
+  }
+}
+
+docs {
+  Actualiza materia, comisión, fecha, horario, cantidad de alumnos y
+  observaciones de un evento único existente, revalidando ventana horaria
+  antes de guardar. Ya no acepta "classroomId": la reasignación de aula ahora
+  es un call aparte, PUT /v1/allocations con
+  { "items": [ { "occurrenceIds": [...], "classroomId": ... } ] }
+  (ver 02-reasignar-aula.bru).
+
+  subjectId es obligatorio salvo para eventType=OTRO. commissionId nunca es
+  obligatorio por sí solo, pero no puede venir sin subjectId (ver ADR-011).
+
+  404 si el id no corresponde a un evento único (inexistente o recurrente), o
+  si subjectId/commissionId no existen. 409 si ya ocurrió. 400 si falta
+  subjectId con eventType distinto de OTRO, o si viene commissionId sin
+  subjectId. La disponibilidad de aula y el solapamiento ya no se validan
+  acá (no hay aula involucrada en este call).
+}

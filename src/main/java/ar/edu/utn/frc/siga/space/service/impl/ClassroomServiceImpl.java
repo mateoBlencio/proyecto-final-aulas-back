@@ -26,13 +26,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Nota: resuelve {@link Building} vía {@link BuildingRepository} directo (no vía
- * {@code BuildingService}) porque el aula necesita la entidad para la relación JPA
- * {@code Classroom.building}, ambas intra-módulo. {@code BuildingService} (fachada
- * {@code api}) solo expone DTOs — devolver la entidad ahí sería reintroducir el mismo
- * acoplamiento que la Fase 4 elimina, aunque el consumidor esté en el propio módulo.
- */
 @Slf4j
 @Service
 @Transactional(readOnly = true)
@@ -130,15 +123,9 @@ public class ClassroomServiceImpl implements ClassroomService {
         log.info("Aula eliminada: id={}", id);
     }
 
-    /**
-     * Busca por edificio+número; si no matchea, hace fallback a buscar solo por número
-     * — tolera edificio mal cargado en el origen (p. ej. typo de planilla) sin tocar el
-     * dato — pero solo si el número resulta en una única aula en todo el catálogo (no
-     * siempre es así, p. ej. "999" es código genérico repetido entre edificios).
-     */
     @Override
     public ClassroomResponseDto findByRoomNumberAndBuilding(String roomNumber, Integer buildingId) {
-        Building building = requireBuilding(buildingId);
+        Building building = findBuildingById(buildingId);
         return classroomMapper.toDto(classroomRepository.findByRoomNumberAndBuilding(roomNumber, building)
                 .or(() -> fallbackByRoomNumberOnly(roomNumber, buildingId))
                 .orElseThrow(() -> ResourceNotFoundException.of("Classroom", roomNumber)));
@@ -163,18 +150,18 @@ public class ClassroomServiceImpl implements ClassroomService {
                 });
     }
 
-    private Building findActiveBuilding(Integer id) {
-        return buildingRepository.findById(id)
-                .filter(Building::getActive)
-                .orElseThrow(() -> {
-                    log.warn("Edificio no encontrado: id={}", id);
-                    return ResourceNotFoundException.of("Building", id);
-                });
-    }
-
-    private Building requireBuilding(Integer id) {
+    private Building findBuildingById(Integer id) {
         return buildingRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("Building", id));
+    }
+
+    private Building findActiveBuilding(Integer id) {
+        Building building = findBuildingById(id);
+        if (!building.getActive()) {
+            log.warn("Edificio no encontrado: id={}", id);
+            throw ResourceNotFoundException.of("Building", id);
+        }
+        return building;
     }
 
     private void validateFloor(ClassroomRequestDto dto, Building building) {

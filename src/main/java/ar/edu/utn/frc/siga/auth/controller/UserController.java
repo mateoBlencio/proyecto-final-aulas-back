@@ -25,9 +25,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Administración de usuarios: alta, habilitación/inhabilitación, cambio de rol y listados.
- */
 @Slf4j
 @RestController
 @RequestMapping("${siga.api.base-path}/users")

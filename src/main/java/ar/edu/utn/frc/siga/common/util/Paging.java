@@ -6,7 +6,6 @@ import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
-/** Pagina en memoria una lista ya calculada (agregaciones que no se resuelven con una query paginable). */
 public final class Paging {
 
     private Paging() {

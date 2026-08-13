@@ -1,0 +1,19 @@
+meta {
+  name: Volver a pedir aula para una ocurrencia
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/v1/events/occurrences/:occurrenceId/request-room
+  body: none
+  auth: inherit
+}
+
+params:path {
+  occurrenceId: 1
+}
+
+docs {
+  Vuelve a marcar la ocurrencia como necesitada de aula (NEEDS_ROOM). Rechaza ocurrencias pasadas.
+}

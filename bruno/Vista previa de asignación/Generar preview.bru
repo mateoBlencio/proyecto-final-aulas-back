@@ -1,0 +1,80 @@
+meta {
+  name: Generar preview
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/v1/previews
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJhZG1pbkBmcmMudXRuLmVkdS5hciIsInJvbGVzIjpbIlNVQlNFQ1JFVEFSSUEiXSwiaWF0IjoxNzg1MTE0NTc1LCJleHAiOjE3ODUxMTU3NzV9.X-EjQOMqzdQbdcABQ3BubqKjeZHNDvvuohGpXe1eGu3uN9Oifsl_FojTuPEDvWLS
+}
+
+body:json {
+  {
+    "selectAll":true,
+    "excludedIds":[1005, 171, 1006, 1325],
+    "eventIds": [],
+    "timeLimitSeconds": 30
+  }
+}
+
+docs {
+  Corre el solver con TODAS las aulas disponibles de la BD y la ocupación existente
+  (asignaciones ya hechas) como restricción dura. Devuelve una preview con previewId,
+  sin persistir asignaciones. El confirm es un paso aparte (pendiente).
+  
+  Dos modos EXCLUYENTES para elegir los eventos a (RE)RESOLVER (ninguno o ambos a la
+  vez → 400 Invalid selection):
+  - eventIds: lista explícita, vengan del listado que vengan (GET /problems):
+    eventos SIN aula asignada, o eventos YA asignados con sobrecupo o superposición
+    (sus aulas se "sueltan" para que el solver pueda reasignarlas).
+  - selectAll: true junto con excludedIds (opcional) para resolver TODOS los eventos
+    sin aula (mismo criterio que GET /unallocated sin filtros), descontando los ids
+    que el usuario desmarcó manualmente. Pensado para el botón "Seleccionar todas
+    (N)" del front, evitando mandar miles de ids en el body.
+  
+  Ejemplo modo selectAll:
+  {
+    "selectAll": true,
+    "excludedIds": [205, 318],
+    "timeLimitSeconds": 30
+  }
+  
+  Los ids duplicados se deduplican (un evento puede aparecer en más de un listado).
+  Todo lo NO seleccionado sigue siendo intocable (ocupación pinned): la propuesta
+  jamás pisa asignaciones firmes. Solo se consideran occurrences futuras (>= hoy).
+  
+  Respuesta (datos para dibujar la propuesta en el calendario):
+  {
+    "previewId": "prev_xxxxxxxx",
+    "allocations": [ { "event": {...}, "occurrenceDates": ["2026-08-03", ...], "classroom": {...}, "overcrowdedBy": 0, "unchanged": false } ],
+    "unresolved": [ { "event": {...}, "dates": ["2026-08-03", ...], "conflicts": [
+      { "date": "2026-08-03", "startTime": "08:00", "endTime": "09:30", "classroomId": 9,
+        "conflictingEventId": 42, "origin": "DATABASE" }
+    ] } ]
+  }
+  allocations = filas con aula propuesta; unresolved = el solver no encontró aula sin
+  conflicto para ese evento → queda para revisión manual.
+  overcrowdedBy = alumnos que exceden la capacidad del aula propuesta (0 si entran, o si
+  la fila es unresolved); pintar alerta de sobrecupo cuando es > 0.
+  Nota: un evento que YA tenía aula asignada nunca cae en unresolved aunque el solver no
+  lo reubique — conserva su aula previa (floor de no-regresión). Solo eventos nuevos sin
+  aula pueden quedar en unresolved.
+  unchanged = true cuando el aula propuesta es la misma que el evento ya tenía asignada
+  antes de correr el solver (evento nuevo sin aula previa siempre da unchanged: false).
+  El front no debe mostrar esa fila como una reasignación exitosa, sino como "sin cambios".
+  
+  unresolved[].conflicts: por qué ninguna aula candidata sirvió — a lo sumo UN conflicto
+  por aula candidata (el primero por fecha). origin: DATABASE = choca con asignación
+  firme de BD; PREVIEW = choca con otra fila ya resuelta de esta misma propuesta.
+  conflicts vacío = no se pudo determinar el motivo (caso raro, solve subóptimo por
+  corte de tiempo).
+  
+  IMPORTANTE: el timeout del cliente debe superar timeLimitSeconds (el POST queda
+  pendiente mientras corre el solver; con timeLimitSeconds=300 puede tardar 5 min).
+}

@@ -1,5 +1,7 @@
 spring:
   jpa:
+    hibernate:
+      ddl-auto: update
     show-sql: false
   datasource:
     hikari:

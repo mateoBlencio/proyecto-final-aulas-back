@@ -15,9 +15,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/**
- * Consulta de períodos académicos.
- */
 @Slf4j
 @RestController
 @RequestMapping("${siga.api.base-path}/academic-periods")
