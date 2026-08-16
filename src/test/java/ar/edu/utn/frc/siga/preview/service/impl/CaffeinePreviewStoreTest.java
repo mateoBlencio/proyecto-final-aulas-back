@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.siga.preview.service.impl;
 
-import ar.edu.utn.frc.siga.preview.config.PreviewProperties;
+import ar.edu.utn.frc.siga.preview.config.PreviewSettings;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizerAllocation;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizationResult;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @DisplayName("CaffeinePreviewStore")
 class CaffeinePreviewStoreTest {
@@ -18,7 +20,10 @@ class CaffeinePreviewStoreTest {
 
     @BeforeEach
     void setUp() {
-        store = new CaffeinePreviewStore(new PreviewProperties());
+        PreviewSettings previewSettings = mock(PreviewSettings.class);
+        when(previewSettings.getTtlMinutes()).thenReturn(30L);
+        store = new CaffeinePreviewStore(previewSettings);
+        store.init();
     }
 
     @Test

@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.optimizer.service.impl;
 
-import ar.edu.utn.frc.siga.optimizer.config.OptimizerProperties;
+import ar.edu.utn.frc.siga.optimizer.config.OptimizerSettings;
+import ar.edu.utn.frc.siga.optimizer.config.SolverManagerProvider;
 import ar.edu.utn.frc.siga.optimizer.model.ClassAllocation;
 import ar.edu.utn.frc.siga.optimizer.model.ScheduleSolution;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizerAllocation;
@@ -40,11 +41,17 @@ class OptimizerServiceImplTest {
     @Mock
     private SolverManager<ScheduleSolution> solverManager;
 
+    @Mock
+    private SolverManagerProvider solverManagerProvider;
+
+    @Mock
+    private OptimizerSettings optimizerSettings;
+
     private OptimizerServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new OptimizerServiceImpl(solverManager, new OptimizerProperties());
+        service = new OptimizerServiceImpl(solverManagerProvider, optimizerSettings);
     }
 
     private static OptimizerEvent event(String id, LocalTime start, LocalTime end, LocalDate... dates) {
@@ -56,6 +63,7 @@ class OptimizerServiceImplTest {
         SolverJobBuilder<ScheduleSolution> builder = mock(SolverJobBuilder.class, Answers.RETURNS_SELF);
         SolverJob<ScheduleSolution> job = mock(SolverJob.class);
         ArgumentCaptor<ScheduleSolution> captor = ArgumentCaptor.forClass(ScheduleSolution.class);
+        when(solverManagerProvider.get()).thenReturn(solverManager);
         when(solverManager.solveBuilder()).thenReturn(builder);
         when(builder.withProblem(captor.capture())).thenReturn(builder);
         when(builder.run()).thenReturn(job);
@@ -176,7 +184,7 @@ class OptimizerServiceImplTest {
 
             ScheduleSolution problem = captor.getValue();
             assertThat(problem.getAllocations()).hasSize(1);
-            ClassAllocation pinnedAllocation = problem.getAllocations().get(0);
+            ClassAllocation pinnedAllocation = problem.getAllocations().getFirst();
             assertThat(pinnedAllocation.isPinned()).isTrue();
             assertThat(pinnedAllocation.getClassroom()).isEqualTo(room);
             assertThat(pinnedAllocation.getCandidates()).containsExactly(room);

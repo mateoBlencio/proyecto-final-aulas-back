@@ -9,23 +9,40 @@ import ai.timefold.solver.core.api.score.stream.Joiners;
 import lombok.Setter;
 import org.jspecify.annotations.NonNull;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Setter
 public class ClassroomConstraintProvider implements ConstraintProvider {
 
     private int overcrowdingWeight = 100_000;
     private int sameCommissionDiffRoomWeight = 2_000;
     private int sameCommissionDiffBuildingWeight = 4_000;
+    private int unusedCapacityWeight = 1;
+
+    private boolean minimizeOvercrowdingEnabled = true;
+    private boolean minimizeUnusedCapacityEnabled = true;
+    private boolean preferSameRoomSameCommissionEnabled = true;
+    private boolean preferSameBuildingSameCommissionEnabled = true;
 
     @Override
     public Constraint @NonNull [] defineConstraints(@NonNull ConstraintFactory factory) {
-        return new Constraint[]{
-                noOverlap(factory),
-                allocateAllPossible(factory),
-                minimizeOvercrowding(factory),
-                minimizeUnusedCapacity(factory),
-                preferSameRoomSameCommission(factory),
-                preferSameBuildingSameCommission(factory)
-        };
+        List<Constraint> constraints = new ArrayList<>();
+        constraints.add(noOverlap(factory));
+        constraints.add(allocateAllPossible(factory));
+        if (minimizeOvercrowdingEnabled) {
+            constraints.add(minimizeOvercrowding(factory));
+        }
+        if (minimizeUnusedCapacityEnabled) {
+            constraints.add(minimizeUnusedCapacity(factory));
+        }
+        if (preferSameRoomSameCommissionEnabled) {
+            constraints.add(preferSameRoomSameCommission(factory));
+        }
+        if (preferSameBuildingSameCommissionEnabled) {
+            constraints.add(preferSameBuildingSameCommission(factory));
+        }
+        return constraints.toArray(new Constraint[0]);
     }
 
     Constraint noOverlap(ConstraintFactory factory) {
@@ -58,7 +75,7 @@ public class ClassroomConstraintProvider implements ConstraintProvider {
                 .forEach(ClassAllocation.class)
                 .filter(a -> !a.isPinned())
                 .penalize(HardMediumSoftScore.ONE_SOFT,
-                        ClassAllocation::getUnusedCapacity)
+                        a -> (long) a.getUnusedCapacity() * unusedCapacityWeight)
                 .asConstraint("Minimizar subocupacion");
     }
 

@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.optimizer.service.impl;
 
-import ar.edu.utn.frc.siga.optimizer.config.OptimizerProperties;
+import ar.edu.utn.frc.siga.optimizer.config.OptimizerSettings;
+import ar.edu.utn.frc.siga.optimizer.config.SolverManagerProvider;
 import ar.edu.utn.frc.siga.optimizer.exception.SchedulingException;
 import ar.edu.utn.frc.siga.optimizer.model.ClassAllocation;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizerOccupancy;
@@ -13,7 +14,6 @@ import ar.edu.utn.frc.siga.optimizer.service.OptimizerService;
 import ar.edu.utn.frc.siga.common.util.Clashes;
 import ai.timefold.solver.core.api.solver.SolverConfigOverride;
 import ai.timefold.solver.core.api.solver.SolverJob;
-import ai.timefold.solver.core.api.solver.SolverManager;
 import ai.timefold.solver.core.config.solver.termination.TerminationConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,8 +35,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OptimizerServiceImpl implements OptimizerService {
 
-    private final SolverManager<ScheduleSolution> solverManager;
-    private final OptimizerProperties optimizerProperties;
+    private final SolverManagerProvider solverManagerProvider;
+    private final OptimizerSettings optimizerSettings;
 
     private record ExistingOccupancy(OptimizerEvent event, OptimizerRoom room) {
     }
@@ -117,7 +117,7 @@ public class OptimizerServiceImpl implements OptimizerService {
     private ScheduleSolution runSolver(ScheduleSolution problem, int timeLimitSeconds) {
         String jobId = UUID.randomUUID().toString();
         log.info("Job del solver {} lanzado, límite {}s", jobId, timeLimitSeconds);
-        SolverJob<ScheduleSolution> job = solverManager.solveBuilder()
+        SolverJob<ScheduleSolution> job = solverManagerProvider.get().solveBuilder()
                 .withProblemId(jobId)
                 .withProblem(problem)
                 .withConfigOverride(new SolverConfigOverride()
@@ -141,7 +141,7 @@ public class OptimizerServiceImpl implements OptimizerService {
     private TerminationConfig buildTermination(int timeLimitSeconds) {
         TerminationConfig termination = new TerminationConfig()
                 .withSecondsSpentLimit((long) timeLimitSeconds);
-        long unimproved = optimizerProperties.getUnimprovedSecondsLimit();
+        long unimproved = optimizerSettings.getUnimprovedSecondsLimit();
         if (unimproved > 0) {
             termination.setUnimprovedSecondsSpentLimit(unimproved);
         }

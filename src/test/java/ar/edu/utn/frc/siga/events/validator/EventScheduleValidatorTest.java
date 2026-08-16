@@ -2,7 +2,7 @@ package ar.edu.utn.frc.siga.events.validator;
 
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
-import ar.edu.utn.frc.siga.events.config.EventScheduleProperties;
+import ar.edu.utn.frc.siga.events.config.EventScheduleSettings;
 import ar.edu.utn.frc.siga.events.exception.InvalidCommissionForSubjectException;
 import ar.edu.utn.frc.siga.events.exception.InvalidEventScheduleException;
 import ar.edu.utn.frc.siga.events.exception.MissingAcademicReferenceException;
@@ -20,11 +20,15 @@ import java.time.LocalTime;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("EventScheduleValidator")
 class EventScheduleValidatorTest {
+
+    @Mock
+    private EventScheduleSettings scheduleSettings;
 
     @Mock
     private SubjectCommissionService subjectCommissionService;
@@ -33,7 +37,9 @@ class EventScheduleValidatorTest {
 
     @BeforeEach
     void setUp() {
-        validator = new EventScheduleValidator(new EventScheduleProperties(), subjectCommissionService);
+        lenient().when(scheduleSettings.getStart()).thenReturn(LocalTime.of(8, 0));
+        lenient().when(scheduleSettings.getEnd()).thenReturn(LocalTime.of(23, 0));
+        validator = new EventScheduleValidator(scheduleSettings, subjectCommissionService);
     }
 
 

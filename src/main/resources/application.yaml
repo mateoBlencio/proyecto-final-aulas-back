@@ -35,8 +35,6 @@ spring:
       org:
         hibernate:
           envers:
-            # Guardar los datos de la entidad en la revisión DEL: sin esto la fila DEL queda
-            # con las FKs en null y el historial filtrado por relatedId no la encuentra.
             store_data_at_delete: true
 
   docker:
@@ -75,20 +73,9 @@ siga:
     base-path: /v1
   optimizer:
     parallel-solver-count: AUTO
-    unimproved-seconds-limit: 1000
     environment-mode: PHASE_ASSERT
-    weights:
-      overcrowding: 100000
-      same-commission-diff-room: 2000
-      same-commission-diff-building: 4000
-  preview:
-    ttl-minutes: 30
   space:
     default-classroom-type: Normal
-  events:
-    hours:
-      start: "08:00"
-      end: "23:00"
   jwt:
     secret: ${JWT_SECRET}
     access-expiration-minutes: ${JWT_ACCESS_EXPIRATION_MINUTES:20}
@@ -108,7 +95,6 @@ logging:
   level:
     root: WARN
     ar.edu.utn.frc.siga: INFO
-    # Fases del solver (construction heuristic / local search) y resumen de score de Timefold.
     ai.timefold.solver.core.impl.solver: INFO
     ai.timefold.solver.core.impl.constructionheuristic: INFO
     ai.timefold.solver.core.impl.localsearch: INFO

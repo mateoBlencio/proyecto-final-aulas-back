@@ -12,6 +12,7 @@ import ar.edu.utn.frc.siga.preview.dto.request.PreviewAllocationDto;
 import ar.edu.utn.frc.siga.preview.dto.request.PreviewRequestDto;
 import ar.edu.utn.frc.siga.preview.dto.response.ConfirmPreviewResponseDto;
 import ar.edu.utn.frc.siga.preview.dto.response.PreviewResponseDto;
+import ar.edu.utn.frc.siga.preview.config.PreviewSettings;
 import ar.edu.utn.frc.siga.preview.exception.ExpiredPreviewException;
 import ar.edu.utn.frc.siga.preview.mapper.PreviewComposer;
 import ar.edu.utn.frc.siga.preview.service.PreviewStore;
@@ -62,13 +63,16 @@ class PreviewServiceImplTest {
     private AllocationConflictService allocationConflictService;
     @Mock
     private OccurrenceService occurrenceService;
+    @Mock
+    private PreviewSettings previewSettings;
 
     private PreviewServiceImpl service;
 
     @BeforeEach
     void setUp() {
         service = new PreviewServiceImpl(previewEngine, previewStore, previewComposer, previewValidator,
-                validator, allocationService, allocationConflictService, occurrenceService);
+                validator, allocationService, allocationConflictService, occurrenceService, previewSettings);
+        lenient().when(previewSettings.getDefaultTimeLimitSeconds()).thenReturn(30);
         lenient().when(previewEngine.loadInputs(any())).thenReturn(
                 new PreviewEngine.Inputs(List.of(), Map.of(), List.of(), List.of(), List.of(), Map.of()));
     }

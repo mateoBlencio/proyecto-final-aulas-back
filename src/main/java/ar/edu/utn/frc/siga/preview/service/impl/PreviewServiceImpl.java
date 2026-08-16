@@ -16,6 +16,7 @@ import ar.edu.utn.frc.siga.preview.dto.request.PreviewAllocationDto;
 import ar.edu.utn.frc.siga.preview.dto.request.PreviewRequestDto;
 import ar.edu.utn.frc.siga.preview.dto.response.ConfirmPreviewResponseDto;
 import ar.edu.utn.frc.siga.preview.dto.response.PreviewResponseDto;
+import ar.edu.utn.frc.siga.preview.config.PreviewSettings;
 import ar.edu.utn.frc.siga.preview.mapper.PreviewComposer;
 import ar.edu.utn.frc.siga.preview.service.PreviewService;
 import ar.edu.utn.frc.siga.preview.service.PreviewStore;
@@ -39,8 +40,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PreviewServiceImpl implements PreviewService {
 
-    private static final int DEFAULT_TIME_LIMIT_SECONDS = 30;
-
     private final PreviewEngine previewEngine;
     private final PreviewStore previewStore;
     private final PreviewComposer previewComposer;
@@ -49,12 +48,13 @@ public class PreviewServiceImpl implements PreviewService {
     private final AllocationService allocationService;
     private final AllocationConflictService allocationConflictService;
     private final OccurrenceService occurrenceService;
+    private final PreviewSettings previewSettings;
 
     @Override
     public PreviewResponseDto autoPreview(PreviewRequestDto request) {
         Set<Long> eventIds = resolveEventIds(request);
         int timeLimit = request.timeLimitSeconds() != null
-                ? request.timeLimitSeconds() : DEFAULT_TIME_LIMIT_SECONDS;
+                ? request.timeLimitSeconds() : previewSettings.getDefaultTimeLimitSeconds();
         log.info("Auto-preview: {} eventos, límite {}s", eventIds.size(), timeLimit);
 
         OptimizationResult preview = previewEngine.generate(eventIds, timeLimit);
