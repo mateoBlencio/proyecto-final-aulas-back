@@ -1,0 +1,22 @@
+meta {
+  name: Catálogo - listar comisiones de una materia
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/v1/room-requests/catalog/commissions?subjectId=1
+  body: none
+  auth: none
+}
+
+params:query {
+  subjectId: 1
+}
+
+docs {
+  Tercer combo del formulario. Devuelve las comisiones asociadas a la materia
+  vía materia_comision.
+
+  Endpoint PÚBLICO. 404 si la materia no existe.
+}

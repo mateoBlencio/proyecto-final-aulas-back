@@ -1,0 +1,22 @@
+meta {
+  name: Catálogo - listar materias de una especialidad
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/room-requests/catalog/subjects?specialtyCode=1
+  body: none
+  auth: none
+}
+
+params:query {
+  specialtyCode: 1
+}
+
+docs {
+  Segundo combo del formulario. Se filtra por el CÓDIGO de especialidad
+  (no por id) porque es lo que devuelve el combo anterior.
+
+  Endpoint PÚBLICO.
+}

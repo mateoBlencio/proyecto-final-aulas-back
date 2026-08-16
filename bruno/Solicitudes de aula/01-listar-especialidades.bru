@@ -1,0 +1,21 @@
+meta {
+  name: Catálogo - listar especialidades
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/room-requests/catalog/specialties
+  body: none
+  auth: none
+}
+
+docs {
+  Primer combo del formulario público de solicitud de aula.
+
+  Endpoint PÚBLICO: no lleva token. Devuelve solo código y nombre.
+
+  Existe en vez de usar GET /v1/specialties porque ese está cerrado con
+  @PreAuthorize para personal interno; acá se expone una lectura acotada y
+  el permitAll se decide en un solo lugar (SecurityConfig).
+}
