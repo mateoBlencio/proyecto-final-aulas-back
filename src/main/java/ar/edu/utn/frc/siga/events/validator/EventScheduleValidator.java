@@ -1,7 +1,7 @@
 package ar.edu.utn.frc.siga.events.validator;
 
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
-import ar.edu.utn.frc.siga.events.config.EventScheduleProperties;
+import ar.edu.utn.frc.siga.events.config.EventScheduleSettings;
 import ar.edu.utn.frc.siga.events.exception.InvalidCommissionForSubjectException;
 import ar.edu.utn.frc.siga.events.exception.InvalidEventScheduleException;
 import ar.edu.utn.frc.siga.events.exception.MissingAcademicReferenceException;
@@ -18,7 +18,7 @@ import java.time.LocalTime;
 @RequiredArgsConstructor
 public class EventScheduleValidator {
 
-    private final EventScheduleProperties scheduleProperties;
+    private final EventScheduleSettings scheduleSettings;
     private final SubjectCommissionService subjectCommissionService;
 
     public void validateBusinessHours(LocalTime start, LocalTime end) {
@@ -26,10 +26,10 @@ public class EventScheduleValidator {
             throw new InvalidEventScheduleException(
                     "La hora de fin (" + end + ") debe ser posterior a la hora de inicio (" + start + ").");
         }
-        if (start.isBefore(scheduleProperties.getStart()) || end.isAfter(scheduleProperties.getEnd())) {
+        if (start.isBefore(scheduleSettings.getStart()) || end.isAfter(scheduleSettings.getEnd())) {
             throw new InvalidEventScheduleException("El horario " + start + "-" + end
-                    + " está fuera de la ventana permitida (" + scheduleProperties.getStart()
-                    + "-" + scheduleProperties.getEnd() + ").");
+                    + " está fuera de la ventana permitida (" + scheduleSettings.getStart()
+                    + "-" + scheduleSettings.getEnd() + ").");
         }
     }
 

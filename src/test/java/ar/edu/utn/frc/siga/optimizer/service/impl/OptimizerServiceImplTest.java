@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.siga.optimizer.service.impl;
 
-import ar.edu.utn.frc.siga.optimizer.config.OptimizerProperties;
+import ar.edu.utn.frc.siga.optimizer.config.OptimizerSettings;
 import ar.edu.utn.frc.siga.optimizer.model.ClassAllocation;
 import ar.edu.utn.frc.siga.optimizer.model.ScheduleSolution;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizerAllocation;
@@ -40,11 +40,14 @@ class OptimizerServiceImplTest {
     @Mock
     private SolverManager<ScheduleSolution> solverManager;
 
+    @Mock
+    private OptimizerSettings optimizerSettings;
+
     private OptimizerServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new OptimizerServiceImpl(solverManager, new OptimizerProperties());
+        service = new OptimizerServiceImpl(solverManager, optimizerSettings);
     }
 
     private static OptimizerEvent event(String id, LocalTime start, LocalTime end, LocalDate... dates) {
@@ -176,7 +179,7 @@ class OptimizerServiceImplTest {
 
             ScheduleSolution problem = captor.getValue();
             assertThat(problem.getAllocations()).hasSize(1);
-            ClassAllocation pinnedAllocation = problem.getAllocations().get(0);
+            ClassAllocation pinnedAllocation = problem.getAllocations().getFirst();
             assertThat(pinnedAllocation.isPinned()).isTrue();
             assertThat(pinnedAllocation.getClassroom()).isEqualTo(room);
             assertThat(pinnedAllocation.getCandidates()).containsExactly(room);

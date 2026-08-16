@@ -1,0 +1,20 @@
+meta {
+  name: Obtener configuración por clave
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/settings/:key
+  body: none
+  auth: inherit
+}
+
+params:path {
+  key: optimizer.weights.overcrowding
+}
+
+docs {
+  Devuelve un único setting con su metadata y valor actual. 404 si la clave no
+  existe. Requiere rol SUBSECRETARIA.
+}
