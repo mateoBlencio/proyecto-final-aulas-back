@@ -1,0 +1,17 @@
+meta {
+  name: Listar configuración
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/settings
+  body: none
+  auth: inherit
+}
+
+docs {
+  Devuelve la configuración de negocio parametrizable agrupada por categoría
+  (optimizer, preview, events), con su metadata: tipo, valor actual, nivel de
+  riesgo y cotas (min/max). Requiere rol SUBSECRETARIA.
+}

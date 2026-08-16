@@ -6,16 +6,14 @@ import ai.timefold.solver.core.api.score.stream.Constraint;
 import ai.timefold.solver.core.api.score.stream.ConstraintFactory;
 import ai.timefold.solver.core.api.score.stream.ConstraintProvider;
 import ai.timefold.solver.core.api.score.stream.Joiners;
-import lombok.Setter;
 import org.jspecify.annotations.NonNull;
 
-@Setter
 public class ClassroomConstraintProvider implements ConstraintProvider {
 
-    private int overcrowdingWeight = 100_000;
-    private int sameCommissionDiffRoomWeight = 2_000;
-    private int sameCommissionDiffBuildingWeight = 4_000;
-    private int unusedCapacityWeight = 1;
+    public static final String OVERCROWDING = "Minimizar sobreocupacion";
+    public static final String UNUSED_CAPACITY = "Minimizar subocupacion";
+    public static final String SAME_ROOM_SAME_COMMISSION = "Preferir misma aula por comision";
+    public static final String SAME_BUILDING_SAME_COMMISSION = "Preferir mismo edificio por comision";
 
     @Override
     public Constraint @NonNull [] defineConstraints(@NonNull ConstraintFactory factory) {
@@ -50,17 +48,16 @@ public class ClassroomConstraintProvider implements ConstraintProvider {
         return factory
                 .forEach(ClassAllocation.class)
                 .filter(a -> !a.isPinned() && a.getOvercrowding() > 0)
-                .penalize(HardMediumSoftScore.ONE_SOFT, a -> (long) a.getOvercrowding() * overcrowdingWeight)
-                .asConstraint("Minimizar sobreocupacion");
+                .penalize(HardMediumSoftScore.ONE_SOFT, a -> (long) a.getOvercrowding())
+                .asConstraint(OVERCROWDING);
     }
 
     Constraint minimizeUnusedCapacity(ConstraintFactory factory) {
         return factory
                 .forEach(ClassAllocation.class)
                 .filter(a -> !a.isPinned())
-                .penalize(HardMediumSoftScore.ONE_SOFT,
-                        a -> (long) a.getUnusedCapacity() * unusedCapacityWeight)
-                .asConstraint("Minimizar subocupacion");
+                .penalize(HardMediumSoftScore.ONE_SOFT, a -> (long) a.getUnusedCapacity())
+                .asConstraint(UNUSED_CAPACITY);
     }
 
     Constraint preferSameRoomSameCommission(ConstraintFactory factory) {
@@ -72,8 +69,8 @@ public class ClassroomConstraintProvider implements ConstraintProvider {
                         Joiners.lessThan(ClassAllocation::getId),
                         Joiners.filtering((a, b) -> !b.isPinned() && b.getClassroom() != null
                                 && !a.getClassroom().equals(b.getClassroom())))
-                .penalize(HardMediumSoftScore.ONE_SOFT, (a, b) -> sameCommissionDiffRoomWeight)
-                .asConstraint("Preferir misma aula por comision");
+                .penalize(HardMediumSoftScore.ONE_SOFT)
+                .asConstraint(SAME_ROOM_SAME_COMMISSION);
     }
 
     Constraint preferSameBuildingSameCommission(ConstraintFactory factory) {
@@ -85,7 +82,7 @@ public class ClassroomConstraintProvider implements ConstraintProvider {
                         Joiners.lessThan(ClassAllocation::getId),
                         Joiners.filtering((a, b) -> !b.isPinned() && b.getBuildingId() != null
                                 && !a.getBuildingId().equals(b.getBuildingId())))
-                .penalize(HardMediumSoftScore.ONE_SOFT, (a, b) -> sameCommissionDiffBuildingWeight)
-                .asConstraint("Preferir mismo edificio por comision");
+                .penalize(HardMediumSoftScore.ONE_SOFT)
+                .asConstraint(SAME_BUILDING_SAME_COMMISSION);
     }
 }

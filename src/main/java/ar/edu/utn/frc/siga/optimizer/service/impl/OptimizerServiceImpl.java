@@ -1,7 +1,6 @@
 package ar.edu.utn.frc.siga.optimizer.service.impl;
 
 import ar.edu.utn.frc.siga.optimizer.config.OptimizerSettings;
-import ar.edu.utn.frc.siga.optimizer.config.SolverManagerProvider;
 import ar.edu.utn.frc.siga.optimizer.exception.SchedulingException;
 import ar.edu.utn.frc.siga.optimizer.model.ClassAllocation;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizerOccupancy;
@@ -12,8 +11,11 @@ import ar.edu.utn.frc.siga.optimizer.model.OptimizationResult;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizerRoom;
 import ar.edu.utn.frc.siga.optimizer.service.OptimizerService;
 import ar.edu.utn.frc.siga.common.util.Clashes;
+import ai.timefold.solver.core.api.domain.solution.ConstraintWeightOverrides;
+import ai.timefold.solver.core.api.score.HardMediumSoftScore;
 import ai.timefold.solver.core.api.solver.SolverConfigOverride;
 import ai.timefold.solver.core.api.solver.SolverJob;
+import ai.timefold.solver.core.api.solver.SolverManager;
 import ai.timefold.solver.core.config.solver.termination.TerminationConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,7 +37,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OptimizerServiceImpl implements OptimizerService {
 
-    private final SolverManagerProvider solverManagerProvider;
+    private final SolverManager<ScheduleSolution> solverManager;
     private final OptimizerSettings optimizerSettings;
 
     private record ExistingOccupancy(OptimizerEvent event, OptimizerRoom room) {
@@ -107,7 +109,7 @@ public class OptimizerServiceImpl implements OptimizerService {
             allocations.add(ClassAllocation.pinned(
                     occ.event(), occ.room(), conflictsByEventId.getOrDefault(occ.event().planningId(), Set.of())));
         }
-        ScheduleSolution problem = new ScheduleSolution(classrooms, allocations);
+        ScheduleSolution problem = new ScheduleSolution(classrooms, allocations, weightOverrides());
         log.info("Modelo del solver armado: {} entidades de planificación ({} nuevas + {} pinned), "
                         + "{} aulas candidatas por evento",
                 allocations.size(), events.size(), existing.size(), classrooms.size());
@@ -117,7 +119,7 @@ public class OptimizerServiceImpl implements OptimizerService {
     private ScheduleSolution runSolver(ScheduleSolution problem, int timeLimitSeconds) {
         String jobId = UUID.randomUUID().toString();
         log.info("Job del solver {} lanzado, límite {}s", jobId, timeLimitSeconds);
-        SolverJob<ScheduleSolution> job = solverManagerProvider.get().solveBuilder()
+        SolverJob<ScheduleSolution> job = solverManager.solveBuilder()
                 .withProblemId(jobId)
                 .withProblem(problem)
                 .withConfigOverride(new SolverConfigOverride()
@@ -146,6 +148,18 @@ public class OptimizerServiceImpl implements OptimizerService {
             termination.setUnimprovedSecondsSpentLimit(unimproved);
         }
         return termination;
+    }
+
+    private ConstraintWeightOverrides<HardMediumSoftScore> weightOverrides() {
+        return ConstraintWeightOverrides.of(Map.of(
+                ClassroomConstraintProvider.OVERCROWDING,
+                HardMediumSoftScore.ofSoft(optimizerSettings.getOvercrowdingWeight()),
+                ClassroomConstraintProvider.UNUSED_CAPACITY,
+                HardMediumSoftScore.ofSoft(optimizerSettings.getUnusedCapacityWeight()),
+                ClassroomConstraintProvider.SAME_ROOM_SAME_COMMISSION,
+                HardMediumSoftScore.ofSoft(optimizerSettings.getSameCommissionDiffRoomWeight()),
+                ClassroomConstraintProvider.SAME_BUILDING_SAME_COMMISSION,
+                HardMediumSoftScore.ofSoft(optimizerSettings.getSameCommissionDiffBuildingWeight())));
     }
 
     private record Edge(String from, String to) {

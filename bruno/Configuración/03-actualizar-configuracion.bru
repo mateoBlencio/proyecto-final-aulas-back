@@ -1,0 +1,31 @@
+meta {
+  name: Actualizar configuración
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/v1/settings/:key
+  body: json
+  auth: inherit
+}
+
+params:path {
+  key: optimizer.weights.overcrowding
+}
+
+body:json {
+  {
+    "value": "80000"
+  }
+}
+
+docs {
+  Actualiza el valor de un setting. Valida tipo y cotas server-side (400 si el
+  valor está fuera de rango o no es del tipo esperado), audita el cambio con
+  Envers y aplica con efecto inmediato (sin reiniciar). 404 si la clave no
+  existe. Requiere rol SUBSECRETARIA.
+
+  Para desactivar una constraint SOFT del optimizer, poné su peso en 0
+  (Timefold la saltea): p.ej. key optimizer.weights.overcrowding, value "0".
+}
