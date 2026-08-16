@@ -46,23 +46,15 @@ public class SolverManagerProvider {
     private SolverManager<ScheduleSolution> build() {
         ScoreDirectorFactoryConfig scoreDirectorFactoryConfig = new ScoreDirectorFactoryConfig()
                 .withConstraintProviderClass(ClassroomConstraintProvider.class)
-                .withConstraintProviderCustomProperties(Map.ofEntries(
-                        Map.entry("overcrowdingWeight",
-                                String.valueOf(optimizerSettings.getOvercrowdingWeight())),
-                        Map.entry("sameCommissionDiffRoomWeight",
-                                String.valueOf(optimizerSettings.getSameCommissionDiffRoomWeight())),
-                        Map.entry("sameCommissionDiffBuildingWeight",
-                                String.valueOf(optimizerSettings.getSameCommissionDiffBuildingWeight())),
-                        Map.entry("unusedCapacityWeight",
-                                String.valueOf(optimizerSettings.getUnusedCapacityWeight())),
-                        Map.entry("minimizeOvercrowdingEnabled",
-                                String.valueOf(optimizerSettings.isMinimizeOvercrowdingEnabled())),
-                        Map.entry("minimizeUnusedCapacityEnabled",
-                                String.valueOf(optimizerSettings.isMinimizeUnusedCapacityEnabled())),
-                        Map.entry("preferSameRoomSameCommissionEnabled",
-                                String.valueOf(optimizerSettings.isPreferSameRoomSameCommissionEnabled())),
-                        Map.entry("preferSameBuildingSameCommissionEnabled",
-                                String.valueOf(optimizerSettings.isPreferSameBuildingSameCommissionEnabled()))));
+                .withConstraintProviderCustomProperties(Map.of(
+                        "overcrowdingWeight",
+                        String.valueOf(optimizerSettings.getOvercrowdingWeight()),
+                        "sameCommissionDiffRoomWeight",
+                        String.valueOf(optimizerSettings.getSameCommissionDiffRoomWeight()),
+                        "sameCommissionDiffBuildingWeight",
+                        String.valueOf(optimizerSettings.getSameCommissionDiffBuildingWeight()),
+                        "unusedCapacityWeight",
+                        String.valueOf(optimizerSettings.getUnusedCapacityWeight())));
         SolverConfig config = new SolverConfig()
                 .withSolutionClass(ScheduleSolution.class)
                 .withEntityClasses(ClassAllocation.class)

@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.settings.service;
 
 import ar.edu.utn.frc.siga.settings.api.SettingChangedEvent;
+import ar.edu.utn.frc.siga.settings.config.SettingsCatalogProperties;
 import ar.edu.utn.frc.siga.settings.model.Setting;
 import ar.edu.utn.frc.siga.settings.model.SettingKey;
 import ar.edu.utn.frc.siga.settings.repository.SettingRepository;
@@ -24,6 +25,7 @@ public class SettingsStore {
 
     private final SettingRepository repository;
     private final ApplicationEventPublisher eventPublisher;
+    private final SettingsCatalogProperties catalog;
     private final Map<SettingKey, String> cache = new ConcurrentHashMap<>();
 
     @PostConstruct
@@ -33,7 +35,7 @@ public class SettingsStore {
     }
 
     public String getRaw(SettingKey key) {
-        return cache.getOrDefault(key, key.getDefaultValue());
+        return cache.getOrDefault(key, catalog.defaultValue(key));
     }
 
     public int getInt(SettingKey key) {

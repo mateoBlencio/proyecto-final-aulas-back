@@ -1,13 +1,14 @@
 package ar.edu.utn.frc.siga.settings.config;
 
+import ar.edu.utn.frc.siga.settings.SettingsCatalogFixture;
 import ar.edu.utn.frc.siga.settings.model.Setting;
 import ar.edu.utn.frc.siga.settings.model.SettingKey;
 import ar.edu.utn.frc.siga.settings.repository.SettingRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -27,8 +28,13 @@ class SettingsSeederTest {
     @Mock
     private SettingRepository repository;
 
-    @InjectMocks
+    private final SettingsCatalogProperties catalog = SettingsCatalogFixture.catalog();
     private SettingsSeeder seeder;
+
+    @BeforeEach
+    void setUp() {
+        seeder = new SettingsSeeder(repository, catalog);
+    }
 
     @Test
     @DisplayName("Con la base vacía siembra una fila por cada SettingKey con su default")
@@ -44,7 +50,7 @@ class SettingsSeederTest {
         assertThat(saved).hasSize(SettingKey.values().length);
         for (SettingKey key : SettingKey.values()) {
             assertThat(saved)
-                    .anyMatch(s -> s.getKey().equals(key.getKey()) && s.getValue().equals(key.getDefaultValue()));
+                    .anyMatch(s -> s.getKey().equals(key.getKey()) && s.getValue().equals(catalog.defaultValue(key)));
         }
     }
 

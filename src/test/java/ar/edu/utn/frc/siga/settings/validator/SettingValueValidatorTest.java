@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.settings.validator;
 
+import ar.edu.utn.frc.siga.settings.SettingsCatalogFixture;
 import ar.edu.utn.frc.siga.settings.exception.InvalidSettingValueException;
 import ar.edu.utn.frc.siga.settings.model.SettingKey;
 import org.junit.jupiter.api.DisplayName;
@@ -12,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("SettingValueValidator")
 class SettingValueValidatorTest {
 
-    private final SettingValueValidator validator = new SettingValueValidator();
+    private final SettingValueValidator validator = new SettingValueValidator(SettingsCatalogFixture.catalog());
 
     @Test
     @DisplayName("INT dentro de cotas devuelve el valor canónico")
@@ -56,23 +57,6 @@ class SettingValueValidatorTest {
         assertThatThrownBy(() -> validator.validate(SettingKey.OPTIMIZER_UNIMPROVED_SECONDS_LIMIT, "3601"))
                 .isInstanceOf(InvalidSettingValueException.class);
         assertThatThrownBy(() -> validator.validate(SettingKey.OPTIMIZER_UNIMPROVED_SECONDS_LIMIT, "-1"))
-                .isInstanceOf(InvalidSettingValueException.class);
-    }
-
-    @Test
-    @DisplayName("BOOLEAN acepta true/false sin importar mayúsculas y normaliza a minúsculas")
-    void booleanIsNormalized() {
-        assertThat(validator.validate(SettingKey.OPTIMIZER_CONSTRAINT_MINIMIZE_OVERCROWDING_ENABLED, "TRUE"))
-                .isEqualTo("true");
-        assertThat(validator.validate(SettingKey.OPTIMIZER_CONSTRAINT_MINIMIZE_OVERCROWDING_ENABLED, "False"))
-                .isEqualTo("false");
-    }
-
-    @Test
-    @DisplayName("BOOLEAN con un valor que no es true/false lanza 400")
-    void booleanInvalidIsRejected() {
-        assertThatThrownBy(() ->
-                validator.validate(SettingKey.OPTIMIZER_CONSTRAINT_MINIMIZE_OVERCROWDING_ENABLED, "yes"))
                 .isInstanceOf(InvalidSettingValueException.class);
     }
 

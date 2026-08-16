@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.auth.model.Role;
 import ar.edu.utn.frc.siga.auth.security.JwtService;
 import ar.edu.utn.frc.siga.common.audit.RevisionReader;
 import ar.edu.utn.frc.siga.common.dto.response.RevisionDto;
+import ar.edu.utn.frc.siga.settings.config.SettingsCatalogProperties;
 import ar.edu.utn.frc.siga.settings.model.Setting;
 import ar.edu.utn.frc.siga.settings.model.SettingKey;
 import ar.edu.utn.frc.siga.settings.repository.SettingRepository;
@@ -48,13 +49,15 @@ class SettingsApiIntegrationTest extends AbstractIntegrationTest {
     private PlatformTransactionManager transactionManager;
     @Autowired
     private ObjectMapper objectMapper;
+    @Autowired
+    private SettingsCatalogProperties catalog;
 
     @BeforeEach
     void ensureSeeded() {
         new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
             for (SettingKey key : SettingKey.values()) {
                 if (!settingRepository.existsById(key.getKey())) {
-                    settingRepository.save(new Setting(key.getKey(), key.getDefaultValue()));
+                    settingRepository.save(new Setting(key.getKey(), catalog.defaultValue(key)));
                 }
             }
         });
@@ -70,8 +73,8 @@ class SettingsApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.events").isArray())
                 .andExpect(jsonPath("$.events[?(@.key=='events.hours.start')].value").value("08:00"))
                 .andExpect(jsonPath("$.events[?(@.key=='events.hours.start')].type").value("TIME"))
-                .andExpect(jsonPath("$.optimizer[?(@.key=='optimizer.constraints.minimizeOvercrowding.enabled')]"
-                        + ".riskLevel").value("ADVANCED"));
+                .andExpect(jsonPath("$.optimizer[?(@.key=='optimizer.weights.overcrowding')].min").value("0"))
+                .andExpect(jsonPath("$.optimizer[?(@.key=='optimizer.weights.overcrowding')].max").value("1000000"));
     }
 
     @Test

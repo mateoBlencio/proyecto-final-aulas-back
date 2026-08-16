@@ -40,24 +40,4 @@ class OptimizerSettingsProvider implements OptimizerSettings {
     public int getUnusedCapacityWeight() {
         return settingsReader.getInt(SettingKey.OPTIMIZER_WEIGHT_UNUSED_CAPACITY);
     }
-
-    @Override
-    public boolean isMinimizeOvercrowdingEnabled() {
-        return settingsReader.getBoolean(SettingKey.OPTIMIZER_CONSTRAINT_MINIMIZE_OVERCROWDING_ENABLED);
-    }
-
-    @Override
-    public boolean isMinimizeUnusedCapacityEnabled() {
-        return settingsReader.getBoolean(SettingKey.OPTIMIZER_CONSTRAINT_MINIMIZE_UNUSED_CAPACITY_ENABLED);
-    }
-
-    @Override
-    public boolean isPreferSameRoomSameCommissionEnabled() {
-        return settingsReader.getBoolean(SettingKey.OPTIMIZER_CONSTRAINT_PREFER_SAME_ROOM_SAME_COMMISSION_ENABLED);
-    }
-
-    @Override
-    public boolean isPreferSameBuildingSameCommissionEnabled() {
-        return settingsReader.getBoolean(SettingKey.OPTIMIZER_CONSTRAINT_PREFER_SAME_BUILDING_SAME_COMMISSION_ENABLED);
-    }
 }

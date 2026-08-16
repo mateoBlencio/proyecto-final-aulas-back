@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SettingsSeeder implements ApplicationRunner {
 
     private final SettingRepository repository;
+    private final SettingsCatalogProperties catalog;
 
     @Override
     @Transactional
@@ -24,7 +25,7 @@ public class SettingsSeeder implements ApplicationRunner {
         int seeded = 0;
         for (SettingKey key : SettingKey.values()) {
             if (!repository.existsById(key.getKey())) {
-                repository.save(new Setting(key.getKey(), key.getDefaultValue()));
+                repository.save(new Setting(key.getKey(), catalog.defaultValue(key)));
                 seeded++;
             }
         }

@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.settings.service.impl;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.settings.dto.request.SettingUpdateItemDto;
 import ar.edu.utn.frc.siga.settings.dto.response.SettingResponseDto;
+import ar.edu.utn.frc.siga.settings.mapper.SettingResponseMapper;
 import ar.edu.utn.frc.siga.settings.model.SettingKey;
 import ar.edu.utn.frc.siga.settings.service.SettingsService;
 import ar.edu.utn.frc.siga.settings.service.SettingsStore;
@@ -25,6 +26,7 @@ public class SettingsServiceImpl implements SettingsService {
 
     private final SettingsStore store;
     private final SettingValueValidator validator;
+    private final SettingResponseMapper mapper;
 
     @Override
     public int getInt(SettingKey key) {
@@ -52,7 +54,7 @@ public class SettingsServiceImpl implements SettingsService {
         Map<String, List<SettingResponseDto>> grouped = new LinkedHashMap<>();
         for (SettingKey key : SettingKey.values()) {
             grouped.computeIfAbsent(key.getCategory(), category -> new ArrayList<>())
-                    .add(toResponse(key));
+                    .add(mapper.toDto(key, store.getRaw(key)));
         }
         return grouped;
     }
@@ -60,7 +62,8 @@ public class SettingsServiceImpl implements SettingsService {
     @Override
     @Transactional(readOnly = true)
     public SettingResponseDto findByKey(String key) {
-        return toResponse(resolveKey(key));
+        SettingKey settingKey = resolveKey(key);
+        return mapper.toDto(settingKey, store.getRaw(settingKey));
     }
 
     @Override
@@ -70,7 +73,7 @@ public class SettingsServiceImpl implements SettingsService {
         String normalized = validator.validate(settingKey, value);
         store.write(settingKey, normalized);
         log.info("Configuración actualizada: clave={}, valor={}", settingKey.getKey(), normalized);
-        return toResponse(settingKey, normalized);
+        return mapper.toDto(settingKey, normalized);
     }
 
     @Override
@@ -87,15 +90,5 @@ public class SettingsServiceImpl implements SettingsService {
         } catch (IllegalArgumentException ex) {
             throw new ResourceNotFoundException("Setting not found with id: " + key);
         }
-    }
-
-    private SettingResponseDto toResponse(SettingKey key) {
-        return toResponse(key, store.getRaw(key));
-    }
-
-    private SettingResponseDto toResponse(SettingKey key, String value) {
-        return new SettingResponseDto(
-                key.getKey(), key.getType(), value, key.getRisk(),
-                key.getMin(), key.getMax(), key.getWarning());
     }
 }

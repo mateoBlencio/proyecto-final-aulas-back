@@ -1,13 +1,14 @@
 package ar.edu.utn.frc.siga.settings.service;
 
+import ar.edu.utn.frc.siga.settings.SettingsCatalogFixture;
 import ar.edu.utn.frc.siga.settings.api.SettingChangedEvent;
 import ar.edu.utn.frc.siga.settings.model.Setting;
 import ar.edu.utn.frc.siga.settings.model.SettingKey;
 import ar.edu.utn.frc.siga.settings.repository.SettingRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -30,8 +31,12 @@ class SettingsStoreTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
-    @InjectMocks
     private SettingsStore store;
+
+    @BeforeEach
+    void setUp() {
+        store = new SettingsStore(repository, eventPublisher, SettingsCatalogFixture.catalog());
+    }
 
     @Test
     @DisplayName("getRaw cae al default del enum cuando la clave no está cacheada")
@@ -44,7 +49,6 @@ class SettingsStoreTest {
     void typedGettersParseDefaults() {
         assertThat(store.getInt(SettingKey.OPTIMIZER_WEIGHT_OVERCROWDING)).isEqualTo(100000);
         assertThat(store.getLong(SettingKey.OPTIMIZER_UNIMPROVED_SECONDS_LIMIT)).isEqualTo(10L);
-        assertThat(store.getBoolean(SettingKey.OPTIMIZER_CONSTRAINT_MINIMIZE_OVERCROWDING_ENABLED)).isTrue();
         assertThat(store.getTime(SettingKey.EVENTS_HOURS_START)).isEqualTo(LocalTime.of(8, 0));
     }
 

@@ -13,28 +13,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ClassroomConstraintProviderTest {
 
     @Test
-    @DisplayName("los String de customProperties se convierten a boolean e int en los setters")
+    @DisplayName("los String de customProperties se convierten a int en los setters de pesos")
     void customPropertiesAreConvertedToPrimitiveTypes() throws Exception {
         ClassroomConstraintProvider provider = new ClassroomConstraintProvider();
 
         ConfigUtils.applyCustomProperties(provider, "constraintProviderClass",
                 Map.of(
-                        "minimizeOvercrowdingEnabled", "false",
-                        "minimizeUnusedCapacityEnabled", "true",
-                        "preferSameRoomSameCommissionEnabled", "false",
-                        "preferSameBuildingSameCommissionEnabled", "true",
+                        "overcrowdingWeight", "55555",
+                        "sameCommissionDiffRoomWeight", "3000",
+                        "sameCommissionDiffBuildingWeight", "6000",
                         "unusedCapacityWeight", "7"),
                 "constraintProviderCustomProperties");
 
-        assertThat(readBoolean(provider, "minimizeOvercrowdingEnabled")).isFalse();
-        assertThat(readBoolean(provider, "minimizeUnusedCapacityEnabled")).isTrue();
-        assertThat(readBoolean(provider, "preferSameRoomSameCommissionEnabled")).isFalse();
-        assertThat(readBoolean(provider, "preferSameBuildingSameCommissionEnabled")).isTrue();
+        assertThat(readInt(provider, "overcrowdingWeight")).isEqualTo(55555);
+        assertThat(readInt(provider, "sameCommissionDiffRoomWeight")).isEqualTo(3000);
+        assertThat(readInt(provider, "sameCommissionDiffBuildingWeight")).isEqualTo(6000);
         assertThat(readInt(provider, "unusedCapacityWeight")).isEqualTo(7);
-    }
-
-    private static boolean readBoolean(Object target, String fieldName) throws Exception {
-        return field(target, fieldName).getBoolean(target);
     }
 
     private static int readInt(Object target, String fieldName) throws Exception {

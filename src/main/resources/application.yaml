@@ -71,6 +71,44 @@ cors:
 siga:
   api:
     base-path: /v1
+  settings:
+    definitions:
+      - key: optimizer.unimprovedSecondsLimit
+        default-value: "10"
+        min: "0"
+        max: "3600"
+      - key: optimizer.weights.overcrowding
+        default-value: "100000"
+        min: "0"
+        max: "1000000"
+      - key: optimizer.weights.sameCommissionDiffRoom
+        default-value: "2000"
+        min: "0"
+        max: "1000000"
+      - key: optimizer.weights.sameCommissionDiffBuilding
+        default-value: "4000"
+        min: "0"
+        max: "1000000"
+      - key: optimizer.weights.unusedCapacity
+        default-value: "1"
+        min: "0"
+        max: "1000000"
+      - key: optimizer.solverSecondsSpentLimit
+        default-value: "300"
+        min: "1"
+        max: "3600"
+      - key: preview.defaultTimeLimitSeconds
+        default-value: "30"
+        min: "1"
+        max: "3600"
+      - key: preview.ttlMinutes
+        default-value: "30"
+        min: "1"
+        max: "1440"
+      - key: events.hours.start
+        default-value: "08:00"
+      - key: events.hours.end
+        default-value: "23:00"
   optimizer:
     parallel-solver-count: AUTO
     environment-mode: PHASE_ASSERT

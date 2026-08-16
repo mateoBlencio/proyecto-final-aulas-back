@@ -13,12 +13,4 @@ public interface OptimizerSettings {
     int getSameCommissionDiffBuildingWeight();
 
     int getUnusedCapacityWeight();
-
-    boolean isMinimizeOvercrowdingEnabled();
-
-    boolean isMinimizeUnusedCapacityEnabled();
-
-    boolean isPreferSameRoomSameCommissionEnabled();
-
-    boolean isPreferSameBuildingSameCommissionEnabled();
 }

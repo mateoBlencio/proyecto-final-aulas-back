@@ -1,14 +1,19 @@
 package ar.edu.utn.frc.siga.settings.validator;
 
+import ar.edu.utn.frc.siga.settings.config.SettingsCatalogProperties;
 import ar.edu.utn.frc.siga.settings.exception.InvalidSettingValueException;
 import ar.edu.utn.frc.siga.settings.model.SettingKey;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 
 @Component
+@RequiredArgsConstructor
 public class SettingValueValidator {
+
+    private final SettingsCatalogProperties catalog;
 
     public String validate(SettingKey key, String rawValue) {
         if (rawValue == null) {
@@ -25,18 +30,18 @@ public class SettingValueValidator {
 
     private int validateInt(SettingKey key, String value) {
         int parsed = parse(key, value, "un entero", () -> Integer.parseInt(value));
-        checkBounds(key, parsed,
-                key.getMin() == null ? null : Long.parseLong(key.getMin()),
-                key.getMax() == null ? null : Long.parseLong(key.getMax()));
+        checkBounds(key, parsed, boundOf(catalog.min(key)), boundOf(catalog.max(key)));
         return parsed;
     }
 
     private long validateLong(SettingKey key, String value) {
         long parsed = parse(key, value, "un entero largo", () -> Long.parseLong(value));
-        checkBounds(key, parsed,
-                key.getMin() == null ? null : Long.parseLong(key.getMin()),
-                key.getMax() == null ? null : Long.parseLong(key.getMax()));
+        checkBounds(key, parsed, boundOf(catalog.min(key)), boundOf(catalog.max(key)));
         return parsed;
+    }
+
+    private Long boundOf(String bound) {
+        return bound == null ? null : Long.parseLong(bound);
     }
 
     private String validateBoolean(SettingKey key, String value) {
