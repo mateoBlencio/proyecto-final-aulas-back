@@ -1,0 +1,27 @@
+meta {
+  name: Actualizar configuración en lote
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/v1/settings
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "settings": [
+      { "key": "optimizer.weights.overcrowding", "value": "80000" },
+      { "key": "optimizer.weights.unusedCapacity", "value": "2" },
+      { "key": "events.hours.end", "value": "22:30" }
+    ]
+  }
+}
+
+docs {
+  Actualiza varios settings en una única transacción: si alguno falla la
+  validación, ninguno se persiste (rollback total, 400). Audita y aplica con
+  efecto inmediato. Requiere rol SUBSECRETARIA.
+}

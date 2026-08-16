@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.optimizer.model;
 
+import ai.timefold.solver.core.api.domain.solution.ConstraintWeightOverrides;
 import ai.timefold.solver.core.api.domain.solution.PlanningEntityCollectionProperty;
 import ai.timefold.solver.core.api.domain.solution.PlanningScore;
 import ai.timefold.solver.core.api.domain.solution.PlanningSolution;
@@ -28,11 +29,16 @@ public class ScheduleSolution {
     List<ClassAllocation> allocations;
 
     @Setter
+    ConstraintWeightOverrides<HardMediumSoftScore> constraintWeightOverrides;
+
+    @Setter
     @PlanningScore
     HardMediumSoftScore score;
 
-    public ScheduleSolution(List<OptimizerRoom> classrooms, List<ClassAllocation> allocations) {
+    public ScheduleSolution(List<OptimizerRoom> classrooms, List<ClassAllocation> allocations,
+                            ConstraintWeightOverrides<HardMediumSoftScore> constraintWeightOverrides) {
         this.classrooms = classrooms;
         this.allocations = allocations;
+        this.constraintWeightOverrides = constraintWeightOverrides;
     }
 }

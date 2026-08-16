@@ -9,7 +9,6 @@ import ai.timefold.solver.core.config.score.director.ScoreDirectorFactoryConfig;
 import ai.timefold.solver.core.config.solver.SolverConfig;
 import ai.timefold.solver.core.config.solver.SolverManagerConfig;
 import ai.timefold.solver.core.config.solver.termination.TerminationConfig;
-import java.util.Map;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,24 +17,18 @@ import org.springframework.context.annotation.Configuration;
 @EnableConfigurationProperties(OptimizerProperties.class)
 public class OptimizerConfiguration {
 
-    private static final long DEFAULT_SECONDS_LIMIT = 300L;
-
     @Bean
-    public SolverFactory<ScheduleSolution> scheduleSolverFactory(OptimizerProperties properties) {
-        OptimizerProperties.Weights weights = properties.getWeights();
+    public SolverFactory<ScheduleSolution> scheduleSolverFactory(
+            OptimizerProperties properties, OptimizerSettings settings) {
         ScoreDirectorFactoryConfig scoreDirectorFactoryConfig = new ScoreDirectorFactoryConfig()
-                .withConstraintProviderClass(ClassroomConstraintProvider.class)
-                .withConstraintProviderCustomProperties(Map.of(
-                        "overcrowdingWeight", String.valueOf(weights.getOvercrowding()),
-                        "sameCommissionDiffRoomWeight", String.valueOf(weights.getSameCommissionDiffRoom()),
-                        "sameCommissionDiffBuildingWeight", String.valueOf(weights.getSameCommissionDiffBuilding())));
+                .withConstraintProviderClass(ClassroomConstraintProvider.class);
         SolverConfig config = new SolverConfig()
                 .withSolutionClass(ScheduleSolution.class)
                 .withEntityClasses(ClassAllocation.class)
                 .withScoreDirectorFactory(scoreDirectorFactoryConfig)
                 .withEnvironmentMode(properties.getEnvironmentMode())
                 .withTerminationConfig(new TerminationConfig()
-                        .withSecondsSpentLimit(DEFAULT_SECONDS_LIMIT));
+                        .withSecondsSpentLimit(settings.getSolverSecondsSpentLimit()));
         return SolverFactory.create(config);
     }
 
