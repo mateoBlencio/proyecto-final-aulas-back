@@ -24,11 +24,13 @@ escucha vía `@ApplicationModuleListener` para desasignar automáticamente.
 | `auth` | `common` | Autenticación (JWT), usuarios, rate limiting de login |
 | `space` | `common` | Aulas, edificios, tipos de aula |
 | `academic` | `common` | Especialidades, planes, materias, períodos académicos, comisiones |
-| `events` | `academic::api`, `common` | Eventos académicos (recurrentes/únicos) y sus ocurrencias |
-| `optimizer` | `common` | Motor de asignación automática puro (Timefold), sin persistencia ni conocimiento de otros módulos |
+| `settings` | `common` | Store de configuración en runtime (pesos del optimizer, ventanas horarias, TTLs de preview), con validación y defaults declarados en `application.yaml` |
+| `events` | `academic::api`, `settings::api`, `common` | Eventos académicos (recurrentes/únicos) y sus ocurrencias |
+| `optimizer` | `settings::api`, `common` | Motor de asignación automática puro (Timefold), sin persistencia ni conocimiento de otros módulos |
 | `allocation` | `events::api`, `space::api`, `academic::api`, `common` | Asignación de aula (alta/reasignación/baja en lote), detección de conflictos |
-| `preview` | `allocation::api`, `optimizer::api`, `events::api`, `space::api`, `academic::api`, `common` | Orquesta el flujo de asignación automática: arma pedido al optimizer, guarda vista previa revisable, confirma atómicamente contra `allocation` |
+| `preview` | `allocation::api`, `optimizer::api`, `events::api`, `space::api`, `academic::api`, `settings::api`, `common` | Orquesta el flujo de asignación automática: arma pedido al optimizer, guarda vista previa revisable, confirma atómicamente contra `allocation` |
 | `ingest` | `academic::api`, `space::api`, `allocation::api`, `events::api`, `common` | Importación masiva desde Excel (carga académica y de asignación) |
+| `roomrequest` | `academic::api`, `space::api`, `common` | Solicitudes de aula: alta pública y catálogos del formulario |
 
 ## Setup
 
