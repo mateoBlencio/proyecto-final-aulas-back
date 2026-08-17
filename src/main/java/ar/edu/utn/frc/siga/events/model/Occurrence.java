@@ -38,7 +38,7 @@ public class Occurrence {
     @EqualsAndHashCode.Include
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "ocurrencia_seq")
-    @SequenceGenerator(name = "ocurrencia_seq", sequenceName = "ocurrencia_id_ocurrencia_seq", allocationSize = 1)
+    @SequenceGenerator(name = "ocurrencia_seq", sequenceName = "ocurrencia_id_ocurrencia_seq", allocationSize = 50)
     @Column(name = "id_ocurrencia")
     private Long id;
 
