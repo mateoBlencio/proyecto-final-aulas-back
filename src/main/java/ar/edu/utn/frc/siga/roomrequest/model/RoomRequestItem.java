@@ -97,10 +97,10 @@ public class RoomRequestItem {
 
     @Convert(converter = DurationMinutesConverter.class)
     @Column(name = "duracion_minutos", nullable = false)
-    private Duration duration;
+    private Duration duration; // aca en caso de tratarse de type clase (unica vez o recurrente) podriamos sacar los datos de sysacad
 
     @Column(name = "cantidad_inscriptos", nullable = false)
-    private Integer enrolled;
+    private Integer enrolled; // a chequear si debe seguir funcionado, si nosotros ya tenemos los datos desde sysacad
 
     @Column(name = "cantidad_estimada", nullable = false)
     private Integer estimated;
@@ -125,13 +125,21 @@ public class RoomRequestItem {
     @Column(name = "cantidad_computadoras")
     private Integer computerCount;
 
-    @Column(name = "requiere_usuarios_examen") // debe poder ser null, solo pueden solicituar usuarios examen aquellos que solicitaron computadoras
+    @Column(name = "requiere_usuarios_examen")
     private Boolean requiresExamUsers;
 
-    @Column(name = "software_requerido")
+    /** Listado corto ("Office, MATLAB"), no un párrafo: alcanza con el default de 255. */
+    @Column(name = "software_requerido", length = 255)
     private String requiredSoftware;
 
-    @Column(name = "observaciones")
+    /**
+     * Texto libre del docente. El largo va explícito y no con el default de 255
+     * porque para las solicitudes de tipo {@code OTHER} es el <b>único</b> campo
+     * que describe el pedido, así que un párrafo entero es el caso esperado.
+     * El {@code @Size} espejo en el DTO es el que convierte pasarse de largo en
+     * un 400 en vez de un 500 al insertar.
+     */
+    @Column(name = "observaciones", length = 1000)
     private String observations;
 
     /**
@@ -164,6 +172,15 @@ public class RoomRequestItem {
         this.decidedBy = decidedBy;
         this.decisionReason = reason;
         this.decidedAt = decidedAt;
+    }
+
+    /**
+     * Agrega varias aulas de preferencia respetando el orden recibido, que es
+     * el orden de prioridad que declaró el docente. "Sin preferencias" es una
+     * lista vacía, no {@code null}: normalizarlo es tarea del DTO de entrada.
+     */
+    public void addPreferences(List<Integer> classroomIds) {
+        classroomIds.forEach(this::addPreference);
     }
 
     /** Agrega un aula de preferencia al final del orden de prioridad. */

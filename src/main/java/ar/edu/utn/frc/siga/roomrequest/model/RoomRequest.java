@@ -10,6 +10,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -69,7 +70,8 @@ public class RoomRequest {
     @Column(name = "id_materia")
     private Long subjectId;
 
-    @Column(name = "fecha_creacion", nullable = false)
+    /** Dato de auditoría: lo pone {@link #onCreate()} al persistir, no el negocio. */
+    @Column(name = "fecha_creacion", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     /**
@@ -88,6 +90,18 @@ public class RoomRequest {
     @OrderBy("position ASC")
     @Builder.Default
     private List<RoomRequestItem> items = new ArrayList<>();
+
+    /**
+     * Sella la fecha de creación al persistir. Se usa esto y no
+     * {@code @CreationTimestamp} porque respeta el valor ya seteado en vez de
+     * pisarlo, y así los tests pueden fijar la fecha.
+     */
+    @PrePersist
+    void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+    }
 
     /** Agrega un ítem al final y le asigna la posición que le corresponde. */
     public void addItem(RoomRequestItem item) {

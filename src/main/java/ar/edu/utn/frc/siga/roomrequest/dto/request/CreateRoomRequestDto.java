@@ -19,18 +19,11 @@ import java.util.List;
  * del tipo de solicitud y la valida {@code RoomRequestValidator}.
  */
 public record CreateRoomRequestDto(
-
         @NotNull RoomRequestType type,
-
         @NotNull AcademicScope scope,
-
         @NotBlank @Size(max = 150) String teacherName,
-
         @NotBlank @Email @Size(max = 150) String teacherEmail,
-
         @NotBlank @Size(max = 40) String teacherPhone,
-
         Long subjectId,
-
         @NotEmpty @Valid List<CreateRoomRequestItemDto> items
 ) {}

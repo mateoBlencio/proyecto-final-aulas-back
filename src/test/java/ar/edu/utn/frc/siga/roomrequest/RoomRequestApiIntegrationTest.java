@@ -16,7 +16,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -104,6 +107,195 @@ class RoomRequestApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("booleanos ausentes en el JSON: se toman como 'no' y no rompen la deserialización")
+    void create_withOmittedBooleans_returnsCreated() throws Exception {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+
+        Map<String, Object> body = validRequest(academic, item -> {
+            item.remove("requiresProjector");
+            item.remove("requiresComputers");
+            item.remove("preferredClassroomIds");
+        });
+
+        anonymousMockMvc.perform(post("/v1/room-requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.items[0].requiresProjector").value(false))
+                .andExpect(jsonPath("$.items[0].requiresComputers").value(false))
+                .andExpect(jsonPath("$.items[0].preferredClassrooms").isEmpty());
+    }
+
+    @Test
+    @DisplayName("hora de fin anterior al inicio: 400")
+    void create_withInvertedTimeRange_returnsBadRequest() throws Exception {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+
+        Map<String, Object> body = validRequest(academic, item -> {
+            item.put("startTime", "12:00:00");
+            item.put("endTime", "10:00:00");
+        });
+
+        anonymousMockMvc.perform(post("/v1/room-requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("aula repetida en las preferencias: 400")
+    void create_withRepeatedPreference_returnsBadRequest() throws Exception {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+        Classroom classroom = testData.aula(testData.edificio());
+
+        Map<String, Object> body = validRequest(academic, item ->
+                item.put("preferredClassroomIds", List.of(classroom.getId(), classroom.getId())));
+
+        anonymousMockMvc.perform(post("/v1/room-requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("pide computadoras sin decir cuántas: 400")
+    void create_withComputersButNoCount_returnsBadRequest() throws Exception {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+
+        Map<String, Object> body = validRequest(academic, item -> item.put("requiresComputers", true));
+
+        anonymousMockMvc.perform(post("/v1/room-requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("regla de negocio violada (usuarios de examen en un parcial sin computadoras): 400")
+    void create_withExamUsersButNoComputers_returnsBadRequest() throws Exception {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+
+        Map<String, Object> body = validRequest(academic, item -> item.put("requiresExamUsers", true));
+
+        anonymousMockMvc.perform(post("/v1/room-requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("parcial con computadoras sin responder si necesita usuarios de examen: 400")
+    void create_examWithComputersAndNoExamUsersAnswer_returnsBadRequest() throws Exception {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+
+        Map<String, Object> body = validRequest(academic, item -> {
+            item.put("requiresComputers", true);
+            item.put("computerCount", 20);
+        });
+
+        anonymousMockMvc.perform(post("/v1/room-requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("parcial con computadoras respondiendo que no necesita usuarios de examen: 201")
+    void create_examWithComputersAndFalseExamUsers_returnsCreated() throws Exception {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+
+        Map<String, Object> body = validRequest(academic, item -> {
+            item.put("requiresComputers", true);
+            item.put("computerCount", 20);
+            item.put("requiresExamUsers", false);
+        });
+
+        anonymousMockMvc.perform(post("/v1/room-requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.items[0].requiresExamUsers").value(false));
+    }
+
+    @Test
+    @DisplayName("observations de más de 1000 caracteres: 400 y no un 500 al insertar")
+    void create_withOversizedObservations_returnsBadRequest() throws Exception {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+
+        Map<String, Object> body = validRequest(academic, item -> item.put("observations", "x".repeat(1001)));
+
+        anonymousMockMvc.perform(post("/v1/room-requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("observations largas pero dentro del límite: 201 y se guardan enteras")
+    void create_withLongButValidObservations_returnsCreated() throws Exception {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+        String longText = "x".repeat(1000);
+
+        Map<String, Object> body = validRequest(academic, item -> item.put("observations", longText));
+
+        anonymousMockMvc.perform(post("/v1/room-requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.items[0].observations").value(longText));
+    }
+
+    @Test
+    @DisplayName("aula preferida inexistente: 404")
+    void create_withUnknownClassroom_returnsNotFound() throws Exception {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+
+        Map<String, Object> body = validRequest(academic, item ->
+                item.put("preferredClassroomIds", List.of(999_999)));
+
+        anonymousMockMvc.perform(post("/v1/room-requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("tipo OTHER sin observations: 400")
+    void create_otherTypeWithoutObservations_returnsBadRequest() throws Exception {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+
+        Map<String, Object> body = validRequest(academic, item -> item.remove("commissionId"));
+        body.put("type", "OTHER");
+        body.remove("subjectId");
+
+        anonymousMockMvc.perform(post("/v1/room-requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("tipo OTHER con observations: 201, sin materia ni comisión")
+    void create_otherTypeWithObservations_returnsCreated() throws Exception {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+
+        Map<String, Object> body = validRequest(academic, item -> {
+            item.remove("commissionId");
+            item.put("observations", "Necesito un aula para grabar un video institucional");
+        });
+        body.put("type", "OTHER");
+        body.remove("subjectId");
+
+        anonymousMockMvc.perform(post("/v1/room-requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.type").value("OTHER"))
+                .andExpect(jsonPath("$.subject").doesNotExist())
+                .andExpect(jsonPath("$.items[0].commission").doesNotExist());
+    }
+
+    @Test
     @DisplayName("catálogos sin autenticación: responden 200")
     void catalogs_withoutAuthentication_returnOk() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
@@ -117,6 +309,17 @@ class RoomRequestApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$[0].id").value(academic.commissionId()));
         anonymousMockMvc.perform(get("/v1/room-requests/catalog/classrooms"))
                 .andExpect(status().isOk());
+        anonymousMockMvc.perform(get("/v1/room-requests/catalog/subjects")
+                        .param("specialtyCode", "1"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("catálogo de comisiones de una materia inexistente: 404")
+    void commissionsCatalog_withUnknownSubject_returnsNotFound() throws Exception {
+        anonymousMockMvc.perform(get("/v1/room-requests/catalog/commissions")
+                        .param("subjectId", "999999"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -126,5 +329,35 @@ class RoomRequestApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isUnauthorized());
         anonymousMockMvc.perform(get("/v1/subjects"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * Payload de un parcial válido; el {@code mutation} toca sólo el pedido que
+     * a cada test le interesa romper, para que el motivo del 400 quede a la vista.
+     */
+    private Map<String, Object> validRequest(IntegrationTestData.SubjectAndCommission academic,
+                                             Consumer<Map<String, Object>> mutation) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("commissionId", academic.commissionId());
+        item.put("date", LocalDate.now().plusDays(7).toString());
+        item.put("startTime", "10:00:00");
+        item.put("endTime", "12:00:00");
+        item.put("enrolled", 30);
+        item.put("estimated", 35);
+        item.put("classroomCount", 1);
+        item.put("requiresProjector", true);
+        item.put("requiresComputers", false);
+        item.put("preferredClassroomIds", List.of());
+        mutation.accept(item);
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("type", "PARTIAL_EXAM");
+        body.put("scope", "GRADO");
+        body.put("teacherName", "Ada Lovelace");
+        body.put("teacherEmail", "ada@frc.utn.edu.ar");
+        body.put("teacherPhone", "351-1234567");
+        body.put("subjectId", academic.subjectId());
+        body.put("items", List.of(item));
+        return body;
     }
 }

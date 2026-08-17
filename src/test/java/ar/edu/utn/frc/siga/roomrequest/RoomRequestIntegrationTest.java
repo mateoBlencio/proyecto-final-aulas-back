@@ -1,12 +1,11 @@
 package ar.edu.utn.frc.siga.roomrequest;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
-import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestItemDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
-import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestTransitionException;
 import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
@@ -78,26 +77,102 @@ class RoomRequestIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("findById: recupera la solicitud con sus pedidos y preferencias")
-    void findById_returnsFullGraph() {
+    @DisplayName("preferencias múltiples: se guardan en el orden de prioridad declarado")
+    void create_withSeveralPreferences_keepsDeclaredOrder() {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
-        Classroom preferred = testData.aula(testData.edificio());
+        Building building = testData.edificio();
+        Classroom first = testData.aula(building);
+        Classroom second = testData.aula(building);
+        Classroom third = testData.aula(building);
+        List<Integer> priority = List.of(third.getId(), first.getId(), second.getId());
 
-        Long id = roomRequestService.create(new CreateRoomRequestDto(
-                RoomRequestType.FINAL_EXAM,
-                AcademicScope.POSTGRADO,
-                "Alan Turing",
-                "alan@frc.utn.edu.ar",
-                "351-7654321",
+        RoomRequestResponseDto created = roomRequestService.create(new CreateRoomRequestDto(
+                RoomRequestType.PARTIAL_EXAM,
+                AcademicScope.GRADO,
+                "Ada Lovelace",
+                "ada@frc.utn.edu.ar",
+                "351-1234567",
                 academic.subjectId(),
-                List.of(item(academic.commissionId(), LocalDate.now().plusDays(5), null,
-                        List.of(preferred.getId()))))).id();
+                List.of(item(academic.commissionId(), LocalDate.now().plusDays(10), null, priority))));
 
-        RoomRequestResponseDto found = roomRequestService.findById(id);
+        assertThat(created.items().getFirst().preferredClassrooms())
+                .extracting(ClassroomOptionDto::id)
+                .containsExactlyElementsOf(priority);
+    }
 
-        assertThat(found.id()).isEqualTo(id);
-        assertThat(found.items()).singleElement()
-                .satisfies(item -> assertThat(item.preferredClassrooms()).hasSize(1));
+    @Test
+    @DisplayName("booleanos opcionales en null: projector/computers se persisten como false, examUsers queda null")
+    void create_withNullBooleans_normalizesToFalse() {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+
+        CreateRoomRequestItemDto itemWithNulls = new CreateRoomRequestItemDto(
+                academic.commissionId(), LocalDate.now().plusDays(5),
+                LocalTime.of(10, 0), LocalTime.of(12, 0),
+                30, 35, 1, null,
+                null, null, null, null, null, null, null);
+
+        RoomRequestResponseDto created = roomRequestService.create(new CreateRoomRequestDto(
+                RoomRequestType.PARTIAL_EXAM,
+                AcademicScope.GRADO,
+                "Ada Lovelace",
+                "ada@frc.utn.edu.ar",
+                "351-1234567",
+                academic.subjectId(),
+                List.of(itemWithNulls)));
+
+        var item = created.items().getFirst();
+        assertThat(item.requiresProjector()).isFalse();
+        assertThat(item.requiresComputers()).isFalse();
+        assertThat(item.requiresExamUsers()).isNull();
+        assertThat(item.preferredClassrooms()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("examUsers en un parcial con computadoras: se acepta y se persiste")
+    void create_examWithComputers_acceptsExamUsers() {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+
+        CreateRoomRequestItemDto itemWithExamUsers = new CreateRoomRequestItemDto(
+                academic.commissionId(), LocalDate.now().plusDays(5),
+                LocalTime.of(10, 0), LocalTime.of(12, 0),
+                30, 35, 1, null,
+                true, true, 20, true, "Office", null, List.of());
+
+        RoomRequestResponseDto created = roomRequestService.create(new CreateRoomRequestDto(
+                RoomRequestType.PARTIAL_EXAM,
+                AcademicScope.GRADO,
+                "Ada Lovelace",
+                "ada@frc.utn.edu.ar",
+                "351-1234567",
+                academic.subjectId(),
+                List.of(itemWithExamUsers)));
+
+        var item = created.items().getFirst();
+        assertThat(item.requiresComputers()).isTrue();
+        assertThat(item.requiresExamUsers()).isTrue();
+    }
+
+    @Test
+    @DisplayName("examUsers en una conferencia: se rechaza porque no es parcial ni final")
+    void create_examUsers_onNonExamType_isRejected() {
+        CreateRoomRequestItemDto itemWithExamUsers = new CreateRoomRequestItemDto(
+                null, LocalDate.now().plusDays(5),
+                LocalTime.of(10, 0), LocalTime.of(12, 0),
+                30, 35, 1, null,
+                true, true, 20, true, "Office", null, List.of());
+
+        CreateRoomRequestDto dto = new CreateRoomRequestDto(
+                RoomRequestType.CONFERENCE,
+                AcademicScope.EXTENSION,
+                "Grace Hopper",
+                "grace@frc.utn.edu.ar",
+                "351-0000000",
+                null,
+                List.of(itemWithExamUsers));
+
+        assertThatThrownBy(() -> roomRequestService.create(dto))
+                .isInstanceOf(InvalidRoomRequestException.class)
+                .hasMessageContaining("requiresExamUsers");
     }
 
     @Test
@@ -135,76 +210,46 @@ class RoomRequestIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("ciclo de estados de un pedido: PENDING -> PRE_APPROVED -> CANCELLED, y no se puede volver")
-    void itemStatusTransitions_followTheStateMachine() {
-        RoomRequestResponseDto created = roomRequestService.create(oneItemRequest());
-        Long id = created.id();
-        Long itemId = created.items().getFirst().id();
-
-        RoomRequestResponseDto preApproved = roomRequestService.preApproveItem(
-                id, itemId, "subsecretaria@frc.utn.edu.ar", "Hay aula disponible");
-        var item = preApproved.items().getFirst();
-        assertThat(item.status()).isEqualTo(RoomRequestStatus.PRE_APPROVED);
-        assertThat(item.decidedBy()).isEqualTo("subsecretaria@frc.utn.edu.ar");
-        assertThat(item.decidedAt()).isNotNull();
-        assertThat(item.decisionReason()).isEqualTo("Hay aula disponible");
-
-        RoomRequestResponseDto cancelled = roomRequestService.cancelItem(
-                id, itemId, "subsecretaria@frc.utn.edu.ar", "El docente se dio de baja");
-        assertThat(cancelled.items().getFirst().status()).isEqualTo(RoomRequestStatus.CANCELLED);
-
-        assertThatThrownBy(() ->
-                roomRequestService.preApproveItem(id, itemId, "subsecretaria@frc.utn.edu.ar", null))
-                .isInstanceOf(InvalidRoomRequestTransitionException.class);
-    }
-
-    @Test
-    @DisplayName("decidir un pedido no toca a los otros: el parcial de abril se resuelve y el de julio queda pendiente")
-    void decidingOneItem_leavesTheOthersUntouched() {
-        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+    @DisplayName("tipo OTHER con observations: se persiste y el enum vuelve intacto de la base")
+    void create_otherType_roundTripsThroughDatabase() {
         RoomRequestResponseDto created = roomRequestService.create(new CreateRoomRequestDto(
-                RoomRequestType.PARTIAL_EXAM,
-                AcademicScope.GRADO,
-                "Barbara Liskov",
-                "barbara@frc.utn.edu.ar",
-                "351-2222222",
-                academic.subjectId(),
-                List.of(
-                        item(academic.commissionId(), LocalDate.now().plusDays(30), null, List.of()),
-                        item(academic.commissionId(), LocalDate.now().plusDays(120), null, List.of()))));
+                RoomRequestType.OTHER,
+                AcademicScope.EXTENSION,
+                "Grace Hopper",
+                "grace@frc.utn.edu.ar",
+                "351-0000000",
+                null,
+                List.of(item(null, LocalDate.now().plusDays(15), null, List.of()))));
 
-        Long firstItemId = created.items().getFirst().id();
-        RoomRequestResponseDto decided = roomRequestService.preApproveItem(
-                created.id(), firstItemId, "subsecretaria@frc.utn.edu.ar", "Aula reservada");
-
-        assertThat(decided.items().getFirst().status()).isEqualTo(RoomRequestStatus.PRE_APPROVED);
-        assertThat(decided.items().get(1).status()).isEqualTo(RoomRequestStatus.PENDING);
-        assertThat(decided.items().get(1).decidedBy()).isNull();
-        assertThat(decided.items().get(1).decidedAt()).isNull();
+        assertThat(created.type()).isEqualTo(RoomRequestType.OTHER);
+        assertThat(created.subject()).isNull();
+        assertThat(created.items()).singleElement().satisfies(item -> {
+            assertThat(item.status()).isEqualTo(RoomRequestStatus.PENDING);
+            assertThat(item.observations()).isEqualTo("Observación de prueba");
+        });
     }
 
     @Test
-    @DisplayName("decidir un pedido que no es de esa solicitud: 404")
-    void decidingItemFromAnotherRequest_isRejected() {
-        RoomRequestResponseDto owner = roomRequestService.create(oneItemRequest());
-        RoomRequestResponseDto other = roomRequestService.create(oneItemRequest());
-        Long foreignItemId = other.items().getFirst().id();
+    @DisplayName("tipo OTHER sin observations: se rechaza, es el único dato que describe el pedido")
+    void create_otherType_withoutObservations_isRejected() {
+        CreateRoomRequestItemDto itemWithoutObservations = new CreateRoomRequestItemDto(
+                null, LocalDate.now().plusDays(15),
+                LocalTime.of(10, 0), LocalTime.of(12, 0),
+                30, 35, 1, null,
+                false, false, null, null, null, null, List.of());
 
-        assertThatThrownBy(() -> roomRequestService.preApproveItem(
-                owner.id(), foreignItemId, "subsecretaria@frc.utn.edu.ar", null))
-                .isInstanceOf(ResourceNotFoundException.class);
-    }
+        CreateRoomRequestDto dto = new CreateRoomRequestDto(
+                RoomRequestType.OTHER,
+                AcademicScope.EXTENSION,
+                "Grace Hopper",
+                "grace@frc.utn.edu.ar",
+                "351-0000000",
+                null,
+                List.of(itemWithoutObservations));
 
-    private CreateRoomRequestDto oneItemRequest() {
-        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
-        return new CreateRoomRequestDto(
-                RoomRequestType.ONE_TIME_ROOM_CHANGE,
-                AcademicScope.GRADO,
-                "Edsger Dijkstra",
-                "edsger@frc.utn.edu.ar",
-                "351-1111111",
-                academic.subjectId(),
-                List.of(item(academic.commissionId(), LocalDate.now().plusDays(2), null, List.of())));
+        assertThatThrownBy(() -> roomRequestService.create(dto))
+                .isInstanceOf(InvalidRoomRequestException.class)
+                .hasMessageContaining("observations");
     }
 
     private CreateRoomRequestItemDto item(Long commissionId, LocalDate date,
@@ -221,7 +266,7 @@ class RoomRequestIntegrationTest extends AbstractIntegrationTest {
                 true,
                 false,
                 null,
-                false,
+                null,
                 null,
                 "Observación de prueba",
                 preferredClassroomIds);

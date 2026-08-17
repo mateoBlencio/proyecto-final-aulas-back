@@ -34,16 +34,27 @@ public class RoomRequestValidator {
     private final SubjectCommissionService subjectCommissionService;
     private final ClassroomService classroomService;
 
-    /** Valida la solicitud completa antes de persistirla. */
+    /**
+     * Valida la solicitud completa antes de persistirla.
+     *
+     * <p>Primero todo lo que se resuelve con los datos del propio DTO y después
+     * lo que necesita ir a la base: así una solicitud mal armada se rechaza sin
+     * gastar una sola query. El orden es parte del contrato, no un detalle —
+     * hay tests que verifican que un rechazo temprano no toca ningún módulo.
+     */
     public void validateForCreation(CreateRoomRequestDto dto) {
         validateAcademicReference(dto);
+        validateExamUsers(dto);
+        validateOtherHasObservations(dto);
+
         validateReferencesExist(dto);
         validateClassroomsExist(dto);
     }
 
     /**
-     * Una charla o conferencia no está atada a una materia; el resto de los
-     * tipos sí. Mismo criterio que {@code EventScheduleValidator} en events.
+     * Una charla, conferencia u otro tipo sin definir no está atada a una
+     * materia; el resto de los tipos sí. Mismo criterio que
+     * {@code EventScheduleValidator} en events.
      */
     private void validateAcademicReference(CreateRoomRequestDto dto) {
         RoomRequestType type = dto.type();
@@ -98,9 +109,7 @@ public class RoomRequestValidator {
             if (item.currentClassroomId() != null) {
                 classroomIds.add(item.currentClassroomId());
             }
-            if (item.preferredClassroomIds() != null) {
-                classroomIds.addAll(item.preferredClassroomIds());
-            }
+            classroomIds.addAll(item.preferredClassroomIds());
         }
         if (classroomIds.isEmpty()) {
             return;
@@ -111,6 +120,60 @@ public class RoomRequestValidator {
         for (Integer classroomId : classroomIds) {
             if (!classroomsById.containsKey(classroomId)) {
                 throw ResourceNotFoundException.of("Classroom", classroomId);
+            }
+        }
+    }
+
+    /**
+     * {@code requiresExamUsers} son usuarios de examen a nivel de la computadora
+     * del aula, así que la pregunta sólo existe para un parcial o final que
+     * además pide computadoras. La regla es un si y sólo si:
+     *
+     * <ul>
+     *   <li>parcial o final <b>con</b> computadoras: el docente tiene que
+     *       contestar, {@code true} o {@code false}. Un null ahí es el
+     *       formulario incompleto, no un "no".</li>
+     *   <li>cualquier otro caso: tiene que venir en null, porque la pregunta ni
+     *       siquiera se le mostró.</li>
+     * </ul>
+     *
+     * <p>Por eso {@code false} no es equivalente a null: uno significa "le
+     * preguntamos y dijo que no" y el otro "no aplica". El valor se guarda como
+     * {@code Boolean} nullable justamente para poder distinguirlos.
+     */
+    private void validateExamUsers(CreateRoomRequestDto dto) {
+        boolean examType = dto.type().isExam();
+        for (CreateRoomRequestItemDto item : dto.items()) {
+            boolean applies = examType && Boolean.TRUE.equals(item.requiresComputers());
+            if (applies && item.requiresExamUsers() == null) {
+                throw new InvalidRoomRequestException(
+                        "requiresExamUsers es obligatorio en un pedido de parcial o final "
+                                + "que requiere computadoras.");
+            }
+            if (!applies && item.requiresExamUsers() != null) {
+                throw new InvalidRoomRequestException(
+                        "requiresExamUsers solo puede indicarse en un pedido de parcial o final "
+                                + "que además requiera computadoras.");
+            }
+        }
+    }
+
+    /**
+     * {@code OTHER} no tiene reglas de negocio propias todavía y no exige
+     * referencia académica, así que sin este chequeo un pedido de ese tipo
+     * podría llegar sin absolutamente ningún dato que diga de qué se trata.
+     * {@code observations} es el único campo libre que ya existe en el item;
+     * reusarlo evita otra columna/migración para algo que todavía no sabemos
+     * cómo va a usarse en la práctica.
+     */
+    private void validateOtherHasObservations(CreateRoomRequestDto dto) {
+        if (dto.type() != RoomRequestType.OTHER) {
+            return;
+        }
+        for (CreateRoomRequestItemDto item : dto.items()) {
+            if (item.observations() == null || item.observations().isBlank()) {
+                throw new InvalidRoomRequestException(
+                        "observations es obligatorio en cada pedido para solicitudes de tipo OTHER.");
             }
         }
     }
