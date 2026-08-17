@@ -25,8 +25,7 @@ import java.util.Set;
 
 /**
  * Resuelve por batch los datos que viven en otros módulos (materia, comisión,
- * aulas) y arma el DTO de respuesta. Un solo {@code findByIds} por tipo, para
- * no caer en N+1 (ADR-002).
+ * aulas) y arma el DTO de respuesta. Un solo {@code findByIds} por tipo.
  */
 @Component
 @RequiredArgsConstructor

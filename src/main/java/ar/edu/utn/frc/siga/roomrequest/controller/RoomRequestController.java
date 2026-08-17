@@ -40,7 +40,7 @@ public class RoomRequestController {
                        + "para que subsecretaría la analice. Endpoint público, sin autenticación. "
                        + "Devuelve la solicitud creada, que es lo que alimenta la pantalla de confirmación.")
     public ResponseEntity<RoomRequestResponseDto> create(@Valid @RequestBody CreateRoomRequestDto dto) {
-        log.debug("POST /v1/room-requests: type={}, items={}", dto.type(), dto.items().size());
+        log.debug("POST /v1/room-requests: teacherName={}, type={}, items={}", dto.teacherName(), dto.type(), dto.items().size());
         RoomRequestResponseDto response = roomRequestService.create(dto);
         log.info("Solicitud de aula creada vía controller: id={}", response.id());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

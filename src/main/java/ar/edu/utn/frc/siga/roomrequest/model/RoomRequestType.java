@@ -18,7 +18,17 @@ public enum RoomRequestType {
     ONE_TIME_ROOM_CHANGE(true),
 
     /** Cambio de aulas para dictado regular de clases. */
-    REGULAR_ROOM_CHANGE(true);
+    REGULAR_ROOM_CHANGE(true),
+
+    /**
+     * Catch-all para pedidos que no encajan en ningún otro tipo. Sin reglas de
+     * negocio propias todavía: se creó para no bloquear casos que no
+     * anticipamos, así que a propósito es el tipo con menos restricciones.
+     * Lo único que exige {@code RoomRequestValidator} es que cada pedido
+     * traiga {@code observations} — es la única forma de que subsecretaría
+     * sepa de qué se trata sin agregar un campo nuevo al schema.
+     */
+    OTHER(false);
 
     private final boolean academicReferenceRequired;
 
@@ -27,16 +37,16 @@ public enum RoomRequestType {
     }
 
     /**
-     * Si el tipo exige materia y comisión. Una charla o conferencia no está atada
-     * a una materia; el resto sí. Mismo criterio que
+     * Si el tipo exige materia y comisión. Una charla, conferencia u otro tipo
+     * sin definir no está atada a una materia; el resto sí. Mismo criterio que
      * {@code EventScheduleValidator.validateAcademicReference} en {@code events}.
      */
     public boolean requiresAcademicReference() {
         return academicReferenceRequired;
     }
 
-    /** Si el pedido es para reubicar una cursada existente en vez de crear algo nuevo. */
-    public boolean isRoomChange() {
-        return this == ONE_TIME_ROOM_CHANGE || this == REGULAR_ROOM_CHANGE;
+    /** Si el pedido es para un parcial o un final. */
+    public boolean isExam() {
+        return this == PARTIAL_EXAM || this == FINAL_EXAM;
     }
 }
