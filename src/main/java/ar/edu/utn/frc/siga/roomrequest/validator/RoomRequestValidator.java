@@ -44,6 +44,7 @@ public class RoomRequestValidator {
      */
     public void validateForCreation(CreateRoomRequestDto dto) {
         validateAcademicReference(dto);
+        validateScheduleAndEnrollment(dto);
         validateExamUsers(dto);
         validateOtherHasObservations(dto);
 
@@ -69,6 +70,32 @@ public class RoomRequestValidator {
             if (item.commissionId() == null) {
                 throw new InvalidRoomRequestException(
                         "commissionId es obligatorio en cada pedido para solicitudes de tipo " + type + ".");
+            }
+        }
+    }
+
+    /**
+     * {@code startTime}/{@code endTime}/{@code enrolled} son obligatorios salvo
+     * en {@code ONE_TIME_ROOM_CHANGE}/{@code REGULAR_ROOM_CHANGE}, donde esos
+     * datos ya salen de la comisión y su ocurrencia — pedirlos de nuevo en el
+     * formulario sería redundante y una fuente más de inconsistencia. Bean
+     * Validation no puede expresar "obligatorio según el tipo", así que
+     * {@code CreateRoomRequestItemDto} los declara opcionales y la obligatoriedad
+     * condicional se resuelve acá, igual que {@link #validateAcademicReference}.
+     */
+    private void validateScheduleAndEnrollment(CreateRoomRequestDto dto) {
+        RoomRequestType type = dto.type();
+        if (!type.requiresScheduleAndEnrollment()) {
+            return;
+        }
+        for (CreateRoomRequestItemDto item : dto.items()) {
+            if (item.startTime() == null || item.endTime() == null) {
+                throw new InvalidRoomRequestException(
+                        "startTime y endTime son obligatorios en cada pedido para solicitudes de tipo " + type + ".");
+            }
+            if (item.enrolled() == null) {
+                throw new InvalidRoomRequestException(
+                        "enrolled es obligatorio en cada pedido para solicitudes de tipo " + type + ".");
             }
         }
     }

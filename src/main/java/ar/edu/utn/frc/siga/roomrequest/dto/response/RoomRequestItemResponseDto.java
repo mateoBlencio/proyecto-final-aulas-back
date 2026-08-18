@@ -19,7 +19,7 @@ public record RoomRequestItemResponseDto(
         LocalDate date,
         LocalTime startTime,
         LocalTime endTime,
-        long durationMinutes,
+        Long durationMinutes,
         Integer enrolled,
         Integer estimated,
         Integer classroomCount,

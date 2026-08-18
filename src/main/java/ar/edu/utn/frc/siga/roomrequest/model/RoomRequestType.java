@@ -6,19 +6,26 @@ package ar.edu.utn.frc.siga.roomrequest.model;
 public enum RoomRequestType {
 
     /** Solicitud de aulas para parcial. */
-    PARTIAL_EXAM(true),
+    PARTIAL_EXAM(true, true),
 
     /** Solicitud de aulas para final. */
-    FINAL_EXAM(true),
+    FINAL_EXAM(true, true),
 
     /** Solicitud de charla, conferencia o curso. */
-    CONFERENCE(false),
+    CONFERENCE(false, true),
 
-    /** Cambio de aula para dictado de clases por única vez. */
-    ONE_TIME_ROOM_CHANGE(true),
+    /**
+     * Cambio de aula para dictado de clases por única vez. La comisión ya
+     * define horario e inscriptos por ocurrencia, así que el formulario no
+     * necesita pedirlos de nuevo.
+     */
+    ONE_TIME_ROOM_CHANGE(true, false),
 
-    /** Cambio de aulas para dictado regular de clases. */
-    REGULAR_ROOM_CHANGE(true),
+    /**
+     * Cambio de aulas para dictado regular de clases. Mismo motivo que
+     * {@link #ONE_TIME_ROOM_CHANGE}: horario e inscriptos salen de la comisión.
+     */
+    REGULAR_ROOM_CHANGE(true, false),
 
     /**
      * Catch-all para pedidos que no encajan en ningún otro tipo. Sin reglas de
@@ -28,12 +35,14 @@ public enum RoomRequestType {
      * traiga {@code observations} — es la única forma de que subsecretaría
      * sepa de qué se trata sin agregar un campo nuevo al schema.
      */
-    OTHER(false);
+    OTHER(false, true);
 
     private final boolean academicReferenceRequired;
+    private final boolean scheduleAndEnrollmentRequired;
 
-    RoomRequestType(boolean academicReferenceRequired) {
+    RoomRequestType(boolean academicReferenceRequired, boolean scheduleAndEnrollmentRequired) {
         this.academicReferenceRequired = academicReferenceRequired;
+        this.scheduleAndEnrollmentRequired = scheduleAndEnrollmentRequired;
     }
 
     /**
@@ -48,5 +57,14 @@ public enum RoomRequestType {
     /** Si el pedido es para un parcial o un final. */
     public boolean isExam() {
         return this == PARTIAL_EXAM || this == FINAL_EXAM;
+    }
+
+    /**
+     * Si cada pedido de este tipo debe traer {@code startTime}/{@code endTime}/
+     * {@code enrolled}. Falso solo en los cambios de aula: ahí esos datos ya
+     * existen por comisión/ocurrencia y pedirlos de nuevo sería redundante.
+     */
+    public boolean requiresScheduleAndEnrollment() {
+        return scheduleAndEnrollmentRequired;
     }
 }

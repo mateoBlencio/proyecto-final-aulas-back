@@ -74,7 +74,8 @@ public interface RoomRequestMapper {
     @Mapping(target = "currentClassroom", source = "currentClassroom")
     @Mapping(target = "preferredClassrooms", source = "preferredClassrooms")
     @Mapping(target = "endTime", expression = "java(item.endTime())")
-    @Mapping(target = "durationMinutes", expression = "java(item.getDuration().toMinutes())")
+    @Mapping(target = "durationMinutes",
+             expression = "java(item.getDuration() == null ? null : item.getDuration().toMinutes())")
     RoomRequestItemResponseDto toDto(RoomRequestItem item,
                                      CommissionResponseDto commission,
                                      ClassroomOptionDto currentClassroom,
