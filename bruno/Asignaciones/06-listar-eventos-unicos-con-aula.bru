@@ -1,0 +1,17 @@
+meta {
+  name: Listar eventos únicos con aula
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{baseUrl}}/v1/allocations/events/unique
+  body: none
+  auth: inherit
+}
+
+docs {
+  Devuelve todos los eventos únicos (parciales, trabajos prácticos, mesas
+  especiales, etc.) con estado, aula asignada y sobrecupo de su ocurrencia.
+  Para la vista sin aula ver GET /v1/events/unique.
+}

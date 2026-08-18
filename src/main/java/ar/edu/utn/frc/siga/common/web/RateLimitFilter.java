@@ -18,14 +18,6 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/**
- * Rate limit general por IP, red de seguridad base contra abuso amplio del API (no específico
- * de login, ver {@code auth.security.LoginRateLimiter} para eso). Se apoya en
- * {@code request.getRemoteAddr()} ya resuelto por el {@code ForwardedHeaderFilter} de Boot
- * (activado vía {@code server.forward-headers-strategy: framework}) — nunca lee
- * {@code X-Forwarded-For} a mano, porque ese header lo controla el cliente y permitiría evadir
- * el límite o inflar esta caché con IPs falsas.
- */
 @RequiredArgsConstructor
 public class RateLimitFilter extends OncePerRequestFilter {
 

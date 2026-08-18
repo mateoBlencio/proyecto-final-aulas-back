@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
+import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -35,7 +37,6 @@ class AcademicPeriodServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        // AcademicPeriodMapperImpl no tiene dependencias (uses ninguno): se instancia real.
         service = new AcademicPeriodServiceImpl(academicPeriodRepository, new AcademicPeriodMapperImpl());
     }
 
@@ -100,7 +101,7 @@ class AcademicPeriodServiceImplTest {
         List<AcademicPeriodResponseDto> result = service.findActive();
 
         assertThat(result).hasSize(1);
-        AcademicPeriodResponseDto dto = result.get(0);
+        AcademicPeriodResponseDto dto = result.getFirst();
         assertThat(dto.year()).isEqualTo(2026);
         assertThat(dto.semester()).isEqualTo(1);
         assertThat(dto.startDate()).isEqualTo(LocalDate.of(2026, 3, 1));
@@ -120,6 +121,49 @@ class AcademicPeriodServiceImplTest {
 
         List<AcademicPeriodResponseDto> result = service.findActive();
 
-        assertThat(result.get(0).endDate()).isNull();
+        assertThat(result.getFirst().endDate()).isNull();
+    }
+
+    @Test
+    @DisplayName("findAll: mapea todos los períodos del repositorio")
+    void findAllMapsAllPeriods() {
+        AcademicPeriod period = AcademicPeriod.builder()
+                .id(1L).year(2026).semester(1)
+                .startDate(LocalDate.of(2026, 3, 1))
+                .endDate(LocalDate.of(2026, 7, 31))
+                .active(true)
+                .build();
+        when(academicPeriodRepository.findAll()).thenReturn(List.of(period));
+
+        List<AcademicPeriodResponseDto> result = service.findAll();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().year()).isEqualTo(2026);
+    }
+
+    @Test
+    @DisplayName("findById: devuelve el DTO mapeado cuando el período existe")
+    void findByIdReturnsMappedDto() {
+        AcademicPeriod period = AcademicPeriod.builder()
+                .id(1L).year(2026).semester(1)
+                .startDate(LocalDate.of(2026, 3, 1))
+                .endDate(LocalDate.of(2026, 7, 31))
+                .active(true)
+                .build();
+        when(academicPeriodRepository.findById(1L)).thenReturn(Optional.of(period));
+
+        AcademicPeriodResponseDto result = service.findById(1L);
+
+        assertThat(result.year()).isEqualTo(2026);
+    }
+
+    @Test
+    @DisplayName("findById: si el período no existe, lanza ResourceNotFoundException")
+    void findByIdWithMissingPeriodThrowsResourceNotFound() {
+        when(academicPeriodRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.findById(99L))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("AcademicPeriod not found with id: 99");
     }
 }

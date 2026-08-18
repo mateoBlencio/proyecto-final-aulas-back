@@ -1,11 +1,15 @@
 meta {
   name: Ocurrencias de un evento
   type: http
-  seq: 3
+  seq: 2
 }
 
 get {
-  url: {{baseUrl}}/v1/events/1/occurrences
+  url: {{baseUrl}}/v1/events/:id/occurrences
   body: none
-  auth: none
+  auth: inherit
+}
+
+params:path {
+  id: 1
 }

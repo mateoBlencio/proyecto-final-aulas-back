@@ -1,14 +1,17 @@
 package ar.edu.utn.frc.siga.academic.service;
 
 import ar.edu.utn.frc.siga.academic.dto.response.StudyPlanResponseDto;
-import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
+
+import java.util.List;
 
 import org.springframework.modulith.NamedInterface;
 
-/** Fachada de planes de estudio: resolución idempotente (find-or-create) por código de plan dentro de una especialidad. */
 @NamedInterface("api")
 public interface StudyPlanService {
 
-    /** {@code specialtyCode} identifica la especialidad por su clave natural (no hay ID cruzando la frontera). */
-    FindOrCreateResult<StudyPlanResponseDto> findOrCreate(Integer planCode, Integer specialtyCode);
+    List<StudyPlanResponseDto> findAll();
+
+    StudyPlanResponseDto findById(Long id);
+
+    StudyPlanResponseDto findByPlanCodeAndSpecialtyCode(Integer planCode, Integer specialtyCode);
 }

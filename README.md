@@ -2,10 +2,10 @@
 
 Gestión y asignación de aulas para eventos académicos de la UTN FRC: asignación
 manual, importación masiva desde Excel y asignación automática mediante un solver
-de optimización (Timefold).
+de optimización (Timefold), con revisión previa a confirmar.
 
 **Stack**: Spring Boot 4 · Java 21 · PostgreSQL · Maven · Spring Modulith ·
-Timefold Solver 2.2 · Apache POI · Hibernate Envers.
+Timefold Solver 2.2 · Apache POI · Hibernate Envers · Spring Security (JWT) · Bucket4j.
 
 ## Arquitectura: monolito modular
 
@@ -13,22 +13,24 @@ Un solo deployable y una sola base de datos, pero módulos con fronteras vigilad
 por Spring Modulith: `ModularityTests.verifyBoundaries()` rompe el build si un
 módulo accede a internals de otro. Lo público de cada módulo se marca con
 `@NamedInterface("api")`; la comunicación entre módulos es por ID plano + DTO a
-través de esa interfaz, nunca compartiendo entidades JPA.
+través de esa interfaz, nunca compartiendo entidades JPA. `events` y `allocation`
+además se comunican de forma asíncrona: `events` publica `OccurrenceVacated`
+(registro de publicación persistido, entrega al menos una vez) y `allocation` lo
+escucha vía `@ApplicationModuleListener` para desasignar automáticamente.
 
 | Módulo | Depende de | Responsabilidad |
 |---|---|---|
+| `common` | (OPEN) | Manejo de errores centralizado, resultado uniforme "buscar o crear", auditoría (Envers), config de mapeo/CORS/API |
+| `auth` | `common` | Autenticación (JWT), usuarios, rate limiting de login |
 | `space` | `common` | Aulas, edificios, tipos de aula |
-| `academic` | `common` | Materias, comisiones, planes, períodos |
-| `allocation` | `space::api`, `academic::api`, `solver::api`, `common` | Eventos académicos (recurrentes/únicos), ocurrencias, asignaciones de aula |
-| `solver` | `common` | Asignación automática con Timefold Solver |
-| `excelimport` | `academic::api`, `space::api`, `allocation::api`, `common` | Importación masiva desde Excel |
-| `common` | (OPEN) | Config, excepciones globales, converters |
-
-Documentación de detalle:
-
-- [docs/modulos/](docs/modulos/) — ficha técnica por módulo: responsabilidad, API pública, invariantes, gaps y testing.
-- [docs/adr/](docs/adr/) — decisiones arquitectónicas (manejo de errores, MapStruct/composers, DTOs como records, fronteras de módulo, OSIV off, soft-delete, auditoría Envers).
-- [docs/modelo-dominio.md](docs/modelo-dominio.md) — modelo Evento → Ocurrencia → Asignación.
+| `academic` | `common` | Especialidades, planes, materias, períodos académicos, comisiones |
+| `settings` | `common` | Store de configuración en runtime (pesos del optimizer, ventanas horarias, TTLs de preview), con validación y defaults declarados en `application.yaml` |
+| `events` | `academic::api`, `settings::api`, `common` | Eventos académicos (recurrentes/únicos) y sus ocurrencias |
+| `optimizer` | `settings::api`, `common` | Motor de asignación automática puro (Timefold), sin persistencia ni conocimiento de otros módulos |
+| `allocation` | `events::api`, `space::api`, `academic::api`, `common` | Asignación de aula (alta/reasignación/baja en lote), detección de conflictos |
+| `preview` | `allocation::api`, `optimizer::api`, `events::api`, `space::api`, `academic::api`, `settings::api`, `common` | Orquesta el flujo de asignación automática: arma pedido al optimizer, guarda vista previa revisable, confirma atómicamente contra `allocation` |
+| `ingest` | `academic::api`, `space::api`, `allocation::api`, `events::api`, `common` | Importación masiva desde Excel (carga académica y de asignación) |
+| `roomrequest` | `academic::api`, `space::api`, `common` | Solicitudes de aula: alta pública y catálogos del formulario |
 
 ## Setup
 
@@ -59,6 +61,7 @@ SPRING_PROFILES_ACTIVE=dev-local ./mvnw spring-boot:run
 
 - Context-path `/api`, endpoints bajo `/v1` (p. ej. `GET /api/v1/buildings`).
 - Swagger UI habilitado solo en dev/dev-local/test: `/api/swagger-ui.html`.
+- Autenticación JWT: `POST /auth/login`, `/auth/refresh`, `/auth/logout`.
 - Colección [Bruno](https://www.usebruno.com/) en [bruno/](bruno/) (entorno `local`).
   Al agregar o cambiar un endpoint, actualizar la colección.
 
@@ -69,15 +72,15 @@ SPRING_PROFILES_ACTIVE=dev-local ./mvnw spring-boot:run
 ./mvnw test
 
 # Un solo test / un solo método
-./mvnw test -Dtest=SolverServiceImplTest
-./mvnw test -Dtest=SolverServiceImplTest#nombreDelMetodo
+./mvnw test -Dtest=NombreDelTest
+./mvnw test -Dtest=NombreDelTest#nombreDelMetodo
 
 # Verificar fronteras entre módulos (correr SIEMPRE tras cambios estructurales)
 ./mvnw test -Dtest=ModularityTests
 ```
 
-- **Unitarios**: AssertJ + Mockito, sin contexto Spring. Las constraints del solver
-  se verifican con `ConstraintVerifier` de Timefold.
+- **Unitarios**: AssertJ + Mockito, sin contexto Spring. Las constraints del
+  optimizer se verifican con `ConstraintVerifier` de Timefold.
 - **Integración** (sufijo `*IntegrationTest`): `@SpringBootTest` + MockMvc contra
   Postgres real vía Testcontainers (URL `jdbc:tc:...`, contenedor singleton por
   JVM). **Sin Docker se saltean limpiamente** (`@Testcontainers(disabledWithoutDocker = true)`);
@@ -86,19 +89,10 @@ SPRING_PROFILES_ACTIVE=dev-local ./mvnw spring-boot:run
   `./mvnw test -Dspring.profiles.active=integration` en push a
   `feature/**`/`hotfix/**` y PRs a `develop`/`main`.
 
-## Base de datos
-
-- **No hay Flyway/Liquibase**: el esquema lo administra un DBA externo. La app corre
-  con `ddl-auto: validate` — si las entidades no coinciden con el esquema real, no levanta.
-- Cambio de esquema → agregarlo a mano a [scripts/sql/ddl.sql](.claude/sql/sql/ddl.sql)
-  (DDL pendiente consolidado), entregarlo al DBA, y mapear en las entidades recién
-  cuando esté aplicado.
-- Excepciones: `dev-local` y los tests de integración usan `create-drop`.
-
 ## Convenciones
 
 - Commits: [Conventional Commits](https://www.conventionalcommits.org/) **en español**
-  — `fix(solver): ...`, `test(allocation): ...`. Branches `feature/**` / `hotfix/**`;
+  — `fix(allocation): ...`, `test(ingest): ...`. Branches `feature/**` / `hotfix/**`;
   PRs contra `develop`/`main`.
 - Código en inglés (nombres de clases/métodos); comentarios, mensajes y
   documentación en español.

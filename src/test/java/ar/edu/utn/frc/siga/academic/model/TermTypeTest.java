@@ -55,12 +55,22 @@ class TermTypeTest {
     }
 
     @Test
-    @DisplayName("fromLabel es sensible a mayúsculas/minúsculas y espacios: no hace match parcial ni case-insensitive")
-    void fromLabelIsCaseAndWhitespaceSensitive() {
-        // FIXME: fromLabel usa equals() estricto; variantes razonables como "anual" o "1 Cuat"
-        // (sin punto final) no matchean, lo que puede romper imports con datos de origen inconsistente.
-        assertThat(TermType.fromLabel("anual")).isEmpty();
-        assertThat(TermType.fromLabel("1 Cuat")).isEmpty();
-        assertThat(TermType.fromLabel(" Anual")).isEmpty();
+    @DisplayName("fromLabel tolera mayúsculas, espacios y punto final")
+    void fromLabelToleratesCaseWhitespaceAndTrailingDot() {
+        assertThat(TermType.fromLabel("anual")).contains(TermType.ANUAL);
+        assertThat(TermType.fromLabel("1 Cuat")).contains(TermType.PRIMER_CUATRIMESTRE);
+        assertThat(TermType.fromLabel(" Anual")).contains(TermType.ANUAL);
+    }
+
+    @Test
+    @DisplayName("fromLabel(null) devuelve Optional vacío")
+    void fromLabelWithNullReturnsEmpty() {
+        assertThat(TermType.fromLabel(null)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("fromLabel con una etiqueta que no corresponde a ningún tipo sigue sin matchear")
+    void fromLabelWithUnrelatedLabelStillReturnsEmpty() {
+        assertThat(TermType.fromLabel("Trimestral")).isEmpty();
     }
 }

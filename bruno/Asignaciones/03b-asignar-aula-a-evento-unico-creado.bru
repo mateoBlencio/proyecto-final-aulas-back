@@ -1,0 +1,27 @@
+meta {
+  name: Asignar aula a evento único recién creado
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/v1/allocations
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "items": [
+      { "occurrenceIds": [1], "classroomId": 1 }
+    ],
+    "observation": "Aula asignada al crear el evento único"
+  }
+}
+
+docs {
+  Paso 2 del alta de un evento único CON aula: después de POST /v1/events/unique,
+  buscar el id de su única occurrence (GET /v1/events/:id/occurrences) y asignarle
+  aula con este request. Dos llamadas, no atómicas — si la segunda falla, el evento
+  queda creado sin aula (estado válido, no un error a medias).
+}

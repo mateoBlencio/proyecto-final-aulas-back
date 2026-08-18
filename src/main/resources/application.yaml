@@ -17,6 +17,8 @@ spring:
       minimum-idle: 2
       connection-timeout: 30000
       idle-timeout: 600000
+      data-source-properties:
+        reWriteBatchedInserts: true
 
   jpa:
     open-in-view: false
@@ -30,6 +32,10 @@ spring:
           batch_size: 50
         order_inserts: true
         order_updates: true
+      org:
+        hibernate:
+          envers:
+            store_data_at_delete: true
 
   docker:
     compose:
@@ -65,16 +71,47 @@ cors:
 siga:
   api:
     base-path: /v1
-  solver:
+  settings:
+    definitions:
+      - key: optimizer.unimprovedSecondsLimit
+        default-value: "10"
+        min: "0"
+        max: "3600"
+      - key: optimizer.weights.overcrowding
+        default-value: "100000"
+        min: "0"
+        max: "1000000"
+      - key: optimizer.weights.sameCommissionDiffRoom
+        default-value: "2000"
+        min: "0"
+        max: "1000000"
+      - key: optimizer.weights.sameCommissionDiffBuilding
+        default-value: "4000"
+        min: "0"
+        max: "1000000"
+      - key: optimizer.weights.unusedCapacity
+        default-value: "1"
+        min: "0"
+        max: "1000000"
+      - key: optimizer.solverSecondsSpentLimit
+        default-value: "300"
+        min: "1"
+        max: "3600"
+      - key: preview.defaultTimeLimitSeconds
+        default-value: "30"
+        min: "1"
+        max: "3600"
+      - key: preview.ttlMinutes
+        default-value: "30"
+        min: "1"
+        max: "1440"
+      - key: events.hours.start
+        default-value: "08:00"
+      - key: events.hours.end
+        default-value: "23:00"
+  optimizer:
     parallel-solver-count: AUTO
-    unimproved-seconds-limit: 1000
     environment-mode: PHASE_ASSERT
-    preview:
-      ttl-minutes: 30
-    weights:
-      overcrowding: 100000
-      same-commission-diff-room: 2000
-      same-commission-diff-building: 4000
   space:
     default-classroom-type: Normal
   jwt:
@@ -96,7 +133,6 @@ logging:
   level:
     root: WARN
     ar.edu.utn.frc.siga: INFO
-    # Fases del solver (construction heuristic / local search) y resumen de score de Timefold.
     ai.timefold.solver.core.impl.solver: INFO
     ai.timefold.solver.core.impl.constructionheuristic: INFO
     ai.timefold.solver.core.impl.localsearch: INFO

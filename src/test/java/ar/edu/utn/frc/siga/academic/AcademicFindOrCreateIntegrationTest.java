@@ -2,20 +2,9 @@ package ar.edu.utn.frc.siga.academic;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
 import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
-import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
-import ar.edu.utn.frc.siga.academic.dto.response.StudyPlanResponseDto;
-import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
-import ar.edu.utn.frc.siga.academic.model.Specialty;
-import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
-import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
-import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
-import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
-import ar.edu.utn.frc.siga.academic.service.SpecialtyService;
-import ar.edu.utn.frc.siga.academic.service.StudyPlanService;
-import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 
 import java.time.LocalDate;
@@ -27,78 +16,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * {@code findOrCreate} de academic no tiene endpoint HTTP (módulo sin controller):
- * se inyectan los services directamente.
- */
-@DisplayName("Academic findOrCreate (integración)")
+@DisplayName("AcademicPeriod findOrCreate (integración)")
 class AcademicFindOrCreateIntegrationTest extends AbstractIntegrationTest {
 
     private static final AtomicInteger SEQ = new AtomicInteger((int) (System.nanoTime() % 1_000_000));
 
     @Autowired
-    private SpecialtyService specialtyService;
-    @Autowired
-    private StudyPlanService studyPlanService;
-    @Autowired
-    private SubjectService subjectService;
-    @Autowired
     private AcademicPeriodService academicPeriodService;
-
-    @Autowired
-    private SpecialtyRepository specialtyRepository;
-    @Autowired
-    private StudyPlanRepository studyPlanRepository;
-    @Autowired
-    private SubjectRepository subjectRepository;
     @Autowired
     private AcademicPeriodRepository academicPeriodRepository;
 
     private static int nextCode() {
         return SEQ.incrementAndGet();
-    }
-
-    @Test
-    @DisplayName("cadena Specialty->StudyPlan->Subject: primera llamada crea, segunda reusa (ids estables, sin duplicados)")
-    void findOrCreate_chain_isIdempotent() {
-        int specialtyCode = nextCode();
-        int planCode = nextCode();
-        int subjectCode = nextCode();
-
-        long specialtiesBefore = specialtyRepository.count();
-        long plansBefore = studyPlanRepository.count();
-        long subjectsBefore = subjectRepository.count();
-
-        FindOrCreateResult<SpecialtyResponseDto> specialty1 = specialtyService.findOrCreate(specialtyCode);
-        FindOrCreateResult<StudyPlanResponseDto> plan1 = studyPlanService.findOrCreate(planCode, specialtyCode);
-        FindOrCreateResult<SubjectResponseDto> subject1 =
-                subjectService.findOrCreate(subjectCode, "Materia IT", planCode, specialtyCode, "Anual");
-
-        assertThat(specialty1.created()).isTrue();
-        assertThat(plan1.created()).isTrue();
-        assertThat(subject1.created()).isTrue();
-
-        FindOrCreateResult<SpecialtyResponseDto> specialty2 = specialtyService.findOrCreate(specialtyCode);
-        FindOrCreateResult<StudyPlanResponseDto> plan2 = studyPlanService.findOrCreate(planCode, specialtyCode);
-        FindOrCreateResult<SubjectResponseDto> subject2 =
-                subjectService.findOrCreate(subjectCode, "Materia IT (nombre distinto)", planCode, specialtyCode, "Anual");
-
-        assertThat(specialty2.created()).isFalse();
-        assertThat(plan2.created()).isFalse();
-        assertThat(subject2.created()).isFalse();
-
-        // Los DTOs de Specialty/StudyPlan no exponen id (clave natural es specialtyCode/planCode);
-        // la estabilidad del id real se verifica contra la entidad vía repository.
-        Specialty specialtyEntity = specialtyRepository.findBySpecialtyCode(specialtyCode).orElseThrow();
-        StudyPlan planEntity = studyPlanRepository.findByPlanCodeAndSpecialty(planCode, specialtyEntity).orElseThrow();
-        assertThat(subject2.value().id()).isEqualTo(subject1.value().id());
-        assertThat(planEntity.getId()).isNotNull();
-        assertThat(specialty2.value().specialtyCode()).isEqualTo(specialtyCode);
-        assertThat(plan2.value().planCode()).isEqualTo(planCode);
-
-        assertThat(specialtyRepository.count()).isEqualTo(specialtiesBefore + 1);
-        assertThat(studyPlanRepository.count()).isEqualTo(plansBefore + 1);
-        assertThat(subjectRepository.count()).isEqualTo(subjectsBefore + 1);
     }
 
     @Test

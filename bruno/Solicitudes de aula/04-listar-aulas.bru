@@ -1,0 +1,19 @@
+meta {
+  name: Catálogo - listar aulas
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/v1/room-requests/catalog/classrooms
+  body: none
+  auth: none
+}
+
+docs {
+  Para elegir el aula donde se cursa actualmente y las aulas de preferencia.
+
+  Endpoint PÚBLICO: por eso devuelve solo id, número de aula y edificio, y
+  NO capacidad, disponibilidad ni tipo de aula. Lista únicamente las aulas
+  disponibles.
+}

@@ -46,7 +46,7 @@ public class AuthServiceImpl implements AuthService {
         String email = request.email();
         String ip = httpRequest.getRemoteAddr();
 
-        if (!email.toLowerCase().endsWith("@" + authDomainProperties.getAllowedEmailDomain().toLowerCase())) {
+        if (!authDomainProperties.isAllowedEmail(email)) {
             log.warn("Login rechazado, dominio no institucional: email={}, ip={}", email, ip);
             throw new InvalidCredentialsException();
         }
@@ -70,7 +70,7 @@ public class AuthServiceImpl implements AuthService {
         loginRateLimiter.recordSuccess(email);
         log.info("Login exitoso: email={}, ip={}", email, ip);
 
-        User user = userRepository.findByEmailAndDeletedFalse(email)
+        User user = userRepository.findByEmailAndEnabledTrue(email)
                 .orElseThrow(InvalidCredentialsException::new);
 
         return buildTokenResponse(user, refreshTokenService.issue(user));

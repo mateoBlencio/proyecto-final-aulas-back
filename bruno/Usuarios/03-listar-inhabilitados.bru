@@ -1,0 +1,16 @@
+meta {
+  name: Listar usuarios inhabilitados
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/v1/users/disabled
+  body: none
+  auth: none
+}
+
+params:query {
+  page: 0
+  size: 15
+}

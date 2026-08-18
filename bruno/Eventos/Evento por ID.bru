@@ -1,13 +1,13 @@
 meta {
   name: Evento por ID
   type: http
-  seq: 2
+  seq: 1
 }
 
 get {
   url: {{baseUrl}}/v1/events/:id
   body: none
-  auth: none
+  auth: inherit
 }
 
 params:path {

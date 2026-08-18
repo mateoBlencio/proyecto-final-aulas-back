@@ -2,7 +2,6 @@ package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.space.SpaceTestData;
-import ar.edu.utn.frc.siga.space.exception.SpaceDomainException;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
 import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,7 +10,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 
@@ -31,7 +29,6 @@ class ClassroomTypeServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new ClassroomTypeServiceImpl(classroomTypeRepository);
-        ReflectionTestUtils.setField(service, "defaultClassroomTypeDescription", "Normal");
     }
 
     @Test
@@ -51,34 +48,5 @@ class ClassroomTypeServiceImplTest {
         assertThatThrownBy(() -> service.findById(99))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("ClassroomType not found with id: 99");
-    }
-
-    @Test
-    @DisplayName("findDefault: busca por la descripción configurada vía siga.space.default-classroom-type")
-    void findDefaultUsesConfiguredDescription() {
-        ClassroomType type = SpaceTestData.classroomType().description("Normal").build();
-        when(classroomTypeRepository.findByDescriptionIgnoreCase("Normal")).thenReturn(Optional.of(type));
-
-        assertThat(service.findDefault()).isEqualTo(type);
-    }
-
-    @Test
-    @DisplayName("findDefault: respeta una descripción configurada distinta de la default")
-    void findDefaultUsesCustomConfiguredDescription() {
-        ReflectionTestUtils.setField(service, "defaultClassroomTypeDescription", "Laboratorio");
-        ClassroomType type = SpaceTestData.classroomType().description("Laboratorio").build();
-        when(classroomTypeRepository.findByDescriptionIgnoreCase("Laboratorio")).thenReturn(Optional.of(type));
-
-        assertThat(service.findDefault()).isEqualTo(type);
-    }
-
-    @Test
-    @DisplayName("findDefault: si el tipo por defecto no existe, lanza SpaceDomainException")
-    void findDefaultWithMissingTypeThrowsSpaceDomainException() {
-        when(classroomTypeRepository.findByDescriptionIgnoreCase("Normal")).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.findDefault())
-                .isInstanceOf(SpaceDomainException.class)
-                .hasMessageContaining("Normal");
     }
 }

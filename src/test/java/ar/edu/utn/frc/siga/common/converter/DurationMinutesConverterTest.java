@@ -40,13 +40,11 @@ class DurationMinutesConverterTest {
     }
 
     @Test
-    @DisplayName("trunca segundos: una Duration con segundos sueltos pierde precisión al convertir a minutos")
-    void truncatesPartialMinutes() {
-        // FIXME: convertToDatabaseColumn trunca hacia abajo (Duration.toMinutes()) en vez de
-        // redondear o rechazar duraciones no múltiplos de 60s; documentamos el comportamiento actual.
-        Integer minutes = converter.convertToDatabaseColumn(Duration.ofSeconds(125));
-
-        assertThat(minutes).isEqualTo(2);
+    @DisplayName("redondea al minuto más cercano: segundos sueltos redondean half-up")
+    void roundsToNearestMinute() {
+        assertThat(converter.convertToDatabaseColumn(Duration.ofSeconds(125))).isEqualTo(2);
+        assertThat(converter.convertToDatabaseColumn(Duration.ofSeconds(150))).isEqualTo(3);
+        assertThat(converter.convertToDatabaseColumn(Duration.ofSeconds(59))).isEqualTo(1);
     }
 
     @Test

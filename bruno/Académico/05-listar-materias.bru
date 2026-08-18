@@ -1,0 +1,21 @@
+meta {
+  name: Listar materias
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/v1/subjects?specialtyCode=5
+  body: none
+  auth: inherit
+}
+
+params:query {
+  specialtyCode: 5
+}
+
+docs {
+  Sin specialtyCode devuelve el catálogo completo de materias. Con specialtyCode,
+  filtra las materias de todos los planes de esa especialidad (no valida que la
+  especialidad exista: código inexistente devuelve lista vacía).
+}

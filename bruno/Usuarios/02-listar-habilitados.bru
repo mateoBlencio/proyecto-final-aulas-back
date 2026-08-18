@@ -1,0 +1,16 @@
+meta {
+  name: Listar usuarios habilitados
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/users
+  body: none
+  auth: none
+}
+
+params:query {
+  page: 0
+  size: 15
+}

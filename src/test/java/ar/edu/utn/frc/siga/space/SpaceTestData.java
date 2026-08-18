@@ -5,10 +5,6 @@ import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
 
-/**
- * Fixture única de datos de prueba del módulo {@code space}. Métodos estáticos que arman
- * entidades/DTOs con valores por defecto razonables, sobreescribibles vía el builder de Lombok.
- */
 public class SpaceTestData {
 
     public static Building.BuildingBuilder building() {

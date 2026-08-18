@@ -15,28 +15,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * Base para tests de integración: levanta el contexto completo de Spring contra
- * un Postgres real vía Testcontainers.
- *
- * <p>Decisiones:
- * <ul>
- *     <li>{@code @Testcontainers(disabledWithoutDocker = true)} sin ningún {@code @Container}:
- *     no manejamos un contenedor propio, pero la anotación igual evalúa la disponibilidad de
- *     Docker y skipea la clase entera (no falla) antes de intentar levantar el contexto.</li>
- *     <li>El contenedor real lo crea el driver JDBC {@code jdbc:tc:...} (ver
- *     application-integration.yaml), que es singleton por JVM y se reutiliza entre clases de
- *     test — compatible con el cache de contextos de Spring, a diferencia de un
- *     {@code @Container static} o {@code @ServiceConnection} por clase.</li>
- *     <li>Sin {@code @Transactional}: Hibernate Envers necesita que los commits ocurran de
- *     verdad para auditar; un rollback automático por test rompería esa auditoría.</li>
- *     <li>Seguridad: el profile de integración mantiene la cadena JWT activa (ver SecurityConfig).
- *     En vez de desactivarla, el MockMvc se arma con {@code springSecurity()} y firma un access
- *     token real (rol SUBSECRETARIA, con acceso a todos los endpoints) que viaja como header
- *     {@code Authorization} por defecto en cada request. Así los tests de API ejercitan el filtro
- *     JWT de verdad sin hacer login por HTTP.</li>
- * </ul>
- */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @ActiveProfiles("integration")
 @Testcontainers(disabledWithoutDocker = true)

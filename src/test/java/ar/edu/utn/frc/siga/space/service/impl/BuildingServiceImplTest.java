@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
-import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
+import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.space.SpaceTestData;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.mapper.BuildingMapper;
@@ -10,7 +10,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -18,9 +17,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -54,40 +51,44 @@ class BuildingServiceImplTest {
     }
 
     @Test
-    @DisplayName("findOrCreate: si el edificio ya existe por nombre, no lo crea y created queda en false")
-    void findOrCreateWithExistingBuildingDoesNotSave() {
+    @DisplayName("findById: devuelve el DTO mapeado cuando el edificio existe")
+    void findByIdReturnsMappedDto() {
+        Building existing = SpaceTestData.building().id(1).build();
+        BuildingResponseDto dto = new BuildingResponseDto(1, "Edificio Central", 5, true);
+        when(buildingRepository.findById(1)).thenReturn(Optional.of(existing));
+        when(buildingMapper.toDto(existing)).thenReturn(dto);
+
+        assertThat(service.findById(1)).isEqualTo(dto);
+    }
+
+    @Test
+    @DisplayName("findById: si el edificio no existe, lanza ResourceNotFoundException")
+    void findByIdWithMissingBuildingThrowsResourceNotFound() {
+        when(buildingRepository.findById(99)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.findById(99))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Building not found with id: 99");
+    }
+
+    @Test
+    @DisplayName("findByName: devuelve el DTO mapeado cuando el edificio existe")
+    void findByNameReturnsMappedDto() {
         Building existing = SpaceTestData.building().name("Edificio Central").build();
         BuildingResponseDto dto = new BuildingResponseDto(1, "Edificio Central", 5, true);
         when(buildingRepository.findByName("Edificio Central")).thenReturn(Optional.of(existing));
         when(buildingMapper.toDto(existing)).thenReturn(dto);
 
-        FindOrCreateResult<BuildingResponseDto> result = service.findOrCreate("Edificio Central");
-
-        assertThat(result.created()).isFalse();
-        assertThat(result.value()).isEqualTo(dto);
-        verify(buildingRepository, never()).save(any());
+        assertThat(service.findByName("Edificio Central")).isEqualTo(dto);
     }
 
     @Test
-    @DisplayName("findOrCreate: si no existe, crea el edificio con floorCount=0 provisional y created queda en true")
-    void findOrCreateWithoutExistingBuildingCreatesProvisional() {
-        BuildingResponseDto dto = new BuildingResponseDto(9, "Edificio Nuevo", 0, true);
+    @DisplayName("findByName: si el edificio no existe, lanza ResourceNotFoundException")
+    void findByNameWithMissingBuildingThrowsResourceNotFound() {
         when(buildingRepository.findByName("Edificio Nuevo")).thenReturn(Optional.empty());
-        when(buildingRepository.save(any())).thenAnswer(invocation -> {
-            Building toSave = invocation.getArgument(0);
-            toSave.setId(9);
-            return toSave;
-        });
-        when(buildingMapper.toDto(any())).thenReturn(dto);
 
-        FindOrCreateResult<BuildingResponseDto> result = service.findOrCreate("Edificio Nuevo");
-
-        assertThat(result.created()).isTrue();
-        assertThat(result.value()).isEqualTo(dto);
-        ArgumentCaptor<Building> captor = ArgumentCaptor.forClass(Building.class);
-        verify(buildingRepository).save(captor.capture());
-        Building saved = captor.getValue();
-        assertThat(saved.getName()).isEqualTo("Edificio Nuevo");
-        assertThat(saved.getFloorCount()).isZero();
+        assertThatThrownBy(() -> service.findByName("Edificio Nuevo"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Building not found with id: Edificio Nuevo");
     }
 }

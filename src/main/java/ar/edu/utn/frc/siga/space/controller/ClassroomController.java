@@ -4,6 +4,8 @@ import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 import lombok.RequiredArgsConstructor;
@@ -25,19 +27,20 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * CRUD y búsqueda paginada/filtrada de aulas.
- */
 @Slf4j
 @RestController
 @RequestMapping("${siga.api.base-path}/classrooms")
 @RequiredArgsConstructor
+@Tag(name = "Aulas", description = "ABM y consulta de aulas")
 public class ClassroomController {
 
     private final ClassroomService classroomService;
 
     @PostMapping
     @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Crear aula",
+               description = "400 si el roomNumber ya existe, si el piso excede el floorCount del edificio o si "
+                       + "la capacidad no es positiva. 404 si el edificio o el tipo de aula no existen.")
     public ResponseEntity<ClassroomResponseDto> create(@Valid @RequestBody ClassroomRequestDto dto) {
         log.debug("POST /v1/classrooms: roomNumber={}, buildingId={}", dto.roomNumber(), dto.buildingId());
         ClassroomResponseDto response = classroomService.create(dto);
@@ -47,6 +50,7 @@ public class ClassroomController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @Operation(summary = "Buscar aula por id", description = "404 si el aula no existe.")
     public ResponseEntity<ClassroomResponseDto> findById(@PathVariable Integer id) {
         log.debug("GET /v1/classrooms/{}", id);
         return ResponseEntity.ok(classroomService.findById(id));
@@ -54,6 +58,8 @@ public class ClassroomController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @Operation(summary = "Listar aulas", description = "Listado paginado con filtros opcionales por número, "
+            + "edificio, tipo, capacidad, piso y disponibilidad.")
     public ResponseEntity<Page<ClassroomResponseDto>> findAll(
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
             @RequestParam(required = false) String roomNumber,
@@ -74,6 +80,9 @@ public class ClassroomController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Actualizar aula",
+               description = "404 si el aula, el edificio o el tipo de aula no existen. 400 si el piso excede "
+                       + "el floorCount del edificio o si la capacidad no es positiva.")
     public ResponseEntity<ClassroomResponseDto> update(@PathVariable Integer id,
                                                         @Valid @RequestBody ClassroomRequestDto dto) {
         log.debug("PUT /v1/classrooms/{}: roomNumber={}", id, dto.roomNumber());
@@ -84,6 +93,7 @@ public class ClassroomController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Eliminar aula", description = "Soft-delete. 404 si el aula no existe.")
     public ResponseEntity<Void> delete(@PathVariable Integer id) {
         log.debug("DELETE /v1/classrooms/{}", id);
         classroomService.delete(id);

@@ -12,11 +12,20 @@ post {
 
 body:json {
   {
-    "refreshToken":"QpiJbOe9FuUGPrUC8qqoCTJESmYwUHo55QMnwK9NcQM"
+    "refreshToken":"{{refreshToken}}"
   }
 }
 
 settings {
   encodeUrl: true
   timeout: 0
+}
+
+script:post-response {
+  if (res.body.accessToken) {
+    bru.setVar("accessToken", res.body.accessToken);
+  }
+  if (res.body.refreshToken) {
+    bru.setVar("refreshToken", res.body.refreshToken);
+  }
 }

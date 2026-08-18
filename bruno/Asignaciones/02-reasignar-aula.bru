@@ -5,29 +5,43 @@ meta {
 }
 
 put {
-  url: {{baseUrl}}/v1/allocations/1
+  url: {{baseUrl}}/v1/allocations
   body: json
-  auth: none
+  auth: inherit
 }
 
 body:json {
   {
-    "classroomId": 2,
+    "items": [
+      { "occurrenceIds": [1], "classroomId": 2 }
+    ],
     "observation": "Cambio de aula por conflicto de capacidad"
   }
 }
 
 docs {
-  Cambia el aula de una asignación existente (source = MANUAL).
-  
-  Valida que el aula nueva no esté ocupada por OTRA asignación en la misma fecha/
-  franja de la ocurrencia (la ocupación actual de esta misma asignación no cuenta
-  como conflicto: reasignar al mismo aula que ya tenía es válido). Si hay
-  solapamiento → 409 con:
+  Asigna aula en lote (source = MANUAL), en modo upsert: crea la asignación si
+  no existía, o actualiza (cambia de aula) si ya existía. Para strict-create
+  (falla si ya existe) ver POST /v1/allocations.
+
+  Cada item de "items" es EITHER "occurrenceIds" (lista explícita de ids de
+  ocurrencia) OR "eventId" (todas las ocurrencias aplicables del evento desde
+  la primera fecha aún modificable en adelante), nunca ambos ni ninguno.
+  "classroomId" es obligatorio en todos los items. Este ejemplo usa un solo
+  item con una sola ocurrencia; ver 07-reasignar-lote.bru y
+  05-reasignar-aula-de-evento.bru para ejemplos de lote múltiple y de item
+  por eventId.
+
+  Valida que el aula nueva no esté ocupada por OTRA asignación en la misma
+  fecha/franja de la ocurrencia (la ocupación actual de esta misma asignación
+  no cuenta como conflicto: reasignar al mismo aula que ya tenía es válido).
+  Todo el lote se valida ANTES de escribir nada. Si hay solapamiento → 409 con:
   {
     "conflicts": [
       { "occurrenceId", "date", "startTime", "endTime", "classroomId",
         "conflictingEventId", "conflictingAllocationId" }
     ]
   }
+
+  Respuesta 200: List<AllocationResponseDto> con el/los item(s) resultantes.
 }

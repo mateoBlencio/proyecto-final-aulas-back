@@ -5,34 +5,43 @@ meta {
 }
 
 put {
-  url: {{baseUrl}}/v1/allocations/batch
+  url: {{baseUrl}}/v1/allocations
   body: json
-  auth: none
+  auth: inherit
 }
 
 body:json {
   {
-    "moves": [
-      { "allocationId": 1, "classroomId": 2 },
-      { "allocationId": 2, "classroomId": 3 }
-    ]
+    "items": [
+      { "occurrenceIds": [1], "classroomId": 2 },
+      { "occurrenceIds": [2], "classroomId": 3 }
+    ],
+    "observation": null
   }
 }
 
 docs {
-  Reasigna el aula de varias asignaciones en un solo lote (source = MANUAL).
-  
-  Todos los moves se validan JUNTOS antes de escribir nada: cada uno contra la
-  ocupación firme de BD (excluyendo las propias asignaciones del lote, que se
-  están moviendo) Y entre sí (dos moves al mismo aula, misma fecha, con franjas
-  que se pisan). Si hay cualquier conflicto → 409 con la lista completa, sin
-  persistir ningún cambio:
+  Asigna/reasigna aula de varios items en un solo lote (source = MANUAL, modo
+  upsert: crea la asignación si no existía, o actualiza si ya existía).
+
+  Cada item es EITHER "occurrenceIds" (lista explícita de ids de ocurrencia)
+  OR "eventId" (todas las ocurrencias aplicables del evento desde la primera
+  fecha aún modificable en adelante), nunca ambos ni ninguno. "classroomId"
+  es obligatorio en todos los items.
+
+  Todos los items se validan JUNTOS antes de escribir nada: cada uno contra la
+  ocupación firme de BD (excluyendo las propias ocurrencias del lote, que se
+  están moviendo) Y entre sí (dos items al mismo aula, misma fecha, con
+  franjas que se pisan). Si hay cualquier conflicto → 409 con la lista
+  completa, sin persistir ningún cambio:
   {
     "conflicts": [
       { "occurrenceId", "date", "startTime", "endTime", "classroomId",
         "conflictingEventId", "conflictingAllocationId" }
     ]
   }
-  conflictingAllocationId va null cuando el choque es entre dos moves del propio
-  lote (todavía no hay asignación real involucrada).
+  conflictingAllocationId va null cuando el choque es entre dos items del
+  propio lote (todavía no hay asignación real involucrada).
+
+  Respuesta 200: List<AllocationResponseDto> con todos los items resultantes.
 }

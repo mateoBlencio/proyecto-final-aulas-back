@@ -1,4 +1,12 @@
+auth {
+  mode: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
 vars:pre-request {
   baseUrl: http://localhost:8080/api
-  ~baseUrl: http://100.90.179.1:8080/api
+  ~baseUrl: http://100.90.179.1:8090/api
 }

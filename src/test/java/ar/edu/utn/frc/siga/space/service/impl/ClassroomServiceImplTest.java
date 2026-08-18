@@ -1,6 +1,5 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
-import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.space.SpaceTestData;
 import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
@@ -59,7 +58,6 @@ class ClassroomServiceImplTest {
         service = new ClassroomServiceImpl(classroomRepository, buildingRepository, classroomTypeService, classroomMapper);
     }
 
-    // ---- create ----
 
     @Test
     @DisplayName("create: si roomNumber ya existe, lanza SpaceDomainException y no guarda")
@@ -180,7 +178,6 @@ class ClassroomServiceImplTest {
         assertThat(toSave.getClassroomType()).isEqualTo(type);
     }
 
-    // ---- findById ----
 
     @Test
     @DisplayName("findById: devuelve el DTO mapeado cuando el aula existe")
@@ -203,7 +200,6 @@ class ClassroomServiceImplTest {
                 .hasMessage("Classroom not found with id: 99");
     }
 
-    // ---- findAllAvailable / findByIds / findAll ----
 
     @Test
     @DisplayName("findAllAvailable: mapea solo las aulas disponibles devueltas por el repositorio")
@@ -244,7 +240,6 @@ class ClassroomServiceImplTest {
         assertThat(result.getContent()).containsExactly(dto);
     }
 
-    // ---- update ----
 
     @Test
     @DisplayName("update: si roomNumber pasa a coincidir con otra aula, no valida duplicado (solo create lo hace)")
@@ -324,7 +319,6 @@ class ClassroomServiceImplTest {
                 .hasMessage("Building not found with id: 1");
     }
 
-    // ---- delete ----
 
     @Test
     @DisplayName("delete: marca el aula como eliminada (soft-delete) sin borrado físico")
@@ -349,11 +343,10 @@ class ClassroomServiceImplTest {
                 .hasMessage("Classroom not found with id: 1");
     }
 
-    // ---- findOrCreate ----
 
     @Test
-    @DisplayName("findOrCreate: si el aula ya existe en el edificio, no la crea y created queda en false")
-    void findOrCreateWithExistingClassroomDoesNotSave() {
+    @DisplayName("findByRoomNumberAndBuilding: si el aula existe en el edificio, devuelve el DTO mapeado")
+    void findByRoomNumberAndBuildingReturnsMappedDto() {
         Building building = SpaceTestData.building().build();
         Classroom existing = SpaceTestData.classroom().build();
         ClassroomResponseDto dto = new ClassroomResponseDto(1, "101", 1, 40, true, 1, "Edificio Central", 1, "Normal");
@@ -361,102 +354,76 @@ class ClassroomServiceImplTest {
         when(classroomRepository.findByRoomNumberAndBuilding("101", building)).thenReturn(Optional.of(existing));
         when(classroomMapper.toDto(existing)).thenReturn(dto);
 
-        FindOrCreateResult<ClassroomResponseDto> result = service.findOrCreate("101", 1, 35);
+        ClassroomResponseDto result = service.findByRoomNumberAndBuilding("101", 1);
 
-        assertThat(result.created()).isFalse();
-        assertThat(result.value()).isEqualTo(dto);
+        assertThat(result).isEqualTo(dto);
         verify(classroomRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("findOrCreate: si no existe, crea con floor=0, capacity=enrolledCount y el tipo por defecto")
-    void findOrCreateWithoutExistingClassroomCreatesProvisional() {
-        Building building = SpaceTestData.building().build();
-        ClassroomType defaultType = SpaceTestData.classroomType().build();
-        when(buildingRepository.findById(1)).thenReturn(Optional.of(building));
-        when(classroomRepository.findByRoomNumberAndBuilding("101", building)).thenReturn(Optional.empty());
-        when(classroomTypeService.findDefault()).thenReturn(defaultType);
-        when(classroomRepository.save(any())).thenAnswer(invocation -> {
-            Classroom toSave = invocation.getArgument(0);
-            toSave.setId(9);
-            return toSave;
-        });
-        when(classroomMapper.toDto(any())).thenReturn(
-                new ClassroomResponseDto(9, "101", 0, 35, null, 1, "Edificio Central", 1, "Normal"));
-
-        FindOrCreateResult<ClassroomResponseDto> result = service.findOrCreate("101", 1, 35);
-
-        assertThat(result.created()).isTrue();
-        ArgumentCaptor<Classroom> captor = ArgumentCaptor.forClass(Classroom.class);
-        verify(classroomRepository).save(captor.capture());
-        Classroom saved = captor.getValue();
-        assertThat(saved.getFloor()).isZero();
-        assertThat(saved.getCapacity()).isEqualTo(35);
-        assertThat(saved.getBuilding()).isEqualTo(building);
-        assertThat(saved.getClassroomType()).isEqualTo(defaultType);
-    }
-
-    @Test
-    @DisplayName("findOrCreate: si enrolledCount es null, la capacidad provisional queda en 1")
-    void findOrCreateWithNullEnrolledCountUsesCapacityOne() {
-        Building building = SpaceTestData.building().build();
-        ClassroomType defaultType = SpaceTestData.classroomType().build();
-        when(buildingRepository.findById(1)).thenReturn(Optional.of(building));
-        when(classroomRepository.findByRoomNumberAndBuilding("101", building)).thenReturn(Optional.empty());
-        when(classroomTypeService.findDefault()).thenReturn(defaultType);
-        when(classroomRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(classroomMapper.toDto(any())).thenReturn(
-                new ClassroomResponseDto(1, "101", 0, 1, null, 1, "Edificio Central", 1, "Normal"));
-
-        service.findOrCreate("101", 1, null);
-
-        ArgumentCaptor<Classroom> captor = ArgumentCaptor.forClass(Classroom.class);
-        verify(classroomRepository).save(captor.capture());
-        assertThat(captor.getValue().getCapacity()).isEqualTo(1);
-    }
-
-    @Test
-    @DisplayName("findOrCreate: si enrolledCount es 0, la capacidad provisional queda en 1")
-    void findOrCreateWithZeroEnrolledCountUsesCapacityOne() {
-        Building building = SpaceTestData.building().build();
-        ClassroomType defaultType = SpaceTestData.classroomType().build();
-        when(buildingRepository.findById(1)).thenReturn(Optional.of(building));
-        when(classroomRepository.findByRoomNumberAndBuilding("101", building)).thenReturn(Optional.empty());
-        when(classroomTypeService.findDefault()).thenReturn(defaultType);
-        when(classroomRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(classroomMapper.toDto(any())).thenReturn(
-                new ClassroomResponseDto(1, "101", 0, 1, null, 1, "Edificio Central", 1, "Normal"));
-
-        service.findOrCreate("101", 1, 0);
-
-        ArgumentCaptor<Classroom> captor = ArgumentCaptor.forClass(Classroom.class);
-        verify(classroomRepository).save(captor.capture());
-        assertThat(captor.getValue().getCapacity()).isEqualTo(1);
-    }
-
-    @Test
-    @DisplayName("findOrCreate: no exige edificio activo (usa requireBuilding, no requireActiveBuilding)")
-    void findOrCreateDoesNotRequireActiveBuilding() {
+    @DisplayName("findByRoomNumberAndBuilding: no exige edificio activo")
+    void findByRoomNumberAndBuildingDoesNotRequireActiveBuilding() {
         Building inactive = SpaceTestData.building().active(false).build();
-        ClassroomType defaultType = SpaceTestData.classroomType().build();
+        Classroom existing = SpaceTestData.classroom().build();
+        ClassroomResponseDto dto = new ClassroomResponseDto(1, "101", 1, 40, true, 1, "Edificio Central", 1, "Normal");
         when(buildingRepository.findById(1)).thenReturn(Optional.of(inactive));
-        when(classroomRepository.findByRoomNumberAndBuilding("101", inactive)).thenReturn(Optional.empty());
-        when(classroomTypeService.findDefault()).thenReturn(defaultType);
-        when(classroomRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(classroomMapper.toDto(any())).thenReturn(
-                new ClassroomResponseDto(1, "101", 0, 1, null, 1, "Edificio Central", 1, "Normal"));
+        when(classroomRepository.findByRoomNumberAndBuilding("101", inactive)).thenReturn(Optional.of(existing));
+        when(classroomMapper.toDto(existing)).thenReturn(dto);
 
-        FindOrCreateResult<ClassroomResponseDto> result = service.findOrCreate("101", 1, null);
+        ClassroomResponseDto result = service.findByRoomNumberAndBuilding("101", 1);
 
-        assertThat(result.created()).isTrue();
+        assertThat(result).isEqualTo(dto);
     }
 
     @Test
-    @DisplayName("findOrCreate: si el edificio no existe, lanza ResourceNotFoundException")
-    void findOrCreateWithMissingBuildingThrowsResourceNotFound() {
+    @DisplayName("findByRoomNumberAndBuilding: si no está en el edificio informado, hace fallback a buscar solo por número")
+    void findByRoomNumberAndBuildingFallsBackToRoomNumberOnly() {
+        Building informedBuilding = SpaceTestData.building().id(2).name("Edif. Ing.Inchaurrondo").build();
+        Classroom actual = SpaceTestData.classroom().build();
+        ClassroomResponseDto dto = new ClassroomResponseDto(1, "101", 1, 40, true, 1, "Edificio Central", 1, "Normal");
+        when(buildingRepository.findById(2)).thenReturn(Optional.of(informedBuilding));
+        when(classroomRepository.findByRoomNumberAndBuilding("101", informedBuilding)).thenReturn(Optional.empty());
+        when(classroomRepository.findAllByRoomNumber("101")).thenReturn(List.of(actual));
+        when(classroomMapper.toDto(actual)).thenReturn(dto);
+
+        ClassroomResponseDto result = service.findByRoomNumberAndBuilding("101", 2);
+
+        assertThat(result).isEqualTo(dto);
+    }
+
+    @Test
+    @DisplayName("findByRoomNumberAndBuilding: si el número es ambiguo (más de un aula en catálogo), no adivina y lanza ResourceNotFoundException")
+    void findByRoomNumberAndBuildingWithAmbiguousRoomNumberThrowsResourceNotFound() {
+        Building informedBuilding = SpaceTestData.building().id(2).name("Otro edificio").build();
+        Classroom other1 = SpaceTestData.classroom().id(10).build();
+        Classroom other2 = SpaceTestData.classroom().id(11).build();
+        when(buildingRepository.findById(2)).thenReturn(Optional.of(informedBuilding));
+        when(classroomRepository.findByRoomNumberAndBuilding("999", informedBuilding)).thenReturn(Optional.empty());
+        when(classroomRepository.findAllByRoomNumber("999")).thenReturn(List.of(other1, other2));
+
+        assertThatThrownBy(() -> service.findByRoomNumberAndBuilding("999", 2))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Classroom not found with id: 999");
+    }
+
+    @Test
+    @DisplayName("findByRoomNumberAndBuilding: si el aula no existe en el edificio, lanza ResourceNotFoundException")
+    void findByRoomNumberAndBuildingWithMissingClassroomThrowsResourceNotFound() {
+        Building building = SpaceTestData.building().build();
+        when(buildingRepository.findById(1)).thenReturn(Optional.of(building));
+        when(classroomRepository.findByRoomNumberAndBuilding("101", building)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.findByRoomNumberAndBuilding("101", 1))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Classroom not found with id: 101");
+    }
+
+    @Test
+    @DisplayName("findByRoomNumberAndBuilding: si el edificio no existe, lanza ResourceNotFoundException")
+    void findByRoomNumberAndBuildingWithMissingBuildingThrowsResourceNotFound() {
         when(buildingRepository.findById(1)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.findOrCreate("101", 1, 35))
+        assertThatThrownBy(() -> service.findByRoomNumberAndBuilding("101", 1))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Building not found with id: 1");
     }

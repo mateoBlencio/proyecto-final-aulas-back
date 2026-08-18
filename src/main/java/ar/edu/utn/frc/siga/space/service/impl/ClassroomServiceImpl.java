@@ -1,6 +1,5 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
-import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
@@ -25,14 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
-/**
- * Nota: resuelve {@link Building} vía {@link BuildingRepository} directo (no vía
- * {@code BuildingService}) porque el aula necesita la entidad para la relación JPA
- * {@code Classroom.building}, ambas intra-módulo. {@code BuildingService} (fachada
- * {@code api}) solo expone DTOs — devolver la entidad ahí sería reintroducir el mismo
- * acoplamiento que la Fase 4 elimina, aunque el consumidor esté en el propio módulo.
- */
 @Slf4j
 @Service
 @Transactional(readOnly = true)
@@ -131,24 +124,22 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     @Override
-    @Transactional
-    public FindOrCreateResult<ClassroomResponseDto> findOrCreate(String roomNumber, Integer buildingId, Integer enrolledCount) {
-        Building building = requireBuilding(buildingId);
-        return FindOrCreateResult.resolve(
-                classroomRepository.findByRoomNumberAndBuilding(roomNumber, building),
-                () -> {
-                    log.warn("Creando aula con datos provisionales: roomNumber={}, buildingId={}",
-                            roomNumber, buildingId);
-                    return classroomRepository.save(
-                            Classroom.builder()
-                                    .roomNumber(roomNumber)
-                                    .building(building)
-                                    .floor(0)
-                                    .capacity(enrolledCount != null && enrolledCount > 0 ? enrolledCount : 1)
-                                    .classroomType(classroomTypeService.findDefault())
-                                    .build());
-                }
-        ).map(classroomMapper::toDto);
+    public ClassroomResponseDto findByRoomNumberAndBuilding(String roomNumber, Integer buildingId) {
+        Building building = findBuildingById(buildingId);
+        return classroomMapper.toDto(classroomRepository.findByRoomNumberAndBuilding(roomNumber, building)
+                .or(() -> fallbackByRoomNumberOnly(roomNumber, buildingId))
+                .orElseThrow(() -> ResourceNotFoundException.of("Classroom", roomNumber)));
+    }
+
+    private Optional<Classroom> fallbackByRoomNumberOnly(String roomNumber, Integer buildingId) {
+        List<Classroom> matches = classroomRepository.findAllByRoomNumber(roomNumber);
+        if (matches.size() != 1) {
+            return Optional.empty();
+        }
+        Classroom found = matches.getFirst();
+        log.warn("Aula '{}' no está en el edificio informado (buildingId={}); se usa la única "
+                + "coincidencia por número, en buildingId={}", roomNumber, buildingId, found.getBuilding().getId());
+        return Optional.of(found);
     }
 
     private Classroom findExistingClassroomById(Integer id) {
@@ -159,18 +150,18 @@ public class ClassroomServiceImpl implements ClassroomService {
                 });
     }
 
-    private Building findActiveBuilding(Integer id) {
-        return buildingRepository.findById(id)
-                .filter(Building::getActive)
-                .orElseThrow(() -> {
-                    log.warn("Edificio no encontrado: id={}", id);
-                    return ResourceNotFoundException.of("Building", id);
-                });
-    }
-
-    private Building requireBuilding(Integer id) {
+    private Building findBuildingById(Integer id) {
         return buildingRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("Building", id));
+    }
+
+    private Building findActiveBuilding(Integer id) {
+        Building building = findBuildingById(id);
+        if (!building.getActive()) {
+            log.warn("Edificio no encontrado: id={}", id);
+            throw ResourceNotFoundException.of("Building", id);
+        }
+        return building;
     }
 
     private void validateFloor(ClassroomRequestDto dto, Building building) {

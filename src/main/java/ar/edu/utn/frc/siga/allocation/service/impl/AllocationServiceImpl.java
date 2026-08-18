@@ -1,399 +1,109 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
-import ar.edu.utn.frc.siga.allocation.dto.request.AllocateFromDateRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.request.AllocateOccurrenceRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.request.BatchReassignRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
-import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceConflictDto;
-import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
-import ar.edu.utn.frc.siga.allocation.exception.ReassignConflictException;
+import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationComposer;
-import ar.edu.utn.frc.siga.allocation.model.AcademicEvent;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
-import ar.edu.utn.frc.siga.allocation.model.Occurrence;
-import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
-import ar.edu.utn.frc.siga.allocation.model.RecurringEvent;
-import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
-import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
+import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
-import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
-import ar.edu.utn.frc.siga.space.service.ClassroomService;
+import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
+import ar.edu.utn.frc.siga.allocation.validator.AllocationCandidate;
+import ar.edu.utn.frc.siga.common.util.Finder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.Hibernate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
-/**
- * Implementación de los intent methods de asignación manual/importada: valida contra el
- * estado actual de BD (occurrence asignable, aula existente, sin solapamiento) y aplica
- * cada operación (individual o batch) en una única transacción atómica.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AllocationServiceImpl implements AllocationService {
 
     private final AllocationRepository allocationRepository;
-    private final OccurrenceRepository occurrenceRepository;
-    private final AcademicEventRepository eventRepository;
-    private final ClassroomService classroomService;
+    private final OccurrenceService occurrenceService;
     private final AllocationComposer composer;
+    private final AllocationValidator validator;
+    private final AllocationTargetResolver targetResolver;
+    private final AllocationWriter writer;
 
     @Override
     @Transactional(readOnly = true)
     public AllocationResponseDto findById(Long allocationId) {
-        Allocation allocation = allocationRepository.findByIdEager(allocationId)
-                .orElseThrow(() -> ResourceNotFoundException.of("Allocation", allocationId));
-        return composer.compose(allocation);
-    }
-
-    /**
-     * Asigna un aula a una occurrence puntual (source MANUAL). Rechaza si la occurrence ya
-     * ocurrió, ya tiene asignación, está CANCELLED/SUSPENDED, o si el aula ya está ocupada
-     * ese día/horario.
-     */
-    @Override
-    @Transactional
-    public AllocationResponseDto assignManually(Long occurrenceId, AllocateOccurrenceRequestDto dto) {
-        log.debug("Asignando ocurrencia={} a aula={}", occurrenceId, dto.classroomId());
-
-        Occurrence occurrence = findOccurrence(occurrenceId);
-        validateNotPast(occurrence);
-        validateAssignable(occurrence);
-
-        if (allocationRepository.findByOccurrence_Id(occurrenceId).isPresent()) {
-            throw new AllocationConflictException("Occurrence " + occurrenceId + " already has an allocation.");
-        }
-
-        Integer classroomId = findClassroom(dto.classroomId());
-        validateNoOverlap(List.of(new OverlapCandidate(occurrence, classroomId)));
-
-        Allocation saved = allocationRepository.save(Allocation.builder()
-                .occurrence(occurrence)
-                .classroomId(classroomId)
-                .source(AllocationSource.MANUAL)
-                .createdAt(LocalDateTime.now())
-                .observation(dto.observation())
-                .build());
-
-        occurrence.setStatus(OccurrenceStatus.ASSIGNED);
-        occurrenceRepository.save(occurrence);
-
-        log.info("Asignación creada: id={}, occurrenceId={}, classroomId={}", saved.getId(), occurrenceId, dto.classroomId());
-        return composer.compose(saved);
-    }
-
-    /**
-     * Cambia el aula de una asignación existente (source MANUAL). Rechaza si la occurrence
-     * ya ocurrió o si el nuevo aula ya está ocupada ese día/horario.
-     */
-    @Override
-    @Transactional
-    public AllocationResponseDto reassign(Long allocationId, AllocateOccurrenceRequestDto dto) {
-        log.debug("Reasignando asignación={} a aula={}", allocationId, dto.classroomId());
-
-        Allocation allocation = findAllocation(allocationId);
-        validateNotPast(allocation.getOccurrence());
-
-        Integer classroomId = findClassroom(dto.classroomId());
-        validateNoOverlap(List.of(new OverlapCandidate(allocation.getOccurrence(), classroomId)));
-
-        allocation.setClassroomId(classroomId);
-        allocation.setSource(AllocationSource.MANUAL);
-        allocation.setObservation(dto.observation());
-
-        Allocation saved = allocationRepository.save(allocation);
-        log.info("Asignación reasignada: id={}, classroomId={}", allocationId, dto.classroomId());
-        return composer.compose(saved);
-    }
-
-    /**
-     * Reasigna varias asignaciones en una sola transacción atómica (source MANUAL): todos
-     * los moves se resuelven y validan (contra BD y entre sí) antes de escribir nada; si
-     * cualquiera choca o ya ocurrió, no se aplica ninguno.
-     */
-    @Override
-    @Transactional
-    public List<AllocationResponseDto> batchReassign(BatchReassignRequestDto dto) {
-        log.debug("batchReassign: moves={}", dto.moves().size());
-
-        // Primero se resuelven y validan TODOS los moves (contra BD y entre sí); nada
-        // se escribe hasta que el lote completo esté libre de solapamientos.
-        List<Allocation> allocations = new ArrayList<>();
-        List<OverlapCandidate> candidates = new ArrayList<>();
-        for (BatchReassignRequestDto.MoveDto move : dto.moves()) {
-            Allocation allocation = findAllocation(move.allocationId());
-            validateNotPast(allocation.getOccurrence());
-            Integer classroomId = findClassroom(move.classroomId());
-            allocations.add(allocation);
-            candidates.add(new OverlapCandidate(allocation.getOccurrence(), classroomId));
-        }
-
-        validateNoOverlap(candidates);
-
-        List<AllocationResponseDto> results = new ArrayList<>();
-        for (int i = 0; i < allocations.size(); i++) {
-            Allocation allocation = allocations.get(i);
-            allocation.setClassroomId(candidates.get(i).classroomId());
-            allocation.setSource(AllocationSource.MANUAL);
-            results.add(composer.compose(allocationRepository.save(allocation)));
-        }
-        log.info("batchReassign completo: moved={}", results.size());
-        return results;
-    }
-
-    /**
-     * Asigna un aula a todas las occurrences futuras (fecha &gt;= hoy) de un evento
-     * recurrente desde {@code fromDate}, salteando las que ya ocurrieron (source MANUAL).
-     * Valida que ninguna choque antes de aplicar el lote completo; solo soportado para
-     * eventos recurrentes.
-     */
-    @Override
-    @Transactional
-    public List<AllocationResponseDto> assignManuallyFromDate(AllocateFromDateRequestDto dto) {
-        log.debug("assignManuallyFromDate: event={}, fromDate={}, classroom={}", dto.recurringEventId(), dto.fromDate(), dto.classroomId());
-
-        AcademicEvent event = eventRepository.findById(dto.recurringEventId())
-                .orElseThrow(() -> ResourceNotFoundException.of("AcademicEvent", dto.recurringEventId()));
-
-        if (!(Hibernate.unproxy(event) instanceof RecurringEvent)) {
-            throw new AllocationConflictException("assignManuallyFromDate is only supported for recurring events");
-        }
-
-        Integer classroomId = findClassroom(dto.classroomId());
-        LocalDate effectiveFrom = dto.fromDate().isBefore(LocalDate.now()) ? LocalDate.now() : dto.fromDate();
-
-        List<Occurrence> occurrences = occurrenceRepository
-                .findByEvent_IdAndDateGreaterThanEqual(dto.recurringEventId(), effectiveFrom);
-
-        validateNoOverlap(occurrences.stream().map(o -> new OverlapCandidate(o, classroomId)).toList());
-
-        List<Allocation> saved = allocateToOccurrences(
-                occurrences, classroomId, dto.observation(), AllocationSource.MANUAL, true);
-        List<AllocationResponseDto> results = composer.composeAll(saved);
-
-        log.info("assignManuallyFromDate completo: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), results.size());
-        return results;
-    }
-
-    /**
-     * Igual que {@link #assignManuallyFromDate}, pero para carga masiva desde Excel (source
-     * IMPORTED): incluye occurrences pasadas (no se saltean) y no valida solapamiento previo,
-     * ya que la importación reemplaza el estado existente por diseño. Devuelve solo la
-     * cantidad aplicada: el caller (importación masiva) no usa el DTO compuesto.
-     */
-    @Override
-    @Transactional
-    public int importAssignmentsFromDate(AllocateFromDateRequestDto dto) {
-        log.debug("importAssignmentsFromDate: event={}, fromDate={}, classroom={}", dto.recurringEventId(), dto.fromDate(), dto.classroomId());
-
-        AcademicEvent event = eventRepository.findById(dto.recurringEventId())
-                .orElseThrow(() -> ResourceNotFoundException.of("AcademicEvent", dto.recurringEventId()));
-
-        if (!(Hibernate.unproxy(event) instanceof RecurringEvent)) {
-            throw new AllocationConflictException("importAssignmentsFromDate is only supported for recurring events");
-        }
-
-        Integer classroomId = findClassroom(dto.classroomId());
-
-        List<Occurrence> occurrences = occurrenceRepository
-                .findByEvent_IdAndDateGreaterThanEqual(dto.recurringEventId(), dto.fromDate());
-
-        List<Allocation> saved = allocateToOccurrences(
-                occurrences, classroomId, dto.observation(), AllocationSource.IMPORTED, false);
-
-        log.info("importAssignmentsFromDate completo: event={}, fromDate={}, allocated={}", dto.recurringEventId(), dto.fromDate(), saved.size());
-        return saved.size();
-    }
-
-    /**
-     * Crea o actualiza (upsert por occurrence) la asignación de cada occurrence de la
-     * lista al aula indicada, y la pasa a ASSIGNED. Las no-asignables (CANCELLED/SUSPENDED,
-     * o pasadas cuando {@code skipPast}) se saltean por diseño, no son un fallo parcial.
-     * Prefetch en batch (una sola query) de las allocations existentes para evitar N+1.
-     */
-    private List<Allocation> allocateToOccurrences(
-            List<Occurrence> occurrences, Integer classroomId, String observation,
-            AllocationSource source, boolean skipPast) {
-        Map<Long, Allocation> existingByOccurrence = allocationRepository
-                .findByOccurrence_IdIn(occurrences.stream().map(Occurrence::getId).toList())
-                .stream().collect(Collectors.toMap(a -> a.getOccurrence().getId(), a -> a));
-
-        List<Allocation> saved = new ArrayList<>();
-        for (Occurrence occurrence : occurrences) {
-            if (skipPast && occurrence.isPast()) continue;
-            if (!isAssignable(occurrence)) continue;
-
-            Allocation existing = existingByOccurrence.get(occurrence.getId());
-            Allocation allocation;
-            if (existing != null) {
-                existing.setClassroomId(classroomId);
-                existing.setSource(source);
-                existing.setObservation(observation);
-                allocation = existing;
-            } else {
-                allocation = Allocation.builder()
-                        .occurrence(occurrence)
-                        .classroomId(classroomId)
-                        .source(source)
-                        .createdAt(LocalDateTime.now())
-                        .observation(observation)
-                        .build();
-            }
-
-            saved.add(allocationRepository.save(allocation));
-
-            occurrence.setStatus(OccurrenceStatus.ASSIGNED);
-            occurrenceRepository.save(occurrence);
-        }
-        return saved;
+        return composer.compose(findAllocation(allocationId));
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<AllocationResponseDto> findByDate(LocalDate date) {
-        log.debug("findByDate: date={}", date);
-        return composer.composeAll(allocationRepository.findByDateEager(date));
+        List<Long> occurrenceIds = occurrenceService.findSlotsByDate(date).stream()
+                .map(OccurrenceSlotDto::occurrenceId).toList();
+        return composer.composeAll(allocationRepository.findByOccurrenceIdIn(occurrenceIds));
     }
 
-    /** Ocurrencia a (re)asignar y el aula destino que se le quiere dar. */
-    private record OverlapCandidate(Occurrence occurrence, Integer classroomId) {
+    @Override
+    @Transactional
+    public List<AllocationResponseDto> allocate(AllocationCommand command) {
+        Map<OccurrenceSlotDto, Integer> classroomByOccurrence = resolveAndValidate(command);
+        List<Allocation> saved = writer.create(classroomByOccurrence, command.observation(), command.source());
+        log.info("Asignación creada: source={}, count={}", command.source(), saved.size());
+        return composer.composeAll(saved);
     }
 
-    /**
-     * Verifica que ninguno de los candidatos (ocurrencia + aula destino) solape con
-     * asignaciones ASSIGNED existentes ni entre sí. Las propias ocurrencias de los
-     * candidatos se excluyen de la ocupación de BD (sus asignaciones actuales, si
-     * existen, se están reemplazando/moviendo en esta misma operación). Si algo choca,
-     * corta con 409 y el detalle de todos los conflictos encontrados; nada se escribe.
-     */
-    private void validateNoOverlap(List<OverlapCandidate> candidates) {
-        List<OverlapCandidate> future = candidates.stream().filter(c -> !c.occurrence().isPast()).toList();
-        if (future.isEmpty()) return;
+    @Override
+    @Transactional
+    public List<AllocationResponseDto> reallocate(AllocationCommand command) {
+        Map<OccurrenceSlotDto, Integer> classroomByOccurrence = resolveAndValidate(command);
+        List<Allocation> saved = writer.upsert(classroomByOccurrence, command.observation(), command.source());
+        log.info("Asignación actualizada: source={}, count={}", command.source(), saved.size());
+        return composer.composeAll(saved);
+    }
 
-        LocalDate min = future.stream().map(c -> c.occurrence().getDate()).min(Comparator.naturalOrder()).orElseThrow();
-        LocalDate max = future.stream().map(c -> c.occurrence().getDate()).max(Comparator.naturalOrder()).orElseThrow();
-        Set<Long> ownOccurrenceIds = future.stream().map(c -> c.occurrence().getId()).collect(Collectors.toSet());
+    @Override
+    @Transactional
+    public List<DeallocatedOccurrenceDto> deallocate(DeallocationCommand command) {
+        List<OccurrenceSlotDto> occurrences = targetResolver.resolveAll(command.targets(), null);
+        occurrences.forEach(validator::validateNotPast);
 
-        List<Allocation> occupancy = allocationRepository.findOccupancyBetween(min, max, OccurrenceStatus.ASSIGNED)
-                .stream()
-                .filter(a -> !ownOccurrenceIds.contains(a.getOccurrence().getId()))
+        List<AllocationWriter.DeallocatedOccurrence> deallocated = writer.delete(occurrences);
+        log.info("Asignación liberada: count={}", deallocated.size());
+        return deallocated.stream()
+                .map(d -> new DeallocatedOccurrenceDto(d.occurrenceId(), d.classroomId()))
                 .toList();
+    }
 
-        List<OccurrenceConflictDto> conflicts = new ArrayList<>();
-        conflicts.addAll(databaseConflicts(future, occupancy));
-        conflicts.addAll(internalConflicts(future));
+    private Map<OccurrenceSlotDto, Integer> resolveAndValidate(AllocationCommand command) {
+        LocalDate clampFrom = command.source() == AllocationSource.IMPORTED ? null : LocalDate.now();
+        Map<OccurrenceSlotDto, Integer> classroomByOccurrence =
+                targetResolver.resolveClassroomByOccurrence(command.items(), clampFrom);
 
-        if (!conflicts.isEmpty()) {
-            throw new ReassignConflictException(conflicts);
+        if (classroomByOccurrence.isEmpty()) {
+            return classroomByOccurrence;
         }
-    }
 
-    /** Conflictos de un candidato contra ocupación ASSIGNED firme de BD (ya sin lo propio). */
-    private List<OccurrenceConflictDto> databaseConflicts(List<OverlapCandidate> candidates, List<Allocation> occupancy) {
-        List<OccurrenceConflictDto> conflicts = new ArrayList<>();
-        for (OverlapCandidate candidate : candidates) {
-            LocalTime start = candidate.occurrence().startTime();
-            LocalTime end = candidate.occurrence().endTime();
-            for (Allocation existing : occupancy) {
-                if (!existing.getClassroomId().equals(candidate.classroomId())) continue;
-                if (!existing.getOccurrence().getDate().equals(candidate.occurrence().getDate())) continue;
-                AcademicEvent occupant = existing.getOccurrence().getEvent();
-                if (!overlaps(start, end, occupant.getStartTime(), occupant.endTime())) continue;
-                conflicts.add(new OccurrenceConflictDto(candidate.occurrence().getId(), candidate.occurrence().getDate(),
-                        start, end, candidate.classroomId(), occupant.getId(), existing.getId()));
-            }
+        Set<Integer> classroomIds = Set.copyOf(classroomByOccurrence.values());
+        validator.validateClassroomsAvailable(classroomIds);
+
+        if (command.source() == AllocationSource.MANUAL) {
+            List<AllocationCandidate> candidates = classroomByOccurrence.entrySet().stream()
+                    .map(e -> new AllocationCandidate(e.getKey(), e.getValue()))
+                    .toList();
+            validator.validateNoOverlap(candidates);
         }
-        return conflicts;
-    }
 
-    /**
-     * Conflictos entre los propios candidatos: dos ocurrencias distintas cayendo en la
-     * misma aula/fecha con franjas que se pisan (relevante para {@code batchReassign},
-     * donde varios moves se validan juntos). Nada persiste todavía → no hay asignación
-     * real involucrada en el choque, {@code conflictingAllocationId} va null.
-     */
-    private List<OccurrenceConflictDto> internalConflicts(List<OverlapCandidate> candidates) {
-        List<OccurrenceConflictDto> conflicts = new ArrayList<>();
-        for (int i = 0; i < candidates.size(); i++) {
-            OverlapCandidate a = candidates.get(i);
-            for (int j = i + 1; j < candidates.size(); j++) {
-                OverlapCandidate b = candidates.get(j);
-                if (!a.classroomId().equals(b.classroomId())) continue;
-                if (!a.occurrence().getDate().equals(b.occurrence().getDate())) continue;
-                LocalTime aStart = a.occurrence().startTime();
-                LocalTime aEnd = a.occurrence().endTime();
-                LocalTime bStart = b.occurrence().startTime();
-                LocalTime bEnd = b.occurrence().endTime();
-                if (!overlaps(aStart, aEnd, bStart, bEnd)) continue;
-                conflicts.add(new OccurrenceConflictDto(a.occurrence().getId(), a.occurrence().getDate(),
-                        aStart, aEnd, a.classroomId(), b.occurrence().getEvent().getId(), null));
-            }
-        }
-        return conflicts;
-    }
-
-    /** Barrido de franjas horarias: fin == inicio no es solapamiento. */
-    private boolean overlaps(LocalTime start1, LocalTime end1, LocalTime start2, LocalTime end2) {
-        return start1.isBefore(end2) && start2.isBefore(end1);
-    }
-
-    private Occurrence findOccurrence(Long id) {
-        return occurrenceRepository.findById(id)
-                .orElseThrow(() -> {
-                    log.warn("Ocurrencia no encontrada: id={}", id);
-                    return ResourceNotFoundException.of("Occurrence", id);
-                });
+        return classroomByOccurrence;
     }
 
     private Allocation findAllocation(Long id) {
-        return allocationRepository.findById(id)
-                .orElseThrow(() -> {
-                    log.warn("Asignación no encontrada: id={}", id);
-                    return ResourceNotFoundException.of("Allocation", id);
-                });
-    }
-
-    /** Valida que el aula exista (404 de la fachada de space) y devuelve su ID plano. */
-    private Integer findClassroom(Integer id) {
-        try {
-            classroomService.findById(id);
-            return id;
-        } catch (ResourceNotFoundException ex) {
-            log.warn("Aula no encontrada: id={}", id);
-            throw new AllocationConflictException("Classroom not found with id: " + id);
-        }
-    }
-
-    private void validateNotPast(Occurrence occurrence) {
-        if (occurrence.isPast()) {
-            throw new AllocationConflictException(
-                    "Cannot modify allocation: occurrence on " + occurrence.getDate() + " has already taken place.");
-        }
-    }
-
-    private void validateAssignable(Occurrence occurrence) {
-        if (!isAssignable(occurrence)) {
-            throw new AllocationConflictException(
-                    "Cannot assign classroom: occurrence " + occurrence.getId() + " is " + occurrence.getStatus() + ".");
-        }
-    }
-
-    private boolean isAssignable(Occurrence occurrence) {
-        return occurrence.getStatus() != OccurrenceStatus.CANCELLED
-                && occurrence.getStatus() != OccurrenceStatus.SUSPENDED;
+        return Finder.orThrow(allocationRepository::findById, id, "Allocation");
     }
 }

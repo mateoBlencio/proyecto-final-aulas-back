@@ -188,6 +188,8 @@ buildNumber.properties
 # Mateo
 plans/
 AGENTS.md
+CLAUDE.md
+.mcp.json
 
 # Claude
 .claude
@@ -195,3 +197,4 @@ AGENTS.md
 # VSCode
 .vscode
 .codegraph
+CLAUDE.local.md

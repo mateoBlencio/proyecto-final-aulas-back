@@ -197,6 +197,14 @@
 			<artifactId>spring-modulith-starter-core</artifactId>
 		</dependency>
 
+		<!-- Publicación de eventos de aplicación (OccurrenceVacated) con registro persistido
+		     (tabla event_publication, autocreada) para reintento at-least-once vía
+		     @ApplicationModuleListener. Primer uso de este mecanismo en el proyecto. -->
+		<dependency>
+			<groupId>org.springframework.modulith</groupId>
+			<artifactId>spring-modulith-starter-jpa</artifactId>
+		</dependency>
+
 		<dependency>
 			<groupId>org.springframework.modulith</groupId>
 			<artifactId>spring-modulith-starter-test</artifactId>
@@ -226,8 +234,28 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
 				<configuration>
-					<argLine>-Duser.timezone=UTC</argLine>
+					<argLine>@{argLine} -Duser.timezone=UTC</argLine>
 				</configuration>
+			</plugin>
+
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>0.8.12</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>report</id>
+						<phase>test</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 
 			<plugin>

@@ -9,5 +9,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "siga.auth")
 public class AuthDomainProperties {
 
-    private String allowedEmailDomain = "frc.utn.edu.ar";
+    private static final String ALLOWED_DOMAIN = "frc.utn.edu.ar";
+
+    public boolean isAllowedEmail(String email) {
+        return email != null && email.toLowerCase().endsWith("@" + ALLOWED_DOMAIN.toLowerCase());
+    }
 }

@@ -115,7 +115,6 @@ class ClassroomApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("Bean Validation: campo requerido null responde 400 con detalle de errores por campo")
     void create_missingRequiredField_returns400WithFieldErrors() throws Exception {
-        // roomNumber (NotBlank) ausente en el JSON
         String json = """
                 {"capacity":40,"floor":1,"classroomTypeId":1,"available":true,"buildingId":1}
                 """;
@@ -154,7 +153,6 @@ class ClassroomApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[?(@.id == " + id + ")]").isEmpty());
 
-        // @SQLRestriction filtra a nivel de entidad: la fila sigue en BD marcada eliminado=true.
         assertThat(classroomRepository.findById(id)).isEmpty();
     }
 

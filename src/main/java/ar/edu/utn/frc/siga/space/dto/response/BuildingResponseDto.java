@@ -1,8 +1,8 @@
 package ar.edu.utn.frc.siga.space.dto.response;
 
-/**
- * Representación de un edificio para consumo por API/clientes.
- */
+import org.springframework.modulith.NamedInterface;
+
+@NamedInterface("api")
 public record BuildingResponseDto(
         Integer id,
         String name,

@@ -1,13 +1,14 @@
 package ar.edu.utn.frc.siga.allocation;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
-import ar.edu.utn.frc.siga.allocation.dto.request.CreateRecurringEventRequestDto;
-import ar.edu.utn.frc.siga.allocation.dto.request.CreateUniqueEventRequestDto;
-import ar.edu.utn.frc.siga.allocation.model.Occurrence;
-import ar.edu.utn.frc.siga.allocation.model.OccurrenceStatus;
-import ar.edu.utn.frc.siga.allocation.repository.AcademicEventRepository;
-import ar.edu.utn.frc.siga.allocation.repository.OccurrenceRepository;
-import ar.edu.utn.frc.siga.allocation.service.AcademicEventService;
+import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
+import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
+import ar.edu.utn.frc.siga.events.model.Occurrence;
+import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
+import ar.edu.utn.frc.siga.events.repository.AcademicEventRepository;
+import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 
@@ -49,11 +50,9 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
     private ObjectMapper objectMapper;
 
     @Test
-    @DisplayName("POST /v1/events/recurring crea el evento y genera ocurrencias SCHEDULED con las fechas esperadas")
+    @DisplayName("POST /v1/events/recurring crea el evento y genera ocurrencias NEEDS_ROOM con las fechas esperadas")
     void createRecurring_persistsEventAndOccurrencesWithExpectedDates() throws Exception {
         IntegrationTestData.SubjectAndCommission sc = testData.materiaYComision();
-        // dayOfWeek == startDate.getDayOfWeek(): nextOrSame(dayOfWeek) devuelve startDate exacto,
-        // así la primera ocurrencia esperada es determinística.
         LocalDate startDate = LocalDate.now().plusDays(1);
         DayOfWeek dayOfWeek = startDate.getDayOfWeek();
         LocalDate endDate = startDate.plusWeeks(3);
@@ -78,7 +77,7 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
         List<LocalDate> expectedDates = List.of(
                 startDate, startDate.plusWeeks(1), startDate.plusWeeks(2), startDate.plusWeeks(3));
         assertThat(occurrences).extracting(Occurrence::getDate).containsExactlyInAnyOrderElementsOf(expectedDates);
-        assertThat(occurrences).allSatisfy(o -> assertThat(o.getStatus()).isEqualTo(OccurrenceStatus.SCHEDULED));
+        assertThat(occurrences).allSatisfy(o -> assertThat(o.getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM));
     }
 
     @Test
@@ -99,11 +98,13 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /v1/events/unique crea el evento y exactamente 1 ocurrencia")
+    @DisplayName("POST /v1/events/unique crea el evento (bare, sin aula) y exactamente 1 ocurrencia NEEDS_ROOM")
     void createUnique_persistsSingleOccurrence() throws Exception {
         LocalDate date = LocalDate.now().plusDays(5);
+        IntegrationTestData.SubjectAndCommission sc = testData.materiaYComision();
         CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
-                20, LocalTime.of(10, 0), 60, date, "Evento único IT");
+                UniqueEventKind.EXAMEN_FINAL, sc.subjectId(), sc.commissionId(),
+                date, LocalTime.of(10, 0), 60, 20, null);
 
         MvcResult result = mockMvc.perform(post("/v1/events/unique")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -118,12 +119,31 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
         List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId);
         assertThat(occurrences).hasSize(1);
         assertThat(occurrences.getFirst().getDate()).isEqualTo(date);
-        assertThat(occurrences.getFirst().getStatus()).isEqualTo(OccurrenceStatus.SCHEDULED);
+        assertThat(occurrences.getFirst().getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM);
     }
 
     @Test
-    @DisplayName("findOrCreateRecurringEvent no duplica: segunda llamada idéntica reusa el evento existente")
-    void findOrCreateRecurringEvent_doesNotDuplicate() {
+    @DisplayName("POST /v1/events/unique sin eventType responde 400 (tipo_actividad no puede ser null)")
+    void createUnique_missingEventType_returns400() throws Exception {
+        LocalDate date = LocalDate.now().plusDays(6);
+        String bodyWithoutEventType = """
+                {
+                  "date": "%s",
+                  "startTime": "10:00",
+                  "durationMinutes": 60,
+                  "enrolled": 20
+                }
+                """.formatted(date);
+
+        mockMvc.perform(post("/v1/events/unique")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bodyWithoutEventType))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("findOrCreateRecurringEvent: reusa el mismo evento existente entre llamadas idénticas, sin duplicarlo")
+    void findOrCreateRecurringEvent_reusesExistingEvent() {
         IntegrationTestData.SubjectAndCommission sc = testData.materiaYComision();
         LocalDate startDate = LocalDate.now().plusDays(1);
         DayOfWeek dayOfWeek = startDate.getDayOfWeek();
@@ -131,14 +151,15 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
         CreateRecurringEventRequestDto dto = new CreateRecurringEventRequestDto(
                 30, LocalTime.of(8, 0), 90, dayOfWeek, startDate, null, sc.subjectId(), sc.commissionId());
 
+        Long createdId = academicEventService.createRecurringEvent(dto).id();
         long before = eventRepository.count();
 
         FindOrCreateResult<Long> first = academicEventService.findOrCreateRecurringEvent(dto);
         FindOrCreateResult<Long> second = academicEventService.findOrCreateRecurringEvent(dto);
 
-        assertThat(first.created()).isTrue();
-        assertThat(second.created()).isFalse();
-        assertThat(second.value()).isEqualTo(first.value());
-        assertThat(eventRepository.count()).isEqualTo(before + 1);
+        assertThat(first.created()).isFalse();
+        assertThat(first.value()).isEqualTo(createdId);
+        assertThat(second.value()).isEqualTo(createdId);
+        assertThat(eventRepository.count()).isEqualTo(before);
     }
 }

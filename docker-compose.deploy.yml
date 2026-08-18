@@ -5,17 +5,16 @@ services:
     restart: always
     environment:
       SPRING_PROFILES_ACTIVE: dev
-      DB_HOST: postgres_dev
+      DB_HOST: ${DB_HOST_DEV}
       DB_PORT: 5432
-      DB_NAME: database_dev
-      DB_USERNAME: back_user_dev
+      DB_NAME: ${DB_NAME_DEV}
+      DB_USERNAME: ${DB_USERNAME_DEV}
       DB_PASSWORD: ${BACK_USER_DEV_PASSWORD}
       JWT_SECRET: ${JWT_SECRET_DEV}
       JWT_ACCESS_EXPIRATION_MINUTES: ${JWT_ACCESS_EXPIRATION_MINUTES:-20}
       JWT_REFRESH_EXPIRATION_DAYS: ${JWT_REFRESH_EXPIRATION_DAYS:-30}
       JWT_REFRESH_GRACE_SECONDS: ${JWT_REFRESH_GRACE_SECONDS:-10}
-    ports:
-      - "8080:8080"
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS_DEV}
     networks:
       - app-network
 
@@ -25,17 +24,16 @@ services:
     restart: always
     environment:
       SPRING_PROFILES_ACTIVE: test
-      DB_HOST: postgres_test
+      DB_HOST: ${DB_HOST_TEST}
       DB_PORT: 5432
-      DB_NAME: database_test
-      DB_USERNAME: back_user_test
+      DB_NAME: ${DB_NAME_TEST}
+      DB_USERNAME: ${DB_USERNAME_TEST}
       DB_PASSWORD: ${BACK_USER_TEST_PASSWORD}
       JWT_SECRET: ${JWT_SECRET_TEST}
       JWT_ACCESS_EXPIRATION_MINUTES: ${JWT_ACCESS_EXPIRATION_MINUTES:-20}
       JWT_REFRESH_EXPIRATION_DAYS: ${JWT_REFRESH_EXPIRATION_DAYS:-30}
       JWT_REFRESH_GRACE_SECONDS: ${JWT_REFRESH_GRACE_SECONDS:-10}
-    ports:
-      - "8081:8080"
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS_TEST}
     networks:
       - app-network
 

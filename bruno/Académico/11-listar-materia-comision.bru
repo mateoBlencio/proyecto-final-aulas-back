@@ -1,0 +1,21 @@
+meta {
+  name: Listar materia-comisión
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/v1/subject-commissions?subjectId=1
+  body: none
+  auth: inherit
+}
+
+params:query {
+  subjectId: 1
+}
+
+docs {
+  Sin subjectId devuelve el catálogo completo materia×comisión. Con subjectId,
+  filtra las comisiones vinculadas a esa materia (no valida que la materia exista:
+  id inexistente devuelve lista vacía).
+}
