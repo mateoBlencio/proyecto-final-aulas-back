@@ -21,11 +21,25 @@ public interface ClassroomMapper {
     @Mapping(target = "deleted", ignore = true)
     @Mapping(target = "building", ignore = true)
     @Mapping(target = "classroomType", ignore = true)
+    @Mapping(target = "source", ignore = true)
+    @Mapping(target = "syncedAt", ignore = true)
+    @Mapping(target = "sysacadHash", ignore = true)
+    @Mapping(target = "presentInSysacad", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "version", ignore = true)
     Classroom toEntity(ClassroomRequestDto dto);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "deleted", ignore = true)
     @Mapping(target = "building", ignore = true)
     @Mapping(target = "classroomType", ignore = true)
+    @Mapping(target = "source", ignore = true)
+    @Mapping(target = "syncedAt", ignore = true)
+    @Mapping(target = "sysacadHash", ignore = true)
+    @Mapping(target = "presentInSysacad", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "version", ignore = true)
     void updateEntity(@MappingTarget Classroom entity, ClassroomRequestDto dto);
 }

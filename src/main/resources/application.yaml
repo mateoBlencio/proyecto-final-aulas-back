@@ -128,6 +128,18 @@ siga:
     general:
       capacity: 100
       refill-period-seconds: 60
+  sysacad:
+    enabled: ${SYSACAD_ENABLED:false}
+    base-url: https://dataview.frc.utn.edu.ar
+    api-key: ${SYSACAD_API_KEY:}
+    connect-timeout: 5s
+    read-timeout: 30s
+    max-retries: 3
+    sync:
+      edificios: "0 0 3 1 3,8 *"
+      aulas: "0 15 3 1 3,8 *"
+      especialidades: "0 30 3 1 3,8 *"
+      comisiones: "0 45 3 1 3,8 *"
 
 logging:
   level:

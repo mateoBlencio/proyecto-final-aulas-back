@@ -1,13 +1,17 @@
 package ar.edu.utn.frc.siga.space.model;
 
+import ar.edu.utn.frc.siga.common.model.RecordSource;
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SQLRestriction;
+import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
 @Table(name = "aula", uniqueConstraints = @UniqueConstraint(columnNames = {"id_edificio", "num_aula"}))
@@ -42,6 +46,33 @@ public class Classroom {
     @Builder.Default
     @Column(name = "eliminado", nullable = false)
     private Boolean deleted = false;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "origen", nullable = false, length = 16)
+    private RecordSource source = RecordSource.LOCAL;
+
+    @Column(name = "sincronizado_en")
+    private Instant syncedAt;
+
+    @Column(name = "hash_sysacad", length = 64)
+    private String sysacadHash;
+
+    @Builder.Default
+    @Column(name = "vigente_sysacad", nullable = false)
+    private Boolean presentInSysacad = true;
+
+    @CreationTimestamp
+    @Column(name = "creado_en", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "actualizado_en", nullable = false)
+    private Instant updatedAt;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_edificio", nullable = false)
