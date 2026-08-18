@@ -92,14 +92,17 @@ public class RoomRequestItem {
     @Column(name = "fecha", nullable = false)
     private LocalDate date;
 
-    @Column(name = "hora_inicio", nullable = false)
+    /** Null en ONE_TIME_ROOM_CHANGE/REGULAR_ROOM_CHANGE: sale de la comisión. */
+    @Column(name = "hora_inicio")
     private LocalTime startTime;
 
+    /** Null en ONE_TIME_ROOM_CHANGE/REGULAR_ROOM_CHANGE: sale de la comisión. */
     @Convert(converter = DurationMinutesConverter.class)
-    @Column(name = "duracion_minutos", nullable = false)
+    @Column(name = "duracion_minutos")
     private Duration duration; // aca en caso de tratarse de type clase (unica vez o recurrente) podriamos sacar los datos de sysacad
 
-    @Column(name = "cantidad_inscriptos", nullable = false)
+    /** Null en ONE_TIME_ROOM_CHANGE/REGULAR_ROOM_CHANGE: sale de los inscriptos de la materia. */
+    @Column(name = "cantidad_inscriptos")
     private Integer enrolled; // a chequear si debe seguir funcionado, si nosotros ya tenemos los datos desde sysacad
 
     @Column(name = "cantidad_estimada", nullable = false)
@@ -154,8 +157,9 @@ public class RoomRequestItem {
     @Builder.Default
     private List<RoomPreference> preferences = new ArrayList<>();
 
+    /** Null si el pedido no trae horario (ver {@link #startTime}/{@link #duration}). */
     public LocalTime endTime() {
-        return startTime.plus(duration);
+        return (startTime == null || duration == null) ? null : startTime.plus(duration);
     }
 
     void attachTo(RoomRequest request, int position) {

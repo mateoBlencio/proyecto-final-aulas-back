@@ -23,9 +23,9 @@ import java.util.List;
 public record CreateRoomRequestItemDto(
         Long commissionId,
         @NotNull @FutureOrPresent LocalDate date,
-        @NotNull LocalTime startTime,
-        @NotNull LocalTime endTime,
-        @NotNull @Min(0) Integer enrolled,
+        LocalTime startTime,
+        LocalTime endTime,
+        @Min(0) Integer enrolled,
         @NotNull @Min(0) Integer estimated,
         @NotNull @Min(1) Integer classroomCount,
         Integer currentClassroomId,
@@ -52,12 +52,13 @@ public record CreateRoomRequestItemDto(
     }
 
     /**
-     * Duración del pedido, derivada del rango que carga el docente. Sólo tiene
-     * sentido con el DTO ya validado: {@link #isTimeRangeValid()} garantiza que
-     * ambas horas están presentes y que el rango es positivo.
+     * Duración del pedido, derivada del rango que carga el docente. Null si
+     * falta alguna hora: {@code ONE_TIME_ROOM_CHANGE}/{@code REGULAR_ROOM_CHANGE}
+     * no la piden porque ya surge de la comisión. {@link #isTimeRangeValid()}
+     * garantiza que, cuando ambas horas están, el rango es positivo.
      */
     public Duration duration() {
-        return Duration.between(startTime, endTime);
+        return (startTime == null || endTime == null) ? null : Duration.between(startTime, endTime);
     }
 
     @AssertTrue(message = "La hora de fin debe ser posterior a la hora de inicio")
