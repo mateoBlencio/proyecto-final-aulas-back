@@ -18,4 +18,6 @@ public interface ClassroomRepository extends JpaRepository<Classroom, Integer>, 
     Optional<Classroom> findByRoomNumberAndBuilding(String roomNumber, Building building);
 
     List<Classroom> findByAvailableTrue();
+
+    List<Classroom> findByBuilding(Building building);
 }

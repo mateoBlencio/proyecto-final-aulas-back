@@ -9,9 +9,11 @@ import org.springframework.modulith.NamedInterface;
 @NamedInterface("api")
 public interface BuildingService {
 
-    List<BuildingResponseDto> findAll();
+    List<BuildingResponseDto> findAll(boolean includeInactive);
 
     BuildingResponseDto findById(Integer id);
 
     BuildingResponseDto findByName(String name);
+
+    BuildingResponseDto setActive(Integer id, Boolean active);
 }

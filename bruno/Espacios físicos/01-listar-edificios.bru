@@ -5,7 +5,11 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/buildings
+  url: {{baseUrl}}/v1/buildings?includeInactive=false
   body: none
   auth: inherit
+}
+
+params:query {
+  includeInactive: false
 }

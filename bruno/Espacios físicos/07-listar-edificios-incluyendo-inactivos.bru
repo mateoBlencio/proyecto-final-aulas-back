@@ -1,0 +1,15 @@
+meta {
+  name: Listar edificios incluyendo inactivos
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/v1/buildings?includeInactive=true
+  body: none
+  auth: inherit
+}
+
+params:query {
+  includeInactive: true
+}
