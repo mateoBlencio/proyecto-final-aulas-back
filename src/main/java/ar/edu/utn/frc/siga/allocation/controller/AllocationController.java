@@ -115,7 +115,9 @@ public class AllocationController {
     @PostMapping
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Asignar aulas en lote",
-               description = "Asigna aula a cada item del lote (occurrences puntuales o evento completo). "
+               description = "Asigna aula a cada item del lote. Cada item apunta de una de tres formas: "
+                       + "'occurrenceIds' (fechas puntuales), 'eventId' solo (todas las ocurrencias futuras "
+                       + "del evento) o 'eventId' + 'from' [+ 'to'] (rango de fechas, ambos bordes inclusive). "
                        + "409 si alguna occurrence del lote ya tiene asignación, si algún aula no existe/no está "
                        + "disponible, o si hay solapamiento de horario con otra asignación. Atómico.")
     public ResponseEntity<List<AllocationResponseDto>> allocate(@Valid @RequestBody AllocationBatchRequestDto dto) {
@@ -129,8 +131,14 @@ public class AllocationController {
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Reasignar aulas en lote",
                description = "Cambia el aula de cada item del lote (upsert: crea la asignación si no existía). "
-                       + "409 si algún aula no existe/no está disponible, o si hay solapamiento de horario con "
-                       + "otra asignación. Atómico.")
+                       + "Además de las formas puntual ('occurrenceIds') y evento completo ('eventId'), acepta "
+                       + "mover un evento por rango de fechas: 'eventId' + 'from' + 'to' es un cambio TEMPORAL "
+                       + "(las ocurrencias de afuera del rango conservan su aula, así que la clase 'vuelve' sola), "
+                       + "y 'eventId' + 'from' sin 'to' es un cambio PERMANENTE desde esa fecha hasta que termine "
+                       + "el dictado. Ambos bordes son inclusive y 'from' no puede ser anterior a hoy (400). "
+                       + "409 si algún aula no existe/no está disponible, si hay solapamiento de horario con otra "
+                       + "asignación, o si una ocurrencia del rango ya ocurrió. Atómico: si una sola fecha del "
+                       + "rango falla, no se aplica ningún cambio.")
     public ResponseEntity<List<AllocationResponseDto>> reallocate(@Valid @RequestBody AllocationBatchRequestDto dto) {
         log.debug("PUT /v1/allocations: items={}", dto.items().size());
         List<AllocationResponseDto> response = allocationService.reallocate(commandMapper.toManualCommand(dto));

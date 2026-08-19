@@ -1,0 +1,40 @@
+meta {
+  name: Reasignar por rango — permanente
+  type: http
+  seq: 17
+}
+
+put {
+  url: {{baseUrl}}/v1/allocations
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "items": [
+      {
+        "eventId": 55,
+        "from": "2026-09-15",
+        "classroomId": 12
+      }
+    ],
+    "observation": "La comisión creció: de acá en adelante cursa en el aula 12"
+  }
+}
+
+docs {
+  Movimiento PERMANENTE: al omitir "to", mueve todas las ocurrencias del evento
+  desde "from" hasta que termine el dictado.
+
+  Diferencia con mandar solo "eventId" (ver 05-reasignar-aula-de-evento.bru):
+  ese reasigna desde HOY, sin poder elegir la fecha. Este permite decir "desde
+  el 15 de septiembre", dejando intacto lo anterior aunque todavía no haya
+  pasado.
+
+  Mismas reglas y mismos errores que el rango temporal (400 si "from" ya pasó,
+  409 con la lista de conflictos si alguna fecha tiene el aula ocupada, y en ese
+  caso NO se aplica ningún cambio). Ver 08-reasignar-por-rango-temporal.bru.
+
+  Respuesta 200: List<AllocationResponseDto>, un item por ocurrencia movida.
+}
