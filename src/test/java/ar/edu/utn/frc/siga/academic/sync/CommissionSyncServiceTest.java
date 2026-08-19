@@ -1,27 +1,64 @@
 package ar.edu.utn.frc.siga.academic.sync;
 
+import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
+import ar.edu.utn.frc.siga.academic.model.Commission;
+import ar.edu.utn.frc.siga.academic.model.TermType;
+import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
+import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
+import ar.edu.utn.frc.siga.common.model.RecordSource;
+import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
+import ar.edu.utn.frc.siga.sysacad.api.SysacadCommissionDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CommissionSyncService")
 class CommissionSyncServiceTest {
 
     @Mock
+    private SysacadCatalogReader catalogReader;
+
+    @Mock
+    private CommissionRepository commissionRepository;
+
+    @Mock
+    private AcademicPeriodRepository academicPeriodRepository;
+
+    @Mock
     private SysacadSyncStateService syncStateService;
 
     @Test
-    @DisplayName("sync: registra el skip porque la vista no permite resolver el AcademicPeriod")
-    void syncRecordsSkip() {
-        new CommissionSyncService(syncStateService).sync();
+    @DisplayName("sync: resuelve el AcademicPeriod anual a partir del año de la comisión y da de alta la comisión")
+    void syncCreatesCommissionUnderAnnualPeriod() {
+        SysacadCommissionDto row = new SysacadCommissionDto("101", 1, 2024, 55, 2026, 1);
+        AcademicPeriod period = AcademicPeriod.builder().id(9L).year(2026).semester(TermType.ANUAL.getSemester()).build();
 
-        verify(syncStateService).recordFailure(SysacadView.COMISIONES, CommissionSyncService.UNRESOLVED_PERIOD);
+        when(catalogReader.findCommissions()).thenReturn(List.of(row));
+        when(commissionRepository.findAll()).thenReturn(List.of());
+        when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
+                .thenReturn(Optional.of(period));
+        when(commissionRepository.save(any(Commission.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        new CommissionSyncService(catalogReader, commissionRepository, academicPeriodRepository, syncStateService).sync();
+
+        verify(syncStateService).recordSuccess(SysacadView.COMISIONES, 1);
+        verify(academicPeriodRepository).findByYearAndSemester(2026, TermType.ANUAL.getSemester());
+        verify(commissionRepository).save(argThat((Commission commission) ->
+                RecordSource.SYSACAD == commission.getSource()
+                        && "101".equals(commission.getCourseCode())
+                        && Integer.valueOf(1).equals(commission.getCommissionNumber())
+                        && period.equals(commission.getAcademicPeriod())));
     }
 }
