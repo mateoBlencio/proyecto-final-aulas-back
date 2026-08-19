@@ -96,6 +96,7 @@ public class ClassroomSyncService implements SysacadViewSyncer {
                         .classroomType(defaultType)
                         .capacity(row.capacity())
                         .available(row.isEnabled())
+                        .sysacadEnabled(row.isEnabled())
                         .source(RecordSource.SYSACAD)
                         .syncedAt(syncedAt)
                         .sysacadHash(hash)
@@ -108,10 +109,11 @@ public class ClassroomSyncService implements SysacadViewSyncer {
             if (isUpToDate(classroom, hash)) {
                 continue;
             }
-            // `piso` y `classroomType` son local-owned: el sync nunca los pisa en un update (§4.3).
+            // `piso`, `classroomType` y `available` son local-owned: el sync nunca los pisa en
+            // un update (§4.3). `sysacadEnabled` sí refleja siempre la respuesta cruda de SysAcad.
             // Al crear sí se asigna un default (§ constraint NOT NULL), ver resolveDefaultClassroomType().
             classroom.setCapacity(row.capacity());
-            classroom.setAvailable(row.isEnabled());
+            classroom.setSysacadEnabled(row.isEnabled());
             classroom.setSource(RecordSource.SYSACAD);
             classroom.setSyncedAt(syncedAt);
             classroom.setSysacadHash(hash);
@@ -133,6 +135,7 @@ public class ClassroomSyncService implements SysacadViewSyncer {
             }
             classroom.setPresentInSysacad(false);
             classroom.setAvailable(false);
+            classroom.setSysacadEnabled(false);
             classroom.setSyncedAt(syncedAt);
             classroomRepository.save(classroom);
             affected++;

@@ -25,6 +25,7 @@ public interface ClassroomMapper {
     @Mapping(target = "syncedAt", ignore = true)
     @Mapping(target = "sysacadHash", ignore = true)
     @Mapping(target = "presentInSysacad", ignore = true)
+    @Mapping(target = "sysacadEnabled", ignore = true)
     @Mapping(target = "version", ignore = true)
     Classroom toEntity(ClassroomRequestDto dto);
 
@@ -36,6 +37,7 @@ public interface ClassroomMapper {
     @Mapping(target = "syncedAt", ignore = true)
     @Mapping(target = "sysacadHash", ignore = true)
     @Mapping(target = "presentInSysacad", ignore = true)
+    @Mapping(target = "sysacadEnabled", ignore = true)
     @Mapping(target = "version", ignore = true)
     void updateEntity(@MappingTarget Classroom entity, ClassroomRequestDto dto);
 }

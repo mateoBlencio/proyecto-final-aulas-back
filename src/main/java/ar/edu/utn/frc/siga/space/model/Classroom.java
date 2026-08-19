@@ -43,6 +43,10 @@ public class Classroom extends TimestampedEntity {
     private Boolean available = true;
 
     @Builder.Default
+    @Column(name = "habilitada_sysacad", nullable = false)
+    private Boolean sysacadEnabled = true;
+
+    @Builder.Default
     @Column(name = "eliminado", nullable = false)
     private Boolean deleted = false;
 

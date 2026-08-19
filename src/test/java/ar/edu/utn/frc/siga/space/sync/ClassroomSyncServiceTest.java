@@ -77,6 +77,7 @@ class ClassroomSyncServiceTest {
         assertThat(inserted.getClassroomType()).isSameAs(defaultType);
         assertThat(inserted.getCapacity()).isEqualTo(70);
         assertThat(inserted.getAvailable()).isTrue();
+        assertThat(inserted.getSysacadEnabled()).isTrue();
         assertThat(inserted.getSource()).isEqualTo(RecordSource.SYSACAD);
         assertThat(inserted.getSysacadHash()).isEqualTo(Hashes.sha256Hex(70, true));
         assertThat(inserted.getPresentInSysacad()).isTrue();
@@ -99,12 +100,13 @@ class ClassroomSyncServiceTest {
     }
 
     @Test
-    @DisplayName("sync: actualiza capacidad y disponibilidad sin pisar piso ni tipo de aula")
+    @DisplayName("sync: actualiza capacidad y habilitada_sysacad sin pisar piso, tipo de aula ni disponible local")
     void syncUpdatesOnlySysacadOwnedFields() {
         ClassroomType type = SpaceTestData.classroomType().build();
         Classroom existing = sysacadClassroom("101", 40, true, Hashes.sha256Hex(40, true));
         existing.setFloor(3);
         existing.setClassroomType(type);
+        existing.setAvailable(false);
         when(catalogReader.findClassrooms()).thenReturn(List.of(new SysacadClassroomDto(101, 2, false, 70)));
         when(buildingRepository.findAll()).thenReturn(List.of(BUILDING));
         when(classroomRepository.findAll()).thenReturn(List.of(existing));
@@ -112,10 +114,26 @@ class ClassroomSyncServiceTest {
         service.sync();
 
         assertThat(existing.getCapacity()).isEqualTo(70);
+        assertThat(existing.getSysacadEnabled()).isFalse();
         assertThat(existing.getAvailable()).isFalse();
         assertThat(existing.getFloor()).isEqualTo(3);
         assertThat(existing.getClassroomType()).isSameAs(type);
         verify(classroomRepository).save(existing);
+    }
+
+    @Test
+    @DisplayName("sync: no pisa disponible local aunque SysAcad habilite el aula")
+    void syncNeverOverwritesLocalAvailable() {
+        Classroom existing = sysacadClassroom("101", 40, true, Hashes.sha256Hex(40, true));
+        existing.setAvailable(false);
+        when(catalogReader.findClassrooms()).thenReturn(List.of(new SysacadClassroomDto(101, 2, true, 70)));
+        when(buildingRepository.findAll()).thenReturn(List.of(BUILDING));
+        when(classroomRepository.findAll()).thenReturn(List.of(existing));
+
+        service.sync();
+
+        assertThat(existing.getSysacadEnabled()).isTrue();
+        assertThat(existing.getAvailable()).isFalse();
     }
 
     @Test
