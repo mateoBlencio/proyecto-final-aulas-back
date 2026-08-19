@@ -9,7 +9,6 @@ import ar.edu.utn.frc.siga.common.util.Maps;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -58,7 +57,6 @@ class AllocationWriter {
                         .occurrenceId(occurrence.occurrenceId())
                         .classroomId(classroomId)
                         .source(source)
-                        .createdAt(LocalDateTime.now())
                         .observation(observation)
                         .build());
             }

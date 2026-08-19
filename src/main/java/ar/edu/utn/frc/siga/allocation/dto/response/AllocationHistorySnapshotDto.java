@@ -2,14 +2,14 @@ package ar.edu.utn.frc.siga.allocation.dto.response;
 
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record AllocationHistorySnapshotDto(
         Long id,
         Long occurrenceId,
         Integer classroomId,
         AllocationSource source,
-        LocalDateTime createdAt,
+        Instant createdAt,
         String observation
 ) {
 }

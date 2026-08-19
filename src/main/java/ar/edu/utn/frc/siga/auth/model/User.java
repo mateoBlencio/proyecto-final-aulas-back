@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.auth.model;
 
+import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -28,7 +29,7 @@ import org.hibernate.annotations.SQLRestriction;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class User {
+public class User extends TimestampedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

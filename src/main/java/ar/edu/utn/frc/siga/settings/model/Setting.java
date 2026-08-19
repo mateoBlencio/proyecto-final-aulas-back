@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.settings.model;
 
+import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -16,8 +17,8 @@ import org.hibernate.envers.Audited;
 @Audited
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class Setting {
+@EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
+public class Setting extends TimestampedEntity {
 
     @EqualsAndHashCode.Include
     @Id

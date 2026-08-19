@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.academic.model;
 
 import ar.edu.utn.frc.siga.common.model.RecordSource;
+import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -16,9 +17,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SQLRestriction;
-import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
 @Table(name = "especialidad")
@@ -28,7 +27,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Specialty {
+public class Specialty extends TimestampedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -59,14 +58,6 @@ public class Specialty {
     @Builder.Default
     @Column(name = "vigente_sysacad", nullable = false)
     private Boolean presentInSysacad = true;
-
-    @CreationTimestamp
-    @Column(name = "creado_en", nullable = false, updatable = false)
-    private Instant createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "actualizado_en", nullable = false)
-    private Instant updatedAt;
 
     @Version
     @Column(name = "version", nullable = false)

@@ -38,7 +38,6 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -90,8 +89,7 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
 
     private void allocateDirect(Occurrence occurrence, Integer classroomId) {
         allocationRepository.save(Allocation.builder()
-                .occurrenceId(occurrence.getId()).classroomId(classroomId).source(AllocationSource.MANUAL)
-                .createdAt(LocalDateTime.now()).build());
+                .occurrenceId(occurrence.getId()).classroomId(classroomId).source(AllocationSource.MANUAL).build());
     }
 
     private void blockAllAvailableRooms(LocalDate date) {
@@ -102,8 +100,7 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
             Occurrence occ = occurrenceRepository.save(Occurrence.builder()
                     .event(blocker).date(date).status(OccurrenceStatus.NEEDS_ROOM).build());
             allocationRepository.save(Allocation.builder()
-                    .occurrenceId(occ.getId()).classroomId(room.id()).source(AllocationSource.MANUAL)
-                    .createdAt(LocalDateTime.now()).build());
+                    .occurrenceId(occ.getId()).classroomId(room.id()).source(AllocationSource.MANUAL).build());
         }
     }
 

@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.academic.model;
 
 import ar.edu.utn.frc.siga.common.model.RecordSource;
+import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import jakarta.persistence.*;
 import java.time.Instant;
 import lombok.AllArgsConstructor;
@@ -8,9 +9,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SQLRestriction;
-import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
 @Table(name = "comision", uniqueConstraints = @UniqueConstraint(columnNames = {"id_periodo", "codigo_curso", "numero_comision"}))
@@ -20,7 +19,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Commission {
+public class Commission extends TimestampedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -58,14 +57,6 @@ public class Commission {
     @Builder.Default
     @Column(name = "vigente_sysacad", nullable = false)
     private Boolean presentInSysacad = true;
-
-    @CreationTimestamp
-    @Column(name = "creado_en", nullable = false, updatable = false)
-    private Instant createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "actualizado_en", nullable = false)
-    private Instant updatedAt;
 
     @Version
     @Column(name = "version", nullable = false)

@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.space.model;
 
 import ar.edu.utn.frc.siga.common.model.RecordSource;
+import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -20,9 +21,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SQLRestriction;
-import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
 @Table(name = "edificio")
@@ -32,12 +31,15 @@ import org.hibernate.annotations.UpdateTimestamp;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Building {
+public class Building extends TimestampedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id_edificio")
     private Integer id;
+
+    @Column(name = "codigo_edificio", unique = true)
+    private Integer buildingCode;
 
     @Column(name = "nombre", nullable = false, length = 100)
     private String name;
@@ -67,14 +69,6 @@ public class Building {
     @Builder.Default
     @Column(name = "vigente_sysacad", nullable = false)
     private Boolean presentInSysacad = true;
-
-    @CreationTimestamp
-    @Column(name = "creado_en", nullable = false, updatable = false)
-    private Instant createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "actualizado_en", nullable = false)
-    private Instant updatedAt;
 
     @Version
     @Column(name = "version", nullable = false)

@@ -1,0 +1,17 @@
+meta {
+  name: Estado del sync
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/sysacad/sync
+  body: none
+  auth: inherit
+}
+
+docs {
+  Devuelve, por vista (Edificios, Aulas, Especialidades, Comisiones), el
+  último sync exitoso, la cantidad de filas afectadas y el último error si lo
+  hubo. Requiere rol SUBSECRETARIA.
+}

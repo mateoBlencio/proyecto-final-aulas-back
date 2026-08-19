@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.space.model;
 
 import ar.edu.utn.frc.siga.common.model.RecordSource;
+import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import jakarta.persistence.*;
 import java.time.Instant;
 import lombok.AllArgsConstructor;
@@ -9,9 +10,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SQLRestriction;
-import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
 @Table(name = "aula", uniqueConstraints = @UniqueConstraint(columnNames = {"id_edificio", "num_aula"}))
@@ -21,8 +20,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class Classroom {
+@EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
+public class Classroom extends TimestampedEntity {
 
     @EqualsAndHashCode.Include
     @Id
@@ -61,14 +60,6 @@ public class Classroom {
     @Builder.Default
     @Column(name = "vigente_sysacad", nullable = false)
     private Boolean presentInSysacad = true;
-
-    @CreationTimestamp
-    @Column(name = "creado_en", nullable = false, updatable = false)
-    private Instant createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "actualizado_en", nullable = false)
-    private Instant updatedAt;
 
     @Version
     @Column(name = "version", nullable = false)

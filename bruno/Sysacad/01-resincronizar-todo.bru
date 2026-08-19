@@ -1,0 +1,19 @@
+meta {
+  name: Resincronizar todo
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/sysacad/sync
+  body: none
+  auth: inherit
+}
+
+docs {
+  Dispara el resync de Edificios, Aulas, Especialidades y Comisiones contra
+  SysAcad, en ese orden (por FK). Corre asíncrono: responde 202 de inmediato
+  con el estado previo del sync, sin esperar a que SysAcad termine. Si ya hay
+  un resync en curso, el disparo se ignora. Requiere rol SUBSECRETARIA y
+  siga.sysacad.enabled=true en el backend.
+}

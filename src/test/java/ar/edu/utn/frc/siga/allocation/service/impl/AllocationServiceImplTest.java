@@ -28,7 +28,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.LocalTime;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -40,12 +40,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -434,12 +432,11 @@ class AllocationServiceImplTest {
                 .occurrenceId(occurrenceId)
                 .classroomId(classroomId)
                 .source(source)
-                .createdAt(LocalDateTime.now())
                 .build();
     }
 
     private AllocationResponseDto dummyResponseDto() {
-        return new AllocationResponseDto(1L, AllocationSource.MANUAL, LocalDateTime.now(), null, null, null, null);
+        return new AllocationResponseDto(1L, AllocationSource.MANUAL, Instant.now(), null, null, null, null);
     }
 
     private Map<OccurrenceSlotDto, Integer> mapOf(OccurrenceSlotDto occ, Integer classroomId) {

@@ -34,7 +34,6 @@ import org.springframework.data.domain.Pageable;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Set;
@@ -351,7 +350,6 @@ class AllocationConflictServiceImplTest {
                 .occurrenceId(occurrenceId)
                 .classroomId(classroomId)
                 .source(AllocationSource.MANUAL)
-                .createdAt(LocalDateTime.now())
                 .build();
     }
 

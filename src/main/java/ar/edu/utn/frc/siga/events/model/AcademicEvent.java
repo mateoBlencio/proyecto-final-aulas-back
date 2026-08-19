@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.events.model;
 
 import ar.edu.utn.frc.siga.common.converter.DurationMinutesConverter;
+import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.DiscriminatorColumn;
@@ -32,8 +33,8 @@ import java.util.List;
 @Getter
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public abstract class AcademicEvent {
+@EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
+public abstract class AcademicEvent extends TimestampedEntity {
 
     @EqualsAndHashCode.Include
     @Id

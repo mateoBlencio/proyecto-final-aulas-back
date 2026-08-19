@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.auth.model;
 
+import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -25,7 +26,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class RefreshToken {
+public class RefreshToken extends TimestampedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -56,9 +57,5 @@ public class RefreshToken {
 
     @Column(name = "fecha_expiracion", nullable = false)
     private Instant expiresAt;
-
-    @Builder.Default
-    @Column(name = "fecha_creacion", nullable = false)
-    private Instant createdAt = Instant.now();
 
 }

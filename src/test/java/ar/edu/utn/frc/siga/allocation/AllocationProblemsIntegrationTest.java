@@ -28,7 +28,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -84,8 +83,7 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
     /** Segunda allocation en la misma franja/aula por repositorio directo: la API bloquea el solape (validateNoOverlap). */
     private void allocateDirect(Occurrence occurrence, Integer classroomId) {
         allocationRepository.save(Allocation.builder()
-                .occurrenceId(occurrence.getId()).classroomId(classroomId).source(AllocationSource.MANUAL)
-                .createdAt(LocalDateTime.now()).build());
+                .occurrenceId(occurrence.getId()).classroomId(classroomId).source(AllocationSource.MANUAL).build());
     }
 
     /**

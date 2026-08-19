@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.roomrequest.model;
 
+import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -35,8 +36,8 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class RoomPreference {
+@EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
+public class RoomPreference extends TimestampedEntity {
 
     @EqualsAndHashCode.Include
     @Id

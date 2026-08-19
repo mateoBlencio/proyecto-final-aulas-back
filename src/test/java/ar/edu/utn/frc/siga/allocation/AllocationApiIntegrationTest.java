@@ -283,7 +283,6 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
                 .occurrenceId(past.getId())
                 .classroomId(aulaOriginal.getId())
                 .source(AllocationSource.MANUAL)
-                .createdAt(java.time.LocalDateTime.now())
                 .build()).getId();
 
         mockMvc.perform(put("/v1/allocations")
