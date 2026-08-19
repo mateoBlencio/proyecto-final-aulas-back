@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.sysacad.internal;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
+import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,15 @@ public class SysacadSyncStateServiceImpl implements SysacadSyncStateService {
     private static final int MAX_ERROR_LENGTH = 1000;
 
     private final SysacadSyncStateRepository repository;
+
+    @PostConstruct
+    void seedStates() {
+        for (SysacadView view : SysacadView.values()) {
+            if (repository.findByView(view).isEmpty()) {
+                repository.save(SysacadSyncState.builder().view(view).build());
+            }
+        }
+    }
 
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -38,6 +48,14 @@ public class SysacadSyncStateServiceImpl implements SysacadSyncStateService {
         state.setLastError(truncate(errorMessage));
         state.setLastErrorAt(Instant.now());
         repository.save(state);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void ensureExists(SysacadView view) {
+        if (repository.findByView(view).isEmpty()) {
+            repository.save(SysacadSyncState.builder().view(view).build());
+        }
     }
 
     @Override

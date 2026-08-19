@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -68,6 +69,48 @@ class SysacadSyncOrchestratorTest {
         verify(classrooms).sync();
         verify(specialties).sync();
         verify(commissions).sync();
+    }
+
+    @Test
+    @DisplayName("Sin fallos, el resultado es SUCCESS")
+    void resyncAll_allOk_returnsSuccess() {
+        SysacadResyncOutcome outcome = orchestrator.resyncAll();
+
+        assertThat(outcome).isEqualTo(SysacadResyncOutcome.SUCCESS);
+    }
+
+    @Test
+    @DisplayName("Una vista con error de datos (no de conexión) da PARTIAL_FAILURE")
+    void resyncAll_dataError_returnsPartialFailure() {
+        doThrow(new IllegalStateException("dato inválido")).when(buildings).sync();
+
+        SysacadResyncOutcome outcome = orchestrator.resyncAll();
+
+        assertThat(outcome).isEqualTo(SysacadResyncOutcome.PARTIAL_FAILURE);
+    }
+
+    @Test
+    @DisplayName("Todas las vistas fallando por conexión da CONNECTIVITY_FAILURE")
+    void resyncAll_allConnectivityErrors_returnsConnectivityFailure() {
+        doThrow(new SysacadUnavailableException("I/O error", null)).when(buildings).sync();
+        doThrow(new SysacadUnavailableException("I/O error", null)).when(classrooms).sync();
+        doThrow(new SysacadUnavailableException("I/O error", null)).when(specialties).sync();
+        doThrow(new SysacadUnavailableException("I/O error", null)).when(commissions).sync();
+
+        SysacadResyncOutcome outcome = orchestrator.resyncAll();
+
+        assertThat(outcome).isEqualTo(SysacadResyncOutcome.CONNECTIVITY_FAILURE);
+    }
+
+    @Test
+    @DisplayName("Conexión caída en una vista y otra con error de datos da PARTIAL_FAILURE")
+    void resyncAll_mixedErrors_returnsPartialFailure() {
+        doThrow(new SysacadUnavailableException("I/O error", null)).when(buildings).sync();
+        doThrow(new IllegalStateException("dato inválido")).when(classrooms).sync();
+
+        SysacadResyncOutcome outcome = orchestrator.resyncAll();
+
+        assertThat(outcome).isEqualTo(SysacadResyncOutcome.PARTIAL_FAILURE);
     }
 
     @Test

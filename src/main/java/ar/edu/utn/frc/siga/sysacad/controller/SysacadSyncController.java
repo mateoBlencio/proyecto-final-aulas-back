@@ -2,6 +2,8 @@ package ar.edu.utn.frc.siga.sysacad.controller;
 
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
+import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
+import ar.edu.utn.frc.siga.sysacad.internal.SysacadResyncOutcome;
 import ar.edu.utn.frc.siga.sysacad.internal.SysacadSyncOrchestrator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -9,6 +11,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,12 +34,23 @@ public class SysacadSyncController {
     @PostMapping
     @Operation(summary = "Resincronizar todas las vistas de SysAcad",
                description = "Dispara el resync de Edificios, Aulas, Especialidades y Comisiones en el orden de "
-                       + "FK. Corre asíncrono: responde 202 de inmediato con el estado previo del sync, sin "
-                       + "esperar a SysAcad. Si ya hay un resync en curso, el disparo se ignora.")
+                       + "FK. Espera a que termine (incluyendo reintentos ante errores transitorios) y devuelve "
+                       + "el estado resultante, con el error de cada vista si lo hubo. Responde 200 si las 4 "
+                       + "vistas sincronizaron bien, 207 si al menos una falló por datos, 503 si no se pudo "
+                       + "establecer conexión con SysAcad (red/VPN caída). Si ya hay un resync en curso, el "
+                       + "disparo se ignora y devuelve 200 con el estado previo.")
     public ResponseEntity<List<SysacadSyncStateDto>> resyncAll() {
         log.info("POST /v1/sysacad/sync: resync manual de todas las vistas");
-        orchestrator.resyncAll();
-        return ResponseEntity.accepted().body(syncStateService.findAll());
+        for (SysacadView view : SysacadView.values()) {
+            syncStateService.ensureExists(view);
+        }
+        SysacadResyncOutcome outcome = orchestrator.resyncAll();
+        HttpStatus status = switch (outcome) {
+            case SUCCESS -> HttpStatus.OK;
+            case PARTIAL_FAILURE -> HttpStatus.MULTI_STATUS;
+            case CONNECTIVITY_FAILURE -> HttpStatus.SERVICE_UNAVAILABLE;
+        };
+        return ResponseEntity.status(status).body(syncStateService.findAll());
     }
 
     @GetMapping

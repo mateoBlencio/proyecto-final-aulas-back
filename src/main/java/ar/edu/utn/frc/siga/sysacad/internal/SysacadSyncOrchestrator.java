@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -32,22 +31,35 @@ public class SysacadSyncOrchestrator {
         syncer.sync();
     }
 
-    @Async
-    public void resyncAll() {
+    public SysacadResyncOutcome resyncAll() {
         if (!running.compareAndSet(false, true)) {
             log.info("Resync manual ignorado: ya hay uno en curso");
-            return;
+            return SysacadResyncOutcome.SUCCESS;
         }
+        SysacadView[] views = SysacadView.values();
+        int failedViews = 0;
+        int connectivityFailures = 0;
         try {
-            for (SysacadView view : SysacadView.values()) {
+            for (SysacadView view : views) {
                 try {
                     sync(view);
                 } catch (RuntimeException e) {
                     log.error("Falló el sync de la vista {}: {}", view, e.getMessage());
+                    failedViews++;
+                    if (e instanceof SysacadUnavailableException) {
+                        connectivityFailures++;
+                    }
                 }
             }
         } finally {
             running.set(false);
         }
+        if (failedViews == 0) {
+            return SysacadResyncOutcome.SUCCESS;
+        }
+        if (connectivityFailures == views.length) {
+            return SysacadResyncOutcome.CONNECTIVITY_FAILURE;
+        }
+        return SysacadResyncOutcome.PARTIAL_FAILURE;
     }
 }

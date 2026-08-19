@@ -8,5 +8,7 @@ public interface SysacadSyncStateService {
 
     void recordFailure(SysacadView view, String errorMessage);
 
+    void ensureExists(SysacadView view);
+
     List<SysacadSyncStateDto> findAll();
 }

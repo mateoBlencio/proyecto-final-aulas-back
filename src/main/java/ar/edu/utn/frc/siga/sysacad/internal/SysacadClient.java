@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriBuilder;
@@ -50,6 +51,9 @@ public class SysacadClient {
                 log.warn("SysAcad respondió {} en la vista {}; reintento {}/{} en {} ms",
                         e.getStatusCode().value(), view, attempt + 1, maxRetries, backoff.toMillis());
                 sleep(backoff);
+            } catch (ResourceAccessException e) {
+                throw new SysacadUnavailableException(
+                        "No se pudo conectar con SysAcad para la vista " + view, e);
             }
         }
     }
