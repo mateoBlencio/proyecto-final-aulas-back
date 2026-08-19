@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.space.service.impl;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.space.SpaceTestData;
 import ar.edu.utn.frc.siga.space.config.SpaceSettings;
+import ar.edu.utn.frc.siga.space.dto.request.BuildingActiveBatchItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.mapper.BuildingMapper;
 import ar.edu.utn.frc.siga.space.model.Building;
@@ -162,6 +163,41 @@ class BuildingServiceImplTest {
         when(buildingRepository.findById(99)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.setActive(99, true))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Building not found with id: 99");
+    }
+
+    @Test
+    @DisplayName("setActiveBatch: aplica el cambio a cada edificio del lote")
+    void setActiveBatchAppliesEachItem() {
+        Building building1 = SpaceTestData.building().id(1).active(true).build();
+        Building building2 = SpaceTestData.building().id(2).active(true).build();
+        BuildingResponseDto dto1 = new BuildingResponseDto(1, "Edificio Central", 5, false);
+        BuildingResponseDto dto2 = new BuildingResponseDto(2, "Edificio Anexo", 2, false);
+        when(buildingRepository.findById(1)).thenReturn(Optional.of(building1));
+        when(buildingRepository.findById(2)).thenReturn(Optional.of(building2));
+        when(buildingRepository.save(building1)).thenReturn(building1);
+        when(buildingRepository.save(building2)).thenReturn(building2);
+        when(classroomRepository.findByBuilding(building1)).thenReturn(List.of());
+        when(classroomRepository.findByBuilding(building2)).thenReturn(List.of());
+        when(buildingMapper.toDto(building1)).thenReturn(dto1);
+        when(buildingMapper.toDto(building2)).thenReturn(dto2);
+
+        List<BuildingResponseDto> result = service.setActiveBatch(List.of(
+                new BuildingActiveBatchItemDto(1, false),
+                new BuildingActiveBatchItemDto(2, false)));
+
+        assertThat(result).containsExactly(dto1, dto2);
+        assertThat(building1.getActive()).isFalse();
+        assertThat(building2.getActive()).isFalse();
+    }
+
+    @Test
+    @DisplayName("setActiveBatch: si un edificio del lote no existe, lanza ResourceNotFoundException")
+    void setActiveBatchWithMissingBuildingThrowsResourceNotFound() {
+        when(buildingRepository.findById(99)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.setActiveBatch(List.of(new BuildingActiveBatchItemDto(99, true))))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Building not found with id: 99");
     }

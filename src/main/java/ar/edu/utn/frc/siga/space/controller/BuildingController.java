@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.space.controller;
 
+import ar.edu.utn.frc.siga.space.dto.request.BuildingActiveBatchRequestDto;
 import ar.edu.utn.frc.siga.space.dto.request.BuildingActiveRequestDto;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.service.BuildingService;
@@ -55,6 +56,20 @@ public class BuildingController {
         log.debug("PATCH /v1/buildings/{}/active: active={}", id, dto.active());
         BuildingResponseDto response = buildingService.setActive(id, dto.active());
         log.info("Edificio actualizado vía controller: id={}, active={}", id, dto.active());
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/active")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Activar/desactivar edificios en lote",
+               description = "Aplica el cambio de estado activo (y la cascada a sus aulas) a varios edificios en "
+                       + "una única transacción: si alguno falla (ej. 404), no se aplica ninguno. Pensado para "
+                       + "desactivar de una los edificios/aulas que sincroniza SysAcad pero que la facultad no usa.")
+    public ResponseEntity<List<BuildingResponseDto>> setActiveBatch(
+            @Valid @RequestBody BuildingActiveBatchRequestDto dto) {
+        log.debug("PATCH /v1/buildings/active (batch): count={}", dto.buildings().size());
+        List<BuildingResponseDto> response = buildingService.setActiveBatch(dto.buildings());
+        log.info("Batch de edificios actualizado vía controller: count={}", response.size());
         return ResponseEntity.ok(response);
     }
 }

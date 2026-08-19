@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.space.service;
 
+import ar.edu.utn.frc.siga.space.dto.request.BuildingActiveBatchItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 
 import java.util.List;
@@ -16,4 +17,6 @@ public interface BuildingService {
     BuildingResponseDto findByName(String name);
 
     BuildingResponseDto setActive(Integer id, Boolean active);
+
+    List<BuildingResponseDto> setActiveBatch(List<BuildingActiveBatchItemDto> items);
 }

@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.space.config.SpaceSettings;
+import ar.edu.utn.frc.siga.space.dto.request.BuildingActiveBatchItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.mapper.BuildingMapper;
 import ar.edu.utn.frc.siga.space.model.Building;
@@ -65,5 +66,14 @@ public class BuildingServiceImpl implements BuildingService {
         log.info("Edificio {} {}: aulas afectadas={}", id, active ? "activado" : "desactivado", classrooms.size());
 
         return buildingMapper.toDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public List<BuildingResponseDto> setActiveBatch(List<BuildingActiveBatchItemDto> items) {
+        log.debug("Actualizando estado activo en lote: count={}", items.size());
+        return items.stream()
+                .map(item -> setActive(item.id(), item.active()))
+                .toList();
     }
 }
