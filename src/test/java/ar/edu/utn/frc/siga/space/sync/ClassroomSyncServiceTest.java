@@ -8,6 +8,7 @@ import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
+import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadClassroomDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
@@ -21,9 +22,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -41,21 +45,26 @@ class ClassroomSyncServiceTest {
     @Mock
     private BuildingRepository buildingRepository;
     @Mock
+    private ClassroomTypeRepository classroomTypeRepository;
+    @Mock
     private SysacadSyncStateService syncStateService;
 
     private ClassroomSyncService service;
 
     @BeforeEach
     void setUp() {
-        service = new ClassroomSyncService(catalogReader, classroomRepository, buildingRepository, syncStateService);
+        service = new ClassroomSyncService(
+                catalogReader, classroomRepository, buildingRepository, classroomTypeRepository, syncStateService);
     }
 
     @Test
-    @DisplayName("sync: inserta el aula nueva enlazada al edificio por su código de SysAcad")
+    @DisplayName("sync: inserta el aula nueva enlazada al edificio por su código de SysAcad, con tipo por defecto")
     void syncInsertsUnknownClassroom() {
+        ClassroomType defaultType = SpaceTestData.classroomType().description("Normal").build();
         when(catalogReader.findClassrooms()).thenReturn(List.of(new SysacadClassroomDto(101, 2, true, 70)));
         when(buildingRepository.findAll()).thenReturn(List.of(BUILDING));
         when(classroomRepository.findAll()).thenReturn(List.of());
+        when(classroomTypeRepository.findByDescriptionIgnoreCase("Normal")).thenReturn(Optional.of(defaultType));
         when(classroomRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.sync();
@@ -65,12 +74,28 @@ class ClassroomSyncServiceTest {
         Classroom inserted = saved.getValue();
         assertThat(inserted.getRoomNumber()).isEqualTo("101");
         assertThat(inserted.getBuilding()).isSameAs(BUILDING);
+        assertThat(inserted.getClassroomType()).isSameAs(defaultType);
         assertThat(inserted.getCapacity()).isEqualTo(70);
         assertThat(inserted.getAvailable()).isTrue();
         assertThat(inserted.getSource()).isEqualTo(RecordSource.SYSACAD);
         assertThat(inserted.getSysacadHash()).isEqualTo(Hashes.sha256Hex(70, true));
         assertThat(inserted.getPresentInSysacad()).isTrue();
         verify(syncStateService).recordSuccess(SysacadView.AULAS, 1);
+    }
+
+    @Test
+    @DisplayName("sync: falla con mensaje claro si falta el tipo de aula por defecto")
+    void syncFailsWhenDefaultClassroomTypeMissing() {
+        when(catalogReader.findClassrooms()).thenReturn(List.of(new SysacadClassroomDto(101, 2, true, 70)));
+        when(buildingRepository.findAll()).thenReturn(List.of(BUILDING));
+        when(classroomRepository.findAll()).thenReturn(List.of());
+        when(classroomTypeRepository.findByDescriptionIgnoreCase("Normal")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.sync())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Normal");
+        verify(classroomRepository, never()).save(any());
+        verify(syncStateService).recordFailure(eq(SysacadView.AULAS), any());
     }
 
     @Test

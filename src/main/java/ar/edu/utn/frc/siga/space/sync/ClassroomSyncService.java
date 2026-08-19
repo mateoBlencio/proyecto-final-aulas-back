@@ -4,8 +4,10 @@ import ar.edu.utn.frc.siga.common.model.RecordSource;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
+import ar.edu.utn.frc.siga.space.model.ClassroomType;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
+import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadClassroomDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
@@ -30,9 +32,12 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(prefix = "siga.sysacad", name = "enabled", havingValue = "true")
 public class ClassroomSyncService implements SysacadViewSyncer {
 
+    private static final String DEFAULT_CLASSROOM_TYPE = "Normal";
+
     private final SysacadCatalogReader catalogReader;
     private final ClassroomRepository classroomRepository;
     private final BuildingRepository buildingRepository;
+    private final ClassroomTypeRepository classroomTypeRepository;
     private final SysacadSyncStateService syncStateService;
 
     @Override
@@ -55,6 +60,7 @@ public class ClassroomSyncService implements SysacadViewSyncer {
 
     private int upsert(List<SysacadClassroomDto> rows) {
         Instant syncedAt = Instant.now();
+        ClassroomType defaultType = null;
         Map<Integer, Building> buildingsByCode = buildingRepository.findAll().stream()
                 .filter(building -> building.getBuildingCode() != null)
                 .collect(Collectors.toMap(Building::getBuildingCode, Function.identity()));
@@ -81,9 +87,13 @@ public class ClassroomSyncService implements SysacadViewSyncer {
             Classroom classroom = existing.get(key);
 
             if (classroom == null) {
+                if (defaultType == null) {
+                    defaultType = resolveDefaultClassroomType();
+                }
                 Classroom saved = classroomRepository.save(Classroom.builder()
                         .roomNumber(key.roomNumber())
                         .building(building)
+                        .classroomType(defaultType)
                         .capacity(row.capacity())
                         .available(row.isEnabled())
                         .source(RecordSource.SYSACAD)
@@ -98,7 +108,8 @@ public class ClassroomSyncService implements SysacadViewSyncer {
             if (isUpToDate(classroom, hash)) {
                 continue;
             }
-            // `piso` y `classroomType` son local-owned: el sync nunca los pisa (§4.3).
+            // `piso` y `classroomType` son local-owned: el sync nunca los pisa en un update (§4.3).
+            // Al crear sí se asigna un default (§ constraint NOT NULL), ver resolveDefaultClassroomType().
             classroom.setCapacity(row.capacity());
             classroom.setAvailable(row.isEnabled());
             classroom.setSource(RecordSource.SYSACAD);
@@ -128,6 +139,12 @@ public class ClassroomSyncService implements SysacadViewSyncer {
             log.info("Aula marcada como no vigente en SysAcad: id={}", classroom.getId());
         }
         return affected;
+    }
+
+    private ClassroomType resolveDefaultClassroomType() {
+        return classroomTypeRepository.findByDescriptionIgnoreCase(DEFAULT_CLASSROOM_TYPE)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Falta el tipo de aula por defecto '" + DEFAULT_CLASSROOM_TYPE + "' (seed de data.sql)"));
     }
 
     private static ClassroomKey keyOf(Classroom classroom) {
