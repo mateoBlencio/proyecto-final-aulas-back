@@ -8,6 +8,7 @@ import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.preview.dto.response.MoveConflictDto;
 import ar.edu.utn.frc.siga.preview.dto.response.PreviewItemDto;
 import ar.edu.utn.frc.siga.preview.dto.response.PreviewResponseDto;
+import ar.edu.utn.frc.siga.preview.dto.response.RoomStretchDto;
 import ar.edu.utn.frc.siga.preview.dto.response.UnresolvedAllocationDto;
 import ar.edu.utn.frc.siga.preview.validator.PreviewValidator;
 import ar.edu.utn.frc.siga.preview.validator.PreviewValidator.ResolvedProposal;
@@ -21,7 +22,9 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -38,6 +41,7 @@ public class PreviewComposer {
     public PreviewResponseDto compose(OptimizationResult preview, List<RecurringEventResponseDto> events,
                                             Map<Long, List<LocalDate>> datesByEvent,
                                             Map<Long, Integer> priorRoomByEvent,
+                                            Map<Long, List<OccupiedSlot>> priorSlotsByEvent,
                                             List<OptimizerRoom> rooms, List<OccupiedSlot> databaseOccupancy) {
         Map<Long, RecurringEventResponseDto> eventsById = Maps.byId(events, RecurringEventResponseDto::id);
 
@@ -63,12 +67,15 @@ public class PreviewComposer {
                 .toList();
         Map<Long, AcademicEventResponseDto> eventDtoById = Maps.byId(referencedEvents, AcademicEventResponseDto::id);
 
-        Set<Integer> classroomIds = Set.copyOf(effectiveRoomByEventId.values());
+        // Las aulas de los tramos actuales entran en el mismo batch que las propuestas: una query.
+        Set<Integer> classroomIds = new LinkedHashSet<>(effectiveRoomByEventId.values());
+        priorSlotsByEvent.values().stream().flatMap(List::stream).map(OccupiedSlot::classroomId).forEach(classroomIds::add);
         Map<Integer, ClassroomResponseDto> classroomDtoById = Maps.byId(classroomService.findByIds(classroomIds), ClassroomResponseDto::id);
 
         List<PreviewItemDto> allocations = resolved.stream()
                 .map(a -> toPreviewItemDto(a, eventDtoById, datesByEvent,
-                        classroomDtoById.get(effectiveRoomByEventId.get(a.eventId())), priorRoomByEvent))
+                        classroomDtoById.get(effectiveRoomByEventId.get(a.eventId())), priorRoomByEvent,
+                        roomStretches(priorSlotsByEvent.get(eventIdOf(a)), classroomDtoById)))
                 .toList();
 
         Set<Integer> candidateRoomIds = rooms.stream().map(OptimizerRoom::id).collect(Collectors.toSet());
@@ -96,7 +103,8 @@ public class PreviewComposer {
 
     private PreviewItemDto toPreviewItemDto(OptimizerAllocation allocation,
             Map<Long, AcademicEventResponseDto> eventDtoById, Map<Long, List<LocalDate>> datesByEvent,
-            ClassroomResponseDto classroom, Map<Long, Integer> priorRoomByEvent) {
+            ClassroomResponseDto classroom, Map<Long, Integer> priorRoomByEvent,
+            List<RoomStretchDto> currentRoomStretches) {
         Long eventId = eventIdOf(allocation);
         AcademicEventResponseDto event = eventDtoById.get(eventId);
         boolean unchanged = classroom != null && Objects.equals(classroom.id(), priorRoomByEvent.get(eventId));
@@ -104,7 +112,41 @@ public class PreviewComposer {
                 event, datesByEvent.getOrDefault(eventId, List.of()), classroom,
                 Objects.requireNonNullElse(Overcrowding.by(
                         event != null ? event.enrolled() : null, classroom != null ? classroom.capacity() : null), 0),
-                unchanged);
+                unchanged, currentRoomStretches);
+    }
+
+    /**
+     * Colapsa la ocupación actual de un evento en tramos continuos de misma aula, ordenados por
+     * fecha, y devuelve la lista <b>solo si hay más de un tramo</b>: con uno solo no hay nada que
+     * avisar, y devolverlo obligaría al front a comparar para saber si mostrar algo.
+     *
+     * <p>Fechas repetidas (dos ocurrencias el mismo día) cuentan como clases del mismo tramo.
+     */
+    private static List<RoomStretchDto> roomStretches(
+            List<OccupiedSlot> slots, Map<Integer, ClassroomResponseDto> classroomDtoById) {
+        if (slots == null || slots.isEmpty()) {
+            return List.of();
+        }
+        List<OccupiedSlot> ordered = slots.stream().sorted(Comparator.comparing(OccupiedSlot::date)).toList();
+
+        List<RoomStretchDto> stretches = new ArrayList<>();
+        Integer classroomId = ordered.getFirst().classroomId();
+        LocalDate from = ordered.getFirst().date();
+        LocalDate to = from;
+        int classes = 0;
+        for (OccupiedSlot slot : ordered) {
+            if (!Objects.equals(slot.classroomId(), classroomId)) {
+                stretches.add(new RoomStretchDto(classroomDtoById.get(classroomId), from, to, classes));
+                classroomId = slot.classroomId();
+                from = slot.date();
+                classes = 0;
+            }
+            to = slot.date();
+            classes++;
+        }
+        stretches.add(new RoomStretchDto(classroomDtoById.get(classroomId), from, to, classes));
+
+        return stretches.size() > 1 ? List.copyOf(stretches) : List.of();
     }
 
     private UnresolvedAllocationDto toUnresolvedAllocationDto(OptimizerAllocation allocation,

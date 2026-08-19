@@ -40,9 +40,18 @@ class PreviewEngine {
     private final AllocationOccupancyService occupancyService;
     private final OptimizerService optimizerService;
 
+    /**
+     * @param priorRoomByEvent   aula actual de cada evento, una sola por evento. Se conserva tal
+     *        cual porque además del "sin cambios" alimenta el aula de respaldo cuando el motor no
+     *        propone ninguna; cuando un evento usa más de un aula, acá queda la primera.
+     * @param priorSlotsByEvent  la ocupación actual de los propios eventos, sin colapsar. Es lo que
+     *        permite ver que un evento hoy cursa en más de un aula — un movimiento temporal, por
+     *        ejemplo — que {@code priorRoomByEvent} no puede representar.
+     */
     record Inputs(List<RecurringEventResponseDto> events, Map<Long, List<LocalDate>> datesByEvent,
                   List<OptimizerRoom> rooms, List<OptimizerOccupancy> occupancy,
-                  List<OccupiedSlot> databaseOccupancy, Map<Long, Integer> priorRoomByEvent) {
+                  List<OccupiedSlot> databaseOccupancy, Map<Long, Integer> priorRoomByEvent,
+                  Map<Long, List<OccupiedSlot>> priorSlotsByEvent) {
     }
 
     @Transactional(readOnly = true)
@@ -57,12 +66,19 @@ class PreviewEngine {
         List<OccupiedSlot> databaseOccupancy = occupancyInRange.stream()
                 .filter(o -> !eventIds.contains(o.eventId()))
                 .toList();
-        Map<Long, Integer> priorRoomByEvent = occupancyInRange.stream()
+        List<OccupiedSlot> ownOccupancy = occupancyInRange.stream()
                 .filter(o -> eventIds.contains(o.eventId()))
+                .toList();
+        Map<Long, Integer> priorRoomByEvent = ownOccupancy.stream()
                 .collect(Collectors.toMap(OccupiedSlot::eventId, OccupiedSlot::classroomId, (x, y) -> x));
+        // Sin consultas extra: es la misma ocupación ya cargada, agrupada por evento en vez de
+        // colapsada a un aula.
+        Map<Long, List<OccupiedSlot>> priorSlotsByEvent = ownOccupancy.stream()
+                .collect(Collectors.groupingBy(OccupiedSlot::eventId));
 
         List<OptimizerOccupancy> occupancy = databaseOccupancy.stream().map(this::toOccupancy).toList();
-        return new Inputs(events, datesByEvent, rooms, occupancy, databaseOccupancy, priorRoomByEvent);
+        return new Inputs(events, datesByEvent, rooms, occupancy, databaseOccupancy, priorRoomByEvent,
+                priorSlotsByEvent);
     }
 
     OptimizationResult generate(Set<Long> eventIds, int timeLimitSeconds) {
