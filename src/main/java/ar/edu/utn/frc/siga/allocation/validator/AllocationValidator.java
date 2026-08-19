@@ -6,7 +6,9 @@ import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.exception.ReallocationConflictException;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
+import ar.edu.utn.frc.siga.common.exception.InvalidDateRangeException;
 import ar.edu.utn.frc.siga.common.util.Clashes;
+import ar.edu.utn.frc.siga.common.util.DateRanges;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import ar.edu.utn.frc.siga.common.util.RoomDate;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
@@ -80,6 +82,30 @@ public class AllocationValidator {
 
     private static List<RoomDate> candidateKey(AllocationCandidate candidate) {
         return List.of(new RoomDate(candidate.classroomId(), candidate.occurrence().date()));
+    }
+
+    /**
+     * Valida el rango de una reasignación temporal o permanente <b>antes</b> de expandirlo a
+     * ocurrencias: arrancar en el pasado es un pedido mal formado (400), no un conflicto con el
+     * estado del sistema (409).
+     *
+     * <p>Es la contracara de {@link #validateNotPast(OccurrenceSlotDto)}, que corre después sobre
+     * cada ocurrencia ya resuelta. Los dos hacen falta: un rango que arranca hoy pasa por acá sin
+     * problema y aun así puede incluir la clase de hoy que ya empezó, porque {@code from} es una
+     * fecha y "ya pasó" se decide con fecha <i>y</i> hora.
+     *
+     * @param from primera fecha del rango, inclusive; obligatoria
+     * @param to   última fecha del rango, inclusive; {@code null} significa "hasta que termine el dictado"
+     */
+    public void validateRange(LocalDate from, LocalDate to) {
+        if (from == null) {
+            throw new InvalidDateRangeException("La reasignación por rango necesita una fecha de inicio.");
+        }
+        if (from.isBefore(LocalDate.now())) {
+            throw new InvalidDateRangeException(
+                    "No se puede reasignar desde el " + from + ": esa fecha ya pasó.");
+        }
+        DateRanges.requireNotBefore(to, from);
     }
 
     public void validateNotPast(OccurrenceSlotDto occurrence) {
