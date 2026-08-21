@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.allocation.dto.request.AllocationBatchRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.DeallocationBatchRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationHistorySnapshotDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.AllocationImpactResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.UniqueEventAllocationResponseDto;
@@ -12,6 +13,7 @@ import ar.edu.utn.frc.siga.allocation.mapper.EventAllocationComposer;
 import ar.edu.utn.frc.siga.common.dto.response.RevisionDto;
 import ar.edu.utn.frc.siga.allocation.service.AllocationAuditHistoryService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationConflictService;
+import ar.edu.utn.frc.siga.allocation.service.AllocationImpactService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.model.ConflictType;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
@@ -52,6 +54,7 @@ public class AllocationController {
     private final AllocationService allocationService;
     private final AllocationAuditHistoryService allocationAuditHistoryService;
     private final AllocationConflictService allocationConflictService;
+    private final AllocationImpactService allocationImpactService;
     private final AllocationCommandMapper commandMapper;
     private final EventAllocationComposer eventAllocationComposer;
     private final AcademicEventService academicEventService;
@@ -144,6 +147,24 @@ public class AllocationController {
         List<AllocationResponseDto> response = allocationService.reallocate(commandMapper.toManualCommand(dto));
         log.info("Reasignación en lote completa: allocated={}", response.size());
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/impact")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Ver el impacto de un pedido sin aplicarlo",
+               description = "Recibe el mismo body que POST/PUT y responde qué pasaría si se aplicara, sin "
+                       + "escribir nada. Devuelve cuántas clases toca el pedido —dato que el 409 no puede dar, "
+                       + "porque el rango se expande en el servidor— y los choques como DATO y no como error, "
+                       + "cada uno con el evento que ocupa el aula y las aulas libres en esa fecha y franja para "
+                       + "poder destrabarlo. Siempre 200, incluso con conflictos. Sigue devolviendo 400 si el "
+                       + "pedido está mal formado y 409 si pide un aula inexistente o una ocurrencia ya pasada: "
+                       + "eso no es un resultado a mostrar, es un pedido que no se puede ni evaluar.")
+    public ResponseEntity<AllocationImpactResponseDto> impact(@Valid @RequestBody AllocationBatchRequestDto dto) {
+        log.debug("POST /v1/allocations/impact: items={}", dto.items().size());
+        AllocationImpactResponseDto impact = allocationImpactService.analyze(commandMapper.toManualCommand(dto));
+        log.info("Impacto analizado: total={}, movibles={}, bloqueadas={}",
+                impact.totalClasses(), impact.movableClasses(), impact.blockedClasses());
+        return ResponseEntity.ok(impact);
     }
 
     @DeleteMapping

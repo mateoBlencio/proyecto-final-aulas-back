@@ -35,8 +35,24 @@ public class AllocationValidator {
     private final OccurrenceService occurrenceService;
 
     public void validateNoOverlap(List<AllocationCandidate> candidates) {
+        throwIfAny(findConflicts(candidates));
+    }
+
+    public void validateNoOverlap(List<AllocationCandidate> candidates, List<OccupiedSlot> occupancy) {
+        throwIfAny(findConflicts(candidates, occupancy));
+    }
+
+    /**
+     * Los mismos conflictos que harían fallar la escritura, pero <b>devueltos</b> en vez de
+     * lanzados. Existe para que la vista previa de impacto pueda mostrarlos como dato sin
+     * reimplementar la validación: si esto y {@link #validateNoOverlap(List)} no compartieran
+     * el cálculo, tarde o temprano dirían cosas distintas.
+     *
+     * @return lista vacía si el pedido se puede aplicar tal cual
+     */
+    public List<OccurrenceConflictDto> findConflicts(List<AllocationCandidate> candidates) {
         List<AllocationCandidate> future = candidates.stream().filter(c -> !c.occurrence().isPast()).toList();
-        if (future.isEmpty()) return;
+        if (future.isEmpty()) return List.of();
 
         LocalDate min = future.stream().map(c -> c.occurrence().date()).min(Comparator.naturalOrder()).orElseThrow();
         LocalDate max = future.stream().map(c -> c.occurrence().date()).max(Comparator.naturalOrder()).orElseThrow();
@@ -52,14 +68,17 @@ public class AllocationValidator {
                 .map(a -> OccupiedSlot.from(a, slotByOccurrenceId.get(a.getOccurrenceId())))
                 .toList();
 
-        validateNoOverlap(future, occupancy);
+        return findConflicts(future, occupancy);
     }
 
-    public void validateNoOverlap(List<AllocationCandidate> candidates, List<OccupiedSlot> occupancy) {
+    public List<OccurrenceConflictDto> findConflicts(List<AllocationCandidate> candidates, List<OccupiedSlot> occupancy) {
         List<OccurrenceConflictDto> conflicts = new ArrayList<>();
         conflicts.addAll(databaseConflicts(candidates, occupancy));
         conflicts.addAll(internalConflicts(candidates));
+        return conflicts;
+    }
 
+    private static void throwIfAny(List<OccurrenceConflictDto> conflicts) {
         if (!conflicts.isEmpty()) {
             throw new ReallocationConflictException(conflicts);
         }
@@ -70,14 +89,16 @@ public class AllocationValidator {
                 occupancy, occupied -> List.of(new RoomDate(occupied.classroomId(), occupied.date())),
                 (c, o) -> true,
                 (c, o, key) -> new OccurrenceConflictDto(c.occurrence().occurrenceId(), key.date(),
-                        c.startTime(), c.endTime(), c.classroomId(), o.eventId(), o.allocationId()));
+                        c.startTime(), c.endTime(), c.classroomId(), o.eventId(), o.allocationId(),
+                        o.occurrenceId()));
     }
 
     List<OccurrenceConflictDto> internalConflicts(List<AllocationCandidate> candidates) {
         return Clashes.within(candidates, AllocationValidator::candidateKey,
                 (a, b) -> !a.occurrence().eventId().equals(b.occurrence().eventId()),
                 (a, b, key) -> new OccurrenceConflictDto(a.occurrence().occurrenceId(), key.date(),
-                        a.startTime(), a.endTime(), a.classroomId(), b.occurrence().eventId(), null));
+                        a.startTime(), a.endTime(), a.classroomId(), b.occurrence().eventId(), null,
+                        b.occurrence().occurrenceId()));
     }
 
     private static List<RoomDate> candidateKey(AllocationCandidate candidate) {
