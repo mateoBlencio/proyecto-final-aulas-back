@@ -42,14 +42,8 @@ public class AllocationValidator {
         throwIfAny(findConflicts(candidates, occupancy));
     }
 
-    /**
-     * Los mismos conflictos que harían fallar la escritura, pero <b>devueltos</b> en vez de
-     * lanzados. Existe para que la vista previa de impacto pueda mostrarlos como dato sin
-     * reimplementar la validación: si esto y {@link #validateNoOverlap(List)} no compartieran
-     * el cálculo, tarde o temprano dirían cosas distintas.
-     *
-     * @return lista vacía si el pedido se puede aplicar tal cual
-     */
+    // Los mismos conflictos que harían fallar la escritura, pero devueltos en vez de lanzados:
+    // así /impact los muestra como dato sin reimplementar la validación por su cuenta.
     public List<OccurrenceConflictDto> findConflicts(List<AllocationCandidate> candidates) {
         List<AllocationCandidate> future = candidates.stream().filter(c -> !c.occurrence().isPast()).toList();
         if (future.isEmpty()) return List.of();
@@ -105,19 +99,10 @@ public class AllocationValidator {
         return List.of(new RoomDate(candidate.classroomId(), candidate.occurrence().date()));
     }
 
-    /**
-     * Valida el rango de una reasignación temporal o permanente <b>antes</b> de expandirlo a
-     * ocurrencias: arrancar en el pasado es un pedido mal formado (400), no un conflicto con el
-     * estado del sistema (409).
-     *
-     * <p>Es la contracara de {@link #validateNotPast(OccurrenceSlotDto)}, que corre después sobre
-     * cada ocurrencia ya resuelta. Los dos hacen falta: un rango que arranca hoy pasa por acá sin
-     * problema y aun así puede incluir la clase de hoy que ya empezó, porque {@code from} es una
-     * fecha y "ya pasó" se decide con fecha <i>y</i> hora.
-     *
-     * @param from primera fecha del rango, inclusive; obligatoria
-     * @param to   última fecha del rango, inclusive; {@code null} significa "hasta que termine el dictado"
-     */
+    // Valida el rango ANTES de expandirlo a ocurrencias (400 si arranca en el pasado). Es la
+    // contracara de validateNotPast, que corre después sobre cada ocurrencia ya resuelta: un
+    // rango que arranca hoy pasa esta validación igual, y aun así puede incluir la clase de hoy
+    // que ya empezó, porque acá se compara solo fecha y ahí se compara fecha y hora.
     public void validateRange(LocalDate from, LocalDate to) {
         if (from == null) {
             throw new InvalidDateRangeException("La reasignación por rango necesita una fecha de inicio.");

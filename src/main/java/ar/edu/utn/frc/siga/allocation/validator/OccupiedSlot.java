@@ -13,11 +13,6 @@ import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 public record OccupiedSlot(Integer classroomId, LocalDate date, LocalTime startTime, LocalTime endTime,
                             Long eventId, Long allocationId, Long occurrenceId) implements TimeSpan {
 
-    /**
-     * Para callers que solo necesitan saber que el aula está ocupada y no de qué ocurrencia viene.
-     * La ocupación construida desde la base siempre usa {@link #from(Allocation, OccurrenceSlotDto)},
-     * que sí la completa.
-     */
     public OccupiedSlot(Integer classroomId, LocalDate date, LocalTime startTime, LocalTime endTime,
                         Long eventId, Long allocationId) {
         this(classroomId, date, startTime, endTime, eventId, allocationId, null);

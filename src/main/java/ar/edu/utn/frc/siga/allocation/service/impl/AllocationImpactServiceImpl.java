@@ -36,13 +36,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Corre el mismo camino que una escritura pero se detiene antes de escribir.
- *
- * <p>La resolución del pedido y el cálculo de conflictos se delegan en las mismas piezas que usa
- * {@link AllocationServiceImpl} ({@link AllocationTargetResolver} y {@link AllocationValidator}),
- * para que la vista previa no pueda decir algo distinto de lo que después hace el PUT.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -115,10 +108,7 @@ class AllocationImpactServiceImpl implements AllocationImpactService {
                 .toList();
     }
 
-    /**
-     * Enriquece cada conflicto con el tipo del evento que bloquea y con las aulas a las que se
-     * podría mover. Si no hay conflictos no se consulta nada: el camino feliz no paga el costo.
-     */
+    // Si no hay conflictos no se consulta nada: el camino feliz no paga el costo.
     private List<ImpactConflictDto> describeConflicts(List<OccurrenceConflictDto> conflicts,
                                                       List<AllocationCandidate> candidates) {
         if (conflicts.isEmpty()) {
@@ -163,11 +153,8 @@ class AllocationImpactServiceImpl implements AllocationImpactService {
                         (x, y) -> x));
     }
 
-    /**
-     * Aulas habilitadas que quedarían libres en esa fecha y franja <b>después</b> de aplicar el
-     * pedido: las ocurrencias que se están moviendo liberan su aula vieja, y las aulas que el
-     * propio pedido ocupa cuentan como tomadas.
-     */
+    // Libres DESPUÉS de aplicar el pedido: las ocurrencias que se mueven liberan su aula vieja,
+    // y las aulas que el propio pedido ocupa cuentan como tomadas.
     private List<ClassroomResponseDto> freeRoomsAt(OccurrenceConflictDto conflict,
                                                    List<OccupiedSlot> occupancy,
                                                    Set<Long> movingOccurrenceIds,

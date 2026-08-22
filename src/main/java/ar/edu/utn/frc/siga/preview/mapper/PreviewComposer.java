@@ -67,7 +67,6 @@ public class PreviewComposer {
                 .toList();
         Map<Long, AcademicEventResponseDto> eventDtoById = Maps.byId(referencedEvents, AcademicEventResponseDto::id);
 
-        // Las aulas de los tramos actuales entran en el mismo batch que las propuestas: una query.
         Set<Integer> classroomIds = new LinkedHashSet<>(effectiveRoomByEventId.values());
         priorSlotsByEvent.values().stream().flatMap(List::stream).map(OccupiedSlot::classroomId).forEach(classroomIds::add);
         Map<Integer, ClassroomResponseDto> classroomDtoById = Maps.byId(classroomService.findByIds(classroomIds), ClassroomResponseDto::id);
@@ -115,13 +114,9 @@ public class PreviewComposer {
                 unchanged, currentRoomStretches);
     }
 
-    /**
-     * Colapsa la ocupación actual de un evento en tramos continuos de misma aula, ordenados por
-     * fecha, y devuelve la lista <b>solo si hay más de un tramo</b>: con uno solo no hay nada que
-     * avisar, y devolverlo obligaría al front a comparar para saber si mostrar algo.
-     *
-     * <p>Fechas repetidas (dos ocurrencias el mismo día) cuentan como clases del mismo tramo.
-     */
+    // Colapsa la ocupación de un evento en tramos continuos de misma aula, y devuelve la lista
+    // solo si hay más de uno: con un solo tramo no hay nada que avisar, y devolverlo obligaría
+    // al front a comparar para saber si mostrar algo.
     private static List<RoomStretchDto> roomStretches(
             List<OccupiedSlot> slots, Map<Integer, ClassroomResponseDto> classroomDtoById) {
         if (slots == null || slots.isEmpty()) {

@@ -59,10 +59,8 @@ class AllocationTargetResolver {
                     .toList();
             case AllocationTarget.EventRange(Long eventId, LocalDate from, LocalDate to) -> {
                 validator.validateRange(from, to);
-                // El clamp del comando se ignora a propósito: el rango trae su propio 'desde', ya
-                // validado contra el pasado. El 'hasta' se filtra acá y no en la base para no
-                // ampliar la fachada de events por un único consumidor; son las ocurrencias de un
-                // solo evento a partir de 'from', un volumen acotado.
+                // Se ignora el clamp del comando: el rango trae su propio 'desde', ya validado.
+                // El 'hasta' se filtra acá (no en la base) porque es un solo evento acotado.
                 List<OccurrenceSlotDto> occurrences = occurrenceService.findSlotsByEvent(eventId, from).stream()
                         .filter(o -> to == null || !o.date().isAfter(to))
                         .toList();

@@ -36,14 +36,8 @@ public class AllocationCommandMapper {
         return toTarget(dto.occurrenceIds(), dto.eventId(), null, null);
     }
 
-    /**
-     * Elige la forma de target. Que {@code from} sea nulo es lo que separa "todas las ocurrencias
-     * futuras del evento" de un movimiento acotado; que {@code to} sea nulo separa el temporal del
-     * permanente, y eso ya lo interpreta {@link AllocationTarget.EventRange}.
-     *
-     * <p>La combinación inválida (rango sin evento, {@code to} sin {@code from}) no llega hasta acá:
-     * la corta Bean Validation en {@code AllocationItemRequestDto} con un 400.
-     */
+    // Las combinaciones inválidas (rango sin evento, `to` sin `from`) no llegan hasta acá: las
+    // corta Bean Validation en AllocationItemRequestDto con un 400.
     private AllocationTarget toTarget(List<Long> occurrenceIds, Long eventId, LocalDate from, LocalDate to) {
         if (eventId == null) {
             return new AllocationTarget.Occurrences(occurrenceIds);
