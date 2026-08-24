@@ -153,8 +153,7 @@ public class AllocationController {
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Ver el impacto de un pedido sin aplicarlo",
                description = "Recibe el mismo body que POST/PUT y responde qué pasaría si se aplicara, sin "
-                       + "escribir nada. Devuelve cuántas clases toca el pedido —dato que el 409 no puede dar, "
-                       + "porque el rango se expande en el servidor— y los choques como DATO y no como error, "
+                       + "escribir nada. Devuelve cuántas clases toca el pedido y los choques como DATO y no como error, "
                        + "cada uno con el evento que ocupa el aula y las aulas libres en esa fecha y franja para "
                        + "poder destrabarlo. Siempre 200, incluso con conflictos. Sigue devolviendo 400 si el "
                        + "pedido está mal formado y 409 si pide un aula inexistente o una ocurrencia ya pasada: "
