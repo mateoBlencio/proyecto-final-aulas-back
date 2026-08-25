@@ -50,6 +50,7 @@ class AllocationTargetResolver {
         return switch (target) {
             case AllocationTarget.Occurrences(List<Long> occurrenceIds) -> {
                 List<OccurrenceSlotDto> occurrences = occurrenceService.findSlots(occurrenceIds);
+                validator.validateOccurrencesExist(occurrenceIds, occurrences);
                 occurrences.forEach(validator::validateNotPast);
                 yield occurrences;
             }

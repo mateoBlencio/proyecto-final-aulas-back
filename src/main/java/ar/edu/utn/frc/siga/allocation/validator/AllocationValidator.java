@@ -114,6 +114,14 @@ public class AllocationValidator {
         DateRanges.requireNotBefore(to, from);
     }
 
+    public void validateOccurrencesExist(List<Long> requestedIds, List<OccurrenceSlotDto> resolved) {
+        if (requestedIds.size() == resolved.size()) return;
+
+        Set<Long> resolvedIds = resolved.stream().map(OccurrenceSlotDto::occurrenceId).collect(Collectors.toSet());
+        List<Long> missing = requestedIds.stream().filter(id -> !resolvedIds.contains(id)).toList();
+        throw new AllocationConflictException("La(s) ocurrencia(s) " + missing + " no existe(n).");
+    }
+
     public void validateNotPast(OccurrenceSlotDto occurrence) {
         if (occurrence.isPast()) {
             throw new AllocationConflictException(
