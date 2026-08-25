@@ -37,15 +37,15 @@ public class PreviewComposer {
 
     public PreviewResponseDto compose(OptimizationResult preview, List<RecurringEventResponseDto> events,
                                             Map<Long, List<LocalDate>> datesByEvent,
-                                            Map<Long, Integer> priorRoomByEvent,
+                                            Map<Long, Long> priorRoomByEvent,
                                             List<OptimizerRoom> rooms, List<OccupiedSlot> databaseOccupancy) {
         Map<Long, RecurringEventResponseDto> eventsById = Maps.byId(events, RecurringEventResponseDto::id);
 
         List<OptimizerAllocation> resolved = new ArrayList<>();
         List<OptimizerAllocation> unresolved = new ArrayList<>();
-        Map<String, Integer> effectiveRoomByEventId = new LinkedHashMap<>();
+        Map<String, Long> effectiveRoomByEventId = new LinkedHashMap<>();
         for (OptimizerAllocation allocation : preview.allocations()) {
-            Integer classroomId = allocation.classroomId();
+            Long classroomId = allocation.classroomId();
             if (classroomId == null) {
                 classroomId = priorRoomByEvent.get(eventIdOf(allocation));
             }
@@ -63,15 +63,15 @@ public class PreviewComposer {
                 .toList();
         Map<Long, AcademicEventResponseDto> eventDtoById = Maps.byId(referencedEvents, AcademicEventResponseDto::id);
 
-        Set<Integer> classroomIds = Set.copyOf(effectiveRoomByEventId.values());
-        Map<Integer, ClassroomResponseDto> classroomDtoById = Maps.byId(classroomService.findByIds(classroomIds), ClassroomResponseDto::id);
+        Set<Long> classroomIds = Set.copyOf(effectiveRoomByEventId.values());
+        Map<Long, ClassroomResponseDto> classroomDtoById = Maps.byId(classroomService.findByIds(classroomIds), ClassroomResponseDto::id);
 
         List<PreviewItemDto> allocations = resolved.stream()
                 .map(a -> toPreviewItemDto(a, eventDtoById, datesByEvent,
                         classroomDtoById.get(effectiveRoomByEventId.get(a.eventId())), priorRoomByEvent))
                 .toList();
 
-        Set<Integer> candidateRoomIds = rooms.stream().map(OptimizerRoom::id).collect(Collectors.toSet());
+        Set<Long> candidateRoomIds = rooms.stream().map(OptimizerRoom::id).collect(Collectors.toSet());
         List<ResolvedProposal> resolvedProposals = buildResolvedProposals(effectiveRoomByEventId, eventsById, datesByEvent);
         List<UnresolvedAllocationDto> unresolvedDtos = unresolved.stream()
                 .map(a -> toUnresolvedAllocationDto(a, eventDtoById, datesByEvent, eventsById,
@@ -81,10 +81,10 @@ public class PreviewComposer {
         return new PreviewResponseDto(preview.previewId(), allocations, unresolvedDtos);
     }
 
-    private List<ResolvedProposal> buildResolvedProposals(Map<String, Integer> effectiveRoomByEventId,
+    private List<ResolvedProposal> buildResolvedProposals(Map<String, Long> effectiveRoomByEventId,
             Map<Long, RecurringEventResponseDto> eventsById, Map<Long, List<LocalDate>> datesByEvent) {
         List<ResolvedProposal> proposals = new ArrayList<>();
-        for (Map.Entry<String, Integer> entry : effectiveRoomByEventId.entrySet()) {
+        for (Map.Entry<String, Long> entry : effectiveRoomByEventId.entrySet()) {
             Long eventId = Long.valueOf(entry.getKey());
             RecurringEventResponseDto event = eventsById.get(eventId);
             if (event == null) continue;
@@ -96,7 +96,7 @@ public class PreviewComposer {
 
     private PreviewItemDto toPreviewItemDto(OptimizerAllocation allocation,
             Map<Long, AcademicEventResponseDto> eventDtoById, Map<Long, List<LocalDate>> datesByEvent,
-            ClassroomResponseDto classroom, Map<Long, Integer> priorRoomByEvent) {
+            ClassroomResponseDto classroom, Map<Long, Long> priorRoomByEvent) {
         Long eventId = eventIdOf(allocation);
         AcademicEventResponseDto event = eventDtoById.get(eventId);
         boolean unchanged = classroom != null && Objects.equals(classroom.id(), priorRoomByEvent.get(eventId));
@@ -109,7 +109,7 @@ public class PreviewComposer {
 
     private UnresolvedAllocationDto toUnresolvedAllocationDto(OptimizerAllocation allocation,
             Map<Long, AcademicEventResponseDto> eventDtoById, Map<Long, List<LocalDate>> datesByEvent,
-            Map<Long, RecurringEventResponseDto> eventsById, Set<Integer> candidateRoomIds,
+            Map<Long, RecurringEventResponseDto> eventsById, Set<Long> candidateRoomIds,
             List<OccupiedSlot> databaseOccupancy, List<ResolvedProposal> resolvedProposals) {
         Long eventId = eventIdOf(allocation);
         AcademicEventResponseDto event = eventDtoById.get(eventId);

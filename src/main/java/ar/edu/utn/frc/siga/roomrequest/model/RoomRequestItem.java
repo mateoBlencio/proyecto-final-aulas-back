@@ -25,6 +25,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.BatchSize;
+import org.hibernate.envers.Audited;
 
 import java.time.Duration;
 import java.time.LocalDate;
@@ -34,6 +35,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
+@Audited
 @Table(name = "solicitud_aula_item",
        uniqueConstraints = @UniqueConstraint(name = "uq_solicitud_item_orden",
                                              columnNames = {"id_solicitud", "orden"}))
@@ -95,7 +97,7 @@ public class RoomRequestItem extends TimestampedEntity {
     private Integer classroomCount = 1;
 
     @Column(name = "id_aula_actual")
-    private Integer currentClassroomId;
+    private Long currentClassroomId;
 
     @Column(name = "requiere_proyector", nullable = false)
     @Builder.Default
@@ -139,11 +141,11 @@ public class RoomRequestItem extends TimestampedEntity {
         this.decidedAt = decidedAt;
     }
 
-    public void addPreferences(List<Integer> classroomIds) {
+    public void addPreferences(List<Long> classroomIds) {
         classroomIds.forEach(this::addPreference);
     }
 
-    public void addPreference(Integer classroomId) {
+    public void addPreference(Long classroomId) {
         preferences.add(RoomPreference.builder()
                 .item(this)
                 .classroomId(classroomId)

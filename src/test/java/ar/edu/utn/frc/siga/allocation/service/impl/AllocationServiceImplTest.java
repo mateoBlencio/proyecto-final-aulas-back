@@ -83,10 +83,10 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("allocate: target Occurrences, batch de 1, aula libre → crea y valida solapamiento (MANUAL)")
     void allocateOccurrencesTargetBatchDeUnoCrea() {
-        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5);
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
         AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
-        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ, 5);
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
         when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
         Allocation saved = allocation(100L, 10L, 5, AllocationSource.MANUAL);
         when(writer.create(resolved, "obs", AllocationSource.MANUAL)).thenReturn(List.of(saved));
@@ -95,22 +95,22 @@ class AllocationServiceImplTest {
         List<AllocationResponseDto> result = service.allocate(command);
 
         assertThat(result).hasSize(1);
-        verify(validator).validateClassroomsAvailable(Set.of(5));
+        verify(validator).validateClassroomsAvailable(Set.of(5L));
         ArgumentCaptor<List<AllocationCandidate>> captor = ArgumentCaptor.forClass(List.class);
         verify(validator).validateNoOverlap(captor.capture());
-        assertThat(captor.getValue()).containsExactly(new AllocationCandidate(occ, 5));
+        assertThat(captor.getValue()).containsExactly(new AllocationCandidate(occ, 5L));
         verify(writer).create(resolved, "obs", AllocationSource.MANUAL);
     }
 
     @Test
     @DisplayName("allocate: target Event, batch de N (una sola occurrence del evento se resuelve en varias) → crea todas")
     void allocateEventTargetBatchDeNCrea() {
-        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5);
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5L);
         AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
         OccurrenceSlotDto occ1 = occurrenceSlot(10L, 1L, futureDate(1));
         OccurrenceSlotDto occ2 = occurrenceSlot(11L, 1L, futureDate(8));
         OccurrenceSlotDto occ3 = occurrenceSlot(12L, 1L, futureDate(15));
-        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ1, 5, occ2, 5, occ3, 5);
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ1, 5, occ2, 5, occ3, 5);
         when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
         List<Allocation> saved = List.of(
                 allocation(100L, 10L, 5, AllocationSource.MANUAL),
@@ -128,12 +128,12 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("allocate: múltiples items en el lote (batch de N a nivel comando) → resuelve juntos y crea juntos")
     void allocateMultiplesItemsBatchDeN() {
-        AllocationItem item1 = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5);
-        AllocationItem item2 = new AllocationItem(new AllocationTarget.Occurrences(List.of(11L)), 6);
+        AllocationItem item1 = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
+        AllocationItem item2 = new AllocationItem(new AllocationTarget.Occurrences(List.of(11L)), 6L);
         AllocationCommand command = AllocationCommand.manual(List.of(item1, item2), "obs");
         OccurrenceSlotDto occ1 = occurrenceSlot(10L, 1L, futureDate(1));
         OccurrenceSlotDto occ2 = occurrenceSlot(11L, 2L, futureDate(2));
-        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ1, 5, occ2, 6);
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ1, 5, occ2, 6);
         when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
         List<Allocation> saved = List.of(allocation(100L, 10L, 5, AllocationSource.MANUAL), allocation(101L, 11L, 6, AllocationSource.MANUAL));
         when(writer.create(resolved, "obs", AllocationSource.MANUAL)).thenReturn(saved);
@@ -142,13 +142,13 @@ class AllocationServiceImplTest {
         List<AllocationResponseDto> result = service.allocate(command);
 
         assertThat(result).hasSize(2);
-        verify(validator).validateClassroomsAvailable(Set.of(5, 6));
+        verify(validator).validateClassroomsAvailable(Set.of(5L, 6L));
     }
 
     @Test
     @DisplayName("allocate: lote que no resuelve a ninguna occurrence es un no-op (sin validar aulas ni solapamiento)")
     void allocateTargetVacioEsNoOp() {
-        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5);
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5L);
         AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
         when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(Map.of());
         when(writer.create(Map.of(), "obs", AllocationSource.MANUAL)).thenReturn(List.of());
@@ -164,12 +164,12 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("allocate: aula no disponible → el validator corta antes de escribir")
     void allocateAulaNoDisponibleNoEscribe() {
-        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 999);
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 999L);
         AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
-        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ, 999);
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 999);
         when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
-        doThrow(new AllocationConflictException("aula 999 no existe")).when(validator).validateClassroomsAvailable(Set.of(999));
+        doThrow(new AllocationConflictException("aula 999 no existe")).when(validator).validateClassroomsAvailable(Set.of(999L));
 
         assertThatThrownBy(() -> service.allocate(command)).isInstanceOf(AllocationConflictException.class);
 
@@ -180,10 +180,10 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("allocate: source MANUAL con solapamiento → el validator corta, writer.create nunca se llama (409, nada se escribe)")
     void allocateManualConSolapeNoEscribe() {
-        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5);
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
         AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
-        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ, 5);
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
         when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
         doThrow(new ReallocationConflictException(List.of())).when(validator).validateNoOverlap(anyList());
 
@@ -195,26 +195,26 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("allocate: source AUTOMATIC no valida solapamiento (ya lo validó el preview contra su propio snapshot)")
     void allocateAutomaticNoValidaSolapamiento() {
-        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5);
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
         AllocationCommand command = AllocationCommand.automatic(List.of(item));
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
-        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ, 5);
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
         when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
         when(writer.create(resolved, null, AllocationSource.AUTOMATIC)).thenReturn(List.of(allocation(100L, 10L, 5, AllocationSource.AUTOMATIC)));
 
         service.allocate(command);
 
-        verify(validator).validateClassroomsAvailable(Set.of(5));
+        verify(validator).validateClassroomsAvailable(Set.of(5L));
         verify(validator, never()).validateNoOverlap(anyList());
     }
 
     @Test
     @DisplayName("allocate: source IMPORTED clampea a null (incluye pasadas) y no valida solapamiento")
     void allocateImportedClampeaNullYNoValidaSolapamiento() {
-        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5);
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5L);
         AllocationCommand command = AllocationCommand.imported(List.of(item), "Importado de Excel");
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, LocalDate.now().minusDays(3));
-        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ, 5);
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
         when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), isNull())).thenReturn(resolved);
         when(writer.create(resolved, "Importado de Excel", AllocationSource.IMPORTED))
                 .thenReturn(List.of(allocation(100L, 10L, 5, AllocationSource.IMPORTED)));
@@ -228,7 +228,7 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("allocate: source MANUAL clampea a hoy (no toca el pasado)")
     void allocateManualClampeaHoy() {
-        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5);
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5L);
         AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
         when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(Map.of());
 
@@ -242,10 +242,10 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("reallocate: target Occurrences, batch de 1 → upsert (no create)")
     void reallocateOccurrencesTargetBatchDeUnoHaceUpsert() {
-        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5);
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
         AllocationCommand command = AllocationCommand.manual(List.of(item), "cambio de aula");
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
-        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ, 5);
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
         when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
         Allocation saved = allocation(900L, 10L, 5, AllocationSource.MANUAL);
         when(writer.upsert(resolved, "cambio de aula", AllocationSource.MANUAL)).thenReturn(List.of(saved));
@@ -261,11 +261,11 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("reallocate: target Event, batch de N → upsert de todas las occurrences resueltas")
     void reallocateEventTargetBatchDeN() {
-        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 7);
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 7L);
         AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
         OccurrenceSlotDto occ1 = occurrenceSlot(10L, 1L, futureDate(1));
         OccurrenceSlotDto occ2 = occurrenceSlot(11L, 1L, futureDate(8));
-        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ1, 7, occ2, 7);
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ1, 7, occ2, 7);
         when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
         List<Allocation> saved = List.of(allocation(900L, 10L, 7, AllocationSource.MANUAL), allocation(901L, 11L, 7, AllocationSource.MANUAL));
         when(writer.upsert(resolved, "obs", AllocationSource.MANUAL)).thenReturn(saved);
@@ -280,7 +280,7 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("reallocate: lote vacío es un no-op")
     void reallocateTargetVacioEsNoOp() {
-        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5);
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
         AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
         when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(Map.of());
         when(writer.upsert(Map.of(), "obs", AllocationSource.MANUAL)).thenReturn(List.of());
@@ -295,10 +295,10 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("reallocate: source MANUAL con solapamiento → 409, writer.upsert nunca se llama")
     void reallocateManualConSolapeNoEscribe() {
-        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5);
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
         AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
-        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ, 5);
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
         when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
         doThrow(new ReallocationConflictException(List.of())).when(validator).validateNoOverlap(anyList());
 
@@ -310,10 +310,10 @@ class AllocationServiceImplTest {
     @Test
     @DisplayName("reallocate: source AUTOMATIC no valida solapamiento")
     void reallocateAutomaticNoValidaSolapamiento() {
-        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5);
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
         AllocationCommand command = AllocationCommand.automatic(List.of(item));
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
-        Map<OccurrenceSlotDto, Integer> resolved = mapOf(occ, 5);
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
         when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
         when(writer.upsert(resolved, null, AllocationSource.AUTOMATIC)).thenReturn(List.of(allocation(900L, 10L, 5, AllocationSource.AUTOMATIC)));
 
@@ -330,11 +330,11 @@ class AllocationServiceImplTest {
         DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(10L))), "obs");
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
         when(targetResolver.resolveAll(command.targets(), null)).thenReturn(List.of(occ));
-        when(writer.delete(List.of(occ))).thenReturn(List.of(new AllocationWriter.DeallocatedOccurrence(10L, 5)));
+        when(writer.delete(List.of(occ))).thenReturn(List.of(new AllocationWriter.DeallocatedOccurrence(10L, 5L)));
 
         List<DeallocatedOccurrenceDto> result = service.deallocate(command);
 
-        assertThat(result).containsExactly(new DeallocatedOccurrenceDto(10L, 5));
+        assertThat(result).containsExactly(new DeallocatedOccurrenceDto(10L, 5L));
         verify(validator).validateNotPast(occ);
         verify(writer).delete(List.of(occ));
     }
@@ -347,12 +347,12 @@ class AllocationServiceImplTest {
         OccurrenceSlotDto occ2 = occurrenceSlot(11L, 1L, futureDate(8));
         when(targetResolver.resolveAll(command.targets(), null)).thenReturn(List.of(occ1, occ2));
         when(writer.delete(List.of(occ1, occ2))).thenReturn(List.of(
-                new AllocationWriter.DeallocatedOccurrence(10L, 5),
-                new AllocationWriter.DeallocatedOccurrence(11L, 6)));
+                new AllocationWriter.DeallocatedOccurrence(10L, 5L),
+                new AllocationWriter.DeallocatedOccurrence(11L, 6L)));
 
         List<DeallocatedOccurrenceDto> result = service.deallocate(command);
 
-        assertThat(result).containsExactly(new DeallocatedOccurrenceDto(10L, 5), new DeallocatedOccurrenceDto(11L, 6));
+        assertThat(result).containsExactly(new DeallocatedOccurrenceDto(10L, 5L), new DeallocatedOccurrenceDto(11L, 6L));
         verify(validator).validateNotPast(occ1);
         verify(validator).validateNotPast(occ2);
     }
@@ -426,7 +426,7 @@ class AllocationServiceImplTest {
         return new OccurrenceSlotDto(id, eventId, date, LocalTime.of(8, 0), LocalTime.of(9, 30), OccurrenceStatus.NEEDS_ROOM, 30);
     }
 
-    private Allocation allocation(long id, Long occurrenceId, Integer classroomId, AllocationSource source) {
+    private Allocation allocation(long id, Long occurrenceId, long classroomId, AllocationSource source) {
         return Allocation.builder()
                 .id(id)
                 .occurrenceId(occurrenceId)
@@ -439,22 +439,22 @@ class AllocationServiceImplTest {
         return new AllocationResponseDto(1L, AllocationSource.MANUAL, Instant.now(), null, null, null, null);
     }
 
-    private Map<OccurrenceSlotDto, Integer> mapOf(OccurrenceSlotDto occ, Integer classroomId) {
-        Map<OccurrenceSlotDto, Integer> map = new LinkedHashMap<>();
+    private Map<OccurrenceSlotDto, Long> mapOf(OccurrenceSlotDto occ, long classroomId) {
+        Map<OccurrenceSlotDto, Long> map = new LinkedHashMap<>();
         map.put(occ, classroomId);
         return map;
     }
 
-    private Map<OccurrenceSlotDto, Integer> mapOf(OccurrenceSlotDto occ1, Integer classroomId1, OccurrenceSlotDto occ2, Integer classroomId2) {
-        Map<OccurrenceSlotDto, Integer> map = new LinkedHashMap<>();
+    private Map<OccurrenceSlotDto, Long> mapOf(OccurrenceSlotDto occ1, long classroomId1, OccurrenceSlotDto occ2, long classroomId2) {
+        Map<OccurrenceSlotDto, Long> map = new LinkedHashMap<>();
         map.put(occ1, classroomId1);
         map.put(occ2, classroomId2);
         return map;
     }
 
-    private Map<OccurrenceSlotDto, Integer> mapOf(OccurrenceSlotDto occ1, Integer classroomId1, OccurrenceSlotDto occ2, Integer classroomId2,
-            OccurrenceSlotDto occ3, Integer classroomId3) {
-        Map<OccurrenceSlotDto, Integer> map = new LinkedHashMap<>();
+    private Map<OccurrenceSlotDto, Long> mapOf(OccurrenceSlotDto occ1, long classroomId1, OccurrenceSlotDto occ2, long classroomId2,
+            OccurrenceSlotDto occ3, long classroomId3) {
+        Map<OccurrenceSlotDto, Long> map = new LinkedHashMap<>();
         map.put(occ1, classroomId1);
         map.put(occ2, classroomId2);
         map.put(occ3, classroomId3);

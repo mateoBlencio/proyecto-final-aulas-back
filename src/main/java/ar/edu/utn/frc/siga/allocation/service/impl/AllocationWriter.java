@@ -20,7 +20,7 @@ class AllocationWriter {
 
     private final AllocationRepository allocationRepository;
 
-    List<Allocation> create(Map<OccurrenceSlotDto, Integer> classroomByOccurrence, String observation, AllocationSource source) {
+    List<Allocation> create(Map<OccurrenceSlotDto, Long> classroomByOccurrence, String observation, AllocationSource source) {
         List<Long> occurrenceIds = classroomByOccurrence.keySet().stream().map(OccurrenceSlotDto::occurrenceId).toList();
         List<Allocation> existing = allocationRepository.findByOccurrenceIdIn(occurrenceIds);
         if (!existing.isEmpty()) {
@@ -30,11 +30,11 @@ class AllocationWriter {
         return write(classroomByOccurrence, observation, source);
     }
 
-    List<Allocation> upsert(Map<OccurrenceSlotDto, Integer> classroomByOccurrence, String observation, AllocationSource source) {
+    List<Allocation> upsert(Map<OccurrenceSlotDto, Long> classroomByOccurrence, String observation, AllocationSource source) {
         return write(classroomByOccurrence, observation, source);
     }
 
-    private List<Allocation> write(Map<OccurrenceSlotDto, Integer> classroomByOccurrence, String observation, AllocationSource source) {
+    private List<Allocation> write(Map<OccurrenceSlotDto, Long> classroomByOccurrence, String observation, AllocationSource source) {
         if (classroomByOccurrence.isEmpty()) return List.of();
 
         List<Long> occurrenceIds = classroomByOccurrence.keySet().stream().map(OccurrenceSlotDto::occurrenceId).toList();
@@ -42,9 +42,9 @@ class AllocationWriter {
                 allocationRepository.findByOccurrenceIdIn(occurrenceIds), Allocation::getOccurrenceId);
 
         List<Allocation> saved = new ArrayList<>();
-        for (Entry<OccurrenceSlotDto, Integer> entry : classroomByOccurrence.entrySet()) {
+        for (Entry<OccurrenceSlotDto, Long> entry : classroomByOccurrence.entrySet()) {
             OccurrenceSlotDto occurrence = entry.getKey();
-            Integer classroomId = entry.getValue();
+            Long classroomId = entry.getValue();
             Allocation existing = existingByOccurrence.get(occurrence.occurrenceId());
             Allocation allocation;
             if (existing != null) {
@@ -74,5 +74,5 @@ class AllocationWriter {
         return existing.stream().map(a -> new DeallocatedOccurrence(a.getOccurrenceId(), a.getClassroomId())).toList();
     }
 
-    record DeallocatedOccurrence(Long occurrenceId, Integer classroomId) {}
+    record DeallocatedOccurrence(Long occurrenceId, Long classroomId) {}
 }

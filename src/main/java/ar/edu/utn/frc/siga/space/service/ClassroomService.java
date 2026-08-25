@@ -15,17 +15,17 @@ public interface ClassroomService {
 
     ClassroomResponseDto create(ClassroomRequestDto dto);
 
-    ClassroomResponseDto findById(Integer id);
+    ClassroomResponseDto findById(Long id);
 
     List<ClassroomResponseDto> findAllAvailable();
 
-    List<ClassroomResponseDto> findByIds(Collection<Integer> ids);
+    List<ClassroomResponseDto> findByIds(Collection<Long> ids);
 
     Page<ClassroomResponseDto> findAll(ClassroomFilter filter, Pageable pageable);
 
-    ClassroomResponseDto update(Integer id, ClassroomRequestDto dto);
+    ClassroomResponseDto update(Long id, ClassroomRequestDto dto);
 
-    void delete(Integer id);
+    void delete(Long id);
 
-    ClassroomResponseDto findByRoomNumberAndBuilding(String roomNumber, Integer buildingId);
+    ClassroomResponseDto findByRoomNumberAndBuilding(Integer roomNumber, Long buildingId);
 }

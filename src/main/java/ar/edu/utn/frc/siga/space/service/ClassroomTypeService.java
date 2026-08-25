@@ -4,6 +4,6 @@ import ar.edu.utn.frc.siga.space.model.ClassroomType;
 
 public interface ClassroomTypeService {
 
-    ClassroomType findById(Integer id);
+    ClassroomType findById(Long id);
 
 }

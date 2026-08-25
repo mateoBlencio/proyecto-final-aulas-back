@@ -17,14 +17,10 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.envers.Audited;
 
-/**
- * Un aula que el docente preferiría, con su orden de prioridad dentro del ítem.
- *
- * <p>Es una preferencia declarada: nadie la valida contra disponibilidad ni
- * capacidad. Subsecretaría la ve al procesar la solicitud y decide.
- */
 @Entity
+@Audited
 @Table(name = "solicitud_aula_preferencia",
        uniqueConstraints = {
            @UniqueConstraint(name = "uq_solicitud_preferencia_item_aula",
@@ -49,11 +45,9 @@ public class RoomPreference extends TimestampedEntity {
     @JoinColumn(name = "id_item", nullable = false)
     private RoomRequestItem item;
 
-    /** ID plano: el aula vive en {@code space}. */
     @Column(name = "id_aula", nullable = false)
-    private Integer classroomId;
+    private Long classroomId;
 
-    /** Prioridad: 1 es la primera opción. */
     @Column(name = "orden", nullable = false)
     private Integer position;
 }

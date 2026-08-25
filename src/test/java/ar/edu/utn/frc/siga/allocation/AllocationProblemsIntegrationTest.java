@@ -71,7 +71,7 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
         return occurrenceRepository.findByEvent_Id(eventId).getFirst();
     }
 
-    private void allocateOk(Long occurrenceId, Integer classroomId) throws Exception {
+    private void allocateOk(Long occurrenceId, Long classroomId) throws Exception {
         var dto = new AllocationBatchRequestDto(
                 List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, classroomId)), null);
         mockMvc.perform(post("/v1/allocations")
@@ -81,7 +81,7 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
     }
 
     /** Segunda allocation en la misma franja/aula por repositorio directo: la API bloquea el solape (validateNoOverlap). */
-    private void allocateDirect(Occurrence occurrence, Integer classroomId) {
+    private void allocateDirect(Occurrence occurrence, Long classroomId) {
         allocationRepository.save(Allocation.builder()
                 .occurrenceId(occurrence.getId()).classroomId(classroomId).source(AllocationSource.MANUAL).build());
     }
@@ -132,7 +132,7 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
         LocalDate from = LocalDate.now().plusDays(60);
         LocalDate to = LocalDate.now().plusDays(70);
         var sc = testData.materiaYComision();
-        Classroom aulaChica = testData.aula(testData.edificio(), testData.tipoAulaNormal(), 1, 10, true);
+        Classroom aulaChica = testData.aula(testData.edificio(), testData.tipoAulaNormal(), 10);
         Occurrence overcrowdOcc = seedOccurrence(sc, from.plusDays(2), 50);
         Long overcrowdEventId = overcrowdOcc.getEvent().getId();
         allocateOk(overcrowdOcc.getId(), aulaChica.getId());
@@ -141,7 +141,7 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(content).anySatisfy(node -> {
             assertThat(node.get("event").get("id").asLong()).isEqualTo(overcrowdEventId);
-            assertThat(node.get("classroom").get("id").asInt()).isEqualTo(aulaChica.getId());
+            assertThat(node.get("classroom").get("id").asLong()).isEqualTo(aulaChica.getId());
             assertThat(node.get("enrolled").asInt()).isEqualTo(50);
             assertThat(node.get("capacity").asInt()).isEqualTo(10);
             assertThat(node.get("overcrowdedBy").asInt()).isEqualTo(40);
@@ -155,7 +155,7 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
         LocalDate to = LocalDate.now().plusDays(70);
         var scOverlapA = testData.materiaYComision();
         var scOverlapB = testData.materiaYComision();
-        Classroom aulaOverlap = testData.aula(testData.edificio(), testData.tipoAulaNormal(), 1, 100, true);
+        Classroom aulaOverlap = testData.aula(testData.edificio(), testData.tipoAulaNormal(), 100);
         LocalDate overlapDate = from.plusDays(3);
         Occurrence overlapOccA = seedOccurrence(scOverlapA, overlapDate, 20);
         Occurrence overlapOccB = seedOccurrence(scOverlapB, overlapDate, 20);
@@ -167,7 +167,7 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
         JsonNode content = conflictsContent("OVERLAP", from, to);
 
         assertThat(content).anySatisfy(node -> {
-            assertThat(node.get("classroom").get("id").asInt()).isEqualTo(aulaOverlap.getId());
+            assertThat(node.get("classroom").get("id").asLong()).isEqualTo(aulaOverlap.getId());
             assertThat(List.of(node.get("eventA").get("id").asLong(), node.get("eventB").get("id").asLong()))
                     .containsExactlyInAnyOrder(overlapEventAId, overlapEventBId);
         });

@@ -131,7 +131,7 @@ public class RoomRequestValidator {
      * son preferencias declaradas por el docente, no una asignación.
      */
     private void validateClassroomsExist(CreateRoomRequestDto dto) {
-        Set<Integer> classroomIds = new LinkedHashSet<>();
+        Set<Long> classroomIds = new LinkedHashSet<>();
         for (CreateRoomRequestItemDto item : dto.items()) {
             if (item.currentClassroomId() != null) {
                 classroomIds.add(item.currentClassroomId());
@@ -142,9 +142,9 @@ public class RoomRequestValidator {
             return;
         }
 
-        Map<Integer, ClassroomResponseDto> classroomsById =
+        Map<Long, ClassroomResponseDto> classroomsById =
                 Maps.byId(classroomService.findByIds(classroomIds), ClassroomResponseDto::id);
-        for (Integer classroomId : classroomIds) {
+        for (Long classroomId : classroomIds) {
             if (!classroomsById.containsKey(classroomId)) {
                 throw ResourceNotFoundException.of("Classroom", classroomId);
             }

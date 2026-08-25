@@ -9,15 +9,13 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface ClassroomRepository extends JpaRepository<Classroom, Integer>, JpaSpecificationExecutor<Classroom> {
+public interface ClassroomRepository extends JpaRepository<Classroom, Long>, JpaSpecificationExecutor<Classroom> {
 
-    Optional<Classroom> findByRoomNumber(String roomNumber);
+    Optional<Classroom> findByRoomNumber(Integer roomNumber);
 
-    List<Classroom> findAllByRoomNumber(String roomNumber);
+    List<Classroom> findAllByRoomNumber(Integer roomNumber);
 
-    Optional<Classroom> findByRoomNumberAndBuilding(String roomNumber, Building building);
-
-    List<Classroom> findByAvailableTrue();
+    Optional<Classroom> findByRoomNumberAndBuilding(Integer roomNumber, Building building);
 
     List<Classroom> findByBuilding(Building building);
 }

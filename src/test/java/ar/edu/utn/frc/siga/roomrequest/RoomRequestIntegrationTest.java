@@ -84,7 +84,7 @@ class RoomRequestIntegrationTest extends AbstractIntegrationTest {
         Classroom first = testData.aula(building);
         Classroom second = testData.aula(building);
         Classroom third = testData.aula(building);
-        List<Integer> priority = List.of(third.getId(), first.getId(), second.getId());
+        List<Long> priority = List.of(third.getId(), first.getId(), second.getId());
 
         RoomRequestResponseDto created = roomRequestService.create(new CreateRoomRequestDto(
                 RoomRequestType.PARTIAL_EXAM,
@@ -253,7 +253,7 @@ class RoomRequestIntegrationTest extends AbstractIntegrationTest {
     }
 
     private CreateRoomRequestItemDto item(Long commissionId, LocalDate date,
-                                          Integer currentClassroomId, List<Integer> preferredClassroomIds) {
+                                          Long currentClassroomId, List<Long> preferredClassroomIds) {
         return new CreateRoomRequestItemDto(
                 commissionId,
                 date,

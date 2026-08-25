@@ -94,7 +94,7 @@ class RoomRequestMapperTest {
             assertThat(item.getEnrolled()).isEqualTo(30);
             assertThat(item.getEstimated()).isEqualTo(35);
             assertThat(item.getClassroomCount()).isEqualTo(1);
-            assertThat(item.getCurrentClassroomId()).isEqualTo(10);
+            assertThat(item.getCurrentClassroomId()).isEqualTo(10L);
             assertThat(item.getObservations()).isEqualTo("Observación de prueba");
         }
 
@@ -121,7 +121,7 @@ class RoomRequestMapperTest {
         void mappedItemAcceptsPreferences() {
             RoomRequestItem item = mapper.toEntity(itemDto());
 
-            item.addPreferences(List.of(11, 12));
+            item.addPreferences(List.of(11L, 12L));
 
             assertThat(item.getPreferences()).extracting("position").containsExactly(1, 2);
         }
@@ -204,9 +204,9 @@ class RoomRequestMapperTest {
         @Test
         @DisplayName("comisión y aulas se pegan tal cual las resolvió el composer")
         void itemUsesComposedPieces() {
-            CommissionResponseDto commission = new CommissionResponseDto(7L, "3K1", 1, 3, null);
-            ClassroomOptionDto current = new ClassroomOptionDto(10, "A10", "Pabellón");
-            List<ClassroomOptionDto> preferred = List.of(new ClassroomOptionDto(11, "A11", "Pabellón"));
+            CommissionResponseDto commission = new CommissionResponseDto(7L, "3K1", null);
+            ClassroomOptionDto current = new ClassroomOptionDto(10L, 10, "Pabellón");
+            List<ClassroomOptionDto> preferred = List.of(new ClassroomOptionDto(11L, 11, "Pabellón"));
 
             RoomRequestItemResponseDto dto = mapper.toDto(itemEntity(), commission, current, preferred);
 
@@ -234,7 +234,7 @@ class RoomRequestMapperTest {
 
     private static CreateRoomRequestItemDto itemDto(Boolean requiresExamUsers) {
         return new CreateRoomRequestItemDto(7L, LocalDate.of(2026, 9, 1),
-                LocalTime.of(10, 0), LocalTime.of(12, 0), 30, 35, 1, 10,
+                LocalTime.of(10, 0), LocalTime.of(12, 0), 30, 35, 1, 10L,
                 true, false, null, requiresExamUsers, null, "Observación de prueba", List.of());
     }
 
@@ -267,7 +267,7 @@ class RoomRequestMapperTest {
                 .enrolled(30)
                 .estimated(35)
                 .classroomCount(1)
-                .currentClassroomId(10)
+                .currentClassroomId(10L)
                 .observations("Observación de prueba")
                 .build();
     }

@@ -44,7 +44,7 @@ public class RoomRequestComposer {
     public List<RoomRequestResponseDto> compose(Collection<RoomRequest> requests) {
         Set<Long> subjectIds = new LinkedHashSet<>();
         Set<Long> commissionIds = new LinkedHashSet<>();
-        Set<Integer> classroomIds = new LinkedHashSet<>();
+        Set<Long> classroomIds = new LinkedHashSet<>();
 
         for (RoomRequest request : requests) {
             if (request.getSubjectId() != null) {
@@ -65,7 +65,7 @@ public class RoomRequestComposer {
                 Maps.byId(subjectService.findByIds(subjectIds), SubjectResponseDto::id);
         Map<Long, CommissionResponseDto> commissionsById =
                 Maps.byId(commissionService.findByIds(commissionIds), CommissionResponseDto::id);
-        Map<Integer, ClassroomOptionDto> classroomsById =
+        Map<Long, ClassroomOptionDto> classroomsById =
                 Maps.byId(catalogMapper.toClassroomOptions(classroomService.findByIds(classroomIds)),
                         ClassroomOptionDto::id);
 
@@ -81,7 +81,7 @@ public class RoomRequestComposer {
 
     private List<RoomRequestItemResponseDto> composeItems(RoomRequest request,
                                                           Map<Long, CommissionResponseDto> commissionsById,
-                                                          Map<Integer, ClassroomOptionDto> classroomsById) {
+                                                          Map<Long, ClassroomOptionDto> classroomsById) {
         List<RoomRequestItemResponseDto> items = new ArrayList<>(request.getItems().size());
         for (RoomRequestItem item : request.getItems()) {
             CommissionResponseDto commission = item.getCommissionId() != null

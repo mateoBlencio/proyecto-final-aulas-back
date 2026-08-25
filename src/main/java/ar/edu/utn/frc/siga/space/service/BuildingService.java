@@ -12,11 +12,11 @@ public interface BuildingService {
 
     List<BuildingResponseDto> findAll(boolean includeInactive);
 
-    BuildingResponseDto findById(Integer id);
+    BuildingResponseDto findById(Long id);
 
     BuildingResponseDto findByName(String name);
 
-    BuildingResponseDto setActive(Integer id, Boolean active);
+    BuildingResponseDto setActive(Long id, Boolean active);
 
     List<BuildingResponseDto> setActiveBatch(List<BuildingActiveBatchItemDto> items);
 }

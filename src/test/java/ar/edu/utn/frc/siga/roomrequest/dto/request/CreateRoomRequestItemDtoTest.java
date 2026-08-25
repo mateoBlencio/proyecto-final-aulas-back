@@ -56,28 +56,28 @@ class CreateRoomRequestItemDtoTest {
         @Test
         @DisplayName("la lista se copia: mutar la original no cambia el DTO")
         void preferences_areDefensivelyCopied() {
-            List<Integer> source = new ArrayList<>(List.of(1, 2));
+            List<Long> source = new ArrayList<>(List.of(1L, 2L));
             CreateRoomRequestItemDto dto = item().preferredClassroomIds(source).build();
 
-            source.add(3);
+            source.add(3L);
 
-            assertThat(dto.preferredClassroomIds()).containsExactly(1, 2);
+            assertThat(dto.preferredClassroomIds()).containsExactly(1L, 2L);
         }
 
         @Test
         @DisplayName("la lista del DTO es inmutable")
         void preferences_areUnmodifiable() {
-            CreateRoomRequestItemDto dto = item().preferredClassroomIds(List.of(1)).build();
+            CreateRoomRequestItemDto dto = item().preferredClassroomIds(List.of(1L)).build();
 
-            assertThatThrownBy(() -> dto.preferredClassroomIds().add(2))
+            assertThatThrownBy(() -> dto.preferredClassroomIds().add(2L))
                     .isInstanceOf(UnsupportedOperationException.class);
         }
 
         @Test
         @DisplayName("se admite un id inexistente: el 404 claro lo da el validator, no la deserialización")
         void preferences_admitUnknownIds() {
-            assertThat(item().preferredClassroomIds(List.of(999_999)).build().preferredClassroomIds())
-                    .containsExactly(999_999);
+            assertThat(item().preferredClassroomIds(List.of(999_999L)).build().preferredClassroomIds())
+                    .containsExactly(999_999L);
         }
     }
 
@@ -201,13 +201,13 @@ class CreateRoomRequestItemDtoTest {
         @Test
         @DisplayName("aulas distintas: válido")
         void distinctClassrooms_areValid() {
-            assertThat(violations(item().preferredClassroomIds(List.of(1, 2, 3)).build())).isEmpty();
+            assertThat(violations(item().preferredClassroomIds(List.of(1L, 2L, 3L)).build())).isEmpty();
         }
 
         @Test
         @DisplayName("aula repetida: rechazada")
         void repeatedClassroom_isRejected() {
-            CreateRoomRequestItemDto dto = item().preferredClassroomIds(List.of(1, 2, 1)).build();
+            CreateRoomRequestItemDto dto = item().preferredClassroomIds(List.of(1L, 2L, 1L)).build();
 
             assertThat(messages(dto)).contains("No se puede repetir un aula en las preferencias");
         }
@@ -314,14 +314,14 @@ class CreateRoomRequestItemDtoTest {
         private Integer enrolled = 30;
         private Integer estimated = 35;
         private Integer classroomCount = 1;
-        private Integer currentClassroomId;
+        private Long currentClassroomId;
         private Boolean requiresProjector = false;
         private Boolean requiresComputers = false;
         private Integer computerCount;
         private Boolean requiresExamUsers;
         private String requiredSoftware;
         private String observations;
-        private List<Integer> preferredClassroomIds = List.of();
+        private List<Long> preferredClassroomIds = List.of();
 
         ItemBuilder date(LocalDate v) { this.date = v; return this; }
         ItemBuilder startTime(LocalTime v) { this.startTime = v; return this; }
@@ -332,7 +332,7 @@ class CreateRoomRequestItemDtoTest {
         ItemBuilder computerCount(Integer v) { this.computerCount = v; return this; }
         ItemBuilder requiredSoftware(String v) { this.requiredSoftware = v; return this; }
         ItemBuilder observations(String v) { this.observations = v; return this; }
-        ItemBuilder preferredClassroomIds(List<Integer> v) { this.preferredClassroomIds = v; return this; }
+        ItemBuilder preferredClassroomIds(List<Long> v) { this.preferredClassroomIds = v; return this; }
 
         CreateRoomRequestItemDto build() {
             return new CreateRoomRequestItemDto(

@@ -7,7 +7,7 @@ import java.time.Instant;
 public record AllocationHistorySnapshotDto(
         Long id,
         Long occurrenceId,
-        Integer classroomId,
+        Long classroomId,
         AllocationSource source,
         Instant createdAt,
         String observation

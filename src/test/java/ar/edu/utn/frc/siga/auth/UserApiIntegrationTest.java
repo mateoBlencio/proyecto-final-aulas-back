@@ -60,13 +60,13 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     /** Crea un usuario vía API (SUBSECRETARIA) y devuelve su id. */
-    private int createUser(String email, Role rol) throws Exception {
+    private long createUser(String email, Role rol) throws Exception {
         MvcResult result = mockMvc.perform(post("/v1/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createBody(email, "supersegura", rol)))
                 .andExpect(status().isCreated())
                 .andReturn();
-        return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asInt();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
     }
 
     // ---- create ----
@@ -85,7 +85,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.password").doesNotExist())
                 .andReturn();
 
-        int id = objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asInt();
+        long id = objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
         User saved = userRepository.findById(id).orElseThrow();
         assertThat(saved.getEnabled()).isTrue();
         assertThat(saved.getPasswordHash()).isNotEqualTo("supersegura");
@@ -134,7 +134,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("PATCH /v1/users/{id}/enabled alterna el estado y lo mueve entre listados")
     void setEnabled_togglesStateAndListing() throws Exception {
         String email = uniqueEmail();
-        int id = createUser(email, Role.AUXILIAR_AULICO);
+        long id = createUser(email, Role.AUXILIAR_AULICO);
 
         mockMvc.perform(patch("/v1/users/{id}/enabled", id)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -149,7 +149,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("PATCH /v1/users/{id}/role cambia el rol")
     void changeRole_updatesRole() throws Exception {
-        int id = createUser(uniqueEmail(), Role.AUXILIAR_AULICO);
+        long id = createUser(uniqueEmail(), Role.AUXILIAR_AULICO);
 
         mockMvc.perform(patch("/v1/users/{id}/role", id)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -165,7 +165,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("PATCH /v1/users/{id}/role rechaza (400) editar el propio rol")
     void changeRole_ownRole_returns400() throws Exception {
         String email = uniqueEmail();
-        int id = createUser(email, Role.SUBSECRETARIA);
+        long id = createUser(email, Role.SUBSECRETARIA);
 
         // Autenticado como el mismo usuario que se intenta editar.
         mockMvcAs(email, Role.SUBSECRETARIA).perform(patch("/v1/users/{id}/role", id)

@@ -11,6 +11,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
+import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,7 +23,7 @@ import org.hibernate.annotations.SQLRestriction;
 @Entity
 @Table(name = "plan_estudio",
        uniqueConstraints = @UniqueConstraint(columnNames = {"codigo_plan", "id_especialidad"}))
-@SQLRestriction("eliminado = false")
+@SQLRestriction("eliminado_en IS NULL")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -41,7 +43,16 @@ public class StudyPlan extends TimestampedEntity {
     @JoinColumn(name = "id_especialidad", nullable = false)
     private Specialty specialty;
 
-    @Column(name = "eliminado")
-    @Builder.Default
-    private Boolean deleted = false;
+    @Column(name = "eliminado_en")
+    private Instant deletedAt;
+
+    @Column(name = "sincronizado_en")
+    private Instant syncedAt;
+
+    @Column(name = "hash_sysacad", length = 64)
+    private String sysacadHash;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 }

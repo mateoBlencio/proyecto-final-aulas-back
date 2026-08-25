@@ -54,12 +54,6 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
     }
 
     @Override
-    public SubjectCommissionResponseDto findById(Long id) {
-        return subjectCommissionMapper.toDto(subjectCommissionRepository.findById(id)
-                .orElseThrow(() -> ResourceNotFoundException.of("SubjectCommission", id)));
-    }
-
-    @Override
     public List<SubjectCommissionResponseDto> findBySubjectId(Long subjectId) {
         return subjectCommissionRepository.findBySubject_Id(subjectId).stream()
                 .map(subjectCommissionMapper::toDto)

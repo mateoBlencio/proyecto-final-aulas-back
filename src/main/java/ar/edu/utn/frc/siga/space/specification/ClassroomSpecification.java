@@ -13,9 +13,8 @@ public class ClassroomSpecification {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
-            if (filter.roomNumber() != null && !filter.roomNumber().isBlank()) {
-                predicates.add(cb.like(cb.lower(root.get("roomNumber")),
-                        "%" + filter.roomNumber().toLowerCase() + "%"));
+            if (filter.roomNumber() != null) {
+                predicates.add(cb.equal(root.get("roomNumber"), filter.roomNumber()));
             }
             if (filter.buildingId() != null) {
                 predicates.add(cb.equal(root.get("building").get("id"), filter.buildingId()));
@@ -28,12 +27,6 @@ public class ClassroomSpecification {
             }
             if (filter.capacityMax() != null) {
                 predicates.add(cb.lessThanOrEqualTo(root.get("capacity"), filter.capacityMax()));
-            }
-            if (filter.floor() != null) {
-                predicates.add(cb.equal(root.get("floor"), filter.floor()));
-            }
-            if (filter.available() != null) {
-                predicates.add(cb.equal(root.get("available"), filter.available()));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

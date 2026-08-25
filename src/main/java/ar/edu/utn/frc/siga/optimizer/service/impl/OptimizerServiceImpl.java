@@ -46,7 +46,7 @@ public class OptimizerServiceImpl implements OptimizerService {
     @Override
     public OptimizationResult optimize(List<OptimizerEvent> events, List<OptimizerRoom> classrooms,
                                  List<OptimizerOccupancy> occupancy, int timeLimitSeconds) {
-        Map<Integer, OptimizerRoom> roomsById = classrooms.stream()
+        Map<Long, OptimizerRoom> roomsById = classrooms.stream()
                 .collect(Collectors.toMap(OptimizerRoom::id, r -> r));
         List<ExistingOccupancy> existing = buildExistingOccupancy(occupancy, roomsById);
 
@@ -77,7 +77,7 @@ public class OptimizerServiceImpl implements OptimizerService {
     }
 
     private List<ExistingOccupancy> buildExistingOccupancy(List<OptimizerOccupancy> occupancy,
-                                                           Map<Integer, OptimizerRoom> roomsById) {
+                                                           Map<Long, OptimizerRoom> roomsById) {
         if (occupancy == null || occupancy.isEmpty()) return List.of();
         Map<String, ExistingOccupancy> byPlanningId = new LinkedHashMap<>();
         for (OptimizerOccupancy occ : occupancy) {

@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.sysacad.internal.service;
+package ar.edu.utn.frc.siga.sysacad.internal.service.impl;
 
 import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadUnavailableException;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadResyncOutcome;
@@ -25,8 +25,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("SysacadSyncOrchestrator")
-class SysacadSyncOrchestratorTest {
+@DisplayName("SysacadSyncOrchestratorImpl")
+class SysacadSyncOrchestratorImplTest {
 
     @Mock
     private SysacadViewSyncer buildings;
@@ -37,7 +37,7 @@ class SysacadSyncOrchestratorTest {
     @Mock
     private SysacadViewSyncer commissions;
 
-    private SysacadSyncOrchestrator orchestrator;
+    private SysacadSyncOrchestratorImpl orchestrator;
 
     @BeforeEach
     void setUp() {
@@ -46,7 +46,7 @@ class SysacadSyncOrchestratorTest {
         when(specialties.view()).thenReturn(SysacadView.ESPECIALIDADES);
         when(commissions.view()).thenReturn(SysacadView.COMISIONES);
         // El orden de registro es el inverso al de FK para probar que no lo define la inyección.
-        orchestrator = new SysacadSyncOrchestrator(List.of(commissions, specialties, classrooms, buildings));
+        orchestrator = new SysacadSyncOrchestratorImpl(List.of(commissions, specialties, classrooms, buildings));
     }
 
     @Test

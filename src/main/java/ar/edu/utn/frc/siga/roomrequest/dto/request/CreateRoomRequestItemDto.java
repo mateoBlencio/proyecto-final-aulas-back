@@ -28,14 +28,14 @@ public record CreateRoomRequestItemDto(
         @Min(0) Integer enrolled,
         @NotNull @Min(0) Integer estimated,
         @NotNull @Min(1) Integer classroomCount,
-        Integer currentClassroomId,
+        Long currentClassroomId,
         Boolean requiresProjector,
         Boolean requiresComputers,
         @Min(1) Integer computerCount,
         Boolean requiresExamUsers,
         @Size(max = 255) String requiredSoftware,
         @Size(max = 1000) String observations,
-        List<Integer> preferredClassroomIds
+        List<Long> preferredClassroomIds
 ) {
 
     /**

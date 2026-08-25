@@ -4,14 +4,12 @@ import org.springframework.modulith.NamedInterface;
 
 @NamedInterface("api")
 public record ClassroomResponseDto(
-        Integer id,
-        String roomNumber,
-        Integer floor,
+        Long id,
+        Integer roomNumber,
         Integer capacity,
-        Boolean available,
-        Integer buildingId,
+        Long buildingId,
         String buildingName,
-        Integer classroomTypeId,
+        Long classroomTypeId,
         String classroomTypeDescription
 ) {
 }

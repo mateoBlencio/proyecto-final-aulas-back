@@ -15,6 +15,5 @@ public interface CommissionService {
 
     List<CommissionResponseDto> findAll();
 
-    CommissionResponseDto findByCourseAndNumberAndPeriod(String courseCode, Integer commissionNumber,
-            Integer periodYear, Integer periodSemester);
+    CommissionResponseDto findByCourseAndPeriod(String courseCode, Integer periodYear, Integer periodSemester);
 }

@@ -29,7 +29,7 @@ class ClassAllocationTest {
     @Test
     @DisplayName("getOvercrowding con aula asignada delega en OptimizerRoom.overcrowding")
     void overcrowdingWithClassroom() {
-        OptimizerRoom room = new OptimizerRoom(1, 10, 100);
+        OptimizerRoom room = new OptimizerRoom(1L, 10, 100L);
         ClassAllocation allocation = new ClassAllocation(event(null, 15), List.of(room), Set.of());
         allocation.setClassroom(room);
 
@@ -47,7 +47,7 @@ class ClassAllocationTest {
     @Test
     @DisplayName("getUnusedCapacity con aula asignada delega en OptimizerRoom.undercrowding")
     void unusedCapacityWithClassroom() {
-        OptimizerRoom room = new OptimizerRoom(1, 30, 100);
+        OptimizerRoom room = new OptimizerRoom(1L, 30, 100L);
         ClassAllocation allocation = new ClassAllocation(event(null, 20), List.of(room), Set.of());
         allocation.setClassroom(room);
 
@@ -82,17 +82,17 @@ class ClassAllocationTest {
     @Test
     @DisplayName("getBuildingId con aula asignada delega en el aula")
     void buildingIdWithClassroom() {
-        OptimizerRoom room = new OptimizerRoom(1, 30, 100);
+        OptimizerRoom room = new OptimizerRoom(1L, 30, 100L);
         ClassAllocation allocation = new ClassAllocation(event(null, 10), List.of(room), Set.of());
         allocation.setClassroom(room);
 
-        assertThat(allocation.getBuildingId()).isEqualTo(100);
+        assertThat(allocation.getBuildingId()).isEqualTo(100L);
     }
 
     @Test
     @DisplayName("pinned() fija el aula como única candidata y marca pinned=true")
     void pinnedFactory() {
-        OptimizerRoom room = new OptimizerRoom(1, 30, 100);
+        OptimizerRoom room = new OptimizerRoom(1L, 30, 100L);
         OptimizerEvent occupiedEvent = event(null, 0);
 
         ClassAllocation allocation = ClassAllocation.pinned(occupiedEvent, room, Set.of("x"));

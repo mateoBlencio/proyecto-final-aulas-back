@@ -108,7 +108,7 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         }
 
         Set<Long> eventIds = new LinkedHashSet<>();
-        Set<Integer> classroomIds = new LinkedHashSet<>();
+        Set<Long> classroomIds = new LinkedHashSet<>();
         for (OvercrowdAcc acc : overcrowdAccs.values()) {
             eventIds.add(acc.eventId);
             classroomIds.add(acc.classroomId);
@@ -122,7 +122,7 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         Map<OverlapKey, OverlapAcc> overlapAccs = computeOverlaps(occupancy);
 
         Set<Long> eventIds = new LinkedHashSet<>();
-        Set<Integer> classroomIds = new LinkedHashSet<>();
+        Set<Long> classroomIds = new LinkedHashSet<>();
         for (OverlapAcc acc : overlapAccs.values()) {
             eventIds.add(acc.eventIdA);
             eventIds.add(acc.eventIdB);
@@ -162,7 +162,7 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         return Maps.byId(academicEventService.findByIds(eventIds), AcademicEventResponseDto::id);
     }
 
-    private Map<Integer, ClassroomResponseDto> fetchClassroomsById(Set<Integer> ids) {
+    private Map<Long, ClassroomResponseDto> fetchClassroomsById(Set<Long> ids) {
         return Maps.byId(classroomService.findByIds(ids), ClassroomResponseDto::id);
     }
 
@@ -205,7 +205,7 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
     }
 
     private List<OvercrowdedConflictDto> buildOvercrowded(Map<OvercrowdKey, OvercrowdAcc> overcrowdAccs,
-            Map<Long, AcademicEventResponseDto> eventDtoById, Map<Integer, ClassroomResponseDto> classroomDtoById) {
+            Map<Long, AcademicEventResponseDto> eventDtoById, Map<Long, ClassroomResponseDto> classroomDtoById) {
         List<OvercrowdedConflictDto> overcrowded = new ArrayList<>();
         for (OvercrowdAcc acc : overcrowdAccs.values()) {
             ClassroomResponseDto classroom = classroomDtoById.get(acc.classroomId);
@@ -224,7 +224,7 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
     }
 
     private List<OverlapConflictDto> buildOverlaps(Map<OverlapKey, OverlapAcc> overlapAccs,
-            Map<Long, AcademicEventResponseDto> eventDtoById, Map<Integer, ClassroomResponseDto> classroomDtoById) {
+            Map<Long, AcademicEventResponseDto> eventDtoById, Map<Long, ClassroomResponseDto> classroomDtoById) {
         List<OverlapConflictDto> overlaps = new ArrayList<>();
         for (OverlapAcc acc : overlapAccs.values()) {
             overlaps.add(new OverlapConflictDto(
@@ -239,30 +239,30 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
     private record Range(LocalDate from, LocalDate to) {
     }
 
-    private record OvercrowdKey(Long eventId, Integer classroomId) {
+    private record OvercrowdKey(Long eventId, Long classroomId) {
     }
 
     private static final class OvercrowdAcc {
         final Long eventId;
-        final Integer classroomId;
+        final Long classroomId;
         final Set<LocalDate> dates = new TreeSet<>();
 
-        OvercrowdAcc(Long eventId, Integer classroomId) {
+        OvercrowdAcc(Long eventId, Long classroomId) {
             this.eventId = eventId;
             this.classroomId = classroomId;
         }
     }
 
-    private record OverlapKey(Long eventIdA, Long eventIdB, Integer classroomId) {
+    private record OverlapKey(Long eventIdA, Long eventIdB, Long classroomId) {
     }
 
     private static final class OverlapAcc {
         final Long eventIdA;
         final Long eventIdB;
-        final Integer classroomId;
+        final Long classroomId;
         final Set<LocalDate> dates = new TreeSet<>();
 
-        OverlapAcc(Long eventIdA, Long eventIdB, Integer classroomId) {
+        OverlapAcc(Long eventIdA, Long eventIdB, Long classroomId) {
             this.eventIdA = eventIdA;
             this.eventIdB = eventIdB;
             this.classroomId = classroomId;

@@ -1,6 +1,5 @@
 package ar.edu.utn.frc.siga.auth.model;
 
-import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -19,22 +18,22 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.SQLRestriction;
+import org.hibernate.envers.Audited;
 
 @Entity
+@Audited
 @Table(name = "usuario")
-@SQLRestriction("eliminado = false")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class User extends TimestampedEntity {
+public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id_usuario")
-    private Integer id;
+    private Long id;
 
     @Column(name = "correo", nullable = false, unique = true, length = 150)
     private String email;
@@ -45,10 +44,6 @@ public class User extends TimestampedEntity {
     @Builder.Default
     @Column(name = "habilitado", nullable = false)
     private Boolean enabled = true;
-
-    @Builder.Default
-    @Column(name = "eliminado", nullable = false)
-    private Boolean deleted = false;
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "usuario_rol", joinColumns = @JoinColumn(name = "id_usuario"))

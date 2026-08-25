@@ -41,7 +41,7 @@ class SubjectCommissionServiceImplTest {
     private SubjectCommissionServiceImpl service;
 
     private final Subject subject = Subject.builder().id(1L).code(101).name("Algoritmos").build();
-    private final Commission commission = Commission.builder().id(2L).courseCode("K1001").commissionNumber(1).build();
+    private final Commission commission = Commission.builder().id(2L).courseCode("K1001").build();
 
     @BeforeEach
     void setUp() {
@@ -50,11 +50,11 @@ class SubjectCommissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("find: si existe la relaciÃ³n, devuelve el DTO mapeado")
+    @DisplayName("find: si existe la relación, devuelve el DTO mapeado")
     void findWithExistingRelationReturnsMappedDto() {
-        SubjectCommission existing = SubjectCommission.builder().id(5L).subject(subject).commission(commission)
+        SubjectCommission existing = SubjectCommission.builder().subject(subject).commission(commission)
                 .enrolledCount(30).build();
-        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(5L, 1L, 2L, null, 30);
+        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, 2L, null, 30);
         when(subjectRepository.findById(1L)).thenReturn(Optional.of(subject));
         when(commissionRepository.findById(2L)).thenReturn(Optional.of(commission));
         when(subjectCommissionRepository.findBySubjectAndCommission(subject, commission)).thenReturn(Optional.of(existing));
@@ -66,7 +66,7 @@ class SubjectCommissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("find: si no existe la relaciÃ³n, lanza ResourceNotFoundException")
+    @DisplayName("find: si no existe la relación, lanza ResourceNotFoundException")
     void findWithoutExistingRelationThrowsResourceNotFound() {
         when(subjectRepository.findById(1L)).thenReturn(Optional.of(subject));
         when(commissionRepository.findById(2L)).thenReturn(Optional.of(commission));
@@ -90,9 +90,9 @@ class SubjectCommissionServiceImplTest {
     @Test
     @DisplayName("findAll: mapea todas las relaciones del repositorio")
     void findAllMapsAllRelations() {
-        SubjectCommission relation = SubjectCommission.builder().id(5L).subject(subject).commission(commission)
+        SubjectCommission relation = SubjectCommission.builder().subject(subject).commission(commission)
                 .enrolledCount(30).build();
-        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(5L, 1L, 2L, null, 30);
+        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, 2L, null, 30);
         when(subjectCommissionRepository.findAll()).thenReturn(List.of(relation));
         when(subjectCommissionMapper.toDto(relation)).thenReturn(dto);
 
@@ -102,33 +102,11 @@ class SubjectCommissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("findById: devuelve el DTO mapeado cuando la relaciÃ³n existe")
-    void findByIdReturnsMappedDto() {
-        SubjectCommission relation = SubjectCommission.builder().id(5L).subject(subject).commission(commission)
-                .enrolledCount(30).build();
-        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(5L, 1L, 2L, null, 30);
-        when(subjectCommissionRepository.findById(5L)).thenReturn(Optional.of(relation));
-        when(subjectCommissionMapper.toDto(relation)).thenReturn(dto);
-
-        assertThat(service.findById(5L)).isEqualTo(dto);
-    }
-
-    @Test
-    @DisplayName("findById: si la relaciÃ³n no existe, lanza ResourceNotFoundException")
-    void findByIdWithMissingRelationThrowsResourceNotFound() {
-        when(subjectCommissionRepository.findById(99L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.findById(99L))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("SubjectCommission not found with id: 99");
-    }
-
-    @Test
     @DisplayName("findBySubjectId: mapea las comisiones vinculadas a esa materia")
     void findBySubjectIdMapsRelations() {
-        SubjectCommission relation = SubjectCommission.builder().id(5L).subject(subject).commission(commission)
+        SubjectCommission relation = SubjectCommission.builder().subject(subject).commission(commission)
                 .enrolledCount(30).build();
-        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(5L, 1L, 2L, null, 30);
+        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, 2L, null, 30);
         when(subjectCommissionRepository.findBySubject_Id(1L)).thenReturn(List.of(relation));
         when(subjectCommissionMapper.toDto(relation)).thenReturn(dto);
 

@@ -1,11 +1,8 @@
 package ar.edu.utn.frc.siga.academic.model;
 
-import ar.edu.utn.frc.siga.common.model.RecordSource;
 import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -17,11 +14,9 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "especialidad")
-@SQLRestriction("eliminado = false")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -40,24 +35,14 @@ public class Specialty extends TimestampedEntity {
     @Column(name = "nombre")
     private String name;
 
-    @Column(name = "eliminado")
-    @Builder.Default
-    private Boolean deleted = false;
-
-    @Builder.Default
-    @Enumerated(EnumType.STRING)
-    @Column(name = "origen", nullable = false, length = 16)
-    private RecordSource source = RecordSource.LOCAL;
+    @Column(name = "abreviatura")
+    private String abbreviation;
 
     @Column(name = "sincronizado_en")
     private Instant syncedAt;
 
     @Column(name = "hash_sysacad", length = 64)
     private String sysacadHash;
-
-    @Builder.Default
-    @Column(name = "vigente_sysacad", nullable = false)
-    private Boolean presentInSysacad = true;
 
     @Version
     @Column(name = "version", nullable = false)

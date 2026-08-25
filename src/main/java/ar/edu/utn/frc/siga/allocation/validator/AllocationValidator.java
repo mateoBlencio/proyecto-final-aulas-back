@@ -89,12 +89,12 @@ public class AllocationValidator {
         }
     }
 
-    public void validateClassroomsAvailable(Set<Integer> classroomIds) {
-        Map<Integer, ClassroomResponseDto> classroomsById =
+    public void validateClassroomsAvailable(Set<Long> classroomIds) {
+        Map<Long, ClassroomResponseDto> classroomsById =
                 Maps.byId(classroomService.findByIds(classroomIds), ClassroomResponseDto::id);
-        for (Integer classroomId : classroomIds) {
+        for (Long classroomId : classroomIds) {
             ClassroomResponseDto classroom = classroomsById.get(classroomId);
-            if (classroom == null || !Boolean.TRUE.equals(classroom.available())) {
+            if (classroom == null) {
                 throw new AllocationConflictException("El aula " + classroomId + " no existe o no está disponible.");
             }
         }

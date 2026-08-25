@@ -8,7 +8,7 @@ import jakarta.validation.constraints.NotNull;
 public record AllocationItemRequestDto(
         List<Long> occurrenceIds,
         Long eventId,
-        @NotNull Integer classroomId
+        @NotNull Long classroomId
 ) {
     @AssertTrue(message = "Debe indicar occurrenceIds o eventId, pero no ambos ni ninguno")
     private boolean isTargetValid() {

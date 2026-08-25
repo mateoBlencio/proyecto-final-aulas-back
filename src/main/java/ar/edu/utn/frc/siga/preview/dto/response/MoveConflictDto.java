@@ -7,7 +7,7 @@ public record MoveConflictDto(
         LocalDate date,
         LocalTime startTime,
         LocalTime endTime,
-        Integer classroomId,
+        Long classroomId,
         Long conflictingEventId,
         ConflictOrigin origin) {
 

@@ -78,7 +78,7 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
         return occurrenceRepository.findByEvent_Id(eventId).getFirst();
     }
 
-    private void allocateOk(Long occurrenceId, Integer classroomId) throws Exception {
+    private void allocateOk(Long occurrenceId, Long classroomId) throws Exception {
         var dto = new AllocationBatchRequestDto(
                 List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, classroomId)), null);
         mockMvc.perform(post("/v1/allocations")
@@ -87,7 +87,7 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated());
     }
 
-    private void allocateDirect(Occurrence occurrence, Integer classroomId) {
+    private void allocateDirect(Occurrence occurrence, Long classroomId) {
         allocationRepository.save(Allocation.builder()
                 .occurrenceId(occurrence.getId()).classroomId(classroomId).source(AllocationSource.MANUAL).build());
     }
@@ -262,7 +262,7 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
 
         PreviewResponseDto preview = autoPreview(List.of(eventId));
         assertThat(preview.allocations()).hasSize(1);
-        Integer proposedRoom = preview.allocations().getFirst().classroom().id();
+        Long proposedRoom = preview.allocations().getFirst().classroom().id();
 
         MvcResult confirmResult = mockMvc.perform(post("/v1/previews/{id}/confirm", preview.previewId())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -301,7 +301,7 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
 
         PreviewResponseDto preview = autoPreview(List.of(eventId));
         assertThat(preview.allocations()).hasSize(1);
-        Integer proposedRoom = preview.allocations().getFirst().classroom().id();
+        Long proposedRoom = preview.allocations().getFirst().classroom().id();
 
         var scForeign = testData.materiaYComision();
         Long foreignEventId = createEvent(scForeign, date);

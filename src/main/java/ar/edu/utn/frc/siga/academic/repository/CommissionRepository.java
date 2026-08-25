@@ -10,8 +10,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface CommissionRepository extends JpaRepository<Commission, Long> {
-    Optional<Commission> findByCourseCodeAndCommissionNumberAndAcademicPeriod(
-            String courseCode, Integer commissionNumber, AcademicPeriod academicPeriod);
+    Optional<Commission> findByCourseCodeAndAcademicPeriod(
+            String courseCode, AcademicPeriod academicPeriod);
 
     @Override
     @EntityGraph(attributePaths = {"academicPeriod"})

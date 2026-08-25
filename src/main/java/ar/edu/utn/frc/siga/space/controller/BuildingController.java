@@ -48,10 +48,9 @@ public class BuildingController {
     @PatchMapping("/{id}/active")
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Activar/desactivar edificio",
-               description = "Cambia el estado activo del edificio y, en cascada, la disponibilidad de todas sus "
-                       + "aulas. Pensado para ocultar edificios/aulas que sincroniza SysAcad pero que la facultad "
-                       + "no usa realmente. 404 si el edificio no existe.")
-    public ResponseEntity<BuildingResponseDto> setActive(@PathVariable Integer id,
+               description = "Cambia el estado activo del edificio. Pensado para ocultar edificios que sincroniza "
+                       + "SysAcad pero que la facultad no usa realmente. 404 si el edificio no existe.")
+    public ResponseEntity<BuildingResponseDto> setActive(@PathVariable Long id,
                                                           @Valid @RequestBody BuildingActiveRequestDto dto) {
         log.debug("PATCH /v1/buildings/{}/active: active={}", id, dto.active());
         BuildingResponseDto response = buildingService.setActive(id, dto.active());
@@ -62,9 +61,9 @@ public class BuildingController {
     @PatchMapping("/active")
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Activar/desactivar edificios en lote",
-               description = "Aplica el cambio de estado activo (y la cascada a sus aulas) a varios edificios en "
-                       + "una única transacción: si alguno falla (ej. 404), no se aplica ninguno. Pensado para "
-                       + "desactivar de una los edificios/aulas que sincroniza SysAcad pero que la facultad no usa.")
+               description = "Aplica el cambio de estado activo a varios edificios en una única transacción: si "
+                       + "alguno falla (ej. 404), no se aplica ninguno. Pensado para desactivar de una los "
+                       + "edificios que sincroniza SysAcad pero que la facultad no usa.")
     public ResponseEntity<List<BuildingResponseDto>> setActiveBatch(
             @Valid @RequestBody BuildingActiveBatchRequestDto dto) {
         log.debug("PATCH /v1/buildings/active (batch): count={}", dto.buildings().size());

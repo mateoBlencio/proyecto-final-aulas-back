@@ -44,14 +44,14 @@ class ClassroomFindByRoomNumberIntegrationTest extends AbstractIntegrationTest {
         testData.tipoAulaNormal();
         Building building = testData.edificio();
 
-        assertThatThrownBy(() -> classroomService.findByRoomNumberAndBuilding("NO-EXISTE", building.getId()))
+        assertThatThrownBy(() -> classroomService.findByRoomNumberAndBuilding(-999, building.getId()))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
     @DisplayName("edificio inexistente: lanza ResourceNotFoundException")
     void findByRoomNumberAndBuilding_missingBuilding_throwsResourceNotFound() {
-        assertThatThrownBy(() -> classroomService.findByRoomNumberAndBuilding("101", -1))
+        assertThatThrownBy(() -> classroomService.findByRoomNumberAndBuilding(101, -1L))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 }

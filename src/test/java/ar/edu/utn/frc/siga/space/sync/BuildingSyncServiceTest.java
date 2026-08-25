@@ -1,6 +1,5 @@
 package ar.edu.utn.frc.siga.space.sync;
 
-import ar.edu.utn.frc.siga.common.model.RecordSource;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.SpaceTestData;
 import ar.edu.utn.frc.siga.space.model.Building;
@@ -45,7 +44,7 @@ class BuildingSyncServiceTest {
     }
 
     @Test
-    @DisplayName("sync: inserta el edificio que no existe con origen SYSACAD y columnas de control")
+    @DisplayName("sync: inserta el edificio que no existe con columnas de control")
     void syncInsertsUnknownBuilding() {
         when(catalogReader.findBuildings()).thenReturn(List.of(new SysacadBuildingDto(4, "Edif.Malvinas")));
         when(buildingRepository.findAll()).thenReturn(List.of());
@@ -58,10 +57,8 @@ class BuildingSyncServiceTest {
         Building inserted = saved.getValue();
         assertThat(inserted.getBuildingCode()).isEqualTo(4);
         assertThat(inserted.getName()).isEqualTo("Edif.Malvinas");
-        assertThat(inserted.getSource()).isEqualTo(RecordSource.SYSACAD);
         assertThat(inserted.getSyncedAt()).isNotNull();
         assertThat(inserted.getSysacadHash()).isEqualTo(Hashes.sha256Hex("Edif.Malvinas"));
-        assertThat(inserted.getPresentInSysacad()).isTrue();
         verify(syncStateService).recordSuccess(SysacadView.EDIFICIOS, 1);
     }
 
@@ -94,7 +91,7 @@ class BuildingSyncServiceTest {
     }
 
     @Test
-    @DisplayName("sync: el edificio ausente upstream queda inactivo y no vigente, sin borrarse")
+    @DisplayName("sync: el edificio ausente upstream queda no vigente y con deletedAt, sin borrarse")
     void syncMarksAbsentBuildingAsNotCurrent() {
         Building absent = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));
         when(catalogReader.findBuildings()).thenReturn(List.of());
@@ -102,24 +99,21 @@ class BuildingSyncServiceTest {
 
         service.sync();
 
-        assertThat(absent.getPresentInSysacad()).isFalse();
-        assertThat(absent.getActive()).isFalse();
-        assertThat(absent.getDeleted()).isFalse();
+        assertThat(absent.getDeletedAt()).isNotNull();
         verify(buildingRepository).save(absent);
         verify(syncStateService).recordSuccess(SysacadView.EDIFICIOS, 1);
     }
 
     @Test
-    @DisplayName("sync: no toca los edificios locales ausentes de SysAcad")
-    void syncLeavesLocalBuildingsUntouched() {
-        Building local = SpaceTestData.building().id(7).buildingCode(9).source(RecordSource.LOCAL).build();
+    @DisplayName("sync: no toca los edificios sin código SysAcad (creados localmente)")
+    void syncLeavesBuildingsWithoutSysacadCodeUntouched() {
+        Building local = SpaceTestData.building().id(7L).buildingCode(null).build();
         when(catalogReader.findBuildings()).thenReturn(List.of());
         when(buildingRepository.findAll()).thenReturn(List.of(local));
 
         service.sync();
 
-        assertThat(local.getActive()).isTrue();
-        assertThat(local.getPresentInSysacad()).isTrue();
+        assertThat(local.getDeletedAt()).isNull();
         verify(buildingRepository, never()).save(any());
     }
 
@@ -135,12 +129,10 @@ class BuildingSyncServiceTest {
 
     private static Building sysacadBuilding(Integer code, String name, String hash) {
         return SpaceTestData.building()
-                .id(code)
+                .id(code.longValue())
                 .buildingCode(code)
                 .name(name)
-                .source(RecordSource.SYSACAD)
                 .sysacadHash(hash)
-                .presentInSysacad(true)
                 .build();
     }
 }

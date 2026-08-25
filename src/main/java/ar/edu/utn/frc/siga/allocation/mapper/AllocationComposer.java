@@ -44,10 +44,10 @@ public class AllocationComposer {
         Map<Long, AcademicEventResponseDto> eventDtoById = Maps.byId(
                 academicEventService.findByIds(eventIds), AcademicEventResponseDto::id);
 
-        Set<Integer> classroomIds = allocations.stream()
+        Set<Long> classroomIds = allocations.stream()
                 .map(Allocation::getClassroomId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
-        Map<Integer, ClassroomResponseDto> classroomsById = Maps.byId(classroomService.findByIds(classroomIds), ClassroomResponseDto::id);
+        Map<Long, ClassroomResponseDto> classroomsById = Maps.byId(classroomService.findByIds(classroomIds), ClassroomResponseDto::id);
 
         List<AllocationResponseDto> result = new ArrayList<>(allocations.size());
         for (Allocation allocation : allocations) {

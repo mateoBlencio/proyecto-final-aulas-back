@@ -7,6 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -16,7 +17,7 @@ import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "tipo_aula")
-@SQLRestriction("eliminado = false")
+@SQLRestriction("eliminado_en IS NULL")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -27,12 +28,11 @@ public class ClassroomType extends TimestampedEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id_tipo_aula")
-    private Integer id;
+    private Long id;
 
     @Column(name = "descripcion", nullable = false, length = 50)
     private String description;
 
-    @Builder.Default
-    @Column(name = "eliminado", nullable = false)
-    private Boolean deleted = false;
+    @Column(name = "eliminado_en")
+    private Instant deletedAt;
 }

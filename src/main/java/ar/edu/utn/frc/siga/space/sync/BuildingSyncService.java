@@ -1,6 +1,5 @@
 package ar.edu.utn.frc.siga.space.sync;
 
-import ar.edu.utn.frc.siga.common.model.RecordSource;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
@@ -71,10 +70,8 @@ public class BuildingSyncService implements SysacadViewSyncer {
                 Building saved = buildingRepository.save(Building.builder()
                         .buildingCode(row.buildingCode())
                         .name(row.name())
-                        .source(RecordSource.SYSACAD)
                         .syncedAt(syncedAt)
                         .sysacadHash(hash)
-                        .presentInSysacad(true)
                         .build());
                 existing.put(row.buildingCode(), saved);
                 affected++;
@@ -83,14 +80,10 @@ public class BuildingSyncService implements SysacadViewSyncer {
             if (isUpToDate(building, hash)) {
                 continue;
             }
-            if (Boolean.FALSE.equals(building.getPresentInSysacad())) {
-                building.setActive(true);
-            }
+            building.setDeletedAt(null);
             building.setName(row.name());
-            building.setSource(RecordSource.SYSACAD);
             building.setSyncedAt(syncedAt);
             building.setSysacadHash(hash);
-            building.setPresentInSysacad(true);
             buildingRepository.save(building);
             affected++;
         }
@@ -101,13 +94,10 @@ public class BuildingSyncService implements SysacadViewSyncer {
     private int markAbsent(Iterable<Building> existing, Set<Integer> incoming, Instant syncedAt) {
         int affected = 0;
         for (Building building : existing) {
-            if (incoming.contains(building.getBuildingCode())
-                    || building.getSource() != RecordSource.SYSACAD
-                    || Boolean.FALSE.equals(building.getPresentInSysacad())) {
+            if (incoming.contains(building.getBuildingCode()) || building.getDeletedAt() != null) {
                 continue;
             }
-            building.setPresentInSysacad(false);
-            building.setActive(false);
+            building.setDeletedAt(syncedAt);
             building.setSyncedAt(syncedAt);
             buildingRepository.save(building);
             affected++;
@@ -117,8 +107,6 @@ public class BuildingSyncService implements SysacadViewSyncer {
     }
 
     private static boolean isUpToDate(Building building, String hash) {
-        return hash.equals(building.getSysacadHash())
-                && Boolean.TRUE.equals(building.getPresentInSysacad())
-                && building.getSource() == RecordSource.SYSACAD;
+        return hash.equals(building.getSysacadHash()) && building.getDeletedAt() == null;
     }
 }

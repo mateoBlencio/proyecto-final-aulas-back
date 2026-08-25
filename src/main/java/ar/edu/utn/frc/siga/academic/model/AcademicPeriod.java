@@ -8,6 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
 import java.time.LocalDate;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -42,7 +43,6 @@ public class AcademicPeriod extends TimestampedEntity {
     @Column(name = "fecha_fin")
     private LocalDate endDate;
 
-    @Column(name = "activo", nullable = false)
-    @Builder.Default
-    private Boolean active = true;
+    @Column(name = "eliminado_en")
+    private Instant deletedAt;
 }

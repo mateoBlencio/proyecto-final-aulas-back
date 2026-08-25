@@ -16,13 +16,11 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.envers.AuditOverride;
 import org.hibernate.envers.Audited;
 
 @Entity
 @Table(name = "asignacion_aula")
 @Audited
-@AuditOverride(forClass = TimestampedEntity.class, name = "createdAt")
 @Getter
 @Setter
 @Builder
@@ -42,7 +40,7 @@ public class Allocation extends TimestampedEntity {
     private Long occurrenceId;
 
     @Column(name = "id_aula", nullable = false)
-    private Integer classroomId;
+    private Long classroomId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "origen", nullable = false)

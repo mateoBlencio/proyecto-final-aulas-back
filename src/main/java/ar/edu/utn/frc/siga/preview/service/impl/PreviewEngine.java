@@ -42,7 +42,7 @@ class PreviewEngine {
 
     record Inputs(List<RecurringEventResponseDto> events, Map<Long, List<LocalDate>> datesByEvent,
                   List<OptimizerRoom> rooms, List<OptimizerOccupancy> occupancy,
-                  List<OccupiedSlot> databaseOccupancy, Map<Long, Integer> priorRoomByEvent) {
+                  List<OccupiedSlot> databaseOccupancy, Map<Long, Long> priorRoomByEvent) {
     }
 
     @Transactional(readOnly = true)
@@ -57,7 +57,7 @@ class PreviewEngine {
         List<OccupiedSlot> databaseOccupancy = occupancyInRange.stream()
                 .filter(o -> !eventIds.contains(o.eventId()))
                 .toList();
-        Map<Long, Integer> priorRoomByEvent = occupancyInRange.stream()
+        Map<Long, Long> priorRoomByEvent = occupancyInRange.stream()
                 .filter(o -> eventIds.contains(o.eventId()))
                 .collect(Collectors.toMap(OccupiedSlot::eventId, OccupiedSlot::classroomId, (x, y) -> x));
 

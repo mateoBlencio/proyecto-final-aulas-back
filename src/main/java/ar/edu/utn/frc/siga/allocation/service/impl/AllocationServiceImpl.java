@@ -53,7 +53,7 @@ public class AllocationServiceImpl implements AllocationService {
     @Override
     @Transactional
     public List<AllocationResponseDto> allocate(AllocationCommand command) {
-        Map<OccurrenceSlotDto, Integer> classroomByOccurrence = resolveAndValidate(command);
+        Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolveAndValidate(command);
         List<Allocation> saved = writer.create(classroomByOccurrence, command.observation(), command.source());
         log.info("Asignación creada: source={}, count={}", command.source(), saved.size());
         return composer.composeAll(saved);
@@ -62,7 +62,7 @@ public class AllocationServiceImpl implements AllocationService {
     @Override
     @Transactional
     public List<AllocationResponseDto> reallocate(AllocationCommand command) {
-        Map<OccurrenceSlotDto, Integer> classroomByOccurrence = resolveAndValidate(command);
+        Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolveAndValidate(command);
         List<Allocation> saved = writer.upsert(classroomByOccurrence, command.observation(), command.source());
         log.info("Asignación actualizada: source={}, count={}", command.source(), saved.size());
         return composer.composeAll(saved);
@@ -81,16 +81,16 @@ public class AllocationServiceImpl implements AllocationService {
                 .toList();
     }
 
-    private Map<OccurrenceSlotDto, Integer> resolveAndValidate(AllocationCommand command) {
+    private Map<OccurrenceSlotDto, Long> resolveAndValidate(AllocationCommand command) {
         LocalDate clampFrom = command.source() == AllocationSource.IMPORTED ? null : LocalDate.now();
-        Map<OccurrenceSlotDto, Integer> classroomByOccurrence =
+        Map<OccurrenceSlotDto, Long> classroomByOccurrence =
                 targetResolver.resolveClassroomByOccurrence(command.items(), clampFrom);
 
         if (classroomByOccurrence.isEmpty()) {
             return classroomByOccurrence;
         }
 
-        Set<Integer> classroomIds = Set.copyOf(classroomByOccurrence.values());
+        Set<Long> classroomIds = Set.copyOf(classroomByOccurrence.values());
         validator.validateClassroomsAvailable(classroomIds);
 
         if (command.source() == AllocationSource.MANUAL) {

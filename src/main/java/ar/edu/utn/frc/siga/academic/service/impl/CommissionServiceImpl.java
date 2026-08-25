@@ -45,14 +45,13 @@ public class CommissionServiceImpl implements CommissionService {
     }
 
     @Override
-    public CommissionResponseDto findByCourseAndNumberAndPeriod(String courseCode, Integer commissionNumber,
-            Integer periodYear, Integer periodSemester) {
+    public CommissionResponseDto findByCourseAndPeriod(String courseCode, Integer periodYear,
+            Integer periodSemester) {
         AcademicPeriod period = requirePeriod(periodYear, periodSemester);
-        return commissionRepository.findByCourseCodeAndCommissionNumberAndAcademicPeriod(
-                        courseCode, commissionNumber, period)
+        return commissionRepository.findByCourseCodeAndAcademicPeriod(courseCode, period)
                 .map(commissionMapper::toDto)
                 .orElseThrow(() -> ResourceNotFoundException.of("Commission",
-                        courseCode + "-" + commissionNumber + "-" + periodYear + "-" + periodSemester));
+                        courseCode + "-" + periodYear + "-" + periodSemester));
     }
 
     private AcademicPeriod requirePeriod(Integer year, Integer semester) {

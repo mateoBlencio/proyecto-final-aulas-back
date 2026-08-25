@@ -67,17 +67,17 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
         return occurrences.getFirst();
     }
 
-    private static AllocationBatchRequestDto byOccurrence(Long occurrenceId, Integer classroomId) {
+    private static AllocationBatchRequestDto byOccurrence(Long occurrenceId, Long classroomId) {
         return new AllocationBatchRequestDto(
                 List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, classroomId)), null);
     }
 
-    private static AllocationBatchRequestDto byEvent(Long eventId, Integer classroomId, String observation) {
+    private static AllocationBatchRequestDto byEvent(Long eventId, Long classroomId, String observation) {
         return new AllocationBatchRequestDto(
                 List.of(new AllocationItemRequestDto(null, eventId, classroomId)), observation);
     }
 
-    private MvcResult allocateOk(Long occurrenceId, Integer classroomId) throws Exception {
+    private MvcResult allocateOk(Long occurrenceId, Long classroomId) throws Exception {
         return mockMvc.perform(post("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(byOccurrence(occurrenceId, classroomId))))

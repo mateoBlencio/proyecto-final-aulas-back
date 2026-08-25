@@ -35,7 +35,7 @@ class PreviewValidatorTest {
     @DisplayName("validateNoDuplicateEventIds: eventId repetido lanza AllocationConflictException")
     void validateNoDuplicateEventIdsRepetidoLanza() {
         List<PreviewAllocationDto> allocations = List.of(
-                new PreviewAllocationDto(1L, 5), new PreviewAllocationDto(1L, 6));
+                new PreviewAllocationDto(1L, 5L), new PreviewAllocationDto(1L, 6L));
 
         assertThatThrownBy(() -> validator.validateNoDuplicateEventIds(allocations))
                 .isInstanceOf(AllocationConflictException.class);
@@ -45,7 +45,7 @@ class PreviewValidatorTest {
     @DisplayName("validateNoDuplicateEventIds: sin repetidos no lanza")
     void validateNoDuplicateEventIdsSinRepetidosNoLanza() {
         List<PreviewAllocationDto> allocations = List.of(
-                new PreviewAllocationDto(1L, 5), new PreviewAllocationDto(2L, 6));
+                new PreviewAllocationDto(1L, 5L), new PreviewAllocationDto(2L, 6L));
 
         assertThatCode(() -> validator.validateNoDuplicateEventIds(allocations)).doesNotThrowAnyException();
     }
@@ -53,7 +53,7 @@ class PreviewValidatorTest {
     @Test
     @DisplayName("validateAllocationsBelongToPreview: evento ajeno al preview lanza AllocationConflictException")
     void validateAllocationsBelongToPreviewAjenoLanza() {
-        List<PreviewAllocationDto> allocations = List.of(new PreviewAllocationDto(99L, 5));
+        List<PreviewAllocationDto> allocations = List.of(new PreviewAllocationDto(99L, 5L));
 
         assertThatThrownBy(() -> validator.validateAllocationsBelongToPreview(allocations, Set.of(1L, 2L)))
                 .isInstanceOf(AllocationConflictException.class);
@@ -62,7 +62,7 @@ class PreviewValidatorTest {
     @Test
     @DisplayName("validateAllocationsBelongToPreview: todos pertenecen al preview no lanza")
     void validateAllocationsBelongToPreviewTodosPertenecenNoLanza() {
-        List<PreviewAllocationDto> allocations = List.of(new PreviewAllocationDto(1L, 5));
+        List<PreviewAllocationDto> allocations = List.of(new PreviewAllocationDto(1L, 5L));
 
         assertThatCode(() -> validator.validateAllocationsBelongToPreview(allocations, Set.of(1L, 2L)))
                 .doesNotThrowAnyException();
@@ -75,20 +75,20 @@ class PreviewValidatorTest {
         LocalDate date = futureDate(1);
         LocalTime start = LocalTime.of(8, 0);
         LocalTime end = LocalTime.of(9, 30);
-        OccupiedSlot dbSlot = new OccupiedSlot(5, date, start, end, 99L, 500L);
-        ResolvedProposal previewProposal = new ResolvedProposal(1L, 6, List.of(date), start, end);
+        OccupiedSlot dbSlot = new OccupiedSlot(5L, date, start, end, 99L, 500L);
+        ResolvedProposal previewProposal = new ResolvedProposal(1L, 6L, List.of(date), start, end);
 
-        List<MoveConflictDto> conflicts = validator.unresolvedConflicts(Set.of(5, 6), Set.of(date), start, end,
+        List<MoveConflictDto> conflicts = validator.unresolvedConflicts(Set.of(5L, 6L), Set.of(date), start, end,
                 List.of(dbSlot), List.of(previewProposal));
 
         assertThat(conflicts).hasSize(2);
         assertThat(conflicts).anySatisfy(c -> {
-            assertThat(c.classroomId()).isEqualTo(5);
+            assertThat(c.classroomId()).isEqualTo(5L);
             assertThat(c.origin()).isEqualTo(ConflictOrigin.DATABASE);
             assertThat(c.conflictingEventId()).isEqualTo(99L);
         });
         assertThat(conflicts).anySatisfy(c -> {
-            assertThat(c.classroomId()).isEqualTo(6);
+            assertThat(c.classroomId()).isEqualTo(6L);
             assertThat(c.origin()).isEqualTo(ConflictOrigin.PREVIEW);
             assertThat(c.conflictingEventId()).isEqualTo(1L);
         });
@@ -101,10 +101,10 @@ class PreviewValidatorTest {
         LocalDate date2 = futureDate(8);
         LocalTime start = LocalTime.of(8, 0);
         LocalTime end = LocalTime.of(9, 30);
-        OccupiedSlot slot1 = new OccupiedSlot(5, date1, start, end, 99L, 500L);
-        OccupiedSlot slot2 = new OccupiedSlot(5, date2, start, end, 98L, 501L);
+        OccupiedSlot slot1 = new OccupiedSlot(5L, date1, start, end, 99L, 500L);
+        OccupiedSlot slot2 = new OccupiedSlot(5L, date2, start, end, 98L, 501L);
 
-        List<MoveConflictDto> conflicts = validator.unresolvedConflicts(Set.of(5), Set.of(date1, date2), start, end,
+        List<MoveConflictDto> conflicts = validator.unresolvedConflicts(Set.of(5L), Set.of(date1, date2), start, end,
                 List.of(slot1, slot2), List.of());
 
         assertThat(conflicts).hasSize(1);
@@ -117,13 +117,13 @@ class PreviewValidatorTest {
         LocalDate date = futureDate(1);
         LocalTime start = LocalTime.of(8, 0);
         LocalTime end = LocalTime.of(9, 30);
-        OccupiedSlot dbSlot = new OccupiedSlot(5, date, start, end, 99L, 500L);
+        OccupiedSlot dbSlot = new OccupiedSlot(5L, date, start, end, 99L, 500L);
 
-        List<MoveConflictDto> conflicts = validator.unresolvedConflicts(Set.of(5, 7), Set.of(date), start, end,
+        List<MoveConflictDto> conflicts = validator.unresolvedConflicts(Set.of(5L, 7L), Set.of(date), start, end,
                 List.of(dbSlot), List.of());
 
         assertThat(conflicts).hasSize(1);
-        assertThat(conflicts.getFirst().classroomId()).isEqualTo(5);
+        assertThat(conflicts.getFirst().classroomId()).isEqualTo(5L);
     }
 
     @Test
@@ -134,7 +134,7 @@ class PreviewValidatorTest {
         LocalTime end = LocalTime.of(9, 30);
         ResolvedProposal sinAula = new ResolvedProposal(2L, null, List.of(date), start, end);
 
-        List<MoveConflictDto> conflicts = validator.unresolvedConflicts(Set.of(6), Set.of(date), start, end,
+        List<MoveConflictDto> conflicts = validator.unresolvedConflicts(Set.of(6L), Set.of(date), start, end,
                 List.of(), List.of(sinAula));
 
         assertThat(conflicts).isEmpty();

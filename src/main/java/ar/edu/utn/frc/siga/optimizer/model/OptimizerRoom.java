@@ -3,7 +3,7 @@ package ar.edu.utn.frc.siga.optimizer.model;
 import org.springframework.modulith.NamedInterface;
 
 @NamedInterface("api")
-public record OptimizerRoom(Integer id, Integer capacity, Integer buildingId) {
+public record OptimizerRoom(Long id, Integer capacity, Long buildingId) {
     public int overcrowding(int enrolled) {
         return Math.max(0, enrolled - capacity);
     }

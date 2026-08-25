@@ -13,7 +13,5 @@ public interface SubjectCommissionService {
 
     List<SubjectCommissionResponseDto> findAll();
 
-    SubjectCommissionResponseDto findById(Long id);
-
     List<SubjectCommissionResponseDto> findBySubjectId(Long subjectId);
 }

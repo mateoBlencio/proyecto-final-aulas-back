@@ -12,8 +12,10 @@ post {
 
 docs {
   Dispara el resync de Edificios, Aulas, Especialidades y Comisiones contra
-  SysAcad, en ese orden (por FK). Corre asíncrono: responde 202 de inmediato
-  con el estado previo del sync, sin esperar a que SysAcad termine. Si ya hay
-  un resync en curso, el disparo se ignora. Requiere rol SUBSECRETARIA y
-  siga.sysacad.enabled=true en el backend.
+  SysAcad, en ese orden (por FK). Espera a que termine (incluyendo reintentos
+  ante errores transitorios) y devuelve el estado resultante. Responde 200 si
+  las 4 vistas sincronizaron bien, 207 si al menos una falló por datos, 503 si
+  no se pudo establecer conexión con SysAcad (red/VPN caída). Si ya hay un
+  resync en curso, el disparo se ignora y devuelve 200 con el estado previo.
+  Requiere rol SUBSECRETARIA y siga.sysacad.enabled=true en el backend.
 }

@@ -1,6 +1,5 @@
 package ar.edu.utn.frc.siga.space.sync;
 
-import ar.edu.utn.frc.siga.common.model.RecordSource;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
@@ -81,7 +80,7 @@ public class ClassroomSyncService implements SysacadViewSyncer {
                 continue;
             }
 
-            ClassroomKey key = new ClassroomKey(building.getId(), String.valueOf(row.roomNumber()));
+            ClassroomKey key = new ClassroomKey(building.getId(), row.roomNumber());
             incoming.add(key);
             String hash = Hashes.sha256Hex(row.capacity(), row.isEnabled());
             Classroom classroom = existing.get(key);
@@ -95,12 +94,9 @@ public class ClassroomSyncService implements SysacadViewSyncer {
                         .building(building)
                         .classroomType(defaultType)
                         .capacity(row.capacity())
-                        .available(row.isEnabled())
                         .sysacadEnabled(row.isEnabled())
-                        .source(RecordSource.SYSACAD)
                         .syncedAt(syncedAt)
                         .sysacadHash(hash)
-                        .presentInSysacad(true)
                         .build());
                 existing.put(key, saved);
                 affected++;
@@ -109,15 +105,12 @@ public class ClassroomSyncService implements SysacadViewSyncer {
             if (isUpToDate(classroom, hash)) {
                 continue;
             }
-            // `piso`, `classroomType` y `available` son local-owned: el sync nunca los pisa en
-            // un update (§4.3). `sysacadEnabled` sí refleja siempre la respuesta cruda de SysAcad.
+            // `classroomType` es local-owned: el sync nunca lo pisa en un update (§4.3).
             // Al crear sí se asigna un default (§ constraint NOT NULL), ver resolveDefaultClassroomType().
             classroom.setCapacity(row.capacity());
             classroom.setSysacadEnabled(row.isEnabled());
-            classroom.setSource(RecordSource.SYSACAD);
             classroom.setSyncedAt(syncedAt);
             classroom.setSysacadHash(hash);
-            classroom.setPresentInSysacad(true);
             classroomRepository.save(classroom);
             affected++;
         }
@@ -128,13 +121,9 @@ public class ClassroomSyncService implements SysacadViewSyncer {
     private int markAbsent(Iterable<Classroom> existing, Set<ClassroomKey> incoming, Instant syncedAt) {
         int affected = 0;
         for (Classroom classroom : existing) {
-            if (incoming.contains(keyOf(classroom))
-                    || classroom.getSource() != RecordSource.SYSACAD
-                    || Boolean.FALSE.equals(classroom.getPresentInSysacad())) {
+            if (incoming.contains(keyOf(classroom)) || Boolean.FALSE.equals(classroom.getSysacadEnabled())) {
                 continue;
             }
-            classroom.setPresentInSysacad(false);
-            classroom.setAvailable(false);
             classroom.setSysacadEnabled(false);
             classroom.setSyncedAt(syncedAt);
             classroomRepository.save(classroom);
@@ -155,10 +144,8 @@ public class ClassroomSyncService implements SysacadViewSyncer {
     }
 
     private static boolean isUpToDate(Classroom classroom, String hash) {
-        return hash.equals(classroom.getSysacadHash())
-                && Boolean.TRUE.equals(classroom.getPresentInSysacad())
-                && classroom.getSource() == RecordSource.SYSACAD;
+        return hash.equals(classroom.getSysacadHash()) && Boolean.TRUE.equals(classroom.getSysacadEnabled());
     }
 
-    private record ClassroomKey(Integer buildingId, String roomNumber) {}
+    private record ClassroomKey(Long buildingId, Integer roomNumber) {}
 }

@@ -6,8 +6,6 @@ import org.springframework.modulith.NamedInterface;
 public record CommissionResponseDto(
         Long id,
         String courseCode,
-        Integer commissionNumber,
-        Integer yearLevel,
         AcademicPeriodResponseDto academicPeriod
 ) {
 }

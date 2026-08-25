@@ -24,11 +24,11 @@ class AllocationTargetResolver {
     private final OccurrenceService occurrenceService;
     private final AllocationValidator validator;
 
-    Map<OccurrenceSlotDto, Integer> resolveClassroomByOccurrence(List<AllocationItem> items, LocalDate clampFrom) {
-        Map<OccurrenceSlotDto, Integer> classroomByOccurrence = new LinkedHashMap<>();
+    Map<OccurrenceSlotDto, Long> resolveClassroomByOccurrence(List<AllocationItem> items, LocalDate clampFrom) {
+        Map<OccurrenceSlotDto, Long> classroomByOccurrence = new LinkedHashMap<>();
         for (AllocationItem item : items) {
             for (OccurrenceSlotDto occurrence : resolveApplicable(item.target(), clampFrom)) {
-                Integer previous = classroomByOccurrence.putIfAbsent(occurrence, item.classroomId());
+                Long previous = classroomByOccurrence.putIfAbsent(occurrence, item.classroomId());
                 if (previous != null) {
                     throw new AllocationConflictException(
                             "La ocurrencia " + occurrence.occurrenceId() + " está apuntada por más de un item del lote.");

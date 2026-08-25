@@ -42,12 +42,12 @@ class IngestRowBatchProcessorTest {
                 LocalTime.of(18, 0), LocalTime.of(19, 30), null, 1, 1, 100, "Materia", 30);
     }
 
-    private IngestRowResolver.ResolvedRow resolved(Long eventId, boolean created, Integer classroomBuildingId) {
+    private IngestRowResolver.ResolvedRow resolved(Long eventId, boolean created, Long classroomBuildingId) {
         SubjectResponseDto subject = new SubjectResponseDto(10L, 100, "Materia", "Anual", null);
-        CommissionResponseDto commission = new CommissionResponseDto(20L, "6301", 1, 1, null);
-        BuildingResponseDto building = new BuildingResponseDto(5, "Edificio Central", 1, true);
+        CommissionResponseDto commission = new CommissionResponseDto(20L, "6301", null);
+        BuildingResponseDto building = new BuildingResponseDto(5L, "Edificio Central", true);
         ClassroomResponseDto classroom = new ClassroomResponseDto(
-                50, "105", 1, 40, true, classroomBuildingId, "Edificio Real", 1, "Aula");
+                50L, 105, 40, classroomBuildingId, "Edificio Real", 1L, "Aula");
         return new IngestRowResolver.ResolvedRow(eventId, created, subject, commission, building, classroom);
     }
 
@@ -55,7 +55,7 @@ class IngestRowBatchProcessorTest {
     @DisplayName("fila resuelta: incrementa processedRows, agrega la asignación pendiente por evento")
     void filaResueltaAgregaAsignacionPendiente() {
         when(rowResolver.resolve(any(), any(), anyInt(), any(), any(), any(), any()))
-                .thenReturn(resolved(1L, true, 5));
+                .thenReturn(resolved(1L, true, 5L));
 
         IngestRowBatchProcessor.BatchResult result = processor().process(List.of(new ImportedRow(7, row("Anual"))), 2026);
 
@@ -65,14 +65,14 @@ class IngestRowBatchProcessorTest {
         assertThat(result.rowWarnings()).isEmpty();
         assertThat(result.pendingAllocations()).hasSize(1);
         assertThat(result.pendingAllocations().getFirst().target()).isEqualTo(new AllocationTarget.Event(1L));
-        assertThat(result.pendingAllocations().getFirst().classroomId()).isEqualTo(50);
+        assertThat(result.pendingAllocations().getFirst().classroomId()).isEqualTo(50L);
     }
 
     @Test
     @DisplayName("aula resuelta en un edificio distinto al informado: agrega warning pero sigue procesando")
     void aulaEnEdificioDistintoAgregaWarning() {
         when(rowResolver.resolve(any(), any(), anyInt(), any(), any(), any(), any()))
-                .thenReturn(resolved(1L, false, 7)); // classroom.buildingId=7 != building.id=5
+                .thenReturn(resolved(1L, false, 7L)); // classroom.buildingId=7 != building.id=5
 
         IngestRowBatchProcessor.BatchResult result = processor().process(List.of(new ImportedRow(7, row("Anual"))), 2026);
 
@@ -86,7 +86,7 @@ class IngestRowBatchProcessorTest {
     void filaQueNoResuelveSeSalteaYElLoteSigue() {
         when(rowResolver.resolve(any(), any(), anyInt(), any(), any(), any(), any()))
                 .thenThrow(ResourceNotFoundException.of("Subject", 999))
-                .thenReturn(resolved(2L, true, 5));
+                .thenReturn(resolved(2L, true, 5L));
 
         IngestRowBatchProcessor.BatchResult result = processor().process(
                 List.of(new ImportedRow(7, row("Anual")), new ImportedRow(8, row("Anual"))), 2026);
@@ -109,7 +109,7 @@ class IngestRowBatchProcessorTest {
     @DisplayName("startDate/endDate del año se derivan del TermType de la fila")
     void startEndDateSeDerivanDelTermType() {
         when(rowResolver.resolve(any(), any(), anyInt(), any(), any(), any(), any()))
-                .thenReturn(resolved(1L, true, 5));
+                .thenReturn(resolved(1L, true, 5L));
 
         processor().process(List.of(new ImportedRow(7, row("1 Cuat."))), 2026);
 

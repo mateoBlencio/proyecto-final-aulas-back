@@ -11,6 +11,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,7 +22,7 @@ import org.hibernate.annotations.SQLRestriction;
 @Entity
 @Table(name = "materia",
        uniqueConstraints = @UniqueConstraint(columnNames = {"codigo_materia", "id_plan"}))
-@SQLRestriction("eliminado = false")
+@SQLRestriction("eliminado_en IS NULL")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -47,7 +48,6 @@ public class Subject extends TimestampedEntity {
     @Column(name = "dictado")
     private String term;
 
-    @Column(name = "eliminado")
-    @Builder.Default
-    private Boolean deleted = false;
+    @Column(name = "eliminado_en")
+    private Instant deletedAt;
 }

@@ -125,7 +125,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
     @Override
     @Transactional
-    public void revokeAllByUserId(Integer userId) {
+    public void revokeAllByUserId(Long userId) {
         refreshTokenRepository.revokeAllByUserId(userId, Instant.now());
     }
 

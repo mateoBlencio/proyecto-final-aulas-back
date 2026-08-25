@@ -22,7 +22,8 @@ public final class SettingsCatalogFixture {
                 definition("preview.defaultTimeLimitSeconds", "30", "1", "3600"),
                 definition("preview.ttlMinutes", "30", "1", "1440"),
                 definition("events.hours.start", "08:00", null, null),
-                definition("events.hours.end", "23:00", null, null)));
+                definition("events.hours.end", "23:00", null, null),
+                definition("space.filterInactiveBuildings", "true", null, null)));
         return properties;
     }
 
