@@ -1,0 +1,82 @@
+meta {
+  name: Impacto de una reasignación (no escribe)
+  type: http
+  seq: 18
+}
+
+post {
+  url: {{baseUrl}}/v1/allocations/impact
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "items": [
+      {
+        "eventId": 55,
+        "from": "2026-03-03",
+        "to": "2026-04-14",
+        "classroomId": 12
+      }
+    ]
+  }
+}
+
+docs {
+  Recibe EL MISMO body que POST/PUT /v1/allocations y responde qué pasaría si se
+  aplicara, sin escribir nada. Pensado para llamarlo al confirmar el formulario,
+  en vez de mandar el PUT a ciegas y comerse un 409.
+
+  Responde las dos cosas que un 409 no puede dar:
+
+  1. CUÁNTAS CLASES TOCA. El rango se expande en el servidor, así que el front
+     no tiene forma de saber el denominador: si son 3 o 15. Y cuando no hay
+     conflicto no hay error que leer.
+  2. LOS CHOQUES COMO DATO, no como error, cada uno con el evento que ocupa el
+     aula y las aulas libres en esa fecha y franja para poder destrabarlo.
+
+  Siempre 200, incluso con conflictos. Sigue devolviendo 400 si el pedido está
+  mal formado (from en el pasado, to antes que from, from/to con occurrenceIds)
+  y 409 si pide un aula inexistente o una ocurrencia ya pasada: eso no es un
+  resultado para mostrar, es un pedido que no se puede ni evaluar.
+
+  Respuesta:
+  {
+    "totalClasses": 7,
+    "movableClasses": 6,
+    "blockedClasses": 1,
+    "occurrences": [
+      { "occurrenceId": 701, "eventId": 55, "date": "2026-03-03",
+        "startTime": "18:00:00", "endTime": "20:00:00",
+        "currentClassroomId": 3, "requestedClassroomId": 12, "blocked": false }
+    ],
+    "conflicts": [
+      { "occurrenceId": 704, "date": "2026-03-24",
+        "startTime": "18:00:00", "endTime": "20:00:00",
+        "requestedClassroomId": 12,
+        "blockedBy": { "kind": "EXISTING_ALLOCATION", "eventId": 88,
+                       "eventType": "UNIQUE_EVENT", "occurrenceId": 950,
+                       "allocationId": 3001 },
+        "alternativeClassrooms": [ { "id": 31, "roomNumber": "31", "...": "..." } ] }
+    ]
+  }
+
+  CÓMO DESTRABAR UN CONFLICTO (ver PARA-FRONT: no hace falta endpoint nuevo, se
+  resuelve armando bien el lote del PUT):
+
+  - Correr al que bloquea, si blockedBy.kind es EXISTING_ALLOCATION: un lote con
+    { "occurrenceIds": [blockedBy.occurrenceId], "classroomId": <alternativa> }
+    MÁS el item del rango original. Las ocurrencias que van en el lote se
+    excluyen de la ocupación existente, así que el swap valida y entra atómico.
+  - Correr la propia clase: PARTIR el rango en tres items (antes / la fecha del
+    choque a otra aula / después). NO mandar el rango completo más un item
+    "excepción" para esa fecha: eso da 409 "la ocurrencia está apuntada por más
+    de un item del lote".
+  - blockedBy.kind SAME_BATCH significa que dos items del propio pedido se pisan
+    entre sí. No hay nada escrito que mover: hay que corregir el lote.
+
+  Recordá que blockedClasses > 0 significa que el PUT equivalente falla ENTERO.
+  movableClasses dice cuántas se salvarían si se resolvieran los conflictos, no
+  que se vayan a aplicar sueltas.
+}

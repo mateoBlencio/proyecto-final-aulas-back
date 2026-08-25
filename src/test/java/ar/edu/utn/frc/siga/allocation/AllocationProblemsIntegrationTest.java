@@ -74,7 +74,7 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
 
     private void allocateOk(Long occurrenceId, Integer classroomId) throws Exception {
         var dto = new AllocationBatchRequestDto(
-                List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, classroomId)), null);
+                List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, null, null, classroomId)), null);
         mockMvc.perform(post("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(dto)))

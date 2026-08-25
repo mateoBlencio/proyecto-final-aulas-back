@@ -50,6 +50,7 @@ class AllocationTargetResolver {
         return switch (target) {
             case AllocationTarget.Occurrences(List<Long> occurrenceIds) -> {
                 List<OccurrenceSlotDto> occurrences = occurrenceService.findSlots(occurrenceIds);
+                validator.validateOccurrencesExist(occurrenceIds, occurrences);
                 occurrences.forEach(validator::validateNotPast);
                 yield occurrences;
             }
@@ -57,6 +58,16 @@ class AllocationTargetResolver {
                     .stream()
                     .filter(o -> clampFrom == null || !o.isPast())
                     .toList();
+            case AllocationTarget.EventRange(Long eventId, LocalDate from, LocalDate to) -> {
+                validator.validateRange(from, to);
+                // Se ignora el clamp del comando: el rango trae su propio 'desde', ya validado.
+                // El 'hasta' se filtra acá (no en la base) porque es un solo evento acotado.
+                List<OccurrenceSlotDto> occurrences = occurrenceService.findSlotsByEvent(eventId, from).stream()
+                        .filter(o -> to == null || !o.date().isAfter(to))
+                        .toList();
+                occurrences.forEach(validator::validateNotPast);
+                yield occurrences;
+            }
         };
     }
 }

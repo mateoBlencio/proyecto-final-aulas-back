@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.allocation.mapper;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.stereotype.Component;
@@ -27,16 +28,22 @@ public class AllocationCommandMapper {
     }
 
     private AllocationItem toItem(AllocationItemRequestDto dto) {
-        return new AllocationItem(toTarget(dto.occurrenceIds(), dto.eventId()), dto.classroomId());
+        return new AllocationItem(
+                toTarget(dto.occurrenceIds(), dto.eventId(), dto.from(), dto.to()), dto.classroomId());
     }
 
     private AllocationTarget toTarget(DeallocationTargetRequestDto dto) {
-        return toTarget(dto.occurrenceIds(), dto.eventId());
+        return toTarget(dto.occurrenceIds(), dto.eventId(), null, null);
     }
 
-    private AllocationTarget toTarget(List<Long> occurrenceIds, Long eventId) {
-        return eventId != null
+    // Las combinaciones inválidas (rango sin evento, `to` sin `from`) no llegan hasta acá: las
+    // corta Bean Validation en AllocationItemRequestDto con un 400.
+    private AllocationTarget toTarget(List<Long> occurrenceIds, Long eventId, LocalDate from, LocalDate to) {
+        if (eventId == null) {
+            return new AllocationTarget.Occurrences(occurrenceIds);
+        }
+        return from == null
                 ? new AllocationTarget.Event(eventId)
-                : new AllocationTarget.Occurrences(occurrenceIds);
+                : new AllocationTarget.EventRange(eventId, from, to);
     }
 }
