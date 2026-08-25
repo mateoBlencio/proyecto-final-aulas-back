@@ -3,12 +3,8 @@ package ar.edu.utn.frc.siga.roomrequest.model;
 import java.util.Set;
 
 /**
- * Estados de un pedido dentro de una solicitud de aula ({@link RoomRequestItem}).
- * La cabecera no tiene estado: cada pedido se decide por separado.
- *
- * <p>Set inicial, pensado para ampliarse. Al agregar un valor hay que actualizar
- * el check constraint {@code chk_solicitud_item_estado} en la base de dev
- * <b>y</b> en la de test.
+ * Estados de un pedido ({@link RoomRequestItem}); la cabecera no tiene estado propio.
+ * Al agregar un valor, actualizar el check constraint {@code chk_solicitud_item_estado} en dev y en test.
  */
 public enum RoomRequestStatus {
 

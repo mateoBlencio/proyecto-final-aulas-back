@@ -54,15 +54,22 @@ docs {
   formulario original es simplemente la cantidad de ítems.
 
   type: PARTIAL_EXAM | FINAL_EXAM | CONFERENCE | ONE_TIME_ROOM_CHANGE |
-  REGULAR_ROOM_CHANGE.
+  REGULAR_ROOM_CHANGE | OTHER.
   scope: GRADO | TECNICATURA | LICENCIATURA | EXTENSION | POSTGRADO.
 
   subjectId y commissionId son obligatorios para todos los tipos MENOS
-  CONFERENCE (una charla no está atada a una materia). Si vienen, se valida
-  que existan y que la comisión pertenezca a la materia → 400 si no.
+  CONFERENCE y OTHER (una charla o un pedido sin tipo definido no están
+  atados a una materia). Si vienen, se valida que existan y que la comisión
+  pertenezca a la materia → 400 si no.
 
-  Se envía hora de inicio y hora de FIN; el backend guarda inicio + duración
-  para que traducir la solicitud a un evento académico sea directo.
+  startTime/endTime/enrolled son obligatorios salvo en ONE_TIME_ROOM_CHANGE
+  y REGULAR_ROOM_CHANGE: ahí esos datos ya salen de la comisión/ocurrencia y
+  pedirlos de nuevo sería redundante. Se envía hora de inicio y hora de FIN;
+  el backend guarda inicio + duración para que traducir la solicitud a un
+  evento académico sea directo.
+
+  OTHER no exige materia ni horario, pero exige "observations" no vacío: es
+  la única forma de saber de qué se trata un pedido de este tipo.
 
   classroomCount > 1 significa aulas EN SIMULTÁNEO para la misma franja
   (ej. un parcial repartido en varias aulas).
@@ -76,9 +83,10 @@ docs {
   declarada: no se valida disponibilidad ni capacidad, solo que el aula
   exista.
 
-  Respuesta 201: la solicitud creada en estado PENDING, con materia,
-  comisión y aulas ya resueltas. Es lo que alimenta la pantalla de
-  confirmación del docente.
+  Respuesta 201: la solicitud creada, con materia, comisión y aulas ya
+  resueltas. La cabecera NO tiene estado: cada ítem trae su propio estado
+  (PENDING al crear). Es lo que alimenta la pantalla de confirmación del
+  docente.
 
   La solicitud NO asigna aulas ni crea eventos: es un pedido que
   subsecretaría analiza después.

@@ -33,17 +33,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Un pedido concreto dentro de una solicitud: una comisión, una fecha, un horario.
- * El formulario permite cargar varios ("cantidad de pedidos").
- *
- * <p><b>Es la unidad de decisión.</b> Cada pedido lleva su propio estado, porque
- * los pedidos de una misma solicitud pueden estar separados por meses: se puede
- * pre-aprobar el parcial de abril y dejar pendiente el recuperatorio de julio,
- * que todavía no se puede resolver.
- *
- * <p>Guarda duración y no hora de fin, para que traducirlo a un evento académico
- * sea directo ({@code AcademicEvent} también guarda inicio + duración). La
- * conversión desde la hora de fin que carga el docente se hace en el DTO.
+ * Un pedido concreto dentro de una solicitud (comisión, fecha, horario). Es la
+ * unidad de decisión: cada uno tiene su propio estado porque pueden resolverse
+ * en momentos distintos (ej. pre-aprobar abril y dejar pendiente julio).
  */
 @Entity
 @Table(name = "solicitud_aula_item",
@@ -99,11 +91,11 @@ public class RoomRequestItem {
     /** Null en ONE_TIME_ROOM_CHANGE/REGULAR_ROOM_CHANGE: sale de la comisión. */
     @Convert(converter = DurationMinutesConverter.class)
     @Column(name = "duracion_minutos")
-    private Duration duration; // aca en caso de tratarse de type clase (unica vez o recurrente) podriamos sacar los datos de sysacad
+    private Duration duration;
 
     /** Null en ONE_TIME_ROOM_CHANGE/REGULAR_ROOM_CHANGE: sale de los inscriptos de la materia. */
     @Column(name = "cantidad_inscriptos")
-    private Integer enrolled; // a chequear si debe seguir funcionado, si nosotros ya tenemos los datos desde sysacad
+    private Integer enrolled;
 
     @Column(name = "cantidad_estimada", nullable = false)
     private Integer estimated;
@@ -135,22 +127,11 @@ public class RoomRequestItem {
     @Column(name = "software_requerido", length = 255)
     private String requiredSoftware;
 
-    /**
-     * Texto libre del docente. El largo va explícito y no con el default de 255
-     * porque para las solicitudes de tipo {@code OTHER} es el <b>único</b> campo
-     * que describe el pedido, así que un párrafo entero es el caso esperado.
-     * El {@code @Size} espejo en el DTO es el que convierte pasarse de largo en
-     * un 400 en vez de un 500 al insertar.
-     */
+    /** Largo explícito (no el default 255): en OTHER es el único campo que describe el pedido. */
     @Column(name = "observaciones", length = 1000)
     private String observations;
 
-    /**
-     * No entra en el entity graph de la solicitud: fetchear dos bags en la
-     * misma query rompe con {@code MultipleBagFetchException}. El
-     * {@code @BatchSize} hace que cargarlas para todos los ítems de una
-     * solicitud sea una query y no una por ítem.
-     */
+    /** Fuera del entity graph de la solicitud (dos bags en la misma query = {@code MultipleBagFetchException}). */
     @OneToMany(mappedBy = "item", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("position ASC")
     @BatchSize(size = 50)
@@ -167,10 +148,7 @@ public class RoomRequestItem {
         this.position = position;
     }
 
-    /**
-     * Registra una decisión sobre este pedido. La legalidad de la transición
-     * la valida {@code RoomRequestValidator} antes de llamar acá.
-     */
+    /** La legalidad de la transición ya la validó {@code RoomRequestValidator}. */
     public void decide(RoomRequestStatus target, String decidedBy, String reason, LocalDateTime decidedAt) {
         this.status = target;
         this.decidedBy = decidedBy;
@@ -178,16 +156,10 @@ public class RoomRequestItem {
         this.decidedAt = decidedAt;
     }
 
-    /**
-     * Agrega varias aulas de preferencia respetando el orden recibido, que es
-     * el orden de prioridad que declaró el docente. "Sin preferencias" es una
-     * lista vacía, no {@code null}: normalizarlo es tarea del DTO de entrada.
-     */
     public void addPreferences(List<Integer> classroomIds) {
         classroomIds.forEach(this::addPreference);
     }
 
-    /** Agrega un aula de preferencia al final del orden de prioridad. */
     public void addPreference(Integer classroomId) {
         preferences.add(RoomPreference.builder()
                 .item(this)

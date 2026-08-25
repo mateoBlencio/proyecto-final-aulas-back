@@ -20,11 +20,7 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Reglas de negocio que Bean Validation no puede expresar: obligatoriedad
- * condicional por tipo, existencia de las referencias a otros módulos y
- * legalidad de los cambios de estado.
- */
+/** Reglas de negocio que Bean Validation no puede expresar: obligatoriedad condicional por tipo, referencias a otros módulos y transiciones de estado. */
 @Component
 @RequiredArgsConstructor
 public class RoomRequestValidator {
@@ -35,12 +31,9 @@ public class RoomRequestValidator {
     private final ClassroomService classroomService;
 
     /**
-     * Valida la solicitud completa antes de persistirla.
-     *
-     * <p>Primero todo lo que se resuelve con los datos del propio DTO y después
-     * lo que necesita ir a la base: así una solicitud mal armada se rechaza sin
-     * gastar una sola query. El orden es parte del contrato, no un detalle —
-     * hay tests que verifican que un rechazo temprano no toca ningún módulo.
+     * Primero lo que se resuelve con el propio DTO, después lo que pega a la base:
+     * así un pedido mal armado se rechaza sin gastar queries. El orden es contrato
+     * (hay tests que verifican que un rechazo temprano no toca otros módulos).
      */
     public void validateForCreation(CreateRoomRequestDto dto) {
         validateAcademicReference(dto);
@@ -52,11 +45,7 @@ public class RoomRequestValidator {
         validateClassroomsExist(dto);
     }
 
-    /**
-     * Una charla, conferencia u otro tipo sin definir no está atada a una
-     * materia; el resto de los tipos sí. Mismo criterio que
-     * {@code EventScheduleValidator} en events.
-     */
+    /** CONFERENCE/OTHER no atan a una materia; el resto sí (mismo criterio que {@code EventScheduleValidator} en events). */
     private void validateAcademicReference(CreateRoomRequestDto dto) {
         RoomRequestType type = dto.type();
         if (!type.requiresAcademicReference()) {
@@ -75,13 +64,9 @@ public class RoomRequestValidator {
     }
 
     /**
-     * {@code startTime}/{@code endTime}/{@code enrolled} son obligatorios salvo
-     * en {@code ONE_TIME_ROOM_CHANGE}/{@code REGULAR_ROOM_CHANGE}, donde esos
-     * datos ya salen de la comisión y su ocurrencia — pedirlos de nuevo en el
-     * formulario sería redundante y una fuente más de inconsistencia. Bean
-     * Validation no puede expresar "obligatorio según el tipo", así que
-     * {@code CreateRoomRequestItemDto} los declara opcionales y la obligatoriedad
-     * condicional se resuelve acá, igual que {@link #validateAcademicReference}.
+     * Obligatorios salvo en los cambios de aula, donde ya salen de la comisión/ocurrencia.
+     * Bean Validation no expresa "obligatorio según el tipo", por eso el DTO los declara
+     * opcionales y la condición se resuelve acá (igual que {@link #validateAcademicReference}).
      */
     private void validateScheduleAndEnrollment(CreateRoomRequestDto dto) {
         RoomRequestType type = dto.type();
@@ -126,10 +111,7 @@ public class RoomRequestValidator {
         }
     }
 
-    /**
-     * Las aulas referenciadas existen. No se valida disponibilidad ni capacidad:
-     * son preferencias declaradas por el docente, no una asignación.
-     */
+    /** Las aulas existen; no se valida disponibilidad ni capacidad: son preferencias, no una asignación. */
     private void validateClassroomsExist(CreateRoomRequestDto dto) {
         Set<Integer> classroomIds = new LinkedHashSet<>();
         for (CreateRoomRequestItemDto item : dto.items()) {
@@ -152,21 +134,10 @@ public class RoomRequestValidator {
     }
 
     /**
-     * {@code requiresExamUsers} son usuarios de examen a nivel de la computadora
-     * del aula, así que la pregunta sólo existe para un parcial o final que
-     * además pide computadoras. La regla es un si y sólo si:
-     *
-     * <ul>
-     *   <li>parcial o final <b>con</b> computadoras: el docente tiene que
-     *       contestar, {@code true} o {@code false}. Un null ahí es el
-     *       formulario incompleto, no un "no".</li>
-     *   <li>cualquier otro caso: tiene que venir en null, porque la pregunta ni
-     *       siquiera se le mostró.</li>
-     * </ul>
-     *
-     * <p>Por eso {@code false} no es equivalente a null: uno significa "le
-     * preguntamos y dijo que no" y el otro "no aplica". El valor se guarda como
-     * {@code Boolean} nullable justamente para poder distinguirlos.
+     * Si-y-sólo-si: parcial/final con computadoras exige {@code true}/{@code false}
+     * explícito (null = formulario incompleto); cualquier otro caso exige null,
+     * porque la pregunta ni se mostró. Por eso el campo es {@code Boolean} nullable:
+     * {@code false} ("dijo que no") y null ("no aplica") no son lo mismo.
      */
     private void validateExamUsers(CreateRoomRequestDto dto) {
         boolean examType = dto.type().isExam();
@@ -185,14 +156,7 @@ public class RoomRequestValidator {
         }
     }
 
-    /**
-     * {@code OTHER} no tiene reglas de negocio propias todavía y no exige
-     * referencia académica, así que sin este chequeo un pedido de ese tipo
-     * podría llegar sin absolutamente ningún dato que diga de qué se trata.
-     * {@code observations} es el único campo libre que ya existe en el item;
-     * reusarlo evita otra columna/migración para algo que todavía no sabemos
-     * cómo va a usarse en la práctica.
-     */
+    /** OTHER no exige referencia académica ni tiene reglas propias; sin esto podría llegar sin ningún dato. */
     private void validateOtherHasObservations(CreateRoomRequestDto dto) {
         if (dto.type() != RoomRequestType.OTHER) {
             return;

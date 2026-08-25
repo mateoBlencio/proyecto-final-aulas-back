@@ -16,19 +16,9 @@ import org.mapstruct.Mapping;
 import java.util.List;
 
 /**
- * Mapper puro: solo campos propios. Los datos de otros módulos (materia,
- * comisión, aulas) los resuelve {@link RoomRequestComposer} y se los pasa
- * ya armados, siguiendo el patrón mapper + composer (ADR-002).
- *
- * <p>De entrada arma el agregado campo a campo; lo que es responsabilidad de
- * las entidades (posición del ítem, vínculo con la cabecera, preferencias)
- * queda ignorado acá y lo resuelven ellas.
- *
- * <p><b>Ojo con los {@code ignore = true}:</b> varios no significan "queda en
- * null" sino "lo pone el {@code @Builder.Default} de la entidad" — es el caso
- * de {@code status}, {@code items} y {@code preferences}. Si alguien saca uno
- * de esos defaults, el mapper empieza a producir nulls en silencio y el error
- * recién aparece como violación de NOT NULL al insertar.
+ * Mapper puro: solo campos propios (datos de otros módulos los resuelve {@link RoomRequestComposer}, ADR-002).
+ * Ojo: varios {@code ignore = true} ({@code status}, {@code items}, {@code preferences}) no significan
+ * null, sino "lo pone el {@code @Builder.Default} de la entidad" — sacar ese default rompe en silencio.
  */
 @Mapper(config = CentralMapperConfig.class)
 public interface RoomRequestMapper {
@@ -40,14 +30,9 @@ public interface RoomRequestMapper {
     RoomRequest toEntity(CreateRoomRequestDto dto);
 
     /**
-     * El ítem nace suelto: {@link RoomRequest#addItem} le asigna posición y
-     * cabecera, y las preferencias las agrega {@link RoomRequestItem#addPreferences}
-     * para que se numeren solas.
-     *
-     * <p>{@code duration} va por {@code expression} y no por {@code source}
-     * porque MapStruct sólo ve los componentes del record, no los accessors
-     * derivados. Eso ata la expresión al nombre del parámetro: si se renombra
-     * {@code dto}, el error sale sobre el código generado.
+     * El ítem nace suelto: {@link RoomRequest#addItem} asigna posición y cabecera.
+     * {@code duration} va por {@code expression} y no {@code source} porque MapStruct
+     * no ve accessors derivados del record, solo sus componentes.
      */
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "request", ignore = true)

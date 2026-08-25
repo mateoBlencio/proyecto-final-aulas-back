@@ -15,15 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Alta de solicitudes de aula.
- *
- * <p><b>Endpoint público:</b> lo consume un docente sin usuario en el sistema.
- * El {@code permitAll} está declarado en {@code SecurityConfig} y es acotado a
- * este POST; el resto de {@code /v1/**} sigue requiriendo autenticación.
- * La protección contra abuso la da el {@code RateLimitFilter} general, que
- * corre sobre todas las requests con o sin auth.
- */
+/** Alta pública de solicitudes de aula ({@code permitAll} acotado a este POST en {@code SecurityConfig}; protegido por {@code RateLimitFilter}). */
 @Slf4j
 @RestController
 @RequestMapping("${siga.api.base-path}/room-requests")

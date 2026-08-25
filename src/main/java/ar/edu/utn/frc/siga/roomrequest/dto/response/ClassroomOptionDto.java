@@ -1,12 +1,6 @@
 package ar.edu.utn.frc.siga.roomrequest.dto.response;
 
-/**
- * Opción de aula para el combo público del formulario.
- *
- * <p>A propósito expone lo mínimo (identificación y edificio) y no capacidad,
- * disponibilidad ni tipo: el catálogo completo de aulas es información para
- * personal interno, y este endpoint es público.
- */
+/** Opción de aula para el combo público: expone solo identificación y edificio, nada del catálogo interno. */
 public record ClassroomOptionDto(
         Integer id,
         String roomNumber,

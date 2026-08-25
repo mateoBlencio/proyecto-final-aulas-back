@@ -7,13 +7,7 @@ import ar.edu.utn.frc.siga.roomrequest.dto.response.SubjectOptionDto;
 
 import java.util.List;
 
-/**
- * Lectura pública y acotada de los catálogos que necesita el formulario.
- *
- * <p>No expone los controllers de {@code academic} y {@code space}, que están
- * cerrados por rol para personal interno: consume sus fachadas {@code api} y
- * devuelve solo los campos necesarios para poblar los combos.
- */
+/** Lectura pública y acotada de los catálogos que necesita el formulario (no expone los controllers internos). */
 public interface RoomRequestCatalogService {
 
     List<SpecialtyOptionDto> findSpecialties();
