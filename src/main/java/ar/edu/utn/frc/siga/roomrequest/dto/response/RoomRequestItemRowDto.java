@@ -8,11 +8,6 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
-/**
- * Fila de {@code GET /v1/room-requests/items}: un pedido, no una solicitud. La cabecera
- * ({@link #request}) viaja aplanada porque una solicitud con varios ítems puede tener uno resuelto
- * y otro pendiente (ver {@code RoomRequestStatus}), así que la unidad de decisión es el ítem.
- */
 public record RoomRequestItemRowDto(
         Long itemId,
         Integer position,

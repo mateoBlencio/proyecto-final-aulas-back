@@ -55,10 +55,6 @@ public class RoomRequestServiceImpl implements RoomRequestService {
         return composer.compose(saved);
     }
 
-    /**
-     * {@code readOnly}: con OSIV desactivado (ADR-005). No se usa {@code page.map(...)} porque el
-     * composer resuelve todo el batch de una vez, no fila por fila.
-     */
     @Override
     @Transactional(readOnly = true)
     public Page<RoomRequestItemRowDto> findItems(RoomRequestItemFilter filter, Pageable pageable) {
