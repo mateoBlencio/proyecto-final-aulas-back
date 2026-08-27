@@ -5,10 +5,8 @@ import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
-/** Sin estado ni decisión: eso vive en {@link RoomRequestItemResponseDto}, uno por pedido. */
-public record RoomRequestResponseDto(
+public record RoomRequestItemDetailHeaderDto(
         Long id,
         RoomRequestType type,
         AcademicScope scope,
@@ -16,6 +14,5 @@ public record RoomRequestResponseDto(
         String teacherEmail,
         String teacherPhone,
         SubjectResponseDto subject,
-        LocalDateTime createdAt,
-        List<RoomRequestItemResponseDto> items
+        LocalDateTime createdAt
 ) {}

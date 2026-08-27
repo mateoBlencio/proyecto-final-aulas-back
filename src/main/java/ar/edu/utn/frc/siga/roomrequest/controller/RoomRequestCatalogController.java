@@ -17,14 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/**
- * Combos del formulario público de solicitud de aula.
- *
- * <p><b>Endpoints públicos.</b> Existen en vez de abrir los controllers de
- * {@code academic} y {@code space}, que están cerrados por rol porque son el
- * catálogo del personal interno: acá se devuelve solo lo necesario para poblar
- * un combo, y "esto es público" se decide en un único lugar.
- */
+/** Combos públicos del formulario; evita abrir los controllers internos de {@code academic}/{@code space} (cerrados por rol). */
 @Slf4j
 @RestController
 @RequestMapping("${siga.api.base-path}/room-requests/catalog")

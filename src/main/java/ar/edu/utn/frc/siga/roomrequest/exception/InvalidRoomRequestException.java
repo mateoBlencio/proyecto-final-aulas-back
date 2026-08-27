@@ -5,7 +5,6 @@ import org.springframework.http.HttpStatus;
 
 import java.io.Serial;
 
-/** La solicitud no cumple una regla de negocio que Bean Validation no puede expresar. */
 public class InvalidRoomRequestException extends SigaAppException {
 
     @Serial
