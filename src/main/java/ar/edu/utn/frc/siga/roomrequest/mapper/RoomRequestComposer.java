@@ -7,7 +7,9 @@ import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemRowDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestResponseDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestRowHeaderDto;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomPreference;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +40,13 @@ public class RoomRequestComposer {
     private final CommissionService commissionService;
     private final ClassroomService classroomService;
 
+    /** Materia/comisión/aulas ya resueltas por batch para una tanda de solicitudes o de ítems. */
+    private record Catalogs(
+            Map<Long, SubjectResponseDto> subjectsById,
+            Map<Long, CommissionResponseDto> commissionsById,
+            Map<Integer, ClassroomOptionDto> classroomsById) {
+    }
+
     public RoomRequestResponseDto compose(RoomRequest request) {
         return compose(List.of(request)).getFirst();
     }
@@ -50,17 +60,55 @@ public class RoomRequestComposer {
             if (request.getSubjectId() != null) {
                 subjectIds.add(request.getSubjectId());
             }
-            for (RoomRequestItem item : request.getItems()) {
-                if (item.getCommissionId() != null) {
-                    commissionIds.add(item.getCommissionId());
-                }
-                if (item.getCurrentClassroomId() != null) {
-                    classroomIds.add(item.getCurrentClassroomId());
-                }
-                item.getPreferences().stream().map(RoomPreference::getClassroomId).forEach(classroomIds::add);
-            }
+            collectItemIds(request.getItems(), commissionIds, classroomIds);
         }
 
+        Catalogs catalogs = resolveCatalogs(subjectIds, commissionIds, classroomIds);
+
+        List<RoomRequestResponseDto> result = new ArrayList<>(requests.size());
+        for (RoomRequest request : requests) {
+            SubjectResponseDto subject = request.getSubjectId() != null
+                    ? catalogs.subjectsById().get(request.getSubjectId())
+                    : null;
+            result.add(mapper.toDto(request, subject, composeItems(request.getItems(), catalogs)));
+        }
+        return result;
+    }
+
+    /**
+     * Bandeja de pedidos ({@code GET /v1/room-requests/items}): la fila es el ítem, no la
+     * solicitud, así que la cabecera se resuelve una sola vez por {@code request.id} aunque
+     * varios ítems de la misma solicitud caigan en la misma página.
+     */
+    public List<RoomRequestItemRowDto> composeRows(Collection<RoomRequestItem> items) {
+        Set<Long> subjectIds = new LinkedHashSet<>();
+        Set<Long> commissionIds = new LinkedHashSet<>();
+        Set<Integer> classroomIds = new LinkedHashSet<>();
+
+        for (RoomRequestItem item : items) {
+            if (item.getRequest().getSubjectId() != null) {
+                subjectIds.add(item.getRequest().getSubjectId());
+            }
+        }
+        collectItemIds(items, commissionIds, classroomIds);
+
+        Catalogs catalogs = resolveCatalogs(subjectIds, commissionIds, classroomIds);
+
+        Map<Long, RoomRequestRowHeaderDto> headersByRequestId = new LinkedHashMap<>();
+        List<RoomRequestItemRowDto> result = new ArrayList<>(items.size());
+        for (RoomRequestItem item : items) {
+            RoomRequest request = item.getRequest();
+            RoomRequestRowHeaderDto header = headersByRequestId.computeIfAbsent(request.getId(),
+                    id -> mapper.toRowHeaderDto(request,
+                            request.getSubjectId() != null ? catalogs.subjectsById().get(request.getSubjectId()) : null));
+
+            result.add(mapper.toRowDto(item, header, resolveCommission(item, catalogs),
+                    resolveCurrentClassroom(item, catalogs), resolvePreferredClassrooms(item, catalogs)));
+        }
+        return result;
+    }
+
+    private Catalogs resolveCatalogs(Set<Long> subjectIds, Set<Long> commissionIds, Set<Integer> classroomIds) {
         Map<Long, SubjectResponseDto> subjectsById =
                 Maps.byId(subjectService.findByIds(subjectIds), SubjectResponseDto::id);
         Map<Long, CommissionResponseDto> commissionsById =
@@ -68,34 +116,42 @@ public class RoomRequestComposer {
         Map<Integer, ClassroomOptionDto> classroomsById =
                 Maps.byId(catalogMapper.toClassroomOptions(classroomService.findByIds(classroomIds)),
                         ClassroomOptionDto::id);
+        return new Catalogs(subjectsById, commissionsById, classroomsById);
+    }
 
-        List<RoomRequestResponseDto> result = new ArrayList<>(requests.size());
-        for (RoomRequest request : requests) {
-            SubjectResponseDto subject = request.getSubjectId() != null
-                    ? subjectsById.get(request.getSubjectId())
-                    : null;
-            result.add(mapper.toDto(request, subject, composeItems(request, commissionsById, classroomsById)));
+    private void collectItemIds(Collection<RoomRequestItem> items, Set<Long> commissionIds, Set<Integer> classroomIds) {
+        for (RoomRequestItem item : items) {
+            if (item.getCommissionId() != null) {
+                commissionIds.add(item.getCommissionId());
+            }
+            if (item.getCurrentClassroomId() != null) {
+                classroomIds.add(item.getCurrentClassroomId());
+            }
+            item.getPreferences().stream().map(RoomPreference::getClassroomId).forEach(classroomIds::add);
+        }
+    }
+
+    private List<RoomRequestItemResponseDto> composeItems(Collection<RoomRequestItem> items, Catalogs catalogs) {
+        List<RoomRequestItemResponseDto> result = new ArrayList<>(items.size());
+        for (RoomRequestItem item : items) {
+            result.add(mapper.toDto(item, resolveCommission(item, catalogs),
+                    resolveCurrentClassroom(item, catalogs), resolvePreferredClassrooms(item, catalogs)));
         }
         return result;
     }
 
-    private List<RoomRequestItemResponseDto> composeItems(RoomRequest request,
-                                                          Map<Long, CommissionResponseDto> commissionsById,
-                                                          Map<Integer, ClassroomOptionDto> classroomsById) {
-        List<RoomRequestItemResponseDto> items = new ArrayList<>(request.getItems().size());
-        for (RoomRequestItem item : request.getItems()) {
-            CommissionResponseDto commission = item.getCommissionId() != null
-                    ? commissionsById.get(item.getCommissionId())
-                    : null;
-            ClassroomOptionDto currentClassroom = item.getCurrentClassroomId() != null
-                    ? classroomsById.get(item.getCurrentClassroomId())
-                    : null;
-            List<ClassroomOptionDto> preferred = item.getPreferences().stream()
-                    .map(RoomPreference::getClassroomId)
-                    .map(classroomsById::get)
-                    .toList();
-            items.add(mapper.toDto(item, commission, currentClassroom, preferred));
-        }
-        return items;
+    private CommissionResponseDto resolveCommission(RoomRequestItem item, Catalogs catalogs) {
+        return item.getCommissionId() != null ? catalogs.commissionsById().get(item.getCommissionId()) : null;
+    }
+
+    private ClassroomOptionDto resolveCurrentClassroom(RoomRequestItem item, Catalogs catalogs) {
+        return item.getCurrentClassroomId() != null ? catalogs.classroomsById().get(item.getCurrentClassroomId()) : null;
+    }
+
+    private List<ClassroomOptionDto> resolvePreferredClassrooms(RoomRequestItem item, Catalogs catalogs) {
+        return item.getPreferences().stream()
+                .map(RoomPreference::getClassroomId)
+                .map(catalogs.classroomsById()::get)
+                .toList();
     }
 }

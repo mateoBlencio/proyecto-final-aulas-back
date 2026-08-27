@@ -7,7 +7,9 @@ import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemRowDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestResponseDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestRowHeaderDto;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import org.mapstruct.Mapper;
@@ -65,4 +67,28 @@ public interface RoomRequestMapper {
                                      CommissionResponseDto commission,
                                      ClassroomOptionDto currentClassroom,
                                      List<ClassroomOptionDto> preferredClassrooms);
+
+    @Mapping(target = "id", source = "request.id")
+    @Mapping(target = "subject", source = "subject")
+    RoomRequestRowHeaderDto toRowHeaderDto(RoomRequest request, SubjectResponseDto subject);
+
+    /**
+     * El parámetro se llama {@code requestHeader} y no {@code request} a propósito: si coincidiera
+     * con el nombre de {@link RoomRequestItem#getRequest()}, MapStruct podría navegar esa relación
+     * en vez de usar este DTO ya resuelto (ADR-003, la misma trampa de nombres colisionando con
+     * relaciones que documenta la clase).
+     */
+    @Mapping(target = "itemId", source = "item.id")
+    @Mapping(target = "request", source = "requestHeader")
+    @Mapping(target = "commission", source = "commission")
+    @Mapping(target = "currentClassroom", source = "currentClassroom")
+    @Mapping(target = "preferredClassrooms", source = "preferredClassrooms")
+    @Mapping(target = "endTime", expression = "java(item.endTime())")
+    @Mapping(target = "durationMinutes",
+             expression = "java(item.getDuration() == null ? null : item.getDuration().toMinutes())")
+    RoomRequestItemRowDto toRowDto(RoomRequestItem item,
+                                   RoomRequestRowHeaderDto requestHeader,
+                                   CommissionResponseDto commission,
+                                   ClassroomOptionDto currentClassroom,
+                                   List<ClassroomOptionDto> preferredClassrooms);
 }
