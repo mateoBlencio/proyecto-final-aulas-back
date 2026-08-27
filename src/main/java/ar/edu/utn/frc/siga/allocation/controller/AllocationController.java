@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.allocation.dto.request.AllocationBatchRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.DeallocationBatchRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationHistorySnapshotDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.AllocationImpactResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.UniqueEventAllocationResponseDto;
@@ -12,6 +13,7 @@ import ar.edu.utn.frc.siga.allocation.mapper.EventAllocationComposer;
 import ar.edu.utn.frc.siga.common.dto.response.RevisionDto;
 import ar.edu.utn.frc.siga.allocation.service.AllocationAuditHistoryService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationConflictService;
+import ar.edu.utn.frc.siga.allocation.service.AllocationImpactService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.model.ConflictType;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
@@ -52,6 +54,7 @@ public class AllocationController {
     private final AllocationService allocationService;
     private final AllocationAuditHistoryService allocationAuditHistoryService;
     private final AllocationConflictService allocationConflictService;
+    private final AllocationImpactService allocationImpactService;
     private final AllocationCommandMapper commandMapper;
     private final EventAllocationComposer eventAllocationComposer;
     private final AcademicEventService academicEventService;
@@ -115,7 +118,9 @@ public class AllocationController {
     @PostMapping
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Asignar aulas en lote",
-               description = "Asigna aula a cada item del lote (occurrences puntuales o evento completo). "
+               description = "Asigna aula a cada item del lote. Cada item apunta de una de tres formas: "
+                       + "'occurrenceIds' (fechas puntuales), 'eventId' solo (todas las ocurrencias futuras "
+                       + "del evento) o 'eventId' + 'from' [+ 'to'] (rango de fechas, ambos bordes inclusive). "
                        + "409 si alguna occurrence del lote ya tiene asignación, si algún aula no existe/no está "
                        + "disponible, o si hay solapamiento de horario con otra asignación. Atómico.")
     public ResponseEntity<List<AllocationResponseDto>> allocate(@Valid @RequestBody AllocationBatchRequestDto dto) {
@@ -129,13 +134,36 @@ public class AllocationController {
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Reasignar aulas en lote",
                description = "Cambia el aula de cada item del lote (upsert: crea la asignación si no existía). "
-                       + "409 si algún aula no existe/no está disponible, o si hay solapamiento de horario con "
-                       + "otra asignación. Atómico.")
+                       + "Además de las formas puntual ('occurrenceIds') y evento completo ('eventId'), acepta "
+                       + "mover un evento por rango de fechas: 'eventId' + 'from' + 'to' es un cambio TEMPORAL "
+                       + "(las ocurrencias de afuera del rango conservan su aula, así que la clase 'vuelve' sola), "
+                       + "y 'eventId' + 'from' sin 'to' es un cambio PERMANENTE desde esa fecha hasta que termine "
+                       + "el dictado. Ambos bordes son inclusive y 'from' no puede ser anterior a hoy (400). "
+                       + "409 si algún aula no existe/no está disponible, si hay solapamiento de horario con otra "
+                       + "asignación, o si una ocurrencia del rango ya ocurrió. Atómico: si una sola fecha del "
+                       + "rango falla, no se aplica ningún cambio.")
     public ResponseEntity<List<AllocationResponseDto>> reallocate(@Valid @RequestBody AllocationBatchRequestDto dto) {
         log.debug("PUT /v1/allocations: items={}", dto.items().size());
         List<AllocationResponseDto> response = allocationService.reallocate(commandMapper.toManualCommand(dto));
         log.info("Reasignación en lote completa: allocated={}", response.size());
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/impact")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Ver el impacto de un pedido sin aplicarlo",
+               description = "Recibe el mismo body que POST/PUT y responde qué pasaría si se aplicara, sin "
+                       + "escribir nada. Devuelve cuántas clases toca el pedido y los choques como DATO y no como error, "
+                       + "cada uno con el evento que ocupa el aula y las aulas libres en esa fecha y franja para "
+                       + "poder destrabarlo. Siempre 200, incluso con conflictos. Sigue devolviendo 400 si el "
+                       + "pedido está mal formado y 409 si pide un aula inexistente o una ocurrencia ya pasada: "
+                       + "eso no es un resultado a mostrar, es un pedido que no se puede ni evaluar.")
+    public ResponseEntity<AllocationImpactResponseDto> impact(@Valid @RequestBody AllocationBatchRequestDto dto) {
+        log.debug("POST /v1/allocations/impact: items={}", dto.items().size());
+        AllocationImpactResponseDto impact = allocationImpactService.analyze(commandMapper.toManualCommand(dto));
+        log.info("Impacto analizado: total={}, movibles={}, bloqueadas={}",
+                impact.totalClasses(), impact.movableClasses(), impact.blockedClasses());
+        return ResponseEntity.ok(impact);
     }
 
     @DeleteMapping

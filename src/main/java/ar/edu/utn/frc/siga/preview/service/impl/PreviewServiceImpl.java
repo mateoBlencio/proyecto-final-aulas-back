@@ -74,7 +74,7 @@ public class PreviewServiceImpl implements PreviewService {
                 .collect(Collectors.toSet());
         PreviewEngine.Inputs inputs = previewEngine.loadInputs(eventIds);
         return previewComposer.compose(preview, inputs.events(), inputs.datesByEvent(), inputs.priorRoomByEvent(),
-                inputs.rooms(), inputs.databaseOccupancy());
+                inputs.priorSlotsByEvent(), inputs.rooms(), inputs.databaseOccupancy());
     }
 
     @Override

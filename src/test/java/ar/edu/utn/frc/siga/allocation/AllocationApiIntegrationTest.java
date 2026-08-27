@@ -69,12 +69,29 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
 
     private static AllocationBatchRequestDto byOccurrence(Long occurrenceId, Long classroomId) {
         return new AllocationBatchRequestDto(
-                List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, classroomId)), null);
+                List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, null, null, classroomId)), null);
     }
 
     private static AllocationBatchRequestDto byEvent(Long eventId, Long classroomId, String observation) {
         return new AllocationBatchRequestDto(
-                List.of(new AllocationItemRequestDto(null, eventId, classroomId)), observation);
+                List.of(new AllocationItemRequestDto(null, eventId, null, null, classroomId)), observation);
+    }
+
+    private static AllocationBatchRequestDto byRange(Long eventId, LocalDate from, LocalDate to, Long classroomId) {
+        return new AllocationBatchRequestDto(
+                List.of(new AllocationItemRequestDto(null, eventId, from, to, classroomId)), "movimiento por rango");
+    }
+
+    /** Evento semanal de {@code weeks} ocurrencias arrancando en {@code start}. */
+    private Long seedWeeklyEvent(IntegrationTestData.SubjectAndCommission sc, LocalDate start, int weeks) {
+        var dto = new CreateRecurringEventRequestDto(30, START, DURATION, start.getDayOfWeek(),
+                start, start.plusWeeks(weeks - 1L), sc.subjectId(), sc.commissionId());
+        return academicEventService.createRecurringEvent(dto).id();
+    }
+
+    private Long classroomOf(Long occurrenceId) {
+        return allocationRepository.findByOccurrenceIdIn(List.of(occurrenceId)).stream()
+                .map(Allocation::getClassroomId).findFirst().orElse(null);
     }
 
     private MvcResult allocateOk(Long occurrenceId, Long classroomId) throws Exception {
@@ -198,8 +215,8 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
         allocateOk(occ3.getId(), aulaC.getId());
 
         var dto = new AllocationBatchRequestDto(List.of(
-                new AllocationItemRequestDto(List.of(occ1.getId()), null, aulaLibre.getId()),
-                new AllocationItemRequestDto(List.of(occ2.getId()), null, aulaC.getId())), null);
+                new AllocationItemRequestDto(List.of(occ1.getId()), null, null, null, aulaLibre.getId()),
+                new AllocationItemRequestDto(List.of(occ2.getId()), null, null, null, aulaC.getId())), null);
 
         mockMvc.perform(put("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -320,6 +337,173 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(0));
 
         assertThat(allocationRepository.findByOccurrenceIdIn(List.of(past.getId()))).isEmpty();
+    }
+
+    // ---------- reasignación por rango (temporal y permanente) ----------
+
+    @Test
+    @DisplayName("PUT por rango temporal mueve solo las ocurrencias de la ventana y deja el resto en su aula original")
+    void reallocateByRange_temporal_movesOnlyOccurrencesInsideWindow() throws Exception {
+        var sc = testData.materiaYComision();
+        var edificio = testData.edificio();
+        Classroom aulaOriginal = testData.aula(edificio);
+        Classroom aulaNueva = testData.aula(edificio);
+        LocalDate start = LocalDate.now().plusDays(7);
+        Long eventId = seedWeeklyEvent(sc, start, 5);
+
+        mockMvc.perform(put("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(byEvent(eventId, aulaOriginal.getId(), null))))
+                .andExpect(status().isOk());
+
+        // Ventana sobre la 2da y 3ra ocurrencia: bordes inclusive.
+        LocalDate from = start.plusWeeks(1);
+        LocalDate to = start.plusWeeks(2);
+
+        mockMvc.perform(put("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(byRange(eventId, from, to, aulaNueva.getId()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+
+        List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId).stream()
+                .sorted(java.util.Comparator.comparing(Occurrence::getDate)).toList();
+        assertThat(occurrences).hasSize(5);
+        assertThat(classroomOf(occurrences.get(0).getId())).isEqualTo(aulaOriginal.getId());
+        assertThat(classroomOf(occurrences.get(1).getId())).isEqualTo(aulaNueva.getId());
+        assertThat(classroomOf(occurrences.get(2).getId())).isEqualTo(aulaNueva.getId());
+        assertThat(classroomOf(occurrences.get(3).getId())).isEqualTo(aulaOriginal.getId());
+        assertThat(classroomOf(occurrences.get(4).getId())).isEqualTo(aulaOriginal.getId());
+    }
+
+    @Test
+    @DisplayName("PUT por rango sin 'to' es permanente: mueve desde esa fecha en adelante y no toca lo anterior")
+    void reallocateByRange_sinTo_esPermanenteDesdeLaFecha() throws Exception {
+        var sc = testData.materiaYComision();
+        var edificio = testData.edificio();
+        Classroom aulaOriginal = testData.aula(edificio);
+        Classroom aulaNueva = testData.aula(edificio);
+        LocalDate start = LocalDate.now().plusDays(7);
+        Long eventId = seedWeeklyEvent(sc, start, 4);
+
+        mockMvc.perform(put("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(byEvent(eventId, aulaOriginal.getId(), null))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                byRange(eventId, start.plusWeeks(2), null, aulaNueva.getId()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+
+        List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId).stream()
+                .sorted(java.util.Comparator.comparing(Occurrence::getDate)).toList();
+        assertThat(classroomOf(occurrences.get(0).getId())).isEqualTo(aulaOriginal.getId());
+        assertThat(classroomOf(occurrences.get(1).getId())).isEqualTo(aulaOriginal.getId());
+        assertThat(classroomOf(occurrences.get(2).getId())).isEqualTo(aulaNueva.getId());
+        assertThat(classroomOf(occurrences.get(3).getId())).isEqualTo(aulaNueva.getId());
+    }
+
+    @Test
+    @DisplayName("PUT por rango con 'from' anterior a hoy responde 400 (D4: el pedido está mal formado)")
+    void reallocateByRange_fromEnElPasado_responde400() throws Exception {
+        var sc = testData.materiaYComision();
+        Classroom aula = testData.aula(testData.edificio());
+        LocalDate start = LocalDate.now().plusDays(7);
+        Long eventId = seedWeeklyEvent(sc, start, 2);
+
+        mockMvc.perform(put("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                byRange(eventId, LocalDate.now().minusDays(1), null, aula.getId()))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PUT por rango con 'to' anterior a 'from' responde 400")
+    void reallocateByRange_toAntesQueFrom_responde400() throws Exception {
+        var sc = testData.materiaYComision();
+        Classroom aula = testData.aula(testData.edificio());
+        LocalDate start = LocalDate.now().plusDays(7);
+        Long eventId = seedWeeklyEvent(sc, start, 2);
+
+        mockMvc.perform(put("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                byRange(eventId, start.plusWeeks(1), start, aula.getId()))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PUT con 'from' junto a occurrenceIds responde 400: el rango solo aplica sobre un evento")
+    void reallocateByRange_rangoSobreOccurrenceIds_responde400() throws Exception {
+        var sc = testData.materiaYComision();
+        Classroom aula = testData.aula(testData.edificio());
+        Occurrence occ = seedOccurrence(sc, LocalDate.now().plusDays(7));
+        var dto = new AllocationBatchRequestDto(List.of(new AllocationItemRequestDto(
+                List.of(occ.getId()), null, LocalDate.now().plusDays(1), null, aula.getId())), null);
+
+        mockMvc.perform(put("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PUT por rango con una sola fecha en conflicto responde 409 y NO mueve ninguna (D5: todo o nada)")
+    void reallocateByRange_unaFechaEnConflicto_noAplicaNada() throws Exception {
+        var sc = testData.materiaYComision();
+        var edificio = testData.edificio();
+        Classroom aulaOriginal = testData.aula(edificio);
+        Classroom aulaDestino = testData.aula(edificio);
+        LocalDate start = LocalDate.now().plusDays(7);
+        Long eventId = seedWeeklyEvent(sc, start, 3);
+
+        mockMvc.perform(put("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(byEvent(eventId, aulaOriginal.getId(), null))))
+                .andExpect(status().isOk());
+
+        // Un evento ajeno ocupa el aula destino en la fecha del medio, misma franja.
+        var otro = testData.materiaYComision();
+        Occurrence intruso = seedOccurrence(otro, start.plusWeeks(1));
+        allocateOk(intruso.getId(), aulaDestino.getId());
+
+        mockMvc.perform(put("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                byRange(eventId, start, start.plusWeeks(2), aulaDestino.getId()))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.conflicts").isArray());
+
+        assertThat(occurrenceRepository.findByEvent_Id(eventId))
+                .allSatisfy(o -> assertThat(classroomOf(o.getId())).isEqualTo(aulaOriginal.getId()));
+    }
+
+    @Test
+    @DisplayName("Un lote puede mezclar rango y ocurrencias puntuales en la misma operación atómica")
+    void reallocate_mezclaRangoYPuntualEnElMismoLote() throws Exception {
+        var sc = testData.materiaYComision();
+        var edificio = testData.edificio();
+        Classroom aulaRango = testData.aula(edificio);
+        Classroom aulaPuntual = testData.aula(edificio);
+        LocalDate start = LocalDate.now().plusDays(7);
+        Long eventId = seedWeeklyEvent(sc, start, 3);
+        Occurrence suelta = seedOccurrence(testData.materiaYComision(), start.plusDays(1));
+
+        var dto = new AllocationBatchRequestDto(List.of(
+                new AllocationItemRequestDto(null, eventId, start, start.plusWeeks(1), aulaRango.getId()),
+                new AllocationItemRequestDto(List.of(suelta.getId()), null, null, null, aulaPuntual.getId())), null);
+
+        mockMvc.perform(put("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3));
+
+        assertThat(classroomOf(suelta.getId())).isEqualTo(aulaPuntual.getId());
     }
 
     @Test
