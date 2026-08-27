@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.roomrequest.controller;
 
 import ar.edu.utn.frc.siga.roomrequest.dto.RoomRequestItemFilter;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemRowDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
@@ -22,6 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -76,5 +78,15 @@ public class RoomRequestController {
         Page<RoomRequestItemRowDto> page = roomRequestService.findItems(filter, pageable);
         log.info("Pedidos de aula listados vía controller: total={}", page.getTotalElements());
         return ResponseEntity.ok(page);
+    }
+
+    @GetMapping("/items/{id}")
+    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @Operation(summary = "Buscar un pedido por id",
+               description = "Detalle completo de un pedido, con la cabecera de su solicitud "
+                       + "(incluido el contacto del docente). 404 si no existe.")
+    public ResponseEntity<RoomRequestItemDetailDto> findItemById(@PathVariable Long id) {
+        log.debug("GET /v1/room-requests/items/{}", id);
+        return ResponseEntity.ok(roomRequestService.findItemById(id));
     }
 }

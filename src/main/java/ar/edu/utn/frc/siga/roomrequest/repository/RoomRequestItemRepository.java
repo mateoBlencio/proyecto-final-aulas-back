@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public interface RoomRequestItemRepository
         extends JpaRepository<RoomRequestItem, Long>, JpaSpecificationExecutor<RoomRequestItem> {
@@ -21,4 +23,7 @@ public interface RoomRequestItemRepository
     @Override
     @EntityGraph(attributePaths = "request")
     Page<RoomRequestItem> findAll(Specification<RoomRequestItem> spec, Pageable pageable);
+
+    @EntityGraph(attributePaths = "request")
+    Optional<RoomRequestItem> findWithRequestById(Long id);
 }

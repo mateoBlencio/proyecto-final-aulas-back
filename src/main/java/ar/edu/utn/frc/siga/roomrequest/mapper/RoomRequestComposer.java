@@ -6,6 +6,8 @@ import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailHeaderDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemRowDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestResponseDto;
@@ -60,7 +62,8 @@ public class RoomRequestComposer {
             if (request.getSubjectId() != null) {
                 subjectIds.add(request.getSubjectId());
             }
-            collectItemIds(request.getItems(), commissionIds, classroomIds);
+            collectCommissionIds(request.getItems(), commissionIds);
+            collectClassroomIds(request.getItems(), classroomIds);
         }
 
         Catalogs catalogs = resolveCatalogs(subjectIds, commissionIds, classroomIds);
@@ -83,16 +86,15 @@ public class RoomRequestComposer {
     public List<RoomRequestItemRowDto> composeRows(Collection<RoomRequestItem> items) {
         Set<Long> subjectIds = new LinkedHashSet<>();
         Set<Long> commissionIds = new LinkedHashSet<>();
-        Set<Integer> classroomIds = new LinkedHashSet<>();
 
         for (RoomRequestItem item : items) {
             if (item.getRequest().getSubjectId() != null) {
                 subjectIds.add(item.getRequest().getSubjectId());
             }
         }
-        collectItemIds(items, commissionIds, classroomIds);
+        collectCommissionIds(items, commissionIds);
 
-        Catalogs catalogs = resolveCatalogs(subjectIds, commissionIds, classroomIds);
+        Catalogs catalogs = resolveCatalogs(subjectIds, commissionIds, Set.of());
 
         Map<Long, RoomRequestRowHeaderDto> headersByRequestId = new LinkedHashMap<>();
         List<RoomRequestItemRowDto> result = new ArrayList<>(items.size());
@@ -102,10 +104,31 @@ public class RoomRequestComposer {
                     id -> mapper.toRowHeaderDto(request,
                             request.getSubjectId() != null ? catalogs.subjectsById().get(request.getSubjectId()) : null));
 
-            result.add(mapper.toRowDto(item, header, resolveCommission(item, catalogs),
-                    resolveCurrentClassroom(item, catalogs), resolvePreferredClassrooms(item, catalogs)));
+            result.add(mapper.toRowDto(item, header, resolveCommission(item, catalogs)));
         }
         return result;
+    }
+
+    public RoomRequestItemDetailDto composeDetail(RoomRequestItem item) {
+        Set<Long> subjectIds = new LinkedHashSet<>();
+        Set<Long> commissionIds = new LinkedHashSet<>();
+        Set<Integer> classroomIds = new LinkedHashSet<>();
+
+        RoomRequest request = item.getRequest();
+        if (request.getSubjectId() != null) {
+            subjectIds.add(request.getSubjectId());
+        }
+        collectCommissionIds(List.of(item), commissionIds);
+        collectClassroomIds(List.of(item), classroomIds);
+
+        Catalogs catalogs = resolveCatalogs(subjectIds, commissionIds, classroomIds);
+
+        RoomRequestItemDetailHeaderDto header = mapper.toDetailHeaderDto(request,
+                request.getSubjectId() != null ? catalogs.subjectsById().get(request.getSubjectId()) : null);
+        RoomRequestItemResponseDto itemDto = mapper.toDto(item, resolveCommission(item, catalogs),
+                resolveCurrentClassroom(item, catalogs), resolvePreferredClassrooms(item, catalogs));
+
+        return new RoomRequestItemDetailDto(header, itemDto);
     }
 
     private Catalogs resolveCatalogs(Set<Long> subjectIds, Set<Long> commissionIds, Set<Integer> classroomIds) {
@@ -119,11 +142,16 @@ public class RoomRequestComposer {
         return new Catalogs(subjectsById, commissionsById, classroomsById);
     }
 
-    private void collectItemIds(Collection<RoomRequestItem> items, Set<Long> commissionIds, Set<Integer> classroomIds) {
+    private void collectCommissionIds(Collection<RoomRequestItem> items, Set<Long> commissionIds) {
         for (RoomRequestItem item : items) {
             if (item.getCommissionId() != null) {
                 commissionIds.add(item.getCommissionId());
             }
+        }
+    }
+
+    private void collectClassroomIds(Collection<RoomRequestItem> items, Set<Integer> classroomIds) {
+        for (RoomRequestItem item : items) {
             if (item.getCurrentClassroomId() != null) {
                 classroomIds.add(item.getCurrentClassroomId());
             }

@@ -1,6 +1,8 @@
 package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
+import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.roomrequest.dto.RoomRequestItemFilter;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemRowDto;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestComposer;
@@ -25,19 +27,15 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/**
- * El repositorio se mockea, así que lo que importa acá no es el filtrado (eso lo cubre
- * {@code RoomRequestItemListApiIntegrationTest}) sino que el {@code Pageable} que llega al
- * repositorio ya pasó por {@link ar.edu.utn.frc.siga.roomrequest.specification.RoomRequestItemSort}.
- */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("RoomRequestServiceImpl.findItems")
+@DisplayName("RoomRequestServiceImpl")
 class RoomRequestServiceImplTest {
 
     @Mock
@@ -100,5 +98,29 @@ class RoomRequestServiceImplTest {
                 .isInstanceOf(InvalidRoomRequestException.class);
 
         verifyNoInteractions(itemRepository, composer);
+    }
+
+    @Test
+    @DisplayName("findItemById: delega en el repositorio y en el composer")
+    void findItemByIdDelegatesToRepositoryAndComposer() {
+        RoomRequestItem item = RoomRequestItem.builder().id(5L).build();
+        RoomRequestItemDetailDto detail = new RoomRequestItemDetailDto(null, null);
+        when(itemRepository.findWithRequestById(5L)).thenReturn(Optional.of(item));
+        when(composer.composeDetail(item)).thenReturn(detail);
+
+        RoomRequestItemDetailDto result = service.findItemById(5L);
+
+        assertThat(result).isSameAs(detail);
+    }
+
+    @Test
+    @DisplayName("findItemById: id inexistente lanza ResourceNotFoundException sin llamar al composer")
+    void findItemByIdNotFoundThrows() {
+        when(itemRepository.findWithRequestById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.findItemById(999L))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(composer);
     }
 }

@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.common.mapper.CentralMapperConfig;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailHeaderDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemRowDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestResponseDto;
@@ -68,7 +69,9 @@ public interface RoomRequestMapper {
     @Mapping(target = "endTime", expression = "java(item.endTime())")
     RoomRequestItemRowDto toRowDto(RoomRequestItem item,
                                    RoomRequestRowHeaderDto requestHeader,
-                                   CommissionResponseDto commission,
-                                   ClassroomOptionDto currentClassroom,
-                                   List<ClassroomOptionDto> preferredClassrooms);
+                                   CommissionResponseDto commission);
+
+    @Mapping(target = "id", source = "request.id")
+    @Mapping(target = "subject", source = "subject")
+    RoomRequestItemDetailHeaderDto toDetailHeaderDto(RoomRequest request, SubjectResponseDto subject);
 }

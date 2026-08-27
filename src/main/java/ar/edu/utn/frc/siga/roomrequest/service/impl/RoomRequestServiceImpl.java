@@ -1,8 +1,10 @@
 package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
+import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.roomrequest.dto.RoomRequestItemFilter;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestItemDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemRowDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestComposer;
@@ -69,5 +71,14 @@ public class RoomRequestServiceImpl implements RoomRequestService {
                 new PageImpl<>(composer.composeRows(page.getContent()), page.getPageable(), page.getTotalElements());
         log.info("Pedidos de aula listados: total={}", result.getTotalElements());
         return result;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public RoomRequestItemDetailDto findItemById(Long itemId) {
+        log.debug("Buscando pedido de aula por id={}", itemId);
+        RoomRequestItem item = itemRepository.findWithRequestById(itemId)
+                .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
+        return composer.composeDetail(item);
     }
 }
