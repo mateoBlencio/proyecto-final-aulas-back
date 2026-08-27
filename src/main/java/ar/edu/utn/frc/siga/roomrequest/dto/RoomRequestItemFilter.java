@@ -18,10 +18,6 @@ public record RoomRequestItemFilter(
         LocalDate dateTo,
         boolean includePast) {
 
-    /**
-     * Con {@code includePast=false} (el default) el {@code dateFrom} efectivo es
-     * {@code max(dateFrom, hoy)}, para que los pedidos ya vencidos no aparezcan en la bandeja.
-     */
     public static RoomRequestItemFilter of(Set<RoomRequestType> types, Set<RoomRequestStatus> statuses,
             AcademicScope scope, Long subjectId, LocalDate dateFrom, LocalDate dateTo, boolean includePast) {
         LocalDate effectiveFrom = includePast ? dateFrom : laterOf(dateFrom, LocalDate.now());

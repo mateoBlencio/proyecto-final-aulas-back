@@ -67,28 +67,14 @@ class RoomRequestServiceImplTest {
         RoomRequestItem item = RoomRequestItem.builder().id(5L).build();
         RoomRequestItemRowDto row = new RoomRequestItemRowDto(
                 5L,     // itemId
-                1,      // position
                 null,   // status
-                null,   // decidedBy
                 null,   // decidedAt
-                null,   // decisionReason
                 null,   // request
                 null,   // commission
                 null,   // date
                 null,   // startTime
                 null,   // endTime
-                null,   // durationMinutes
-                null,   // enrolled
-                null,   // estimated
-                null,   // classroomCount
-                null,   // currentClassroom
-                null,   // requiresProjector
-                null,   // requiresComputers
-                null,   // computerCount
-                null,   // requiresExamUsers
-                null,   // requiredSoftware
-                null,   // observations
-                List.of()); // preferredClassrooms
+                null);  // classroomCount
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         when(itemRepository.findAll(ArgumentMatchers.<Specification<RoomRequestItem>>any(), pageableCaptor.capture()))

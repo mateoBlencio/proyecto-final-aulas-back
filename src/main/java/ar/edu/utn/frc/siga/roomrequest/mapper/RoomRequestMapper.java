@@ -17,11 +17,7 @@ import org.mapstruct.Mapping;
 
 import java.util.List;
 
-/**
- * Mapper puro: solo campos propios (datos de otros módulos los resuelve {@link RoomRequestComposer}, ADR-002).
- * Ojo: varios {@code ignore = true} ({@code status}, {@code items}, {@code preferences}) no significan
- * null, sino "lo pone el {@code @Builder.Default} de la entidad" — sacar ese default rompe en silencio.
- */
+
 @Mapper(config = CentralMapperConfig.class)
 public interface RoomRequestMapper {
 
@@ -31,11 +27,6 @@ public interface RoomRequestMapper {
     @Mapping(target = "items", ignore = true)
     RoomRequest toEntity(CreateRoomRequestDto dto);
 
-    /**
-     * El ítem nace suelto: {@link RoomRequest#addItem} asigna posición y cabecera.
-     * {@code duration} va por {@code expression} y no {@code source} porque MapStruct
-     * no ve accessors derivados del record, solo sus componentes.
-     */
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "request", ignore = true)
     @Mapping(target = "position", ignore = true)
@@ -58,7 +49,6 @@ public interface RoomRequestMapper {
 
     @Mapping(target = "id", source = "item.id")
     @Mapping(target = "commission", source = "commission")
-    @Mapping(target = "currentClassroom", source = "currentClassroom")
     @Mapping(target = "preferredClassrooms", source = "preferredClassrooms")
     @Mapping(target = "endTime", expression = "java(item.endTime())")
     @Mapping(target = "durationMinutes",
@@ -72,20 +62,10 @@ public interface RoomRequestMapper {
     @Mapping(target = "subject", source = "subject")
     RoomRequestRowHeaderDto toRowHeaderDto(RoomRequest request, SubjectResponseDto subject);
 
-    /**
-     * El parámetro se llama {@code requestHeader} y no {@code request} a propósito: si coincidiera
-     * con el nombre de {@link RoomRequestItem#getRequest()}, MapStruct podría navegar esa relación
-     * en vez de usar este DTO ya resuelto (ADR-003, la misma trampa de nombres colisionando con
-     * relaciones que documenta la clase).
-     */
     @Mapping(target = "itemId", source = "item.id")
     @Mapping(target = "request", source = "requestHeader")
     @Mapping(target = "commission", source = "commission")
-    @Mapping(target = "currentClassroom", source = "currentClassroom")
-    @Mapping(target = "preferredClassrooms", source = "preferredClassrooms")
     @Mapping(target = "endTime", expression = "java(item.endTime())")
-    @Mapping(target = "durationMinutes",
-             expression = "java(item.getDuration() == null ? null : item.getDuration().toMinutes())")
     RoomRequestItemRowDto toRowDto(RoomRequestItem item,
                                    RoomRequestRowHeaderDto requestHeader,
                                    CommissionResponseDto commission,

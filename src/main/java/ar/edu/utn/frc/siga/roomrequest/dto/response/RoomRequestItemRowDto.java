@@ -6,7 +6,6 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.List;
 
 public record RoomRequestItemRowDto(
         Long itemId,
@@ -17,7 +16,5 @@ public record RoomRequestItemRowDto(
         LocalDate date,
         LocalTime startTime,
         LocalTime endTime,
-        Integer enrolled,
-        Integer estimated,
         Integer classroomCount
 ) {}
