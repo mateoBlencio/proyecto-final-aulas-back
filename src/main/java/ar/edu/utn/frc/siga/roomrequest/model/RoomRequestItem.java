@@ -33,9 +33,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Un pedido concreto dentro de una solicitud (comisión, fecha, horario). Es la
- * unidad de decisión: cada uno tiene su propio estado porque pueden resolverse
- * en momentos distintos (ej. pre-aprobar abril y dejar pendiente julio).
+ * Unidad de decisión: cada ítem tiene su propio estado porque pueden resolverse en momentos
+ * distintos (ej. pre-aprobar abril y dejar pendiente julio).
  */
 @Entity
 @Table(name = "solicitud_aula_item",
@@ -58,7 +57,6 @@ public class RoomRequestItem {
     @JoinColumn(name = "id_solicitud", nullable = false)
     private RoomRequest request;
 
-    /** Posición dentro de la solicitud, arrancando en 1. */
     @Column(name = "orden", nullable = false)
     private Integer position;
 
@@ -67,7 +65,7 @@ public class RoomRequestItem {
     @Builder.Default
     private RoomRequestStatus status = RoomRequestStatus.PENDING;
 
-    /** Email del usuario que decidió. No es FK: {@code auth} no expone fachada de usuarios. */
+    /** No es FK: {@code auth} no expone fachada de usuarios. */
     @Column(name = "decidido_por", length = 150)
     private String decidedBy;
 
@@ -77,7 +75,7 @@ public class RoomRequestItem {
     @Column(name = "motivo_decision")
     private String decisionReason;
 
-    /** ID plano: la comisión vive en {@code academic}. Null para conferencias. */
+    /** Null para conferencias. */
     @Column(name = "id_comision")
     private Long commissionId;
 
@@ -105,7 +103,6 @@ public class RoomRequestItem {
     @Builder.Default
     private Integer classroomCount = 1;
 
-    /** ID plano: el aula vive en {@code space}. Dónde cursa hoy. */
     @Column(name = "id_aula_actual")
     private Integer currentClassroomId;
 
@@ -138,7 +135,6 @@ public class RoomRequestItem {
     @Builder.Default
     private List<RoomPreference> preferences = new ArrayList<>();
 
-    /** Null si el pedido no trae horario (ver {@link #startTime}/{@link #duration}). */
     public LocalTime endTime() {
         return (startTime == null || duration == null) ? null : startTime.plus(duration);
     }

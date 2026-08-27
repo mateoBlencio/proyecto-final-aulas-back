@@ -24,10 +24,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Cabecera de una solicitud (quién pide, tipo, materia); el detalle vive en {@link RoomRequestItem}.
- * No tiene estado propio: cada ítem se decide por separado.
- */
 @Entity
 @Table(name = "solicitud_aula")
 @Getter
@@ -60,18 +56,14 @@ public class RoomRequest {
     @Column(name = "docente_telefono", nullable = false, length = 40)
     private String teacherPhone;
 
-    /** ID plano: la materia vive en {@code academic} (ADR-004). Null para conferencias. */
+    /** Referencia a {@code academic} sin relación JPA (ver ADR-004). Null para conferencias. */
     @Column(name = "id_materia")
     private Long subjectId;
 
-    /** Dato de auditoría: lo pone {@link #onCreate()} al persistir, no el negocio. */
     @Column(name = "fecha_creacion", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    /**
-     * ID del ticket GLPI; null hasta que se crea con éxito. Es {@code Long} porque
-     * {@code glpi_tickets.id} es {@code int unsigned} y desborda un {@code Integer} de Java.
-     */
+    /** {@code Long} porque {@code glpi_tickets.id} es {@code int unsigned} y desborda un {@code Integer}. */
     @Column(name = "id_glpi", unique = true)
     private Long glpiTicketId;
 

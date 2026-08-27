@@ -26,12 +26,9 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
-/**
- * Resuelve por batch los datos que viven en otros módulos (materia, comisión,
- * aulas) y arma el DTO de respuesta. Un solo {@code findByIds} por tipo.
- */
 @Component
 @RequiredArgsConstructor
 public class RoomRequestComposer {
@@ -42,7 +39,6 @@ public class RoomRequestComposer {
     private final CommissionService commissionService;
     private final ClassroomService classroomService;
 
-    /** Materia/comisión/aulas ya resueltas por batch para una tanda de solicitudes o de ítems. */
     private record Catalogs(
             Map<Long, SubjectResponseDto> subjectsById,
             Map<Long, CommissionResponseDto> commissionsById,
@@ -59,9 +55,7 @@ public class RoomRequestComposer {
         Set<Integer> classroomIds = new LinkedHashSet<>();
 
         for (RoomRequest request : requests) {
-            if (request.getSubjectId() != null) {
-                subjectIds.add(request.getSubjectId());
-            }
+            collectSubjectId(request, subjectIds);
             collectCommissionIds(request.getItems(), commissionIds);
             collectClassroomIds(request.getItems(), classroomIds);
         }
@@ -70,27 +64,18 @@ public class RoomRequestComposer {
 
         List<RoomRequestResponseDto> result = new ArrayList<>(requests.size());
         for (RoomRequest request : requests) {
-            SubjectResponseDto subject = request.getSubjectId() != null
-                    ? catalogs.subjectsById().get(request.getSubjectId())
-                    : null;
-            result.add(mapper.toDto(request, subject, composeItems(request.getItems(), catalogs)));
+            result.add(mapper.toDto(request, resolveSubject(request, catalogs), composeItems(request.getItems(), catalogs)));
         }
         return result;
     }
 
-    /**
-     * Bandeja de pedidos ({@code GET /v1/room-requests/items}): la fila es el ítem, no la
-     * solicitud, así que la cabecera se resuelve una sola vez por {@code request.id} aunque
-     * varios ítems de la misma solicitud caigan en la misma página.
-     */
+    /** La fila es el ítem, no la solicitud: la cabecera se resuelve una sola vez por {@code request.id} aunque varios ítems compartan página. */
     public List<RoomRequestItemRowDto> composeRows(Collection<RoomRequestItem> items) {
         Set<Long> subjectIds = new LinkedHashSet<>();
         Set<Long> commissionIds = new LinkedHashSet<>();
 
         for (RoomRequestItem item : items) {
-            if (item.getRequest().getSubjectId() != null) {
-                subjectIds.add(item.getRequest().getSubjectId());
-            }
+            collectSubjectId(item.getRequest(), subjectIds);
         }
         collectCommissionIds(items, commissionIds);
 
@@ -101,8 +86,7 @@ public class RoomRequestComposer {
         for (RoomRequestItem item : items) {
             RoomRequest request = item.getRequest();
             RoomRequestRowHeaderDto header = headersByRequestId.computeIfAbsent(request.getId(),
-                    id -> mapper.toRowHeaderDto(request,
-                            request.getSubjectId() != null ? catalogs.subjectsById().get(request.getSubjectId()) : null));
+                    id -> mapper.toRowHeaderDto(request, resolveSubject(request, catalogs)));
 
             result.add(mapper.toRowDto(item, header, resolveCommission(item, catalogs)));
         }
@@ -115,18 +99,14 @@ public class RoomRequestComposer {
         Set<Integer> classroomIds = new LinkedHashSet<>();
 
         RoomRequest request = item.getRequest();
-        if (request.getSubjectId() != null) {
-            subjectIds.add(request.getSubjectId());
-        }
+        collectSubjectId(request, subjectIds);
         collectCommissionIds(List.of(item), commissionIds);
         collectClassroomIds(List.of(item), classroomIds);
 
         Catalogs catalogs = resolveCatalogs(subjectIds, commissionIds, classroomIds);
 
-        RoomRequestItemDetailHeaderDto header = mapper.toDetailHeaderDto(request,
-                request.getSubjectId() != null ? catalogs.subjectsById().get(request.getSubjectId()) : null);
-        RoomRequestItemResponseDto itemDto = mapper.toDto(item, resolveCommission(item, catalogs),
-                resolveCurrentClassroom(item, catalogs), resolvePreferredClassrooms(item, catalogs));
+        RoomRequestItemDetailHeaderDto header = mapper.toDetailHeaderDto(request, resolveSubject(request, catalogs));
+        RoomRequestItemResponseDto itemDto = composeItems(List.of(item), catalogs).getFirst();
 
         return new RoomRequestItemDetailDto(header, itemDto);
     }
@@ -140,6 +120,12 @@ public class RoomRequestComposer {
                 Maps.byId(catalogMapper.toClassroomOptions(classroomService.findByIds(classroomIds)),
                         ClassroomOptionDto::id);
         return new Catalogs(subjectsById, commissionsById, classroomsById);
+    }
+
+    private void collectSubjectId(RoomRequest request, Set<Long> subjectIds) {
+        if (request.getSubjectId() != null) {
+            subjectIds.add(request.getSubjectId());
+        }
     }
 
     private void collectCommissionIds(Collection<RoomRequestItem> items, Set<Long> commissionIds) {
@@ -168,6 +154,10 @@ public class RoomRequestComposer {
         return result;
     }
 
+    private SubjectResponseDto resolveSubject(RoomRequest request, Catalogs catalogs) {
+        return request.getSubjectId() != null ? catalogs.subjectsById().get(request.getSubjectId()) : null;
+    }
+
     private CommissionResponseDto resolveCommission(RoomRequestItem item, Catalogs catalogs) {
         return item.getCommissionId() != null ? catalogs.commissionsById().get(item.getCommissionId()) : null;
     }
@@ -180,6 +170,7 @@ public class RoomRequestComposer {
         return item.getPreferences().stream()
                 .map(RoomPreference::getClassroomId)
                 .map(catalogs.classroomsById()::get)
+                .filter(Objects::nonNull)
                 .toList();
     }
 }

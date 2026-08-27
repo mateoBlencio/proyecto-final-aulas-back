@@ -24,6 +24,6 @@ public interface RoomRequestItemRepository
     @EntityGraph(attributePaths = "request")
     Page<RoomRequestItem> findAll(Specification<RoomRequestItem> spec, Pageable pageable);
 
-    @EntityGraph(attributePaths = "request")
+    @EntityGraph(attributePaths = {"request", "preferences"})
     Optional<RoomRequestItem> findWithRequestById(Long id);
 }

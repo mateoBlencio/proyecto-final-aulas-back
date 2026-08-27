@@ -13,7 +13,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** Un pedido dentro de la solicitud. El docente carga inicio/fin; la conversión a duración vive acá. */
 public record CreateRoomRequestItemDto(
         Long commissionId,
         @NotNull @FutureOrPresent LocalDate date,
@@ -39,7 +38,7 @@ public record CreateRoomRequestItemDto(
                 : Collections.unmodifiableList(new ArrayList<>(preferredClassroomIds));
     }
 
-    /** Derivada del rango cargado; null si falta alguna hora. {@link #isTimeRangeValid()} asegura que el rango sea positivo. */
+    /** No valida que el rango sea positivo: eso lo garantiza {@link #isTimeRangeValid()}. */
     public Duration duration() {
         return (startTime == null || endTime == null) ? null : Duration.between(startTime, endTime);
     }
