@@ -15,4 +15,8 @@ public interface SysacadCatalogReader {
     List<SysacadSubjectCommissionDto> findSubjectCommissions();
 
     List<SysacadCommissionDto> findCommissions();
+
+    List<SysacadAcademicEventDto> findAcademicEvents();
+
+    List<SysacadAllocationDto> findAllocations();
 }

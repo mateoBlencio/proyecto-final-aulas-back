@@ -22,4 +22,7 @@ public interface SubjectCommissionRepository extends JpaRepository<SubjectCommis
 
     @EntityGraph(attributePaths = {"commission", "commission.academicPeriod"})
     List<SubjectCommission> findBySubject_Id(Long subjectId);
+
+    @EntityGraph(attributePaths = {"commission", "commission.academicPeriod"})
+    Optional<SubjectCommission> findByCommission_IdAndSubject_Code(Long commissionId, Integer subjectCode);
 }

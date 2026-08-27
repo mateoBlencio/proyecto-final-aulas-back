@@ -383,6 +383,65 @@ class AllocationServiceImplTest {
         verifyNoInteractions(validator);
     }
 
+    // ---------- syncFromSysacad ----------
+
+    @Test
+    @DisplayName("syncFromSysacad: clampea a null (no descarta ocurrencias pasadas, plan §4) y delega el mapa a writer.syncFromSysacad")
+    void syncFromSysacadClampeaNullYDelegaAlWriter() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5L);
+        OccurrenceSlotDto pastOcc = occurrenceSlot(10L, 1L, LocalDate.now().minusMonths(2));
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(pastOcc, 5);
+        when(targetResolver.resolveClassroomByOccurrence(List.of(item), null)).thenReturn(resolved);
+        when(writer.syncFromSysacad(resolved)).thenReturn(1);
+
+        int affected = service.syncFromSysacad(List.of(item));
+
+        assertThat(affected).isEqualTo(1);
+        verify(targetResolver).resolveClassroomByOccurrence(List.of(item), null);
+        verify(writer).syncFromSysacad(resolved);
+    }
+
+    @Test
+    @DisplayName("syncFromSysacad: valida que las aulas propuestas existan, igual que allocate/reallocate")
+    void syncFromSysacadValidaAulasDisponibles() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5L);
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
+        when(targetResolver.resolveClassroomByOccurrence(List.of(item), null)).thenReturn(resolved);
+        when(writer.syncFromSysacad(resolved)).thenReturn(1);
+
+        service.syncFromSysacad(List.of(item));
+
+        verify(validator).validateClassroomsAvailable(Set.of(5L));
+    }
+
+    @Test
+    @DisplayName("syncFromSysacad: source SYSACAD no valida solapamiento (se importa tal cual, supuestos §3)")
+    void syncFromSysacadNoValidaSolapamiento() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5L);
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
+        when(targetResolver.resolveClassroomByOccurrence(List.of(item), null)).thenReturn(resolved);
+        when(writer.syncFromSysacad(resolved)).thenReturn(1);
+
+        service.syncFromSysacad(List.of(item));
+
+        verify(validator, never()).validateNoOverlap(anyList());
+    }
+
+    @Test
+    @DisplayName("syncFromSysacad: lote que no resuelve a ninguna ocurrencia es un no-op (sin validar aulas)")
+    void syncFromSysacadTargetVacioEsNoOp() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5L);
+        when(targetResolver.resolveClassroomByOccurrence(List.of(item), null)).thenReturn(Map.of());
+        when(writer.syncFromSysacad(Map.of())).thenReturn(0);
+
+        int affected = service.syncFromSysacad(List.of(item));
+
+        assertThat(affected).isEqualTo(0);
+        verify(validator, never()).validateClassroomsAvailable(any());
+    }
+
     // ---------- findById / findByDate ----------
 
     @Test

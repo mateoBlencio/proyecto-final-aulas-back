@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -14,9 +15,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 class AllocationWriter {
+
+    private static final String SYSACAD_CREATED_OBSERVATION = "Recuperado de SysAcad";
+    private static final String SYSACAD_UPDATED_OBSERVATION = "Actualizado por sync de SysAcad";
 
     private final AllocationRepository allocationRepository;
 
@@ -63,6 +68,46 @@ class AllocationWriter {
             saved.add(allocation);
         }
         return saved;
+    }
+
+    /**
+     * Escritura del sync ASIGNACIONES de SysAcad: a diferencia de {@link #create}/{@link #upsert}, no
+     * es "todo o nada" por lote — la política de precedencia se decide ocurrencia por ocurrencia (ver
+     * .claude/docs/plan-sync-eventos-sysacad.md §4): sin asignación -> crea (source=SYSACAD); con
+     * asignación propia (source=SYSACAD) -> actualiza el aula; con asignación de otro origen (humano o
+     * import de Excel) -> no se toca, WARN. Devuelve la cantidad de ocurrencias creadas+actualizadas.
+     */
+    int syncFromSysacad(Map<OccurrenceSlotDto, Long> classroomByOccurrence) {
+        if (classroomByOccurrence.isEmpty()) return 0;
+
+        List<Long> occurrenceIds = classroomByOccurrence.keySet().stream().map(OccurrenceSlotDto::occurrenceId).toList();
+        Map<Long, Allocation> existingByOccurrence = Maps.byId(
+                allocationRepository.findByOccurrenceIdIn(occurrenceIds), Allocation::getOccurrenceId);
+
+        int affected = 0;
+        for (Entry<OccurrenceSlotDto, Long> entry : classroomByOccurrence.entrySet()) {
+            OccurrenceSlotDto occurrence = entry.getKey();
+            Long classroomId = entry.getValue();
+            Allocation existing = existingByOccurrence.get(occurrence.occurrenceId());
+
+            if (existing == null) {
+                allocationRepository.save(Allocation.builder()
+                        .occurrenceId(occurrence.occurrenceId())
+                        .classroomId(classroomId)
+                        .source(AllocationSource.SYSACAD)
+                        .observation(SYSACAD_CREATED_OBSERVATION)
+                        .build());
+                affected++;
+            } else if (existing.getSource() == AllocationSource.SYSACAD) {
+                existing.setClassroomId(classroomId);
+                existing.setObservation(SYSACAD_UPDATED_OBSERVATION);
+                affected++;
+            } else {
+                log.warn("Ocurrencia {} ya tiene una asignación de origen {}; el sync de SysAcad no la pisa",
+                        occurrence.occurrenceId(), existing.getSource());
+            }
+        }
+        return affected;
     }
 
     List<DeallocatedOccurrence> delete(List<OccurrenceSlotDto> occurrences) {

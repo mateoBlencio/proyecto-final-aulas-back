@@ -2998,5 +2998,317 @@
     "MateriaNombre": "Mecatrónica II",
     "MateriaDictado": "C",
     "EspecialidadNombre": "Tecnicatura Universitaria en Mecatrónica"
+  },
+  {
+    "especialid": 7,
+    "plan": 95,
+    "materia": 519,
+    "MateriaNombre": "Avances en Metalurgia y Nuevos Materiales (Elec.)",
+    "MateriaDictado": "A",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 9,
+    "plan": 95,
+    "materia": 519,
+    "MateriaNombre": "Avances en Metalurgia y Nuevos Materiales (Elec.)",
+    "MateriaDictado": "A",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 17,
+    "plan": 94,
+    "materia": 519,
+    "MateriaNombre": "Avances en Metalurgia y Nuevos Materiales (Elec.)",
+    "MateriaDictado": "A",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 18,
+    "plan": 95,
+    "materia": 519,
+    "MateriaNombre": "Avances en Metalurgia y Nuevos Materiales (Elec.)",
+    "MateriaDictado": "A",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 27,
+    "plan": 95,
+    "materia": 519,
+    "MateriaNombre": "Avances en Metalurgia y Nuevos Materiales (Elec.)",
+    "MateriaDictado": "A",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 27,
+    "plan": 95,
+    "materia": 5029,
+    "MateriaNombre": "Materia 5029",
+    "MateriaDictado": null,
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 31,
+    "plan": 95,
+    "materia": 519,
+    "MateriaNombre": "Avances en Metalurgia y Nuevos Materiales (Elec.)",
+    "MateriaDictado": "A",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 32,
+    "plan": 95,
+    "materia": 121,
+    "MateriaNombre": "Matemática Discreta",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 32,
+    "plan": 95,
+    "materia": 122,
+    "MateriaNombre": "Materia 122",
+    "MateriaDictado": null,
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 32,
+    "plan": 95,
+    "materia": 123,
+    "MateriaNombre": "Arquitectura de Computadoras",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 32,
+    "plan": 95,
+    "materia": 124,
+    "MateriaNombre": "Química",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 32,
+    "plan": 95,
+    "materia": 125,
+    "MateriaNombre": "Sistemas y Organizaciones",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 32,
+    "plan": 95,
+    "materia": 126,
+    "MateriaNombre": "Materia 126",
+    "MateriaDictado": null,
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 32,
+    "plan": 95,
+    "materia": 127,
+    "MateriaNombre": "Materia 127",
+    "MateriaDictado": null,
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 32,
+    "plan": 95,
+    "materia": 228,
+    "MateriaNombre": "Sintaxis y Semántica de los Lenguajes",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 32,
+    "plan": 95,
+    "materia": 229,
+    "MateriaNombre": "Materia 229",
+    "MateriaDictado": null,
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 32,
+    "plan": 95,
+    "materia": 230,
+    "MateriaNombre": "Materia 230",
+    "MateriaDictado": null,
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 32,
+    "plan": 95,
+    "materia": 231,
+    "MateriaNombre": "Materia 231",
+    "MateriaDictado": null,
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 32,
+    "plan": 95,
+    "materia": 232,
+    "MateriaNombre": "Materia 232",
+    "MateriaDictado": null,
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 32,
+    "plan": 95,
+    "materia": 233,
+    "MateriaNombre": "Materia 233",
+    "MateriaDictado": null,
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 32,
+    "plan": 95,
+    "materia": 234,
+    "MateriaNombre": "Materia 234",
+    "MateriaDictado": null,
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 32,
+    "plan": 95,
+    "materia": 335,
+    "MateriaNombre": "Materia 335",
+    "MateriaDictado": null,
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 41,
+    "plan": 2001,
+    "materia": 1,
+    "MateriaNombre": "Mecatrónica I",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 41,
+    "plan": 2001,
+    "materia": 2,
+    "MateriaNombre": "Física",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 41,
+    "plan": 2001,
+    "materia": 3,
+    "MateriaNombre": "Matemática",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 41,
+    "plan": 2001,
+    "materia": 4,
+    "MateriaNombre": "Inglés",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 41,
+    "plan": 2001,
+    "materia": 5,
+    "MateriaNombre": "Herramientas Informáticas",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 41,
+    "plan": 2001,
+    "materia": 6,
+    "MateriaNombre": "Sistemas de Representación-CAD",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 42,
+    "plan": 2001,
+    "materia": 11,
+    "MateriaNombre": "Mantenimiento Industrial II",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 42,
+    "plan": 2001,
+    "materia": 12,
+    "MateriaNombre": "Elementos de Máquinas",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 42,
+    "plan": 2001,
+    "materia": 13,
+    "MateriaNombre": "Tecnología de Frío y Calor",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 42,
+    "plan": 2001,
+    "materia": 14,
+    "MateriaNombre": "Instalaciones y Máquinas Eléctricas",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 42,
+    "plan": 2001,
+    "materia": 15,
+    "MateriaNombre": "Informática II",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 42,
+    "plan": 2001,
+    "materia": 16,
+    "MateriaNombre": "Seguridad, Higiene y Protección Ambiental",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 42,
+    "plan": 2001,
+    "materia": 17,
+    "MateriaNombre": "Inglés",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 42,
+    "plan": 2001,
+    "materia": 18,
+    "MateriaNombre": "Costos y Control de Gestión",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 42,
+    "plan": 2001,
+    "materia": 19,
+    "MateriaNombre": "Elementos de Automatización",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 42,
+    "plan": 2001,
+    "materia": 20,
+    "MateriaNombre": "Aseguramiento de la Calidad",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
+  },
+  {
+    "especialid": 119,
+    "plan": 2003,
+    "materia": 1,
+    "MateriaNombre": "Mecatrónica I",
+    "MateriaDictado": "C",
+    "EspecialidadNombre": null
   }
 ]

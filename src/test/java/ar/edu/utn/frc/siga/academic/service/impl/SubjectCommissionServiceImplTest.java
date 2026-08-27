@@ -88,6 +88,31 @@ class SubjectCommissionServiceImplTest {
     }
 
     @Test
+    @DisplayName("findByCommissionAndSubjectCode: si existe la relación, devuelve el DTO mapeado")
+    void findByCommissionAndSubjectCodeWithExistingRelationReturnsMappedDto() {
+        SubjectCommission existing = SubjectCommission.builder().subject(subject).commission(commission)
+                .enrolledCount(30).build();
+        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, 2L, null, 30);
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
+                .thenReturn(Optional.of(existing));
+        when(subjectCommissionMapper.toDto(existing)).thenReturn(dto);
+
+        SubjectCommissionResponseDto result = service.findByCommissionAndSubjectCode(2L, 101);
+
+        assertThat(result).isEqualTo(dto);
+    }
+
+    @Test
+    @DisplayName("findByCommissionAndSubjectCode: si no existe la relación, lanza ResourceNotFoundException")
+    void findByCommissionAndSubjectCodeWithoutExistingRelationThrowsResourceNotFound() {
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.findByCommissionAndSubjectCode(2L, 101))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
     @DisplayName("findAll: mapea todas las relaciones del repositorio")
     void findAllMapsAllRelations() {
         SubjectCommission relation = SubjectCommission.builder().subject(subject).commission(commission)

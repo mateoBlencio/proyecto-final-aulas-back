@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.SpaceTestData;
 import ar.edu.utn.frc.siga.space.config.SpaceSettings;
 import ar.edu.utn.frc.siga.space.dto.request.BuildingActiveBatchItemDto;
@@ -8,10 +9,12 @@ import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.mapper.BuildingMapper;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
+import ar.edu.utn.frc.siga.space.service.command.BuildingSyncCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -21,6 +24,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -189,5 +194,83 @@ class BuildingServiceImplTest {
         assertThatThrownBy(() -> service.setActiveBatch(List.of(new BuildingActiveBatchItemDto(99L, true))))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Building not found with id: 99");
+    }
+
+    @Test
+    @DisplayName("syncBuildings: inserta el edificio que no existe con columnas de control")
+    void syncBuildingsInsertsUnknownBuilding() {
+        when(buildingRepository.findAll()).thenReturn(List.of());
+        when(buildingRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(4, "Edif.Malvinas")));
+
+        ArgumentCaptor<Building> saved = ArgumentCaptor.forClass(Building.class);
+        verify(buildingRepository).save(saved.capture());
+        Building inserted = saved.getValue();
+        assertThat(inserted.getBuildingCode()).isEqualTo(4);
+        assertThat(inserted.getName()).isEqualTo("Edif.Malvinas");
+        assertThat(inserted.getSyncedAt()).isNotNull();
+        assertThat(inserted.getSysacadHash()).isEqualTo(Hashes.sha256Hex("Edif.Malvinas"));
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("syncBuildings: actualiza el nombre del edificio existente cuando cambió upstream")
+    void syncBuildingsUpdatesRenamedBuilding() {
+        Building existing = sysacadBuilding(4, "Malvinas viejo", Hashes.sha256Hex("Malvinas viejo"));
+        when(buildingRepository.findAll()).thenReturn(List.of(existing));
+
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(4, "Edif.Malvinas")));
+
+        assertThat(existing.getName()).isEqualTo("Edif.Malvinas");
+        assertThat(existing.getSysacadHash()).isEqualTo(Hashes.sha256Hex("Edif.Malvinas"));
+        verify(buildingRepository).save(existing);
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("syncBuildings: no escribe cuando el hash no cambió")
+    void syncBuildingsSkipsUnchangedBuilding() {
+        Building existing = sysacadBuilding(4, "Edif.Malvinas", Hashes.sha256Hex("Edif.Malvinas"));
+        when(buildingRepository.findAll()).thenReturn(List.of(existing));
+
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(4, "Edif.Malvinas")));
+
+        verify(buildingRepository, never()).save(any());
+        assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("syncBuildings: el edificio ausente upstream queda no vigente y con deletedAt, sin borrarse")
+    void syncBuildingsMarksAbsentBuildingAsNotCurrent() {
+        Building absent = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));
+        when(buildingRepository.findAll()).thenReturn(List.of(absent));
+
+        int affected = service.syncBuildings(List.of());
+
+        assertThat(absent.getDeletedAt()).isNotNull();
+        verify(buildingRepository).save(absent);
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("syncBuildings: no toca los edificios sin código SysAcad (creados localmente)")
+    void syncBuildingsLeavesBuildingsWithoutSysacadCodeUntouched() {
+        Building local = SpaceTestData.building().id(7L).buildingCode(null).build();
+        when(buildingRepository.findAll()).thenReturn(List.of(local));
+
+        service.syncBuildings(List.of());
+
+        assertThat(local.getDeletedAt()).isNull();
+        verify(buildingRepository, never()).save(any());
+    }
+
+    private static Building sysacadBuilding(Integer code, String name, String hash) {
+        return SpaceTestData.building()
+                .id(code.longValue())
+                .buildingCode(code)
+                .name(name)
+                .sysacadHash(hash)
+                .build();
     }
 }

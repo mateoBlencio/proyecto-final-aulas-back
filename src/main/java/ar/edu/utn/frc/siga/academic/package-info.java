@@ -1,4 +1,4 @@
-@ApplicationModule(allowedDependencies = { "common", "sysacad :: api" })
+@ApplicationModule(allowedDependencies = { "common" })
 package ar.edu.utn.frc.siga.academic;
 
 import org.springframework.modulith.ApplicationModule;

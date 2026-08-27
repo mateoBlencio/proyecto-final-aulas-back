@@ -1,12 +1,10 @@
-package ar.edu.utn.frc.siga.academic.sync;
+package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.academic.mapper.SpecialtyMapper;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
+import ar.edu.utn.frc.siga.academic.service.command.SpecialtySyncCommand;
 import ar.edu.utn.frc.siga.common.util.Hashes;
-import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
-import ar.edu.utn.frc.siga.sysacad.api.SysacadSpecialtyDto;
-import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
-import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,39 +16,35 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("SpecialtySyncService")
-class SpecialtySyncServiceTest {
+@DisplayName("SpecialtyServiceImpl")
+class SpecialtyServiceImplTest {
 
-    @Mock
-    private SysacadCatalogReader catalogReader;
     @Mock
     private SpecialtyRepository specialtyRepository;
     @Mock
-    private SysacadSyncStateService syncStateService;
+    private SpecialtyMapper specialtyMapper;
 
-    private SpecialtySyncService service;
+    private SpecialtyServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new SpecialtySyncService(catalogReader, specialtyRepository, syncStateService);
+        service = new SpecialtyServiceImpl(specialtyRepository, specialtyMapper);
     }
 
     @Test
-    @DisplayName("sync: inserta la especialidad que no existe con columnas de control")
-    void syncInsertsUnknownSpecialty() {
-        when(catalogReader.findSpecialties())
-                .thenReturn(List.of(new SysacadSpecialtyDto(5, "Ingeniería en Sistemas de Información", "Ing. Sist. Inf.")));
+    @DisplayName("syncSpecialties: inserta la especialidad que no existe con columnas de control")
+    void syncSpecialtiesInsertsUnknownSpecialty() {
         when(specialtyRepository.findAll()).thenReturn(List.of());
         when(specialtyRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        service.sync();
+        int affected = service.syncSpecialties(
+                List.of(new SpecialtySyncCommand(5, "Ingeniería en Sistemas de Información", "Ing. Sist. Inf.")));
 
         ArgumentCaptor<Specialty> saved = ArgumentCaptor.forClass(Specialty.class);
         verify(specialtyRepository).save(saved.capture());
@@ -61,17 +55,16 @@ class SpecialtySyncServiceTest {
         assertThat(inserted.getSyncedAt()).isNotNull();
         assertThat(inserted.getSysacadHash())
                 .isEqualTo(Hashes.sha256Hex("Ingeniería en Sistemas de Información", "Ing. Sist. Inf."));
-        verify(syncStateService).recordSuccess(SysacadView.ESPECIALIDADES, 1);
+        assertThat(affected).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("sync: actualiza el nombre de la especialidad existente cuando cambió upstream")
-    void syncUpdatesRenamedSpecialty() {
+    @DisplayName("syncSpecialties: actualiza el nombre de la especialidad existente cuando cambió upstream")
+    void syncSpecialtiesUpdatesRenamedSpecialty() {
         Specialty existing = sysacadSpecialty(5, "Sistemas", Hashes.sha256Hex("Sistemas", "Sist."));
-        when(catalogReader.findSpecialties()).thenReturn(List.of(new SysacadSpecialtyDto(5, "Ing. Sistemas", "Sist.")));
         when(specialtyRepository.findAll()).thenReturn(List.of(existing));
 
-        service.sync();
+        service.syncSpecialties(List.of(new SpecialtySyncCommand(5, "Ing. Sistemas", "Sist.")));
 
         assertThat(existing.getName()).isEqualTo("Ing. Sistemas");
         assertThat(existing.getAbbreviation()).isEqualTo("Sist.");
@@ -79,54 +72,51 @@ class SpecialtySyncServiceTest {
     }
 
     @Test
-    @DisplayName("sync: actualiza cuando solo cambió la abreviatura")
-    void syncUpdatesWhenOnlyAbbreviationChanged() {
+    @DisplayName("syncSpecialties: actualiza cuando solo cambió la abreviatura")
+    void syncSpecialtiesUpdatesWhenOnlyAbbreviationChanged() {
         Specialty existing = sysacadSpecialty(5, "Ing. Sistemas", Hashes.sha256Hex("Ing. Sistemas", "Sist."));
         existing.setAbbreviation("Sist.");
-        when(catalogReader.findSpecialties())
-                .thenReturn(List.of(new SysacadSpecialtyDto(5, "Ing. Sistemas", "Ing. Sist.")));
         when(specialtyRepository.findAll()).thenReturn(List.of(existing));
 
-        service.sync();
+        service.syncSpecialties(List.of(new SpecialtySyncCommand(5, "Ing. Sistemas", "Ing. Sist.")));
 
         assertThat(existing.getAbbreviation()).isEqualTo("Ing. Sist.");
         verify(specialtyRepository).save(existing);
     }
 
     @Test
-    @DisplayName("sync: no escribe cuando el hash no cambió")
-    void syncSkipsUnchangedSpecialty() {
+    @DisplayName("syncSpecialties: no escribe cuando el hash no cambió")
+    void syncSpecialtiesSkipsUnchangedSpecialty() {
         Specialty existing = sysacadSpecialty(5, "Ing. Sistemas", Hashes.sha256Hex("Ing. Sistemas", "Sist."));
-        when(catalogReader.findSpecialties()).thenReturn(List.of(new SysacadSpecialtyDto(5, "Ing. Sistemas", "Sist.")));
         when(specialtyRepository.findAll()).thenReturn(List.of(existing));
 
-        service.sync();
+        int affected = service.syncSpecialties(List.of(new SpecialtySyncCommand(5, "Ing. Sistemas", "Sist.")));
 
         verify(specialtyRepository, never()).save(any());
-        verify(syncStateService).recordSuccess(SysacadView.ESPECIALIDADES, 0);
+        assertThat(affected).isZero();
     }
 
     @Test
-    @DisplayName("sync: la especialidad ausente upstream no se toca (especialidad no tiene flag de vigencia)")
-    void syncLeavesAbsentSpecialtyUntouched() {
+    @DisplayName("syncSpecialties: la especialidad ausente upstream no se toca (especialidad no tiene flag de vigencia)")
+    void syncSpecialtiesLeavesAbsentSpecialtyUntouched() {
         Specialty absent = sysacadSpecialty(5, "Ing. Sistemas", Hashes.sha256Hex("Ing. Sistemas", "Sist."));
-        when(catalogReader.findSpecialties()).thenReturn(List.of());
         when(specialtyRepository.findAll()).thenReturn(List.of(absent));
 
-        service.sync();
+        int affected = service.syncSpecialties(List.of());
 
         verify(specialtyRepository, never()).save(any());
-        verify(syncStateService).recordSuccess(SysacadView.ESPECIALIDADES, 0);
+        assertThat(affected).isZero();
     }
 
     @Test
-    @DisplayName("sync: registra el error y propaga la excepción cuando falla la lectura")
-    void syncRecordsFailure() {
-        when(catalogReader.findSpecialties()).thenThrow(new IllegalStateException("SysAcad caído"));
+    @DisplayName("syncSpecialties: comando con clave vacía se ignora")
+    void syncSpecialtiesIgnoresCommandWithMissingCode() {
+        when(specialtyRepository.findAll()).thenReturn(List.of());
 
-        assertThatThrownBy(() -> service.sync()).isInstanceOf(IllegalStateException.class);
+        int affected = service.syncSpecialties(List.of(new SpecialtySyncCommand(null, "Sin código", null)));
 
-        verify(syncStateService).recordFailure(SysacadView.ESPECIALIDADES, "SysAcad caído");
+        verify(specialtyRepository, never()).save(any());
+        assertThat(affected).isZero();
     }
 
     private static Specialty sysacadSpecialty(Integer code, String name, String hash) {

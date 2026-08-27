@@ -8,6 +8,7 @@ import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
+import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
@@ -81,8 +82,21 @@ public class AllocationServiceImpl implements AllocationService {
                 .toList();
     }
 
+    @Override
+    @Transactional
+    public int syncFromSysacad(List<AllocationItem> items) {
+        AllocationCommand command = new AllocationCommand(items, null, AllocationSource.SYSACAD);
+        Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolveAndValidate(command);
+        int affected = writer.syncFromSysacad(classroomByOccurrence);
+        log.info("Sync de SysAcad: asignaciones afectadas={}", affected);
+        return affected;
+    }
+
     private Map<OccurrenceSlotDto, Long> resolveAndValidate(AllocationCommand command) {
-        LocalDate clampFrom = command.source() == AllocationSource.IMPORTED ? null : LocalDate.now();
+        // IMPORTED (ingest Excel) y SYSACAD no clampean: el primer sync/import de una comisión a mitad
+        // de año trae ocurrencias ya pasadas, y rechazarlas dejaría esos slots sin asignación (plan §4).
+        LocalDate clampFrom = (command.source() == AllocationSource.IMPORTED || command.source() == AllocationSource.SYSACAD)
+                ? null : LocalDate.now();
         Map<OccurrenceSlotDto, Long> classroomByOccurrence =
                 targetResolver.resolveClassroomByOccurrence(command.items(), clampFrom);
 

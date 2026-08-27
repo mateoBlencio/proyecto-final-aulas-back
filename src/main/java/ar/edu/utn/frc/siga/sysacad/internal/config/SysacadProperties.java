@@ -25,13 +25,15 @@ public class SysacadProperties {
 
     private boolean materiasMockEnabled = false;
 
-    private Sync sync = new Sync(null, null, null, null, null);
+    private Sync sync = new Sync(null, null, null, null, null, null, null);
 
     public record Sync(
             String edificios,
             String aulas,
             String especialidades,
             String materias,
-            String comisiones
+            String comisiones,
+            String eventos,
+            String asignaciones
     ) {}
 }

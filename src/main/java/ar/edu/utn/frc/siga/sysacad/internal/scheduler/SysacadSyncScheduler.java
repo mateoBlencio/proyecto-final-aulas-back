@@ -46,4 +46,16 @@ public class SysacadSyncScheduler {
         log.info("Cron de sync de Comisiones disparado");
         orchestrator.sync(SysacadView.COMISIONES);
     }
+
+    @Scheduled(cron = "${siga.sysacad.sync.eventos}")
+    public void syncAcademicEvents() {
+        log.info("Cron de sync de Eventos disparado");
+        orchestrator.sync(SysacadView.EVENTOS);
+    }
+
+    @Scheduled(cron = "${siga.sysacad.sync.asignaciones}")
+    public void syncAllocations() {
+        log.info("Cron de sync de Asignaciones disparado");
+        orchestrator.sync(SysacadView.ASIGNACIONES);
+    }
 }

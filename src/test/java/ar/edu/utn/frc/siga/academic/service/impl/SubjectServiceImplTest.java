@@ -8,11 +8,14 @@ import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
 import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
+import ar.edu.utn.frc.siga.academic.service.command.SubjectSyncCommand;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.util.Hashes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -21,6 +24,10 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,6 +42,8 @@ class SubjectServiceImplTest {
     private SpecialtyRepository specialtyRepository;
     @Mock
     private SubjectMapper subjectMapper;
+    @Mock
+    private StudyPlanResolver studyPlanResolver;
 
     private SubjectServiceImpl service;
 
@@ -43,7 +52,8 @@ class SubjectServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new SubjectServiceImpl(subjectRepository, studyPlanRepository, specialtyRepository, subjectMapper);
+        service = new SubjectServiceImpl(
+                subjectRepository, studyPlanRepository, specialtyRepository, subjectMapper, studyPlanResolver);
     }
 
     @Test
@@ -158,5 +168,91 @@ class SubjectServiceImplTest {
         assertThatThrownBy(() -> service.findByCodeAndStudyPlan(101, 2020, 10))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Subject not found with id: 101");
+    }
+
+    @Test
+    @DisplayName("syncSubjects: inserta la materia que no existe con columnas de control")
+    void syncSubjectsInsertsUnknownSubject() {
+        StudyPlan syncStudyPlan = syncStudyPlan();
+        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any())).thenReturn(Optional.of(syncStudyPlan));
+        when(subjectRepository.findAll()).thenReturn(List.of());
+        when(subjectRepository.save(any(Subject.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        int affected = service.syncSubjects(
+                List.of(new SubjectSyncCommand(17, 94, 519, "Análisis Matemático I", "C")));
+
+        ArgumentCaptor<Subject> saved = ArgumentCaptor.forClass(Subject.class);
+        verify(subjectRepository).save(saved.capture());
+        Subject inserted = saved.getValue();
+        assertThat(inserted.getCode()).isEqualTo(519);
+        assertThat(inserted.getName()).isEqualTo("Análisis Matemático I");
+        assertThat(inserted.getTerm()).isEqualTo("C");
+        assertThat(inserted.getStudyPlan()).isEqualTo(syncStudyPlan);
+        assertThat(inserted.getSyncedAt()).isNotNull();
+        assertThat(inserted.getSysacadHash()).isEqualTo(Hashes.sha256Hex("Análisis Matemático I", "C"));
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("syncSubjects: actualiza el nombre y el dictado de la materia existente cuando cambiaron upstream")
+    void syncSubjectsUpdatesRenamedSubject() {
+        StudyPlan syncStudyPlan = syncStudyPlan();
+        Subject existing = Subject.builder().id(1L).code(519).name("Analisis I").term("A").studyPlan(syncStudyPlan)
+                .sysacadHash(Hashes.sha256Hex("Analisis I", "A")).build();
+        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any())).thenReturn(Optional.of(syncStudyPlan));
+        when(subjectRepository.findAll()).thenReturn(List.of(existing));
+
+        service.syncSubjects(List.of(new SubjectSyncCommand(17, 94, 519, "Análisis Matemático I", "C")));
+
+        assertThat(existing.getName()).isEqualTo("Análisis Matemático I");
+        assertThat(existing.getTerm()).isEqualTo("C");
+        verify(subjectRepository).save(existing);
+    }
+
+    @Test
+    @DisplayName("syncSubjects: no escribe cuando el hash no cambió")
+    void syncSubjectsSkipsUnchangedSubject() {
+        StudyPlan syncStudyPlan = syncStudyPlan();
+        Subject existing = Subject.builder().id(1L).code(519).name("Análisis Matemático I").term("C")
+                .studyPlan(syncStudyPlan).sysacadHash(Hashes.sha256Hex("Análisis Matemático I", "C")).build();
+        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any())).thenReturn(Optional.of(syncStudyPlan));
+        when(subjectRepository.findAll()).thenReturn(List.of(existing));
+
+        int affected = service.syncSubjects(
+                List.of(new SubjectSyncCommand(17, 94, 519, "Análisis Matemático I", "C")));
+
+        verify(subjectRepository, never()).save(any());
+        assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("syncSubjects: comando con datos incompletos se ignora")
+    void syncSubjectsIgnoresIncompleteCommand() {
+        when(subjectRepository.findAll()).thenReturn(List.of());
+
+        int affected = service.syncSubjects(
+                List.of(new SubjectSyncCommand(17, null, 519, "Análisis Matemático I", "C")));
+
+        verify(subjectRepository, never()).save(any());
+        verify(studyPlanResolver, never()).findOrCreate(any(), any(), any());
+        assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("syncSubjects: si no se resuelve el plan de estudio, la materia se ignora")
+    void syncSubjectsSkipsWhenStudyPlanUnresolved() {
+        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any())).thenReturn(Optional.empty());
+        when(subjectRepository.findAll()).thenReturn(List.of());
+
+        int affected = service.syncSubjects(
+                List.of(new SubjectSyncCommand(17, 94, 519, "Análisis Matemático I", "C")));
+
+        verify(subjectRepository, never()).save(any());
+        assertThat(affected).isZero();
+    }
+
+    private static StudyPlan syncStudyPlan() {
+        return StudyPlan.builder().id(1L).planCode(94)
+                .specialty(Specialty.builder().id(1L).specialtyCode(17).build()).build();
     }
 }

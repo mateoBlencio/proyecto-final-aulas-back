@@ -20,4 +20,7 @@ public interface CommissionRepository extends JpaRepository<Commission, Long> {
     @Override
     @EntityGraph(attributePaths = {"academicPeriod"})
     List<Commission> findAllById(Iterable<Long> ids);
+
+    @EntityGraph(attributePaths = {"academicPeriod"})
+    List<Commission> findByCourseCodeAndSysacadEnabledTrue(String courseCode);
 }

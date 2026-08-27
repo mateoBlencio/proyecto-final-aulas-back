@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.academic.sync;
+package ar.edu.utn.frc.siga.academic.service.impl;
 
 import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;

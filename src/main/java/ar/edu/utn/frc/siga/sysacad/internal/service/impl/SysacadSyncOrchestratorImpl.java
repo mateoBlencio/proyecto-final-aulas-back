@@ -42,11 +42,18 @@ public class SysacadSyncOrchestratorImpl implements SysacadSyncOrchestrator {
             log.info("Resync manual ignorado: ya hay uno en curso");
             return SysacadResyncOutcome.SUCCESS;
         }
-        SysacadView[] views = SysacadView.values();
+        int attemptedViews = 0;
         int failedViews = 0;
         int connectivityFailures = 0;
         try {
-            for (SysacadView view : views) {
+            for (SysacadView view : SysacadView.values()) {
+                // Vistas sin syncer registrado (todavía) no cuentan ni como intento ni como falla — ver
+                // sync(view): loguea WARN y las saltea. Sin este chequeo, agregar una vista nueva sin
+                // syncer bajaría artificialmente el % de fallas y CONNECTIVITY_FAILURE dejaría de poder
+                // darse nunca (siempre habría vistas "sanas" de más en el denominador).
+                if (syncersByView.containsKey(view)) {
+                    attemptedViews++;
+                }
                 try {
                     sync(view);
                 } catch (RuntimeException e) {
@@ -63,7 +70,7 @@ public class SysacadSyncOrchestratorImpl implements SysacadSyncOrchestrator {
         if (failedViews == 0) {
             return SysacadResyncOutcome.SUCCESS;
         }
-        if (connectivityFailures == views.length) {
+        if (attemptedViews > 0 && connectivityFailures == attemptedViews) {
             return SysacadResyncOutcome.CONNECTIVITY_FAILURE;
         }
         return SysacadResyncOutcome.PARTIAL_FAILURE;

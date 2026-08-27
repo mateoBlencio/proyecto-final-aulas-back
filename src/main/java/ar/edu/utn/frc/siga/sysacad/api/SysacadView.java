@@ -5,5 +5,7 @@ public enum SysacadView {
     AULAS,
     ESPECIALIDADES,
     MATERIAS,
-    COMISIONES
+    COMISIONES,
+    EVENTOS,
+    ASIGNACIONES
 }
