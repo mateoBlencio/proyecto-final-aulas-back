@@ -65,14 +65,14 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
                         .param("subjectId", String.valueOf(academic.subjectId()))
                         .param("types", "PARTIAL_EXAM"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(2));
+                .andExpect(jsonPath("$.page.totalElements").value(2));
 
         mockMvc.perform(get("/v1/room-requests/items")
                         .param("subjectId", String.valueOf(academic.subjectId()))
                         .param("types", "PARTIAL_EXAM")
                         .param("statuses", "PRE_APPROVED"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.page.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].status").value("PRE_APPROVED"))
                 .andExpect(jsonPath("$.content[0].request.id").value(partial.getId()));
     }
@@ -91,7 +91,7 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
                         .param("dateFrom", LocalDate.now().toString())
                         .param("dateTo", LocalDate.now().plusDays(10).toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.page.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].date").value(LocalDate.now().plusDays(5).toString()));
     }
 
@@ -107,13 +107,13 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/v1/room-requests/items")
                         .param("subjectId", String.valueOf(academic.subjectId())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(1));
+                .andExpect(jsonPath("$.page.totalElements").value(1));
 
         mockMvc.perform(get("/v1/room-requests/items")
                         .param("subjectId", String.valueOf(academic.subjectId()))
                         .param("includePast", "true"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(2));
+                .andExpect(jsonPath("$.page.totalElements").value(2));
     }
 
     @Test
@@ -132,8 +132,8 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
                         .param("size", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(2))
-                .andExpect(jsonPath("$.totalElements").value(3))
-                .andExpect(jsonPath("$.totalPages").value(2));
+                .andExpect(jsonPath("$.page.totalElements").value(3))
+                .andExpect(jsonPath("$.page.totalPages").value(2));
     }
 
     @Test
