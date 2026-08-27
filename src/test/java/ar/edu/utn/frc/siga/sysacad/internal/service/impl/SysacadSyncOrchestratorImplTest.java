@@ -35,6 +35,8 @@ class SysacadSyncOrchestratorImplTest {
     @Mock
     private SysacadViewSyncer specialties;
     @Mock
+    private SysacadViewSyncer subjects;
+    @Mock
     private SysacadViewSyncer commissions;
 
     private SysacadSyncOrchestratorImpl orchestrator;
@@ -44,9 +46,10 @@ class SysacadSyncOrchestratorImplTest {
         when(buildings.view()).thenReturn(SysacadView.EDIFICIOS);
         when(classrooms.view()).thenReturn(SysacadView.AULAS);
         when(specialties.view()).thenReturn(SysacadView.ESPECIALIDADES);
+        when(subjects.view()).thenReturn(SysacadView.MATERIAS);
         when(commissions.view()).thenReturn(SysacadView.COMISIONES);
         // El orden de registro es el inverso al de FK para probar que no lo define la inyección.
-        orchestrator = new SysacadSyncOrchestratorImpl(List.of(commissions, specialties, classrooms, buildings));
+        orchestrator = new SysacadSyncOrchestratorImpl(List.of(commissions, subjects, specialties, classrooms, buildings));
     }
 
     @Test
@@ -54,10 +57,11 @@ class SysacadSyncOrchestratorImplTest {
     void resyncAll_respectsForeignKeyOrder() {
         orchestrator.resyncAll();
 
-        InOrder order = inOrder(buildings, classrooms, specialties, commissions);
+        InOrder order = inOrder(buildings, classrooms, specialties, subjects, commissions);
         order.verify(buildings).sync();
         order.verify(classrooms).sync();
         order.verify(specialties).sync();
+        order.verify(subjects).sync();
         order.verify(commissions).sync();
         order.verifyNoMoreInteractions();
     }
@@ -71,6 +75,7 @@ class SysacadSyncOrchestratorImplTest {
 
         verify(classrooms).sync();
         verify(specialties).sync();
+        verify(subjects).sync();
         verify(commissions).sync();
     }
 
@@ -98,6 +103,7 @@ class SysacadSyncOrchestratorImplTest {
         doThrow(new SysacadUnavailableException("I/O error", null)).when(buildings).sync();
         doThrow(new SysacadUnavailableException("I/O error", null)).when(classrooms).sync();
         doThrow(new SysacadUnavailableException("I/O error", null)).when(specialties).sync();
+        doThrow(new SysacadUnavailableException("I/O error", null)).when(subjects).sync();
         doThrow(new SysacadUnavailableException("I/O error", null)).when(commissions).sync();
 
         SysacadResyncOutcome outcome = orchestrator.resyncAll();
@@ -139,6 +145,7 @@ class SysacadSyncOrchestratorImplTest {
         verify(buildings, times(1)).sync();
         verify(classrooms, times(1)).sync();
         verify(specialties, times(1)).sync();
+        verify(subjects, times(1)).sync();
         verify(commissions, times(1)).sync();
     }
 }

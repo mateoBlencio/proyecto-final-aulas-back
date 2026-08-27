@@ -35,6 +35,12 @@ public class SysacadSyncScheduler {
         orchestrator.sync(SysacadView.ESPECIALIDADES);
     }
 
+    @Scheduled(cron = "${siga.sysacad.sync.materias}")
+    public void syncSubjects() {
+        log.info("Cron de sync de Materias disparado");
+        orchestrator.sync(SysacadView.MATERIAS);
+    }
+
     @Scheduled(cron = "${siga.sysacad.sync.comisiones}")
     public void syncCommissions() {
         log.info("Cron de sync de Comisiones disparado");

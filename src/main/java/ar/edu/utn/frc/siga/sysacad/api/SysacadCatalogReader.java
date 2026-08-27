@@ -10,5 +10,9 @@ public interface SysacadCatalogReader {
 
     List<SysacadSpecialtyDto> findSpecialties();
 
+    List<SysacadSubjectDto> findSubjects();
+
+    List<SysacadSubjectCommissionDto> findSubjectCommissions();
+
     List<SysacadCommissionDto> findCommissions();
 }

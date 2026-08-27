@@ -1,0 +1,5504 @@
+[
+  {
+    "Curso": "1C1",
+    "materia": 101,
+    "Inscriptos": 80,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1C1",
+    "materia": 102,
+    "Inscriptos": 66,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1C1",
+    "materia": 103,
+    "Inscriptos": 49,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1C1",
+    "materia": 104,
+    "Inscriptos": 45,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1C1",
+    "materia": 106,
+    "Inscriptos": 70,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1C1",
+    "materia": 107,
+    "Inscriptos": 68,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1C2",
+    "materia": 101,
+    "Inscriptos": 164,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1C2",
+    "materia": 102,
+    "Inscriptos": 163,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1C2",
+    "materia": 103,
+    "Inscriptos": 141,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1C2",
+    "materia": 104,
+    "Inscriptos": 153,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1C2",
+    "materia": 106,
+    "Inscriptos": 122,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1C2",
+    "materia": 107,
+    "Inscriptos": 165,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1C2A",
+    "materia": 106,
+    "Inscriptos": 49,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1C3",
+    "materia": 101,
+    "Inscriptos": 75,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1C3",
+    "materia": 102,
+    "Inscriptos": 65,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1C3",
+    "materia": 103,
+    "Inscriptos": 63,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1C3",
+    "materia": 104,
+    "Inscriptos": 72,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1C3",
+    "materia": 106,
+    "Inscriptos": 104,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1C3",
+    "materia": 107,
+    "Inscriptos": 83,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D1",
+    "materia": 101,
+    "Inscriptos": 137,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D1",
+    "materia": 102,
+    "Inscriptos": 134,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D1",
+    "materia": 103,
+    "Inscriptos": 138,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D1",
+    "materia": 104,
+    "Inscriptos": 139,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D1",
+    "materia": 105,
+    "Inscriptos": 141,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D1",
+    "materia": 106,
+    "Inscriptos": 125,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D1",
+    "materia": 107,
+    "Inscriptos": 125,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D1",
+    "materia": 108,
+    "Inscriptos": 120,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D2",
+    "materia": 101,
+    "Inscriptos": 68,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D2",
+    "materia": 102,
+    "Inscriptos": 91,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D2",
+    "materia": 103,
+    "Inscriptos": 74,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D2",
+    "materia": 104,
+    "Inscriptos": 73,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D2",
+    "materia": 105,
+    "Inscriptos": 87,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D2",
+    "materia": 106,
+    "Inscriptos": 62,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D2",
+    "materia": 107,
+    "Inscriptos": 61,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D2",
+    "materia": 108,
+    "Inscriptos": 43,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D3",
+    "materia": 101,
+    "Inscriptos": 126,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D3",
+    "materia": 102,
+    "Inscriptos": 127,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D3",
+    "materia": 103,
+    "Inscriptos": 151,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D3",
+    "materia": 104,
+    "Inscriptos": 144,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D3",
+    "materia": 105,
+    "Inscriptos": 157,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D3",
+    "materia": 106,
+    "Inscriptos": 141,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D3",
+    "materia": 107,
+    "Inscriptos": 130,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D3",
+    "materia": 108,
+    "Inscriptos": 123,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D3A",
+    "materia": 102,
+    "Inscriptos": 39,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D4",
+    "materia": 101,
+    "Inscriptos": 125,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D4",
+    "materia": 102,
+    "Inscriptos": 125,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D4",
+    "materia": 103,
+    "Inscriptos": 142,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D4",
+    "materia": 104,
+    "Inscriptos": 130,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D4",
+    "materia": 105,
+    "Inscriptos": 149,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D4",
+    "materia": 106,
+    "Inscriptos": 123,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D4",
+    "materia": 107,
+    "Inscriptos": 126,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D4",
+    "materia": 108,
+    "Inscriptos": 119,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D5",
+    "materia": 101,
+    "Inscriptos": 88,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D5",
+    "materia": 102,
+    "Inscriptos": 117,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D5",
+    "materia": 103,
+    "Inscriptos": 121,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D5",
+    "materia": 104,
+    "Inscriptos": 101,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D5",
+    "materia": 105,
+    "Inscriptos": 97,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D5",
+    "materia": 106,
+    "Inscriptos": 84,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D5",
+    "materia": 107,
+    "Inscriptos": 76,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D5",
+    "materia": 108,
+    "Inscriptos": 64,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D6",
+    "materia": 101,
+    "Inscriptos": 114,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D6",
+    "materia": 102,
+    "Inscriptos": 137,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D6",
+    "materia": 103,
+    "Inscriptos": 148,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D6",
+    "materia": 104,
+    "Inscriptos": 121,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D6",
+    "materia": 105,
+    "Inscriptos": 143,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D6",
+    "materia": 106,
+    "Inscriptos": 121,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D6",
+    "materia": 107,
+    "Inscriptos": 114,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D6",
+    "materia": 108,
+    "Inscriptos": 99,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D7",
+    "materia": 101,
+    "Inscriptos": 74,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D7",
+    "materia": 102,
+    "Inscriptos": 120,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D7",
+    "materia": 103,
+    "Inscriptos": 122,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D7",
+    "materia": 104,
+    "Inscriptos": 83,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D7",
+    "materia": 105,
+    "Inscriptos": 96,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D7",
+    "materia": 106,
+    "Inscriptos": 76,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D7",
+    "materia": 107,
+    "Inscriptos": 84,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1D7",
+    "materia": 108,
+    "Inscriptos": 58,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1H10",
+    "materia": 102,
+    "Inscriptos": 225,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1H10",
+    "materia": 103,
+    "Inscriptos": 494,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1H10",
+    "materia": 106,
+    "Inscriptos": 479,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1H10",
+    "materia": 203,
+    "Inscriptos": 109,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1H10B",
+    "materia": 203,
+    "Inscriptos": 115,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1H20",
+    "materia": 106,
+    "Inscriptos": 612,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1H22",
+    "materia": 102,
+    "Inscriptos": 367,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1H80AC",
+    "materia": 106,
+    "Inscriptos": 0,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1H80AC",
+    "materia": 123,
+    "Inscriptos": 0,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1H80MD",
+    "materia": 121,
+    "Inscriptos": 0,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1H80SO",
+    "materia": 125,
+    "Inscriptos": 0,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1H9",
+    "materia": 105,
+    "Inscriptos": 376,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1H90AS",
+    "materia": 208,
+    "Inscriptos": 0,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1H90CO",
+    "materia": 330,
+    "Inscriptos": 0,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1H90DS",
+    "materia": 331,
+    "Inscriptos": 0,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1H90SR",
+    "materia": 115,
+    "Inscriptos": 0,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1H90SR",
+    "materia": 124,
+    "Inscriptos": 0,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1H90SS",
+    "materia": 228,
+    "Inscriptos": 0,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K1",
+    "materia": 101,
+    "Inscriptos": 188,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K1",
+    "materia": 102,
+    "Inscriptos": 194,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K1",
+    "materia": 103,
+    "Inscriptos": 188,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K1",
+    "materia": 104,
+    "Inscriptos": 170,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K1",
+    "materia": 105,
+    "Inscriptos": 155,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K1",
+    "materia": 106,
+    "Inscriptos": 152,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K1",
+    "materia": 108,
+    "Inscriptos": 147,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K10",
+    "materia": 101,
+    "Inscriptos": 98,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K10",
+    "materia": 102,
+    "Inscriptos": 116,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K10",
+    "materia": 103,
+    "Inscriptos": 108,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K10",
+    "materia": 104,
+    "Inscriptos": 119,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K10",
+    "materia": 105,
+    "Inscriptos": 130,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K10",
+    "materia": 106,
+    "Inscriptos": 111,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K10",
+    "materia": 108,
+    "Inscriptos": 90,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K11",
+    "materia": 106,
+    "Inscriptos": 54,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K11",
+    "materia": 107,
+    "Inscriptos": 106,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K12",
+    "materia": 101,
+    "Inscriptos": 124,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K12",
+    "materia": 102,
+    "Inscriptos": 122,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K12",
+    "materia": 103,
+    "Inscriptos": 123,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K12",
+    "materia": 104,
+    "Inscriptos": 75,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K12",
+    "materia": 105,
+    "Inscriptos": 123,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K12",
+    "materia": 106,
+    "Inscriptos": 110,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K12",
+    "materia": 108,
+    "Inscriptos": 104,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K13",
+    "materia": 101,
+    "Inscriptos": 147,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K13",
+    "materia": 102,
+    "Inscriptos": 126,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K13",
+    "materia": 103,
+    "Inscriptos": 153,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K13",
+    "materia": 104,
+    "Inscriptos": 110,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K13",
+    "materia": 105,
+    "Inscriptos": 123,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K13",
+    "materia": 106,
+    "Inscriptos": 113,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K13",
+    "materia": 108,
+    "Inscriptos": 98,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K14",
+    "materia": 101,
+    "Inscriptos": 157,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K14",
+    "materia": 102,
+    "Inscriptos": 144,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K14",
+    "materia": 103,
+    "Inscriptos": 148,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K14",
+    "materia": 104,
+    "Inscriptos": 114,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K14",
+    "materia": 105,
+    "Inscriptos": 124,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K14",
+    "materia": 106,
+    "Inscriptos": 143,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K14",
+    "materia": 108,
+    "Inscriptos": 118,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K16",
+    "materia": 106,
+    "Inscriptos": 33,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K17",
+    "materia": 101,
+    "Inscriptos": 120,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K17",
+    "materia": 102,
+    "Inscriptos": 119,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K17",
+    "materia": 103,
+    "Inscriptos": 149,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K17",
+    "materia": 104,
+    "Inscriptos": 114,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K17",
+    "materia": 105,
+    "Inscriptos": 128,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K17",
+    "materia": 106,
+    "Inscriptos": 151,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K17",
+    "materia": 108,
+    "Inscriptos": 112,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K1B",
+    "materia": 101,
+    "Inscriptos": 131,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K1B",
+    "materia": 102,
+    "Inscriptos": 126,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K1B",
+    "materia": 103,
+    "Inscriptos": 126,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K1B",
+    "materia": 104,
+    "Inscriptos": 105,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K1B",
+    "materia": 105,
+    "Inscriptos": 133,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K1B",
+    "materia": 106,
+    "Inscriptos": 132,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K1B",
+    "materia": 108,
+    "Inscriptos": 115,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K1BA",
+    "materia": 101,
+    "Inscriptos": 49,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K1BA",
+    "materia": 102,
+    "Inscriptos": 51,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K2",
+    "materia": 101,
+    "Inscriptos": 177,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K2",
+    "materia": 102,
+    "Inscriptos": 187,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K2",
+    "materia": 103,
+    "Inscriptos": 174,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K2",
+    "materia": 104,
+    "Inscriptos": 131,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K2",
+    "materia": 105,
+    "Inscriptos": 150,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K2",
+    "materia": 106,
+    "Inscriptos": 144,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K2",
+    "materia": 108,
+    "Inscriptos": 134,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K2B",
+    "materia": 106,
+    "Inscriptos": 100,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K3",
+    "materia": 101,
+    "Inscriptos": 181,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K3",
+    "materia": 102,
+    "Inscriptos": 162,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K3",
+    "materia": 103,
+    "Inscriptos": 186,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K3",
+    "materia": 104,
+    "Inscriptos": 153,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K3",
+    "materia": 105,
+    "Inscriptos": 149,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K3",
+    "materia": 106,
+    "Inscriptos": 146,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K3",
+    "materia": 108,
+    "Inscriptos": 129,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K4",
+    "materia": 101,
+    "Inscriptos": 184,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K4",
+    "materia": 102,
+    "Inscriptos": 138,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K4",
+    "materia": 103,
+    "Inscriptos": 179,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K4",
+    "materia": 104,
+    "Inscriptos": 140,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K4",
+    "materia": 105,
+    "Inscriptos": 142,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K4",
+    "materia": 106,
+    "Inscriptos": 153,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K4",
+    "materia": 108,
+    "Inscriptos": 125,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K5",
+    "materia": 101,
+    "Inscriptos": 186,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K5",
+    "materia": 102,
+    "Inscriptos": 178,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K5",
+    "materia": 103,
+    "Inscriptos": 184,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K5",
+    "materia": 104,
+    "Inscriptos": 124,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K5",
+    "materia": 105,
+    "Inscriptos": 140,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K5",
+    "materia": 106,
+    "Inscriptos": 141,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K5",
+    "materia": 108,
+    "Inscriptos": 128,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K6",
+    "materia": 101,
+    "Inscriptos": 144,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K6",
+    "materia": 102,
+    "Inscriptos": 150,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K6",
+    "materia": 103,
+    "Inscriptos": 152,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K6",
+    "materia": 104,
+    "Inscriptos": 120,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K6",
+    "materia": 105,
+    "Inscriptos": 125,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K6",
+    "materia": 106,
+    "Inscriptos": 144,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K6",
+    "materia": 108,
+    "Inscriptos": 115,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K7",
+    "materia": 101,
+    "Inscriptos": 164,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K7",
+    "materia": 102,
+    "Inscriptos": 147,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K7",
+    "materia": 103,
+    "Inscriptos": 157,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K7",
+    "materia": 104,
+    "Inscriptos": 108,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K7",
+    "materia": 105,
+    "Inscriptos": 142,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K7",
+    "materia": 106,
+    "Inscriptos": 142,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K7",
+    "materia": 108,
+    "Inscriptos": 117,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K8",
+    "materia": 107,
+    "Inscriptos": 111,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K9",
+    "materia": 101,
+    "Inscriptos": 123,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K9",
+    "materia": 102,
+    "Inscriptos": 118,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K9",
+    "materia": 103,
+    "Inscriptos": 163,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K9",
+    "materia": 104,
+    "Inscriptos": 127,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K9",
+    "materia": 105,
+    "Inscriptos": 119,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K9",
+    "materia": 106,
+    "Inscriptos": 113,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K9",
+    "materia": 108,
+    "Inscriptos": 107,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K9B",
+    "materia": 101,
+    "Inscriptos": 99,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K9B",
+    "materia": 102,
+    "Inscriptos": 98,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K9B",
+    "materia": 103,
+    "Inscriptos": 92,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K9B",
+    "materia": 104,
+    "Inscriptos": 69,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K9B",
+    "materia": 105,
+    "Inscriptos": 84,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1K9B",
+    "materia": 106,
+    "Inscriptos": 117,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1K9B",
+    "materia": 108,
+    "Inscriptos": 78,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M10",
+    "materia": 1,
+    "Inscriptos": 80,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1M10",
+    "materia": 2,
+    "Inscriptos": 76,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M10",
+    "materia": 3,
+    "Inscriptos": 75,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M10",
+    "materia": 4,
+    "Inscriptos": 72,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M10",
+    "materia": 5,
+    "Inscriptos": 81,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M10",
+    "materia": 6,
+    "Inscriptos": 33,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1M10",
+    "materia": 7,
+    "Inscriptos": 41,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1M10",
+    "materia": 8,
+    "Inscriptos": 36,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1M10",
+    "materia": 9,
+    "Inscriptos": 48,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1M1PL",
+    "materia": 1,
+    "Inscriptos": 0,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M1PL",
+    "materia": 2,
+    "Inscriptos": 0,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1M1PL",
+    "materia": 3,
+    "Inscriptos": 0,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1M1PL",
+    "materia": 4,
+    "Inscriptos": 0,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1M1PL",
+    "materia": 5,
+    "Inscriptos": 0,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1M1PL",
+    "materia": 6,
+    "Inscriptos": 0,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M1PL",
+    "materia": 7,
+    "Inscriptos": 0,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M1PL",
+    "materia": 8,
+    "Inscriptos": 0,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M1PL",
+    "materia": 9,
+    "Inscriptos": 0,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M2",
+    "materia": 1,
+    "Inscriptos": 89,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1M2",
+    "materia": 2,
+    "Inscriptos": 57,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M2",
+    "materia": 3,
+    "Inscriptos": 56,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M2",
+    "materia": 4,
+    "Inscriptos": 53,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M2",
+    "materia": 5,
+    "Inscriptos": 56,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M2",
+    "materia": 6,
+    "Inscriptos": 50,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1M2",
+    "materia": 7,
+    "Inscriptos": 21,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1M2",
+    "materia": 8,
+    "Inscriptos": 37,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1M2",
+    "materia": 9,
+    "Inscriptos": 52,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1M2PL",
+    "materia": 1,
+    "Inscriptos": 0,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M2PL",
+    "materia": 2,
+    "Inscriptos": 0,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1M2PL",
+    "materia": 3,
+    "Inscriptos": 0,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1M2PL",
+    "materia": 4,
+    "Inscriptos": 0,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1M2PL",
+    "materia": 5,
+    "Inscriptos": 0,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1M2PL",
+    "materia": 6,
+    "Inscriptos": 0,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M2PL",
+    "materia": 7,
+    "Inscriptos": 0,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M2PL",
+    "materia": 8,
+    "Inscriptos": 0,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M2PL",
+    "materia": 9,
+    "Inscriptos": 0,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M4",
+    "materia": 1,
+    "Inscriptos": 90,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1M4",
+    "materia": 2,
+    "Inscriptos": 55,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M4",
+    "materia": 3,
+    "Inscriptos": 54,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M4",
+    "materia": 4,
+    "Inscriptos": 53,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M4",
+    "materia": 5,
+    "Inscriptos": 57,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M4",
+    "materia": 6,
+    "Inscriptos": 39,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1M4",
+    "materia": 7,
+    "Inscriptos": 42,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1M4",
+    "materia": 8,
+    "Inscriptos": 40,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1M4",
+    "materia": 9,
+    "Inscriptos": 32,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1M6",
+    "materia": 1,
+    "Inscriptos": 0,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1M6",
+    "materia": 2,
+    "Inscriptos": 67,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M6",
+    "materia": 3,
+    "Inscriptos": 67,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M6",
+    "materia": 4,
+    "Inscriptos": 65,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1M6",
+    "materia": 5,
+    "Inscriptos": 68,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1Q1",
+    "materia": 101,
+    "Inscriptos": 131,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1Q1",
+    "materia": 102,
+    "Inscriptos": 127,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1Q1",
+    "materia": 103,
+    "Inscriptos": 112,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1Q1",
+    "materia": 104,
+    "Inscriptos": 127,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1Q1",
+    "materia": 105,
+    "Inscriptos": 134,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1Q1",
+    "materia": 106,
+    "Inscriptos": 135,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1Q1",
+    "materia": 107,
+    "Inscriptos": 137,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1Q1",
+    "materia": 108,
+    "Inscriptos": 165,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1R1",
+    "materia": 101,
+    "Inscriptos": 78,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1R1",
+    "materia": 102,
+    "Inscriptos": 99,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1R1",
+    "materia": 103,
+    "Inscriptos": 134,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1R1",
+    "materia": 104,
+    "Inscriptos": 102,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1R1",
+    "materia": 107,
+    "Inscriptos": 58,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1R3",
+    "materia": 102,
+    "Inscriptos": 106,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1R3",
+    "materia": 103,
+    "Inscriptos": 103,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1R3",
+    "materia": 104,
+    "Inscriptos": 60,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1R4",
+    "materia": 102,
+    "Inscriptos": 41,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1R4",
+    "materia": 103,
+    "Inscriptos": 64,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1R4",
+    "materia": 104,
+    "Inscriptos": 51,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1R5",
+    "materia": 101,
+    "Inscriptos": 171,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1R5",
+    "materia": 102,
+    "Inscriptos": 214,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1R5",
+    "materia": 103,
+    "Inscriptos": 214,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1R5",
+    "materia": 104,
+    "Inscriptos": 205,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1R5",
+    "materia": 107,
+    "Inscriptos": 163,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1R7",
+    "materia": 101,
+    "Inscriptos": 83,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1R7",
+    "materia": 102,
+    "Inscriptos": 104,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1R7",
+    "materia": 103,
+    "Inscriptos": 140,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1R7",
+    "materia": 104,
+    "Inscriptos": 102,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1R7",
+    "materia": 107,
+    "Inscriptos": 64,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S1",
+    "materia": 101,
+    "Inscriptos": 93,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S1",
+    "materia": 102,
+    "Inscriptos": 102,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S1",
+    "materia": 103,
+    "Inscriptos": 85,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S1",
+    "materia": 104,
+    "Inscriptos": 87,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S1",
+    "materia": 105,
+    "Inscriptos": 75,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S1",
+    "materia": 106,
+    "Inscriptos": 97,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S1",
+    "materia": 107,
+    "Inscriptos": 104,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S1",
+    "materia": 108,
+    "Inscriptos": 112,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S2",
+    "materia": 101,
+    "Inscriptos": 91,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S2",
+    "materia": 102,
+    "Inscriptos": 98,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S2",
+    "materia": 103,
+    "Inscriptos": 90,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S2",
+    "materia": 104,
+    "Inscriptos": 94,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S2",
+    "materia": 105,
+    "Inscriptos": 62,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S2",
+    "materia": 106,
+    "Inscriptos": 93,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S2",
+    "materia": 107,
+    "Inscriptos": 96,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S2",
+    "materia": 108,
+    "Inscriptos": 98,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S2A",
+    "materia": 102,
+    "Inscriptos": 44,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S3",
+    "materia": 101,
+    "Inscriptos": 125,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S3",
+    "materia": 102,
+    "Inscriptos": 132,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S3",
+    "materia": 103,
+    "Inscriptos": 125,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S3",
+    "materia": 104,
+    "Inscriptos": 119,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S3",
+    "materia": 105,
+    "Inscriptos": 110,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S3",
+    "materia": 106,
+    "Inscriptos": 128,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S3",
+    "materia": 107,
+    "Inscriptos": 143,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S3",
+    "materia": 108,
+    "Inscriptos": 134,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S4",
+    "materia": 101,
+    "Inscriptos": 113,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S4",
+    "materia": 102,
+    "Inscriptos": 111,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S4",
+    "materia": 103,
+    "Inscriptos": 102,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S4",
+    "materia": 104,
+    "Inscriptos": 109,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S4",
+    "materia": 105,
+    "Inscriptos": 86,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S4",
+    "materia": 106,
+    "Inscriptos": 107,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S4",
+    "materia": 107,
+    "Inscriptos": 114,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S4",
+    "materia": 108,
+    "Inscriptos": 118,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1S4A",
+    "materia": 102,
+    "Inscriptos": 72,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1T1",
+    "materia": 101,
+    "Inscriptos": 40,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1T1",
+    "materia": 102,
+    "Inscriptos": 39,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1T1",
+    "materia": 103,
+    "Inscriptos": 44,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1T1",
+    "materia": 104,
+    "Inscriptos": 40,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1T1",
+    "materia": 105,
+    "Inscriptos": 36,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1T1",
+    "materia": 106,
+    "Inscriptos": 33,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1T1",
+    "materia": 107,
+    "Inscriptos": 39,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1T1",
+    "materia": 108,
+    "Inscriptos": 38,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1T1",
+    "materia": 109,
+    "Inscriptos": 36,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "1V1",
+    "materia": 101,
+    "Inscriptos": 132,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1V1",
+    "materia": 102,
+    "Inscriptos": 113,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1V1",
+    "materia": 103,
+    "Inscriptos": 149,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1V1",
+    "materia": 104,
+    "Inscriptos": 150,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1V2",
+    "materia": 101,
+    "Inscriptos": 77,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1V2",
+    "materia": 102,
+    "Inscriptos": 76,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1V2",
+    "materia": 103,
+    "Inscriptos": 139,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1V2",
+    "materia": 104,
+    "Inscriptos": 157,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1V3",
+    "materia": 106,
+    "Inscriptos": 98,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "1Y1",
+    "materia": 8,
+    "Inscriptos": 25,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1Y1",
+    "materia": 9,
+    "Inscriptos": 19,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1Y1",
+    "materia": 10,
+    "Inscriptos": 19,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1Y2",
+    "materia": 7,
+    "Inscriptos": 13,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1Y2",
+    "materia": 8,
+    "Inscriptos": 12,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1Y2",
+    "materia": 9,
+    "Inscriptos": 11,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "1Y2",
+    "materia": 10,
+    "Inscriptos": 11,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "2C1",
+    "materia": 201,
+    "Inscriptos": 131,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2C1",
+    "materia": 202,
+    "Inscriptos": 124,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2C1",
+    "materia": 203,
+    "Inscriptos": 113,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2C1",
+    "materia": 204,
+    "Inscriptos": 163,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2C1",
+    "materia": 205,
+    "Inscriptos": 120,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2C1",
+    "materia": 206,
+    "Inscriptos": 116,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2C1",
+    "materia": 207,
+    "Inscriptos": 133,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2C2",
+    "materia": 202,
+    "Inscriptos": 87,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2C2",
+    "materia": 203,
+    "Inscriptos": 37,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D1",
+    "materia": 201,
+    "Inscriptos": 51,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D1",
+    "materia": 202,
+    "Inscriptos": 98,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D1",
+    "materia": 203,
+    "Inscriptos": 42,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D1",
+    "materia": 204,
+    "Inscriptos": 112,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D1",
+    "materia": 205,
+    "Inscriptos": 29,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D1",
+    "materia": 206,
+    "Inscriptos": 42,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D1",
+    "materia": 207,
+    "Inscriptos": 108,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D1",
+    "materia": 208,
+    "Inscriptos": 151,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D2",
+    "materia": 201,
+    "Inscriptos": 157,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D2",
+    "materia": 202,
+    "Inscriptos": 102,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D2",
+    "materia": 203,
+    "Inscriptos": 106,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D2",
+    "materia": 204,
+    "Inscriptos": 124,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D2",
+    "materia": 205,
+    "Inscriptos": 111,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D2",
+    "materia": 206,
+    "Inscriptos": 115,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D2",
+    "materia": 207,
+    "Inscriptos": 124,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D2",
+    "materia": 208,
+    "Inscriptos": 149,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D3",
+    "materia": 201,
+    "Inscriptos": 100,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D3",
+    "materia": 202,
+    "Inscriptos": 109,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D3",
+    "materia": 203,
+    "Inscriptos": 58,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D3",
+    "materia": 204,
+    "Inscriptos": 106,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D3",
+    "materia": 205,
+    "Inscriptos": 60,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D3",
+    "materia": 206,
+    "Inscriptos": 79,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D3",
+    "materia": 207,
+    "Inscriptos": 118,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D3",
+    "materia": 208,
+    "Inscriptos": 85,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D4",
+    "materia": 201,
+    "Inscriptos": 72,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D4",
+    "materia": 202,
+    "Inscriptos": 116,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D4",
+    "materia": 203,
+    "Inscriptos": 133,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D4",
+    "materia": 204,
+    "Inscriptos": 137,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D4",
+    "materia": 205,
+    "Inscriptos": 159,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D4",
+    "materia": 206,
+    "Inscriptos": 147,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D4",
+    "materia": 207,
+    "Inscriptos": 127,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2D4",
+    "materia": 208,
+    "Inscriptos": 133,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K1",
+    "materia": 201,
+    "Inscriptos": 140,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K1",
+    "materia": 202,
+    "Inscriptos": 154,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K1",
+    "materia": 205,
+    "Inscriptos": 173,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2K1",
+    "materia": 207,
+    "Inscriptos": 149,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K1",
+    "materia": 208,
+    "Inscriptos": 148,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K1",
+    "materia": 301,
+    "Inscriptos": 120,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2K10",
+    "materia": 201,
+    "Inscriptos": 77,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K10",
+    "materia": 202,
+    "Inscriptos": 79,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K10",
+    "materia": 206,
+    "Inscriptos": 114,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2K10",
+    "materia": 207,
+    "Inscriptos": 149,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K10",
+    "materia": 208,
+    "Inscriptos": 145,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K11",
+    "materia": 205,
+    "Inscriptos": 170,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2K11",
+    "materia": 207,
+    "Inscriptos": 134,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K11",
+    "materia": 208,
+    "Inscriptos": 144,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K11",
+    "materia": 301,
+    "Inscriptos": 116,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2K11B",
+    "materia": 207,
+    "Inscriptos": 106,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K1B",
+    "materia": 205,
+    "Inscriptos": 161,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2K2",
+    "materia": 201,
+    "Inscriptos": 104,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K2",
+    "materia": 202,
+    "Inscriptos": 110,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K2",
+    "materia": 205,
+    "Inscriptos": 179,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2K2",
+    "materia": 207,
+    "Inscriptos": 149,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K2",
+    "materia": 208,
+    "Inscriptos": 149,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K2",
+    "materia": 301,
+    "Inscriptos": 114,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2K3",
+    "materia": 201,
+    "Inscriptos": 118,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K3",
+    "materia": 202,
+    "Inscriptos": 126,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K3",
+    "materia": 205,
+    "Inscriptos": 176,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2K3",
+    "materia": 207,
+    "Inscriptos": 148,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K3",
+    "materia": 208,
+    "Inscriptos": 149,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K3",
+    "materia": 301,
+    "Inscriptos": 139,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2K3A",
+    "materia": 208,
+    "Inscriptos": 143,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K4",
+    "materia": 201,
+    "Inscriptos": 72,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K4",
+    "materia": 202,
+    "Inscriptos": 74,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K4",
+    "materia": 206,
+    "Inscriptos": 129,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2K4",
+    "materia": 207,
+    "Inscriptos": 148,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K4",
+    "materia": 208,
+    "Inscriptos": 146,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K5",
+    "materia": 201,
+    "Inscriptos": 73,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K5",
+    "materia": 202,
+    "Inscriptos": 48,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K5",
+    "materia": 205,
+    "Inscriptos": 171,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2K5",
+    "materia": 207,
+    "Inscriptos": 118,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K5",
+    "materia": 208,
+    "Inscriptos": 96,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K5",
+    "materia": 301,
+    "Inscriptos": 88,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2K6",
+    "materia": 201,
+    "Inscriptos": 105,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K6",
+    "materia": 202,
+    "Inscriptos": 102,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K6",
+    "materia": 205,
+    "Inscriptos": 168,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2K6",
+    "materia": 207,
+    "Inscriptos": 102,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K6",
+    "materia": 208,
+    "Inscriptos": 141,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K6",
+    "materia": 301,
+    "Inscriptos": 134,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2K7",
+    "materia": 201,
+    "Inscriptos": 60,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K7",
+    "materia": 202,
+    "Inscriptos": 82,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K7",
+    "materia": 206,
+    "Inscriptos": 132,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2K7",
+    "materia": 207,
+    "Inscriptos": 121,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K7",
+    "materia": 208,
+    "Inscriptos": 126,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K8",
+    "materia": 201,
+    "Inscriptos": 47,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K8",
+    "materia": 202,
+    "Inscriptos": 52,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K8",
+    "materia": 205,
+    "Inscriptos": 166,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2K8",
+    "materia": 207,
+    "Inscriptos": 114,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K8",
+    "materia": 208,
+    "Inscriptos": 104,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K8",
+    "materia": 301,
+    "Inscriptos": 90,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2K9",
+    "materia": 201,
+    "Inscriptos": 23,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K9",
+    "materia": 202,
+    "Inscriptos": 59,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K9",
+    "materia": 205,
+    "Inscriptos": 168,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2K9",
+    "materia": 207,
+    "Inscriptos": 121,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K9",
+    "materia": 208,
+    "Inscriptos": 101,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2K9",
+    "materia": 301,
+    "Inscriptos": 58,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2M10",
+    "materia": 10,
+    "Inscriptos": 48,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2M2",
+    "materia": 10,
+    "Inscriptos": 64,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2Q1",
+    "materia": 201,
+    "Inscriptos": 30,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2Q1",
+    "materia": 202,
+    "Inscriptos": 37,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2Q1",
+    "materia": 203,
+    "Inscriptos": 56,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2Q1",
+    "materia": 204,
+    "Inscriptos": 97,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2Q1",
+    "materia": 205,
+    "Inscriptos": 59,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2Q1",
+    "materia": 206,
+    "Inscriptos": 36,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2Q1",
+    "materia": 207,
+    "Inscriptos": 80,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2Q1",
+    "materia": 208,
+    "Inscriptos": 69,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2Q1",
+    "materia": 209,
+    "Inscriptos": 38,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R1",
+    "materia": 201,
+    "Inscriptos": 46,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R1",
+    "materia": 202,
+    "Inscriptos": 56,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R1",
+    "materia": 203,
+    "Inscriptos": 75,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R1",
+    "materia": 204,
+    "Inscriptos": 98,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2R1",
+    "materia": 205,
+    "Inscriptos": 115,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R1",
+    "materia": 207,
+    "Inscriptos": 129,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R2",
+    "materia": 201,
+    "Inscriptos": 27,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R2",
+    "materia": 202,
+    "Inscriptos": 26,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R2",
+    "materia": 203,
+    "Inscriptos": 71,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R2",
+    "materia": 204,
+    "Inscriptos": 57,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2R2",
+    "materia": 205,
+    "Inscriptos": 94,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R2",
+    "materia": 207,
+    "Inscriptos": 104,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R3",
+    "materia": 201,
+    "Inscriptos": 53,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R3",
+    "materia": 202,
+    "Inscriptos": 40,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R3",
+    "materia": 203,
+    "Inscriptos": 79,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R3",
+    "materia": 204,
+    "Inscriptos": 110,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2R3",
+    "materia": 205,
+    "Inscriptos": 111,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R3",
+    "materia": 207,
+    "Inscriptos": 99,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R3A",
+    "materia": 203,
+    "Inscriptos": 0,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R4",
+    "materia": 201,
+    "Inscriptos": 23,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R4",
+    "materia": 202,
+    "Inscriptos": 54,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R4",
+    "materia": 203,
+    "Inscriptos": 65,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R4",
+    "materia": 204,
+    "Inscriptos": 132,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2R4",
+    "materia": 205,
+    "Inscriptos": 103,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2R4",
+    "materia": 207,
+    "Inscriptos": 55,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2S1",
+    "materia": 201,
+    "Inscriptos": 90,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2S1",
+    "materia": 202,
+    "Inscriptos": 119,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2S1",
+    "materia": 203,
+    "Inscriptos": 82,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2S1",
+    "materia": 204,
+    "Inscriptos": 121,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2S1",
+    "materia": 205,
+    "Inscriptos": 125,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2S1",
+    "materia": 206,
+    "Inscriptos": 79,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2S1",
+    "materia": 207,
+    "Inscriptos": 74,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2S1",
+    "materia": 208,
+    "Inscriptos": 160,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2S1",
+    "materia": 209,
+    "Inscriptos": 50,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2S2",
+    "materia": 201,
+    "Inscriptos": 83,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2S2",
+    "materia": 202,
+    "Inscriptos": 151,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2S2",
+    "materia": 203,
+    "Inscriptos": 77,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2S2",
+    "materia": 204,
+    "Inscriptos": 83,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2S2",
+    "materia": 205,
+    "Inscriptos": 83,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2S2",
+    "materia": 206,
+    "Inscriptos": 78,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2S2",
+    "materia": 207,
+    "Inscriptos": 68,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2S2",
+    "materia": 208,
+    "Inscriptos": 83,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2S2",
+    "materia": 209,
+    "Inscriptos": 49,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2T1",
+    "materia": 201,
+    "Inscriptos": 7,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2T1",
+    "materia": 202,
+    "Inscriptos": 15,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2T1",
+    "materia": 203,
+    "Inscriptos": 12,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2T1",
+    "materia": 204,
+    "Inscriptos": 10,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2T1",
+    "materia": 205,
+    "Inscriptos": 11,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2T1",
+    "materia": 207,
+    "Inscriptos": 14,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2T1",
+    "materia": 208,
+    "Inscriptos": 9,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2T1",
+    "materia": 209,
+    "Inscriptos": 8,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2V1",
+    "materia": 105,
+    "Inscriptos": 119,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2V1",
+    "materia": 108,
+    "Inscriptos": 163,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2V1",
+    "materia": 202,
+    "Inscriptos": 130,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2V1",
+    "materia": 203,
+    "Inscriptos": 185,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2V1",
+    "materia": 310,
+    "Inscriptos": 61,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2Y1",
+    "materia": 11,
+    "Inscriptos": 35,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2Y1",
+    "materia": 12,
+    "Inscriptos": 34,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2Y1",
+    "materia": 13,
+    "Inscriptos": 35,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2Y1",
+    "materia": 14,
+    "Inscriptos": 37,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "2Y1",
+    "materia": 15,
+    "Inscriptos": 35,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2Y1",
+    "materia": 16,
+    "Inscriptos": 32,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2Y1",
+    "materia": 17,
+    "Inscriptos": 32,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "2Y1",
+    "materia": 18,
+    "Inscriptos": 23,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "2Y1",
+    "materia": 19,
+    "Inscriptos": 22,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "2Y1",
+    "materia": 20,
+    "Inscriptos": 23,
+    "ComisionDictado": "2"
+  },
+  {
+    "Curso": "2Y1",
+    "materia": 21,
+    "Inscriptos": 28,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3C1",
+    "materia": 301,
+    "Inscriptos": 86,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3C1",
+    "materia": 303,
+    "Inscriptos": 113,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3C1",
+    "materia": 304,
+    "Inscriptos": 158,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3C1",
+    "materia": 305,
+    "Inscriptos": 149,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3C1",
+    "materia": 308,
+    "Inscriptos": 123,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3C1",
+    "materia": 309,
+    "Inscriptos": 105,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3C1",
+    "materia": 310,
+    "Inscriptos": 154,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3C1A",
+    "materia": 301,
+    "Inscriptos": 70,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3C2",
+    "materia": 305,
+    "Inscriptos": 48,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D1",
+    "materia": 301,
+    "Inscriptos": 161,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D1",
+    "materia": 302,
+    "Inscriptos": 95,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D1",
+    "materia": 303,
+    "Inscriptos": 78,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D1",
+    "materia": 304,
+    "Inscriptos": 105,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D1",
+    "materia": 305,
+    "Inscriptos": 181,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D1",
+    "materia": 306,
+    "Inscriptos": 138,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D1",
+    "materia": 307,
+    "Inscriptos": 80,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D1",
+    "materia": 308,
+    "Inscriptos": 126,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D1",
+    "materia": 309,
+    "Inscriptos": 196,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D2",
+    "materia": 301,
+    "Inscriptos": 165,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D2",
+    "materia": 302,
+    "Inscriptos": 96,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D2",
+    "materia": 303,
+    "Inscriptos": 89,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D2",
+    "materia": 304,
+    "Inscriptos": 109,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D2",
+    "materia": 305,
+    "Inscriptos": 168,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D2",
+    "materia": 306,
+    "Inscriptos": 151,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D2",
+    "materia": 307,
+    "Inscriptos": 97,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D2",
+    "materia": 308,
+    "Inscriptos": 129,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D2",
+    "materia": 309,
+    "Inscriptos": 188,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D3",
+    "materia": 301,
+    "Inscriptos": 141,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D3",
+    "materia": 302,
+    "Inscriptos": 72,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D3",
+    "materia": 303,
+    "Inscriptos": 87,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D3",
+    "materia": 304,
+    "Inscriptos": 113,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D3",
+    "materia": 305,
+    "Inscriptos": 170,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D3",
+    "materia": 306,
+    "Inscriptos": 134,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D3",
+    "materia": 307,
+    "Inscriptos": 89,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D3",
+    "materia": 308,
+    "Inscriptos": 129,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3D3",
+    "materia": 309,
+    "Inscriptos": 195,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K1",
+    "materia": 204,
+    "Inscriptos": 186,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K1",
+    "materia": 303,
+    "Inscriptos": 164,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3K1",
+    "materia": 304,
+    "Inscriptos": 173,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3K1",
+    "materia": 305,
+    "Inscriptos": 205,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K1",
+    "materia": 307,
+    "Inscriptos": 182,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K2",
+    "materia": 204,
+    "Inscriptos": 176,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K2",
+    "materia": 303,
+    "Inscriptos": 164,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3K2",
+    "materia": 304,
+    "Inscriptos": 175,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3K2",
+    "materia": 305,
+    "Inscriptos": 175,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K2",
+    "materia": 307,
+    "Inscriptos": 182,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K3",
+    "materia": 204,
+    "Inscriptos": 156,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K3",
+    "materia": 303,
+    "Inscriptos": 159,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3K3",
+    "materia": 304,
+    "Inscriptos": 124,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3K3",
+    "materia": 305,
+    "Inscriptos": 167,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K3",
+    "materia": 307,
+    "Inscriptos": 213,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K3B",
+    "materia": 304,
+    "Inscriptos": 88,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3K4",
+    "materia": 204,
+    "Inscriptos": 180,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K4",
+    "materia": 303,
+    "Inscriptos": 145,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3K4",
+    "materia": 304,
+    "Inscriptos": 118,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3K4",
+    "materia": 305,
+    "Inscriptos": 170,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K4",
+    "materia": 307,
+    "Inscriptos": 162,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K5",
+    "materia": 204,
+    "Inscriptos": 182,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K5",
+    "materia": 303,
+    "Inscriptos": 159,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3K5",
+    "materia": 304,
+    "Inscriptos": 121,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3K5",
+    "materia": 305,
+    "Inscriptos": 204,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K5",
+    "materia": 307,
+    "Inscriptos": 169,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K5A",
+    "materia": 307,
+    "Inscriptos": 163,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K5A",
+    "materia": 333,
+    "Inscriptos": 80,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3K5I",
+    "materia": 333,
+    "Inscriptos": 0,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3K6",
+    "materia": 204,
+    "Inscriptos": 153,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K6",
+    "materia": 302,
+    "Inscriptos": 129,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3K6",
+    "materia": 304,
+    "Inscriptos": 117,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3K6",
+    "materia": 305,
+    "Inscriptos": 91,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K6",
+    "materia": 306,
+    "Inscriptos": 137,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3K6",
+    "materia": 307,
+    "Inscriptos": 163,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K7",
+    "materia": 204,
+    "Inscriptos": 115,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K7",
+    "materia": 302,
+    "Inscriptos": 150,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3K7",
+    "materia": 304,
+    "Inscriptos": 121,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3K7",
+    "materia": 305,
+    "Inscriptos": 153,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3K7",
+    "materia": 306,
+    "Inscriptos": 133,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3K7",
+    "materia": 307,
+    "Inscriptos": 161,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3Q1",
+    "materia": 301,
+    "Inscriptos": 44,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3Q1",
+    "materia": 302,
+    "Inscriptos": 38,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3Q1",
+    "materia": 303,
+    "Inscriptos": 63,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3Q1",
+    "materia": 304,
+    "Inscriptos": 43,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3Q1",
+    "materia": 305,
+    "Inscriptos": 37,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3Q1",
+    "materia": 306,
+    "Inscriptos": 48,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3Q1",
+    "materia": 307,
+    "Inscriptos": 44,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3Q1",
+    "materia": 308,
+    "Inscriptos": 44,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3Q1",
+    "materia": 309,
+    "Inscriptos": 31,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R1",
+    "materia": 301,
+    "Inscriptos": 24,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R1",
+    "materia": 302,
+    "Inscriptos": 34,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R1",
+    "materia": 303,
+    "Inscriptos": 35,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R1",
+    "materia": 304,
+    "Inscriptos": 111,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R1",
+    "materia": 305,
+    "Inscriptos": 26,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R1",
+    "materia": 306,
+    "Inscriptos": 29,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R1",
+    "materia": 307,
+    "Inscriptos": 112,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R2",
+    "materia": 301,
+    "Inscriptos": 28,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R2",
+    "materia": 302,
+    "Inscriptos": 28,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R2",
+    "materia": 303,
+    "Inscriptos": 18,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R2",
+    "materia": 304,
+    "Inscriptos": 123,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R2",
+    "materia": 305,
+    "Inscriptos": 18,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R2",
+    "materia": 306,
+    "Inscriptos": 22,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R2",
+    "materia": 307,
+    "Inscriptos": 140,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R3",
+    "materia": 301,
+    "Inscriptos": 28,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R3",
+    "materia": 302,
+    "Inscriptos": 27,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R3",
+    "materia": 303,
+    "Inscriptos": 7,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R3",
+    "materia": 304,
+    "Inscriptos": 121,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R3",
+    "materia": 305,
+    "Inscriptos": 13,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R3",
+    "materia": 306,
+    "Inscriptos": 17,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R3",
+    "materia": 307,
+    "Inscriptos": 150,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R4",
+    "materia": 301,
+    "Inscriptos": 42,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R4",
+    "materia": 302,
+    "Inscriptos": 38,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R4",
+    "materia": 303,
+    "Inscriptos": 38,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R4",
+    "materia": 304,
+    "Inscriptos": 120,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R4",
+    "materia": 305,
+    "Inscriptos": 35,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R4",
+    "materia": 306,
+    "Inscriptos": 49,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3R4",
+    "materia": 307,
+    "Inscriptos": 149,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3S2",
+    "materia": 301,
+    "Inscriptos": 79,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3S2",
+    "materia": 302,
+    "Inscriptos": 42,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3S2",
+    "materia": 303,
+    "Inscriptos": 62,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3S2",
+    "materia": 304,
+    "Inscriptos": 44,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3S2",
+    "materia": 305,
+    "Inscriptos": 48,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3S2",
+    "materia": 306,
+    "Inscriptos": 111,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3S2",
+    "materia": 307,
+    "Inscriptos": 48,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3S2",
+    "materia": 308,
+    "Inscriptos": 122,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3S2",
+    "materia": 309,
+    "Inscriptos": 150,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3S2",
+    "materia": 323,
+    "Inscriptos": 48,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3S3",
+    "materia": 301,
+    "Inscriptos": 93,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3S3",
+    "materia": 302,
+    "Inscriptos": 72,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3S3",
+    "materia": 303,
+    "Inscriptos": 88,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3S3",
+    "materia": 304,
+    "Inscriptos": 60,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3S3",
+    "materia": 305,
+    "Inscriptos": 69,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3S3",
+    "materia": 306,
+    "Inscriptos": 104,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3S3",
+    "materia": 307,
+    "Inscriptos": 64,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3S3",
+    "materia": 308,
+    "Inscriptos": 135,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3S3",
+    "materia": 309,
+    "Inscriptos": 162,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3T1",
+    "materia": 301,
+    "Inscriptos": 10,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3T1",
+    "materia": 302,
+    "Inscriptos": 14,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3T1",
+    "materia": 304,
+    "Inscriptos": 17,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3T1",
+    "materia": 305,
+    "Inscriptos": 14,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3T1",
+    "materia": 307,
+    "Inscriptos": 11,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3T1",
+    "materia": 308,
+    "Inscriptos": 14,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3T1",
+    "materia": 310,
+    "Inscriptos": 8,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "3V1",
+    "materia": 302,
+    "Inscriptos": 124,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3V1",
+    "materia": 304,
+    "Inscriptos": 111,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3V1",
+    "materia": 307,
+    "Inscriptos": 162,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3V1",
+    "materia": 308,
+    "Inscriptos": 131,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "3V1",
+    "materia": 404,
+    "Inscriptos": 111,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4C1",
+    "materia": 401,
+    "Inscriptos": 123,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4C1",
+    "materia": 402,
+    "Inscriptos": 113,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4C1",
+    "materia": 403,
+    "Inscriptos": 112,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4C1",
+    "materia": 404,
+    "Inscriptos": 140,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4C1",
+    "materia": 406,
+    "Inscriptos": 115,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D1",
+    "materia": 401,
+    "Inscriptos": 92,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D1",
+    "materia": 402,
+    "Inscriptos": 137,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D1",
+    "materia": 403,
+    "Inscriptos": 88,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D1",
+    "materia": 404,
+    "Inscriptos": 141,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D1",
+    "materia": 405,
+    "Inscriptos": 98,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D1",
+    "materia": 406,
+    "Inscriptos": 87,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D1",
+    "materia": 407,
+    "Inscriptos": 80,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D1",
+    "materia": 408,
+    "Inscriptos": 129,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D1",
+    "materia": 409,
+    "Inscriptos": 90,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D1",
+    "materia": 410,
+    "Inscriptos": 112,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D2",
+    "materia": 401,
+    "Inscriptos": 77,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D2",
+    "materia": 402,
+    "Inscriptos": 126,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D2",
+    "materia": 403,
+    "Inscriptos": 76,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D2",
+    "materia": 404,
+    "Inscriptos": 146,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D2",
+    "materia": 405,
+    "Inscriptos": 99,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D2",
+    "materia": 406,
+    "Inscriptos": 82,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D2",
+    "materia": 407,
+    "Inscriptos": 73,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D2",
+    "materia": 409,
+    "Inscriptos": 85,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D2",
+    "materia": 410,
+    "Inscriptos": 44,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D3",
+    "materia": 401,
+    "Inscriptos": 85,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D3",
+    "materia": 402,
+    "Inscriptos": 78,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D3",
+    "materia": 403,
+    "Inscriptos": 84,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D3",
+    "materia": 404,
+    "Inscriptos": 149,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D3",
+    "materia": 405,
+    "Inscriptos": 80,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D3",
+    "materia": 406,
+    "Inscriptos": 86,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D3",
+    "materia": 407,
+    "Inscriptos": 80,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D3",
+    "materia": 408,
+    "Inscriptos": 90,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D3",
+    "materia": 409,
+    "Inscriptos": 60,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4D3",
+    "materia": 410,
+    "Inscriptos": 99,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4K1",
+    "materia": 403,
+    "Inscriptos": 177,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4K1",
+    "materia": 404,
+    "Inscriptos": 157,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4K1",
+    "materia": 405,
+    "Inscriptos": 218,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4K1",
+    "materia": 407,
+    "Inscriptos": 120,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4K1",
+    "materia": 434,
+    "Inscriptos": 89,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4K1",
+    "materia": 554,
+    "Inscriptos": 165,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4K1A",
+    "materia": 472,
+    "Inscriptos": 74,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4K1B",
+    "materia": 435,
+    "Inscriptos": 78,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4K2",
+    "materia": 403,
+    "Inscriptos": 200,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4K2",
+    "materia": 404,
+    "Inscriptos": 145,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4K2",
+    "materia": 405,
+    "Inscriptos": 227,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4K2",
+    "materia": 407,
+    "Inscriptos": 124,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4K2",
+    "materia": 434,
+    "Inscriptos": 84,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4K2",
+    "materia": 435,
+    "Inscriptos": 88,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4K2A",
+    "materia": 554,
+    "Inscriptos": 102,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4K3",
+    "materia": 403,
+    "Inscriptos": 145,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4K3",
+    "materia": 404,
+    "Inscriptos": 152,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4K3",
+    "materia": 405,
+    "Inscriptos": 221,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4K3",
+    "materia": 407,
+    "Inscriptos": 98,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4K3",
+    "materia": 434,
+    "Inscriptos": 93,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4K3A",
+    "materia": 435,
+    "Inscriptos": 84,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4K4",
+    "materia": 401,
+    "Inscriptos": 170,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4K4",
+    "materia": 402,
+    "Inscriptos": 107,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4K4",
+    "materia": 403,
+    "Inscriptos": 174,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4K4",
+    "materia": 404,
+    "Inscriptos": 147,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4K4",
+    "materia": 406,
+    "Inscriptos": 100,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4K4",
+    "materia": 407,
+    "Inscriptos": 125,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4Q1",
+    "materia": 401,
+    "Inscriptos": 120,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4Q1",
+    "materia": 402,
+    "Inscriptos": 47,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4Q1",
+    "materia": 403,
+    "Inscriptos": 25,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4Q1",
+    "materia": 404,
+    "Inscriptos": 22,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4Q1",
+    "materia": 405,
+    "Inscriptos": 19,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4Q1",
+    "materia": 406,
+    "Inscriptos": 34,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4Q1",
+    "materia": 407,
+    "Inscriptos": 21,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4Q1",
+    "materia": 408,
+    "Inscriptos": 20,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4Q1",
+    "materia": 409,
+    "Inscriptos": 18,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4R1",
+    "materia": 401,
+    "Inscriptos": 43,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4R1",
+    "materia": 402,
+    "Inscriptos": 29,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4R1",
+    "materia": 403,
+    "Inscriptos": 41,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4R1",
+    "materia": 404,
+    "Inscriptos": 44,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4R1",
+    "materia": 405,
+    "Inscriptos": 34,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4R1",
+    "materia": 406,
+    "Inscriptos": 33,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4R1",
+    "materia": 407,
+    "Inscriptos": 36,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4R2",
+    "materia": 401,
+    "Inscriptos": 47,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4R2",
+    "materia": 402,
+    "Inscriptos": 38,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4R2",
+    "materia": 403,
+    "Inscriptos": 44,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4R2",
+    "materia": 404,
+    "Inscriptos": 47,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4R2",
+    "materia": 405,
+    "Inscriptos": 37,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4R2",
+    "materia": 406,
+    "Inscriptos": 40,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4R2",
+    "materia": 407,
+    "Inscriptos": 46,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4S1",
+    "materia": 401,
+    "Inscriptos": 85,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4S1",
+    "materia": 402,
+    "Inscriptos": 62,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4S1",
+    "materia": 403,
+    "Inscriptos": 69,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4S1",
+    "materia": 404,
+    "Inscriptos": 38,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4S1",
+    "materia": 405,
+    "Inscriptos": 59,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4S1",
+    "materia": 406,
+    "Inscriptos": 60,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4S1",
+    "materia": 407,
+    "Inscriptos": 36,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4S1",
+    "materia": 408,
+    "Inscriptos": 42,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4S2",
+    "materia": 401,
+    "Inscriptos": 62,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4S2",
+    "materia": 402,
+    "Inscriptos": 53,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4S2",
+    "materia": 403,
+    "Inscriptos": 45,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4S2",
+    "materia": 404,
+    "Inscriptos": 27,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4S2",
+    "materia": 405,
+    "Inscriptos": 39,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4S2",
+    "materia": 406,
+    "Inscriptos": 58,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4S2",
+    "materia": 407,
+    "Inscriptos": 48,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4S2",
+    "materia": 408,
+    "Inscriptos": 35,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4T1",
+    "materia": 401,
+    "Inscriptos": 9,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4T1",
+    "materia": 403,
+    "Inscriptos": 8,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4T1",
+    "materia": 404,
+    "Inscriptos": 8,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4T1",
+    "materia": 406,
+    "Inscriptos": 12,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4T1",
+    "materia": 408,
+    "Inscriptos": 11,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4T1",
+    "materia": 409,
+    "Inscriptos": 16,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4T1",
+    "materia": 410,
+    "Inscriptos": 11,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "4V1",
+    "materia": 402,
+    "Inscriptos": 102,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4V1",
+    "materia": 403,
+    "Inscriptos": 117,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "4V1",
+    "materia": 406,
+    "Inscriptos": 95,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5C1",
+    "materia": 502,
+    "Inscriptos": 95,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5C1",
+    "materia": 503,
+    "Inscriptos": 120,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5C1",
+    "materia": 504,
+    "Inscriptos": 95,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5C1",
+    "materia": 505,
+    "Inscriptos": 95,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5C1",
+    "materia": 506,
+    "Inscriptos": 148,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5C1A",
+    "materia": 410,
+    "Inscriptos": 68,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5C1A",
+    "materia": 555,
+    "Inscriptos": 90,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5C1A",
+    "materia": 556,
+    "Inscriptos": 64,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5C1A",
+    "materia": 601,
+    "Inscriptos": 105,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5C1B",
+    "materia": 618,
+    "Inscriptos": 35,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5C1B",
+    "materia": 619,
+    "Inscriptos": 35,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5D1",
+    "materia": 501,
+    "Inscriptos": 103,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5D1",
+    "materia": 502,
+    "Inscriptos": 65,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5D1",
+    "materia": 503,
+    "Inscriptos": 91,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5D1",
+    "materia": 504,
+    "Inscriptos": 96,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5D1",
+    "materia": 505,
+    "Inscriptos": 89,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5D1",
+    "materia": 506,
+    "Inscriptos": 115,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5D1",
+    "materia": 507,
+    "Inscriptos": 211,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5D1",
+    "materia": 545,
+    "Inscriptos": 104,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5D1",
+    "materia": 546,
+    "Inscriptos": 72,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5D1.",
+    "materia": 544,
+    "Inscriptos": 122,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5D1.",
+    "materia": 547,
+    "Inscriptos": 81,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5D1.",
+    "materia": 7146,
+    "Inscriptos": 79,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5D2",
+    "materia": 501,
+    "Inscriptos": 86,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5D2",
+    "materia": 502,
+    "Inscriptos": 78,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5D2",
+    "materia": 503,
+    "Inscriptos": 71,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5D2",
+    "materia": 504,
+    "Inscriptos": 94,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5D2",
+    "materia": 505,
+    "Inscriptos": 91,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5D2",
+    "materia": 506,
+    "Inscriptos": 118,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5D2",
+    "materia": 536,
+    "Inscriptos": 133,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5D3",
+    "materia": 501,
+    "Inscriptos": 28,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5D3",
+    "materia": 502,
+    "Inscriptos": 19,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5D3",
+    "materia": 503,
+    "Inscriptos": 24,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5D3",
+    "materia": 504,
+    "Inscriptos": 57,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5D3",
+    "materia": 505,
+    "Inscriptos": 55,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5D3",
+    "materia": 506,
+    "Inscriptos": 103,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5D3",
+    "materia": 545,
+    "Inscriptos": 26,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5K1",
+    "materia": 503,
+    "Inscriptos": 60,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5K1",
+    "materia": 504,
+    "Inscriptos": 54,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5K1",
+    "materia": 505,
+    "Inscriptos": 54,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5K1",
+    "materia": 506,
+    "Inscriptos": 31,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5K1",
+    "materia": 551,
+    "Inscriptos": 72,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5K1",
+    "materia": 555,
+    "Inscriptos": 98,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5K1A",
+    "materia": 553,
+    "Inscriptos": 76,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5K2",
+    "materia": 503,
+    "Inscriptos": 92,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5K2",
+    "materia": 504,
+    "Inscriptos": 120,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5K2",
+    "materia": 505,
+    "Inscriptos": 90,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5K2",
+    "materia": 506,
+    "Inscriptos": 55,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5K2",
+    "materia": 633,
+    "Inscriptos": 87,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5K2A",
+    "materia": 553,
+    "Inscriptos": 83,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5K3",
+    "materia": 501,
+    "Inscriptos": 135,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5K3",
+    "materia": 504,
+    "Inscriptos": 76,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5K3",
+    "materia": 505,
+    "Inscriptos": 115,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5K3",
+    "materia": 506,
+    "Inscriptos": 128,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5K3",
+    "materia": 553,
+    "Inscriptos": 80,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5K3B",
+    "materia": 551,
+    "Inscriptos": 74,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5K4",
+    "materia": 502,
+    "Inscriptos": 117,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5K4",
+    "materia": 503,
+    "Inscriptos": 133,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5K4",
+    "materia": 504,
+    "Inscriptos": 158,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5K4",
+    "materia": 506,
+    "Inscriptos": 112,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5K4",
+    "materia": 552,
+    "Inscriptos": 161,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5Q1",
+    "materia": 501,
+    "Inscriptos": 24,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5Q1",
+    "materia": 502,
+    "Inscriptos": 26,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5Q1",
+    "materia": 503,
+    "Inscriptos": 30,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5Q1",
+    "materia": 504,
+    "Inscriptos": 28,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5Q1",
+    "materia": 505,
+    "Inscriptos": 20,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5Q1",
+    "materia": 506,
+    "Inscriptos": 41,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5Q1",
+    "materia": 512,
+    "Inscriptos": 22,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5Q1",
+    "materia": 523,
+    "Inscriptos": 23,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5Q1",
+    "materia": 524,
+    "Inscriptos": 16,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5Q1",
+    "materia": 525,
+    "Inscriptos": 19,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5Q1",
+    "materia": 526,
+    "Inscriptos": 22,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5Q1",
+    "materia": 527,
+    "Inscriptos": 10,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5Q1",
+    "materia": 568,
+    "Inscriptos": 22,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5R1",
+    "materia": 501,
+    "Inscriptos": 36,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5R1",
+    "materia": 502,
+    "Inscriptos": 34,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5R1",
+    "materia": 503,
+    "Inscriptos": 42,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5R1",
+    "materia": 504,
+    "Inscriptos": 36,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5R1",
+    "materia": 505,
+    "Inscriptos": 30,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5R1",
+    "materia": 506,
+    "Inscriptos": 33,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5R1",
+    "materia": 507,
+    "Inscriptos": 43,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5R2",
+    "materia": 501,
+    "Inscriptos": 37,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5R2",
+    "materia": 502,
+    "Inscriptos": 35,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5R2",
+    "materia": 503,
+    "Inscriptos": 40,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5R2",
+    "materia": 504,
+    "Inscriptos": 30,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5R2",
+    "materia": 505,
+    "Inscriptos": 38,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5R2",
+    "materia": 506,
+    "Inscriptos": 31,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5R2",
+    "materia": 507,
+    "Inscriptos": 44,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5S1",
+    "materia": 501,
+    "Inscriptos": 61,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5S1",
+    "materia": 502,
+    "Inscriptos": 80,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5S1",
+    "materia": 503,
+    "Inscriptos": 92,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5S1",
+    "materia": 504,
+    "Inscriptos": 82,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5S1",
+    "materia": 505,
+    "Inscriptos": 57,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5S1",
+    "materia": 506,
+    "Inscriptos": 71,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5S1",
+    "materia": 507,
+    "Inscriptos": 88,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5S2I",
+    "materia": 535,
+    "Inscriptos": 10,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5S2I",
+    "materia": 536,
+    "Inscriptos": 15,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5S2I",
+    "materia": 538,
+    "Inscriptos": 10,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5S2I2",
+    "materia": 537,
+    "Inscriptos": 15,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5S2M",
+    "materia": 533,
+    "Inscriptos": 74,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5S2M",
+    "materia": 534,
+    "Inscriptos": 37,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5S2M",
+    "materia": 539,
+    "Inscriptos": 37,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5S2M",
+    "materia": 540,
+    "Inscriptos": 39,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5T1",
+    "materia": 501,
+    "Inscriptos": 10,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5T1",
+    "materia": 503,
+    "Inscriptos": 12,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5T1",
+    "materia": 504,
+    "Inscriptos": 13,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5T1",
+    "materia": 505,
+    "Inscriptos": 9,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5T1",
+    "materia": 508,
+    "Inscriptos": 12,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5T1",
+    "materia": 509,
+    "Inscriptos": 10,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5T1",
+    "materia": 518,
+    "Inscriptos": 11,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5T1",
+    "materia": 519,
+    "Inscriptos": 10,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5V1",
+    "materia": 501,
+    "Inscriptos": 60,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5V1",
+    "materia": 502,
+    "Inscriptos": 47,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5V1",
+    "materia": 503,
+    "Inscriptos": 63,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5V1",
+    "materia": 506,
+    "Inscriptos": 36,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5V1",
+    "materia": 507,
+    "Inscriptos": 49,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5V1",
+    "materia": 508,
+    "Inscriptos": 9,
+    "ComisionDictado": "A"
+  },
+  {
+    "Curso": "5V1",
+    "materia": 532,
+    "Inscriptos": 60,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5V1",
+    "materia": 533,
+    "Inscriptos": 63,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5V1",
+    "materia": 581,
+    "Inscriptos": 65,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "5V1A",
+    "materia": 556,
+    "Inscriptos": 45,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "6R1",
+    "materia": 608,
+    "Inscriptos": 9,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "6R1",
+    "materia": 610,
+    "Inscriptos": 5,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "6R1",
+    "materia": 626,
+    "Inscriptos": 6,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "6R1",
+    "materia": 632,
+    "Inscriptos": 14,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "6R1",
+    "materia": 693,
+    "Inscriptos": 9,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "6R2",
+    "materia": 601,
+    "Inscriptos": 54,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "6R2",
+    "materia": 607,
+    "Inscriptos": 13,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "6R2",
+    "materia": 630,
+    "Inscriptos": 26,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "6R3",
+    "materia": 602,
+    "Inscriptos": 41,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "6R3",
+    "materia": 604,
+    "Inscriptos": 22,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "6R3",
+    "materia": 627,
+    "Inscriptos": 18,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "6R3",
+    "materia": 628,
+    "Inscriptos": 29,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "6R3",
+    "materia": 631,
+    "Inscriptos": 13,
+    "ComisionDictado": "1"
+  },
+  {
+    "Curso": "6R3",
+    "materia": 634,
+    "Inscriptos": 35,
+    "ComisionDictado": "1"
+  }
+]

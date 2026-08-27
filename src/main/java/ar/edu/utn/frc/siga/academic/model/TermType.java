@@ -11,8 +11,8 @@ import org.springframework.modulith.NamedInterface;
 @NamedInterface("api")
 public enum TermType {
     ANUAL("Anual", 0),
-    PRIMER_CUATRIMESTRE("1 Cuat.", 1),
-    SEGUNDO_CUATRIMESTRE("2 Cuat.", 2);
+    PRIMER_CUATRIMESTRE("1er Cuatrimestre.", 1),
+    SEGUNDO_CUATRIMESTRE("2do Cuatrimestre.", 2);
 
     private final String label;
     private final int semester;

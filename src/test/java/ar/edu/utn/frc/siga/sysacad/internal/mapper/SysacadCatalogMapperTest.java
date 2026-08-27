@@ -4,10 +4,14 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadBuildingDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadClassroomDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadCommissionDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSpecialtyDto;
+import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectCommissionDto;
+import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectDto;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawBuilding;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawClassroom;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawCommission;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSpecialty;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSubject;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSubjectCommission;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -61,5 +65,23 @@ class SysacadCatalogMapperTest {
                 new RawCommission("5S1   ", 17, 94, 519, 2026, 10));
 
         assertThat(commission).isEqualTo(new SysacadCommissionDto("5S1", 17, 94, 519, 2026, 10));
+    }
+
+    @Test
+    @DisplayName("toSubject: recorta el nombre y el dictado de la materia; no propaga el nombre de especialidad")
+    void recortaNombreDeMateria() {
+        SysacadSubjectDto subject = mapper.toSubject(
+                new RawSubject(17, 94, 519, "Análisis Matemático I   ", "C   ", "Ingeniería Mecánica"));
+
+        assertThat(subject).isEqualTo(new SysacadSubjectDto(17, 94, 519, "Análisis Matemático I", "C"));
+    }
+
+    @Test
+    @DisplayName("toSubjectCommission: recorta el código de curso, conserva los códigos numéricos y no propaga comisionDictado")
+    void recortaCodigoDeCursoEnSubjectCommission() {
+        SysacadSubjectCommissionDto subjectCommission = mapper.toSubjectCommission(
+                new RawSubjectCommission("5S1   ", 519, 30, "1"));
+
+        assertThat(subjectCommission).isEqualTo(new SysacadSubjectCommissionDto("5S1", 519, 30));
     }
 }

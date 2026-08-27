@@ -23,12 +23,15 @@ public class SysacadProperties {
 
     private int maxRetries = 3;
 
-    private Sync sync = new Sync(null, null, null, null);
+    private boolean materiasMockEnabled = false;
+
+    private Sync sync = new Sync(null, null, null, null, null);
 
     public record Sync(
             String edificios,
             String aulas,
             String especialidades,
+            String materias,
             String comisiones
     ) {}
 }
