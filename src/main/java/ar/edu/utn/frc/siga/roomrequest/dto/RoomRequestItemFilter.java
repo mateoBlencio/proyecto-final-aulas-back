@@ -8,11 +8,7 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import java.time.LocalDate;
 import java.util.Set;
 
-/**
- * Filtros del listado de pedidos ({@code GET /v1/room-requests/items}). Usar siempre {@link #of}
- * en vez del constructor canónico: resuelve el rango de fechas efectivo antes de llegar a la
- * Specification.
- */
+
 public record RoomRequestItemFilter(
         Set<RoomRequestType> types,
         Set<RoomRequestStatus> statuses,
@@ -23,10 +19,8 @@ public record RoomRequestItemFilter(
         boolean includePast) {
 
     /**
-     * Con {@code includePast=false} (el caso normal) el {@code dateFrom} efectivo es
+     * Con {@code includePast=false} (el default) el {@code dateFrom} efectivo es
      * {@code max(dateFrom, hoy)}, para que los pedidos ya vencidos no aparezcan en la bandeja.
-     * Con {@code includePast=true} se respeta el {@code dateFrom} del cliente tal cual, null incluido
-     * (sin piso). Valida {@code dateTo >= dateFrom} cuando ambos quedan definidos.
      */
     public static RoomRequestItemFilter of(Set<RoomRequestType> types, Set<RoomRequestStatus> statuses,
             AcademicScope scope, Long subjectId, LocalDate dateFrom, LocalDate dateTo, boolean includePast) {

@@ -10,26 +10,14 @@ import java.util.List;
 
 public record RoomRequestItemRowDto(
         Long itemId,
-        Integer position,
         RoomRequestStatus status,
-        String decidedBy,
         LocalDateTime decidedAt,
-        String decisionReason,
         RoomRequestRowHeaderDto request,
         CommissionResponseDto commission,
         LocalDate date,
         LocalTime startTime,
         LocalTime endTime,
-        Long durationMinutes,
         Integer enrolled,
         Integer estimated,
-        Integer classroomCount,
-        ClassroomOptionDto currentClassroom,
-        Boolean requiresProjector,
-        Boolean requiresComputers,
-        Integer computerCount,
-        Boolean requiresExamUsers,
-        String requiredSoftware,
-        String observations,
-        List<ClassroomOptionDto> preferredClassrooms
+        Integer classroomCount
 ) {}
