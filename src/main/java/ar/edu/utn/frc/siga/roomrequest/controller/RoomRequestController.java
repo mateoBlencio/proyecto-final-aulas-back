@@ -85,21 +85,12 @@ public class RoomRequestController {
     @GetMapping("/items/status-counts")
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     @Operation(summary = "Contar pedidos de aula por estado",
-               description = "Cantidad de pedidos en cada estado. "
-                       + "Acepta los mismos filtros que el listado salvo 'statuses', que se ignora.")
+               description = "Total de pedidos en cada estado.")
     public ResponseEntity<List<RoomRequestItemStatusCountDto>> countItemsByStatus(
-            @RequestParam(required = false) Set<RoomRequestType> types,
-            @RequestParam(required = false) AcademicScope scope,
-            @RequestParam(required = false) Long subjectId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
             @RequestParam(required = false, defaultValue = "false") boolean includePast) {
 
-        log.debug("GET /v1/room-requests/items/status-counts: types={}, scope={}, subjectId={}, includePast={}",
-                types, scope, subjectId, includePast);
-        RoomRequestItemFilter filter =
-                RoomRequestItemFilter.of(types, null, scope, subjectId, dateFrom, dateTo, includePast);
-        List<RoomRequestItemStatusCountDto> counts = roomRequestService.countItemsByStatus(filter);
+        log.debug("GET /v1/room-requests/items/status-counts: includePast={}", includePast);
+        List<RoomRequestItemStatusCountDto> counts = roomRequestService.countItemsByStatus(includePast);
         log.info("Pedidos de aula contados por estado vía controller: {}", counts);
         return ResponseEntity.ok(counts);
     }

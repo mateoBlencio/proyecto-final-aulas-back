@@ -30,7 +30,6 @@ import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -108,12 +107,10 @@ class RoomRequestServiceImplTest {
     @Test
     @DisplayName("countItemsByStatus: un conteo por cada estado del enum, en orden, sin tocar el composer")
     void countItemsByStatusReturnsOneEntryPerStatus() {
-        RoomRequestItemFilter filter =
-                RoomRequestItemFilter.of(null, Set.of(RoomRequestStatus.PENDING), null, null, null, null, true);
         when(itemRepository.count(ArgumentMatchers.<Specification<RoomRequestItem>>any()))
                 .thenReturn(30L, 10L, 0L);
 
-        List<RoomRequestItemStatusCountDto> result = service.countItemsByStatus(filter);
+        List<RoomRequestItemStatusCountDto> result = service.countItemsByStatus(true);
 
         assertThat(result).containsExactly(
                 new RoomRequestItemStatusCountDto(RoomRequestStatus.PENDING, 30L),

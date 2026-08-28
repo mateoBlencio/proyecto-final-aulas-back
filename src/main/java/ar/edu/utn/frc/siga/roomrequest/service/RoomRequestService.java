@@ -17,8 +17,7 @@ public interface RoomRequestService {
 
     Page<RoomRequestItemRowDto> findItems(RoomRequestItemFilter filter, Pageable pageable);
 
-    /** Cantidad de pedidos en cada estado para el mismo {@code filter} del listado; el {@code statuses} del filtro se ignora. */
-    List<RoomRequestItemStatusCountDto> countItemsByStatus(RoomRequestItemFilter filter);
+    List<RoomRequestItemStatusCountDto> countItemsByStatus(boolean includePast);
 
     RoomRequestItemDetailDto findItemById(Long itemId);
 }

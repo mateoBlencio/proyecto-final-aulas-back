@@ -5,48 +5,38 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/room-requests/items/status-counts?scope=&subjectId=&dateFrom=&dateTo=&includePast=true
+  url: {{baseUrl}}/v1/room-requests/items/status-counts?includePast=false
   body: none
   auth: inherit
 }
 
 params:query {
-  scope: 
-  subjectId: 
-  dateFrom: 
-  dateTo: 
-  includePast: true
-  ~types: PARTIAL_EXAM
+  includePast: false
 }
 
 docs {
-  Conteo de pedidos por estado para las solapas de la bandeja. Requiere
-  autenticación (hasAnyRole SUBSECRETARIA, AUXILIAR_AULICO).
-  
-  Acepta los mismos filtros que 06-listar-pedidos SALVO:
-  - statuses: no es un parámetro; si se manda, se ignora (el resultado ya
-    viene desglosado por estado).
-  - page / size / sort: no aplican, la respuesta es un array de 3 elementos.
-  
-  Filtros disponibles (todos opcionales, se combinan igual que en el listado):
-  - types: PARTIAL_EXAM | FINAL_EXAM | CONFERENCE | ONE_TIME_ROOM_CHANGE | REGULAR_ROOM_CHANGE | OTHER
-    (repetir el param para varios valores)
-  - scope: GRADO | TECNICATURA | LICENCIATURA | EXTENSION | POSTGRADO
-  - subjectId: id de materia
-  - dateFrom / dateTo: rango sobre la fecha del pedido (ISO, yyyy-MM-dd)
-  - includePast: default false, mismo criterio que el listado
-  
+  Total de pedidos por estado, para los badges de las solapas de la bandeja.
+  Requiere autenticación (hasAnyRole SUBSECRETARIA, AUXILIAR_AULICO).
+
+  A diferencia de 06-listar-pedidos, NO toma los filtros del listado (types,
+  scope, subjectId, dateFrom, dateTo, statuses): cada badge es el total de ese
+  estado. Único parámetro:
+
+  - includePast: default false, oculta los pedidos con fecha ya pasada (mismo
+    criterio que la bandeja). includePast=true suma el histórico completo.
+
   Respuesta 200: siempre los 3 estados, en este orden, con 0 cuando no hay
-  pedidos. Sin envoltorio de paginación (a diferencia de 06-listar-pedidos).
-  
+  pedidos. Sin envoltorio de paginación.
+
   [
     { "status": "PENDING",      "count": 12 },
     { "status": "PRE_APPROVED", "count": 3  },
-    { "status": "CANCELLED",    "count": 0  }
+    { "status": "CANCELLED",    "count": 47 }
   ]
-  
-  Invariante: para los mismos filtros comunes, count[X] == page.totalElements
-  del listado filtrado por statuses=X. El front pide este endpoint solo al
-  entrar a la bandeja o al cambiar filtros comunes; NO al paginar, ordenar ni
-  cambiar de solapa.
+
+  Uso en el front: se pide una sola vez al entrar a la bandeja (y al togglear
+  includePast, si existe ese control). El badge de la solapa ACTIVA se pisa con
+  el page.totalElements del listado, que sí refleja todos los filtros. Los
+  badges de las otras solapas quedan quietos: solo status es un eje primario,
+  el resto de los filtros es secundario.
 }
