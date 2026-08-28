@@ -6,7 +6,6 @@ import org.springframework.http.HttpStatus;
 
 import java.io.Serial;
 
-/** Se intentó un cambio de estado que la máquina de estados no permite. */
 public class InvalidRoomRequestTransitionException extends SigaAppException {
 
     @Serial

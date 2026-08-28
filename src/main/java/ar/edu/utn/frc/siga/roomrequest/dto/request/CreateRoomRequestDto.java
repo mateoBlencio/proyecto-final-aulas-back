@@ -11,13 +11,6 @@ import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
-/**
- * Alta de una solicitud de aula. Lo carga un docente sin usuario en el sistema,
- * así que los datos de contacto vienen tipeados y no de una sesión.
- *
- * <p>{@code subjectId} es opcional a nivel de formato: la obligatoriedad depende
- * del tipo de solicitud y la valida {@code RoomRequestValidator}.
- */
 public record CreateRoomRequestDto(
         @NotNull RoomRequestType type,
         @NotNull AcademicScope scope,
