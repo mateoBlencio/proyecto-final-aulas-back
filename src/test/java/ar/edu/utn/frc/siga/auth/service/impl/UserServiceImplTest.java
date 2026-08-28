@@ -62,7 +62,7 @@ class UserServiceImplTest {
         return new CreateUserRequestDto(email, "supersegura", Role.AUXILIAR_AULICO.name());
     }
 
-    private User existing(Integer id, String email, Role rol) {
+    private User existing(Long id, String email, Role rol) {
         User user = new User();
         user.setId(id);
         user.setEmail(email);
@@ -79,7 +79,7 @@ class UserServiceImplTest {
         when(passwordEncoder.encode("supersegura")).thenReturn("HASH");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         when(userMapper.toDto(any(User.class)))
-                .thenReturn(new UserResponseDto(1, "nuevo@frc.utn.edu.ar", Role.AUXILIAR_AULICO.name()));
+                .thenReturn(new UserResponseDto(1L, "nuevo@frc.utn.edu.ar", Role.AUXILIAR_AULICO.name()));
 
         UserResponseDto result = service.create(createDto("nuevo@frc.utn.edu.ar"));
 
@@ -117,27 +117,27 @@ class UserServiceImplTest {
     @Test
     @DisplayName("setEnabled(false): inhabilita y revoca los refresh tokens")
     void disableRevokesTokens() {
-        User user = existing(7, "u@frc.utn.edu.ar", Role.AUXILIAR_AULICO);
-        when(userRepository.findById(7)).thenReturn(Optional.of(user));
+        User user = existing(7L, "u@frc.utn.edu.ar", Role.AUXILIAR_AULICO);
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(userMapper.toDto(any(User.class))).thenReturn(null);
 
-        service.setEnabled(7, false);
+        service.setEnabled(7L, false);
 
         assertThat(user.getEnabled()).isFalse();
-        verify(refreshTokenService).revokeAllByUserId(7);
+        verify(refreshTokenService).revokeAllByUserId(7L);
     }
 
     @Test
     @DisplayName("setEnabled(true): habilita y NO revoca refresh tokens")
     void enableDoesNotRevoke() {
-        User user = existing(7, "u@frc.utn.edu.ar", Role.AUXILIAR_AULICO);
+        User user = existing(7L, "u@frc.utn.edu.ar", Role.AUXILIAR_AULICO);
         user.setEnabled(false);
-        when(userRepository.findById(7)).thenReturn(Optional.of(user));
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(userMapper.toDto(any(User.class))).thenReturn(null);
 
-        service.setEnabled(7, true);
+        service.setEnabled(7L, true);
 
         assertThat(user.getEnabled()).isTrue();
         verify(refreshTokenService, never()).revokeAllByUserId(any());
@@ -146,33 +146,33 @@ class UserServiceImplTest {
     @Test
     @DisplayName("setEnabled: usuario inexistente → ResourceNotFoundException")
     void setEnabledNotFoundThrows() {
-        when(userRepository.findById(99)).thenReturn(Optional.empty());
+        when(userRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.setEnabled(99, false))
+        assertThatThrownBy(() -> service.setEnabled(99L, false))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
     @DisplayName("changeRole: cambia el rol y revoca los refresh tokens")
     void changeRoleRevokesTokens() {
-        User user = existing(5, "otro@frc.utn.edu.ar", Role.AUXILIAR_AULICO);
-        when(userRepository.findById(5)).thenReturn(Optional.of(user));
+        User user = existing(5L, "otro@frc.utn.edu.ar", Role.AUXILIAR_AULICO);
+        when(userRepository.findById(5L)).thenReturn(Optional.of(user));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(userMapper.toDto(any(User.class))).thenReturn(null);
 
-        service.changeRole(5, Role.SUBSECRETARIA.name(), "admin@frc.utn.edu.ar");
+        service.changeRole(5L, Role.SUBSECRETARIA.name(), "admin@frc.utn.edu.ar");
 
         assertThat(user.getRoles()).containsExactly(Role.SUBSECRETARIA);
-        verify(refreshTokenService).revokeAllByUserId(5);
+        verify(refreshTokenService).revokeAllByUserId(5L);
     }
 
     @Test
     @DisplayName("changeRole: no puede editar su propio rol → UserDomainException, no guarda ni revoca")
     void changeOwnRoleThrows() {
-        User user = existing(5, "admin@frc.utn.edu.ar", Role.SUBSECRETARIA);
-        when(userRepository.findById(5)).thenReturn(Optional.of(user));
+        User user = existing(5L, "admin@frc.utn.edu.ar", Role.SUBSECRETARIA);
+        when(userRepository.findById(5L)).thenReturn(Optional.of(user));
 
-        assertThatThrownBy(() -> service.changeRole(5, Role.AUXILIAR_AULICO.name(), "admin@frc.utn.edu.ar"))
+        assertThatThrownBy(() -> service.changeRole(5L, Role.AUXILIAR_AULICO.name(), "admin@frc.utn.edu.ar"))
                 .isInstanceOf(UserDomainException.class);
 
         verify(userRepository, never()).save(any());
@@ -182,16 +182,16 @@ class UserServiceImplTest {
     @Test
     @DisplayName("changeRole: usuario inexistente → ResourceNotFoundException")
     void changeRoleNotFoundThrows() {
-        when(userRepository.findById(99)).thenReturn(Optional.empty());
+        when(userRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.changeRole(99, Role.AUXILIAR_AULICO.name(), "admin@frc.utn.edu.ar"))
+        assertThatThrownBy(() -> service.changeRole(99L, Role.AUXILIAR_AULICO.name(), "admin@frc.utn.edu.ar"))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
     @DisplayName("changeRole: rol inválido → UserDomainException, no busca ni guarda ni revoca")
     void changeRoleInvalidRoleThrows() {
-        assertThatThrownBy(() -> service.changeRole(5, "NO_EXISTE", "admin@frc.utn.edu.ar"))
+        assertThatThrownBy(() -> service.changeRole(5L, "NO_EXISTE", "admin@frc.utn.edu.ar"))
                 .isInstanceOf(UserDomainException.class);
 
         verify(userRepository, never()).findById(any());

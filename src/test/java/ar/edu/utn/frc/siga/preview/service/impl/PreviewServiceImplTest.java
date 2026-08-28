@@ -141,7 +141,7 @@ class PreviewServiceImplTest {
     @Test
     @DisplayName("getPreview: recompone el DTO desde la preview guardada")
     void getPreviewRecompone() {
-        OptimizationResult result = new OptimizationResult("prev_x", List.of(new OptimizerAllocation("1", 5)));
+        OptimizationResult result = new OptimizationResult("prev_x", List.of(new OptimizerAllocation("1", 5L)));
         when(previewStore.get("prev_x")).thenReturn(Optional.of(result));
         PreviewResponseDto expected = new PreviewResponseDto("prev_x", List.of(), List.of());
         when(previewComposer.compose(eq(result), any(), any(), any(), any(), any(), any())).thenReturn(expected);
@@ -155,7 +155,7 @@ class PreviewServiceImplTest {
     @DisplayName("confirm: preview inexistente lanza ExpiredPreviewException")
     void confirmPreviewInexistenteLanzaExpirado() {
         when(previewStore.get("prev_missing")).thenReturn(Optional.empty());
-        ConfirmPreviewRequestDto request = new ConfirmPreviewRequestDto(List.of(new PreviewAllocationDto(1L, 5)));
+        ConfirmPreviewRequestDto request = new ConfirmPreviewRequestDto(List.of(new PreviewAllocationDto(1L, 5L)));
 
         assertThatThrownBy(() -> service.confirm("prev_missing", request))
                 .isInstanceOf(ExpiredPreviewException.class);
@@ -179,11 +179,11 @@ class PreviewServiceImplTest {
     @Test
     @DisplayName("confirm: aplica la propuesta y borra el preview del store")
     void confirmAplicaYBorraPreview() {
-        OptimizationResult result = new OptimizationResult("prev_x", List.of(new OptimizerAllocation("1", 5)));
+        OptimizationResult result = new OptimizationResult("prev_x", List.of(new OptimizerAllocation("1", 5L)));
         when(previewStore.get("prev_x")).thenReturn(Optional.of(result));
         when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of());
         when(allocationService.reallocate(any())).thenReturn(List.of());
-        ConfirmPreviewRequestDto request = new ConfirmPreviewRequestDto(List.of(new PreviewAllocationDto(1L, 5)));
+        ConfirmPreviewRequestDto request = new ConfirmPreviewRequestDto(List.of(new PreviewAllocationDto(1L, 5L)));
 
         service.confirm("prev_x", request);
 

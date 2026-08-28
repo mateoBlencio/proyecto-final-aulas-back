@@ -72,13 +72,13 @@ class PreviewComposerRoomStretchesTest {
         assertThat(stretches).hasSize(3);
         assertThat(stretches.get(0))
                 .extracting(s -> s.classroom().id(), RoomStretchDto::from, RoomStretchDto::to, RoomStretchDto::classes)
-                .containsExactly(3, MONDAY, MONDAY, 1);
+                .containsExactly(3L, MONDAY, MONDAY, 1);
         assertThat(stretches.get(1))
                 .extracting(s -> s.classroom().id(), RoomStretchDto::from, RoomStretchDto::to, RoomStretchDto::classes)
-                .containsExactly(12, MONDAY.plusWeeks(1), MONDAY.plusWeeks(2), 2);
+                .containsExactly(12L, MONDAY.plusWeeks(1), MONDAY.plusWeeks(2), 2);
         assertThat(stretches.get(2))
                 .extracting(s -> s.classroom().id(), RoomStretchDto::from, RoomStretchDto::to, RoomStretchDto::classes)
-                .containsExactly(3, MONDAY.plusWeeks(3), MONDAY.plusWeeks(3), 1);
+                .containsExactly(3L, MONDAY.plusWeeks(3), MONDAY.plusWeeks(3), 1);
     }
 
     @Test
@@ -92,8 +92,8 @@ class PreviewComposerRoomStretchesTest {
         List<RoomStretchDto> stretches = stretchesOf(desordenados);
 
         assertThat(stretches).hasSize(2);
-        assertThat(stretches.get(0).classroom().id()).isEqualTo(3);
-        assertThat(stretches.get(1).classroom().id()).isEqualTo(12);
+        assertThat(stretches.get(0).classroom().id()).isEqualTo(3L);
+        assertThat(stretches.get(1).classroom().id()).isEqualTo(12L);
         assertThat(stretches.get(1).classes()).isEqualTo(2);
     }
 
@@ -115,25 +115,25 @@ class PreviewComposerRoomStretchesTest {
     @DisplayName("el evento vuelve al aula de origen → tres tramos, no dos")
     void vuelveAlAulaDeOrigen() {
         List<OccupiedSlot> slots = List.of(
-                slot(MONDAY, 3),
-                slot(MONDAY.plusWeeks(1), 20),
-                slot(MONDAY.plusWeeks(2), 3));
+                slot(MONDAY, 3L),
+                slot(MONDAY.plusWeeks(1), 20L),
+                slot(MONDAY.plusWeeks(2), 3L));
 
         List<RoomStretchDto> stretches = stretchesOf(slots);
 
-        assertThat(stretches).extracting(s -> s.classroom().id()).containsExactly(3, 20, 3);
+        assertThat(stretches).extracting(s -> s.classroom().id()).containsExactly(3L, 20L, 3L);
     }
 
     // ---------- helpers ----------
 
     /** Compone una propuesta mínima de un solo evento y devuelve sus tramos actuales. */
     private List<RoomStretchDto> stretchesOf(List<OccupiedSlot> ownSlots) {
-        OptimizerAllocation proposal = new OptimizerAllocation(String.valueOf(EVENT_ID), 20);
+        OptimizerAllocation proposal = new OptimizerAllocation(String.valueOf(EVENT_ID), 20L);
         PreviewResponseDto response = composer.compose(
                 new OptimizationResult("preview-1", List.of(proposal)),
                 List.<RecurringEventResponseDto>of(),
                 Map.of(EVENT_ID, List.of(MONDAY)),
-                Map.of(EVENT_ID, 3),
+                Map.of(EVENT_ID, 3L),
                 ownSlots.isEmpty() ? Map.of() : Map.of(EVENT_ID, ownSlots),
                 List.of(),
                 List.of());
@@ -142,11 +142,11 @@ class PreviewComposerRoomStretchesTest {
         return response.allocations().getFirst().currentRoomStretches();
     }
 
-    private static OccupiedSlot slot(LocalDate date, Integer classroomId) {
+    private static OccupiedSlot slot(LocalDate date, long classroomId) {
         return new OccupiedSlot(classroomId, date, LocalTime.of(8, 0), LocalTime.of(10, 0), EVENT_ID, 1L);
     }
 
-    private static ClassroomResponseDto classroom(Integer id) {
-        return new ClassroomResponseDto(id, String.valueOf(id), 1, 40, true, 1, "Edificio", 1, "Aula común");
+    private static ClassroomResponseDto classroom(long id) {
+        return new ClassroomResponseDto(id, (int) id, 40, 1L, "Edificio", 1L, "Aula común");
     }
 }

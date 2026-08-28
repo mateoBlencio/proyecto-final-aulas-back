@@ -88,7 +88,7 @@ public class PreviewServiceImpl implements PreviewService {
         previewValidator.validateNoDuplicateEventIds(request.allocations());
         previewValidator.validateAllocationsBelongToPreview(request.allocations(), previewEventIds);
 
-        Map<Long, Integer> classroomByEvent = new LinkedHashMap<>();
+        Map<Long, Long> classroomByEvent = new LinkedHashMap<>();
         for (PreviewAllocationDto allocation : request.allocations()) {
             classroomByEvent.put(allocation.eventId(), allocation.classroomId());
         }
@@ -107,7 +107,7 @@ public class PreviewServiceImpl implements PreviewService {
         }
 
         PreviewEngine.Inputs inputs = previewEngine.loadInputs(eventIdsWithClassroom);
-        Set<Integer> classroomIds = eventIdsWithClassroom.stream().map(classroomByEvent::get).collect(Collectors.toSet());
+        Set<Long> classroomIds = eventIdsWithClassroom.stream().map(classroomByEvent::get).collect(Collectors.toSet());
         validator.validateClassroomsAvailable(classroomIds);
 
         List<OccurrenceSlotDto> targetOccurrences = occurrenceService

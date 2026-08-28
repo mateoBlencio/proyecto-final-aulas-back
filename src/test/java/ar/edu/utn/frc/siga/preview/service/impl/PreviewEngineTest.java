@@ -102,7 +102,7 @@ class PreviewEngineTest {
         when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(
                 List.of(new OccurrenceSlotDto(10L, 1L, date, LocalTime.of(8, 0), LocalTime.of(9, 30),
                         OccurrenceStatus.NEEDS_ROOM, 30)));
-        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5, 100)));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5L, 100)));
         when(optimizerService.optimize(any(), any(), any(), anyInt()))
                 .thenReturn(new OptimizationResult("prev_x", List.of()));
 
@@ -133,7 +133,7 @@ class PreviewEngineTest {
                 DayOfWeek.MONDAY, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 6, 30), null, null);
     }
 
-    private ClassroomResponseDto classroom(Integer id, Integer capacity) {
-        return new ClassroomResponseDto(id, "Aula " + id, 1, capacity, true, 1, "Edificio 1", 1, "Tipo");
+    private ClassroomResponseDto classroom(Long id, Integer capacity) {
+        return new ClassroomResponseDto(id, id.intValue(), capacity, 1L, "Edificio 1", 1L, "Tipo");
     }
 }

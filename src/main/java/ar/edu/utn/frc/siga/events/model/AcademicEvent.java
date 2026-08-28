@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.events.model;
 
 import ar.edu.utn.frc.siga.common.converter.DurationMinutesConverter;
+import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.DiscriminatorColumn;
@@ -13,14 +14,17 @@ import jakarta.persistence.InheritanceType;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 import org.hibernate.envers.Audited;
+import org.hibernate.envers.NotAudited;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -32,8 +36,8 @@ import java.util.List;
 @Getter
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public abstract class AcademicEvent {
+@EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
+public abstract class AcademicEvent extends TimestampedEntity {
 
     @EqualsAndHashCode.Include
     @Id
@@ -62,6 +66,22 @@ public abstract class AcademicEvent {
     @Setter
     @Column(name = "id_comision")
     protected Long commissionId;
+
+    @Setter
+    @NotAudited
+    @Column(name = "sincronizado_en")
+    protected Instant syncedAt;
+
+    @Setter
+    @NotAudited
+    @Column(name = "hash_sysacad", length = 64)
+    protected String sysacadHash;
+
+    @Setter
+    @Builder.Default
+    @NotAudited
+    @Column(name = "habilitado_sysacad", nullable = false)
+    protected Boolean sysacadEnabled = false;
 
     public LocalTime endTime() {
         return startTime.plus(duration);

@@ -12,7 +12,7 @@ public record ImpactOccurrenceDto(
         LocalDate date,
         LocalTime startTime,
         LocalTime endTime,
-        Integer currentClassroomId,
-        Integer requestedClassroomId,
+        Long currentClassroomId,
+        Long requestedClassroomId,
         boolean blocked) {
 }

@@ -29,7 +29,7 @@ class CaffeinePreviewStoreTest {
     @Test
     @DisplayName("save luego get devuelve la preview guardada; tras remove, get queda vacío")
     void saveGetRemove() {
-        OptimizationResult preview = new OptimizationResult("prev_test", List.of(new OptimizerAllocation("1", 5)));
+        OptimizationResult preview = new OptimizationResult("prev_test", List.of(new OptimizerAllocation("1", 5L)));
 
         store.save(preview);
         assertThat(store.get("prev_test")).isPresent().contains(preview);

@@ -34,6 +34,10 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Override
     @Transactional
     public IssuedRefreshToken issue(User user) {
+        return doIssue(user);
+    }
+
+    private IssuedRefreshToken doIssue(User user) {
         String rawToken = generateRawToken();
         long expirationSeconds = Duration.ofDays(jwtProperties.getRefreshExpirationDays()).toSeconds();
         Instant now = Instant.now();
@@ -43,7 +47,6 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
                 .tokenHash(hash(rawToken))
                 .revoked(false)
                 .expiresAt(now.plusSeconds(expirationSeconds))
-                .createdAt(now)
                 .build();
         refreshTokenRepository.save(token);
 
@@ -76,7 +79,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     }
 
     private RefreshResult rotate(RefreshToken token, User user) {
-        IssuedRefreshToken child = issue(user);
+        IssuedRefreshToken child = doIssue(user);
         RefreshToken childEntity = refreshTokenRepository.findByTokenHash(hash(child.rawToken()))
                 .orElseThrow(() -> new IllegalStateException("El refresh token recién emitido no se encontró"));
 
@@ -99,7 +102,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
         if (token.getRevocationReason() == RevocationReason.ROTATION && withinGrace) {
             log.info("Refresh token reutilizado dentro de la ventana de gracia, tratado como reintento de red");
-            return new RefreshResult(token.getUser(), issue(token.getUser()));
+            return new RefreshResult(token.getUser(), doIssue(token.getUser()));
         }
 
         if (token.getRevocationReason() == RevocationReason.ROTATION) {
@@ -122,7 +125,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
     @Override
     @Transactional
-    public void revokeAllByUserId(Integer userId) {
+    public void revokeAllByUserId(Long userId) {
         refreshTokenRepository.revokeAllByUserId(userId, Instant.now());
     }
 

@@ -55,7 +55,7 @@ class AllocationImpactServiceImpl implements AllocationImpactService {
     @Transactional(readOnly = true)
     public AllocationImpactResponseDto analyze(AllocationCommand command) {
         LocalDate clampFrom = command.source() == AllocationSource.IMPORTED ? null : LocalDate.now();
-        Map<OccurrenceSlotDto, Integer> classroomByOccurrence =
+        Map<OccurrenceSlotDto, Long> classroomByOccurrence =
                 targetResolver.resolveClassroomByOccurrence(command.items(), clampFrom);
 
         if (classroomByOccurrence.isEmpty()) {
@@ -90,7 +90,7 @@ class AllocationImpactServiceImpl implements AllocationImpactService {
         Set<Long> occurrenceIds = candidates.stream()
                 .map(c -> c.occurrence().occurrenceId())
                 .collect(Collectors.toSet());
-        Map<Long, Integer> currentRoomByOccurrence = allocationRepository.findByOccurrenceIdIn(occurrenceIds).stream()
+        Map<Long, Long> currentRoomByOccurrence = allocationRepository.findByOccurrenceIdIn(occurrenceIds).stream()
                 .collect(Collectors.toMap(Allocation::getOccurrenceId, Allocation::getClassroomId, (x, y) -> x));
 
         return candidates.stream()
@@ -160,7 +160,7 @@ class AllocationImpactServiceImpl implements AllocationImpactService {
                                                    Set<Long> movingOccurrenceIds,
                                                    List<AllocationCandidate> candidates,
                                                    List<ClassroomResponseDto> availableRooms) {
-        Set<Integer> taken = new HashSet<>();
+        Set<Long> taken = new HashSet<>();
 
         for (OccupiedSlot slot : occupancy) {
             if (movingOccurrenceIds.contains(slot.occurrenceId())) continue;

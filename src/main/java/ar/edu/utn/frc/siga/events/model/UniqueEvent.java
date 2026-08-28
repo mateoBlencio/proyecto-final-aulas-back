@@ -17,7 +17,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Entity
-@Table(name = "evento_unico_academico")
+@Table(name = "evento_unico")
 @DiscriminatorValue("UNIQUE_EVENT")
 @Audited
 @Getter

@@ -9,9 +9,9 @@ public interface UserService {
 
     UserResponseDto create(CreateUserRequestDto dto);
 
-    UserResponseDto setEnabled(Integer id, boolean enabled);
+    UserResponseDto setEnabled(Long id, boolean enabled);
 
-    UserResponseDto changeRole(Integer id, String rol, String currentUserEmail);
+    UserResponseDto changeRole(Long id, String rol, String currentUserEmail);
 
     Page<UserResponseDto> findEnabled(Pageable pageable);
 

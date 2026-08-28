@@ -4,7 +4,7 @@ import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record RoomRequestItemDetailHeaderDto(
         Long id,
@@ -14,5 +14,5 @@ public record RoomRequestItemDetailHeaderDto(
         String teacherEmail,
         String teacherPhone,
         SubjectResponseDto subject,
-        LocalDateTime createdAt
+        Instant createdAt
 ) {}

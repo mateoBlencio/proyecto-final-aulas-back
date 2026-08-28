@@ -42,8 +42,8 @@ class ClassroomApiIntegrationTest extends AbstractIntegrationTest {
     void create_persistsClassroomInDatabase() throws Exception {
         Building building = testData.edificio();
         ClassroomType tipo = testData.tipoAulaNormal();
-        String roomNumber = "NEW-" + IntegrationTestData.nextSeq();
-        ClassroomRequestDto dto = new ClassroomRequestDto(roomNumber, 40, 1, tipo.getId(), true, building.getId());
+        int roomNumber = (int) IntegrationTestData.nextSeq();
+        ClassroomRequestDto dto = new ClassroomRequestDto(roomNumber, 40, tipo.getId(), building.getId());
 
         MvcResult result = mockMvc.perform(post("/v1/classrooms")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -53,7 +53,7 @@ class ClassroomApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.buildingId").value(building.getId()))
                 .andReturn();
 
-        Integer id = objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asInt();
+        Long id = objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
         assertThat(classroomRepository.findById(id)).isPresent();
         assertThat(classroomRepository.findById(id).orElseThrow().getRoomNumber()).isEqualTo(roomNumber);
     }
@@ -63,14 +63,14 @@ class ClassroomApiIntegrationTest extends AbstractIntegrationTest {
     void create_duplicateRoomNumber_returns400ProblemDetail() throws Exception {
         Building building = testData.edificio();
         ClassroomType tipo = testData.tipoAulaNormal();
-        String roomNumber = "DUP-" + IntegrationTestData.nextSeq();
-        ClassroomRequestDto first = new ClassroomRequestDto(roomNumber, 40, 1, tipo.getId(), true, building.getId());
+        int roomNumber = (int) IntegrationTestData.nextSeq();
+        ClassroomRequestDto first = new ClassroomRequestDto(roomNumber, 40, tipo.getId(), building.getId());
         mockMvc.perform(post("/v1/classrooms")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(first)))
                 .andExpect(status().isCreated());
 
-        ClassroomRequestDto duplicate = new ClassroomRequestDto(roomNumber, 30, 2, tipo.getId(), true, building.getId());
+        ClassroomRequestDto duplicate = new ClassroomRequestDto(roomNumber, 30, tipo.getId(), building.getId());
         mockMvc.perform(post("/v1/classrooms")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(duplicate)))
@@ -81,28 +81,12 @@ class ClassroomApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("floor > floorCount del edificio responde 400")
-    void create_floorExceedsBuildingFloorCount_returns400() throws Exception {
-        Building building = testData.edificio("Edificio-Bajo", 2, true);
-        ClassroomType tipo = testData.tipoAulaNormal();
-        ClassroomRequestDto dto = new ClassroomRequestDto(
-                "FLR-" + IntegrationTestData.nextSeq(), 40, 5, tipo.getId(), true, building.getId());
-
-        mockMvc.perform(post("/v1/classrooms")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(dto)))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.title").value("Space domain error"));
-    }
-
-    @Test
     @DisplayName("edificio inactivo responde 404")
     void create_inactiveBuilding_returns404() throws Exception {
-        Building building = testData.edificio("Edificio-Inactivo", 3, false);
+        Building building = testData.edificio("Edificio-Inactivo", false);
         ClassroomType tipo = testData.tipoAulaNormal();
         ClassroomRequestDto dto = new ClassroomRequestDto(
-                "INA-" + IntegrationTestData.nextSeq(), 40, 1, tipo.getId(), true, building.getId());
+                (int) IntegrationTestData.nextSeq(), 40, tipo.getId(), building.getId());
 
         mockMvc.perform(post("/v1/classrooms")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -116,7 +100,7 @@ class ClassroomApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("Bean Validation: campo requerido null responde 400 con detalle de errores por campo")
     void create_missingRequiredField_returns400WithFieldErrors() throws Exception {
         String json = """
-                {"capacity":40,"floor":1,"classroomTypeId":1,"available":true,"buildingId":1}
+                {"capacity":40,"classroomTypeId":1,"buildingId":1}
                 """;
 
         mockMvc.perform(post("/v1/classrooms")
@@ -133,15 +117,15 @@ class ClassroomApiIntegrationTest extends AbstractIntegrationTest {
     void delete_softDeletesClassroom_notFoundAfterwards() throws Exception {
         Building building = testData.edificio();
         ClassroomType tipo = testData.tipoAulaNormal();
-        String roomNumber = "DEL-" + IntegrationTestData.nextSeq();
-        ClassroomRequestDto dto = new ClassroomRequestDto(roomNumber, 40, 1, tipo.getId(), true, building.getId());
+        int roomNumber = (int) IntegrationTestData.nextSeq();
+        ClassroomRequestDto dto = new ClassroomRequestDto(roomNumber, 40, tipo.getId(), building.getId());
 
         MvcResult created = mockMvc.perform(post("/v1/classrooms")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(dto)))
                 .andExpect(status().isCreated())
                 .andReturn();
-        int id = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asInt();
+        long id = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
 
         mockMvc.perform(delete("/v1/classrooms/" + id))
                 .andExpect(status().isNoContent());
@@ -161,9 +145,9 @@ class ClassroomApiIntegrationTest extends AbstractIntegrationTest {
     void findAll_filtersByBuildingAndCapacity_andPaginates() throws Exception {
         Building building = testData.edificio();
         ClassroomType tipo = testData.tipoAulaNormal();
-        Classroom chica = testData.aula(building, tipo, 1, 20, true);
-        Classroom mediana = testData.aula(building, tipo, 1, 40, true);
-        Classroom grande = testData.aula(building, tipo, 1, 80, true);
+        Classroom chica = testData.aula(building, tipo, 20);
+        Classroom mediana = testData.aula(building, tipo, 40);
+        Classroom grande = testData.aula(building, tipo, 80);
 
         mockMvc.perform(get("/v1/classrooms")
                         .param("buildingId", String.valueOf(building.getId()))

@@ -18,12 +18,12 @@ public class ClassroomTypeServiceImpl implements ClassroomTypeService {
     private final ClassroomTypeRepository classroomTypeRepository;
 
     @Override
-    public ClassroomType findById(Integer id) {
+    public ClassroomType findById(Long id) {
         log.debug("Buscando tipo de aula: id={}", id);
         return findExistingById(id);
     }
 
-    private ClassroomType findExistingById(Integer id) {
+    private ClassroomType findExistingById(Long id) {
         return classroomTypeRepository.findById(id)
                 .orElseThrow(() -> {
                     log.warn("Tipo de aula no encontrado: id={}", id);

@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.events.model;
 
+import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -32,8 +33,8 @@ import java.time.LocalTime;
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class Occurrence {
+@EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
+public class Occurrence extends TimestampedEntity {
 
     @EqualsAndHashCode.Include
     @Id

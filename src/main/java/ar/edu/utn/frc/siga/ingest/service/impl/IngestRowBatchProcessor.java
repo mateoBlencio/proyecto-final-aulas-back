@@ -63,7 +63,7 @@ class IngestRowBatchProcessor {
 
                 processedRows++;
                 log.debug("Fila {}: subject={}, commission={}, classroom={}",
-                    rowNum, resolved.subject().name(), resolved.commission().commissionNumber(), dto.roomNumber());
+                    rowNum, resolved.subject().name(), resolved.commission().courseCode(), dto.roomNumber());
             } catch (ResourceNotFoundException e) {
                 skippedRows.add(new RowIssueDto(rowNum, e.getMessage()));
                 log.warn("Fila {} salteada, no resuelve contra el catálogo: {}", rowNum, e.getMessage());

@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/classrooms?buildingId=1&capacityMin=60&available=true&page=0&size=20
+  url: {{baseUrl}}/v1/classrooms?buildingId=1&capacityMin=60&page=0&size=20
   body: none
   auth: inherit
 }
@@ -13,7 +13,6 @@ get {
 params:query {
   buildingId: 1
   capacityMin: 60
-  available: true
   page: 0
   size: 20
 }

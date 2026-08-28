@@ -71,7 +71,7 @@ class AuthServiceImplTest {
     }
 
     private User user(String email) {
-        return User.builder().id(1).email(email).roles(Set.of(Role.SUBSECRETARIA)).build();
+        return User.builder().id(1L).email(email).roles(Set.of(Role.SUBSECRETARIA)).build();
     }
 
     @Test

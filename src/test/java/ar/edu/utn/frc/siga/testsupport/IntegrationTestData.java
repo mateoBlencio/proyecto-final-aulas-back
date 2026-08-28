@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
+import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
@@ -63,47 +64,38 @@ public class IntegrationTestData {
                 .orElseGet(() -> classroomTypeRepository.save(
                         ClassroomType.builder()
                                 .description(defaultClassroomTypeDescription)
-                                .deleted(false)
                                 .build()));
     }
 
-    public Building edificio(String namePrefix, int floorCount, boolean active) {
+    public Building edificio(String namePrefix, boolean active) {
         return buildingRepository.save(Building.builder()
                 .name(namePrefix + "-" + nextSeq())
-                .floorCount(floorCount)
-                .active(active)
-                .deleted(false)
+                .deletedAt(active ? null : java.time.Instant.now())
                 .build());
     }
 
     public Building edificio() {
-        return edificio("Edificio-IT", 5, true);
+        return edificio("Edificio-IT", true);
     }
 
     public Building edificioConNombre(String name) {
         return buildingRepository.save(Building.builder()
                 .name(name)
-                .floorCount(5)
-                .active(true)
-                .deleted(false)
                 .build());
     }
 
-    public Classroom aula(Building building, ClassroomType tipo, int floor, int capacity, boolean available) {
-        return aulaConNumero("AULA-" + nextSeq(), building, tipo, floor, capacity, available);
+    public Classroom aula(Building building, ClassroomType tipo, int capacity) {
+        return aulaConNumero((int) nextSeq(), building, tipo, capacity);
     }
 
     public Classroom aula(Building building) {
-        return aula(building, tipoAulaNormal(), 1, 40, true);
+        return aula(building, tipoAulaNormal(), 40);
     }
 
-    public Classroom aulaConNumero(String roomNumber, Building building, ClassroomType tipo, int floor, int capacity, boolean available) {
+    public Classroom aulaConNumero(Integer roomNumber, Building building, ClassroomType tipo, int capacity) {
         return classroomRepository.save(Classroom.builder()
                 .roomNumber(roomNumber)
-                .floor(floor)
                 .capacity(capacity)
-                .available(available)
-                .deleted(false)
                 .building(building)
                 .classroomType(tipo)
                 .build());
@@ -144,7 +136,7 @@ public class IntegrationTestData {
 
         int year = 2100 + (int) (nextSeq() % 500);
         AcademicPeriod period = periodoAcademico(year, TermType.ANUAL);
-        Commission commission = comision("CUR-" + nextSeq(), 1, period);
+        Commission commission = comision("CUR-" + nextSeq(), period);
         materiaComision(subject, commission, 30);
 
         return new SubjectAndCommission(subject.getId(), commission.getId());
@@ -155,17 +147,16 @@ public class IntegrationTestData {
         return academicPeriodRepository.findByYearAndSemester(year, termType.getSemester()).orElseThrow();
     }
 
-    public Commission comision(String courseCode, int commissionNumber, AcademicPeriod period) {
+    public Commission comision(String courseCode, AcademicPeriod period) {
         return commissionRepository.save(Commission.builder()
                 .courseCode(courseCode)
-                .commissionNumber(commissionNumber)
-                .yearLevel(1)
                 .academicPeriod(period)
                 .build());
     }
 
     public SubjectCommission materiaComision(Subject subject, Commission commission, int enrolledCount) {
         return subjectCommissionRepository.save(SubjectCommission.builder()
+                .id(new SubjectCommissionId())
                 .subject(subject)
                 .commission(commission)
                 .enrolledCount(enrolledCount)

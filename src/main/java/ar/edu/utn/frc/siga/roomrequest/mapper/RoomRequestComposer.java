@@ -42,7 +42,7 @@ public class RoomRequestComposer {
     private record Catalogs(
             Map<Long, SubjectResponseDto> subjectsById,
             Map<Long, CommissionResponseDto> commissionsById,
-            Map<Integer, ClassroomOptionDto> classroomsById) {
+            Map<Long, ClassroomOptionDto> classroomsById) {
     }
 
     public RoomRequestResponseDto compose(RoomRequest request) {
@@ -52,7 +52,7 @@ public class RoomRequestComposer {
     public List<RoomRequestResponseDto> compose(Collection<RoomRequest> requests) {
         Set<Long> subjectIds = new LinkedHashSet<>();
         Set<Long> commissionIds = new LinkedHashSet<>();
-        Set<Integer> classroomIds = new LinkedHashSet<>();
+        Set<Long> classroomIds = new LinkedHashSet<>();
 
         for (RoomRequest request : requests) {
             collectSubjectId(request, subjectIds);
@@ -96,7 +96,7 @@ public class RoomRequestComposer {
     public RoomRequestItemDetailDto composeDetail(RoomRequestItem item) {
         Set<Long> subjectIds = new LinkedHashSet<>();
         Set<Long> commissionIds = new LinkedHashSet<>();
-        Set<Integer> classroomIds = new LinkedHashSet<>();
+        Set<Long> classroomIds = new LinkedHashSet<>();
 
         RoomRequest request = item.getRequest();
         collectSubjectId(request, subjectIds);
@@ -111,12 +111,12 @@ public class RoomRequestComposer {
         return new RoomRequestItemDetailDto(header, itemDto);
     }
 
-    private Catalogs resolveCatalogs(Set<Long> subjectIds, Set<Long> commissionIds, Set<Integer> classroomIds) {
+    private Catalogs resolveCatalogs(Set<Long> subjectIds, Set<Long> commissionIds, Set<Long> classroomIds) {
         Map<Long, SubjectResponseDto> subjectsById =
                 Maps.byId(subjectService.findByIds(subjectIds), SubjectResponseDto::id);
         Map<Long, CommissionResponseDto> commissionsById =
                 Maps.byId(commissionService.findByIds(commissionIds), CommissionResponseDto::id);
-        Map<Integer, ClassroomOptionDto> classroomsById =
+        Map<Long, ClassroomOptionDto> classroomsById =
                 Maps.byId(catalogMapper.toClassroomOptions(classroomService.findByIds(classroomIds)),
                         ClassroomOptionDto::id);
         return new Catalogs(subjectsById, commissionsById, classroomsById);
@@ -136,7 +136,7 @@ public class RoomRequestComposer {
         }
     }
 
-    private void collectClassroomIds(Collection<RoomRequestItem> items, Set<Integer> classroomIds) {
+    private void collectClassroomIds(Collection<RoomRequestItem> items, Set<Long> classroomIds) {
         for (RoomRequestItem item : items) {
             if (item.getCurrentClassroomId() != null) {
                 classroomIds.add(item.getCurrentClassroomId());

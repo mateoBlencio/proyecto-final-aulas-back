@@ -45,7 +45,7 @@ import static org.mockito.Mockito.when;
 class AllocationTargetResolverTest {
 
     private static final long EVENT_ID = 55L;
-    private static final int CLASSROOM_ID = 12;
+    private static final long CLASSROOM_ID = 12L;
 
     @Mock
     private OccurrenceService occurrenceService;
@@ -72,7 +72,7 @@ class AllocationTargetResolverTest {
                 slot(3L, to),                   // borde superior: entra
                 slot(4L, to.plusDays(7))));     // afuera: no entra
 
-        Map<OccurrenceSlotDto, Integer> resolved = resolver.resolveClassroomByOccurrence(
+        Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
                 List.of(rangeItem(from, to)), LocalDate.now());
 
         assertThat(resolved.keySet()).extracting(OccurrenceSlotDto::occurrenceId)
@@ -88,7 +88,7 @@ class AllocationTargetResolverTest {
                 slot(1L, from),
                 slot(2L, from.plusMonths(2))));
 
-        Map<OccurrenceSlotDto, Integer> resolved = resolver.resolveClassroomByOccurrence(
+        Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
                 List.of(rangeItem(from, null)), LocalDate.now());
 
         assertThat(resolved.keySet()).extracting(OccurrenceSlotDto::occurrenceId)
@@ -155,7 +155,7 @@ class AllocationTargetResolverTest {
         realValidateRange();
         when(occurrenceService.findSlotsByEvent(EVENT_ID, from)).thenReturn(List.of());
 
-        Map<OccurrenceSlotDto, Integer> resolved = resolver.resolveClassroomByOccurrence(
+        Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
                 List.of(rangeItem(from, from.plusDays(1))), LocalDate.now());
 
         assertThat(resolved).isEmpty();

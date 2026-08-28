@@ -45,7 +45,7 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
     @Override
     public List<AcademicPeriodResponseDto> findActive() {
         log.debug("Buscando períodos académicos activos");
-        return academicPeriodRepository.findByActiveTrue().stream()
+        return academicPeriodRepository.findByDeletedAtIsNull().stream()
                 .map(academicPeriodMapper::toDto)
                 .toList();
     }

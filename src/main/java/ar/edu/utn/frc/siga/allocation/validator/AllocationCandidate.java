@@ -8,7 +8,7 @@ import org.springframework.modulith.NamedInterface;
 import java.time.LocalTime;
 
 @NamedInterface("api")
-public record AllocationCandidate(OccurrenceSlotDto occurrence, Integer classroomId) implements TimeSpan {
+public record AllocationCandidate(OccurrenceSlotDto occurrence, Long classroomId) implements TimeSpan {
 
     @Override
     public LocalTime startTime() {

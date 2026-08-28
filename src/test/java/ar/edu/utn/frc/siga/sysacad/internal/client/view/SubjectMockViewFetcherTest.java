@@ -1,0 +1,34 @@
+package ar.edu.utn.frc.siga.sysacad.internal.client.view;
+
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSubject;
+import java.util.List;
+import java.util.Set;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
+import tools.jackson.databind.ObjectMapper;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@DisplayName("SubjectMockViewFetcher")
+class SubjectMockViewFetcherTest {
+
+    private final SubjectMockViewFetcher fetcher =
+            new SubjectMockViewFetcher(new ClassPathResource("sysacad/mock/materias.json"), new ObjectMapper());
+
+    @Test
+    @DisplayName("fetch: deserializa el fixture con las claves en español de SysAcad")
+    void fetchDeserializesFixture() {
+        List<RawSubject> rows = fetcher.fetch();
+
+        assertThat(rows).isNotEmpty();
+        assertThat(rows).allSatisfy(row -> {
+            assertThat(row.especialid()).isNotNull();
+            assertThat(row.plan()).isNotNull();
+            assertThat(row.materia()).isNotNull();
+            assertThat(row.materiaNombre()).isNotBlank();
+            assertThat(row.especialidadNombre()).isNotBlank();
+            assertThat(row.materiaDictado()).isIn(Set.of("A", "C"));
+        });
+    }
+}

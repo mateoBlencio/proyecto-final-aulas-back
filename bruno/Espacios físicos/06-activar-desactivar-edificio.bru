@@ -1,0 +1,17 @@
+meta {
+  name: Activar / desactivar edificio
+  type: http
+  seq: 6
+}
+
+patch {
+  url: {{baseUrl}}/v1/buildings/1/active
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "active": false
+  }
+}

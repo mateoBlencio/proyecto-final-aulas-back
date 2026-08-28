@@ -11,7 +11,7 @@ public record OccurrenceConflictDto(
         LocalDate date,
         LocalTime startTime,
         LocalTime endTime,
-        Integer classroomId,
+        Long classroomId,
         Long conflictingEventId,
         Long conflictingAllocationId,
         Long conflictingOccurrenceId) {

@@ -109,6 +109,8 @@ siga:
         default-value: "08:00"
       - key: events.hours.end
         default-value: "23:00"
+      - key: space.filterInactiveBuildings
+        default-value: "true"
   optimizer:
     parallel-solver-count: AUTO
     environment-mode: PHASE_ASSERT
@@ -128,6 +130,29 @@ siga:
     general:
       capacity: 100
       refill-period-seconds: 60
+  sysacad:
+    enabled: ${SYSACAD_ENABLED:false}
+
+    # eliminar cuando se tenga la vista real
+    materias-mock-enabled: true
+
+    # TEMPORAL: sirve asignaciones desde fixture; apagar cuando HorariosComisionesCupos esté completa/alineada
+    asignaciones-mock-enabled: ${SYSACAD_ASIGNACIONES_MOCK:true}
+
+    base-url: https://dataview.frc.utn.edu.ar
+    api-key: ${SYSACAD_API_KEY:}
+    connect-timeout: 5s
+    read-timeout: 30s
+    max-retries: 3
+    sync:
+
+      buildings: "0 0 3 * * SUN"
+      classrooms: "0 0 3 * * SUN"
+      specialties: "0 0 3 * * SUN"
+      events: "0 0 3 * * SUN"
+      allocations: "0 0 3 * * SUN"
+      subjects: "0 0 3 * * SUN"
+      commissions: "0 0 3 * * SUN"
 
 logging:
   level:

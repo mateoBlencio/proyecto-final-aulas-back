@@ -47,7 +47,6 @@ class AcademicPeriodServiceImplTest {
                 .id(1L).year(2026).semester(1)
                 .startDate(LocalDate.of(2026, 3, 1))
                 .endDate(LocalDate.of(2026, 7, 31))
-                .active(true)
                 .build();
         when(academicPeriodRepository.findByYearAndSemester(2026, 1)).thenReturn(Optional.of(existing));
 
@@ -94,9 +93,8 @@ class AcademicPeriodServiceImplTest {
                 .id(1L).year(2026).semester(1)
                 .startDate(LocalDate.of(2026, 3, 1))
                 .endDate(LocalDate.of(2026, 7, 31))
-                .active(true)
                 .build();
-        when(academicPeriodRepository.findByActiveTrue()).thenReturn(List.of(active));
+        when(academicPeriodRepository.findByDeletedAtIsNull()).thenReturn(List.of(active));
 
         List<AcademicPeriodResponseDto> result = service.findActive();
 
@@ -115,9 +113,8 @@ class AcademicPeriodServiceImplTest {
                 .id(2L).year(2026).semester(0)
                 .startDate(LocalDate.of(2026, 3, 1))
                 .endDate(null)
-                .active(true)
                 .build();
-        when(academicPeriodRepository.findByActiveTrue()).thenReturn(List.of(active));
+        when(academicPeriodRepository.findByDeletedAtIsNull()).thenReturn(List.of(active));
 
         List<AcademicPeriodResponseDto> result = service.findActive();
 
@@ -131,7 +128,6 @@ class AcademicPeriodServiceImplTest {
                 .id(1L).year(2026).semester(1)
                 .startDate(LocalDate.of(2026, 3, 1))
                 .endDate(LocalDate.of(2026, 7, 31))
-                .active(true)
                 .build();
         when(academicPeriodRepository.findAll()).thenReturn(List.of(period));
 
@@ -148,7 +144,6 @@ class AcademicPeriodServiceImplTest {
                 .id(1L).year(2026).semester(1)
                 .startDate(LocalDate.of(2026, 3, 1))
                 .endDate(LocalDate.of(2026, 7, 31))
-                .active(true)
                 .build();
         when(academicPeriodRepository.findById(1L)).thenReturn(Optional.of(period));
 

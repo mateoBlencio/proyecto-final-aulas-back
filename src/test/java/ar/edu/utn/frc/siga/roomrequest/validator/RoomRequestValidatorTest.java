@@ -193,24 +193,24 @@ class RoomRequestValidatorTest {
         @Test
         @DisplayName("aula actual y preferidas se consultan juntas en una sola query, sin repetir ids")
         void allClassrooms_areLookedUpInOneBatch() {
-            CreateRoomRequestItemDto first = item(null, 10, List.of(11, 12));
-            CreateRoomRequestItemDto second = item(null, 11, List.of(12, 13));
-            when(classroomService.findByIds(any())).thenReturn(classrooms(10, 11, 12, 13));
+            CreateRoomRequestItemDto first = item(null, 10L, List.of(11L, 12L));
+            CreateRoomRequestItemDto second = item(null, 11L, List.of(12L, 13L));
+            when(classroomService.findByIds(any())).thenReturn(classrooms(10L, 11L, 12L, 13L));
             CreateRoomRequestDto dto = request(RoomRequestType.CONFERENCE, null, first, second);
 
             validator.validateForCreation(dto);
 
-            ArgumentCaptor<Collection<Integer>> captor = ArgumentCaptor.captor();
+            ArgumentCaptor<Collection<Long>> captor = ArgumentCaptor.captor();
             verify(classroomService, times(1)).findByIds(captor.capture());
-            assertThat(captor.getValue()).containsExactlyInAnyOrder(10, 11, 12, 13);
+            assertThat(captor.getValue()).containsExactlyInAnyOrder(10L, 11L, 12L, 13L);
         }
 
         @Test
         @DisplayName("aula preferida inexistente: 404 de Classroom")
         void unknownPreferredClassroom_isRejected() {
-            when(classroomService.findByIds(any())).thenReturn(classrooms(10));
+            when(classroomService.findByIds(any())).thenReturn(classrooms(10L));
             CreateRoomRequestDto dto = request(RoomRequestType.CONFERENCE, null,
-                    item(null, null, List.of(10, 99)));
+                    item(null, null, List.of(10L, 99L)));
 
             assertThatThrownBy(() -> validator.validateForCreation(dto))
                     .isInstanceOf(ResourceNotFoundException.class)
@@ -221,7 +221,7 @@ class RoomRequestValidatorTest {
         @DisplayName("aula actual inexistente: 404 de Classroom")
         void unknownCurrentClassroom_isRejected() {
             when(classroomService.findByIds(any())).thenReturn(List.of());
-            CreateRoomRequestDto dto = request(RoomRequestType.CONFERENCE, null, item(null, 99, List.of()));
+            CreateRoomRequestDto dto = request(RoomRequestType.CONFERENCE, null, item(null, 99L, List.of()));
 
             assertThatThrownBy(() -> validator.validateForCreation(dto))
                     .isInstanceOf(ResourceNotFoundException.class)
@@ -232,9 +232,9 @@ class RoomRequestValidatorTest {
         @DisplayName("no se valida capacidad ni disponibilidad: son preferencias, no una asignación")
         void capacityAndAvailability_areNotValidated() {
             when(classroomService.findByIds(any()))
-                    .thenReturn(List.of(new ClassroomResponseDto(10, "A1", 1, 5, false, 1, "P", 1, "Aula")));
+                    .thenReturn(List.of(new ClassroomResponseDto(10L, 1, 5, 1L, "P", 1L, "Aula")));
             CreateRoomRequestDto dto = request(RoomRequestType.CONFERENCE, null,
-                    item(null, null, List.of(10)));
+                    item(null, null, List.of(10L)));
 
             assertThatCode(() -> validator.validateForCreation(dto)).doesNotThrowAnyException();
         }
@@ -488,9 +488,9 @@ class RoomRequestValidatorTest {
     @Test
     @DisplayName("solicitud válida con todo poblado: no lanza y consulta cada módulo una sola vez")
     void fullyPopulatedRequest_isAccepted() {
-        when(classroomService.findByIds(any())).thenReturn(classrooms(10, 11));
+        when(classroomService.findByIds(any())).thenReturn(classrooms(10L, 11L));
         CreateRoomRequestDto dto = request(RoomRequestType.PARTIAL_EXAM, SUBJECT_ID,
-                item(COMMISSION_ID, 10, List.of(11)));
+                item(COMMISSION_ID, 10L, List.of(11L)));
 
         assertThatCode(() -> validator.validateForCreation(dto)).doesNotThrowAnyException();
 
@@ -510,8 +510,8 @@ class RoomRequestValidatorTest {
         return item(commissionId, null, List.of());
     }
 
-    private static CreateRoomRequestItemDto item(Long commissionId, Integer currentClassroomId,
-                                                 List<Integer> preferredClassroomIds) {
+    private static CreateRoomRequestItemDto item(Long commissionId, Long currentClassroomId,
+                                                 List<Long> preferredClassroomIds) {
         return new CreateRoomRequestItemDto(commissionId, LocalDate.now().plusDays(7),
                 LocalTime.of(10, 0), LocalTime.of(12, 0), 30, 35, 1, currentClassroomId,
                 false, false, null, null, null, null, preferredClassroomIds);
@@ -531,9 +531,9 @@ class RoomRequestValidatorTest {
                 false, false, null, null, null, observations, List.of());
     }
 
-    private static List<ClassroomResponseDto> classrooms(Integer... ids) {
+    private static List<ClassroomResponseDto> classrooms(Long... ids) {
         return java.util.Arrays.stream(ids)
-                .map(id -> new ClassroomResponseDto(id, "A" + id, 1, 40, true, 1, "Pabellón", 1, "Aula"))
+                .map(id -> new ClassroomResponseDto(id, id.intValue(), 40, 1L, "Pabellón", 1L, "Aula"))
                 .toList();
     }
 }

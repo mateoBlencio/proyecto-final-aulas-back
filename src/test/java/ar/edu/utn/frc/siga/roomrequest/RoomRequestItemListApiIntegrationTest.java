@@ -148,15 +148,14 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
     void sortsByRequestCreatedAt() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
 
-        RoomRequest olderRequest = seedRequest(RoomRequestType.PARTIAL_EXAM, academic.subjectId(),
-                LocalDateTime.now().minusDays(5));
+        // createdAt lo sella @CreationTimestamp al persistir: el orden de alta define el orden esperado.
+        RoomRequest olderRequest = seedRequest(RoomRequestType.PARTIAL_EXAM, academic.subjectId());
         seedItem(olderRequest, academic.commissionId(), LocalDate.now().plusDays(30), RoomRequestStatus.PENDING);
-        roomRequestRepository.save(olderRequest);
+        roomRequestRepository.saveAndFlush(olderRequest);
 
-        RoomRequest newerRequest = seedRequest(RoomRequestType.PARTIAL_EXAM, academic.subjectId(),
-                LocalDateTime.now());
+        RoomRequest newerRequest = seedRequest(RoomRequestType.PARTIAL_EXAM, academic.subjectId());
         seedItem(newerRequest, academic.commissionId(), LocalDate.now().plusDays(31), RoomRequestStatus.PENDING);
-        roomRequestRepository.save(newerRequest);
+        roomRequestRepository.saveAndFlush(newerRequest);
 
         mockMvc.perform(get("/v1/room-requests/items")
                         .param("subjectId", String.valueOf(academic.subjectId()))
@@ -182,10 +181,6 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     private RoomRequest seedRequest(RoomRequestType type, Long subjectId) {
-        return seedRequest(type, subjectId, LocalDateTime.now());
-    }
-
-    private RoomRequest seedRequest(RoomRequestType type, Long subjectId, LocalDateTime createdAt) {
         return RoomRequest.builder()
                 .type(type)
                 .scope(AcademicScope.GRADO)
@@ -193,7 +188,6 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
                 .teacherEmail("ada@frc.utn.edu.ar")
                 .teacherPhone("351-1234567")
                 .subjectId(subjectId)
-                .createdAt(createdAt)
                 .build();
     }
 

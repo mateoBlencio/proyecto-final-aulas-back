@@ -4,9 +4,8 @@ import org.springframework.modulith.NamedInterface;
 
 @NamedInterface("api")
 public record BuildingResponseDto(
-        Integer id,
+        Long id,
         String name,
-        Integer floorCount,
         Boolean active
 ) {
 }

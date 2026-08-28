@@ -62,12 +62,12 @@ class AllocationImpactApiIntegrationTest extends AbstractIntegrationTest {
                 .findFirst().orElseThrow();
     }
 
-    private static AllocationBatchRequestDto byRange(Long eventId, LocalDate from, LocalDate to, Integer classroomId) {
+    private static AllocationBatchRequestDto byRange(Long eventId, LocalDate from, LocalDate to, Long classroomId) {
         return new AllocationBatchRequestDto(
                 List.of(new AllocationItemRequestDto(null, eventId, from, to, classroomId)), null);
     }
 
-    private static AllocationBatchRequestDto byOccurrence(Long occurrenceId, Integer classroomId) {
+    private static AllocationBatchRequestDto byOccurrence(Long occurrenceId, Long classroomId) {
         return new AllocationBatchRequestDto(
                 List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, null, null, classroomId)), null);
     }
@@ -85,7 +85,7 @@ class AllocationImpactApiIntegrationTest extends AbstractIntegrationTest {
                 .content(objectMapper.writeValueAsString(body)));
     }
 
-    private Integer classroomOf(Long occurrenceId) {
+    private Long classroomOf(Long occurrenceId) {
         return allocationRepository.findByOccurrenceIdIn(List.of(occurrenceId)).stream()
                 .map(Allocation::getClassroomId).findFirst().orElse(null);
     }

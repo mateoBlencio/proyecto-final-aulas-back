@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.model;
 
+import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -7,6 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
 import java.time.LocalDate;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,7 +24,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class AcademicPeriod {
+public class AcademicPeriod extends TimestampedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -41,7 +43,6 @@ public class AcademicPeriod {
     @Column(name = "fecha_fin")
     private LocalDate endDate;
 
-    @Column(name = "activo", nullable = false)
-    @Builder.Default
-    private Boolean active = true;
+    @Column(name = "eliminado_en")
+    private Instant deletedAt;
 }

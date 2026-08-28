@@ -129,7 +129,6 @@ class RoomRequestItemStatusCountsApiIntegrationTest extends AbstractIntegrationT
                 .teacherEmail("ada@frc.utn.edu.ar")
                 .teacherPhone("351-1234567")
                 .subjectId(subjectId)
-                .createdAt(LocalDateTime.now())
                 .build();
     }
 

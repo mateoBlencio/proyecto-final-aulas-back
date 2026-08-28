@@ -80,6 +80,6 @@ public final class EventTestData {
     }
 
     public static CommissionResponseDto commissionResponseDto(Long id) {
-        return new CommissionResponseDto(id, "K1234", 1, 1, null);
+        return new CommissionResponseDto(id, "K1234", null);
     }
 }

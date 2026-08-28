@@ -18,12 +18,10 @@ import org.mapstruct.Mapping;
 
 import java.util.List;
 
-
 @Mapper(config = CentralMapperConfig.class)
 public interface RoomRequestMapper {
 
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "glpiTicketId", ignore = true)
     @Mapping(target = "items", ignore = true)
     RoomRequest toEntity(CreateRoomRequestDto dto);
@@ -50,6 +48,7 @@ public interface RoomRequestMapper {
 
     @Mapping(target = "id", source = "item.id")
     @Mapping(target = "commission", source = "commission")
+    @Mapping(target = "currentClassroom", source = "currentClassroom")
     @Mapping(target = "preferredClassrooms", source = "preferredClassrooms")
     @Mapping(target = "endTime", expression = "java(item.endTime())")
     @Mapping(target = "durationMinutes",

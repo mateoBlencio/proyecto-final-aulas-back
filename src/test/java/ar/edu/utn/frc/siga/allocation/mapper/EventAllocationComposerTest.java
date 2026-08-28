@@ -55,7 +55,7 @@ class EventAllocationComposerTest {
     @DisplayName("compose: calcula sobrecupo con la capacidad del aula asignada")
     void composeCalculaSobrecupo() {
         UniqueEventResponseDto event = uniqueEvent(3L, 40);
-        ClassroomResponseDto classroom = classroom(5, 30);
+        ClassroomResponseDto classroom = classroom(5L, 30);
         AllocationResponseDto allocation = new AllocationResponseDto(
                 1L, AllocationSource.MANUAL, null, "obs", null, null, classroom);
 
@@ -99,10 +99,10 @@ class EventAllocationComposerTest {
         OccurrenceSlotDto slot = new OccurrenceSlotDto(10L, 3L, LocalDate.of(2026, 3, 10),
                 LocalTime.of(10, 0), LocalTime.of(11, 0), OccurrenceStatus.NEEDS_ROOM, 40);
         Allocation allocation = Allocation.builder()
-                .id(1L).occurrenceId(10L).classroomId(5).observation("obs").build();
+                .id(1L).occurrenceId(10L).classroomId(5L).observation("obs").build();
         when(occurrenceService.findSlotsByEvents(any())).thenReturn(List.of(slot));
         when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(allocation));
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 30)));
+        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, 30)));
 
         List<UniqueEventAllocationResponseDto> result = composer.composeAll(List.of(event));
 
@@ -127,7 +127,7 @@ class EventAllocationComposerTest {
                 LocalTime.of(10, 0), 60, LocalDate.of(2026, 3, 10), "evento especial", null, null);
     }
 
-    private ClassroomResponseDto classroom(Integer id, Integer capacity) {
-        return new ClassroomResponseDto(id, "Aula " + id, 1, capacity, true, 1, "Edificio 1", 1, "Tipo");
+    private ClassroomResponseDto classroom(Long id, Integer capacity) {
+        return new ClassroomResponseDto(id, id.intValue(), capacity, 1L, "Edificio 1", 1L, "Tipo");
     }
 }

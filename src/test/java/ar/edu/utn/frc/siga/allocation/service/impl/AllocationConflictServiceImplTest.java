@@ -34,7 +34,6 @@ import org.springframework.data.domain.Pageable;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Set;
@@ -88,7 +87,7 @@ class AllocationConflictServiceImplTest {
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         Allocation allocation = allocation(100L, 10L, 5);
         mockOccupancy(List.of(slot), List.of(allocation), List.of(event));
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 30)));
+        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, 30)));
 
         List<AllocationConflictDto> result = service.findConflicts(Set.of(), from, to, false, PAGEABLE).getContent();
 
@@ -105,7 +104,7 @@ class AllocationConflictServiceImplTest {
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         Allocation allocation = allocation(100L, 10L, 5);
         mockOccupancy(List.of(slot), List.of(allocation), List.of(event));
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 30)));
+        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, 30)));
 
         List<AllocationConflictDto> result =
                 service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, PAGEABLE).getContent();
@@ -127,7 +126,7 @@ class AllocationConflictServiceImplTest {
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         Allocation allocation = allocation(100L, 10L, 5);
         mockOccupancy(List.of(slot), List.of(allocation), List.of(event));
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, null)));
+        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, null)));
 
         assertThat(service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, PAGEABLE)).isEmpty();
     }
@@ -141,7 +140,7 @@ class AllocationConflictServiceImplTest {
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         Allocation allocation = allocation(100L, 10L, 5);
         mockOccupancy(List.of(slot), List.of(allocation), List.of(event));
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 30)));
+        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, 30)));
 
         assertThat(service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, PAGEABLE)).isEmpty();
     }
@@ -159,14 +158,14 @@ class AllocationConflictServiceImplTest {
         Allocation allocA = allocation(100L, 10L, 5);
         Allocation allocB = allocation(101L, 11L, 5);
         mockOccupancy(List.of(slotA, slotB), List.of(allocA, allocB), List.of(eventA, eventB));
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 100)));
+        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, 100)));
 
         List<AllocationConflictDto> result =
                 service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, PAGEABLE).getContent();
 
         assertThat(result).hasSize(1);
         OverlapConflictDto overlap = (OverlapConflictDto) result.getFirst();
-        assertThat(overlap.classroom().id()).isEqualTo(5);
+        assertThat(overlap.classroom().id()).isEqualTo(5L);
         assertThat(overlap.eventA().id()).isEqualTo(1L);
         assertThat(overlap.eventB().id()).isEqualTo(2L);
         assertThat(overlap.dates()).containsExactly(date);
@@ -185,7 +184,7 @@ class AllocationConflictServiceImplTest {
         Allocation allocA = allocation(100L, 10L, 5);
         Allocation allocB = allocation(101L, 11L, 6);
         mockOccupancy(List.of(slotA, slotB), List.of(allocA, allocB), List.of(eventA, eventB));
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 100), classroom(6, 100)));
+        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, 100), classroom(6L, 100)));
 
         assertThat(service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, PAGEABLE)).isEmpty();
     }
@@ -203,7 +202,7 @@ class AllocationConflictServiceImplTest {
         Allocation allocA = allocation(100L, 10L, 5);
         Allocation allocB = allocation(101L, 11L, 5);
         mockOccupancy(List.of(slotA, slotB), List.of(allocA, allocB), List.of(eventA, eventB));
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 100)));
+        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, 100)));
 
         assertThat(service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, PAGEABLE)).isEmpty();
     }
@@ -228,7 +227,7 @@ class AllocationConflictServiceImplTest {
         Allocation allocB2 = allocation(103L, 13L, 5);
         mockOccupancy(List.of(slotA1, slotB1, slotA2, slotB2),
                 List.of(allocA1, allocB1, allocA2, allocB2), List.of(eventA, eventB));
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5, 100)));
+        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, 100)));
 
         List<AllocationConflictDto> result =
                 service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, PAGEABLE).getContent();
@@ -345,17 +344,16 @@ class AllocationConflictServiceImplTest {
                 OccurrenceStatus.NEEDS_ROOM, event.enrolled());
     }
 
-    private Allocation allocation(long id, Long occurrenceId, Integer classroomId) {
+    private Allocation allocation(long id, Long occurrenceId, long classroomId) {
         return Allocation.builder()
                 .id(id)
                 .occurrenceId(occurrenceId)
                 .classroomId(classroomId)
                 .source(AllocationSource.MANUAL)
-                .createdAt(LocalDateTime.now())
                 .build();
     }
 
-    private ClassroomResponseDto classroom(Integer id, Integer capacity) {
-        return new ClassroomResponseDto(id, "Aula " + id, 1, capacity, true, 1, "Edificio 1", 1, "Tipo");
+    private ClassroomResponseDto classroom(Long id, Integer capacity) {
+        return new ClassroomResponseDto(id, id.intValue(), capacity, 1L, "Edificio 1", 1L, "Tipo");
     }
 }

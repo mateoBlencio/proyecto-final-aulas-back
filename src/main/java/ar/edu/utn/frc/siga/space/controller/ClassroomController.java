@@ -39,8 +39,8 @@ public class ClassroomController {
     @PostMapping
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Crear aula",
-               description = "400 si el roomNumber ya existe, si el piso excede el floorCount del edificio o si "
-                       + "la capacidad no es positiva. 404 si el edificio o el tipo de aula no existen.")
+               description = "400 si el roomNumber ya existe en el edificio o si la capacidad no es positiva. "
+                       + "404 si el edificio o el tipo de aula no existen.")
     public ResponseEntity<ClassroomResponseDto> create(@Valid @RequestBody ClassroomRequestDto dto) {
         log.debug("POST /v1/classrooms: roomNumber={}, buildingId={}", dto.roomNumber(), dto.buildingId());
         ClassroomResponseDto response = classroomService.create(dto);
@@ -51,7 +51,7 @@ public class ClassroomController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     @Operation(summary = "Buscar aula por id", description = "404 si el aula no existe.")
-    public ResponseEntity<ClassroomResponseDto> findById(@PathVariable Integer id) {
+    public ResponseEntity<ClassroomResponseDto> findById(@PathVariable Long id) {
         log.debug("GET /v1/classrooms/{}", id);
         return ResponseEntity.ok(classroomService.findById(id));
     }
@@ -59,20 +59,18 @@ public class ClassroomController {
     @GetMapping
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     @Operation(summary = "Listar aulas", description = "Listado paginado con filtros opcionales por número, "
-            + "edificio, tipo, capacidad, piso y disponibilidad.")
+            + "edificio, tipo y capacidad.")
     public ResponseEntity<Page<ClassroomResponseDto>> findAll(
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
-            @RequestParam(required = false) String roomNumber,
-            @RequestParam(required = false) Integer buildingId,
-            @RequestParam(required = false) Integer classroomTypeId,
+            @RequestParam(required = false) Integer roomNumber,
+            @RequestParam(required = false) Long buildingId,
+            @RequestParam(required = false) Long classroomTypeId,
             @RequestParam(required = false) Integer capacityMin,
-            @RequestParam(required = false) Integer capacityMax,
-            @RequestParam(required = false) Integer floor,
-            @RequestParam(required = false) Boolean available) {
+            @RequestParam(required = false) Integer capacityMax) {
 
         log.debug("GET /v1/classrooms: buildingId={}, page={}", buildingId, pageable.getPageNumber());
         ClassroomFilter filter = new ClassroomFilter(roomNumber, buildingId, classroomTypeId,
-                capacityMin, capacityMax, floor, available);
+                capacityMin, capacityMax);
         Page<ClassroomResponseDto> page = classroomService.findAll(filter, pageable);
         log.info("Aulas listadas: total={}", page.getTotalElements());
         return ResponseEntity.ok(page);
@@ -81,9 +79,9 @@ public class ClassroomController {
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Actualizar aula",
-               description = "404 si el aula, el edificio o el tipo de aula no existen. 400 si el piso excede "
-                       + "el floorCount del edificio o si la capacidad no es positiva.")
-    public ResponseEntity<ClassroomResponseDto> update(@PathVariable Integer id,
+               description = "404 si el aula, el edificio o el tipo de aula no existen. 400 si la capacidad no "
+                       + "es positiva.")
+    public ResponseEntity<ClassroomResponseDto> update(@PathVariable Long id,
                                                         @Valid @RequestBody ClassroomRequestDto dto) {
         log.debug("PUT /v1/classrooms/{}: roomNumber={}", id, dto.roomNumber());
         ClassroomResponseDto response = classroomService.update(id, dto);
@@ -94,7 +92,7 @@ public class ClassroomController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Eliminar aula", description = "Soft-delete. 404 si el aula no existe.")
-    public ResponseEntity<Void> delete(@PathVariable Integer id) {
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.debug("DELETE /v1/classrooms/{}", id);
         classroomService.delete(id);
         log.info("Aula eliminada vía controller: id={}", id);

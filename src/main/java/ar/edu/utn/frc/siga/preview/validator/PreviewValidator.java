@@ -26,11 +26,11 @@ import java.util.stream.Stream;
 @Component
 public class PreviewValidator {
 
-    public record ResolvedProposal(Long eventId, Integer classroomId, List<LocalDate> dates,
+    public record ResolvedProposal(Long eventId, Long classroomId, List<LocalDate> dates,
                                     LocalTime startTime, LocalTime endTime) implements TimeSpan {
     }
 
-    private record Moved(Integer classroomId, LocalTime startTime, LocalTime endTime) implements TimeSpan {
+    private record Moved(Long classroomId, LocalTime startTime, LocalTime endTime) implements TimeSpan {
     }
 
 
@@ -54,7 +54,7 @@ public class PreviewValidator {
     }
 
 
-    List<MoveConflictDto> moveDatabaseConflicts(Integer destination, Set<LocalDate> movedDates,
+    List<MoveConflictDto> moveDatabaseConflicts(Long destination, Set<LocalDate> movedDates,
             LocalTime movedStart, LocalTime movedEnd, List<OccupiedSlot> databaseOccupancy) {
         return conflictsAgainst(destination, movedDates, movedStart, movedEnd, databaseOccupancy,
                 occupied -> List.of(new RoomDate(occupied.classroomId(), occupied.date())),
@@ -62,11 +62,11 @@ public class PreviewValidator {
     }
 
 
-    public List<MoveConflictDto> unresolvedConflicts(Set<Integer> candidateRoomIds, Set<LocalDate> dates,
+    public List<MoveConflictDto> unresolvedConflicts(Set<Long> candidateRoomIds, Set<LocalDate> dates,
             LocalTime start, LocalTime end, List<OccupiedSlot> databaseOccupancy,
             List<ResolvedProposal> resolvedProposals) {
         List<MoveConflictDto> conflicts = new ArrayList<>();
-        for (Integer roomId : candidateRoomIds) {
+        for (Long roomId : candidateRoomIds) {
             MoveConflictDto conflict = moveDatabaseConflicts(roomId, dates, start, end, databaseOccupancy).stream()
                     .min(Comparator.comparing(MoveConflictDto::date))
                     .orElse(null);
@@ -85,13 +85,13 @@ public class PreviewValidator {
         return conflicts;
     }
 
-    private List<MoveConflictDto> previewConflicts(Integer classroomId, Set<LocalDate> dates,
+    private List<MoveConflictDto> previewConflicts(Long classroomId, Set<LocalDate> dates,
             LocalTime start, LocalTime end, List<ResolvedProposal> resolvedProposals) {
         return conflictsAgainst(classroomId, dates, start, end, resolvedProposals,
                 PreviewValidator::proposalKeys, ResolvedProposal::eventId, ConflictOrigin.PREVIEW);
     }
 
-    private <B extends TimeSpan> List<MoveConflictDto> conflictsAgainst(Integer classroomId, Set<LocalDate> dates,
+    private <B extends TimeSpan> List<MoveConflictDto> conflictsAgainst(Long classroomId, Set<LocalDate> dates,
             LocalTime start, LocalTime end, List<B> occupants,
             Function<B, List<RoomDate>> keysOf, Function<B, Long> eventIdOf,
             ConflictOrigin origin) {
@@ -103,7 +103,7 @@ public class PreviewValidator {
                         key.classroomId(), eventIdOf.apply(o), origin));
     }
 
-    private static List<RoomDate> movedKeys(Integer classroomId, Set<LocalDate> dates) {
+    private static List<RoomDate> movedKeys(Long classroomId, Set<LocalDate> dates) {
         return dates.stream().map(date -> new RoomDate(classroomId, date)).toList();
     }
 

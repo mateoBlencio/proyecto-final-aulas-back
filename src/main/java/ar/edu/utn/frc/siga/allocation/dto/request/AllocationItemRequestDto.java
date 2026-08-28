@@ -13,7 +13,7 @@ public record AllocationItemRequestDto(
         Long eventId,
         @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd") LocalDate from,
         @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd") LocalDate to,
-        @NotNull Integer classroomId
+        @NotNull Long classroomId
 ) {
     @AssertTrue(message = "Debe indicar occurrenceIds o eventId, pero no ambos ni ninguno")
     private boolean isTargetValid() {

@@ -18,25 +18,11 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * El mapper generado no tiene dependencias, así que se instancia a mano y se
- * prueba sin Spring.
- *
- * <p>Lo que interesa fijar no son los campos que se copian uno a uno, sino los
- * que dependen de algo que vive <b>fuera</b> del mapper y puede desaparecer sin
- * que el compilador diga nada: los {@code @Mapping(ignore = true)} que en
- * realidad delegan en un {@code @Builder.Default} de la entidad
- * ({@code status}, {@code items}, {@code preferences}) y las dos
- * {@code expression} que llaman a métodos derivados. Si alguien saca uno de
- * esos defaults, el mapper empieza a producir nulls en silencio y el error
- * aparece recién como violación de NOT NULL al insertar.
- */
 @DisplayName("RoomRequestMapper (aislado)")
 class RoomRequestMapperTest {
 
@@ -108,7 +94,7 @@ class RoomRequestMapperTest {
             assertThat(item.getEnrolled()).isEqualTo(30);
             assertThat(item.getEstimated()).isEqualTo(35);
             assertThat(item.getClassroomCount()).isEqualTo(1);
-            assertThat(item.getCurrentClassroomId()).isEqualTo(10);
+            assertThat(item.getCurrentClassroomId()).isEqualTo(10L);
             assertThat(item.getObservations()).isEqualTo("Observación de prueba");
         }
 
@@ -135,7 +121,7 @@ class RoomRequestMapperTest {
         void mappedItemAcceptsPreferences() {
             RoomRequestItem item = mapper.toEntity(itemDto());
 
-            item.addPreferences(List.of(11, 12));
+            item.addPreferences(List.of(11L, 12L));
 
             assertThat(item.getPreferences()).extracting("position").containsExactly(1, 2);
         }
@@ -192,7 +178,6 @@ class RoomRequestMapperTest {
             assertThat(dto.id()).isEqualTo(1L);
             assertThat(dto.type()).isEqualTo(RoomRequestType.PARTIAL_EXAM);
             assertThat(dto.teacherName()).isEqualTo("Ada Lovelace");
-            assertThat(dto.createdAt()).isEqualTo(LocalDateTime.of(2026, 8, 1, 9, 0));
             assertThat(dto.subject()).isSameAs(subject);
             assertThat(dto.items()).containsExactly(itemDto);
         }
@@ -219,9 +204,9 @@ class RoomRequestMapperTest {
         @Test
         @DisplayName("comisión y aulas se pegan tal cual las resolvió el composer")
         void itemUsesComposedPieces() {
-            CommissionResponseDto commission = new CommissionResponseDto(7L, "3K1", 1, 3, null);
-            ClassroomOptionDto current = new ClassroomOptionDto(10, "A10", "Pabellón");
-            List<ClassroomOptionDto> preferred = List.of(new ClassroomOptionDto(11, "A11", "Pabellón"));
+            CommissionResponseDto commission = new CommissionResponseDto(7L, "3K1", null);
+            ClassroomOptionDto current = new ClassroomOptionDto(10L, 10, "Pabellón");
+            List<ClassroomOptionDto> preferred = List.of(new ClassroomOptionDto(11L, 11, "Pabellón"));
 
             RoomRequestItemResponseDto dto = mapper.toDto(itemEntity(), commission, current, preferred);
 
@@ -249,7 +234,7 @@ class RoomRequestMapperTest {
 
     private static CreateRoomRequestItemDto itemDto(Boolean requiresExamUsers) {
         return new CreateRoomRequestItemDto(7L, LocalDate.of(2026, 9, 1),
-                LocalTime.of(10, 0), LocalTime.of(12, 0), 30, 35, 1, 10,
+                LocalTime.of(10, 0), LocalTime.of(12, 0), 30, 35, 1, 10L,
                 true, false, null, requiresExamUsers, null, "Observación de prueba", List.of());
     }
 
@@ -268,7 +253,6 @@ class RoomRequestMapperTest {
                 .teacherEmail("ada@frc.utn.edu.ar")
                 .teacherPhone("351-1234567")
                 .subjectId(42L)
-                .createdAt(LocalDateTime.of(2026, 8, 1, 9, 0))
                 .build();
     }
 
@@ -283,7 +267,7 @@ class RoomRequestMapperTest {
                 .enrolled(30)
                 .estimated(35)
                 .classroomCount(1)
-                .currentClassroomId(10)
+                .currentClassroomId(10L)
                 .observations("Observación de prueba")
                 .build();
     }

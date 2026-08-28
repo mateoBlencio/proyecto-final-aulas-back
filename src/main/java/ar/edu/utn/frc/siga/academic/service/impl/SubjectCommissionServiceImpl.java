@@ -47,16 +47,19 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
     }
 
     @Override
+    public SubjectCommissionResponseDto findByCommissionAndSubjectCode(Long commissionId, Integer subjectCode) {
+        return subjectCommissionRepository
+                .findFirstByCommission_IdAndSubject_CodeOrderBySubject_IdAsc(commissionId, subjectCode)
+                .map(subjectCommissionMapper::toDto)
+                .orElseThrow(() -> ResourceNotFoundException.of("SubjectCommission",
+                        commissionId + "-" + subjectCode));
+    }
+
+    @Override
     public List<SubjectCommissionResponseDto> findAll() {
         return subjectCommissionRepository.findAll().stream()
                 .map(subjectCommissionMapper::toDto)
                 .toList();
-    }
-
-    @Override
-    public SubjectCommissionResponseDto findById(Long id) {
-        return subjectCommissionMapper.toDto(subjectCommissionRepository.findById(id)
-                .orElseThrow(() -> ResourceNotFoundException.of("SubjectCommission", id)));
     }
 
     @Override
