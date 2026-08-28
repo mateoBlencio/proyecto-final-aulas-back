@@ -10,6 +10,7 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestRepository;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,14 +25,15 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Cada test escala su búsqueda por el {@code subjectId} único de
- * {@link IntegrationTestData#materiaYComision()}: la base no se limpia entre tests.
+ * El endpoint devuelve totales globales por estado, no scopeados por materia. La base no se limpia
+ * entre tests, así que se asertan deltas (antes/después de sembrar) en vez de valores absolutos.
  */
 @Import(IntegrationTestData.class)
 @DisplayName("GET /v1/room-requests/items/status-counts (integración)")
@@ -47,56 +49,52 @@ class RoomRequestItemStatusCountsApiIntegrationTest extends AbstractIntegrationT
     private JwtService jwtService;
 
     @Test
-    @DisplayName("devuelve los 3 estados en orden del enum, con 0 explícito, ignorando el param statuses")
-    void returnsCountPerStatus() throws Exception {
+    @DisplayName("devuelve siempre los 3 estados, en orden del enum")
+    void alwaysReturnsThreeStatusesInEnumOrder() throws Exception {
+        mockMvc.perform(get("/v1/room-requests/items/status-counts"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].status").value("PENDING"))
+                .andExpect(jsonPath("$[1].status").value("PRE_APPROVED"))
+                .andExpect(jsonPath("$[2].status").value("CANCELLED"))
+                .andExpect(jsonPath("$[0].count").isNumber())
+                .andExpect(jsonPath("$[2].count").isNumber());
+    }
+
+    @Test
+    @DisplayName("cada estado suma solo sus pedidos; los filtros del listado no aplican")
+    void countsAreGlobalPerStatus() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+
+        long pendingBefore = count(RoomRequestStatus.PENDING, false);
+        long preApprovedBefore = count(RoomRequestStatus.PRE_APPROVED, false);
+        long cancelledBefore = count(RoomRequestStatus.CANCELLED, false);
+
         RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM, academic.subjectId());
         seedItem(request, academic.commissionId(), LocalDate.now().plusDays(10), RoomRequestStatus.PENDING);
         seedItem(request, academic.commissionId(), LocalDate.now().plusDays(11), RoomRequestStatus.PENDING);
         seedItem(request, academic.commissionId(), LocalDate.now().plusDays(12), RoomRequestStatus.PRE_APPROVED);
         roomRequestRepository.save(request);
 
-        mockMvc.perform(get("/v1/room-requests/items/status-counts")
-                        .param("subjectId", String.valueOf(academic.subjectId()))
-                        .param("statuses", "CANCELLED"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(3))
-                .andExpect(jsonPath("$[0].status").value("PENDING"))
-                .andExpect(jsonPath("$[0].count").value(2))
-                .andExpect(jsonPath("$[1].status").value("PRE_APPROVED"))
-                .andExpect(jsonPath("$[1].count").value(1))
-                .andExpect(jsonPath("$[2].status").value("CANCELLED"))
-                .andExpect(jsonPath("$[2].count").value(0));
+        assertThat(count(RoomRequestStatus.PENDING, false)).isEqualTo(pendingBefore + 2);
+        assertThat(count(RoomRequestStatus.PRE_APPROVED, false)).isEqualTo(preApprovedBefore + 1);
+        assertThat(count(RoomRequestStatus.CANCELLED, false)).isEqualTo(cancelledBefore);
     }
 
     @Test
-    @DisplayName("aplica types e includePast igual que el listado")
-    void appliesTypeAndIncludePastFilters() throws Exception {
+    @DisplayName("includePast=false oculta los vencidos; includePast=true los suma")
+    void includePastTogglesPastItems() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
 
-        RoomRequest partial = seedRequest(RoomRequestType.PARTIAL_EXAM, academic.subjectId());
-        seedItem(partial, academic.commissionId(), LocalDate.now().plusDays(5), RoomRequestStatus.PENDING);
-        seedItem(partial, academic.commissionId(), LocalDate.now().minusDays(5), RoomRequestStatus.CANCELLED);
-        roomRequestRepository.save(partial);
+        long cancelledVigentesBefore = count(RoomRequestStatus.CANCELLED, false);
+        long cancelledTodosBefore = count(RoomRequestStatus.CANCELLED, true);
 
-        RoomRequest conference = seedRequest(RoomRequestType.CONFERENCE, academic.subjectId());
-        seedItem(conference, null, LocalDate.now().plusDays(6), RoomRequestStatus.PENDING);
-        roomRequestRepository.save(conference);
+        RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM, academic.subjectId());
+        seedItem(request, academic.commissionId(), LocalDate.now().minusDays(5), RoomRequestStatus.CANCELLED);
+        roomRequestRepository.save(request);
 
-        mockMvc.perform(get("/v1/room-requests/items/status-counts")
-                        .param("subjectId", String.valueOf(academic.subjectId()))
-                        .param("types", "PARTIAL_EXAM"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].count").value(1))
-                .andExpect(jsonPath("$[2].count").value(0));
-
-        mockMvc.perform(get("/v1/room-requests/items/status-counts")
-                        .param("subjectId", String.valueOf(academic.subjectId()))
-                        .param("types", "PARTIAL_EXAM")
-                        .param("includePast", "true"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].count").value(1))
-                .andExpect(jsonPath("$[2].count").value(1));
+        assertThat(count(RoomRequestStatus.CANCELLED, false)).isEqualTo(cancelledVigentesBefore);
+        assertThat(count(RoomRequestStatus.CANCELLED, true)).isEqualTo(cancelledTodosBefore + 1);
     }
 
     @Test
@@ -112,6 +110,15 @@ class RoomRequestItemStatusCountsApiIntegrationTest extends AbstractIntegrationT
         anonymousMockMvc.perform(get("/v1/room-requests/items/status-counts")
                         .header("Authorization", "Bearer " + auxToken))
                 .andExpect(status().isOk());
+    }
+
+    /** El array viene en orden del enum, así que {@code status.ordinal()} es el índice de su fila. */
+    private long count(RoomRequestStatus status, boolean includePast) throws Exception {
+        String body = mockMvc.perform(get("/v1/room-requests/items/status-counts")
+                        .param("includePast", String.valueOf(includePast)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return ((Number) JsonPath.read(body, "$[" + status.ordinal() + "].count")).longValue();
     }
 
     private RoomRequest seedRequest(RoomRequestType type, Long subjectId) {

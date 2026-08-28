@@ -81,23 +81,21 @@ public class RoomRequestServiceImpl implements RoomRequestService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<RoomRequestItemStatusCountDto> countItemsByStatus(RoomRequestItemFilter filter) {
-        log.debug("Contando pedidos de aula por estado: types={}, scope={}, subjectId={}, "
-                        + "dateFrom={}, dateTo={}, includePast={}",
-                filter.types(), filter.scope(), filter.subjectId(),
-                filter.dateFrom(), filter.dateTo(), filter.includePast());
+    public List<RoomRequestItemStatusCountDto> countItemsByStatus(boolean includePast) {
+        log.debug("Contando pedidos de aula por estado: includePast={}", includePast);
 
+        RoomRequestItemFilter base = RoomRequestItemFilter.of(null, null, null, null, null, null, includePast);
         List<RoomRequestItemStatusCountDto> counts = Arrays.stream(RoomRequestStatus.values())
                 .map(status -> new RoomRequestItemStatusCountDto(status, itemRepository.count(
-                        RoomRequestItemSpecification.withFilter(filterForStatus(filter, status)))))
+                        RoomRequestItemSpecification.withFilter(onlyStatus(base, status)))))
                 .toList();
         log.info("Pedidos de aula contados por estado: {}", counts);
         return counts;
     }
 
-    private static RoomRequestItemFilter filterForStatus(RoomRequestItemFilter filter, RoomRequestStatus status) {
-        return new RoomRequestItemFilter(filter.types(), Set.of(status), filter.scope(),
-                filter.subjectId(), filter.dateFrom(), filter.dateTo(), filter.includePast());
+    private static RoomRequestItemFilter onlyStatus(RoomRequestItemFilter base, RoomRequestStatus status) {
+        return new RoomRequestItemFilter(null, Set.of(status), null, null,
+                base.dateFrom(), base.dateTo(), base.includePast());
     }
 
     @Override
