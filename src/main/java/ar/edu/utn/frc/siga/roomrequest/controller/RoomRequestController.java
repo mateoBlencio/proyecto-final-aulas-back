@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.roomrequest.dto.RoomRequestItemFilter;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemRowDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemStatusCountDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
@@ -31,6 +32,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Set;
 
 @Slf4j
@@ -78,6 +80,28 @@ public class RoomRequestController {
         Page<RoomRequestItemRowDto> page = roomRequestService.findItems(filter, pageable);
         log.info("Pedidos de aula listados vía controller: total={}", page.getTotalElements());
         return ResponseEntity.ok(page);
+    }
+
+    @GetMapping("/items/status-counts")
+    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @Operation(summary = "Contar pedidos de aula por estado",
+               description = "Cantidad de pedidos en cada estado. "
+                       + "Acepta los mismos filtros que el listado salvo 'statuses', que se ignora.")
+    public ResponseEntity<List<RoomRequestItemStatusCountDto>> countItemsByStatus(
+            @RequestParam(required = false) Set<RoomRequestType> types,
+            @RequestParam(required = false) AcademicScope scope,
+            @RequestParam(required = false) Long subjectId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+            @RequestParam(required = false, defaultValue = "false") boolean includePast) {
+
+        log.debug("GET /v1/room-requests/items/status-counts: types={}, scope={}, subjectId={}, includePast={}",
+                types, scope, subjectId, includePast);
+        RoomRequestItemFilter filter =
+                RoomRequestItemFilter.of(types, null, scope, subjectId, dateFrom, dateTo, includePast);
+        List<RoomRequestItemStatusCountDto> counts = roomRequestService.countItemsByStatus(filter);
+        log.info("Pedidos de aula contados por estado vía controller: {}", counts);
+        return ResponseEntity.ok(counts);
     }
 
     @GetMapping("/items/{id}")

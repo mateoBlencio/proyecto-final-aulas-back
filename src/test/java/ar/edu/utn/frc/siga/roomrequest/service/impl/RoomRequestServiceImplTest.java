@@ -4,10 +4,12 @@ import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.roomrequest.dto.RoomRequestItemFilter;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemRowDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemStatusCountDto;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestComposer;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestMapper;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestRepository;
 import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestValidator;
@@ -28,9 +30,12 @@ import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -98,6 +103,24 @@ class RoomRequestServiceImplTest {
                 .isInstanceOf(InvalidRoomRequestException.class);
 
         verifyNoInteractions(itemRepository, composer);
+    }
+
+    @Test
+    @DisplayName("countItemsByStatus: un conteo por cada estado del enum, en orden, sin tocar el composer")
+    void countItemsByStatusReturnsOneEntryPerStatus() {
+        RoomRequestItemFilter filter =
+                RoomRequestItemFilter.of(null, Set.of(RoomRequestStatus.PENDING), null, null, null, null, true);
+        when(itemRepository.count(ArgumentMatchers.<Specification<RoomRequestItem>>any()))
+                .thenReturn(30L, 10L, 0L);
+
+        List<RoomRequestItemStatusCountDto> result = service.countItemsByStatus(filter);
+
+        assertThat(result).containsExactly(
+                new RoomRequestItemStatusCountDto(RoomRequestStatus.PENDING, 30L),
+                new RoomRequestItemStatusCountDto(RoomRequestStatus.PRE_APPROVED, 10L),
+                new RoomRequestItemStatusCountDto(RoomRequestStatus.CANCELLED, 0L));
+        verify(itemRepository, times(3)).count(ArgumentMatchers.<Specification<RoomRequestItem>>any());
+        verifyNoInteractions(composer);
     }
 
     @Test
