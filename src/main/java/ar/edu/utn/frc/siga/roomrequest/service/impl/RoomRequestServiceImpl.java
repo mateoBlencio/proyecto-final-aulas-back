@@ -6,11 +6,13 @@ import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemRowDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemStatusCountDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestComposer;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestMapper;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestRepository;
 import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestService;
@@ -24,6 +26,10 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -71,6 +77,27 @@ public class RoomRequestServiceImpl implements RoomRequestService {
                 new PageImpl<>(composer.composeRows(page.getContent()), page.getPageable(), page.getTotalElements());
         log.info("Pedidos de aula listados: total={}", result.getTotalElements());
         return result;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RoomRequestItemStatusCountDto> countItemsByStatus(RoomRequestItemFilter filter) {
+        log.debug("Contando pedidos de aula por estado: types={}, scope={}, subjectId={}, "
+                        + "dateFrom={}, dateTo={}, includePast={}",
+                filter.types(), filter.scope(), filter.subjectId(),
+                filter.dateFrom(), filter.dateTo(), filter.includePast());
+
+        List<RoomRequestItemStatusCountDto> counts = Arrays.stream(RoomRequestStatus.values())
+                .map(status -> new RoomRequestItemStatusCountDto(status, itemRepository.count(
+                        RoomRequestItemSpecification.withFilter(filterForStatus(filter, status)))))
+                .toList();
+        log.info("Pedidos de aula contados por estado: {}", counts);
+        return counts;
+    }
+
+    private static RoomRequestItemFilter filterForStatus(RoomRequestItemFilter filter, RoomRequestStatus status) {
+        return new RoomRequestItemFilter(filter.types(), Set.of(status), filter.scope(),
+                filter.subjectId(), filter.dateFrom(), filter.dateTo(), filter.includePast());
     }
 
     @Override
