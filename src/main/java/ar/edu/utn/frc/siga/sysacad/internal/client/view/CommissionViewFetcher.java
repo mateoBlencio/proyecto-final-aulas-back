@@ -1,7 +1,6 @@
 package ar.edu.utn.frc.siga.sysacad.internal.client.view;
 
 import ar.edu.utn.frc.siga.sysacad.internal.client.SysacadClient;
-import ar.edu.utn.frc.siga.sysacad.internal.client.ViewQuery;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawCommission;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.ViewResponse;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +23,6 @@ public class CommissionViewFetcher {
     private final SysacadClient client;
 
     public List<RawCommission> fetch() {
-        return client.fetchRows(VIEW, ViewQuery.ascendingBy(SORT_COLUMN, null), RESPONSE_TYPE);
+        return client.fetchRowsSpanning(VIEW, SORT_COLUMN, null, RESPONSE_TYPE);
     }
 }

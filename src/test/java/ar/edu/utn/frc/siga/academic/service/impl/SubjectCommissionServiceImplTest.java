@@ -93,7 +93,7 @@ class SubjectCommissionServiceImplTest {
         SubjectCommission existing = SubjectCommission.builder().subject(subject).commission(commission)
                 .enrolledCount(30).build();
         SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, 2L, null, 30);
-        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
+        when(subjectCommissionRepository.findFirstByCommission_IdAndSubject_CodeOrderBySubject_IdAsc(2L, 101))
                 .thenReturn(Optional.of(existing));
         when(subjectCommissionMapper.toDto(existing)).thenReturn(dto);
 
@@ -105,7 +105,7 @@ class SubjectCommissionServiceImplTest {
     @Test
     @DisplayName("findByCommissionAndSubjectCode: si no existe la relación, lanza ResourceNotFoundException")
     void findByCommissionAndSubjectCodeWithoutExistingRelationThrowsResourceNotFound() {
-        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
+        when(subjectCommissionRepository.findFirstByCommission_IdAndSubject_CodeOrderBySubject_IdAsc(2L, 101))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findByCommissionAndSubjectCode(2L, 101))

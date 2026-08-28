@@ -34,13 +34,8 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "siga.sysacad", name = "enabled", havingValue = "true")
-@ConditionalOnProperty(prefix = "siga.sysacad.asignaciones", name = "asignar-aulas", havingValue = "true")
 public class AllocationSyncService implements SysacadViewSyncer {
 
-    /**
-     * Aula 999 o 0: centinela de "sin aula" en cualquier edificio (supuestos-sync-horarios.md §3). El
-     * edificio no forma parte de la clave: en la muestra el aula 999 aparece con edificios 2, 6 y 24.
-     */
     private static final Set<Integer> SENTINEL_ROOM_NUMBERS = Set.of(999, 0);
 
     private final SysacadCatalogReader catalogReader;
@@ -58,64 +53,57 @@ public class AllocationSyncService implements SysacadViewSyncer {
 
     @Override
     public void sync() {
-        try {
-            Map<String, Optional<CommissionResponseDto>> commissionCache = new HashMap<>();
-            Map<SysacadCommissionResolver.LinkKey, Optional<SubjectCommissionResponseDto>> linkCache = new HashMap<>();
-            Map<ClassroomKey, Optional<ClassroomResponseDto>> classroomCache = new HashMap<>();
-            Map<OverlapKey, List<OverlapEntry>> overlapsBySlot = new LinkedHashMap<>();
-            List<AllocationItem> items = new ArrayList<>();
+        ViewSyncRunner.run(syncStateService, SysacadView.ASIGNACIONES, "Asignaciones", log, this::doSync);
+    }
 
-            for (SysacadAllocationDto row : catalogReader.findAllocations()) {
-                if (isSentinel(row)) {
-                    continue;
-                }
+    private int doSync() {
+        SysacadCommissionResolver resolver = new SysacadCommissionResolver(commissionService, subjectCommissionService);
+        Map<ClassroomKey, Optional<ClassroomResponseDto>> classroomCache = new HashMap<>();
+        Map<OverlapKey, List<OverlapEntry>> overlapsBySlot = new LinkedHashMap<>();
+        List<AllocationItem> items = new ArrayList<>();
 
-                Optional<CommissionResponseDto> commission =
-                        SysacadCommissionResolver.resolveCommission(commissionService, commissionCache, row.courseCode());
-                if (commission.isEmpty()) {
-                    continue;
-                }
-                Optional<SubjectCommissionResponseDto> link = SysacadCommissionResolver.resolveLink(
-                        subjectCommissionService, linkCache, commission.get().id(), row.subjectCode());
-                if (link.isEmpty()) {
-                    continue;
-                }
-                Optional<ClassroomResponseDto> classroom =
-                        resolveClassroom(classroomCache, row.roomNumber(), row.buildingCode());
-                if (classroom.isEmpty()) {
-                    log.warn("No se pudo resolver el aula de SysAcad (aula={}, edificio={}) para curso={}, "
-                                    + "materia={}: fila de asignación salteada",
-                            row.roomNumber(), row.buildingCode(), row.courseCode(), row.subjectCode());
-                    continue;
-                }
-
-                int year = commission.get().academicPeriod().year();
-                for (TermType termType : SysacadCommissionResolver.termTypes(
-                        row.semester(), row.courseCode(), row.subjectCode())) {
-                    Optional<Long> eventId = academicEventService.findRecurringEventId(
-                            link.get().subjectId(), commission.get().id(), row.dayOfWeek(), row.startTime(),
-                            termType.startDate(year), termType.endDate(year));
-                    if (eventId.isEmpty()) {
-                        log.warn("No se encontró el evento ya creado por EVENTOS para curso={}, materia={}, "
-                                        + "dia={}, hora={}, cuatrimestre={}: fila de asignación salteada",
-                                row.courseCode(), row.subjectCode(), row.dayOfWeek(), row.startTime(), termType);
-                        continue;
-                    }
-
-                    recordOverlap(overlapsBySlot, row, termType, eventId.get());
-                    items.add(new AllocationItem(new AllocationTarget.Event(eventId.get()), classroom.get().id()));
-                }
+        for (SysacadAllocationDto row : catalogReader.findAllocations()) {
+            if (isSentinel(row)) {
+                continue;
             }
 
-            warnOverlaps(overlapsBySlot);
+            Optional<SysacadCommissionResolver.ResolvedLink> resolved =
+                    resolver.resolve(row.courseCode(), row.subjectCode());
+            if (resolved.isEmpty()) {
+                continue;
+            }
+            CommissionResponseDto commission = resolved.get().commission();
+            SubjectCommissionResponseDto link = resolved.get().link();
+            Optional<ClassroomResponseDto> classroom =
+                    resolveClassroom(classroomCache, row.roomNumber(), row.buildingCode());
+            if (classroom.isEmpty()) {
+                log.warn("No se pudo resolver el aula de SysAcad (aula={}, edificio={}) para curso={}, "
+                                + "materia={}: fila de asignación salteada",
+                        row.roomNumber(), row.buildingCode(), row.courseCode(), row.subjectCode());
+                continue;
+            }
 
-            int affected = allocationService.syncFromSysacad(items);
-            syncStateService.recordSuccess(SysacadView.ASIGNACIONES, affected);
-            log.info("Sync de Asignaciones finalizado: {} filas afectadas", affected);
-        } catch (RuntimeException e) {
-            syncStateService.recordFailure(SysacadView.ASIGNACIONES, e.getMessage());
-            throw e;
+            int year = commission.academicPeriod().year();
+            for (TermType termType : SysacadCommissionResolver.termTypes(
+                    row.semester(), row.courseCode(), row.subjectCode())) {
+                Optional<Long> eventId = academicEventService.findRecurringEventId(
+                        link.subjectId(), commission.id(), row.dayOfWeek(), row.startTime(),
+                        termType.startDate(year), termType.endDate(year));
+                if (eventId.isEmpty()) {
+                    log.warn("No se encontró el evento ya creado por EVENTOS para curso={}, materia={}, "
+                                    + "dia={}, hora={}, cuatrimestre={}: fila de asignación salteada",
+                            row.courseCode(), row.subjectCode(), row.dayOfWeek(), row.startTime(), termType);
+                    continue;
+                }
+
+                recordOverlap(overlapsBySlot, row, termType, eventId.get());
+                items.add(new AllocationItem(new AllocationTarget.Event(eventId.get()), classroom.get().id()));
+            }
         }
+
+        warnOverlaps(overlapsBySlot);
+
+        return allocationService.syncFromSysacad(items);
     }
 
     private static boolean isSentinel(SysacadAllocationDto row) {

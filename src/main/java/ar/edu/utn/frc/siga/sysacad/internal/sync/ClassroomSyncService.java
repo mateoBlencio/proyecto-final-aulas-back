@@ -30,17 +30,12 @@ public class ClassroomSyncService implements SysacadViewSyncer {
 
     @Override
     public void sync() {
-        try {
+        ViewSyncRunner.run(syncStateService, SysacadView.AULAS, "Aulas", log, () -> {
             List<ClassroomSyncCommand> commands = catalogReader.findClassrooms().stream()
                     .map(ClassroomSyncService::toCommand)
                     .toList();
-            int affected = classroomService.syncClassrooms(commands);
-            syncStateService.recordSuccess(SysacadView.AULAS, affected);
-            log.info("Sync de Aulas finalizado: {} filas afectadas", affected);
-        } catch (RuntimeException e) {
-            syncStateService.recordFailure(SysacadView.AULAS, e.getMessage());
-            throw e;
-        }
+            return classroomService.syncClassrooms(commands);
+        });
     }
 
     private static ClassroomSyncCommand toCommand(SysacadClassroomDto dto) {

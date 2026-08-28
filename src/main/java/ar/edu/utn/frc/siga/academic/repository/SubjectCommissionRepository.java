@@ -23,6 +23,11 @@ public interface SubjectCommissionRepository extends JpaRepository<SubjectCommis
     @EntityGraph(attributePaths = {"commission", "commission.academicPeriod"})
     List<SubjectCommission> findBySubject_Id(Long subjectId);
 
+    // TEMPORAL/defensivo: {@code findFirst...} en vez de un único resultado porque una comisión puede
+    // quedar linkeada a dos materias con el mismo código bajo planes distintos (ambigüedad de datos de
+    // SysAcad, ver sync de Comisiones). Se toma el de menor id_materia de forma determinística para no
+    // romper EVENTOS/ASIGNACIONES. Revisar cuando se resuelva el link por plan de la comisión.
     @EntityGraph(attributePaths = {"commission", "commission.academicPeriod"})
-    Optional<SubjectCommission> findByCommission_IdAndSubject_Code(Long commissionId, Integer subjectCode);
+    Optional<SubjectCommission> findFirstByCommission_IdAndSubject_CodeOrderBySubject_IdAsc(
+            Long commissionId, Integer subjectCode);
 }

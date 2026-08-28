@@ -1,7 +1,6 @@
 package ar.edu.utn.frc.siga.sysacad.internal.client.view;
 
 import ar.edu.utn.frc.siga.sysacad.internal.client.SysacadClient;
-import ar.edu.utn.frc.siga.sysacad.internal.client.ViewQuery;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSpecialty;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.ViewResponse;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +24,6 @@ public class SpecialtyViewFetcher {
     private final SysacadClient client;
 
     public List<RawSpecialty> fetch() {
-        return client.fetchRows(VIEW, ViewQuery.ascendingBy(SORT_COLUMN, MAX_ROWS), RESPONSE_TYPE);
+        return client.fetchRowsSpanning(VIEW, SORT_COLUMN, MAX_ROWS, RESPONSE_TYPE);
     }
 }

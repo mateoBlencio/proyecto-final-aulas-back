@@ -6,20 +6,46 @@ import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Resuelve la comisión vigente y su link materia-comisión para las filas de SysAcad, con caché por
+ * corrida de sync (una instancia por {@code sync()}). Concentra la resolución que EVENTOS y ASIGNACIONES
+ * hacían de forma idéntica, junto con las dos cachés que antes cada syncer declaraba a mano.
+ */
 @Slf4j
 final class SysacadCommissionResolver {
 
-    private SysacadCommissionResolver() {
+    private final CommissionService commissionService;
+    private final SubjectCommissionService subjectCommissionService;
+    private final Map<String, Optional<CommissionResponseDto>> commissionCache = new HashMap<>();
+    private final Map<LinkKey, Optional<SubjectCommissionResponseDto>> linkCache = new HashMap<>();
+
+    SysacadCommissionResolver(CommissionService commissionService,
+            SubjectCommissionService subjectCommissionService) {
+        this.commissionService = commissionService;
+        this.subjectCommissionService = subjectCommissionService;
     }
 
-    static Optional<CommissionResponseDto> resolveCommission(CommissionService commissionService,
-            Map<String, Optional<CommissionResponseDto>> cache, String courseCode) {
-        return cache.computeIfAbsent(courseCode, code -> {
+    /**
+     * Devuelve vacío (y ya logueó el WARN correspondiente) si falta la comisión vigente o el link, así el
+     * syncer solo hace {@code if (resolved.isEmpty()) continue;}.
+     */
+    Optional<ResolvedLink> resolve(String courseCode, Integer subjectCode) {
+        Optional<CommissionResponseDto> commission = resolveCommission(courseCode);
+        if (commission.isEmpty()) {
+            return Optional.empty();
+        }
+        Optional<SubjectCommissionResponseDto> link = resolveLink(commission.get().id(), subjectCode);
+        return link.map(l -> new ResolvedLink(commission.get(), l));
+    }
+
+    private Optional<CommissionResponseDto> resolveCommission(String courseCode) {
+        return commissionCache.computeIfAbsent(courseCode, code -> {
             try {
                 return Optional.of(commissionService.findActiveByCourseCode(code));
             } catch (ResourceNotFoundException e) {
@@ -29,9 +55,8 @@ final class SysacadCommissionResolver {
         });
     }
 
-    static Optional<SubjectCommissionResponseDto> resolveLink(SubjectCommissionService subjectCommissionService,
-            Map<LinkKey, Optional<SubjectCommissionResponseDto>> cache, Long commissionId, Integer subjectCode) {
-        return cache.computeIfAbsent(new LinkKey(commissionId, subjectCode), key -> {
+    private Optional<SubjectCommissionResponseDto> resolveLink(Long commissionId, Integer subjectCode) {
+        return linkCache.computeIfAbsent(new LinkKey(commissionId, subjectCode), key -> {
             try {
                 return Optional.of(subjectCommissionService.findByCommissionAndSubjectCode(
                         key.commissionId(), key.subjectCode()));
@@ -61,5 +86,8 @@ final class SysacadCommissionResolver {
     }
 
     record LinkKey(Long commissionId, Integer subjectCode) {
+    }
+
+    record ResolvedLink(CommissionResponseDto commission, SubjectCommissionResponseDto link) {
     }
 }

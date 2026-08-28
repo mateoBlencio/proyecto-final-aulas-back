@@ -15,6 +15,7 @@ import ar.edu.utn.frc.siga.sysacad.internal.client.view.AcademicEventMockViewFet
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.BuildingViewFetcher;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.ClassroomViewFetcher;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.CommissionViewFetcher;
+import ar.edu.utn.frc.siga.sysacad.internal.client.view.ScheduleMockViewFetcher;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.ScheduleViewFetcher;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.SpecialtyViewFetcher;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.SubjectCommissionMockViewFetcher;
@@ -40,6 +41,7 @@ public class SysacadCatalogReaderImpl implements SysacadCatalogReader {
     private final Optional<SubjectMockViewFetcher> subjectMockViewFetcher;
     private final Optional<SubjectCommissionMockViewFetcher> subjectCommissionMockViewFetcher;
     private final Optional<AcademicEventMockViewFetcher> academicEventMockViewFetcher;
+    private final Optional<ScheduleMockViewFetcher> scheduleMockViewFetcher;
     private final SysacadCatalogMapper mapper;
 
     @Override
@@ -88,7 +90,12 @@ public class SysacadCatalogReaderImpl implements SysacadCatalogReader {
 
     @Override
     public List<SysacadAllocationDto> findAllocations() {
-        return scheduleViewFetcher.fetch().stream()
+        // TEMPORAL: si está el mock de asignaciones, se usa en lugar de la vista real (mismo tipo de fila).
+        // Apagar siga.sysacad.asignaciones-mock-enabled para volver a HorariosComisionesCupos.
+        List<ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSchedule> rows = scheduleMockViewFetcher
+                .map(ScheduleMockViewFetcher::fetch)
+                .orElseGet(scheduleViewFetcher::fetch);
+        return rows.stream()
                 .map(mapper::toAllocation)
                 .filter(Objects::nonNull)
                 .toList();

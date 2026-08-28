@@ -136,8 +136,8 @@ siga:
     # eliminar cuando se tenga la vista real
     materias-mock-enabled: true
 
-    asignaciones:
-      asignar-aulas: true
+    # TEMPORAL: sirve asignaciones desde fixture; apagar cuando HorariosComisionesCupos esté completa/alineada
+    asignaciones-mock-enabled: ${SYSACAD_ASIGNACIONES_MOCK:true}
 
     base-url: https://dataview.frc.utn.edu.ar
     api-key: ${SYSACAD_API_KEY:}
@@ -146,13 +146,13 @@ siga:
     max-retries: 3
     sync:
 
-      edificios: "0 0 3 * * SUN"
-      aulas: "0 0 3 * * SUN"
-      especialidades: "0 0 3 * * SUN"
-      materias: "0 0 3 * * SUN"
-      comisiones: "0 0 4 * * SUN"
-      eventos: "0 0 5 * * SUN"
-      asignaciones: "0 0 6 * * SUN"
+      buildings: "0 0 3 * * SUN"
+      classrooms: "0 0 3 * * SUN"
+      specialties: "0 0 3 * * SUN"
+      events: "0 0 3 * * SUN"
+      allocations: "0 0 3 * * SUN"
+      subjects: "0 0 3 * * SUN"
+      commissions: "0 0 3 * * SUN"
 
 logging:
   level:

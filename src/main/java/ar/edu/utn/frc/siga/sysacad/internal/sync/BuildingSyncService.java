@@ -30,17 +30,12 @@ public class BuildingSyncService implements SysacadViewSyncer {
 
     @Override
     public void sync() {
-        try {
+        ViewSyncRunner.run(syncStateService, SysacadView.EDIFICIOS, "Edificios", log, () -> {
             List<BuildingSyncCommand> commands = catalogReader.findBuildings().stream()
                     .map(BuildingSyncService::toCommand)
                     .toList();
-            int affected = buildingService.syncBuildings(commands);
-            syncStateService.recordSuccess(SysacadView.EDIFICIOS, affected);
-            log.info("Sync de Edificios finalizado: {} filas afectadas", affected);
-        } catch (RuntimeException e) {
-            syncStateService.recordFailure(SysacadView.EDIFICIOS, e.getMessage());
-            throw e;
-        }
+            return buildingService.syncBuildings(commands);
+        });
     }
 
     private static BuildingSyncCommand toCommand(SysacadBuildingDto dto) {

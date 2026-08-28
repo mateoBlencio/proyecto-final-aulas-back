@@ -48,7 +48,8 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
 
     @Override
     public SubjectCommissionResponseDto findByCommissionAndSubjectCode(Long commissionId, Integer subjectCode) {
-        return subjectCommissionRepository.findByCommission_IdAndSubject_Code(commissionId, subjectCode)
+        return subjectCommissionRepository
+                .findFirstByCommission_IdAndSubject_CodeOrderBySubject_IdAsc(commissionId, subjectCode)
                 .map(subjectCommissionMapper::toDto)
                 .orElseThrow(() -> ResourceNotFoundException.of("SubjectCommission",
                         commissionId + "-" + subjectCode));

@@ -30,17 +30,12 @@ public class SubjectSyncService implements SysacadViewSyncer {
 
     @Override
     public void sync() {
-        try {
+        ViewSyncRunner.run(syncStateService, SysacadView.MATERIAS, "Materias", log, () -> {
             List<SubjectSyncCommand> commands = catalogReader.findSubjects().stream()
                     .map(SubjectSyncService::toCommand)
                     .toList();
-            int affected = subjectService.syncSubjects(commands);
-            syncStateService.recordSuccess(SysacadView.MATERIAS, affected);
-            log.info("Sync de Materias finalizado: {} filas afectadas", affected);
-        } catch (RuntimeException e) {
-            syncStateService.recordFailure(SysacadView.MATERIAS, e.getMessage());
-            throw e;
-        }
+            return subjectService.syncSubjects(commands);
+        });
     }
 
     private static SubjectSyncCommand toCommand(SysacadSubjectDto dto) {

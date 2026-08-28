@@ -13,9 +13,7 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadViewSyncer;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -43,53 +41,47 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
 
     @Override
     public void sync() {
-        try {
-            Map<String, Optional<CommissionResponseDto>> commissionCache = new HashMap<>();
-            Map<SysacadCommissionResolver.LinkKey, Optional<SubjectCommissionResponseDto>> linkCache = new HashMap<>();
-            Set<Long> presentEventIds = new HashSet<>();
-            int affected = 0;
+        ViewSyncRunner.run(syncStateService, SysacadView.EVENTOS, "Eventos", log, this::doSync);
+    }
 
-            for (SysacadAcademicEventDto row : catalogReader.findAcademicEvents()) {
-                Optional<CommissionResponseDto> commission =
-                        SysacadCommissionResolver.resolveCommission(commissionService, commissionCache, row.courseCode());
-                if (commission.isEmpty()) {
-                    continue;
-                }
-                Optional<SubjectCommissionResponseDto> link = SysacadCommissionResolver.resolveLink(
-                        subjectCommissionService, linkCache, commission.get().id(), row.subjectCode());
-                if (link.isEmpty()) {
-                    continue;
-                }
-                if (row.durationMinutes() == null) {
-                    log.warn("DURACION nula para curso={} materia={}: fila de evento salteada",
-                            row.courseCode(), row.subjectCode());
-                    continue;
-                }
+    private int doSync() {
+        SysacadCommissionResolver resolver = new SysacadCommissionResolver(commissionService, subjectCommissionService);
+        Set<Long> presentEventIds = new HashSet<>();
+        int affected = 0;
 
-                int year = commission.get().academicPeriod().year();
-                for (TermType termType : SysacadCommissionResolver.termTypes(
-                        row.semester(), row.courseCode(), row.subjectCode())) {
-                    SyncRecurringEventCommand cmd = new SyncRecurringEventCommand(
-                            link.get().subjectId(),
-                            commission.get().id(),
-                            row.dayOfWeek(),
-                            row.startTime(),
-                            row.durationMinutes(),
-                            link.get().enrolledCount(),
-                            termType.startDate(year),
-                            termType.endDate(year));
-                    UpsertRecurringEventResult result = academicEventService.syncRecurringEvent(cmd);
-                    presentEventIds.add(result.eventId());
-                    affected++;
-                }
+        for (SysacadAcademicEventDto row : catalogReader.findAcademicEvents()) {
+            Optional<SysacadCommissionResolver.ResolvedLink> resolved =
+                    resolver.resolve(row.courseCode(), row.subjectCode());
+            if (resolved.isEmpty()) {
+                continue;
+            }
+            CommissionResponseDto commission = resolved.get().commission();
+            SubjectCommissionResponseDto link = resolved.get().link();
+            if (row.durationMinutes() == null) {
+                log.warn("DURACION nula para curso={} materia={}: fila de evento salteada",
+                        row.courseCode(), row.subjectCode());
+                continue;
             }
 
-            affected += academicEventService.markRecurringEventsAbsent(presentEventIds);
-            syncStateService.recordSuccess(SysacadView.EVENTOS, affected);
-            log.info("Sync de Eventos finalizado: {} filas afectadas", affected);
-        } catch (RuntimeException e) {
-            syncStateService.recordFailure(SysacadView.EVENTOS, e.getMessage());
-            throw e;
+            int year = commission.academicPeriod().year();
+            for (TermType termType : SysacadCommissionResolver.termTypes(
+                    row.semester(), row.courseCode(), row.subjectCode())) {
+                SyncRecurringEventCommand cmd = new SyncRecurringEventCommand(
+                        link.subjectId(),
+                        commission.id(),
+                        row.dayOfWeek(),
+                        row.startTime(),
+                        row.durationMinutes(),
+                        link.enrolledCount(),
+                        termType.startDate(year),
+                        termType.endDate(year));
+                UpsertRecurringEventResult result = academicEventService.syncRecurringEvent(cmd);
+                presentEventIds.add(result.eventId());
+                affected++;
+            }
         }
+
+        affected += academicEventService.markRecurringEventsAbsent(presentEventIds);
+        return affected;
     }
 }

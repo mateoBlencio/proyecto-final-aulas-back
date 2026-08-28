@@ -198,12 +198,16 @@ public class CommissionServiceImpl implements CommissionService {
         SubjectCommission link = existingLinks.get(id);
 
         if (link == null) {
-            subjectCommissionRepository.save(SubjectCommission.builder()
+            SubjectCommission created = SubjectCommission.builder()
                     .id(new SubjectCommissionId())
                     .subject(subject)
                     .commission(commission)
                     .enrolledCount(command.enrolledCount())
-                    .build());
+                    .build();
+            subjectCommissionRepository.save(created);
+            // Registrar el link recién creado para que un duplicado (mismo subject+commission) en el
+            // mismo batch entre por la rama de actualización y no vuelva a insertar el mismo id.
+            existingLinks.put(id, created);
             return 1;
         }
         if (command.enrolledCount().equals(link.getEnrolledCount())) {

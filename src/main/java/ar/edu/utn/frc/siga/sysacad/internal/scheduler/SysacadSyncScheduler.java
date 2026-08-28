@@ -17,43 +17,43 @@ public class SysacadSyncScheduler {
 
     private final SysacadSyncOrchestrator orchestrator;
 
-    @Scheduled(cron = "${siga.sysacad.sync.edificios}")
+    @Scheduled(cron = "${siga.sysacad.sync.buildings}")
     public void syncBuildings() {
         log.info("Cron de sync de Edificios disparado");
         orchestrator.sync(SysacadView.EDIFICIOS);
     }
 
-    @Scheduled(cron = "${siga.sysacad.sync.aulas}")
+    @Scheduled(cron = "${siga.sysacad.sync.classrooms}")
     public void syncClassrooms() {
         log.info("Cron de sync de Aulas disparado");
         orchestrator.sync(SysacadView.AULAS);
     }
 
-    @Scheduled(cron = "${siga.sysacad.sync.especialidades}")
+    @Scheduled(cron = "${siga.sysacad.sync.specialties}")
     public void syncSpecialties() {
         log.info("Cron de sync de Especialidades disparado");
         orchestrator.sync(SysacadView.ESPECIALIDADES);
     }
 
-    @Scheduled(cron = "${siga.sysacad.sync.materias}")
+    @Scheduled(cron = "${siga.sysacad.sync.subjects}")
     public void syncSubjects() {
         log.info("Cron de sync de Materias disparado");
         orchestrator.sync(SysacadView.MATERIAS);
     }
 
-    @Scheduled(cron = "${siga.sysacad.sync.comisiones}")
+    @Scheduled(cron = "${siga.sysacad.sync.commissions}")
     public void syncCommissions() {
         log.info("Cron de sync de Comisiones disparado");
         orchestrator.sync(SysacadView.COMISIONES);
     }
 
-    @Scheduled(cron = "${siga.sysacad.sync.eventos}")
+    @Scheduled(cron = "${siga.sysacad.sync.events}")
     public void syncAcademicEvents() {
         log.info("Cron de sync de Eventos disparado");
         orchestrator.sync(SysacadView.EVENTOS);
     }
 
-    @Scheduled(cron = "${siga.sysacad.sync.asignaciones}")
+    @Scheduled(cron = "${siga.sysacad.sync.allocations}")
     public void syncAllocations() {
         log.info("Cron de sync de Asignaciones disparado");
         orchestrator.sync(SysacadView.ASIGNACIONES);

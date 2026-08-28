@@ -30,17 +30,12 @@ public class SpecialtySyncService implements SysacadViewSyncer {
 
     @Override
     public void sync() {
-        try {
+        ViewSyncRunner.run(syncStateService, SysacadView.ESPECIALIDADES, "Especialidades", log, () -> {
             List<SpecialtySyncCommand> commands = catalogReader.findSpecialties().stream()
                     .map(SpecialtySyncService::toCommand)
                     .toList();
-            int affected = specialtyService.syncSpecialties(commands);
-            syncStateService.recordSuccess(SysacadView.ESPECIALIDADES, affected);
-            log.info("Sync de Especialidades finalizado: {} filas afectadas", affected);
-        } catch (RuntimeException e) {
-            syncStateService.recordFailure(SysacadView.ESPECIALIDADES, e.getMessage());
-            throw e;
-        }
+            return specialtyService.syncSpecialties(commands);
+        });
     }
 
     private static SpecialtySyncCommand toCommand(SysacadSpecialtyDto dto) {
