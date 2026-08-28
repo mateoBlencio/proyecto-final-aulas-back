@@ -1,0 +1,46 @@
+meta {
+  name: Listar pedidos (bandeja)
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/v1/room-requests/items?types=PARTIAL_EXAM&statuses=PENDING&scope=&subjectId=&dateFrom=&dateTo=&includePast=false&page=0&size=20&sort=date,asc
+  body: none
+  auth: inherit
+}
+
+params:query {
+  types: PARTIAL_EXAM
+  statuses: PENDING
+  scope: 
+  subjectId: 
+  dateFrom: 
+  dateTo: 
+  includePast: false
+  page: 0
+  size: 20
+  sort: date,asc
+}
+
+docs {
+  Bandeja de pedidos para subsecretaría/auxiliar áulico. Requiere autenticación
+  (hasAnyRole SUBSECRETARIA, AUXILIAR_AULICO), a diferencia del resto de este
+  folder, que es público.
+  
+  La fila es el PEDIDO (item), no la solicitud: una solicitud con varios
+  pedidos puede tener uno ya resuelto y otro pendiente.
+  
+  Filtros disponibles (todos opcionales, se pueden combinar):
+  - types: PARTIAL_EXAM | FINAL_EXAM | CONFERENCE | ONE_TIME_ROOM_CHANGE | REGULAR_ROOM_CHANGE | OTHER
+    (repetir el param para varios valores)
+  - statuses: PENDING | PRE_APPROVED | CANCELLED (repetir el param para varios valores)
+  - scope: GRADO | TECNICATURA | LICENCIATURA | EXTENSION | POSTGRADO
+  - subjectId: id de materia
+  - dateFrom / dateTo: rango sobre la fecha del pedido (ISO, yyyy-MM-dd)
+  - includePast: default false, oculta pedidos con fecha ya pasada
+  
+  sort acepta: date, startTime, createdAt (fecha de alta de la solicitud), id.
+  Cualquier otro valor responde 400. Por defecto ordena por date,startTime
+  ascendente, con id ascendente appendeado como desempate.
+}

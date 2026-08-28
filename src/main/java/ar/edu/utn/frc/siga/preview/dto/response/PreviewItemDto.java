@@ -11,6 +11,7 @@ public record PreviewItemDto(
         List<LocalDate> occurrenceDates,
         ClassroomResponseDto classroom,
         int overcrowdedBy,
-        boolean unchanged
+        boolean unchanged,
+        List<RoomStretchDto> currentRoomStretches
 ) {
 }

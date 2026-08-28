@@ -13,13 +13,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Un pedido concreto dentro de la solicitud.
- *
- * <p>El docente carga hora de inicio y hora de fin, que es lo natural en el
- * formulario; la entidad guarda duración. La traducción entre ambas formas es
- * conocimiento del formulario, así que vive acá y no en el service.
- */
 public record CreateRoomRequestItemDto(
         Long commissionId,
         @NotNull @FutureOrPresent LocalDate date,
@@ -38,25 +31,14 @@ public record CreateRoomRequestItemDto(
         List<Integer> preferredClassroomIds
 ) {
 
-    /**
-     * Normaliza lo que el formulario deja opcional, para que nadie aguas abajo
-     * tenga que preguntar por null: sin preferencias es una lista vacía, no
-     * ausencia. La copia es defensiva y admite elementos null a propósito —
-     * un id inexistente lo rechaza {@code RoomRequestValidator} con un 404
-     * claro, que es mejor error que uno de deserialización.
-     */
+    /** Normaliza "sin preferencias" a lista vacía; un id inexistente lo rechaza el validator con un 404 claro. */
     public CreateRoomRequestItemDto {
         preferredClassroomIds = preferredClassroomIds == null
                 ? List.of()
                 : Collections.unmodifiableList(new ArrayList<>(preferredClassroomIds));
     }
 
-    /**
-     * Duración del pedido, derivada del rango que carga el docente. Null si
-     * falta alguna hora: {@code ONE_TIME_ROOM_CHANGE}/{@code REGULAR_ROOM_CHANGE}
-     * no la piden porque ya surge de la comisión. {@link #isTimeRangeValid()}
-     * garantiza que, cuando ambas horas están, el rango es positivo.
-     */
+    /** No valida que el rango sea positivo: eso lo garantiza {@link #isTimeRangeValid()}. */
     public Duration duration() {
         return (startTime == null || endTime == null) ? null : Duration.between(startTime, endTime);
     }

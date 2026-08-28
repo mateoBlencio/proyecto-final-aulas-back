@@ -1,0 +1,50 @@
+meta {
+  name: Reasignar por rango — temporal
+  type: http
+  seq: 16
+}
+
+put {
+  url: {{baseUrl}}/v1/allocations
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "items": [
+      {
+        "eventId": 55,
+        "from": "2026-03-03",
+        "to": "2026-04-14",
+        "classroomId": 12
+      }
+    ],
+    "observation": "Refacción del aula 3: la cursada va al aula 12 hasta mediados de abril"
+  }
+}
+
+docs {
+  Movimiento TEMPORAL: mueve al aula 12 solo las ocurrencias del evento que caen
+  entre "from" y "to", AMBOS BORDES INCLUSIVE. Las ocurrencias de afuera del
+  rango no se tocan, así que conservan su aula y la clase "vuelve" sola cuando
+  termina la ventana. No hace falta ningún proceso de reversión.
+
+  Reglas de "from"/"to" (formato yyyy-MM-dd):
+  - Solo aplican junto a "eventId". Mandarlos con "occurrenceIds" → 400.
+  - "to" sin "from" → 400.
+  - "from" anterior a hoy → 400 (no se modifica el pasado).
+  - "to" anterior a "from" → 400.
+  - Sin "to" el movimiento es PERMANENTE: ver 09-reasignar-por-rango-permanente.bru.
+
+  ATÓMICO Y TODO-O-NADA: si una sola fecha del rango tiene el aula ocupada, no
+  se mueve NINGUNA y responde 409 con la lista de conflictos (misma forma que
+  02-reasignar-aula.bru: occurrenceId, date, startTime, endTime, classroomId,
+  conflictingEventId, conflictingAllocationId). Ojo al mostrarlo en la UI: es
+  fácil que el usuario asuma que se aplicó a medias, y no se guardó nada.
+
+  Si una ocurrencia del rango ya ocurrió (por ejemplo, un rango que arranca hoy
+  y la clase de hoy ya empezó) también responde 409.
+
+  Respuesta 200: List<AllocationResponseDto>, un item por ocurrencia movida.
+}

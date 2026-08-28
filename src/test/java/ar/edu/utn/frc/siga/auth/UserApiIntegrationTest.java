@@ -185,8 +185,8 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/v1/users"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray())
-                .andExpect(jsonPath("$.totalElements").exists())
-                .andExpect(jsonPath("$.totalPages").exists());
+                .andExpect(jsonPath("$.page.totalElements").exists())
+                .andExpect(jsonPath("$.page.totalPages").exists());
     }
 
     // ---- autorización por rol ----

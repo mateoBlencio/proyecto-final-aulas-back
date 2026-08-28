@@ -74,7 +74,7 @@ class PreviewServiceImplTest {
                 validator, allocationService, allocationConflictService, occurrenceService, previewSettings);
         lenient().when(previewSettings.getDefaultTimeLimitSeconds()).thenReturn(30);
         lenient().when(previewEngine.loadInputs(any())).thenReturn(
-                new PreviewEngine.Inputs(List.of(), Map.of(), List.of(), List.of(), List.of(), Map.of()));
+                new PreviewEngine.Inputs(List.of(), Map.of(), List.of(), List.of(), List.of(), Map.of(), Map.of()));
     }
 
     @Test
@@ -144,7 +144,7 @@ class PreviewServiceImplTest {
         OptimizationResult result = new OptimizationResult("prev_x", List.of(new OptimizerAllocation("1", 5)));
         when(previewStore.get("prev_x")).thenReturn(Optional.of(result));
         PreviewResponseDto expected = new PreviewResponseDto("prev_x", List.of(), List.of());
-        when(previewComposer.compose(eq(result), any(), any(), any(), any(), any())).thenReturn(expected);
+        when(previewComposer.compose(eq(result), any(), any(), any(), any(), any(), any())).thenReturn(expected);
 
         PreviewResponseDto actual = service.getPreview("prev_x");
 

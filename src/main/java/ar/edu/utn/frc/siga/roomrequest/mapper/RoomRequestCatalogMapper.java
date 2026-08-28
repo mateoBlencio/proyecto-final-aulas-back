@@ -14,11 +14,6 @@ import org.mapstruct.Mapping;
 
 import java.util.List;
 
-/**
- * Achica los DTOs de los módulos de catálogo a lo mínimo que necesita el
- * formulario público. No es un passthrough a propósito: el catálogo interno
- * expone datos que un endpoint sin autenticación no debería devolver.
- */
 @Mapper(config = CentralMapperConfig.class)
 public interface RoomRequestCatalogMapper {
 

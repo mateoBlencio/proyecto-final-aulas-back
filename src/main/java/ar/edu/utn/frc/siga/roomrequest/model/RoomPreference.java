@@ -17,12 +17,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/**
- * Un aula que el docente preferiría, con su orden de prioridad dentro del ítem.
- *
- * <p>Es una preferencia declarada: nadie la valida contra disponibilidad ni
- * capacidad. Subsecretaría la ve al procesar la solicitud y decide.
- */
 @Entity
 @Table(name = "solicitud_aula_preferencia",
        uniqueConstraints = {
@@ -48,11 +42,9 @@ public class RoomPreference {
     @JoinColumn(name = "id_item", nullable = false)
     private RoomRequestItem item;
 
-    /** ID plano: el aula vive en {@code space}. */
     @Column(name = "id_aula", nullable = false)
     private Integer classroomId;
 
-    /** Prioridad: 1 es la primera opción. */
     @Column(name = "orden", nullable = false)
     private Integer position;
 }
