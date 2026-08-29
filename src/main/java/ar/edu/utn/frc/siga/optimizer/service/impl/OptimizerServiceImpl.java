@@ -1,6 +1,8 @@
 package ar.edu.utn.frc.siga.optimizer.service.impl;
 
 import ar.edu.utn.frc.siga.optimizer.config.OptimizerSettings;
+import ar.edu.utn.frc.siga.optimizer.constraint.OptimizerConstraint;
+import ar.edu.utn.frc.siga.optimizer.constraint.OptimizerConstraints;
 import ar.edu.utn.frc.siga.optimizer.exception.SchedulingException;
 import ar.edu.utn.frc.siga.optimizer.model.ClassAllocation;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizerOccupancy;
@@ -151,15 +153,12 @@ public class OptimizerServiceImpl implements OptimizerService {
     }
 
     private ConstraintWeightOverrides<HardMediumSoftScore> weightOverrides() {
-        return ConstraintWeightOverrides.of(Map.of(
-                ClassroomConstraintProvider.OVERCROWDING,
-                HardMediumSoftScore.ofSoft(optimizerSettings.getOvercrowdingWeight()),
-                ClassroomConstraintProvider.UNUSED_CAPACITY,
-                HardMediumSoftScore.ofSoft(optimizerSettings.getUnusedCapacityWeight()),
-                ClassroomConstraintProvider.SAME_ROOM_SAME_COMMISSION,
-                HardMediumSoftScore.ofSoft(optimizerSettings.getSameCommissionDiffRoomWeight()),
-                ClassroomConstraintProvider.SAME_BUILDING_SAME_COMMISSION,
-                HardMediumSoftScore.ofSoft(optimizerSettings.getSameCommissionDiffBuildingWeight())));
+        Map<String, HardMediumSoftScore> overrides = new HashMap<>();
+        for (OptimizerConstraint constraint : OptimizerConstraints.all()) {
+            constraint.weightKey().ifPresent(key ->
+                    overrides.put(constraint.name(), HardMediumSoftScore.ofSoft(optimizerSettings.getWeight(key))));
+        }
+        return ConstraintWeightOverrides.of(overrides);
     }
 
     private record Edge(String from, String to) {
