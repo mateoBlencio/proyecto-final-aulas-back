@@ -103,7 +103,6 @@ class ClassroomServiceImplTest {
     @DisplayName("create: si el edificio está inactivo, lanza ResourceNotFoundException")
     void createWithInactiveBuildingThrowsResourceNotFound() {
         ClassroomRequestDto dto = SpaceTestData.classroomRequestDto();
-        // el edificio existe pero está inactivo -> findActiveById no lo devuelve
         when(buildingRepository.findActiveById(1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.create(dto))
@@ -266,7 +265,6 @@ class ClassroomServiceImplTest {
         Classroom existing = SpaceTestData.classroom().build();
         ClassroomRequestDto dto = SpaceTestData.classroomRequestDto();
         when(classroomRepository.findActiveById(1L)).thenReturn(Optional.of(existing));
-        // el edificio existe pero está inactivo -> findActiveById no lo devuelve
         when(buildingRepository.findActiveById(1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.update(1L, dto))

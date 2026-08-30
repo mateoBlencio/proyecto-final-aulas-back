@@ -62,7 +62,6 @@ class AcademicActivationApiIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private SubjectCommissionRepository subjectCommissionRepository;
 
-    /** MockMvc autenticado como AUXILIAR_AULICO: sin rol SUBSECRETARIA → 403 en /activation. */
     private MockMvc auxiliarMockMvc;
 
     @BeforeEach
@@ -145,23 +144,19 @@ class AcademicActivationApiIntegrationTest extends AbstractIntegrationTest {
             throws Exception {
         assertThat(active.getAsBoolean()).isTrue();
 
-        // DELETE → soft-delete, 204, y sale del finder de activos; segunda vez sigue 204 (idempotente)
         mockMvc.perform(delete(activationPath)).andExpect(status().isNoContent());
         assertThat(active.getAsBoolean()).isFalse();
         mockMvc.perform(delete(activationPath)).andExpect(status().isNoContent());
         assertThat(active.getAsBoolean()).isFalse();
 
-        // PUT → restore, 204, y reingresa al finder de activos; segunda vez sigue 204 (idempotente)
         mockMvc.perform(put(activationPath)).andExpect(status().isNoContent());
         assertThat(active.getAsBoolean()).isTrue();
         mockMvc.perform(put(activationPath)).andExpect(status().isNoContent());
         assertThat(active.getAsBoolean()).isTrue();
 
-        // id inexistente → 404 en ambos verbos
         mockMvc.perform(put(missingPath)).andExpect(status().isNotFound());
         mockMvc.perform(delete(missingPath)).andExpect(status().isNotFound());
 
-        // sin rol SUBSECRETARIA → 403 en ambos verbos
         auxiliarMockMvc.perform(put(activationPath)).andExpect(status().isForbidden());
         auxiliarMockMvc.perform(delete(activationPath)).andExpect(status().isForbidden());
     }

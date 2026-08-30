@@ -175,8 +175,6 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     private Classroom findExistingClassroomById(Long id) {
-        // Solo aulas activas: sin @SQLRestriction hay que filtrar explícitamente (preserva el 404 para
-        // aulas borradas en findById/update/delete). El restore va por el repositorio (findById directo).
         return classroomRepository.findActiveById(id)
                 .orElseThrow(() -> {
                     log.warn("Aula no encontrada: id={}", id);
@@ -212,7 +210,6 @@ public class ClassroomServiceImpl implements ClassroomService {
         Map<Integer, Building> buildingsByCode = buildingRepository.findAll().stream()
                 .filter(building -> building.getBuildingCode() != null)
                 .collect(Collectors.toMap(Building::getBuildingCode, Function.identity()));
-        // La reconciliación ve intencionalmente filas con soft-delete (findAll, no findAllActive).
         Map<ClassroomKey, Classroom> existing = classroomRepository.findAll().stream()
                 .collect(Collectors.toMap(ClassroomServiceImpl::keyOf, Function.identity()));
         Set<ClassroomKey> incoming = new HashSet<>();

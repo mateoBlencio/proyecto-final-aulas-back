@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 
 class SoftDeletableEntityTest {
 
-    /** Subclase concreta mínima para ejercitar el comportamiento de la superclase. */
     static class Dummy extends SoftDeletableEntity {}
 
     @Test

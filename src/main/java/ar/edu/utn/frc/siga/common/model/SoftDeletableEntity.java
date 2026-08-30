@@ -8,11 +8,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
-/**
- * Superclase para entidades con borrado lógico. Aporta la columna {@code eliminado_en} y el
- * comportamiento de dominio para activar/desactivar, evitando {@code setDeletedAt(...)} disperso por
- * los servicios.
- */
 @MappedSuperclass
 @Getter
 @SuperBuilder
@@ -31,7 +26,6 @@ public abstract class SoftDeletableEntity extends TimestampedEntity implements S
         return deletedAt != null;
     }
 
-    /** Marca la entidad como borrada. Idempotente: no re-timestampea si ya está borrada. */
     @Override
     public void deactivate(Instant when) {
         if (deletedAt == null) {
@@ -43,7 +37,6 @@ public abstract class SoftDeletableEntity extends TimestampedEntity implements S
         deactivate(Instant.now());
     }
 
-    /** Reactiva la entidad. */
     @Override
     public void activate() {
         deletedAt = null;

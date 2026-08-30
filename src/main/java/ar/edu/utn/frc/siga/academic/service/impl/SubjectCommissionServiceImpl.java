@@ -74,7 +74,6 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
 
     @Override
     public List<SubjectCommissionResponseDto> findAll() {
-        // Se conserva el findAll() con @EntityGraph (findAllActive() lo bypassa); se filtra en memoria.
         return subjectCommissionRepository.findAll().stream()
                 .filter(SubjectCommission::isActive)
                 .map(subjectCommissionMapper::toDto)

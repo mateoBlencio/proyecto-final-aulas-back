@@ -18,11 +18,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 
-/**
- * Regresión del refactor de soft-delete (PR-2): al quitar {@code @SQLRestriction} de {@code Classroom},
- * los finders de negocio deben seguir ocultando las filas borradas, pero {@code findById} pasa a verlas,
- * habilitando el restore que antes era imposible.
- */
 @Import(IntegrationTestData.class)
 @DisplayName("Classroom soft-delete (integración)")
 class ClassroomSoftDeleteIntegrationTest extends AbstractIntegrationTest {
@@ -44,7 +39,6 @@ class ClassroomSoftDeleteIntegrationTest extends AbstractIntegrationTest {
         Long id = classroom.getId();
         Integer roomNumber = classroom.getRoomNumber();
 
-        // visible antes del borrado
         assertThat(classroomRepository.findByRoomNumberAndDeletedAtIsNull(roomNumber)).isPresent();
         mockMvc.perform(get("/v1/classrooms").param("buildingId", String.valueOf(building.getId())))
                 .andExpect(status().isOk())
@@ -69,7 +63,6 @@ class ClassroomSoftDeleteIntegrationTest extends AbstractIntegrationTest {
 
         classroomService.delete(id);
 
-        // findById ve la fila borrada (sin @SQLRestriction) → habilita el restore
         Classroom deleted = classroomRepository.findById(id).orElseThrow();
         assertThat(deleted.isDeleted()).isTrue();
 

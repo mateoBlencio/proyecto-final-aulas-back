@@ -93,7 +93,6 @@ public class SubjectServiceImpl implements SubjectService {
     @Transactional
     public int syncSubjects(List<SubjectSyncCommand> commands) {
         Instant syncedAt = Instant.now();
-        // Sync/reconciliación: findAll() a propósito (ve filas borradas) para poder re-activarlas en vez de duplicar.
         Map<SubjectKey, Subject> existing = Maps.byId(subjectRepository.findAll(), SubjectKey::of);
         Map<StudyPlanKey, Optional<StudyPlan>> studyPlansByKey = new HashMap<>();
         int affected = 0;

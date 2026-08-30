@@ -112,7 +112,6 @@ public class CommissionServiceImpl implements CommissionService {
     @Transactional
     public int syncCommissions(List<CommissionSyncCommand> commands) {
         Instant syncedAt = Instant.now();
-        // Sync/reconciliación: findAll() a propósito (ve filas borradas) para reconciliar por clave natural.
         Map<CommissionKey, Commission> existingCommissions = commissionRepository.findAll().stream()
                 .collect(Collectors.toMap(CommissionKey::of, Function.identity()));
         Map<Integer, AcademicPeriod> periodsByYear = new HashMap<>();

@@ -11,10 +11,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface CommissionRepository extends SoftDeletableRepository<Commission, Long> {
 
-    /**
-     * Ve todas las filas (incluidas las borradas) a propósito: lo usa el sync de Comisiones para
-     * reconciliar por clave natural (curso + período) sin duplicar filas.
-     */
     Optional<Commission> findByCourseCodeAndAcademicPeriod(
             String courseCode, AcademicPeriod academicPeriod);
 

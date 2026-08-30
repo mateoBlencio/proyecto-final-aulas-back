@@ -20,14 +20,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 
-/**
- * Regresión del refactor de soft-delete (PR-3): al quitar {@code @SQLRestriction} de las entidades
- * de {@code academic}, los finders de negocio deben seguir ocultando las filas borradas, pero
- * {@code findById} pasa a verlas, habilitando el restore que antes era imposible.
- *
- * <p>Hoy ningún servicio de {@code academic} hace soft-delete de estas entidades, así que el borrado
- * se fuerza a nivel repositorio ({@code deactivate()} + {@code save} / {@code restore}).
- */
 @Import(IntegrationTestData.class)
 @DisplayName("Academic soft-delete (integración)")
 class AcademicSoftDeleteIntegrationTest extends AbstractIntegrationTest {
@@ -53,26 +45,22 @@ class AcademicSoftDeleteIntegrationTest extends AbstractIntegrationTest {
         Long id = subject.getId();
         Integer code = subject.getCode();
 
-        // visible antes del borrado
         assertThat(subjectRepository.findByCodeAndStudyPlanAndDeletedAtIsNull(code, plan)).isPresent();
         assertThat(subjectService.findAll()).anyMatch(dto -> dto.id().equals(id));
 
         subject.deactivate();
         subjectRepository.save(subject);
 
-        // el finder de negocio ya no lo ve
         assertThat(subjectRepository.findByCodeAndStudyPlanAndDeletedAtIsNull(code, plan)).isEmpty();
         assertThat(subjectService.findAll()).noneMatch(dto -> dto.id().equals(id));
         assertThatThrownBy(() -> subjectService.findById(id))
                 .isInstanceOf(ResourceNotFoundException.class);
 
-        // findById (sin @SQLRestriction) sí ve la fila borrada → habilita el restore
         Subject deleted = subjectRepository.findById(id).orElseThrow();
         assertThat(deleted.isDeleted()).isTrue();
 
         subjectRepository.restore(deleted);
 
-        // vuelve a estar visible para el negocio (imposible bajo @SQLRestriction)
         assertThat(subjectRepository.findByCodeAndStudyPlanAndDeletedAtIsNull(code, plan)).isPresent();
         assertThat(subjectService.findAll()).anyMatch(dto -> dto.id().equals(id));
         SubjectResponseDto restored = subjectService.findById(id);

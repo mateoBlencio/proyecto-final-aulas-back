@@ -13,7 +13,6 @@ public class SpaceTestData {
                 .name("Edificio Central");
     }
 
-    /** Marca la entidad como desactivada (soft delete) y la devuelve, para armar fixtures inactivos. */
     public static Building deactivated(Building building) {
         building.deactivate();
         return building;
