@@ -31,13 +31,16 @@ public class SubjectController {
     @GetMapping
     @Operation(summary = "Listar materias",
                description = "Sin parámetros devuelve el catálogo completo. Con specialtyCode, "
-                       + "filtra las materias de todos los planes de esa especialidad.")
+                       + "filtra las materias de todos los planes de esa especialidad. "
+                       + "Por defecto solo devuelve las activas; con includeDeactivated=true incluye "
+                       + "también las desactivadas.")
     public ResponseEntity<List<SubjectResponseDto>> findAll(
-            @RequestParam(required = false) Integer specialtyCode) {
-        log.debug("GET /v1/subjects?specialtyCode={}", specialtyCode);
+            @RequestParam(required = false) Integer specialtyCode,
+            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
+        log.debug("GET /v1/subjects?specialtyCode={}&includeDeactivated={}", specialtyCode, includeDeactivated);
         List<SubjectResponseDto> subjects = specialtyCode != null
-                ? subjectService.findBySpecialtyCode(specialtyCode)
-                : subjectService.findAll();
+                ? subjectService.findBySpecialtyCode(specialtyCode, includeDeactivated)
+                : subjectService.findAll(includeDeactivated);
         return ResponseEntity.ok(subjects);
     }
 

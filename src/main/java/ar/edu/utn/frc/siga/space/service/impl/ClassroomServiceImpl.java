@@ -24,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -100,10 +101,13 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     @Override
-    public Page<ClassroomResponseDto> findAll(ClassroomFilter filter, Pageable pageable) {
-        log.debug("Listando aulas: filter={}, page={}, size={}", filter, pageable.getPageNumber(), pageable.getPageSize());
-        return classroomRepository.findAll(
-                        ClassroomSpecification.withFilter(filter).and(SoftDeleteSpecifications.active()), pageable)
+    public Page<ClassroomResponseDto> findAll(ClassroomFilter filter, Pageable pageable, boolean includeDeactivated) {
+        log.debug("Listando aulas: filter={}, page={}, size={}, includeDeactivated={}",
+                filter, pageable.getPageNumber(), pageable.getPageSize(), includeDeactivated);
+        Specification<Classroom> spec = includeDeactivated
+                ? ClassroomSpecification.withFilter(filter)
+                : ClassroomSpecification.withFilter(filter).and(SoftDeleteSpecifications.active());
+        return classroomRepository.findAll(spec, pageable)
                 .map(classroomMapper::toDto);
     }
 

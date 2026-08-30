@@ -5,13 +5,14 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/subjects?specialtyCode=5
+  url: {{baseUrl}}/v1/subjects?specialtyCode=5&includeDeactivated=false
   body: none
   auth: inherit
 }
 
 params:query {
   specialtyCode: 5
+  includeDeactivated: false
 }
 
 docs {

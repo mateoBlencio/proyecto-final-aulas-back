@@ -205,7 +205,7 @@ class ClassroomServiceImplTest {
                 .thenReturn(page);
         when(classroomMapper.toDto(classroom)).thenReturn(dto);
 
-        Page<ClassroomResponseDto> result = service.findAll(filter, pageable);
+        Page<ClassroomResponseDto> result = service.findAll(filter, pageable, false);
 
         assertThat(result.getContent()).containsExactly(dto);
     }

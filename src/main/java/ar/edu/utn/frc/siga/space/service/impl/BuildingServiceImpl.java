@@ -3,7 +3,6 @@ package ar.edu.utn.frc.siga.space.service.impl;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
-import ar.edu.utn.frc.siga.space.config.SpaceSettings;
 import ar.edu.utn.frc.siga.space.dto.request.BuildingActiveBatchItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.mapper.BuildingMapper;
@@ -33,13 +32,11 @@ public class BuildingServiceImpl implements BuildingService {
 
     private final BuildingRepository buildingRepository;
     private final BuildingMapper buildingMapper;
-    private final SpaceSettings spaceSettings;
 
     @Override
-    public List<BuildingResponseDto> findAll(boolean includeInactive) {
-        boolean filterInactive = !includeInactive && spaceSettings.isFilterInactiveBuildings();
-        log.debug("Listando edificios: includeInactive={}, filterInactive={}", includeInactive, filterInactive);
-        return (filterInactive ? buildingRepository.findAllActive() : buildingRepository.findAll()).stream()
+    public List<BuildingResponseDto> findAll(boolean includeDeactivated) {
+        log.debug("Listando edificios: includeDeactivated={}", includeDeactivated);
+        return (includeDeactivated ? buildingRepository.findAll() : buildingRepository.findAllActive()).stream()
                 .map(buildingMapper::toDto)
                 .toList();
     }

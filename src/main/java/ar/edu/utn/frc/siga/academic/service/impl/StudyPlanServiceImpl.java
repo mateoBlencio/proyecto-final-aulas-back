@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.academic.service.impl;
 import ar.edu.utn.frc.siga.academic.dto.response.StudyPlanResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.StudyPlanMapper;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
+import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
 import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
 import ar.edu.utn.frc.siga.academic.service.StudyPlanService;
@@ -25,8 +26,11 @@ public class StudyPlanServiceImpl implements StudyPlanService {
     private final StudyPlanMapper studyPlanMapper;
 
     @Override
-    public List<StudyPlanResponseDto> findAll() {
-        return studyPlanRepository.findAllActive().stream()
+    public List<StudyPlanResponseDto> findAll(boolean includeDeactivated) {
+        List<StudyPlan> studyPlans = includeDeactivated
+                ? studyPlanRepository.findAll()
+                : studyPlanRepository.findAllActive();
+        return studyPlans.stream()
                 .map(studyPlanMapper::toDto)
                 .toList();
     }

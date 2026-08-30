@@ -32,13 +32,16 @@ public class SubjectCommissionController {
     @GetMapping
     @Operation(summary = "Listar materia-comisión",
                description = "Sin parámetros devuelve el catálogo completo. Con subjectId, "
-                       + "filtra las comisiones vinculadas a esa materia.")
+                       + "filtra las comisiones vinculadas a esa materia. "
+                       + "Por defecto solo devuelve los vínculos activos; con includeDeactivated=true "
+                       + "incluye también los desactivados.")
     public ResponseEntity<List<SubjectCommissionResponseDto>> findAll(
-            @RequestParam(required = false) Long subjectId) {
-        log.debug("GET /v1/subject-commissions?subjectId={}", subjectId);
+            @RequestParam(required = false) Long subjectId,
+            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
+        log.debug("GET /v1/subject-commissions?subjectId={}&includeDeactivated={}", subjectId, includeDeactivated);
         List<SubjectCommissionResponseDto> result = subjectId != null
-                ? subjectCommissionService.findBySubjectId(subjectId)
-                : subjectCommissionService.findAll();
+                ? subjectCommissionService.findBySubjectId(subjectId, includeDeactivated)
+                : subjectCommissionService.findAll(includeDeactivated);
         return ResponseEntity.ok(result);
     }
 

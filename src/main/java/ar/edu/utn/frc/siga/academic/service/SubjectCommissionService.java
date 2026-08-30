@@ -22,7 +22,7 @@ public interface SubjectCommissionService extends ActivationService<SubjectCommi
      */
     SubjectCommissionResponseDto findByCommissionAndSubjectCode(Long commissionId, Integer subjectCode);
 
-    List<SubjectCommissionResponseDto> findAll();
+    List<SubjectCommissionResponseDto> findAll(boolean includeDeactivated);
 
-    List<SubjectCommissionResponseDto> findBySubjectId(Long subjectId);
+    List<SubjectCommissionResponseDto> findBySubjectId(Long subjectId, boolean includeDeactivated);
 }

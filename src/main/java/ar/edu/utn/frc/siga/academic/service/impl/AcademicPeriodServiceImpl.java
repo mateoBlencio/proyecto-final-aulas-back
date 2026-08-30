@@ -52,8 +52,11 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
     }
 
     @Override
-    public List<AcademicPeriodResponseDto> findAll() {
-        return academicPeriodRepository.findAll().stream()
+    public List<AcademicPeriodResponseDto> findAll(boolean includeDeactivated) {
+        List<AcademicPeriod> periods = includeDeactivated
+                ? academicPeriodRepository.findAll()
+                : academicPeriodRepository.findAllActive();
+        return periods.stream()
                 .map(academicPeriodMapper::toDto)
                 .toList();
     }

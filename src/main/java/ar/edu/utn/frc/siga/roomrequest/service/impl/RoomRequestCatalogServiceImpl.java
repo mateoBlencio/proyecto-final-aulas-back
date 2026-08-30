@@ -38,14 +38,14 @@ public class RoomRequestCatalogServiceImpl implements RoomRequestCatalogService 
     @Override
     @Transactional(readOnly = true)
     public List<SubjectOptionDto> findSubjectsBySpecialty(Integer specialtyCode) {
-        return mapper.toSubjectOptions(subjectService.findBySpecialtyCode(specialtyCode));
+        return mapper.toSubjectOptions(subjectService.findBySpecialtyCode(specialtyCode, false));
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<CommissionOptionDto> findCommissionsBySubject(Long subjectId) {
         subjectService.findById(subjectId);
-        return subjectCommissionService.findBySubjectId(subjectId).stream()
+        return subjectCommissionService.findBySubjectId(subjectId, false).stream()
                 .map(SubjectCommissionResponseDto::commission)
                 .map(mapper::toOption)
                 .toList();

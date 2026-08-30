@@ -4,7 +4,6 @@ import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SubjectCommissionMapper;
 import ar.edu.utn.frc.siga.academic.model.Commission;
 import ar.edu.utn.frc.siga.academic.model.Subject;
-import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
@@ -73,16 +72,17 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
     }
 
     @Override
-    public List<SubjectCommissionResponseDto> findAll() {
+    public List<SubjectCommissionResponseDto> findAll(boolean includeDeactivated) {
         return subjectCommissionRepository.findAll().stream()
-                .filter(SubjectCommission::isActive)
+                .filter(link -> includeDeactivated || link.isActive())
                 .map(subjectCommissionMapper::toDto)
                 .toList();
     }
 
     @Override
-    public List<SubjectCommissionResponseDto> findBySubjectId(Long subjectId) {
-        return subjectCommissionRepository.findBySubject_IdAndDeletedAtIsNull(subjectId).stream()
+    public List<SubjectCommissionResponseDto> findBySubjectId(Long subjectId, boolean includeDeactivated) {
+        return subjectCommissionRepository.findBySubject_Id(subjectId).stream()
+                .filter(link -> includeDeactivated || link.isActive())
                 .map(subjectCommissionMapper::toDto)
                 .toList();
     }

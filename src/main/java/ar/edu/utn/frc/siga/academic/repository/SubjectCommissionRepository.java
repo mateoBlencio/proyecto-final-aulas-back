@@ -22,7 +22,7 @@ public interface SubjectCommissionRepository
     List<SubjectCommission> findAll();
 
     @EntityGraph(attributePaths = {"commission", "commission.academicPeriod"})
-    List<SubjectCommission> findBySubject_IdAndDeletedAtIsNull(Long subjectId);
+    List<SubjectCommission> findBySubject_Id(Long subjectId);
 
     // TEMPORAL/defensivo: {@code findFirst...} en vez de un único resultado porque una comisión puede
     // quedar linkeada a dos materias con el mismo código bajo planes distintos (ambigüedad de datos de

@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -28,10 +29,13 @@ public class CommissionController {
     private final CommissionService commissionService;
 
     @GetMapping
-    @Operation(summary = "Listar comisiones")
-    public ResponseEntity<List<CommissionResponseDto>> findAll() {
-        log.debug("GET /v1/commissions");
-        return ResponseEntity.ok(commissionService.findAll());
+    @Operation(summary = "Listar comisiones",
+               description = "Por defecto solo devuelve las activas; con includeDeactivated=true incluye "
+                       + "también las desactivadas.")
+    public ResponseEntity<List<CommissionResponseDto>> findAll(
+            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
+        log.debug("GET /v1/commissions?includeDeactivated={}", includeDeactivated);
+        return ResponseEntity.ok(commissionService.findAll(includeDeactivated));
     }
 
     @GetMapping("/{id}")

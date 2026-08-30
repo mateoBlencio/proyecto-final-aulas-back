@@ -16,7 +16,7 @@ public interface AcademicPeriodService extends ActivationService<Long> {
 
     List<AcademicPeriodResponseDto> findActive();
 
-    List<AcademicPeriodResponseDto> findAll();
+    List<AcademicPeriodResponseDto> findAll(boolean includeDeactivated);
 
     AcademicPeriodResponseDto findById(Long id);
 }

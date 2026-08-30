@@ -146,9 +146,24 @@ class CommissionServiceImplTest {
         when(commissionRepository.findAllActive()).thenReturn(List.of(commission));
         when(commissionMapper.toDto(commission)).thenReturn(dto);
 
-        List<CommissionResponseDto> result = service.findAll();
+        List<CommissionResponseDto> result = service.findAll(false);
 
         assertThat(result).containsExactly(dto);
+    }
+
+    @Test
+    @DisplayName("findAll: con includeDeactivated=true, trae también las comisiones desactivadas")
+    void findAllWithIncludeDeactivatedReturnsEveryStatus() {
+        Commission active = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build();
+        Commission inactive = Commission.builder().id(4L).courseCode("K1002").academicPeriod(period).build();
+        inactive.deactivate();
+        CommissionResponseDto activeDto = new CommissionResponseDto(3L, "K1001", null);
+        CommissionResponseDto inactiveDto = new CommissionResponseDto(4L, "K1002", null);
+        when(commissionRepository.findAll()).thenReturn(List.of(active, inactive));
+        when(commissionMapper.toDto(active)).thenReturn(activeDto);
+        when(commissionMapper.toDto(inactive)).thenReturn(inactiveDto);
+
+        assertThat(service.findAll(true)).containsExactly(activeDto, inactiveDto);
     }
 
     @Test

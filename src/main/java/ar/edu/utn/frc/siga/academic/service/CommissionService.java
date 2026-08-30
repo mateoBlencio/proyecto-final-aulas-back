@@ -15,7 +15,7 @@ public interface CommissionService extends ActivationService<Long> {
 
     List<CommissionResponseDto> findByIds(Collection<Long> ids);
 
-    List<CommissionResponseDto> findAll();
+    List<CommissionResponseDto> findAll(boolean includeDeactivated);
 
     CommissionResponseDto findByCourseAndPeriod(String courseCode, Integer periodYear, Integer periodSemester);
 

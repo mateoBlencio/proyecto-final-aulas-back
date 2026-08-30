@@ -34,14 +34,13 @@ public class BuildingController {
 
     @GetMapping
     @Operation(summary = "Listar edificios",
-               description = "Por defecto devuelve solo los edificios activos (según el setting "
-                       + "space.filterInactiveBuildings). Con includeInactive=true devuelve todos, "
-                       + "independientemente del setting; útil para la pantalla de administración donde se "
-                       + "activan/desactivan edificios.")
+               description = "Por defecto devuelve solo los edificios activos. Con includeDeactivated=true "
+                       + "devuelve todos; útil para la pantalla de administración donde se activan/desactivan "
+                       + "edificios.")
     public ResponseEntity<List<BuildingResponseDto>> findAll(
-            @RequestParam(required = false, defaultValue = "false") boolean includeInactive) {
-        log.debug("GET /v1/buildings: includeInactive={}", includeInactive);
-        List<BuildingResponseDto> buildings = buildingService.findAll(includeInactive);
+            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
+        log.debug("GET /v1/buildings: includeDeactivated={}", includeDeactivated);
+        List<BuildingResponseDto> buildings = buildingService.findAll(includeDeactivated);
         log.info("Edificios listados: count={}", buildings.size());
         return ResponseEntity.ok(buildings);
     }

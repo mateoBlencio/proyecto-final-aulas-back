@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -28,10 +29,13 @@ public class AcademicPeriodController {
     private final AcademicPeriodService academicPeriodService;
 
     @GetMapping
-    @Operation(summary = "Listar períodos académicos")
-    public ResponseEntity<List<AcademicPeriodResponseDto>> findAll() {
-        log.debug("GET /v1/academic-periods");
-        return ResponseEntity.ok(academicPeriodService.findAll());
+    @Operation(summary = "Listar períodos académicos",
+               description = "Por defecto solo devuelve los activos; con includeDeactivated=true incluye "
+                       + "también los desactivados.")
+    public ResponseEntity<List<AcademicPeriodResponseDto>> findAll(
+            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
+        log.debug("GET /v1/academic-periods?includeDeactivated={}", includeDeactivated);
+        return ResponseEntity.ok(academicPeriodService.findAll(includeDeactivated));
     }
 
     @GetMapping("/{id}")

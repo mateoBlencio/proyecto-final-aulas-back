@@ -24,7 +24,7 @@ public interface ClassroomService extends ActivationService<Long> {
 
     List<ClassroomResponseDto> findByIds(Collection<Long> ids);
 
-    Page<ClassroomResponseDto> findAll(ClassroomFilter filter, Pageable pageable);
+    Page<ClassroomResponseDto> findAll(ClassroomFilter filter, Pageable pageable, boolean includeDeactivated);
 
     ClassroomResponseDto update(Long id, ClassroomRequestDto dto);
 

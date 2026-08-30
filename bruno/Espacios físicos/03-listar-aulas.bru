@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/classrooms?buildingId=1&capacityMin=60&page=0&size=20
+  url: {{baseUrl}}/v1/classrooms?buildingId=1&capacityMin=60&page=0&size=20&includeDeactivated=false
   body: none
   auth: inherit
 }
@@ -15,4 +15,5 @@ params:query {
   capacityMin: 60
   page: 0
   size: 20
+  includeDeactivated: false
 }

@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.academic.mapper.SubjectCommissionMapper;
 import ar.edu.utn.frc.siga.academic.model.Commission;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
+import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
@@ -121,9 +122,27 @@ class SubjectCommissionServiceImplTest {
         when(subjectCommissionRepository.findAll()).thenReturn(List.of(relation));
         when(subjectCommissionMapper.toDto(relation)).thenReturn(dto);
 
-        List<SubjectCommissionResponseDto> result = service.findAll();
+        List<SubjectCommissionResponseDto> result = service.findAll(false);
 
         assertThat(result).containsExactly(dto);
+    }
+
+    @Test
+    @DisplayName("findAll: sin includeDeactivated, descarta los vínculos desactivados")
+    void findAllFiltersOutDeactivated() {
+        SubjectCommission active = SubjectCommission.builder().id(new SubjectCommissionId(1L, 2L))
+                .subject(subject).commission(commission).enrolledCount(30).build();
+        SubjectCommission inactive = SubjectCommission.builder().id(new SubjectCommissionId(1L, 3L))
+                .subject(subject).commission(commission).enrolledCount(10).build();
+        inactive.deactivate();
+        SubjectCommissionResponseDto activeDto = new SubjectCommissionResponseDto(1L, 2L, null, 30);
+        SubjectCommissionResponseDto inactiveDto = new SubjectCommissionResponseDto(1L, 2L, null, 10);
+        when(subjectCommissionRepository.findAll()).thenReturn(List.of(active, inactive));
+        when(subjectCommissionMapper.toDto(active)).thenReturn(activeDto);
+        when(subjectCommissionMapper.toDto(inactive)).thenReturn(inactiveDto);
+
+        assertThat(service.findAll(true)).containsExactly(activeDto, inactiveDto);
+        assertThat(service.findAll(false)).containsExactly(activeDto);
     }
 
     @Test
@@ -132,17 +151,17 @@ class SubjectCommissionServiceImplTest {
         SubjectCommission relation = SubjectCommission.builder().subject(subject).commission(commission)
                 .enrolledCount(30).build();
         SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, 2L, null, 30);
-        when(subjectCommissionRepository.findBySubject_IdAndDeletedAtIsNull(1L)).thenReturn(List.of(relation));
+        when(subjectCommissionRepository.findBySubject_Id(1L)).thenReturn(List.of(relation));
         when(subjectCommissionMapper.toDto(relation)).thenReturn(dto);
 
-        assertThat(service.findBySubjectId(1L)).containsExactly(dto);
+        assertThat(service.findBySubjectId(1L, false)).containsExactly(dto);
     }
 
     @Test
     @DisplayName("findBySubjectId: sin comisiones vinculadas, devuelve lista vacía (no lanza)")
     void findBySubjectIdWithoutMatchesReturnsEmptyList() {
-        when(subjectCommissionRepository.findBySubject_IdAndDeletedAtIsNull(99L)).thenReturn(List.of());
+        when(subjectCommissionRepository.findBySubject_Id(99L)).thenReturn(List.of());
 
-        assertThat(service.findBySubjectId(99L)).isEmpty();
+        assertThat(service.findBySubjectId(99L, false)).isEmpty();
     }
 }

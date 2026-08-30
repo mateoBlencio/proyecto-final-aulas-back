@@ -10,7 +10,7 @@ import org.springframework.modulith.NamedInterface;
 @NamedInterface("api")
 public interface StudyPlanService extends ActivationService<Long> {
 
-    List<StudyPlanResponseDto> findAll();
+    List<StudyPlanResponseDto> findAll(boolean includeDeactivated);
 
     StudyPlanResponseDto findById(Long id);
 

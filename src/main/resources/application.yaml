@@ -109,8 +109,6 @@ siga:
         default-value: "08:00"
       - key: events.hours.end
         default-value: "23:00"
-      - key: space.filterInactiveBuildings
-        default-value: "true"
   optimizer:
     parallel-solver-count: AUTO
     environment-mode: PHASE_ASSERT

@@ -12,7 +12,7 @@ import org.springframework.modulith.NamedInterface;
 @NamedInterface("api")
 public interface BuildingService extends ActivationService<Long> {
 
-    List<BuildingResponseDto> findAll(boolean includeInactive);
+    List<BuildingResponseDto> findAll(boolean includeDeactivated);
 
     BuildingResponseDto findById(Long id);
 

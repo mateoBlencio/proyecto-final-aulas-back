@@ -100,7 +100,7 @@ class AcademicFindByCodeIntegrationTest extends AbstractIntegrationTest {
         Commission commission = testData.comision("CUR-" + IntegrationTestData.nextSeq(), period);
         testData.materiaComision(subject, commission, 30);
 
-        List<SubjectCommissionResponseDto> result = subjectCommissionService.findBySubjectId(subject.getId());
+        List<SubjectCommissionResponseDto> result = subjectCommissionService.findBySubjectId(subject.getId(), false);
 
         assertThat(result).hasSize(1);
         SubjectCommissionResponseDto dto = result.getFirst();

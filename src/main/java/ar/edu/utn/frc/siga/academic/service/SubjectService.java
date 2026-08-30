@@ -11,7 +11,7 @@ import org.springframework.modulith.NamedInterface;
 @NamedInterface("api")
 public interface SubjectService extends ActivationService<Long> {
 
-    List<SubjectResponseDto> findAll();
+    List<SubjectResponseDto> findAll(boolean includeDeactivated);
 
     SubjectResponseDto findById(Long id);
 
@@ -19,7 +19,7 @@ public interface SubjectService extends ActivationService<Long> {
 
     SubjectResponseDto findByCodeAndStudyPlan(Integer code, Integer studyPlanCode, Integer specialtyCode);
 
-    List<SubjectResponseDto> findBySpecialtyCode(Integer specialtyCode);
+    List<SubjectResponseDto> findBySpecialtyCode(Integer specialtyCode, boolean includeDeactivated);
 
     /**
      * Sincroniza el lote de materias provenientes de SysAcad: crea/actualiza por clave natural

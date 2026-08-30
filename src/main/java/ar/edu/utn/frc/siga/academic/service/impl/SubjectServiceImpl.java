@@ -38,8 +38,11 @@ public class SubjectServiceImpl implements SubjectService {
     private final StudyPlanResolver studyPlanResolver;
 
     @Override
-    public List<SubjectResponseDto> findAll() {
-        return subjectRepository.findAllActive().stream()
+    public List<SubjectResponseDto> findAll(boolean includeDeactivated) {
+        List<Subject> subjects = includeDeactivated
+                ? subjectRepository.findAll()
+                : subjectRepository.findAllActive();
+        return subjects.stream()
                 .map(subjectMapper::toDto)
                 .toList();
     }
@@ -77,8 +80,9 @@ public class SubjectServiceImpl implements SubjectService {
     }
 
     @Override
-    public List<SubjectResponseDto> findBySpecialtyCode(Integer specialtyCode) {
-        return subjectRepository.findByStudyPlan_Specialty_SpecialtyCodeAndDeletedAtIsNull(specialtyCode).stream()
+    public List<SubjectResponseDto> findBySpecialtyCode(Integer specialtyCode, boolean includeDeactivated) {
+        return subjectRepository.findByStudyPlan_Specialty_SpecialtyCode(specialtyCode).stream()
+                .filter(subject -> includeDeactivated || subject.isActive())
                 .map(subjectMapper::toDto)
                 .toList();
     }

@@ -21,5 +21,5 @@ public interface SubjectRepository extends SoftDeletableRepository<Subject, Long
     List<Subject> findAllById(Iterable<Long> ids);
 
     @EntityGraph(attributePaths = {"studyPlan", "studyPlan.specialty"})
-    List<Subject> findByStudyPlan_Specialty_SpecialtyCodeAndDeletedAtIsNull(Integer specialtyCode);
+    List<Subject> findByStudyPlan_Specialty_SpecialtyCode(Integer specialtyCode);
 }

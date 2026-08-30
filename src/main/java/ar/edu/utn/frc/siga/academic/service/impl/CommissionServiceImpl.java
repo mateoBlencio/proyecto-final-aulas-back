@@ -74,8 +74,11 @@ public class CommissionServiceImpl implements CommissionService {
     }
 
     @Override
-    public List<CommissionResponseDto> findAll() {
-        return commissionRepository.findAllActive().stream()
+    public List<CommissionResponseDto> findAll(boolean includeDeactivated) {
+        List<Commission> commissions = includeDeactivated
+                ? commissionRepository.findAll()
+                : commissionRepository.findAllActive();
+        return commissions.stream()
                 .map(commissionMapper::toDto)
                 .toList();
     }

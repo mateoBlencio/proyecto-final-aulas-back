@@ -122,8 +122,24 @@ class AcademicPeriodServiceImplTest {
     }
 
     @Test
-    @DisplayName("findAll: mapea todos los períodos del repositorio")
-    void findAllMapsAllPeriods() {
+    @DisplayName("findAll: sin includeDeactivated, mapea solo los períodos activos")
+    void findAllMapsActivePeriods() {
+        AcademicPeriod period = AcademicPeriod.builder()
+                .id(1L).year(2026).semester(1)
+                .startDate(LocalDate.of(2026, 3, 1))
+                .endDate(LocalDate.of(2026, 7, 31))
+                .build();
+        when(academicPeriodRepository.findAllActive()).thenReturn(List.of(period));
+
+        List<AcademicPeriodResponseDto> result = service.findAll(false);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().year()).isEqualTo(2026);
+    }
+
+    @Test
+    @DisplayName("findAll: con includeDeactivated=true, mapea todos los períodos del repositorio")
+    void findAllWithIncludeDeactivatedMapsAllPeriods() {
         AcademicPeriod period = AcademicPeriod.builder()
                 .id(1L).year(2026).semester(1)
                 .startDate(LocalDate.of(2026, 3, 1))
@@ -131,7 +147,7 @@ class AcademicPeriodServiceImplTest {
                 .build();
         when(academicPeriodRepository.findAll()).thenReturn(List.of(period));
 
-        List<AcademicPeriodResponseDto> result = service.findAll();
+        List<AcademicPeriodResponseDto> result = service.findAll(true);
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().year()).isEqualTo(2026);
