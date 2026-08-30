@@ -25,21 +25,21 @@ public class StudyPlanServiceImpl implements StudyPlanService {
 
     @Override
     public List<StudyPlanResponseDto> findAll() {
-        return studyPlanRepository.findAll().stream()
+        return studyPlanRepository.findAllActive().stream()
                 .map(studyPlanMapper::toDto)
                 .toList();
     }
 
     @Override
     public StudyPlanResponseDto findById(Long id) {
-        return studyPlanMapper.toDto(studyPlanRepository.findById(id)
+        return studyPlanMapper.toDto(studyPlanRepository.findActiveById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("StudyPlan", id)));
     }
 
     @Override
     public StudyPlanResponseDto findByPlanCodeAndSpecialtyCode(Integer planCode, Integer specialtyCode) {
         Specialty specialty = requireSpecialty(specialtyCode);
-        return studyPlanMapper.toDto(studyPlanRepository.findByPlanCodeAndSpecialty(planCode, specialty)
+        return studyPlanMapper.toDto(studyPlanRepository.findByPlanCodeAndSpecialtyAndDeletedAtIsNull(planCode, specialty)
                 .orElseThrow(() -> ResourceNotFoundException.of("StudyPlan", planCode)));
     }
 

@@ -1,0 +1,103 @@
+package ar.edu.utn.frc.siga.academic;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import ar.edu.utn.frc.siga.AbstractIntegrationTest;
+import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
+import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
+import ar.edu.utn.frc.siga.academic.model.Specialty;
+import ar.edu.utn.frc.siga.academic.model.StudyPlan;
+import ar.edu.utn.frc.siga.academic.model.Subject;
+import ar.edu.utn.frc.siga.academic.model.TermType;
+import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
+import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
+import ar.edu.utn.frc.siga.academic.service.SubjectService;
+import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
+
+/**
+ * Regresión del refactor de soft-delete (PR-3): al quitar {@code @SQLRestriction} de las entidades
+ * de {@code academic}, los finders de negocio deben seguir ocultando las filas borradas, pero
+ * {@code findById} pasa a verlas, habilitando el restore que antes era imposible.
+ *
+ * <p>Hoy ningún servicio de {@code academic} hace soft-delete de estas entidades, así que el borrado
+ * se fuerza a nivel repositorio ({@code deactivate()} + {@code save} / {@code restore}).
+ */
+@Import(IntegrationTestData.class)
+@DisplayName("Academic soft-delete (integración)")
+class AcademicSoftDeleteIntegrationTest extends AbstractIntegrationTest {
+
+    @Autowired
+    private IntegrationTestData testData;
+
+    @Autowired
+    private SubjectRepository subjectRepository;
+
+    @Autowired
+    private AcademicPeriodRepository academicPeriodRepository;
+
+    @Autowired
+    private SubjectService subjectService;
+
+    @Test
+    @DisplayName("un Subject borrado desaparece de los finders de negocio y se puede re-leer/restaurar por id")
+    void softDeletedSubject_isHiddenFromBusinessFindersAndCanBeRestored() {
+        Specialty specialty = testData.especialidad((int) IntegrationTestData.nextSeq());
+        StudyPlan plan = testData.planDeEstudio((int) IntegrationTestData.nextSeq(), specialty);
+        Subject subject = testData.materia((int) IntegrationTestData.nextSeq(), "Materia IT", plan, "Anual");
+        Long id = subject.getId();
+        Integer code = subject.getCode();
+
+        // visible antes del borrado
+        assertThat(subjectRepository.findByCodeAndStudyPlanAndDeletedAtIsNull(code, plan)).isPresent();
+        assertThat(subjectService.findAll()).anyMatch(dto -> dto.id().equals(id));
+
+        subject.deactivate();
+        subjectRepository.save(subject);
+
+        // el finder de negocio ya no lo ve
+        assertThat(subjectRepository.findByCodeAndStudyPlanAndDeletedAtIsNull(code, plan)).isEmpty();
+        assertThat(subjectService.findAll()).noneMatch(dto -> dto.id().equals(id));
+        assertThatThrownBy(() -> subjectService.findById(id))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        // findById (sin @SQLRestriction) sí ve la fila borrada → habilita el restore
+        Subject deleted = subjectRepository.findById(id).orElseThrow();
+        assertThat(deleted.isDeleted()).isTrue();
+
+        subjectRepository.restore(deleted);
+
+        // vuelve a estar visible para el negocio (imposible bajo @SQLRestriction)
+        assertThat(subjectRepository.findByCodeAndStudyPlanAndDeletedAtIsNull(code, plan)).isPresent();
+        assertThat(subjectService.findAll()).anyMatch(dto -> dto.id().equals(id));
+        SubjectResponseDto restored = subjectService.findById(id);
+        assertThat(restored.id()).isEqualTo(id);
+    }
+
+    @Test
+    @DisplayName("un AcademicPeriod borrado sale de findAllActive() pero se re-lee por id y se restaura")
+    void softDeletedAcademicPeriod_isHiddenFromFindAllActiveAndCanBeRestored() {
+        int year = 2100 + (int) (IntegrationTestData.nextSeq() % 500);
+        AcademicPeriod period = testData.periodoAcademico(year, TermType.ANUAL);
+        Long id = period.getId();
+
+        assertThat(academicPeriodRepository.findAllActive()).anyMatch(p -> p.getId().equals(id));
+
+        period.deactivate();
+        academicPeriodRepository.save(period);
+
+        assertThat(academicPeriodRepository.findAllActive()).noneMatch(p -> p.getId().equals(id));
+
+        AcademicPeriod deleted = academicPeriodRepository.findById(id).orElseThrow();
+        assertThat(deleted.isDeleted()).isTrue();
+
+        academicPeriodRepository.restore(deleted);
+
+        assertThat(academicPeriodRepository.findAllActive()).anyMatch(p -> p.getId().equals(id));
+    }
+}

@@ -94,7 +94,7 @@ class AcademicPeriodServiceImplTest {
                 .startDate(LocalDate.of(2026, 3, 1))
                 .endDate(LocalDate.of(2026, 7, 31))
                 .build();
-        when(academicPeriodRepository.findByDeletedAtIsNull()).thenReturn(List.of(active));
+        when(academicPeriodRepository.findAllActive()).thenReturn(List.of(active));
 
         List<AcademicPeriodResponseDto> result = service.findActive();
 
@@ -114,7 +114,7 @@ class AcademicPeriodServiceImplTest {
                 .startDate(LocalDate.of(2026, 3, 1))
                 .endDate(null)
                 .build();
-        when(academicPeriodRepository.findByDeletedAtIsNull()).thenReturn(List.of(active));
+        when(academicPeriodRepository.findAllActive()).thenReturn(List.of(active));
 
         List<AcademicPeriodResponseDto> result = service.findActive();
 
@@ -145,7 +145,7 @@ class AcademicPeriodServiceImplTest {
                 .startDate(LocalDate.of(2026, 3, 1))
                 .endDate(LocalDate.of(2026, 7, 31))
                 .build();
-        when(academicPeriodRepository.findById(1L)).thenReturn(Optional.of(period));
+        when(academicPeriodRepository.findActiveById(1L)).thenReturn(Optional.of(period));
 
         AcademicPeriodResponseDto result = service.findById(1L);
 
@@ -155,7 +155,7 @@ class AcademicPeriodServiceImplTest {
     @Test
     @DisplayName("findById: si el período no existe, lanza ResourceNotFoundException")
     void findByIdWithMissingPeriodThrowsResourceNotFound() {
-        when(academicPeriodRepository.findById(99L)).thenReturn(Optional.empty());
+        when(academicPeriodRepository.findActiveById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)

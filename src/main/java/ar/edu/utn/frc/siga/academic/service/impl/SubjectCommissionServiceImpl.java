@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SubjectCommissionMapper;
 import ar.edu.utn.frc.siga.academic.model.Commission;
 import ar.edu.utn.frc.siga.academic.model.Subject;
+import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
@@ -30,7 +31,7 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
     public SubjectCommissionResponseDto findBySubjectAndCommission(Long subjectId, Long commissionId) {
         Subject subject = requireSubject(subjectId);
         Commission commission = requireCommission(commissionId);
-        return subjectCommissionRepository.findBySubjectAndCommission(subject, commission)
+        return subjectCommissionRepository.findBySubjectAndCommissionAndDeletedAtIsNull(subject, commission)
                 .map(subjectCommissionMapper::toDto)
                 .orElseThrow(() -> ResourceNotFoundException.of("SubjectCommission",
                         subjectId + "-" + commissionId));
@@ -49,7 +50,7 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
     @Override
     public SubjectCommissionResponseDto findByCommissionAndSubjectCode(Long commissionId, Integer subjectCode) {
         return subjectCommissionRepository
-                .findFirstByCommission_IdAndSubject_CodeOrderBySubject_IdAsc(commissionId, subjectCode)
+                .findFirstByCommission_IdAndSubject_CodeAndDeletedAtIsNullOrderBySubject_IdAsc(commissionId, subjectCode)
                 .map(subjectCommissionMapper::toDto)
                 .orElseThrow(() -> ResourceNotFoundException.of("SubjectCommission",
                         commissionId + "-" + subjectCode));
@@ -57,14 +58,16 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
 
     @Override
     public List<SubjectCommissionResponseDto> findAll() {
+        // Se conserva el findAll() con @EntityGraph (findAllActive() lo bypassa); se filtra en memoria.
         return subjectCommissionRepository.findAll().stream()
+                .filter(SubjectCommission::isActive)
                 .map(subjectCommissionMapper::toDto)
                 .toList();
     }
 
     @Override
     public List<SubjectCommissionResponseDto> findBySubjectId(Long subjectId) {
-        return subjectCommissionRepository.findBySubject_Id(subjectId).stream()
+        return subjectCommissionRepository.findBySubject_IdAndDeletedAtIsNull(subjectId).stream()
                 .map(subjectCommissionMapper::toDto)
                 .toList();
     }

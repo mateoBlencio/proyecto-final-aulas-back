@@ -39,19 +39,20 @@ public class SubjectServiceImpl implements SubjectService {
 
     @Override
     public List<SubjectResponseDto> findAll() {
-        return subjectRepository.findAll().stream()
+        return subjectRepository.findAllActive().stream()
                 .map(subjectMapper::toDto)
                 .toList();
     }
 
     @Override
     public SubjectResponseDto findById(Long id) {
-        return subjectMapper.toDto(Finder.orThrow(subjectRepository::findById, id, "Subject"));
+        return subjectMapper.toDto(Finder.orThrow(subjectRepository::findActiveById, id, "Subject"));
     }
 
     @Override
     public List<SubjectResponseDto> findByIds(Collection<Long> ids) {
         return subjectRepository.findAllById(ids).stream()
+                .filter(Subject::isActive)
                 .map(subjectMapper::toDto)
                 .toList();
     }
@@ -59,20 +60,20 @@ public class SubjectServiceImpl implements SubjectService {
     @Override
     public SubjectResponseDto findByCodeAndStudyPlan(Integer code, Integer studyPlanCode, Integer specialtyCode) {
         StudyPlan studyPlan = requireStudyPlan(studyPlanCode, specialtyCode);
-        return subjectMapper.toDto(subjectRepository.findByCodeAndStudyPlan(code, studyPlan)
+        return subjectMapper.toDto(subjectRepository.findByCodeAndStudyPlanAndDeletedAtIsNull(code, studyPlan)
                 .orElseThrow(() -> ResourceNotFoundException.of("Subject", code)));
     }
 
     @Override
     public List<SubjectResponseDto> findBySpecialtyCode(Integer specialtyCode) {
-        return subjectRepository.findByStudyPlan_Specialty_SpecialtyCode(specialtyCode).stream()
+        return subjectRepository.findByStudyPlan_Specialty_SpecialtyCodeAndDeletedAtIsNull(specialtyCode).stream()
                 .map(subjectMapper::toDto)
                 .toList();
     }
 
     private StudyPlan requireStudyPlan(Integer studyPlanCode, Integer specialtyCode) {
         Specialty specialty = Finder.orThrow(specialtyRepository::findBySpecialtyCode, specialtyCode, "Specialty");
-        return studyPlanRepository.findByPlanCodeAndSpecialty(studyPlanCode, specialty)
+        return studyPlanRepository.findByPlanCodeAndSpecialtyAndDeletedAtIsNull(studyPlanCode, specialty)
                 .orElseThrow(() -> ResourceNotFoundException.of("StudyPlan", studyPlanCode));
     }
 
@@ -80,6 +81,7 @@ public class SubjectServiceImpl implements SubjectService {
     @Transactional
     public int syncSubjects(List<SubjectSyncCommand> commands) {
         Instant syncedAt = Instant.now();
+        // Sync/reconciliación: findAll() a propósito (ve filas borradas) para poder re-activarlas en vez de duplicar.
         Map<SubjectKey, Subject> existing = Maps.byId(subjectRepository.findAll(), SubjectKey::of);
         Map<StudyPlanKey, Optional<StudyPlan>> studyPlansByKey = new HashMap<>();
         int affected = 0;

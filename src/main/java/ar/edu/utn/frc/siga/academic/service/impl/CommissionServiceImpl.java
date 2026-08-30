@@ -49,7 +49,7 @@ public class CommissionServiceImpl implements CommissionService {
 
     @Override
     public CommissionResponseDto findById(Long id) {
-        return commissionMapper.toDto(commissionRepository.findById(id)
+        return commissionMapper.toDto(commissionRepository.findActiveById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("Commission", id)));
     }
 
@@ -62,7 +62,7 @@ public class CommissionServiceImpl implements CommissionService {
 
     @Override
     public List<CommissionResponseDto> findAll() {
-        return commissionRepository.findAll().stream()
+        return commissionRepository.findAllActive().stream()
                 .map(commissionMapper::toDto)
                 .toList();
     }
@@ -84,7 +84,7 @@ public class CommissionServiceImpl implements CommissionService {
 
     @Override
     public CommissionResponseDto findActiveByCourseCode(String courseCode) {
-        List<Commission> active = commissionRepository.findByCourseCodeAndSysacadEnabledTrue(courseCode);
+        List<Commission> active = commissionRepository.findByCourseCodeAndSysacadEnabledTrueAndDeletedAtIsNull(courseCode);
         if (active.size() > 1) {
             log.warn("Más de una comisión vigente en SysAcad para el curso {}: {} candidatas, no se puede "
                     + "resolver sin ambigüedad", courseCode, active.size());
@@ -99,6 +99,7 @@ public class CommissionServiceImpl implements CommissionService {
     @Transactional
     public int syncCommissions(List<CommissionSyncCommand> commands) {
         Instant syncedAt = Instant.now();
+        // Sync/reconciliación: findAll() a propósito (ve filas borradas) para reconciliar por clave natural.
         Map<CommissionKey, Commission> existingCommissions = commissionRepository.findAll().stream()
                 .collect(Collectors.toMap(CommissionKey::of, Function.identity()));
         Map<Integer, AcademicPeriod> periodsByYear = new HashMap<>();

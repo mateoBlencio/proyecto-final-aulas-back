@@ -45,7 +45,7 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
     @Override
     public List<AcademicPeriodResponseDto> findActive() {
         log.debug("Buscando períodos académicos activos");
-        return academicPeriodRepository.findByDeletedAtIsNull().stream()
+        return academicPeriodRepository.findAllActive().stream()
                 .map(academicPeriodMapper::toDto)
                 .toList();
     }
@@ -59,7 +59,7 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
 
     @Override
     public AcademicPeriodResponseDto findById(Long id) {
-        return academicPeriodMapper.toDto(academicPeriodRepository.findById(id)
+        return academicPeriodMapper.toDto(academicPeriodRepository.findActiveById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("AcademicPeriod", id)));
     }
 }
