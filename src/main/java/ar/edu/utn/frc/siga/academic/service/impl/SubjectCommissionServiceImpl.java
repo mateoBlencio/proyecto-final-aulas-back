@@ -5,11 +5,13 @@ import ar.edu.utn.frc.siga.academic.mapper.SubjectCommissionMapper;
 import ar.edu.utn.frc.siga.academic.model.Commission;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
+import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.util.Finder;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +37,20 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
                 .map(subjectCommissionMapper::toDto)
                 .orElseThrow(() -> ResourceNotFoundException.of("SubjectCommission",
                         subjectId + "-" + commissionId));
+    }
+
+    @Override
+    @Transactional
+    public void activate(SubjectCommissionId id) {
+        subjectCommissionRepository.restore(
+                Finder.orThrow(subjectCommissionRepository::findById, id, "SubjectCommission"));
+    }
+
+    @Override
+    @Transactional
+    public void deactivate(SubjectCommissionId id) {
+        subjectCommissionRepository.softDelete(
+                Finder.orThrow(subjectCommissionRepository::findById, id, "SubjectCommission"));
     }
 
     private Subject requireSubject(Long id) {

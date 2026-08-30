@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.config.SpaceSettings;
 import ar.edu.utn.frc.siga.space.dto.request.BuildingActiveBatchItemDto;
@@ -70,6 +71,18 @@ public class BuildingServiceImpl implements BuildingService {
         log.info("Edificio {} {}", id, active ? "activado" : "desactivado");
 
         return buildingMapper.toDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public void activate(Long id) {
+        buildingRepository.restore(Finder.orThrow(buildingRepository::findById, id, "Building"));
+    }
+
+    @Override
+    @Transactional
+    public void deactivate(Long id) {
+        buildingRepository.softDelete(Finder.orThrow(buildingRepository::findById, id, "Building"));
     }
 
     @Override

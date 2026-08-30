@@ -8,6 +8,7 @@ import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.util.Finder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -61,5 +62,17 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
     public AcademicPeriodResponseDto findById(Long id) {
         return academicPeriodMapper.toDto(academicPeriodRepository.findActiveById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("AcademicPeriod", id)));
+    }
+
+    @Override
+    @Transactional
+    public void activate(Long id) {
+        academicPeriodRepository.restore(Finder.orThrow(academicPeriodRepository::findById, id, "AcademicPeriod"));
+    }
+
+    @Override
+    @Transactional
+    public void deactivate(Long id) {
+        academicPeriodRepository.softDelete(Finder.orThrow(academicPeriodRepository::findById, id, "AcademicPeriod"));
     }
 }

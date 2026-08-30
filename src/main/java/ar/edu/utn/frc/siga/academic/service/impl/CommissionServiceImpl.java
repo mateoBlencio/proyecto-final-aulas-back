@@ -17,6 +17,7 @@ import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.command.CommissionSyncCommand;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import java.time.Instant;
@@ -51,6 +52,18 @@ public class CommissionServiceImpl implements CommissionService {
     public CommissionResponseDto findById(Long id) {
         return commissionMapper.toDto(commissionRepository.findActiveById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("Commission", id)));
+    }
+
+    @Override
+    @Transactional
+    public void activate(Long id) {
+        commissionRepository.restore(Finder.orThrow(commissionRepository::findById, id, "Commission"));
+    }
+
+    @Override
+    @Transactional
+    public void deactivate(Long id) {
+        commissionRepository.softDelete(Finder.orThrow(commissionRepository::findById, id, "Commission"));
     }
 
     @Override

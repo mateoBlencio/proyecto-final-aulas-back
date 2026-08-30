@@ -2,13 +2,14 @@ package ar.edu.utn.frc.siga.academic.service;
 
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.academic.service.command.SubjectSyncCommand;
+import ar.edu.utn.frc.siga.common.service.ActivationService;
 import java.util.Collection;
 import java.util.List;
 
 import org.springframework.modulith.NamedInterface;
 
 @NamedInterface("api")
-public interface SubjectService {
+public interface SubjectService extends ActivationService<Long> {
 
     List<SubjectResponseDto> findAll();
 

@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
 import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
 import ar.edu.utn.frc.siga.academic.service.StudyPlanService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.util.Finder;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,18 @@ public class StudyPlanServiceImpl implements StudyPlanService {
     public StudyPlanResponseDto findById(Long id) {
         return studyPlanMapper.toDto(studyPlanRepository.findActiveById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("StudyPlan", id)));
+    }
+
+    @Override
+    @Transactional
+    public void activate(Long id) {
+        studyPlanRepository.restore(Finder.orThrow(studyPlanRepository::findById, id, "StudyPlan"));
+    }
+
+    @Override
+    @Transactional
+    public void deactivate(Long id) {
+        studyPlanRepository.softDelete(Finder.orThrow(studyPlanRepository::findById, id, "StudyPlan"));
     }
 
     @Override

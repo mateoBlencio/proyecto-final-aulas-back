@@ -50,6 +50,18 @@ public class SubjectServiceImpl implements SubjectService {
     }
 
     @Override
+    @Transactional
+    public void activate(Long id) {
+        subjectRepository.restore(Finder.orThrow(subjectRepository::findById, id, "Subject"));
+    }
+
+    @Override
+    @Transactional
+    public void deactivate(Long id) {
+        subjectRepository.softDelete(Finder.orThrow(subjectRepository::findById, id, "Subject"));
+    }
+
+    @Override
     public List<SubjectResponseDto> findByIds(Collection<Long> ids) {
         return subjectRepository.findAllById(ids).stream()
                 .filter(Subject::isActive)

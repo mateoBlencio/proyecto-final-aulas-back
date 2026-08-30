@@ -8,8 +8,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -44,5 +46,28 @@ public class SubjectController {
     public ResponseEntity<SubjectResponseDto> findById(@PathVariable Long id) {
         log.debug("GET /v1/subjects/{}", id);
         return ResponseEntity.ok(subjectService.findById(id));
+    }
+
+    @PutMapping("/{id}/activation")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Activar materia",
+               description = "Reactiva una materia previamente desactivada (idempotente). "
+                       + "204 si queda activa; 404 si la materia no existe.")
+    public ResponseEntity<Void> activate(@PathVariable Long id) {
+        log.debug("PUT /v1/subjects/{}/activation", id);
+        subjectService.activate(id);
+        log.info("Materia activada vía controller: id={}", id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{id}/activation")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Desactivar materia",
+               description = "Soft-delete idempotente. 204 si queda inactiva; 404 si la materia no existe.")
+    public ResponseEntity<Void> deactivate(@PathVariable Long id) {
+        log.debug("DELETE /v1/subjects/{}/activation", id);
+        subjectService.deactivate(id);
+        log.info("Materia desactivada vía controller: id={}", id);
+        return ResponseEntity.noContent().build();
     }
 }

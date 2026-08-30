@@ -99,4 +99,27 @@ public class ClassroomController {
         return ResponseEntity.noContent().build();
     }
 
+    @PutMapping("/{id}/activation")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Activar aula",
+               description = "Reactiva un aula previamente desactivada (idempotente). "
+                       + "204 si queda activa; 404 si el aula no existe.")
+    public ResponseEntity<Void> activate(@PathVariable Long id) {
+        log.debug("PUT /v1/classrooms/{}/activation", id);
+        classroomService.activate(id);
+        log.info("Aula activada vía controller: id={}", id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{id}/activation")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Desactivar aula",
+               description = "Soft-delete idempotente. 204 si queda inactiva; 404 si el aula no existe.")
+    public ResponseEntity<Void> deactivate(@PathVariable Long id) {
+        log.debug("DELETE /v1/classrooms/{}/activation", id);
+        classroomService.deactivate(id);
+        log.info("Aula desactivada vía controller: id={}", id);
+        return ResponseEntity.noContent().build();
+    }
+
 }

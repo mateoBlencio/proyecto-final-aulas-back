@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.space.service;
 import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
+import ar.edu.utn.frc.siga.common.service.ActivationService;
 import ar.edu.utn.frc.siga.space.service.command.ClassroomSyncCommand;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,7 +14,7 @@ import java.util.List;
 import java.util.Optional;
 
 @NamedInterface("api")
-public interface ClassroomService {
+public interface ClassroomService extends ActivationService<Long> {
 
     ClassroomResponseDto create(ClassroomRequestDto dto);
 

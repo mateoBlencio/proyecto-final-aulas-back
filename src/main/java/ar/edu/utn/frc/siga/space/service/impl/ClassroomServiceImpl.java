@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
 import ar.edu.utn.frc.siga.space.exception.SpaceDomainException;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomMapper;
+import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
@@ -133,6 +134,18 @@ public class ClassroomServiceImpl implements ClassroomService {
         Classroom classroom = this.findExistingClassroomById(id);
         classroomRepository.softDelete(classroom);
         log.info("Aula eliminada: id={}", id);
+    }
+
+    @Override
+    @Transactional
+    public void activate(Long id) {
+        classroomRepository.restore(Finder.orThrow(classroomRepository::findById, id, "Classroom"));
+    }
+
+    @Override
+    @Transactional
+    public void deactivate(Long id) {
+        classroomRepository.softDelete(Finder.orThrow(classroomRepository::findById, id, "Classroom"));
     }
 
     @Override
