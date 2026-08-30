@@ -60,7 +60,7 @@ public class IntegrationTestData {
     }
 
     public ClassroomType tipoAulaNormal() {
-        return classroomTypeRepository.findByDescriptionIgnoreCase(defaultClassroomTypeDescription)
+        return classroomTypeRepository.findByDescriptionIgnoreCaseAndDeletedAtIsNull(defaultClassroomTypeDescription)
                 .orElseGet(() -> classroomTypeRepository.save(
                         ClassroomType.builder()
                                 .description(defaultClassroomTypeDescription)
@@ -68,10 +68,13 @@ public class IntegrationTestData {
     }
 
     public Building edificio(String namePrefix, boolean active) {
-        return buildingRepository.save(Building.builder()
+        Building building = Building.builder()
                 .name(namePrefix + "-" + nextSeq())
-                .deletedAt(active ? null : java.time.Instant.now())
-                .build());
+                .build();
+        if (!active) {
+            building.deactivate();
+        }
+        return buildingRepository.save(building);
     }
 
     public Building edificio() {

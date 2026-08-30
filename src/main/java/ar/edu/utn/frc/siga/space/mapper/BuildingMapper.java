@@ -9,6 +9,6 @@ import org.mapstruct.Mapping;
 @Mapper(config = CentralMapperConfig.class)
 public interface BuildingMapper {
 
-    @Mapping(target = "active", expression = "java(building.getDeletedAt() == null)")
+    @Mapping(target = "active", expression = "java(building.isActive())")
     BuildingResponseDto toDto(Building building);
 }

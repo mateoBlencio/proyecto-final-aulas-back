@@ -24,7 +24,7 @@ public class ClassroomTypeServiceImpl implements ClassroomTypeService {
     }
 
     private ClassroomType findExistingById(Long id) {
-        return classroomTypeRepository.findById(id)
+        return classroomTypeRepository.findActiveById(id)
                 .orElseThrow(() -> {
                     log.warn("Tipo de aula no encontrado: id={}", id);
                     return ResourceNotFoundException.of("ClassroomType", id);

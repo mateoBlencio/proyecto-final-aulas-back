@@ -38,8 +38,7 @@ public class BuildingServiceImpl implements BuildingService {
     public List<BuildingResponseDto> findAll(boolean includeInactive) {
         boolean filterInactive = !includeInactive && spaceSettings.isFilterInactiveBuildings();
         log.debug("Listando edificios: includeInactive={}, filterInactive={}", includeInactive, filterInactive);
-        return buildingRepository.findAll().stream()
-                .filter(building -> !filterInactive || building.getDeletedAt() == null)
+        return (filterInactive ? buildingRepository.findAllActive() : buildingRepository.findAll()).stream()
                 .map(buildingMapper::toDto)
                 .toList();
     }
@@ -62,7 +61,11 @@ public class BuildingServiceImpl implements BuildingService {
         log.debug("Cambiando estado activo del edificio: id={}, active={}", id, active);
         Building building = buildingRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("Building", id));
-        building.setDeletedAt(Boolean.TRUE.equals(active) ? null : Instant.now());
+        if (Boolean.TRUE.equals(active)) {
+            building.activate();
+        } else {
+            building.deactivate();
+        }
         Building saved = buildingRepository.save(building);
         log.info("Edificio {} {}", id, active ? "activado" : "desactivado");
 
@@ -111,7 +114,7 @@ public class BuildingServiceImpl implements BuildingService {
             if (isUpToDate(building, hash)) {
                 continue;
             }
-            building.setDeletedAt(null);
+            building.activate();
             building.setName(command.name());
             building.setSyncedAt(syncedAt);
             building.setSysacadHash(hash);
@@ -125,10 +128,10 @@ public class BuildingServiceImpl implements BuildingService {
     private int markAbsent(Iterable<Building> existing, Set<Integer> incoming, Instant syncedAt) {
         int affected = 0;
         for (Building building : existing) {
-            if (incoming.contains(building.getBuildingCode()) || building.getDeletedAt() != null) {
+            if (incoming.contains(building.getBuildingCode()) || building.isDeleted()) {
                 continue;
             }
-            building.setDeletedAt(syncedAt);
+            building.deactivate(syncedAt);
             building.setSyncedAt(syncedAt);
             buildingRepository.save(building);
             affected++;
@@ -138,6 +141,6 @@ public class BuildingServiceImpl implements BuildingService {
     }
 
     private static boolean isUpToDate(Building building, String hash) {
-        return hash.equals(building.getSysacadHash()) && building.getDeletedAt() == null;
+        return hash.equals(building.getSysacadHash()) && building.isActive();
     }
 }

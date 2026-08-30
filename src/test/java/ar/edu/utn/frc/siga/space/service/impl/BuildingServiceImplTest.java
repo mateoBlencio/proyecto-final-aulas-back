@@ -18,7 +18,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -51,10 +50,9 @@ class BuildingServiceImplTest {
     @DisplayName("findAll: con el filtro prendido y sin includeInactive, devuelve solo los edificios activos")
     void findAllReturnsOnlyActiveBuildingsMapped() {
         Building active = SpaceTestData.building().id(1L).build();
-        Building inactive = SpaceTestData.building().id(2L).deletedAt(Instant.now()).build();
         BuildingResponseDto dto = new BuildingResponseDto(1L, "Edificio Central", true);
         when(spaceSettings.isFilterInactiveBuildings()).thenReturn(true);
-        when(buildingRepository.findAll()).thenReturn(List.of(active, inactive));
+        when(buildingRepository.findAllActive()).thenReturn(List.of(active));
         when(buildingMapper.toDto(active)).thenReturn(dto);
 
         List<BuildingResponseDto> result = service.findAll(false);
@@ -66,7 +64,7 @@ class BuildingServiceImplTest {
     @DisplayName("findAll: con el filtro apagado por setting, devuelve todos los edificios")
     void findAllReturnsAllBuildingsWhenFilterDisabled() {
         Building active = SpaceTestData.building().id(1L).build();
-        Building inactive = SpaceTestData.building().id(2L).deletedAt(Instant.now()).build();
+        Building inactive = SpaceTestData.deactivated(SpaceTestData.building().id(2L).build());
         BuildingResponseDto activeDto = new BuildingResponseDto(1L, "Edificio Central", true);
         BuildingResponseDto inactiveDto = new BuildingResponseDto(2L, "Edificio Anexo", false);
         when(spaceSettings.isFilterInactiveBuildings()).thenReturn(false);
@@ -83,7 +81,7 @@ class BuildingServiceImplTest {
     @DisplayName("findAll: con includeInactive=true, devuelve todos los edificios sin consultar el setting")
     void findAllReturnsAllBuildingsWhenIncludeInactiveRequested() {
         Building active = SpaceTestData.building().id(1L).build();
-        Building inactive = SpaceTestData.building().id(2L).deletedAt(Instant.now()).build();
+        Building inactive = SpaceTestData.deactivated(SpaceTestData.building().id(2L).build());
         BuildingResponseDto activeDto = new BuildingResponseDto(1L, "Edificio Central", true);
         BuildingResponseDto inactiveDto = new BuildingResponseDto(2L, "Edificio Anexo", false);
         when(buildingRepository.findAll()).thenReturn(List.of(active, inactive));

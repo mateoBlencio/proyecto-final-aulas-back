@@ -1,13 +1,13 @@
 package ar.edu.utn.frc.siga.space.repository;
 
+import ar.edu.utn.frc.siga.common.repository.SoftDeletableRepository;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
 import java.util.Optional;
-import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface ClassroomTypeRepository extends JpaRepository<ClassroomType, Long> {
+public interface ClassroomTypeRepository extends SoftDeletableRepository<ClassroomType, Long> {
 
-    Optional<ClassroomType> findByDescriptionIgnoreCase(String description);
+    Optional<ClassroomType> findByDescriptionIgnoreCaseAndDeletedAtIsNull(String description);
 
 }

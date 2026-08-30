@@ -35,7 +35,7 @@ class ClassroomTypeServiceImplTest {
     @DisplayName("findById: devuelve el tipo de aula cuando existe")
     void findByIdReturnsExistingType() {
         ClassroomType type = SpaceTestData.classroomType().build();
-        when(classroomTypeRepository.findById(1L)).thenReturn(Optional.of(type));
+        when(classroomTypeRepository.findActiveById(1L)).thenReturn(Optional.of(type));
 
         assertThat(service.findById(1L)).isEqualTo(type);
     }
@@ -43,7 +43,7 @@ class ClassroomTypeServiceImplTest {
     @Test
     @DisplayName("findById: si el tipo no existe, lanza ResourceNotFoundException")
     void findByIdWithMissingTypeThrowsResourceNotFound() {
-        when(classroomTypeRepository.findById(99L)).thenReturn(Optional.empty());
+        when(classroomTypeRepository.findActiveById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
