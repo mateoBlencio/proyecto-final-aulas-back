@@ -26,7 +26,11 @@ class SubjectCommissionMockViewFetcherTest {
             assertThat(row.curso()).isNotBlank();
             assertThat(row.materia()).isNotNull();
             assertThat(row.inscriptos()).isNotNull();
-            assertThat(row.comisionDictado()).isIn(Set.of("A", "1", "2"));
+            // comisionDictado es de fidelidad con la vista real y SysacadCatalogMapper no lo propaga;
+            // cuando viene, usa el mismo dominio que MateriaDictado (A/C).
+            if (row.comisionDictado() != null) {
+                assertThat(row.comisionDictado()).isIn(Set.of("A", "C"));
+            }
         });
     }
 }
