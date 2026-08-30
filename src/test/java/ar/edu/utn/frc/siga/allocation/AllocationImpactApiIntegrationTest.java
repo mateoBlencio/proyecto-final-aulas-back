@@ -164,8 +164,9 @@ class AllocationImpactApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.conflicts[0].blockedBy.allocationId").value(allocationBloqueante))
                 .andExpect(jsonPath("$.conflicts[0].blockedBy.eventType").value("RECURRING"))
                 // el aula pedida está ocupada, así que no puede ofrecerse como alternativa
-                .andExpect(jsonPath("$.conflicts[0].alternativeClassrooms[*].id", not(hasItem(destino.getId()))))
-                .andExpect(jsonPath("$.conflicts[0].alternativeClassrooms[*].id", hasItem(libre.getId())));
+                // (jsonPath devuelve los id como Integer; comparo en int para no fallar por Long vs Integer)
+                .andExpect(jsonPath("$.conflicts[0].alternativeClassrooms[*].id", not(hasItem(destino.getId().intValue()))))
+                .andExpect(jsonPath("$.conflicts[0].alternativeClassrooms[*].id", hasItem(libre.getId().intValue())));
     }
 
     @Test
@@ -188,7 +189,7 @@ class AllocationImpactApiIntegrationTest extends AbstractIntegrationTest {
         // 'origen' queda libre porque justamente lo estoy vaciando con este movimiento.
         impact(byRange(eventId, start, start.plusWeeks(2), destino.getId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.conflicts[0].alternativeClassrooms[*].id", hasItem(origen.getId())));
+                .andExpect(jsonPath("$.conflicts[0].alternativeClassrooms[*].id", hasItem(origen.getId().intValue())));
     }
 
     @Test

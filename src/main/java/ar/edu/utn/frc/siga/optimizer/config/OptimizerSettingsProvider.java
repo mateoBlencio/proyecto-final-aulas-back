@@ -22,22 +22,7 @@ class OptimizerSettingsProvider implements OptimizerSettings {
     }
 
     @Override
-    public int getOvercrowdingWeight() {
-        return settingsReader.getInt(SettingKey.OPTIMIZER_WEIGHT_OVERCROWDING);
-    }
-
-    @Override
-    public int getSameCommissionDiffRoomWeight() {
-        return settingsReader.getInt(SettingKey.OPTIMIZER_WEIGHT_SAME_COMMISSION_DIFF_ROOM);
-    }
-
-    @Override
-    public int getSameCommissionDiffBuildingWeight() {
-        return settingsReader.getInt(SettingKey.OPTIMIZER_WEIGHT_SAME_COMMISSION_DIFF_BUILDING);
-    }
-
-    @Override
-    public int getUnusedCapacityWeight() {
-        return settingsReader.getInt(SettingKey.OPTIMIZER_WEIGHT_UNUSED_CAPACITY);
+    public int getWeight(SettingKey key) {
+        return settingsReader.getInt(key);
     }
 }
