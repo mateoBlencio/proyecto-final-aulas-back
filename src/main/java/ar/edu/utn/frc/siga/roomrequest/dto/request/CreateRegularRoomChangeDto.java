@@ -7,7 +7,6 @@ import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
-/** Cambio de aula regular: uno o más días de dictado, sin fecha. N días = N ítems. */
 public record CreateRegularRoomChangeDto(
         RoomRequestType type,
         @Valid @NotNull RequesterInfo requester,

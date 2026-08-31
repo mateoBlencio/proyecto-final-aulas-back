@@ -7,7 +7,6 @@ import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
-/** Parcial que se toma en horario de clases: el docente marca el/los día(s) de cursado; el horario sale del cursado. */
 public record CreatePartialExamInClassDto(
         RoomRequestType type,
         @Valid @NotNull RequesterInfo requester,

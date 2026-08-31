@@ -7,10 +7,6 @@ import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
-/**
- * Parcial fuera de horario de clases: fecha y franja horaria libres. El front expande "todas /
- * algunas / una" comisión a un ítem por comisión, cada uno con su {@code commissionId}.
- */
 public record CreatePartialExamOffScheduleDto(
         RoomRequestType type,
         @Valid @NotNull RequesterInfo requester,

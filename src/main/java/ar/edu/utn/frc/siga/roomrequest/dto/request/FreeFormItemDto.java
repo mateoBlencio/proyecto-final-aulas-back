@@ -12,12 +12,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Pedido de un parcial fuera de horario de clases, un final, una conferencia o un "otro": el docente
- * carga <b>fecha</b> y <b>franja horaria</b>. {@code commissionId} lo interpreta cada handler
- * (obligatorio y distinto por ítem en el parcial fuera de horario; prohibido en el final; opcional en
- * conferencia y otro).
- */
 public record FreeFormItemDto(
         Long commissionId,
         @NotNull @FutureOrPresent LocalDate date,

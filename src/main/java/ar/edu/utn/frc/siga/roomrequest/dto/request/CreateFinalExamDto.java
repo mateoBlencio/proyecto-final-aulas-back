@@ -7,7 +7,6 @@ import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
-/** Final: se solicita por materia, sin comisión. Nace como un solo ítem (sin auto-generación). */
 public record CreateFinalExamDto(
         RoomRequestType type,
         @Valid @NotNull RequesterInfo requester,

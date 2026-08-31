@@ -6,17 +6,6 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 
-/**
- * Un pedido dentro de una solicitud. Hay dos formas según de dónde salen el día y el horario:
- * <ul>
- *   <li>{@link ScheduledItemDto} — cambio de aula y parcial en horario de clases: el backend deriva
- *       día/horario del cursado ({@code events}); el docente sólo marca el día o la fecha.</li>
- *   <li>{@link FreeFormItemDto} — parcial fuera de horario, final, conferencia y otro: el docente
- *       carga fecha y franja horaria.</li>
- * </ul>
- * Los accesos no presentes en una forma devuelven {@code null} por defecto, para que los handlers
- * lean el pedido de manera uniforme.
- */
 public sealed interface CreateRoomRequestItemDto permits ScheduledItemDto, FreeFormItemDto {
 
     default Long commissionId() {
@@ -71,7 +60,6 @@ public sealed interface CreateRoomRequestItemDto permits ScheduledItemDto, FreeF
 
     List<Long> preferredClassroomIds();
 
-    /** Duración derivada del rango que carga el docente; {@code null} si el rango no vino (lo deriva el backend). */
     default Duration duration() {
         return (startTime() == null || endTime() == null) ? null : Duration.between(startTime(), endTime());
     }

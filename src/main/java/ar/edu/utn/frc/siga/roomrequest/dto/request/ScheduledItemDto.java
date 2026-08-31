@@ -11,12 +11,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Pedido de un cambio de aula o de un parcial en horario de clases. El docente sólo marca
- * <b>una fecha</b> ({@code date}, por única vez) o <b>un día de dictado</b> ({@code dayOfWeek},
- * regular / parcial en clase); el día y el horario reales los deriva el backend del cursado
- * ({@code events}) y no se confía en lo que mande el cliente para esos campos.
- */
 public record ScheduledItemDto(
         @FutureOrPresent LocalDate date,
         DayOfWeek dayOfWeek,

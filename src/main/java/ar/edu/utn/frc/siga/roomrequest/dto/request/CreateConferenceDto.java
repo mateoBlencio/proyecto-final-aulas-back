@@ -7,7 +7,6 @@ import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
-/** Conferencia: materia y comisión opcionales (si vienen, se validan); fecha y franja horaria libres. */
 public record CreateConferenceDto(
         RoomRequestType type,
         @Valid @NotNull RequesterInfo requester,

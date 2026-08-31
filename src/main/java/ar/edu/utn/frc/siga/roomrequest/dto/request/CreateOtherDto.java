@@ -7,7 +7,6 @@ import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
-/** Otro: catch-all. Materia y comisión opcionales; cada ítem exige {@code observations}. */
 public record CreateOtherDto(
         RoomRequestType type,
         @Valid @NotNull RequesterInfo requester,

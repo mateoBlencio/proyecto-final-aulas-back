@@ -7,7 +7,6 @@ import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
-/** Cambio de aula por única vez: una fecha puntual de cursado por ítem. */
 public record CreateOneTimeRoomChangeDto(
         RoomRequestType type,
         @Valid @NotNull RequesterInfo requester,

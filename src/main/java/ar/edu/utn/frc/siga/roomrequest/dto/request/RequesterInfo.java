@@ -6,7 +6,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-/** Quién envía la solicitud y en qué ámbito académico. Común a todos los tipos. */
 public record RequesterInfo(
         @NotNull AcademicScope scope,
         @NotBlank @Size(max = 150) String teacherName,
