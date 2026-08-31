@@ -1,65 +1,78 @@
 package ar.edu.utn.frc.siga.roomrequest.dto.request;
 
-import jakarta.validation.constraints.AssertTrue;
-import jakarta.validation.constraints.FutureOrPresent;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
-
+import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
-public record CreateRoomRequestItemDto(
-        Long commissionId,
-        @NotNull @FutureOrPresent LocalDate date,
-        LocalTime startTime,
-        LocalTime endTime,
-        @Min(0) Integer enrolled,
-        @NotNull @Min(0) Integer estimated,
-        @NotNull @Min(1) Integer classroomCount,
-        Long currentClassroomId,
-        Boolean requiresProjector,
-        Boolean requiresComputers,
-        @Min(1) Integer computerCount,
-        Boolean requiresExamUsers,
-        @Size(max = 255) String requiredSoftware,
-        @Size(max = 1000) String observations,
-        List<Long> preferredClassroomIds
-) {
+/**
+ * Un pedido dentro de una solicitud. Hay dos formas según de dónde salen el día y el horario:
+ * <ul>
+ *   <li>{@link ScheduledItemDto} — cambio de aula y parcial en horario de clases: el backend deriva
+ *       día/horario del cursado ({@code events}); el docente sólo marca el día o la fecha.</li>
+ *   <li>{@link FreeFormItemDto} — parcial fuera de horario, final, conferencia y otro: el docente
+ *       carga fecha y franja horaria.</li>
+ * </ul>
+ * Los accesos no presentes en una forma devuelven {@code null} por defecto, para que los handlers
+ * lean el pedido de manera uniforme.
+ */
+public sealed interface CreateRoomRequestItemDto permits ScheduledItemDto, FreeFormItemDto {
 
-    /** Normaliza "sin preferencias" a lista vacía; un id inexistente lo rechaza el validator con un 404 claro. */
-    public CreateRoomRequestItemDto {
-        preferredClassroomIds = preferredClassroomIds == null
-                ? List.of()
-                : Collections.unmodifiableList(new ArrayList<>(preferredClassroomIds));
+    default Long commissionId() {
+        return null;
     }
 
-    /** No valida que el rango sea positivo: eso lo garantiza {@link #isTimeRangeValid()}. */
-    public Duration duration() {
-        return (startTime == null || endTime == null) ? null : Duration.between(startTime, endTime);
+    default LocalDate date() {
+        return null;
     }
 
-    @AssertTrue(message = "La hora de fin debe ser posterior a la hora de inicio")
-    private boolean isTimeRangeValid() {
-        return startTime == null || endTime == null || endTime.isAfter(startTime);
+    default DayOfWeek dayOfWeek() {
+        return null;
     }
 
-    @AssertTrue(message = "Debe indicar la cantidad de computadoras si requiere computadoras, y omitirla si no")
-    private boolean isComputerCountValid() {
-        return Boolean.TRUE.equals(requiresComputers) == (computerCount != null);
+    default LocalTime startTime() {
+        return null;
     }
 
-    @AssertTrue(message = "Solo se puede indicar software requerido si requiere computadoras")
-    private boolean isRequiredSoftwareValid() {
-        return requiredSoftware == null || Boolean.TRUE.equals(requiresComputers);
+    default LocalTime endTime() {
+        return null;
     }
 
-    @AssertTrue(message = "No se puede repetir un aula en las preferencias")
-    private boolean isPreferencesValid() {
-        return preferredClassroomIds.size() == preferredClassroomIds.stream().distinct().count();
+    default Integer estimated() {
+        return null;
+    }
+
+    Integer classroomCount();
+
+    default Boolean requiresProjector() {
+        return null;
+    }
+
+    default Boolean requiresComputers() {
+        return null;
+    }
+
+    default Integer computerCount() {
+        return null;
+    }
+
+    default Boolean requiresExamUsers() {
+        return null;
+    }
+
+    default String requiredSoftware() {
+        return null;
+    }
+
+    default String observations() {
+        return null;
+    }
+
+    List<Long> preferredClassroomIds();
+
+    /** Duración derivada del rango que carga el docente; {@code null} si el rango no vino (lo deriva el backend). */
+    default Duration duration() {
+        return (startTime() == null || endTime() == null) ? null : Duration.between(startTime(), endTime());
     }
 }

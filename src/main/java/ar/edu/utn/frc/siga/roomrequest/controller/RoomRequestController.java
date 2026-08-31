@@ -51,7 +51,8 @@ public class RoomRequestController {
                description = "Registra una solicitud con sus pedidos y queda en estado PENDING "
                        + "para que subsecretaría la analice. Endpoint público")
     public ResponseEntity<RoomRequestResponseDto> create(@Valid @RequestBody CreateRoomRequestDto dto) {
-        log.debug("POST /v1/room-requests: teacherName={}, type={}, items={}", dto.teacherName(), dto.type(), dto.items().size());
+        log.debug("POST /v1/room-requests: teacherName={}, type={}, items={}",
+                dto.requester().teacherName(), dto.type(), dto.items().size());
         RoomRequestResponseDto response = roomRequestService.create(dto);
         log.info("Solicitud de aula creada vía controller: id={}", response.id());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

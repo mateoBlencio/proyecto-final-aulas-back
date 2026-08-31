@@ -50,6 +50,8 @@ public final class RoomRequestItemSort {
             throw new InvalidRoomRequestException(
                     "Campo de ordenamiento inválido: '" + order.getProperty() + "'. Válidos: " + ALLOWED.keySet());
         }
+        // Los pedidos sin fecha (día de dictado) quedan al final del orden ascendente por fecha: es el
+        // comportamiento por defecto de Postgres para NULLS en ASC, y el desempate por id lo estabiliza.
         return order.isAscending() ? Sort.Order.asc(jpaProperty) : Sort.Order.desc(jpaProperty);
     }
 }

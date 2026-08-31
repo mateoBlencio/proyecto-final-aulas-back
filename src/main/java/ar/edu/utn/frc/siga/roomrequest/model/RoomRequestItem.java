@@ -27,6 +27,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.BatchSize;
 import org.hibernate.envers.Audited;
 
+import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -76,28 +77,33 @@ public class RoomRequestItem extends TimestampedEntity {
     @Column(name = "id_comision")
     private Long commissionId;
 
-    @Column(name = "fecha", nullable = false)
+    /** Fecha puntual del pedido. Nula en los tipos que se atan a un día de dictado ({@link #dayOfWeek}). */
+    @Column(name = "fecha")
     private LocalDate date;
+
+    /** Día de dictado del pedido. Nulo en los tipos que se atan a una fecha puntual ({@link #date}). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "dia_semana", length = 20)
+    private DayOfWeek dayOfWeek;
+
+    /** Evento recurrente del que se derivó día y horario, cuando el tipo usa el cursado. Trazabilidad. */
+    @Column(name = "id_evento_recurrente")
+    private Long sourceRecurringEventId;
 
     @Column(name = "hora_inicio")
     private LocalTime startTime;
 
     @Convert(converter = DurationMinutesConverter.class)
     @Column(name = "duracion_minutos")
-    private Duration duration; // aca en caso de tratarse de type clase (unica vez o recurrente) podriamos sacar los datos de sysacad
+    private Duration duration;
 
-    @Column(name = "cantidad_inscriptos")
-    private Integer enrolled; // a chequear si debe seguir funcionado, si nosotros ya tenemos los datos desde sysacad
-
-    @Column(name = "cantidad_estimada", nullable = false)
+    /** Cantidad estimada de asistentes. Nula en los cambios de aula, que no la piden. */
+    @Column(name = "cantidad_estimada")
     private Integer estimated;
 
     @Column(name = "cantidad_aulas", nullable = false)
     @Builder.Default
     private Integer classroomCount = 1;
-
-    @Column(name = "id_aula_actual")
-    private Long currentClassroomId;
 
     @Column(name = "requiere_proyector", nullable = false)
     @Builder.Default

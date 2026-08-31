@@ -138,9 +138,6 @@ public class RoomRequestComposer {
 
     private void collectClassroomIds(Collection<RoomRequestItem> items, Set<Long> classroomIds) {
         for (RoomRequestItem item : items) {
-            if (item.getCurrentClassroomId() != null) {
-                classroomIds.add(item.getCurrentClassroomId());
-            }
             item.getPreferences().stream().map(RoomPreference::getClassroomId).forEach(classroomIds::add);
         }
     }
@@ -149,7 +146,7 @@ public class RoomRequestComposer {
         List<RoomRequestItemResponseDto> result = new ArrayList<>(items.size());
         for (RoomRequestItem item : items) {
             result.add(mapper.toDto(item, resolveCommission(item, catalogs),
-                    resolveCurrentClassroom(item, catalogs), resolvePreferredClassrooms(item, catalogs)));
+                    resolvePreferredClassrooms(item, catalogs)));
         }
         return result;
     }
@@ -160,10 +157,6 @@ public class RoomRequestComposer {
 
     private CommissionResponseDto resolveCommission(RoomRequestItem item, Catalogs catalogs) {
         return item.getCommissionId() != null ? catalogs.commissionsById().get(item.getCommissionId()) : null;
-    }
-
-    private ClassroomOptionDto resolveCurrentClassroom(RoomRequestItem item, Catalogs catalogs) {
-        return item.getCurrentClassroomId() != null ? catalogs.classroomsById().get(item.getCurrentClassroomId()) : null;
     }
 
     private List<ClassroomOptionDto> resolvePreferredClassrooms(RoomRequestItem item, Catalogs catalogs) {

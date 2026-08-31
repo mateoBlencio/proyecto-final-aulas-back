@@ -1,0 +1,73 @@
+package ar.edu.utn.frc.siga.roomrequest.handler;
+
+import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateOneTimeRoomChangeDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestItemDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.ScheduledItemDto;
+import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
+import ar.edu.utn.frc.siga.roomrequest.validator.AcademicReferenceValidator;
+import ar.edu.utn.frc.siga.roomrequest.validator.ClassroomReferenceValidator;
+import ar.edu.utn.frc.siga.roomrequest.validator.CursadoScheduleService;
+import ar.edu.utn.frc.siga.roomrequest.validator.CursadoSlot;
+import ar.edu.utn.frc.siga.roomrequest.validator.ItemConsistency;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+/** Cambio de aula por única vez: una fecha de cursado real por ítem; día y horario salen del cursado. */
+@Component
+public class OneTimeRoomChangeHandler extends AbstractRoomRequestHandler {
+
+    public OneTimeRoomChangeHandler(AcademicReferenceValidator academicReference,
+                                    ClassroomReferenceValidator classroomReference,
+                                    CursadoScheduleService cursadoSchedule) {
+        super(academicReference, classroomReference, cursadoSchedule);
+    }
+
+    @Override
+    public RoomRequestType type() {
+        return RoomRequestType.ONE_TIME_ROOM_CHANGE;
+    }
+
+    @Override
+    protected void validateItems(CreateRoomRequestDto dto) {
+        List<ScheduledItemDto> items = ((CreateOneTimeRoomChangeDto) dto).items();
+        for (ScheduledItemDto item : items) {
+            if (item.date() == null) {
+                throw new InvalidRoomRequestException("Cada pedido de cambio de aula por única vez requiere una fecha.");
+            }
+            if (item.dayOfWeek() != null) {
+                throw new InvalidRoomRequestException(
+                        "El cambio de aula por única vez se ata a una fecha, no a un día de dictado.");
+            }
+            if (item.estimated() != null) {
+                throw new InvalidRoomRequestException("El cambio de aula no lleva cantidad estimada de asistentes.");
+            }
+            ItemConsistency.requireExamUsersConsistent(false, item);
+        }
+        ItemConsistency.requireDistinct(items.stream().map(ScheduledItemDto::date).toList(), "una fecha");
+    }
+
+    @Override
+    protected void validateReferences(CreateRoomRequestDto dto) {
+        academicReference.requireSubject(dto.subjectId());
+        academicReference.requireCommissionOfSubject(dto.subjectId(), dto.commissionId());
+        for (ScheduledItemDto item : ((CreateOneTimeRoomChangeDto) dto).items()) {
+            cursadoSchedule.requireCursadoDate(dto.subjectId(), dto.commissionId(), item.date());
+        }
+    }
+
+    @Override
+    protected RoomRequestItem buildItem(CreateRoomRequestItemDto item, CreateRoomRequestDto dto) {
+        CursadoSlot slot = cursadoSchedule.requireCursadoDate(dto.subjectId(), dto.commissionId(), item.date());
+        return baseItem(item)
+                .commissionId(dto.commissionId())
+                .date(item.date())
+                .startTime(slot.startTime())
+                .duration(slot.duration())
+                .sourceRecurringEventId(slot.recurringEventId())
+                .build();
+    }
+}

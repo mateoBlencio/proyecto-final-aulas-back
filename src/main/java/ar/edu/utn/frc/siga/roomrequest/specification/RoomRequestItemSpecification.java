@@ -26,11 +26,15 @@ public class RoomRequestItemSpecification {
             if (filter.subjectId() != null) {
                 predicates.add(cb.equal(root.get("request").get("subjectId"), filter.subjectId()));
             }
+            // Los pedidos sin fecha (cambio de aula regular, parcial en horario de clases) se atan a un
+            // día de dictado, no vencen y quedan siempre visibles: el corte por fecha no los excluye.
             if (filter.dateFrom() != null) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get("date"), filter.dateFrom()));
+                predicates.add(cb.or(root.get("date").isNull(),
+                        cb.greaterThanOrEqualTo(root.get("date"), filter.dateFrom())));
             }
             if (filter.dateTo() != null) {
-                predicates.add(cb.lessThanOrEqualTo(root.get("date"), filter.dateTo()));
+                predicates.add(cb.or(root.get("date").isNull(),
+                        cb.lessThanOrEqualTo(root.get("date"), filter.dateTo())));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
