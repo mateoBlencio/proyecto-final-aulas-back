@@ -24,6 +24,8 @@ public interface ClassroomMapper {
     @Mapping(target = "sysacadHash", ignore = true)
     @Mapping(target = "sysacadEnabled", ignore = true)
     @Mapping(target = "version", ignore = true)
+    @Mapping(target = "permissionMode", ignore = true)
+    @Mapping(target = "observations", ignore = true)
     Classroom toEntity(ClassroomRequestDto dto);
 
     @Mapping(target = "id", ignore = true)
@@ -33,5 +35,7 @@ public interface ClassroomMapper {
     @Mapping(target = "sysacadHash", ignore = true)
     @Mapping(target = "sysacadEnabled", ignore = true)
     @Mapping(target = "version", ignore = true)
+    @Mapping(target = "permissionMode", ignore = true)
+    @Mapping(target = "observations", ignore = true)
     void updateEntity(@MappingTarget Classroom entity, ClassroomRequestDto dto);
 }
