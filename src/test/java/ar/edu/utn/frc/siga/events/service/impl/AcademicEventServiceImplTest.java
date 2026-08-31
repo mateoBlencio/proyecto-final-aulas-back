@@ -54,6 +54,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -202,6 +203,67 @@ class AcademicEventServiceImplTest {
 
         assertThat(result).isEmpty();
         verify(eventRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("findRecurringEventsBySubjectAndCommission: consulta el cursado vigente (a partir de hoy) y devuelve los slots recurrentes compuestos")
+    void findRecurringEventsBySubjectAndCommissionDevuelveSlots() {
+        RecurringEvent lunes = EventTestData.recurringEvent(1L, DayOfWeek.MONDAY,
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31));
+        RecurringEvent miercoles = EventTestData.recurringEvent(2L, DayOfWeek.WEDNESDAY,
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31));
+        when(recurringEventRepository.findActiveBySubjectAndCommission(eq(1L), eq(9L), any(LocalDate.class)))
+                .thenReturn(List.of(lunes, miercoles));
+        when(composer.compose(anyCollection()))
+                .thenReturn(List.of(dummyRecurringResponseDto(1L), dummyRecurringResponseDto(2L)));
+
+        List<RecurringEventResponseDto> result = service.findRecurringEventsBySubjectAndCommission(1L, 9L);
+
+        assertThat(result).extracting(RecurringEventResponseDto::id).containsExactly(1L, 2L);
+        verify(recurringEventRepository).findActiveBySubjectAndCommission(eq(1L), eq(9L), any(LocalDate.class));
+    }
+
+    @Test
+    @DisplayName("findRecurringEventsBySubjectAndCommission: sin cursado vigente → lista vacía")
+    void findRecurringEventsBySubjectAndCommissionSinCursado() {
+        when(recurringEventRepository.findActiveBySubjectAndCommission(eq(1L), eq(9L), any(LocalDate.class)))
+                .thenReturn(List.of());
+        when(composer.compose(anyCollection())).thenReturn(List.of());
+
+        assertThat(service.findRecurringEventsBySubjectAndCommission(1L, 9L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("findCursadoOccurrences: junta las ocurrencias de los eventos vigentes desde 'from' y las devuelve ordenadas por fecha")
+    void findCursadoOccurrencesOrdenadasPorFecha() {
+        RecurringEvent lunes = EventTestData.recurringEvent(1L, DayOfWeek.MONDAY,
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31));
+        LocalDate from = LocalDate.of(2026, 4, 1);
+        when(recurringEventRepository.findActiveBySubjectAndCommission(eq(1L), eq(9L), any(LocalDate.class)))
+                .thenReturn(List.of(lunes));
+        Occurrence o1 = EventTestData.occurrence(11L, lunes, LocalDate.of(2026, 4, 20), OccurrenceStatus.NEEDS_ROOM);
+        Occurrence o2 = EventTestData.occurrence(12L, lunes, LocalDate.of(2026, 4, 6), OccurrenceStatus.NEEDS_ROOM);
+        when(occurrenceRepository.findByEvent_IdInAndDateGreaterThanEqual(List.of(1L), from))
+                .thenReturn(List.of(o1, o2));
+        when(occurrenceMapper.toDto(o1)).thenReturn(new OccurrenceResponseDto(11L, 1L, o1.getDate(),
+                OccurrenceStatus.NEEDS_ROOM, LocalTime.of(8, 0), LocalTime.of(9, 30)));
+        when(occurrenceMapper.toDto(o2)).thenReturn(new OccurrenceResponseDto(12L, 1L, o2.getDate(),
+                OccurrenceStatus.NEEDS_ROOM, LocalTime.of(8, 0), LocalTime.of(9, 30)));
+
+        List<OccurrenceResponseDto> result = service.findCursadoOccurrences(1L, 9L, from);
+
+        assertThat(result).extracting(OccurrenceResponseDto::date)
+                .containsExactly(LocalDate.of(2026, 4, 6), LocalDate.of(2026, 4, 20));
+    }
+
+    @Test
+    @DisplayName("findCursadoOccurrences: sin cursado vigente → lista vacía, no consulta ocurrencias")
+    void findCursadoOccurrencesSinCursado() {
+        when(recurringEventRepository.findActiveBySubjectAndCommission(eq(1L), eq(9L), any(LocalDate.class)))
+                .thenReturn(List.of());
+
+        assertThat(service.findCursadoOccurrences(1L, 9L, LocalDate.of(2026, 4, 1))).isEmpty();
+        verify(occurrenceRepository, never()).findByEvent_IdInAndDateGreaterThanEqual(anyCollection(), any());
     }
 
     @Test
