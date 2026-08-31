@@ -1,0 +1,11 @@
+meta {
+  name: Desactivar edificio (soft-delete)
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/v1/buildings/1/activation
+  body: none
+  auth: inherit
+}

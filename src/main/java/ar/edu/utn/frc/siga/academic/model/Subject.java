@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.siga.academic.model;
 
-import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
+import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -18,18 +18,16 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "materia",
        uniqueConstraints = @UniqueConstraint(name = "uq_materia_plan_codigo", columnNames = {"id_plan", "codigo_materia"}))
-@SQLRestriction("eliminado_en IS NULL")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Subject extends TimestampedEntity {
+public class Subject extends SoftDeletableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -48,9 +46,6 @@ public class Subject extends TimestampedEntity {
 
     @Column(name = "dictado")
     private String term;
-
-    @Column(name = "eliminado_en")
-    private Instant deletedAt;
 
     @Column(name = "sincronizado_en")
     private Instant syncedAt;

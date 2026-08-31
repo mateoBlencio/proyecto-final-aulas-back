@@ -1,8 +1,8 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
-import ar.edu.utn.frc.siga.space.config.SpaceSettings;
 import ar.edu.utn.frc.siga.space.dto.request.BuildingActiveBatchItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.mapper.BuildingMapper;
@@ -32,14 +32,11 @@ public class BuildingServiceImpl implements BuildingService {
 
     private final BuildingRepository buildingRepository;
     private final BuildingMapper buildingMapper;
-    private final SpaceSettings spaceSettings;
 
     @Override
-    public List<BuildingResponseDto> findAll(boolean includeInactive) {
-        boolean filterInactive = !includeInactive && spaceSettings.isFilterInactiveBuildings();
-        log.debug("Listando edificios: includeInactive={}, filterInactive={}", includeInactive, filterInactive);
-        return buildingRepository.findAll().stream()
-                .filter(building -> !filterInactive || building.getDeletedAt() == null)
+    public List<BuildingResponseDto> findAll(boolean includeDeactivated) {
+        log.debug("Listando edificios: includeDeactivated={}", includeDeactivated);
+        return (includeDeactivated ? buildingRepository.findAll() : buildingRepository.findAllActive()).stream()
                 .map(buildingMapper::toDto)
                 .toList();
     }
@@ -62,11 +59,27 @@ public class BuildingServiceImpl implements BuildingService {
         log.debug("Cambiando estado activo del edificio: id={}, active={}", id, active);
         Building building = buildingRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("Building", id));
-        building.setDeletedAt(Boolean.TRUE.equals(active) ? null : Instant.now());
+        if (Boolean.TRUE.equals(active)) {
+            building.activate();
+        } else {
+            building.deactivate();
+        }
         Building saved = buildingRepository.save(building);
         log.info("Edificio {} {}", id, active ? "activado" : "desactivado");
 
         return buildingMapper.toDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public void activate(Long id) {
+        buildingRepository.restore(Finder.orThrow(buildingRepository::findById, id, "Building"));
+    }
+
+    @Override
+    @Transactional
+    public void deactivate(Long id) {
+        buildingRepository.softDelete(Finder.orThrow(buildingRepository::findById, id, "Building"));
     }
 
     @Override
@@ -111,7 +124,7 @@ public class BuildingServiceImpl implements BuildingService {
             if (isUpToDate(building, hash)) {
                 continue;
             }
-            building.setDeletedAt(null);
+            building.activate();
             building.setName(command.name());
             building.setSyncedAt(syncedAt);
             building.setSysacadHash(hash);
@@ -125,10 +138,10 @@ public class BuildingServiceImpl implements BuildingService {
     private int markAbsent(Iterable<Building> existing, Set<Integer> incoming, Instant syncedAt) {
         int affected = 0;
         for (Building building : existing) {
-            if (incoming.contains(building.getBuildingCode()) || building.getDeletedAt() != null) {
+            if (incoming.contains(building.getBuildingCode()) || building.isDeleted()) {
                 continue;
             }
-            building.setDeletedAt(syncedAt);
+            building.deactivate(syncedAt);
             building.setSyncedAt(syncedAt);
             buildingRepository.save(building);
             affected++;
@@ -138,6 +151,6 @@ public class BuildingServiceImpl implements BuildingService {
     }
 
     private static boolean isUpToDate(Building building, String hash) {
-        return hash.equals(building.getSysacadHash()) && building.getDeletedAt() == null;
+        return hash.equals(building.getSysacadHash()) && building.isActive();
     }
 }

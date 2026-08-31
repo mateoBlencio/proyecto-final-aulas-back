@@ -29,6 +29,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.DayOfWeek;
@@ -42,6 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @Import(IntegrationTestData.class)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_CLASS)
 @DisplayName("Excel Import (integración)")
 class IngestIntegrationTest extends AbstractIntegrationTest {
 
@@ -135,7 +137,7 @@ class IngestIntegrationTest extends AbstractIntegrationTest {
         assertThat(eventRepository.count()).isEqualTo(eventsBefore);
         assertThat(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester())).isPresent();
 
-        Classroom classroom1 = classroomRepository.findByRoomNumber((Integer) row1.roomNumber()).orElseThrow();
+        Classroom classroom1 = classroomRepository.findByRoomNumberAndDeletedAtIsNull((Integer) row1.roomNumber()).orElseThrow();
         assertThat(classroom1.getCapacity()).isEqualTo(row1.enrolledCount());
 
         Long eventId1 = jdbcTemplate.queryForObject(

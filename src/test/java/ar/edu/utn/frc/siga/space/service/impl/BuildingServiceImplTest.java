@@ -3,7 +3,6 @@ package ar.edu.utn.frc.siga.space.service.impl;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.SpaceTestData;
-import ar.edu.utn.frc.siga.space.config.SpaceSettings;
 import ar.edu.utn.frc.siga.space.dto.request.BuildingActiveBatchItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.mapper.BuildingMapper;
@@ -18,7 +17,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -37,24 +35,20 @@ class BuildingServiceImplTest {
     private BuildingRepository buildingRepository;
     @Mock
     private BuildingMapper buildingMapper;
-    @Mock
-    private SpaceSettings spaceSettings;
 
     private BuildingServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new BuildingServiceImpl(buildingRepository, buildingMapper, spaceSettings);
+        service = new BuildingServiceImpl(buildingRepository, buildingMapper);
     }
 
     @Test
-    @DisplayName("findAll: con el filtro prendido y sin includeInactive, devuelve solo los edificios activos")
+    @DisplayName("findAll: sin includeDeactivated, devuelve solo los edificios activos")
     void findAllReturnsOnlyActiveBuildingsMapped() {
         Building active = SpaceTestData.building().id(1L).build();
-        Building inactive = SpaceTestData.building().id(2L).deletedAt(Instant.now()).build();
         BuildingResponseDto dto = new BuildingResponseDto(1L, "Edificio Central", true);
-        when(spaceSettings.isFilterInactiveBuildings()).thenReturn(true);
-        when(buildingRepository.findAll()).thenReturn(List.of(active, inactive));
+        when(buildingRepository.findAllActive()).thenReturn(List.of(active));
         when(buildingMapper.toDto(active)).thenReturn(dto);
 
         List<BuildingResponseDto> result = service.findAll(false);
@@ -63,27 +57,10 @@ class BuildingServiceImplTest {
     }
 
     @Test
-    @DisplayName("findAll: con el filtro apagado por setting, devuelve todos los edificios")
-    void findAllReturnsAllBuildingsWhenFilterDisabled() {
+    @DisplayName("findAll: con includeDeactivated=true, devuelve todos los edificios")
+    void findAllReturnsAllBuildingsWhenIncludeDeactivatedRequested() {
         Building active = SpaceTestData.building().id(1L).build();
-        Building inactive = SpaceTestData.building().id(2L).deletedAt(Instant.now()).build();
-        BuildingResponseDto activeDto = new BuildingResponseDto(1L, "Edificio Central", true);
-        BuildingResponseDto inactiveDto = new BuildingResponseDto(2L, "Edificio Anexo", false);
-        when(spaceSettings.isFilterInactiveBuildings()).thenReturn(false);
-        when(buildingRepository.findAll()).thenReturn(List.of(active, inactive));
-        when(buildingMapper.toDto(active)).thenReturn(activeDto);
-        when(buildingMapper.toDto(inactive)).thenReturn(inactiveDto);
-
-        List<BuildingResponseDto> result = service.findAll(false);
-
-        assertThat(result).containsExactly(activeDto, inactiveDto);
-    }
-
-    @Test
-    @DisplayName("findAll: con includeInactive=true, devuelve todos los edificios sin consultar el setting")
-    void findAllReturnsAllBuildingsWhenIncludeInactiveRequested() {
-        Building active = SpaceTestData.building().id(1L).build();
-        Building inactive = SpaceTestData.building().id(2L).deletedAt(Instant.now()).build();
+        Building inactive = SpaceTestData.deactivated(SpaceTestData.building().id(2L).build());
         BuildingResponseDto activeDto = new BuildingResponseDto(1L, "Edificio Central", true);
         BuildingResponseDto inactiveDto = new BuildingResponseDto(2L, "Edificio Anexo", false);
         when(buildingRepository.findAll()).thenReturn(List.of(active, inactive));
@@ -93,7 +70,6 @@ class BuildingServiceImplTest {
         List<BuildingResponseDto> result = service.findAll(true);
 
         assertThat(result).containsExactly(activeDto, inactiveDto);
-        verify(spaceSettings, org.mockito.Mockito.never()).isFilterInactiveBuildings();
     }
 
     @Test

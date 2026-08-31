@@ -137,7 +137,9 @@ class ClassroomApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[?(@.id == " + id + ")]").isEmpty());
 
-        assertThat(classroomRepository.findById(id)).isEmpty();
+        assertThat(classroomRepository.findActiveById(id)).isEmpty();
+        assertThat(classroomRepository.findById(id)).get()
+                .satisfies(classroom -> assertThat(classroom.isDeleted()).isTrue());
     }
 
     @Test

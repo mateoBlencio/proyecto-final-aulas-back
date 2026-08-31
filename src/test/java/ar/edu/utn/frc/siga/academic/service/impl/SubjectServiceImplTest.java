@@ -61,7 +61,7 @@ class SubjectServiceImplTest {
     void findByIdReturnsMappedDto() {
         Subject subject = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
         SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null);
-        when(subjectRepository.findById(5L)).thenReturn(Optional.of(subject));
+        when(subjectRepository.findActiveById(5L)).thenReturn(Optional.of(subject));
         when(subjectMapper.toDto(subject)).thenReturn(dto);
 
         SubjectResponseDto result = service.findById(5L);
@@ -72,7 +72,7 @@ class SubjectServiceImplTest {
     @Test
     @DisplayName("findById: si la materia no existe, lanza ResourceNotFoundException")
     void findByIdWithMissingSubjectThrowsResourceNotFound() {
-        when(subjectRepository.findById(99L)).thenReturn(Optional.empty());
+        when(subjectRepository.findActiveById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -97,10 +97,25 @@ class SubjectServiceImplTest {
     void findAllMapsAllSubjects() {
         Subject subject = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
         SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null);
-        when(subjectRepository.findAll()).thenReturn(List.of(subject));
+        when(subjectRepository.findAllActive()).thenReturn(List.of(subject));
         when(subjectMapper.toDto(subject)).thenReturn(dto);
 
-        assertThat(service.findAll()).containsExactly(dto);
+        assertThat(service.findAll(false)).containsExactly(dto);
+    }
+
+    @Test
+    @DisplayName("findAll: con includeDeactivated=true, mapea todas las materias (activas e inactivas)")
+    void findAllWithIncludeDeactivatedMapsEveryStatus() {
+        Subject active = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
+        Subject inactive = Subject.builder().id(6L).code(102).name("Química").studyPlan(studyPlan).build();
+        inactive.deactivate();
+        SubjectResponseDto activeDto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null);
+        SubjectResponseDto inactiveDto = new SubjectResponseDto(6L, 102, "Química", null, null);
+        when(subjectRepository.findAll()).thenReturn(List.of(active, inactive));
+        when(subjectMapper.toDto(active)).thenReturn(activeDto);
+        when(subjectMapper.toDto(inactive)).thenReturn(inactiveDto);
+
+        assertThat(service.findAll(true)).containsExactly(activeDto, inactiveDto);
     }
 
     @Test
@@ -111,7 +126,23 @@ class SubjectServiceImplTest {
         when(subjectRepository.findByStudyPlan_Specialty_SpecialtyCode(10)).thenReturn(List.of(subject));
         when(subjectMapper.toDto(subject)).thenReturn(dto);
 
-        assertThat(service.findBySpecialtyCode(10)).containsExactly(dto);
+        assertThat(service.findBySpecialtyCode(10, false)).containsExactly(dto);
+    }
+
+    @Test
+    @DisplayName("findBySpecialtyCode: sin includeDeactivated, descarta las materias desactivadas")
+    void findBySpecialtyCodeFiltersOutDeactivated() {
+        Subject active = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
+        Subject inactive = Subject.builder().id(6L).code(102).name("Química").studyPlan(studyPlan).build();
+        inactive.deactivate();
+        SubjectResponseDto activeDto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null);
+        SubjectResponseDto inactiveDto = new SubjectResponseDto(6L, 102, "Química", null, null);
+        when(subjectRepository.findByStudyPlan_Specialty_SpecialtyCode(10)).thenReturn(List.of(active, inactive));
+        when(subjectMapper.toDto(active)).thenReturn(activeDto);
+        when(subjectMapper.toDto(inactive)).thenReturn(inactiveDto);
+
+        assertThat(service.findBySpecialtyCode(10, true)).containsExactly(activeDto, inactiveDto);
+        assertThat(service.findBySpecialtyCode(10, false)).containsExactly(activeDto);
     }
 
     @Test
@@ -119,7 +150,7 @@ class SubjectServiceImplTest {
     void findBySpecialtyCodeWithoutMatchesReturnsEmptyList() {
         when(subjectRepository.findByStudyPlan_Specialty_SpecialtyCode(999)).thenReturn(List.of());
 
-        assertThat(service.findBySpecialtyCode(999)).isEmpty();
+        assertThat(service.findBySpecialtyCode(999, false)).isEmpty();
     }
 
     @Test
@@ -128,8 +159,8 @@ class SubjectServiceImplTest {
         Subject existing = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
         SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", "Anual", null);
         when(specialtyRepository.findBySpecialtyCode(10)).thenReturn(Optional.of(specialty));
-        when(studyPlanRepository.findByPlanCodeAndSpecialty(2020, specialty)).thenReturn(Optional.of(studyPlan));
-        when(subjectRepository.findByCodeAndStudyPlan(101, studyPlan)).thenReturn(Optional.of(existing));
+        when(studyPlanRepository.findByPlanCodeAndSpecialtyAndDeletedAtIsNull(2020, specialty)).thenReturn(Optional.of(studyPlan));
+        when(subjectRepository.findByCodeAndStudyPlanAndDeletedAtIsNull(101, studyPlan)).thenReturn(Optional.of(existing));
         when(subjectMapper.toDto(existing)).thenReturn(dto);
 
         SubjectResponseDto result = service.findByCodeAndStudyPlan(101, 2020, 10);
@@ -151,7 +182,7 @@ class SubjectServiceImplTest {
     @DisplayName("findByCodeAndStudyPlan: si el plan de estudio no existe para esa especialidad, lanza ResourceNotFoundException")
     void findByCodeAndStudyPlanWithMissingStudyPlanThrowsResourceNotFound() {
         when(specialtyRepository.findBySpecialtyCode(10)).thenReturn(Optional.of(specialty));
-        when(studyPlanRepository.findByPlanCodeAndSpecialty(2020, specialty)).thenReturn(Optional.empty());
+        when(studyPlanRepository.findByPlanCodeAndSpecialtyAndDeletedAtIsNull(2020, specialty)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findByCodeAndStudyPlan(101, 2020, 10))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -162,8 +193,8 @@ class SubjectServiceImplTest {
     @DisplayName("findByCodeAndStudyPlan: si la materia no existe para ese plan, lanza ResourceNotFoundException")
     void findByCodeAndStudyPlanWithMissingSubjectThrowsResourceNotFound() {
         when(specialtyRepository.findBySpecialtyCode(10)).thenReturn(Optional.of(specialty));
-        when(studyPlanRepository.findByPlanCodeAndSpecialty(2020, specialty)).thenReturn(Optional.of(studyPlan));
-        when(subjectRepository.findByCodeAndStudyPlan(101, studyPlan)).thenReturn(Optional.empty());
+        when(studyPlanRepository.findByPlanCodeAndSpecialtyAndDeletedAtIsNull(2020, specialty)).thenReturn(Optional.of(studyPlan));
+        when(subjectRepository.findByCodeAndStudyPlanAndDeletedAtIsNull(101, studyPlan)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findByCodeAndStudyPlan(101, 2020, 10))
                 .isInstanceOf(ResourceNotFoundException.class)

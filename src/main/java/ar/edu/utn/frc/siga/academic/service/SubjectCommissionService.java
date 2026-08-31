@@ -1,13 +1,15 @@
 package ar.edu.utn.frc.siga.academic.service;
 
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
+import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
+import ar.edu.utn.frc.siga.common.service.ActivationService;
 
 import java.util.List;
 
 import org.springframework.modulith.NamedInterface;
 
 @NamedInterface("api")
-public interface SubjectCommissionService {
+public interface SubjectCommissionService extends ActivationService<SubjectCommissionId> {
 
     SubjectCommissionResponseDto findBySubjectAndCommission(Long subjectId, Long commissionId);
 
@@ -20,7 +22,7 @@ public interface SubjectCommissionService {
      */
     SubjectCommissionResponseDto findByCommissionAndSubjectCode(Long commissionId, Integer subjectCode);
 
-    List<SubjectCommissionResponseDto> findAll();
+    List<SubjectCommissionResponseDto> findAll(boolean includeDeactivated);
 
-    List<SubjectCommissionResponseDto> findBySubjectId(Long subjectId);
+    List<SubjectCommissionResponseDto> findBySubjectId(Long subjectId, boolean includeDeactivated);
 }

@@ -3,10 +3,12 @@ package ar.edu.utn.frc.siga.academic.service.impl;
 import ar.edu.utn.frc.siga.academic.dto.response.StudyPlanResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.StudyPlanMapper;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
+import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
 import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
 import ar.edu.utn.frc.siga.academic.service.StudyPlanService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.util.Finder;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,22 +26,37 @@ public class StudyPlanServiceImpl implements StudyPlanService {
     private final StudyPlanMapper studyPlanMapper;
 
     @Override
-    public List<StudyPlanResponseDto> findAll() {
-        return studyPlanRepository.findAll().stream()
+    public List<StudyPlanResponseDto> findAll(boolean includeDeactivated) {
+        List<StudyPlan> studyPlans = includeDeactivated
+                ? studyPlanRepository.findAll()
+                : studyPlanRepository.findAllActive();
+        return studyPlans.stream()
                 .map(studyPlanMapper::toDto)
                 .toList();
     }
 
     @Override
     public StudyPlanResponseDto findById(Long id) {
-        return studyPlanMapper.toDto(studyPlanRepository.findById(id)
+        return studyPlanMapper.toDto(studyPlanRepository.findActiveById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("StudyPlan", id)));
+    }
+
+    @Override
+    @Transactional
+    public void activate(Long id) {
+        studyPlanRepository.restore(Finder.orThrow(studyPlanRepository::findById, id, "StudyPlan"));
+    }
+
+    @Override
+    @Transactional
+    public void deactivate(Long id) {
+        studyPlanRepository.softDelete(Finder.orThrow(studyPlanRepository::findById, id, "StudyPlan"));
     }
 
     @Override
     public StudyPlanResponseDto findByPlanCodeAndSpecialtyCode(Integer planCode, Integer specialtyCode) {
         Specialty specialty = requireSpecialty(specialtyCode);
-        return studyPlanMapper.toDto(studyPlanRepository.findByPlanCodeAndSpecialty(planCode, specialty)
+        return studyPlanMapper.toDto(studyPlanRepository.findByPlanCodeAndSpecialtyAndDeletedAtIsNull(planCode, specialty)
                 .orElseThrow(() -> ResourceNotFoundException.of("StudyPlan", planCode)));
     }
 

@@ -59,19 +59,22 @@ public class ClassroomController {
     @GetMapping
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     @Operation(summary = "Listar aulas", description = "Listado paginado con filtros opcionales por número, "
-            + "edificio, tipo y capacidad.")
+            + "edificio, tipo y capacidad. Por defecto solo devuelve las aulas activas; con "
+            + "includeDeactivated=true incluye también las desactivadas.")
     public ResponseEntity<Page<ClassroomResponseDto>> findAll(
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
             @RequestParam(required = false) Integer roomNumber,
             @RequestParam(required = false) Long buildingId,
             @RequestParam(required = false) Long classroomTypeId,
             @RequestParam(required = false) Integer capacityMin,
-            @RequestParam(required = false) Integer capacityMax) {
+            @RequestParam(required = false) Integer capacityMax,
+            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
 
-        log.debug("GET /v1/classrooms: buildingId={}, page={}", buildingId, pageable.getPageNumber());
+        log.debug("GET /v1/classrooms: buildingId={}, page={}, includeDeactivated={}",
+                buildingId, pageable.getPageNumber(), includeDeactivated);
         ClassroomFilter filter = new ClassroomFilter(roomNumber, buildingId, classroomTypeId,
                 capacityMin, capacityMax);
-        Page<ClassroomResponseDto> page = classroomService.findAll(filter, pageable);
+        Page<ClassroomResponseDto> page = classroomService.findAll(filter, pageable, includeDeactivated);
         log.info("Aulas listadas: total={}", page.getTotalElements());
         return ResponseEntity.ok(page);
     }
@@ -96,6 +99,29 @@ public class ClassroomController {
         log.debug("DELETE /v1/classrooms/{}", id);
         classroomService.delete(id);
         log.info("Aula eliminada vía controller: id={}", id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{id}/activation")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Activar aula",
+               description = "Reactiva un aula previamente desactivada (idempotente). "
+                       + "204 si queda activa; 404 si el aula no existe.")
+    public ResponseEntity<Void> activate(@PathVariable Long id) {
+        log.debug("PUT /v1/classrooms/{}/activation", id);
+        classroomService.activate(id);
+        log.info("Aula activada vía controller: id={}", id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{id}/activation")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Desactivar aula",
+               description = "Soft-delete idempotente. 204 si queda inactiva; 404 si el aula no existe.")
+    public ResponseEntity<Void> deactivate(@PathVariable Long id) {
+        log.debug("DELETE /v1/classrooms/{}/activation", id);
+        classroomService.deactivate(id);
+        log.info("Aula desactivada vía controller: id={}", id);
         return ResponseEntity.noContent().build();
     }
 

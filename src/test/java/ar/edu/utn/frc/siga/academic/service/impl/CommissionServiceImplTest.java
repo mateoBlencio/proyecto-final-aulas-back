@@ -69,7 +69,7 @@ class CommissionServiceImplTest {
     void findByIdReturnsMappedDto() {
         Commission commission = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build();
         CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null);
-        when(commissionRepository.findById(3L)).thenReturn(Optional.of(commission));
+        when(commissionRepository.findActiveById(3L)).thenReturn(Optional.of(commission));
         when(commissionMapper.toDto(commission)).thenReturn(dto);
 
         CommissionResponseDto result = service.findById(3L);
@@ -80,7 +80,7 @@ class CommissionServiceImplTest {
     @Test
     @DisplayName("findById: si la comisión no existe, lanza ResourceNotFoundException")
     void findByIdWithMissingCommissionThrowsResourceNotFound() {
-        when(commissionRepository.findById(99L)).thenReturn(Optional.empty());
+        when(commissionRepository.findActiveById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -143,12 +143,27 @@ class CommissionServiceImplTest {
     void findAllMapsAllCommissions() {
         Commission commission = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build();
         CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null);
-        when(commissionRepository.findAll()).thenReturn(List.of(commission));
+        when(commissionRepository.findAllActive()).thenReturn(List.of(commission));
         when(commissionMapper.toDto(commission)).thenReturn(dto);
 
-        List<CommissionResponseDto> result = service.findAll();
+        List<CommissionResponseDto> result = service.findAll(false);
 
         assertThat(result).containsExactly(dto);
+    }
+
+    @Test
+    @DisplayName("findAll: con includeDeactivated=true, trae también las comisiones desactivadas")
+    void findAllWithIncludeDeactivatedReturnsEveryStatus() {
+        Commission active = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build();
+        Commission inactive = Commission.builder().id(4L).courseCode("K1002").academicPeriod(period).build();
+        inactive.deactivate();
+        CommissionResponseDto activeDto = new CommissionResponseDto(3L, "K1001", null);
+        CommissionResponseDto inactiveDto = new CommissionResponseDto(4L, "K1002", null);
+        when(commissionRepository.findAll()).thenReturn(List.of(active, inactive));
+        when(commissionMapper.toDto(active)).thenReturn(activeDto);
+        when(commissionMapper.toDto(inactive)).thenReturn(inactiveDto);
+
+        assertThat(service.findAll(true)).containsExactly(activeDto, inactiveDto);
     }
 
     @Test
@@ -157,7 +172,7 @@ class CommissionServiceImplTest {
         Commission commission = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period)
                 .sysacadEnabled(true).build();
         CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null);
-        when(commissionRepository.findByCourseCodeAndSysacadEnabledTrue("K1001")).thenReturn(List.of(commission));
+        when(commissionRepository.findByCourseCodeAndSysacadEnabledTrueAndDeletedAtIsNull("K1001")).thenReturn(List.of(commission));
         when(commissionMapper.toDto(commission)).thenReturn(dto);
 
         CommissionResponseDto result = service.findActiveByCourseCode("K1001");
@@ -168,7 +183,7 @@ class CommissionServiceImplTest {
     @Test
     @DisplayName("findActiveByCourseCode: sin comisiones vigentes para el curso, lanza ResourceNotFoundException")
     void findActiveByCourseCodeWithoutActiveThrowsResourceNotFound() {
-        when(commissionRepository.findByCourseCodeAndSysacadEnabledTrue("K1001")).thenReturn(List.of());
+        when(commissionRepository.findByCourseCodeAndSysacadEnabledTrueAndDeletedAtIsNull("K1001")).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.findActiveByCourseCode("K1001"))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -181,7 +196,7 @@ class CommissionServiceImplTest {
                 .sysacadEnabled(true).build();
         Commission commission2 = Commission.builder().id(4L).courseCode("K1001").academicPeriod(period)
                 .sysacadEnabled(true).build();
-        when(commissionRepository.findByCourseCodeAndSysacadEnabledTrue("K1001"))
+        when(commissionRepository.findByCourseCodeAndSysacadEnabledTrueAndDeletedAtIsNull("K1001"))
                 .thenReturn(List.of(commission1, commission2));
 
         assertThatThrownBy(() -> service.findActiveByCourseCode("K1001"))

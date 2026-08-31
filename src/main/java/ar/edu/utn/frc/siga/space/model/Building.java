@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.siga.space.model;
 
-import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
+import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -26,7 +26,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Building extends TimestampedEntity {
+public class Building extends SoftDeletableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -38,9 +38,6 @@ public class Building extends TimestampedEntity {
 
     @Column(name = "nombre", nullable = false, length = 100)
     private String name;
-
-    @Column(name = "eliminado_en")
-    private Instant deletedAt;
 
     @Column(name = "sincronizado_en")
     private Instant syncedAt;

@@ -13,6 +13,11 @@ public class SpaceTestData {
                 .name("Edificio Central");
     }
 
+    public static Building deactivated(Building building) {
+        building.deactivate();
+        return building;
+    }
+
     public static ClassroomType.ClassroomTypeBuilder classroomType() {
         return ClassroomType.builder()
                 .id(1L)

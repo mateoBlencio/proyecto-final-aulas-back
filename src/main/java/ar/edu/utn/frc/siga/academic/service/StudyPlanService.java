@@ -1,15 +1,16 @@
 package ar.edu.utn.frc.siga.academic.service;
 
 import ar.edu.utn.frc.siga.academic.dto.response.StudyPlanResponseDto;
+import ar.edu.utn.frc.siga.common.service.ActivationService;
 
 import java.util.List;
 
 import org.springframework.modulith.NamedInterface;
 
 @NamedInterface("api")
-public interface StudyPlanService {
+public interface StudyPlanService extends ActivationService<Long> {
 
-    List<StudyPlanResponseDto> findAll();
+    List<StudyPlanResponseDto> findAll(boolean includeDeactivated);
 
     StudyPlanResponseDto findById(Long id);
 

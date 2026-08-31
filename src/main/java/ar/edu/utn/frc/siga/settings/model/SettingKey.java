@@ -26,9 +26,7 @@ public enum SettingKey {
     EVENTS_HOURS_START(
             "events.hours.start", SettingType.TIME, RiskLevel.SAFE, "events", null),
     EVENTS_HOURS_END(
-            "events.hours.end", SettingType.TIME, RiskLevel.SAFE, "events", null),
-    SPACE_FILTER_INACTIVE_BUILDINGS(
-            "space.filterInactiveBuildings", SettingType.BOOLEAN, RiskLevel.SAFE, "space", null);
+            "events.hours.end", SettingType.TIME, RiskLevel.SAFE, "events", null);
 
     private final String key;
     private final SettingType type;

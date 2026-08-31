@@ -4,8 +4,10 @@ import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
 import ar.edu.utn.frc.siga.space.exception.SpaceDomainException;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomMapper;
+import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
@@ -22,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,7 +61,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         Building building = findActiveBuilding(dto.buildingId());
         ClassroomType classroomType = classroomTypeService.findById(dto.classroomTypeId());
 
-        if (classroomRepository.findByRoomNumber(dto.roomNumber()).isPresent()) {
+        if (classroomRepository.findByRoomNumberAndDeletedAtIsNull(dto.roomNumber()).isPresent()) {
             log.warn("Creación de aula rechazada: roomNumber '{}' ya existe", dto.roomNumber());
             throw new SpaceDomainException("Classroom roomNumber already exists: " + dto.roomNumber());
         }
@@ -83,7 +86,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Override
     public List<ClassroomResponseDto> findAllAvailable() {
         log.debug("Listando todas las aulas disponibles");
-        return classroomRepository.findAll().stream()
+        return classroomRepository.findAllActive().stream()
                 .map(classroomMapper::toDto)
                 .toList();
     }
@@ -92,14 +95,19 @@ public class ClassroomServiceImpl implements ClassroomService {
     public List<ClassroomResponseDto> findByIds(Collection<Long> ids) {
         log.debug("Buscando aulas por ids: {}", ids);
         return classroomRepository.findAllById(ids).stream()
+                .filter(Classroom::isActive)
                 .map(classroomMapper::toDto)
                 .toList();
     }
 
     @Override
-    public Page<ClassroomResponseDto> findAll(ClassroomFilter filter, Pageable pageable) {
-        log.debug("Listando aulas: filter={}, page={}, size={}", filter, pageable.getPageNumber(), pageable.getPageSize());
-        return classroomRepository.findAll(ClassroomSpecification.withFilter(filter), pageable)
+    public Page<ClassroomResponseDto> findAll(ClassroomFilter filter, Pageable pageable, boolean includeDeactivated) {
+        log.debug("Listando aulas: filter={}, page={}, size={}, includeDeactivated={}",
+                filter, pageable.getPageNumber(), pageable.getPageSize(), includeDeactivated);
+        Specification<Classroom> spec = includeDeactivated
+                ? ClassroomSpecification.withFilter(filter)
+                : ClassroomSpecification.withFilter(filter).and(SoftDeleteSpecifications.active());
+        return classroomRepository.findAll(spec, pageable)
                 .map(classroomMapper::toDto);
     }
 
@@ -128,15 +136,26 @@ public class ClassroomServiceImpl implements ClassroomService {
     public void delete(Long id) {
         log.debug("Eliminando (soft-delete) aula: id={}", id);
         Classroom classroom = this.findExistingClassroomById(id);
-        classroom.setDeletedAt(Instant.now());
-        classroomRepository.save(classroom);
+        classroomRepository.softDelete(classroom);
         log.info("Aula eliminada: id={}", id);
+    }
+
+    @Override
+    @Transactional
+    public void activate(Long id) {
+        classroomRepository.restore(Finder.orThrow(classroomRepository::findById, id, "Classroom"));
+    }
+
+    @Override
+    @Transactional
+    public void deactivate(Long id) {
+        classroomRepository.softDelete(Finder.orThrow(classroomRepository::findById, id, "Classroom"));
     }
 
     @Override
     public ClassroomResponseDto findByRoomNumberAndBuilding(Integer roomNumber, Long buildingId) {
         Building building = findBuildingById(buildingId);
-        return classroomMapper.toDto(classroomRepository.findByRoomNumberAndBuilding(roomNumber, building)
+        return classroomMapper.toDto(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(roomNumber, building)
                 .or(() -> fallbackByRoomNumberOnly(roomNumber, buildingId))
                 .orElseThrow(() -> ResourceNotFoundException.of("Classroom", roomNumber)));
     }
@@ -144,12 +163,12 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Override
     public Optional<ClassroomResponseDto> findByRoomNumberAndBuildingCode(Integer roomNumber, Integer buildingCode) {
         return buildingRepository.findByBuildingCode(buildingCode)
-                .flatMap(building -> classroomRepository.findByRoomNumberAndBuilding(roomNumber, building))
+                .flatMap(building -> classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(roomNumber, building))
                 .map(classroomMapper::toDto);
     }
 
     private Optional<Classroom> fallbackByRoomNumberOnly(Integer roomNumber, Long buildingId) {
-        List<Classroom> matches = classroomRepository.findAllByRoomNumber(roomNumber);
+        List<Classroom> matches = classroomRepository.findAllByRoomNumberAndDeletedAtIsNull(roomNumber);
         if (matches.size() != 1) {
             return Optional.empty();
         }
@@ -160,7 +179,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     private Classroom findExistingClassroomById(Long id) {
-        return classroomRepository.findById(id)
+        return classroomRepository.findActiveById(id)
                 .orElseThrow(() -> {
                     log.warn("Aula no encontrada: id={}", id);
                     return ResourceNotFoundException.of("Classroom", id);
@@ -173,12 +192,11 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     private Building findActiveBuilding(Long id) {
-        Building building = findBuildingById(id);
-        if (building.getDeletedAt() != null) {
-            log.warn("Edificio no encontrado: id={}", id);
-            throw ResourceNotFoundException.of("Building", id);
-        }
-        return building;
+        return buildingRepository.findActiveById(id)
+                .orElseThrow(() -> {
+                    log.warn("Edificio no encontrado: id={}", id);
+                    return ResourceNotFoundException.of("Building", id);
+                });
     }
 
     private void validateCapacity(ClassroomRequestDto dto) {
@@ -267,7 +285,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     private ClassroomType resolveDefaultClassroomType() {
-        return classroomTypeRepository.findByDescriptionIgnoreCase(DEFAULT_CLASSROOM_TYPE)
+        return classroomTypeRepository.findByDescriptionIgnoreCaseAndDeletedAtIsNull(DEFAULT_CLASSROOM_TYPE)
                 .orElseThrow(() -> new IllegalStateException(
                         "Falta el tipo de aula por defecto '" + DEFAULT_CLASSROOM_TYPE + "' (seed de data.sql)"));
     }

@@ -4,17 +4,18 @@ import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.Commission;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
+import ar.edu.utn.frc.siga.common.repository.SoftDeletableRepository;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
-import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface SubjectCommissionRepository extends JpaRepository<SubjectCommission, SubjectCommissionId> {
+public interface SubjectCommissionRepository
+        extends SoftDeletableRepository<SubjectCommission, SubjectCommissionId> {
 
     @EntityGraph(attributePaths = {"commission", "commission.academicPeriod"})
-    Optional<SubjectCommission> findBySubjectAndCommission(Subject subject, Commission commission);
+    Optional<SubjectCommission> findBySubjectAndCommissionAndDeletedAtIsNull(Subject subject, Commission commission);
 
     @Override
     @EntityGraph(attributePaths = {"commission", "commission.academicPeriod"})
@@ -28,6 +29,6 @@ public interface SubjectCommissionRepository extends JpaRepository<SubjectCommis
     // SysAcad, ver sync de Comisiones). Se toma el de menor id_materia de forma determinística para no
     // romper EVENTOS/ASIGNACIONES. Revisar cuando se resuelva el link por plan de la comisión.
     @EntityGraph(attributePaths = {"commission", "commission.academicPeriod"})
-    Optional<SubjectCommission> findFirstByCommission_IdAndSubject_CodeOrderBySubject_IdAsc(
+    Optional<SubjectCommission> findFirstByCommission_IdAndSubject_CodeAndDeletedAtIsNullOrderBySubject_IdAsc(
             Long commissionId, Integer subjectCode);
 }
