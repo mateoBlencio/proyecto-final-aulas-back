@@ -5,14 +5,14 @@ INSERT INTO tipo_aula (descripcion, creado_en, actualizado_en)
 SELECT 'Normal', now(), now()
 WHERE NOT EXISTS (SELECT 1 FROM tipo_aula WHERE descripcion = 'Normal');
 
-INSERT INTO tipo_recurso (codigo, nombre, tipo_valor, creado_en, actualizado_en)
-SELECT v.codigo, v.nombre, v.tipo_valor, now(), now()
+INSERT INTO tipo_recurso (nombre, tipo_valor, creado_en, actualizado_en)
+SELECT v.nombre, v.tipo_valor, now(), now()
 FROM (VALUES
-    ('PC',                 'Cantidad de PC',     'COUNT'),
-    ('PROYECTOR',          'Proyector',          'BOOLEAN'),
-    ('AIRE_ACONDICIONADO', 'Aire acondicionado', 'BOOLEAN')
-) AS v(codigo, nombre, tipo_valor)
-WHERE NOT EXISTS (SELECT 1 FROM tipo_recurso t WHERE t.codigo = v.codigo);
+    ('Cantidad de PC',     'COUNT'),
+    ('Proyector',          'BOOLEAN'),
+    ('Aire acondicionado', 'BOOLEAN')
+) AS v(nombre, tipo_valor)
+WHERE NOT EXISTS (SELECT 1 FROM tipo_recurso t WHERE t.nombre = v.nombre);
 
 -- Admin inicial de dev-local. Password de desarrollo: "AdminSiga2026!" (BCrypt, no es un secreto real).
 INSERT INTO usuario (correo, password_hash, habilitado)

@@ -50,24 +50,24 @@ class ClassroomFeatureWriterTest {
         classroom = Classroom.builder().id(1L).roomNumber(101).capacity(40).build();
     }
 
-    private ResourceType type(String code) {
-        return ResourceType.builder().code(code).name(code).valueKind(ResourceValueKind.COUNT).build();
+    private ResourceType type(long id, String name) {
+        return ResourceType.builder().id(id).name(name).valueKind(ResourceValueKind.COUNT).build();
     }
 
     @Test
     @DisplayName("applyResources: alta, actualización de cantidad y baja (soft-delete) según el pedido")
     void applyResourcesReconciles() {
         ClassroomResource keepPc = ClassroomResource.builder()
-                .classroom(classroom).resourceType(type("PC")).quantity(10).build();
+                .classroom(classroom).resourceType(type(1L, "Cantidad de PC")).quantity(10).build();
         ClassroomResource dropProjector = ClassroomResource.builder()
-                .classroom(classroom).resourceType(type("PROYECTOR")).quantity(1).build();
+                .classroom(classroom).resourceType(type(2L, "Proyector")).quantity(1).build();
         when(classroomResourceRepository.findByClassroomId(1L)).thenReturn(List.of(keepPc, dropProjector));
-        when(resourceTypeRepository.findByCodeAndDeletedAtIsNull("AIRE_ACONDICIONADO"))
-                .thenReturn(Optional.of(type("AIRE_ACONDICIONADO")));
+        when(resourceTypeRepository.findActiveById(3L))
+                .thenReturn(Optional.of(type(3L, "Aire acondicionado")));
 
         writer.applyResources(classroom, List.of(
-                new ClassroomResourceRequestDto("PC", 25),
-                new ClassroomResourceRequestDto("AIRE_ACONDICIONADO", 1)));
+                new ClassroomResourceRequestDto(1L, 25),
+                new ClassroomResourceRequestDto(3L, 1)));
 
         assertThat(keepPc.getQuantity()).isEqualTo(25);
         verify(classroomResourceRepository).softDelete(dropProjector);
@@ -75,15 +75,15 @@ class ClassroomFeatureWriterTest {
     }
 
     @Test
-    @DisplayName("applyResources: código de recurso desconocido lanza SpaceDomainException")
-    void applyResourcesUnknownCodeThrows() {
+    @DisplayName("applyResources: id de tipo de recurso desconocido lanza SpaceDomainException")
+    void applyResourcesUnknownResourceTypeIdThrows() {
         when(classroomResourceRepository.findByClassroomId(1L)).thenReturn(List.of());
-        when(resourceTypeRepository.findByCodeAndDeletedAtIsNull("PIZARRON")).thenReturn(Optional.empty());
+        when(resourceTypeRepository.findActiveById(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> writer.applyResources(classroom,
-                List.of(new ClassroomResourceRequestDto("PIZARRON", 1))))
+                List.of(new ClassroomResourceRequestDto(999L, 1))))
                 .isInstanceOf(SpaceDomainException.class)
-                .hasMessageContaining("PIZARRON");
+                .hasMessageContaining("999");
     }
 
     @Test

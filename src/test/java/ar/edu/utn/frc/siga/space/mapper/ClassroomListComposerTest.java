@@ -60,10 +60,10 @@ class ClassroomListComposerTest {
                 .build();
     }
 
-    private ClassroomResource resource(Classroom classroom, String code, String name, ResourceValueKind kind, int qty) {
+    private ClassroomResource resource(Classroom classroom, long typeId, String name, ResourceValueKind kind, int qty) {
         return ClassroomResource.builder()
                 .classroom(classroom)
-                .resourceType(ResourceType.builder().code(code).name(name).valueKind(kind).build())
+                .resourceType(ResourceType.builder().id(typeId).name(name).valueKind(kind).build())
                 .quantity(qty)
                 .build();
     }
@@ -81,16 +81,17 @@ class ClassroomListComposerTest {
     void exposesResourceList() {
         Classroom classroom = classroom(1L, PermissionMode.ALL);
         when(classroomResourceRepository.findByClassroomIdInAndDeletedAtIsNull(anyCollection())).thenReturn(List.of(
-                resource(classroom, "PC", "Cantidad de PC", ResourceValueKind.COUNT, 30),
-                resource(classroom, "PROYECTOR", "Proyector", ResourceValueKind.BOOLEAN, 1),
-                resource(classroom, "AIRE_ACONDICIONADO", "Aire acondicionado", ResourceValueKind.BOOLEAN, 0)));
+                resource(classroom, 1L, "Cantidad de PC", ResourceValueKind.COUNT, 30),
+                resource(classroom, 2L, "Proyector", ResourceValueKind.BOOLEAN, 1),
+                resource(classroom, 3L, "Aire acondicionado", ResourceValueKind.BOOLEAN, 0)));
         when(classroomPermissionRepository.findByClassroomIdInAndDeletedAtIsNull(anyCollection())).thenReturn(List.of());
 
         ClassroomListItemDto dto = compose(classroom);
 
         assertThat(dto.resources()).hasSize(3)
                 .anySatisfy(resource -> {
-                    assertThat(resource.code()).isEqualTo("PC");
+                    assertThat(resource.resourceTypeId()).isEqualTo(1L);
+                    assertThat(resource.name()).isEqualTo("Cantidad de PC");
                     assertThat(resource.valueKind()).isEqualTo(ResourceValueKind.COUNT);
                     assertThat(resource.quantity()).isEqualTo(30);
                 });

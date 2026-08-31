@@ -79,7 +79,7 @@ public class ClassroomListComposer {
                                        Map<PermissionTargetKind, Map<Long, String>> namesByKind) {
         List<ClassroomResourceDto> resourceDtos = resources.stream()
                 .map(resource -> new ClassroomResourceDto(
-                        resource.getResourceType().getCode(),
+                        resource.getResourceType().getId(),
                         resource.getResourceType().getName(),
                         resource.getResourceType().getValueKind(),
                         resource.getQuantity()))

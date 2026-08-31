@@ -60,17 +60,17 @@ class ClassroomListApiIntegrationTest extends AbstractIntegrationTest {
         Classroom classroom = testData.aula(building, tipo, 50);
         classroom.setObservations("Sin ventanas");
         classroomRepository.save(classroom);
-        testData.recursoDeAula(classroom, testData.tipoRecurso("PC", "Cantidad de PC", ResourceValueKind.COUNT), 25);
+        testData.recursoDeAula(classroom, testData.tipoRecurso("Cantidad de PC", ResourceValueKind.COUNT), 25);
         testData.recursoDeAula(classroom,
-                testData.tipoRecurso("PROYECTOR", "Proyector", ResourceValueKind.BOOLEAN), 1);
+                testData.tipoRecurso("Proyector", ResourceValueKind.BOOLEAN), 1);
         testData.recursoDeAula(classroom,
-                testData.tipoRecurso("AIRE_ACONDICIONADO", "Aire acondicionado", ResourceValueKind.BOOLEAN), 0);
+                testData.tipoRecurso("Aire acondicionado", ResourceValueKind.BOOLEAN), 0);
 
         mockMvc.perform(get("/v1/classrooms").param("buildingId", String.valueOf(building.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(classroom.getId().intValue()))
                 .andExpect(jsonPath("$.content[0].resources.length()").value(3))
-                .andExpect(jsonPath("$.content[0].resources[?(@.code == 'PC')].quantity").value(org.hamcrest.Matchers.hasItem(25)))
+                .andExpect(jsonPath("$.content[0].resources[?(@.name == 'Cantidad de PC')].quantity").value(org.hamcrest.Matchers.hasItem(25)))
                 .andExpect(jsonPath("$.content[0].observations").value("Sin ventanas"))
                 .andExpect(jsonPath("$.content[0].enabled").value(true))
                 .andExpect(jsonPath("$.content[0].permissionMode").value("ALL"))

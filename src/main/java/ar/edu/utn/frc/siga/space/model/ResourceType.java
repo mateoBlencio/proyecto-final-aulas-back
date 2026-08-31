@@ -29,10 +29,7 @@ public class ResourceType extends SoftDeletableEntity {
     @Column(name = "id_tipo_recurso")
     private Long id;
 
-    @Column(name = "codigo", nullable = false, unique = true, length = 50)
-    private String code;
-
-    @Column(name = "nombre", nullable = false, length = 100)
+    @Column(name = "nombre", nullable = false, unique = true, length = 100)
     private String name;
 
     @Enumerated(EnumType.STRING)

@@ -30,19 +30,19 @@ public class ClassroomFeatureWriter {
     public void applyResources(Classroom classroom, List<ClassroomResourceRequestDto> requested) {
         List<ClassroomResourceRequestDto> desired = requested != null ? requested : List.of();
 
-        Map<String, ClassroomResource> existing = new HashMap<>();
+        Map<Long, ClassroomResource> existing = new HashMap<>();
         for (ClassroomResource resource : classroomResourceRepository.findByClassroomId(classroom.getId())) {
-            existing.put(resource.getResourceType().getCode(), resource);
+            existing.put(resource.getResourceType().getId(), resource);
         }
 
-        Set<String> keep = new HashSet<>();
+        Set<Long> keep = new HashSet<>();
         for (ClassroomResourceRequestDto request : desired) {
-            keep.add(request.code());
-            ClassroomResource resource = existing.get(request.code());
+            keep.add(request.resourceTypeId());
+            ClassroomResource resource = existing.get(request.resourceTypeId());
             if (resource == null) {
                 classroomResourceRepository.save(ClassroomResource.builder()
                         .classroom(classroom)
-                        .resourceType(resolveResourceType(request.code()))
+                        .resourceType(resolveResourceType(request.resourceTypeId()))
                         .quantity(request.quantity())
                         .build());
             } else {
@@ -54,8 +54,8 @@ public class ClassroomFeatureWriter {
             }
         }
 
-        existing.forEach((code, resource) -> {
-            if (!keep.contains(code) && resource.isActive()) {
+        existing.forEach((resourceTypeId, resource) -> {
+            if (!keep.contains(resourceTypeId) && resource.isActive()) {
                 classroomResourceRepository.softDelete(resource);
             }
         });
@@ -94,9 +94,9 @@ public class ClassroomFeatureWriter {
         });
     }
 
-    private ResourceType resolveResourceType(String code) {
-        return resourceTypeRepository.findByCodeAndDeletedAtIsNull(code)
-                .orElseThrow(() -> new SpaceDomainException("Unknown resource code: " + code));
+    private ResourceType resolveResourceType(Long resourceTypeId) {
+        return resourceTypeRepository.findActiveById(resourceTypeId)
+                .orElseThrow(() -> new SpaceDomainException("Unknown resource type id: " + resourceTypeId));
     }
 
     private static String key(String kind, Long targetId) {

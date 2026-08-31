@@ -2,10 +2,10 @@ package ar.edu.utn.frc.siga.space.dto.response;
 
 import ar.edu.utn.frc.siga.space.model.ResourceValueKind;
 
-public record ClassroomResourceDto(
-        Long resourceTypeId,
+public record ResourceTypeResponseDto(
+        Long id,
         String name,
         ResourceValueKind valueKind,
-        Integer quantity
+        boolean enabled
 ) {
 }

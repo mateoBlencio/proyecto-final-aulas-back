@@ -115,10 +115,11 @@ public class IntegrationTestData {
                 .build());
     }
 
-    public ResourceType tipoRecurso(String code, String name, ResourceValueKind valueKind) {
-        return resourceTypeRepository.findByCodeAndDeletedAtIsNull(code)
+    public ResourceType tipoRecurso(String name, ResourceValueKind valueKind) {
+        return resourceTypeRepository.findAll().stream()
+                .filter(type -> type.getName().equalsIgnoreCase(name))
+                .findFirst()
                 .orElseGet(() -> resourceTypeRepository.save(ResourceType.builder()
-                        .code(code)
                         .name(name)
                         .valueKind(valueKind)
                         .build()));

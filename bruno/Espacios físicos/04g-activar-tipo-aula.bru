@@ -1,0 +1,21 @@
+meta {
+  name: Activar tipo de aula
+  type: http
+  seq: 12
+}
+
+put {
+  url: {{baseUrl}}/v1/classroom-types/:id/activation
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: 1
+}
+
+docs {
+  PUT /v1/classroom-types/{id}/activation. Rol: SUBSECRETARIA.
+  Reactiva un tipo de aula desactivado (idempotente). 204 si queda activo;
+  404 si no existe.
+}

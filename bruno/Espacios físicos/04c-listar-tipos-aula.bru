@@ -1,0 +1,24 @@
+meta {
+  name: Listar tipos de aula
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/v1/classroom-types?page=0&size=20&includeDeactivated=false
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 0
+  size: 20
+  includeDeactivated: false
+}
+
+docs {
+  GET /v1/classroom-types. Roles: SUBSECRETARIA o AUXILIAR_AULICO.
+  Respuesta paginada (Page: content, totalElements, totalPages, number, size...).
+  sort por defecto: id asc. Por defecto solo activos; includeDeactivated=true
+  incluye los desactivados.
+}

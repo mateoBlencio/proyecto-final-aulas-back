@@ -70,9 +70,9 @@ class ClassroomFeatureRepositoriesTest {
     @DisplayName("ClassroomResource: consulta batch por aula y respeta el soft-delete")
     void classroomResourceBatchQueryRespectsSoftDelete() {
         ResourceType pc = resourceTypeRepository.save(ResourceType.builder()
-                .code("PC-" + System.nanoTime()).name("Cantidad de PC").valueKind(ResourceValueKind.COUNT).build());
+                .name("Cantidad de PC " + System.nanoTime()).valueKind(ResourceValueKind.COUNT).build());
         ResourceType projector = resourceTypeRepository.save(ResourceType.builder()
-                .code("PROY-" + System.nanoTime()).name("Proyector").valueKind(ResourceValueKind.BOOLEAN).build());
+                .name("Proyector " + System.nanoTime()).valueKind(ResourceValueKind.BOOLEAN).build());
 
         classroomResourceRepository.save(ClassroomResource.builder()
                 .classroom(classroom).resourceType(pc).quantity(30).build());
@@ -103,13 +103,17 @@ class ClassroomFeatureRepositoriesTest {
     }
 
     @Test
-    @DisplayName("ResourceTypeRepository: findByCodeAndDeletedAtIsNull")
-    void resourceTypeFindByCode() {
-        String code = "AIRE-" + System.nanoTime();
-        resourceTypeRepository.save(ResourceType.builder()
-                .code(code).name("Aire acondicionado").valueKind(ResourceValueKind.BOOLEAN).build());
+    @DisplayName("ResourceTypeRepository: existsByNameIgnoreCase incluye soft-deleted")
+    void resourceTypeExistsByName() {
+        String name = "Aire acondicionado " + System.nanoTime();
+        ResourceType saved = resourceTypeRepository.save(ResourceType.builder()
+                .name(name).valueKind(ResourceValueKind.BOOLEAN).build());
 
-        assertThat(resourceTypeRepository.findByCodeAndDeletedAtIsNull(code)).isPresent();
-        assertThat(resourceTypeRepository.findByCodeAndDeletedAtIsNull("NO_EXISTE")).isEmpty();
+        assertThat(resourceTypeRepository.existsByNameIgnoreCase(name.toLowerCase())).isTrue();
+        assertThat(resourceTypeRepository.existsByNameIgnoreCaseAndIdNot(name, saved.getId())).isFalse();
+        assertThat(resourceTypeRepository.existsByNameIgnoreCase("no existe " + System.nanoTime())).isFalse();
+
+        resourceTypeRepository.softDelete(saved);
+        assertThat(resourceTypeRepository.existsByNameIgnoreCase(name)).isTrue();
     }
 }
