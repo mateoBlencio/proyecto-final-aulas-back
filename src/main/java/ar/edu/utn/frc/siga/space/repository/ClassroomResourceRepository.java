@@ -9,6 +9,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ClassroomResourceRepository extends SoftDeletableRepository<ClassroomResource, Long> {
 
+    List<ClassroomResource> findByClassroomId(Long classroomId);
+
     List<ClassroomResource> findByClassroomIdAndDeletedAtIsNull(Long classroomId);
 
     List<ClassroomResource> findByClassroomIdInAndDeletedAtIsNull(Collection<Long> classroomIds);

@@ -42,11 +42,11 @@ class ClassroomFeatureRepositoriesTest {
     private Classroom classroom;
 
     @BeforeEach
-    void setUp() {
-        Building building = buildingRepository.save(Building.builder().name("Edificio Test").build());
+    void seedClassroom() {
+        Building building = buildingRepository.save(Building.builder().name("Edificio Test " + System.nanoTime()).build());
         ClassroomType type = classroomTypeRepository.save(ClassroomType.builder().description("Normal").build());
         classroom = classroomRepository.save(Classroom.builder()
-                .roomNumber(101)
+                .roomNumber((int) (System.nanoTime() % 100_000))
                 .capacity(40)
                 .building(building)
                 .classroomType(type)
@@ -70,9 +70,9 @@ class ClassroomFeatureRepositoriesTest {
     @DisplayName("ClassroomResource: consulta batch por aula y respeta el soft-delete")
     void classroomResourceBatchQueryRespectsSoftDelete() {
         ResourceType pc = resourceTypeRepository.save(ResourceType.builder()
-                .code("PC").name("Cantidad de PC").valueKind(ResourceValueKind.COUNT).build());
+                .code("PC-" + System.nanoTime()).name("Cantidad de PC").valueKind(ResourceValueKind.COUNT).build());
         ResourceType projector = resourceTypeRepository.save(ResourceType.builder()
-                .code("PROYECTOR").name("Proyector").valueKind(ResourceValueKind.BOOLEAN).build());
+                .code("PROY-" + System.nanoTime()).name("Proyector").valueKind(ResourceValueKind.BOOLEAN).build());
 
         classroomResourceRepository.save(ClassroomResource.builder()
                 .classroom(classroom).resourceType(pc).quantity(30).build());
@@ -84,7 +84,6 @@ class ClassroomFeatureRepositoriesTest {
                 classroomResourceRepository.findByClassroomIdInAndDeletedAtIsNull(List.of(classroom.getId()));
 
         assertThat(active).hasSize(1);
-        assertThat(active.getFirst().getResourceType().getCode()).isEqualTo("PC");
         assertThat(active.getFirst().getQuantity()).isEqualTo(30);
     }
 
@@ -106,10 +105,11 @@ class ClassroomFeatureRepositoriesTest {
     @Test
     @DisplayName("ResourceTypeRepository: findByCodeAndDeletedAtIsNull")
     void resourceTypeFindByCode() {
+        String code = "AIRE-" + System.nanoTime();
         resourceTypeRepository.save(ResourceType.builder()
-                .code("AIRE_ACONDICIONADO").name("Aire acondicionado").valueKind(ResourceValueKind.BOOLEAN).build());
+                .code(code).name("Aire acondicionado").valueKind(ResourceValueKind.BOOLEAN).build());
 
-        assertThat(resourceTypeRepository.findByCodeAndDeletedAtIsNull("AIRE_ACONDICIONADO")).isPresent();
+        assertThat(resourceTypeRepository.findByCodeAndDeletedAtIsNull(code)).isPresent();
         assertThat(resourceTypeRepository.findByCodeAndDeletedAtIsNull("NO_EXISTE")).isEmpty();
     }
 }

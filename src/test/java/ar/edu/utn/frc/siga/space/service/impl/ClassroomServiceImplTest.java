@@ -5,8 +5,10 @@ import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.SpaceTestData;
 import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomListItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.exception.SpaceDomainException;
+import ar.edu.utn.frc.siga.space.mapper.ClassroomListComposer;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomMapper;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
@@ -36,7 +38,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -57,13 +58,16 @@ class ClassroomServiceImplTest {
     private ClassroomTypeRepository classroomTypeRepository;
     @Mock
     private ClassroomMapper classroomMapper;
+    @Mock
+    private ClassroomListComposer classroomListComposer;
 
     private ClassroomServiceImpl service;
 
     @BeforeEach
     void setUp() {
         service = new ClassroomServiceImpl(
-                classroomRepository, buildingRepository, classroomTypeService, classroomTypeRepository, classroomMapper);
+                classroomRepository, buildingRepository, classroomTypeService, classroomTypeRepository,
+                classroomMapper, classroomListComposer);
     }
 
 
@@ -194,20 +198,22 @@ class ClassroomServiceImplTest {
     }
 
     @Test
-    @DisplayName("findAll: aplica el filtro vía specification y mapea la página resultante")
+    @DisplayName("findAll: aplica filtro vía specification y delega el armado del listado en el composer")
     void findAllMapsPagedResult() {
         ClassroomFilter filter = new ClassroomFilter(101, null, null, null, null);
         Pageable pageable = PageRequest.of(0, 10);
         Classroom classroom = SpaceTestData.classroom().build();
-        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
         Page<Classroom> page = new PageImpl<>(List.of(classroom), pageable, 1);
-        when(classroomRepository.findAll(ArgumentMatchers.<Specification<Classroom>>any(), eq(pageable)))
+        ClassroomListItemDto item = new ClassroomListItemDto(1L, 101, 1L, "Edificio Central", 1L, "Normal", 40,
+                List.of(), null, true, null, "Todas", List.of());
+        Page<ClassroomListItemDto> composed = new PageImpl<>(List.of(item), pageable, 1);
+        when(classroomRepository.findAll(ArgumentMatchers.<Specification<Classroom>>any(), any(Pageable.class)))
                 .thenReturn(page);
-        when(classroomMapper.toDto(classroom)).thenReturn(dto);
+        when(classroomListComposer.compose(page)).thenReturn(composed);
 
-        Page<ClassroomResponseDto> result = service.findAll(filter, pageable, false);
+        Page<ClassroomListItemDto> result = service.findAll(filter, pageable, false);
 
-        assertThat(result.getContent()).containsExactly(dto);
+        assertThat(result.getContent()).containsExactly(item);
     }
 
 

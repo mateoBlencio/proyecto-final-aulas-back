@@ -9,6 +9,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ClassroomPermissionRepository extends SoftDeletableRepository<ClassroomPermission, Long> {
 
+    List<ClassroomPermission> findByClassroomId(Long classroomId);
+
     List<ClassroomPermission> findByClassroomIdAndDeletedAtIsNull(Long classroomId);
 
     List<ClassroomPermission> findByClassroomIdInAndDeletedAtIsNull(Collection<Long> classroomIds);

@@ -2,10 +2,12 @@ package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomListItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
 import ar.edu.utn.frc.siga.space.exception.SpaceDomainException;
+import ar.edu.utn.frc.siga.space.mapper.ClassroomListComposer;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomMapper;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
@@ -18,6 +20,7 @@ import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import ar.edu.utn.frc.siga.space.service.ClassroomTypeService;
 import ar.edu.utn.frc.siga.space.service.command.ClassroomSyncCommand;
+import ar.edu.utn.frc.siga.space.specification.ClassroomListSort;
 import ar.edu.utn.frc.siga.space.specification.ClassroomSpecification;
 
 import lombok.RequiredArgsConstructor;
@@ -51,6 +54,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     private final ClassroomTypeService classroomTypeService;
     private final ClassroomTypeRepository classroomTypeRepository;
     private final ClassroomMapper classroomMapper;
+    private final ClassroomListComposer classroomListComposer;
 
     @Override
     @Transactional
@@ -101,14 +105,14 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     @Override
-    public Page<ClassroomResponseDto> findAll(ClassroomFilter filter, Pageable pageable, boolean includeDeactivated) {
+    public Page<ClassroomListItemDto> findAll(ClassroomFilter filter, Pageable pageable, boolean includeDeactivated) {
         log.debug("Listando aulas: filter={}, page={}, size={}, includeDeactivated={}",
                 filter, pageable.getPageNumber(), pageable.getPageSize(), includeDeactivated);
         Specification<Classroom> spec = includeDeactivated
                 ? ClassroomSpecification.withFilter(filter)
                 : ClassroomSpecification.withFilter(filter).and(SoftDeleteSpecifications.active());
-        return classroomRepository.findAll(spec, pageable)
-                .map(classroomMapper::toDto);
+        return classroomListComposer.compose(
+                classroomRepository.findAll(spec, ClassroomListSort.apply(pageable)));
     }
 
     @Override
