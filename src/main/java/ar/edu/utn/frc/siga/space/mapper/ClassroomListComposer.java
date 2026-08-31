@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -32,6 +33,10 @@ public class ClassroomListComposer {
     private final ClassroomResourceRepository classroomResourceRepository;
     private final ClassroomPermissionRepository classroomPermissionRepository;
     private final PermissionTargetResolvers permissionTargetResolvers;
+
+    public ClassroomListItemDto compose(Classroom classroom) {
+        return compose(new PageImpl<>(List.of(classroom))).getContent().getFirst();
+    }
 
     public Page<ClassroomListItemDto> compose(Page<Classroom> classrooms) {
         List<Long> classroomIds = classrooms.getContent().stream().map(Classroom::getId).toList();

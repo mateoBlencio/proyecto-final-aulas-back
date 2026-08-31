@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.space.service;
 
 import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
+import ar.edu.utn.frc.siga.space.dto.request.ClassroomDetailsUpdateDto;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomListItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
@@ -28,6 +29,8 @@ public interface ClassroomService extends ActivationService<Long> {
     Page<ClassroomListItemDto> findAll(ClassroomFilter filter, Pageable pageable, boolean includeDeactivated);
 
     ClassroomResponseDto update(Long id, ClassroomRequestDto dto);
+
+    ClassroomListItemDto updateDetails(Long id, ClassroomDetailsUpdateDto dto);
 
     void delete(Long id);
 

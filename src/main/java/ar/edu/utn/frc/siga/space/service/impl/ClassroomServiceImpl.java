@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
+import ar.edu.utn.frc.siga.space.dto.request.ClassroomDetailsUpdateDto;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomListItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
@@ -55,6 +56,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     private final ClassroomTypeRepository classroomTypeRepository;
     private final ClassroomMapper classroomMapper;
     private final ClassroomListComposer classroomListComposer;
+    private final ClassroomFeatureWriter classroomFeatureWriter;
 
     @Override
     @Transactional
@@ -133,6 +135,24 @@ public class ClassroomServiceImpl implements ClassroomService {
         Classroom saved = classroomRepository.save(entity);
         log.info("Aula actualizada: id={}, roomNumber={}", saved.getId(), saved.getRoomNumber());
         return classroomMapper.toDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public ClassroomListItemDto updateDetails(Long id, ClassroomDetailsUpdateDto dto) {
+        log.debug("Actualizando campos locales del aula: id={}, permissionMode={}", id, dto.permissionMode());
+
+        Classroom classroom = this.findExistingClassroomById(id);
+        classroom.setClassroomType(classroomTypeService.findById(dto.classroomTypeId()));
+        classroom.setObservations(dto.observations());
+        classroom.setPermissionMode(dto.permissionMode());
+        classroomRepository.save(classroom);
+
+        classroomFeatureWriter.applyResources(classroom, dto.resources());
+        classroomFeatureWriter.applyPermissions(classroom, dto.permissionMode(), dto.permissionTargets());
+
+        log.info("Campos locales del aula actualizados: id={}", id);
+        return classroomListComposer.compose(classroom);
     }
 
     @Override

@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.space.SpaceTestData;
+import ar.edu.utn.frc.siga.space.mapper.ClassroomTypeMapper;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
 import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +16,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,7 +30,7 @@ class ClassroomTypeServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new ClassroomTypeServiceImpl(classroomTypeRepository);
+        service = new ClassroomTypeServiceImpl(classroomTypeRepository, mock(ClassroomTypeMapper.class));
     }
 
     @Test

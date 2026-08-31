@@ -60,6 +60,8 @@ class ClassroomServiceImplTest {
     private ClassroomMapper classroomMapper;
     @Mock
     private ClassroomListComposer classroomListComposer;
+    @Mock
+    private ClassroomFeatureWriter classroomFeatureWriter;
 
     private ClassroomServiceImpl service;
 
@@ -67,7 +69,7 @@ class ClassroomServiceImplTest {
     void setUp() {
         service = new ClassroomServiceImpl(
                 classroomRepository, buildingRepository, classroomTypeService, classroomTypeRepository,
-                classroomMapper, classroomListComposer);
+                classroomMapper, classroomListComposer, classroomFeatureWriter);
     }
 
 
