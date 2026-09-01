@@ -85,6 +85,14 @@ class ScheduledItemDtoTest {
     }
 
     @Test
+    @DisplayName("cantidad de aulas: 0 y más de 100 rechazadas; 100 admitida")
+    void classroomCountBounds() {
+        assertThat(violations(item().classroomCount(0).build())).isNotEmpty();
+        assertThat(violations(item().classroomCount(101).build())).isNotEmpty();
+        assertThat(violations(item().classroomCount(100).build())).isEmpty();
+    }
+
+    @Test
     @DisplayName("fecha en el pasado: rechazada (fecha ausente sí se admite: la usa el subtipo por día)")
     void pastDate() {
         assertThat(violations(new ScheduledItemDto(LocalDate.now().minusDays(1), null, null, 1,
@@ -119,6 +127,7 @@ class ScheduledItemDtoTest {
         private List<Long> preferredClassroomIds = List.of();
 
         Builder estimated(Integer v) { this.estimated = v; return this; }
+        Builder classroomCount(Integer v) { this.classroomCount = v; return this; }
         Builder requiresComputers(Boolean v) { this.requiresComputers = v; return this; }
         Builder computerCount(Integer v) { this.computerCount = v; return this; }
         Builder requiredSoftware(String v) { this.requiredSoftware = v; return this; }

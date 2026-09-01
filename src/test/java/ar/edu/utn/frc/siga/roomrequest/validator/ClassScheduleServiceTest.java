@@ -80,6 +80,19 @@ class ClassScheduleServiceTest {
     }
 
     @Test
+    @DisplayName("requireClassDay: cursada anual cargada como un evento por cuatrimestre → una sola franja")
+    void annualSplitCountsAsOne() {
+        when(academicEventService.findRecurringEventsBySubjectAndCommission(1L, 9L)).thenReturn(List.of(
+                recurring(100L, DayOfWeek.TUESDAY, LocalTime.of(18, 0), 120),
+                recurring(101L, DayOfWeek.TUESDAY, LocalTime.of(18, 0), 120)));
+
+        ClassSlot slot = service.requireClassDay(1L, 9L, DayOfWeek.TUESDAY);
+
+        assertThat(slot.startTime()).isEqualTo(LocalTime.of(18, 0));
+        assertThat(slot.endTime()).isEqualTo(LocalTime.of(20, 0));
+    }
+
+    @Test
     @DisplayName("requireClassDate: resuelve el slot por el evento de la ocurrencia, no por el día")
     void dateResolvesByOccurrenceEvent() {
         LocalDate monday = LocalDate.of(2026, 9, 7);
