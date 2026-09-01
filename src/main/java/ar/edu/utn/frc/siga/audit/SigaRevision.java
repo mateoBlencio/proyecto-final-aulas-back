@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.common.audit;
+package ar.edu.utn.frc.siga.audit;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -32,4 +32,10 @@ public class SigaRevision {
 
     @Column(name = "usuario")
     private String usuario;
+
+    @Column(name = "descripcion", length = 255)
+    private String descripcion;
+
+    @Column(name = "operacion_id", length = 36)
+    private String operacionId;
 }

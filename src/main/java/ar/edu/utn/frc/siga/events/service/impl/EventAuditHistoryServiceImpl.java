@@ -11,95 +11,55 @@ import ar.edu.utn.frc.siga.events.model.UniqueEvent;
 import ar.edu.utn.frc.siga.events.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.events.service.EventAuditHistoryService;
-import ar.edu.utn.frc.siga.common.audit.SigaRevision;
-import ar.edu.utn.frc.siga.common.dto.response.RevisionDto;
-import ar.edu.utn.frc.siga.common.dto.response.RevisionKind;
+import ar.edu.utn.frc.siga.audit.RevisionDto;
+import ar.edu.utn.frc.siga.audit.RevisionReader;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
-import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.envers.AuditReader;
-import org.hibernate.envers.AuditReaderFactory;
-import org.hibernate.envers.RevisionType;
-import org.hibernate.envers.query.AuditEntity;
-import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.function.Function;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class EventAuditHistoryServiceImpl implements EventAuditHistoryService {
 
-    private final EntityManager entityManager;
+    private final RevisionReader revisionReader;
     private final AcademicEventRepository eventRepository;
     private final OccurrenceRepository occurrenceRepository;
 
     @Override
     @Transactional(readOnly = true)
     public List<RevisionDto<EventHistorySnapshotDto>> findEventHistory(Long eventId) {
-        List<?> results = auditReader()
-                .createQuery()
-                .forRevisionsOfEntity(AcademicEvent.class, false, true)
-                .add(AuditEntity.id().eq(eventId))
-                .addOrder(AuditEntity.revisionNumber().asc())
-                .getResultList();
-        return toRevisions(results, eventRepository, "AcademicEvent", eventId,
-                entity -> toEventSnapshot((AcademicEvent) entity));
+        List<RevisionDto<EventHistorySnapshotDto>> revisions =
+                revisionReader.readById(AcademicEvent.class, eventId,
+                        entity -> toEventSnapshot((AcademicEvent) entity));
+        if (revisions.isEmpty() && !eventRepository.existsById(eventId)) {
+            throw ResourceNotFoundException.of("AcademicEvent", eventId);
+        }
+        return revisions;
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<RevisionDto<OccurrenceHistorySnapshotDto>> findOccurrenceHistory(Long occurrenceId) {
-        List<?> results = auditReader()
-                .createQuery()
-                .forRevisionsOfEntity(Occurrence.class, false, true)
-                .add(AuditEntity.id().eq(occurrenceId))
-                .addOrder(AuditEntity.revisionNumber().asc())
-                .getResultList();
-        return toRevisions(results, occurrenceRepository, "Occurrence", occurrenceId, entity -> {
-            Occurrence occurrence = (Occurrence) entity;
-            return new OccurrenceHistorySnapshotDto(
-                    occurrence.getId(),
-                    occurrence.getEvent().getId(),
-                    occurrence.getDate(),
-                    occurrence.getStatus());
-        });
-    }
-
-    private AuditReader auditReader() {
-        return AuditReaderFactory.get(entityManager);
-    }
-
-    private <T> List<RevisionDto<T>> toRevisions(List<?> results, JpaRepository<?, Long> anchorRepository,
-                                                 String anchorName, Long anchorId, Function<Object, T> snapshotMapper) {
-        if (results.isEmpty() && !anchorRepository.existsById(anchorId)) {
-            throw ResourceNotFoundException.of(anchorName, anchorId);
+        List<RevisionDto<OccurrenceHistorySnapshotDto>> revisions =
+                revisionReader.readById(Occurrence.class, occurrenceId,
+                        entity -> toOccurrenceSnapshot((Occurrence) entity));
+        if (revisions.isEmpty() && !occurrenceRepository.existsById(occurrenceId)) {
+            throw ResourceNotFoundException.of("Occurrence", occurrenceId);
         }
-        return results.stream()
-                .map(row -> {
-                    Object[] tuple = (Object[]) row;
-                    SigaRevision revision = (SigaRevision) tuple[1];
-                    RevisionType revisionType = (RevisionType) tuple[2];
-                    return new RevisionDto<>(
-                            revision.getId(),
-                            revision.getFechaRevision(),
-                            revision.getUsuario(),
-                            toKind(revisionType),
-                            revisionType == RevisionType.DEL ? null : snapshotMapper.apply(tuple[0]));
-                })
-                .toList();
+        return revisions;
     }
 
-    private RevisionKind toKind(RevisionType revisionType) {
-        return switch (revisionType) {
-            case ADD -> RevisionKind.CREATED;
-            case MOD -> RevisionKind.MODIFIED;
-            case DEL -> RevisionKind.DELETED;
-        };
+    private OccurrenceHistorySnapshotDto toOccurrenceSnapshot(Occurrence occurrence) {
+        return new OccurrenceHistorySnapshotDto(
+                occurrence.getId(),
+                occurrence.getEvent().getId(),
+                occurrence.getDate(),
+                occurrence.getStatus());
     }
 
     private EventHistorySnapshotDto toEventSnapshot(AcademicEvent event) {

@@ -2,7 +2,7 @@ package ar.edu.utn.frc.siga.events.service;
 
 import ar.edu.utn.frc.siga.events.dto.response.EventHistorySnapshotDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceHistorySnapshotDto;
-import ar.edu.utn.frc.siga.common.dto.response.RevisionDto;
+import ar.edu.utn.frc.siga.audit.RevisionDto;
 
 import java.util.List;
 
