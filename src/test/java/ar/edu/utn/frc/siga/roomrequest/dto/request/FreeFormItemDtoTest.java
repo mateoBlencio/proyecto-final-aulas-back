@@ -97,6 +97,14 @@ class FreeFormItemDtoTest {
             assertThat(violations(item().estimated(null).build())).isNotEmpty();
             assertThat(violations(item().estimated(-1).build())).isNotEmpty();
         }
+
+        @Test
+        @DisplayName("cantidad de aulas: 0 y más de 100 rechazadas; 100 admitida")
+        void classroomCountBounds() {
+            assertThat(violations(item().classroomCount(0).build())).isNotEmpty();
+            assertThat(violations(item().classroomCount(101).build())).isNotEmpty();
+            assertThat(violations(item().classroomCount(100).build())).isEmpty();
+        }
     }
 
     @Nested
@@ -172,6 +180,7 @@ class FreeFormItemDtoTest {
         Builder startTime(LocalTime v) { this.startTime = v; return this; }
         Builder endTime(LocalTime v) { this.endTime = v; return this; }
         Builder estimated(Integer v) { this.estimated = v; return this; }
+        Builder classroomCount(Integer v) { this.classroomCount = v; return this; }
         Builder requiresComputers(Boolean v) { this.requiresComputers = v; return this; }
         Builder computerCount(Integer v) { this.computerCount = v; return this; }
         Builder requiredSoftware(String v) { this.requiredSoftware = v; return this; }

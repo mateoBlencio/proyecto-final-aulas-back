@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.roomrequest.dto.request;
 
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.FutureOrPresent;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 
@@ -15,7 +16,7 @@ public record ScheduledItemDto(
         @FutureOrPresent LocalDate date,
         DayOfWeek dayOfWeek,
         @Min(0) Integer estimated,
-        @Min(1) Integer classroomCount,
+        @Min(1) @Max(100) Integer classroomCount,
         Boolean requiresProjector,
         Boolean requiresComputers,
         @Min(1) Integer computerCount,
