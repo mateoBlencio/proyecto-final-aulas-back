@@ -1,7 +1,7 @@
 meta {
   name: Crear solicitud de aula
   type: http
-  seq: 5
+  seq: 6
 }
 
 post {
@@ -55,7 +55,7 @@ docs {
 
   type:
     ONE_TIME_ROOM_CHANGE | REGULAR_ROOM_CHANGE  -> ítems "scheduled" (dayOfWeek)
-    PARTIAL_EXAM_IN_CLASS                        -> ítems "scheduled" (dayOfWeek)   [ver 05b]
+    PARTIAL_EXAM_IN_CLASS                        -> ítems "scheduled" (dayOfWeek)   [ver 07]
     PARTIAL_EXAM_OFF_SCHEDULE | FINAL_EXAM       -> ítems "free-form" (date + horario)
     CONFERENCE | OTHER                           -> ítems "free-form", materia opcional
   requester.scope: GRADO | TECNICATURA | LICENCIATURA | EXTENSION | POSTGRADO.
@@ -71,7 +71,7 @@ docs {
   estimated son obligatorios. Se envía hora de inicio y hora de FIN; el
   backend guarda inicio + duración.
 
-  Ítem scheduled (ver 05b): NO lleva date ni horario; lleva dayOfWeek y
+  Ítem scheduled (ver 07): NO lleva date ni horario; lleva dayOfWeek y
   estimated. El día/horario se derivan del dictado de esa comisión y quedan
   con trazabilidad al evento recurrente de origen.
 

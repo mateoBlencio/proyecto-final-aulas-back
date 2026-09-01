@@ -1,7 +1,7 @@
 meta {
   name: Crear solicitud - parcial en horario de clase
   type: http
-  seq: 6
+  seq: 7
 }
 
 post {
@@ -39,7 +39,7 @@ docs {
   Variante "scheduled" del alta (type = PARTIAL_EXAM_IN_CLASS). También sirve
   de molde para ONE_TIME_ROOM_CHANGE y REGULAR_ROOM_CHANGE.
 
-  Diferencias con 05 (free-form):
+  Diferencias con 06 (free-form):
   - commissionId va en la CABECERA, no en el ítem.
   - El ítem NO lleva date ni startTime/endTime: se ata a "dayOfWeek" y el
     backend deriva día y horario del dictado de esa comisión (evento
