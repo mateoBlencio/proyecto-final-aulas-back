@@ -20,6 +20,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -90,6 +91,23 @@ class ClassScheduleServiceTest {
 
         assertThat(slot.startTime()).isEqualTo(LocalTime.of(18, 0));
         assertThat(slot.endTime()).isEqualTo(LocalTime.of(20, 0));
+    }
+
+    @Test
+    @DisplayName("distinctSlots: colapsa la cursada anual partida, pero no dos bloques distintos del mismo día")
+    void distinctSlotsCollapsesOnlyIdenticalHours() {
+        when(academicEventService.findRecurringEventsBySubjectAndCommission(1L, 9L)).thenReturn(List.of(
+                recurring(100L, DayOfWeek.TUESDAY, LocalTime.of(18, 0), 120),
+                recurring(101L, DayOfWeek.TUESDAY, LocalTime.of(18, 0), 120),
+                recurring(102L, DayOfWeek.MONDAY, LocalTime.of(8, 0), 120),
+                recurring(103L, DayOfWeek.MONDAY, LocalTime.of(14, 0), 120)));
+
+        assertThat(service.distinctSlots(1L, 9L))
+                .extracting(ClassSlot::dayOfWeek, ClassSlot::startTime)
+                .containsExactly(
+                        tuple(DayOfWeek.TUESDAY, LocalTime.of(18, 0)),
+                        tuple(DayOfWeek.MONDAY, LocalTime.of(8, 0)),
+                        tuple(DayOfWeek.MONDAY, LocalTime.of(14, 0)));
     }
 
     @Test

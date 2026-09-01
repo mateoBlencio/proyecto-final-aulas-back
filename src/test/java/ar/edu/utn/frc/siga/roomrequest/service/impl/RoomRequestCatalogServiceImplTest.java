@@ -50,7 +50,7 @@ class RoomRequestCatalogServiceImplTest {
     @Test
     @DisplayName("materia y comisión válidas: devuelve slots mapeados y fechas de cursado")
     void happy() {
-        when(classScheduleService.slots(1L, 9L)).thenReturn(List.of(
+        when(classScheduleService.distinctSlots(1L, 9L)).thenReturn(List.of(
                 new ClassSlot(100L, DayOfWeek.TUESDAY, LocalTime.of(18, 0), LocalTime.of(20, 0))));
         when(classScheduleService.classDates(eq(1L), eq(9L), any()))
                 .thenReturn(List.of(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 8)));

@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +18,7 @@ public class ClassScheduleService {
 
     private final AcademicEventService academicEventService;
 
-    public List<ClassSlot> slots(Long subjectId, Long commissionId) {
+    private List<ClassSlot> slots(Long subjectId, Long commissionId) {
         return academicEventService.findRecurringEventsBySubjectAndCommission(subjectId, commissionId).stream()
                 .map(r -> new ClassSlot(r.id(), r.dayOfWeek(), r.startTime(), r.endTime()))
                 .toList();
@@ -32,10 +31,18 @@ public class ClassScheduleService {
                 .toList();
     }
 
+    public List<ClassSlot> distinctSlots(Long subjectId, Long commissionId) {
+        Map<List<Object>, ClassSlot> byDayAndHours = new LinkedHashMap<>();
+        for (ClassSlot slot : slots(subjectId, commissionId)) {
+            byDayAndHours.putIfAbsent(List.of(slot.dayOfWeek(), slot.startTime(), slot.endTime()), slot);
+        }
+        return List.copyOf(byDayAndHours.values());
+    }
+
     public ClassSlot requireClassDay(Long subjectId, Long commissionId, DayOfWeek dayOfWeek) {
-        List<ClassSlot> matching = distinctByHours(slots(subjectId, commissionId).stream()
+        List<ClassSlot> matching = distinctSlots(subjectId, commissionId).stream()
                 .filter(slot -> slot.dayOfWeek() == dayOfWeek)
-                .toList());
+                .toList();
         if (matching.isEmpty()) {
             throw new InvalidRoomRequestException(
                     "La comisión " + commissionId + " no dicta clase los " + dayOfWeek + ".");
@@ -46,14 +53,6 @@ public class ClassScheduleService {
                             + "; indicá una fecha puntual en vez de un día de dictado.");
         }
         return matching.getFirst();
-    }
-
-    private static List<ClassSlot> distinctByHours(List<ClassSlot> slots) {
-        Map<List<LocalTime>, ClassSlot> byHours = new LinkedHashMap<>();
-        for (ClassSlot slot : slots) {
-            byHours.putIfAbsent(List.of(slot.startTime(), slot.endTime()), slot);
-        }
-        return List.copyOf(byHours.values());
     }
 
     public ClassSlot requireClassDate(Long subjectId, Long commissionId, LocalDate date) {
