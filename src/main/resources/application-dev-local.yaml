@@ -37,6 +37,9 @@ cors:
 siga:
   jwt:
     secret: dev-local-fixed-secret-not-for-prod-0123456789abcdef
+  sysacad:
+    enabled: false
+    api-key: dev-local-unused
 
 logging:
   level:

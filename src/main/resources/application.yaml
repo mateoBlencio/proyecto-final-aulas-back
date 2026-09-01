@@ -131,16 +131,14 @@ siga:
       capacity: 100
       refill-period-seconds: 60
   sysacad:
-    enabled: ${SYSACAD_ENABLED:false}
+    enabled: ${SYSACAD_ENABLED}
 
-    # eliminar cuando se tenga la vista real
+    # TEMPORAL: sirven fixtures estáticos en vez de las vistas reales. Eliminar cuando estén completas.
     materias-mock-enabled: true
-
-    # TEMPORAL: sirve asignaciones desde fixture; apagar cuando HorariosComisionesCupos esté completa/alineada
-    asignaciones-mock-enabled: ${SYSACAD_ASIGNACIONES_MOCK:true}
+    asignaciones-mock-enabled: true
 
     base-url: https://dataview.frc.utn.edu.ar
-    api-key: ${SYSACAD_API_KEY:}
+    api-key: ${SYSACAD_API_KEY}
     connect-timeout: 5s
     read-timeout: 30s
     max-retries: 3
