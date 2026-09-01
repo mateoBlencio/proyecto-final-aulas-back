@@ -10,6 +10,7 @@ import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
@@ -53,6 +54,7 @@ public class AllocationServiceImpl implements AllocationService {
 
     @Override
     @Transactional
+    @AuditOperation("Asignación de aulas en lote")
     public List<AllocationResponseDto> allocate(AllocationCommand command) {
         Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolveAndValidate(command);
         List<Allocation> saved = writer.create(classroomByOccurrence, command.observation(), command.source());
@@ -62,6 +64,7 @@ public class AllocationServiceImpl implements AllocationService {
 
     @Override
     @Transactional
+    @AuditOperation("Reasignación de aulas en lote")
     public List<AllocationResponseDto> reallocate(AllocationCommand command) {
         Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolveAndValidate(command);
         List<Allocation> saved = writer.upsert(classroomByOccurrence, command.observation(), command.source());
@@ -71,6 +74,7 @@ public class AllocationServiceImpl implements AllocationService {
 
     @Override
     @Transactional
+    @AuditOperation("Liberación de aulas en lote")
     public List<DeallocatedOccurrenceDto> deallocate(DeallocationCommand command) {
         List<OccurrenceSlotDto> occurrences = targetResolver.resolveAll(command.targets(), null);
         occurrences.forEach(validator::validateNotPast);
@@ -84,6 +88,7 @@ public class AllocationServiceImpl implements AllocationService {
 
     @Override
     @Transactional
+    @AuditOperation("Sincronización de asignaciones desde SysAcad")
     public int syncFromSysacad(List<AllocationItem> items) {
         AllocationCommand command = new AllocationCommand(items, null, AllocationSource.SYSACAD);
         Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolveAndValidate(command);

@@ -7,7 +7,7 @@ import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.EventHistorySnapshotDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceHistorySnapshotDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
-import ar.edu.utn.frc.siga.common.dto.response.RevisionDto;
+import ar.edu.utn.frc.siga.audit.RevisionDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.EventAuditHistoryService;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;

@@ -1,0 +1,40 @@
+meta {
+  name: Registro de auditoría
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/audit
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~from: 2026-01-01
+  ~to: 2026-12-31
+  ~user: admin@frc.utn.edu.ar
+  ~entityType: Configuración
+  ~kind: MODIFIED
+  ~page: 0
+  ~size: 20
+}
+
+docs {
+  Log paginado ordenado por revisión descendente. Requiere rol SUBSECRETARIA.
+
+  Cada entrada trae 'type' y 'description':
+  - type=OPERATION: operación de negocio en lote. Trae operationId, recordCount
+    y entityTypes. El detalle se pide en GET /v1/audit/operations/{operationId}.
+  - type=CHANGE: cambio individual suelto. Trae kind, entityType y recordId.
+    Si no pertenece a una operación, 'description' se deriva del tipo de cambio
+    ("Alta de ...", "Modificación de ...", "Baja de ...").
+
+  Filtros opcionales:
+  - from / to: rango de fechas (ISO yyyy-MM-dd)
+  - user: usuario que hizo el cambio
+  - entityType: etiqueta de dominio (ej. "Configuración", "Evento académico",
+    "Asignación", "Ocurrencia", "Usuario", "Solicitud de aula",
+    "Ítem de solicitud de aula", "Preferencia de aula"). 400 si no existe.
+  - kind: CREATED | MODIFIED | DELETED
+}

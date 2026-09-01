@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.roomrequest.dto.RoomRequestItemFilter;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
@@ -44,6 +45,7 @@ public class RoomRequestServiceImpl implements RoomRequestService {
 
     @Override
     @Transactional
+    @AuditOperation("Alta de solicitud de aula")
     public RoomRequestResponseDto create(CreateRoomRequestDto dto) {
         log.debug("Creando solicitud de aula: teacherName={}, type={}, scope={}, subjectId={}, items={}",
                 dto.teacherName(), dto.type(), dto.scope(), dto.subjectId(), dto.items().size());

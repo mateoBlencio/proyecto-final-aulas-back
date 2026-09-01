@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.common.audit;
+package ar.edu.utn.frc.siga.audit;
 
 import org.hibernate.envers.RevisionListener;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
@@ -17,5 +17,11 @@ public class SigaRevisionListener implements RevisionListener {
                 || authentication instanceof AnonymousAuthenticationToken;
 
         revision.setUsuario(sinUsuarioAutenticado ? null : authentication.getName());
+
+        AuditOperationContext.Operation operation = AuditOperationContext.current();
+        if (operation != null) {
+            revision.setOperacionId(operation.id());
+            revision.setDescripcion(operation.description());
+        }
     }
 }
