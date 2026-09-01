@@ -3,6 +3,8 @@ package ar.edu.utn.frc.siga.space.model;
 import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -62,5 +64,13 @@ public class Classroom extends SoftDeletableEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_tipo_aula", nullable = false)
     private ClassroomType classroomType;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "modo_permiso", nullable = false, length = 20)
+    private PermissionMode permissionMode = PermissionMode.ALL;
+
+    @Column(name = "observaciones", length = 500)
+    private String observations;
 
 }

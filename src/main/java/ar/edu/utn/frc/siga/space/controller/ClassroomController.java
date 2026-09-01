@@ -1,7 +1,9 @@
 package ar.edu.utn.frc.siga.space.controller;
 
 import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
+import ar.edu.utn.frc.siga.space.dto.request.ClassroomDetailsUpdateDto;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomListItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -61,7 +63,7 @@ public class ClassroomController {
     @Operation(summary = "Listar aulas", description = "Listado paginado con filtros opcionales por número, "
             + "edificio, tipo y capacidad. Por defecto solo devuelve las aulas activas; con "
             + "includeDeactivated=true incluye también las desactivadas.")
-    public ResponseEntity<Page<ClassroomResponseDto>> findAll(
+    public ResponseEntity<Page<ClassroomListItemDto>> findAll(
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
             @RequestParam(required = false) Integer roomNumber,
             @RequestParam(required = false) Long buildingId,
@@ -74,7 +76,7 @@ public class ClassroomController {
                 buildingId, pageable.getPageNumber(), includeDeactivated);
         ClassroomFilter filter = new ClassroomFilter(roomNumber, buildingId, classroomTypeId,
                 capacityMin, capacityMax);
-        Page<ClassroomResponseDto> page = classroomService.findAll(filter, pageable, includeDeactivated);
+        Page<ClassroomListItemDto> page = classroomService.findAll(filter, pageable, includeDeactivated);
         log.info("Aulas listadas: total={}", page.getTotalElements());
         return ResponseEntity.ok(page);
     }
@@ -89,6 +91,20 @@ public class ClassroomController {
         log.debug("PUT /v1/classrooms/{}: roomNumber={}", id, dto.roomNumber());
         ClassroomResponseDto response = classroomService.update(id, dto);
         log.info("Aula actualizada vía controller: id={}", response.id());
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{id}/details")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Actualizar campos locales del aula",
+               description = "Actualiza tipo de aula, observaciones, recursos y política de permitido. No toca "
+                       + "número, edificio ni capacidad (SysAcad-owned). 404 si el aula o el tipo no existen; "
+                       + "400 si un código de recurso es desconocido.")
+    public ResponseEntity<ClassroomListItemDto> updateDetails(@PathVariable Long id,
+                                                              @Valid @RequestBody ClassroomDetailsUpdateDto dto) {
+        log.debug("PUT /v1/classrooms/{}/details: permissionMode={}", id, dto.permissionMode());
+        ClassroomListItemDto response = classroomService.updateDetails(id, dto);
+        log.info("Campos locales del aula actualizados vía controller: id={}", id);
         return ResponseEntity.ok(response);
     }
 

@@ -10,4 +10,8 @@ public interface ClassroomTypeRepository extends SoftDeletableRepository<Classro
 
     Optional<ClassroomType> findByDescriptionIgnoreCaseAndDeletedAtIsNull(String description);
 
+    boolean existsByDescriptionIgnoreCase(String description);
+
+    boolean existsByDescriptionIgnoreCaseAndIdNot(String description, Long id);
+
 }

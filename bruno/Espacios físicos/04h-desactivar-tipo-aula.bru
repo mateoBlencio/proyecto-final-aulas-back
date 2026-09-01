@@ -1,0 +1,20 @@
+meta {
+  name: Desactivar tipo de aula
+  type: http
+  seq: 13
+}
+
+delete {
+  url: {{baseUrl}}/v1/classroom-types/:id/activation
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: 1
+}
+
+docs {
+  DELETE /v1/classroom-types/{id}/activation. Rol: SUBSECRETARIA.
+  Soft-delete idempotente. 204 si queda inactivo; 404 si no existe.
+}

@@ -1,23 +1,29 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
+import ar.edu.utn.frc.siga.space.dto.request.ClassroomDetailsUpdateDto;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomListItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
 import ar.edu.utn.frc.siga.space.exception.SpaceDomainException;
+import ar.edu.utn.frc.siga.space.mapper.ClassroomListComposer;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomMapper;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
+import ar.edu.utn.frc.siga.space.model.PermissionMode;
+import ar.edu.utn.frc.siga.space.dto.request.ClassroomPermissionTargetRequestDto;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import ar.edu.utn.frc.siga.space.service.ClassroomTypeService;
 import ar.edu.utn.frc.siga.space.service.command.ClassroomSyncCommand;
+import ar.edu.utn.frc.siga.space.specification.ClassroomListSort;
 import ar.edu.utn.frc.siga.space.specification.ClassroomSpecification;
 
 import lombok.RequiredArgsConstructor;
@@ -51,6 +57,8 @@ public class ClassroomServiceImpl implements ClassroomService {
     private final ClassroomTypeService classroomTypeService;
     private final ClassroomTypeRepository classroomTypeRepository;
     private final ClassroomMapper classroomMapper;
+    private final ClassroomListComposer classroomListComposer;
+    private final ClassroomFeatureWriter classroomFeatureWriter;
 
     @Override
     @Transactional
@@ -101,14 +109,14 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     @Override
-    public Page<ClassroomResponseDto> findAll(ClassroomFilter filter, Pageable pageable, boolean includeDeactivated) {
+    public Page<ClassroomListItemDto> findAll(ClassroomFilter filter, Pageable pageable, boolean includeDeactivated) {
         log.debug("Listando aulas: filter={}, page={}, size={}, includeDeactivated={}",
                 filter, pageable.getPageNumber(), pageable.getPageSize(), includeDeactivated);
         Specification<Classroom> spec = includeDeactivated
                 ? ClassroomSpecification.withFilter(filter)
                 : ClassroomSpecification.withFilter(filter).and(SoftDeleteSpecifications.active());
-        return classroomRepository.findAll(spec, pageable)
-                .map(classroomMapper::toDto);
+        return classroomListComposer.compose(
+                classroomRepository.findAll(spec, ClassroomListSort.apply(pageable)));
     }
 
     @Override
@@ -129,6 +137,26 @@ public class ClassroomServiceImpl implements ClassroomService {
         Classroom saved = classroomRepository.save(entity);
         log.info("Aula actualizada: id={}, roomNumber={}", saved.getId(), saved.getRoomNumber());
         return classroomMapper.toDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public ClassroomListItemDto updateDetails(Long id, ClassroomDetailsUpdateDto dto) {
+        log.debug("Actualizando campos locales del aula: id={}, permissionMode={}", id, dto.permissionMode());
+
+        PermissionMode mode = normalizePermissionMode(dto.permissionMode(), dto.permissionTargets());
+
+        Classroom classroom = this.findExistingClassroomById(id);
+        classroom.setClassroomType(classroomTypeService.findById(dto.classroomTypeId()));
+        classroom.setObservations(dto.observations());
+        classroom.setPermissionMode(mode);
+        classroomRepository.save(classroom);
+
+        classroomFeatureWriter.applyResources(classroom, dto.resources());
+        classroomFeatureWriter.applyPermissions(classroom, mode, dto.permissionTargets());
+
+        log.info("Campos locales del aula actualizados: id={}", id);
+        return classroomListComposer.compose(classroom);
     }
 
     @Override
@@ -197,6 +225,12 @@ public class ClassroomServiceImpl implements ClassroomService {
                     log.warn("Edificio no encontrado: id={}", id);
                     return ResourceNotFoundException.of("Building", id);
                 });
+    }
+
+    private static PermissionMode normalizePermissionMode(PermissionMode mode,
+                                                         List<ClassroomPermissionTargetRequestDto> targets) {
+        boolean emptySubset = mode == PermissionMode.SUBSET && (targets == null || targets.isEmpty());
+        return emptySubset ? PermissionMode.NONE : mode;
     }
 
     private void validateCapacity(ClassroomRequestDto dto) {

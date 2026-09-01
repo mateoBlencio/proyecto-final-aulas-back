@@ -19,10 +19,18 @@ import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
+import ar.edu.utn.frc.siga.space.model.ClassroomPermission;
+import ar.edu.utn.frc.siga.space.model.ClassroomResource;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
+import ar.edu.utn.frc.siga.space.model.PermissionTargetKind;
+import ar.edu.utn.frc.siga.space.model.ResourceType;
+import ar.edu.utn.frc.siga.space.model.ResourceValueKind;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
+import ar.edu.utn.frc.siga.space.repository.ClassroomPermissionRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
+import ar.edu.utn.frc.siga.space.repository.ClassroomResourceRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
+import ar.edu.utn.frc.siga.space.repository.ResourceTypeRepository;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -42,6 +50,9 @@ public class IntegrationTestData {
     private final BuildingRepository buildingRepository;
     private final ClassroomRepository classroomRepository;
     private final ClassroomTypeRepository classroomTypeRepository;
+    private final ResourceTypeRepository resourceTypeRepository;
+    private final ClassroomResourceRepository classroomResourceRepository;
+    private final ClassroomPermissionRepository classroomPermissionRepository;
 
     private final SpecialtyRepository specialtyRepository;
     private final StudyPlanRepository studyPlanRepository;
@@ -101,6 +112,32 @@ public class IntegrationTestData {
                 .capacity(capacity)
                 .building(building)
                 .classroomType(tipo)
+                .build());
+    }
+
+    public ResourceType tipoRecurso(String name, ResourceValueKind valueKind) {
+        return resourceTypeRepository.findAll().stream()
+                .filter(type -> type.getName().equalsIgnoreCase(name))
+                .findFirst()
+                .orElseGet(() -> resourceTypeRepository.save(ResourceType.builder()
+                        .name(name)
+                        .valueKind(valueKind)
+                        .build()));
+    }
+
+    public ClassroomResource recursoDeAula(Classroom classroom, ResourceType tipo, int quantity) {
+        return classroomResourceRepository.save(ClassroomResource.builder()
+                .classroom(classroom)
+                .resourceType(tipo)
+                .quantity(quantity)
+                .build());
+    }
+
+    public ClassroomPermission permisoDeAula(Classroom classroom, Long subjectId) {
+        return classroomPermissionRepository.save(ClassroomPermission.builder()
+                .classroom(classroom)
+                .targetKind(PermissionTargetKind.SUBJECT)
+                .targetId(subjectId)
                 .build());
     }
 

@@ -1,0 +1,16 @@
+meta {
+  name: Desactivar tipo de recurso
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/v1/resource-types/1/activation
+  body: none
+  auth: inherit
+}
+
+docs {
+  DELETE /v1/resource-types/{id}/activation. Rol: SUBSECRETARIA.
+  Soft-delete idempotente. 204 si queda inactivo; 404 si no existe.
+}

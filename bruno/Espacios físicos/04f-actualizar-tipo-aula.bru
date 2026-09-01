@@ -1,0 +1,27 @@
+meta {
+  name: Actualizar tipo de aula
+  type: http
+  seq: 11
+}
+
+put {
+  url: {{baseUrl}}/v1/classroom-types/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: 1
+}
+
+body:json {
+  {
+    "description": "Laboratorio de Informática"
+  }
+}
+
+docs {
+  PUT /v1/classroom-types/{id}. Rol: SUBSECRETARIA. Actualiza la descripción.
+  400 si la descripción ya la usa otro tipo de aula (incluye desactivados).
+  404 si el tipo de aula no existe.
+}

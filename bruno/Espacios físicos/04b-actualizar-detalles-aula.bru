@@ -1,0 +1,45 @@
+meta {
+  name: Actualizar detalles de aula
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/v1/classrooms/:id/details
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: 1
+}
+
+body:json {
+  {
+    "classroomTypeId": 1,
+    "observations": "Pizarrón nuevo. Ventana con cierre defectuoso.",
+    "permissionMode": "SUBSET",
+    "permissionTargets": [
+      { "targetKind": "SUBJECT", "targetId": 1 }
+    ],
+    "resources": [
+      { "resourceTypeId": 1, "quantity": 20 },
+      { "resourceTypeId": 2, "quantity": 1 }
+    ]
+  }
+}
+
+docs {
+  Actualiza campos locales del aula: tipo, observaciones, recursos y política de
+  permitido. No toca número, edificio ni capacidad (SysAcad-owned).
+  Rol requerido: SUBSECRETARIA.
+  
+  permissionMode:
+    - ALL / NONE: se ignora permissionTargets.
+    - SUBSET: se usa la lista de permissionTargets (targetKind actual: SUBJECT).
+  
+  resources: se reconcilia contra lo guardado (alta / cambio de cantidad / baja)
+  usando resourceTypeId. El id debe existir y estar activo en tipo_recurso
+  (ver GET /v1/resource-types), si no => 400.
+  404 si el aula o el classroomTypeId no existen.
+}

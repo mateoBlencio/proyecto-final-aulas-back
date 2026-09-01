@@ -1,0 +1,26 @@
+meta {
+  name: Listar tipos de recurso
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/resource-types?page=0&size=20&includeDeactivated=false
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 0
+  size: 20
+  includeDeactivated: false
+}
+
+docs {
+  GET /v1/resource-types. Roles: SUBSECRETARIA o AUXILIAR_AULICO.
+  Respuesta paginada (Page: content, totalElements, totalPages, number, size...).
+  Cada item: id, name, valueKind (COUNT | BOOLEAN), enabled.
+  El id es el que se manda en resources[].resourceTypeId al editar un aula.
+  sort por defecto: id asc. Por defecto solo activos; includeDeactivated=true
+  incluye los desactivados.
+}

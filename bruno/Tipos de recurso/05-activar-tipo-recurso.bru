@@ -1,0 +1,17 @@
+meta {
+  name: Activar tipo de recurso
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/v1/resource-types/1/activation
+  body: none
+  auth: inherit
+}
+
+docs {
+  PUT /v1/resource-types/{id}/activation. Rol: SUBSECRETARIA.
+  Reactiva un tipo de recurso desactivado (idempotente). 204 si queda activo;
+  404 si no existe.
+}
