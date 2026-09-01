@@ -8,7 +8,10 @@ import org.springframework.stereotype.Component;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -30,9 +33,9 @@ public class ClassScheduleService {
     }
 
     public ClassSlot requireClassDay(Long subjectId, Long commissionId, DayOfWeek dayOfWeek) {
-        List<ClassSlot> matching = slots(subjectId, commissionId).stream()
+        List<ClassSlot> matching = distinctByHours(slots(subjectId, commissionId).stream()
                 .filter(slot -> slot.dayOfWeek() == dayOfWeek)
-                .toList();
+                .toList());
         if (matching.isEmpty()) {
             throw new InvalidRoomRequestException(
                     "La comisión " + commissionId + " no dicta clase los " + dayOfWeek + ".");
@@ -43,6 +46,14 @@ public class ClassScheduleService {
                             + "; indicá una fecha puntual en vez de un día de dictado.");
         }
         return matching.getFirst();
+    }
+
+    private static List<ClassSlot> distinctByHours(List<ClassSlot> slots) {
+        Map<List<LocalTime>, ClassSlot> byHours = new LinkedHashMap<>();
+        for (ClassSlot slot : slots) {
+            byHours.putIfAbsent(List.of(slot.startTime(), slot.endTime()), slot);
+        }
+        return List.copyOf(byHours.values());
     }
 
     public ClassSlot requireClassDate(Long subjectId, Long commissionId, LocalDate date) {

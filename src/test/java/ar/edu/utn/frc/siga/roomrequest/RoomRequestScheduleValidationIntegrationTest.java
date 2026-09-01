@@ -69,6 +69,23 @@ class RoomRequestScheduleValidationIntegrationTest extends AbstractIntegrationTe
     }
 
     @Test
+    @DisplayName("regular: cursada anual cargada como un evento recurrente por cuatrimestre → 201, no la trata como doble bloque")
+    void regular_annualSplitSameDayAndTime_isAccepted() {
+        testData.eventoRecurrente(subjectId, commissionId, DayOfWeek.TUESDAY, java.time.LocalTime.of(18, 0),
+                120, LocalDate.now().plusMonths(4).plusDays(1), LocalDate.now().plusMonths(8), 30);
+
+        RoomRequestResponseDto created = roomRequestService.create(new CreateRegularRoomChangeDto(
+                RoomRequestType.REGULAR_ROOM_CHANGE, requester(), subjectId, commissionId,
+                List.of(scheduled(null, DayOfWeek.TUESDAY))));
+
+        assertThat(created.items()).singleElement().satisfies(item -> {
+            assertThat(item.dayOfWeek()).isEqualTo(DayOfWeek.TUESDAY);
+            assertThat(item.startTime()).isEqualTo(java.time.LocalTime.of(18, 0));
+            assertThat(item.durationMinutes()).isEqualTo(120);
+        });
+    }
+
+    @Test
     @DisplayName("regular: día en que la comisión no dicta → rechazado")
     void regular_nonClassDay_isRejected() {
         assertThatThrownBy(() -> roomRequestService.create(new CreateRegularRoomChangeDto(
