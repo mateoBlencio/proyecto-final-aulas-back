@@ -234,8 +234,8 @@ class AcademicEventServiceImplTest {
     }
 
     @Test
-    @DisplayName("findCursadoOccurrences: junta las ocurrencias de los eventos vigentes desde 'from' y las devuelve ordenadas por fecha")
-    void findCursadoOccurrencesOrdenadasPorFecha() {
+    @DisplayName("findClassOccurrences: junta las ocurrencias de los eventos vigentes desde 'from' y las devuelve ordenadas por fecha")
+    void findClassOccurrencesOrdenadasPorFecha() {
         RecurringEvent lunes = EventTestData.recurringEvent(1L, DayOfWeek.MONDAY,
                 LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31));
         LocalDate from = LocalDate.of(2026, 4, 1);
@@ -250,19 +250,19 @@ class AcademicEventServiceImplTest {
         when(occurrenceMapper.toDto(o2)).thenReturn(new OccurrenceResponseDto(12L, 1L, o2.getDate(),
                 OccurrenceStatus.NEEDS_ROOM, LocalTime.of(8, 0), LocalTime.of(9, 30)));
 
-        List<OccurrenceResponseDto> result = service.findCursadoOccurrences(1L, 9L, from);
+        List<OccurrenceResponseDto> result = service.findClassOccurrences(1L, 9L, from);
 
         assertThat(result).extracting(OccurrenceResponseDto::date)
                 .containsExactly(LocalDate.of(2026, 4, 6), LocalDate.of(2026, 4, 20));
     }
 
     @Test
-    @DisplayName("findCursadoOccurrences: sin cursado vigente → lista vacía, no consulta ocurrencias")
-    void findCursadoOccurrencesSinCursado() {
+    @DisplayName("findClassOccurrences: sin cursado vigente → lista vacía, no consulta ocurrencias")
+    void findClassOccurrencesSinCursado() {
         when(recurringEventRepository.findActiveBySubjectAndCommission(eq(1L), eq(9L), any(LocalDate.class)))
                 .thenReturn(List.of());
 
-        assertThat(service.findCursadoOccurrences(1L, 9L, LocalDate.of(2026, 4, 1))).isEmpty();
+        assertThat(service.findClassOccurrences(1L, 9L, LocalDate.of(2026, 4, 1))).isEmpty();
         verify(occurrenceRepository, never()).findByEvent_IdInAndDateGreaterThanEqual(anyCollection(), any());
     }
 

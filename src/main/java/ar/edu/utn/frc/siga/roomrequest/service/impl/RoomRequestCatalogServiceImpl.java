@@ -7,12 +7,12 @@ import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CommissionOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CommissionScheduleDto;
-import ar.edu.utn.frc.siga.roomrequest.dto.response.CursadoSlotDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassSlotDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.SpecialtyOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.SubjectOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestCatalogMapper;
 import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestCatalogService;
-import ar.edu.utn.frc.siga.roomrequest.validator.CursadoScheduleService;
+import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +31,7 @@ public class RoomRequestCatalogServiceImpl implements RoomRequestCatalogService 
     private final SubjectService subjectService;
     private final SubjectCommissionService subjectCommissionService;
     private final ClassroomService classroomService;
-    private final CursadoScheduleService cursadoScheduleService;
+    private final ClassScheduleService classScheduleService;
     private final RoomRequestCatalogMapper mapper;
 
     @Override
@@ -68,11 +68,11 @@ public class RoomRequestCatalogServiceImpl implements RoomRequestCatalogService 
         subjectService.findById(subjectId);
         subjectCommissionService.findBySubjectAndCommission(subjectId, commissionId);
 
-        List<CursadoSlotDto> slots = cursadoScheduleService.slots(subjectId, commissionId).stream()
-                .map(slot -> new CursadoSlotDto(slot.recurringEventId(), slot.dayOfWeek(),
+        List<ClassSlotDto> slots = classScheduleService.slots(subjectId, commissionId).stream()
+                .map(slot -> new ClassSlotDto(slot.recurringEventId(), slot.dayOfWeek(),
                         slot.startTime(), slot.endTime()))
                 .toList();
         return new CommissionScheduleDto(slots,
-                cursadoScheduleService.cursadoDates(subjectId, commissionId, LocalDate.now()));
+                classScheduleService.classDates(subjectId, commissionId, LocalDate.now()));
     }
 }

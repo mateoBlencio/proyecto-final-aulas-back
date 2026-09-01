@@ -6,8 +6,8 @@ import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CommissionScheduleDto;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestCatalogMapper;
-import ar.edu.utn.frc.siga.roomrequest.validator.CursadoScheduleService;
-import ar.edu.utn.frc.siga.roomrequest.validator.CursadoSlot;
+import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
+import ar.edu.utn.frc.siga.roomrequest.validator.ClassSlot;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,7 +36,7 @@ class RoomRequestCatalogServiceImplTest {
     @Mock private SubjectService subjectService;
     @Mock private SubjectCommissionService subjectCommissionService;
     @Mock private ClassroomService classroomService;
-    @Mock private CursadoScheduleService cursadoScheduleService;
+    @Mock private ClassScheduleService classScheduleService;
     @Mock private RoomRequestCatalogMapper mapper;
 
     private RoomRequestCatalogServiceImpl service;
@@ -44,15 +44,15 @@ class RoomRequestCatalogServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new RoomRequestCatalogServiceImpl(specialtyService, subjectService, subjectCommissionService,
-                classroomService, cursadoScheduleService, mapper);
+                classroomService, classScheduleService, mapper);
     }
 
     @Test
     @DisplayName("materia y comisión válidas: devuelve slots mapeados y fechas de cursado")
     void happy() {
-        when(cursadoScheduleService.slots(1L, 9L)).thenReturn(List.of(
-                new CursadoSlot(100L, DayOfWeek.TUESDAY, LocalTime.of(18, 0), LocalTime.of(20, 0))));
-        when(cursadoScheduleService.cursadoDates(eq(1L), eq(9L), any()))
+        when(classScheduleService.slots(1L, 9L)).thenReturn(List.of(
+                new ClassSlot(100L, DayOfWeek.TUESDAY, LocalTime.of(18, 0), LocalTime.of(20, 0))));
+        when(classScheduleService.classDates(eq(1L), eq(9L), any()))
                 .thenReturn(List.of(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 8)));
 
         CommissionScheduleDto result = service.findCommissionSchedule(1L, 9L);
@@ -75,6 +75,6 @@ class RoomRequestCatalogServiceImplTest {
         assertThatThrownBy(() -> service.findCommissionSchedule(1L, 9L))
                 .isInstanceOf(ResourceNotFoundException.class);
 
-        verifyNoInteractions(cursadoScheduleService);
+        verifyNoInteractions(classScheduleService);
     }
 }

@@ -16,8 +16,8 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.validator.AcademicReferenceValidator;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassroomReferenceValidator;
-import ar.edu.utn.frc.siga.roomrequest.validator.CursadoScheduleService;
-import ar.edu.utn.frc.siga.roomrequest.validator.CursadoSlot;
+import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
+import ar.edu.utn.frc.siga.roomrequest.validator.ClassSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -50,15 +50,15 @@ class RoomRequestHandlersTest {
 
     private static final Long SUBJECT = 42L;
     private static final Long COMMISSION = 7L;
-    private static final CursadoSlot TUESDAY_SLOT =
-            new CursadoSlot(100L, DayOfWeek.TUESDAY, LocalTime.of(18, 0), LocalTime.of(20, 0));
+    private static final ClassSlot TUESDAY_SLOT =
+            new ClassSlot(100L, DayOfWeek.TUESDAY, LocalTime.of(18, 0), LocalTime.of(20, 0));
 
     @Mock
     private AcademicReferenceValidator academicReference;
     @Mock
     private ClassroomReferenceValidator classroomReference;
     @Mock
-    private CursadoScheduleService cursadoSchedule;
+    private ClassScheduleService classSchedule;
 
     private static RequesterInfo requester() {
         return new RequesterInfo(AcademicScope.GRADO, "Ada Lovelace", "ada@frc.utn.edu.ar", "351-1234567");
@@ -81,7 +81,7 @@ class RoomRequestHandlersTest {
 
         @BeforeEach
         void setUp() {
-            handler = new OneTimeRoomChangeHandler(academicReference, classroomReference, cursadoSchedule);
+            handler = new OneTimeRoomChangeHandler(academicReference, classroomReference, classSchedule);
         }
 
         private CreateOneTimeRoomChangeDto dto(ScheduledItemDto... items) {
@@ -92,7 +92,7 @@ class RoomRequestHandlersTest {
         @Test
         @DisplayName("happy: fecha por ítem, sin día ni estimado; valida materia+comisión y cada fecha contra el cursado")
         void happy() {
-            when(cursadoSchedule.requireCursadoDate(eq(SUBJECT), eq(COMMISSION), any())).thenReturn(TUESDAY_SLOT);
+            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), any())).thenReturn(TUESDAY_SLOT);
             CreateOneTimeRoomChangeDto dto = dto(scheduledItem(LocalDate.now().plusDays(7), null, null));
 
             assertThatCode(() -> handler.validate(dto)).doesNotThrowAnyException();
@@ -109,7 +109,7 @@ class RoomRequestHandlersTest {
                     .isInstanceOf(InvalidRoomRequestException.class);
             assertThatThrownBy(() -> handler.validate(dto(scheduledItem(LocalDate.now().plusDays(7), null, 30))))
                     .isInstanceOf(InvalidRoomRequestException.class);
-            verifyNoInteractions(academicReference, cursadoSchedule);
+            verifyNoInteractions(academicReference, classSchedule);
         }
 
         @Test
@@ -124,7 +124,7 @@ class RoomRequestHandlersTest {
         @DisplayName("assemble: deriva horario y evento del cursado, deja date y comisión, estimado null")
         void assemble() {
             LocalDate date = LocalDate.now().plusDays(7);
-            when(cursadoSchedule.requireCursadoDate(eq(SUBJECT), eq(COMMISSION), eq(date))).thenReturn(TUESDAY_SLOT);
+            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), eq(date))).thenReturn(TUESDAY_SLOT);
 
             RoomRequest request = handler.assemble(dto(scheduledItem(date, null, null)));
 
@@ -148,7 +148,7 @@ class RoomRequestHandlersTest {
 
         @BeforeEach
         void setUp() {
-            handler = new RegularRoomChangeHandler(academicReference, classroomReference, cursadoSchedule);
+            handler = new RegularRoomChangeHandler(academicReference, classroomReference, classSchedule);
         }
 
         private CreateRegularRoomChangeDto dto(ScheduledItemDto... items) {
@@ -159,7 +159,7 @@ class RoomRequestHandlersTest {
         @Test
         @DisplayName("happy: día por ítem, sin fecha; valida cada día contra el cursado")
         void happy() {
-            when(cursadoSchedule.requireCursadoDay(eq(SUBJECT), eq(COMMISSION), any())).thenReturn(TUESDAY_SLOT);
+            when(classSchedule.requireClassDay(eq(SUBJECT), eq(COMMISSION), any())).thenReturn(TUESDAY_SLOT);
             assertThatCode(() -> handler.validate(dto(scheduledItem(null, DayOfWeek.TUESDAY, null))))
                     .doesNotThrowAnyException();
         }
@@ -184,7 +184,7 @@ class RoomRequestHandlersTest {
         @Test
         @DisplayName("assemble: date null, dayOfWeek seteado, horario del cursado")
         void assemble() {
-            when(cursadoSchedule.requireCursadoDay(eq(SUBJECT), eq(COMMISSION), eq(DayOfWeek.TUESDAY)))
+            when(classSchedule.requireClassDay(eq(SUBJECT), eq(COMMISSION), eq(DayOfWeek.TUESDAY)))
                     .thenReturn(TUESDAY_SLOT);
 
             RoomRequest request = handler.assemble(dto(scheduledItem(null, DayOfWeek.TUESDAY, null)));
@@ -206,7 +206,7 @@ class RoomRequestHandlersTest {
 
         @BeforeEach
         void setUp() {
-            handler = new PartialExamInClassHandler(academicReference, classroomReference, cursadoSchedule);
+            handler = new PartialExamInClassHandler(academicReference, classroomReference, classSchedule);
         }
 
         private CreatePartialExamInClassDto dto(ScheduledItemDto... items) {
@@ -217,7 +217,7 @@ class RoomRequestHandlersTest {
         @Test
         @DisplayName("happy: día + estimado; horario del cursado")
         void happy() {
-            when(cursadoSchedule.requireCursadoDay(eq(SUBJECT), eq(COMMISSION), any())).thenReturn(TUESDAY_SLOT);
+            when(classSchedule.requireClassDay(eq(SUBJECT), eq(COMMISSION), any())).thenReturn(TUESDAY_SLOT);
             assertThatCode(() -> handler.validate(dto(scheduledItem(null, DayOfWeek.TUESDAY, 35))))
                     .doesNotThrowAnyException();
         }
@@ -232,7 +232,7 @@ class RoomRequestHandlersTest {
         @Test
         @DisplayName("assemble: date null, estimado copiado, horario del cursado")
         void assemble() {
-            when(cursadoSchedule.requireCursadoDay(eq(SUBJECT), eq(COMMISSION), eq(DayOfWeek.TUESDAY)))
+            when(classSchedule.requireClassDay(eq(SUBJECT), eq(COMMISSION), eq(DayOfWeek.TUESDAY)))
                     .thenReturn(TUESDAY_SLOT);
 
             RoomRequest request = handler.assemble(dto(scheduledItem(null, DayOfWeek.TUESDAY, 35)));
@@ -253,7 +253,7 @@ class RoomRequestHandlersTest {
 
         @BeforeEach
         void setUp() {
-            handler = new PartialExamOffScheduleHandler(academicReference, classroomReference, cursadoSchedule);
+            handler = new PartialExamOffScheduleHandler(academicReference, classroomReference, classSchedule);
         }
 
         private CreatePartialExamOffScheduleDto dto(FreeFormItemDto... items) {
@@ -269,7 +269,7 @@ class RoomRequestHandlersTest {
             assertThatCode(() -> handler.validate(dto)).doesNotThrowAnyException();
             verify(academicReference).requireCommissionOfSubject(SUBJECT, 7L);
             verify(academicReference).requireCommissionOfSubject(SUBJECT, 8L);
-            verifyNoInteractions(cursadoSchedule);
+            verifyNoInteractions(classSchedule);
         }
 
         @Test
@@ -303,7 +303,7 @@ class RoomRequestHandlersTest {
 
         @BeforeEach
         void setUp() {
-            handler = new FinalExamHandler(academicReference, classroomReference, cursadoSchedule);
+            handler = new FinalExamHandler(academicReference, classroomReference, classSchedule);
         }
 
         private CreateFinalExamDto dto(FreeFormItemDto... items) {
@@ -315,7 +315,7 @@ class RoomRequestHandlersTest {
         void happy() {
             assertThatCode(() -> handler.validate(dto(freeFormItem(null)))).doesNotThrowAnyException();
             verify(academicReference).requireSubject(SUBJECT);
-            verifyNoInteractions(cursadoSchedule);
+            verifyNoInteractions(classSchedule);
         }
 
         @Test
@@ -345,8 +345,8 @@ class RoomRequestHandlersTest {
 
         @BeforeEach
         void setUp() {
-            conference = new ConferenceHandler(academicReference, classroomReference, cursadoSchedule);
-            other = new OtherHandler(academicReference, classroomReference, cursadoSchedule);
+            conference = new ConferenceHandler(academicReference, classroomReference, classSchedule);
+            other = new OtherHandler(academicReference, classroomReference, classSchedule);
         }
 
         @Test

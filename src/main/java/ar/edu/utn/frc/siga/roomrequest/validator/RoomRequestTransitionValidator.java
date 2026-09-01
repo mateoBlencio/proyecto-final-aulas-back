@@ -4,7 +4,6 @@ import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestTransitionExc
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import org.springframework.stereotype.Component;
 
-/** Transiciones de estado de un pedido (preaprobar / cancelar). Aún sin endpoint que lo exponga. */
 @Component
 public class RoomRequestTransitionValidator {
 

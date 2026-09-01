@@ -8,18 +8,17 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.validator.AcademicReferenceValidator;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassroomReferenceValidator;
-import ar.edu.utn.frc.siga.roomrequest.validator.CursadoScheduleService;
+import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
 import ar.edu.utn.frc.siga.roomrequest.validator.ItemConsistency;
 import org.springframework.stereotype.Component;
 
-/** Otro: catch-all. Materia y comisión opcionales; cada pedido tiene que explicar de qué se trata. */
 @Component
 public class OtherHandler extends AbstractRoomRequestHandler {
 
     public OtherHandler(AcademicReferenceValidator academicReference,
                         ClassroomReferenceValidator classroomReference,
-                        CursadoScheduleService cursadoSchedule) {
-        super(academicReference, classroomReference, cursadoSchedule);
+                        ClassScheduleService classSchedule) {
+        super(academicReference, classroomReference, classSchedule);
     }
 
     @Override

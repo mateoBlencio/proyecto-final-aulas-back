@@ -25,17 +25,17 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("CursadoScheduleService")
-class CursadoScheduleServiceTest {
+@DisplayName("ClassScheduleService")
+class ClassScheduleServiceTest {
 
     @Mock
     private AcademicEventService academicEventService;
 
-    private CursadoScheduleService service;
+    private ClassScheduleService service;
 
     @BeforeEach
     void setUp() {
-        service = new CursadoScheduleService(academicEventService);
+        service = new ClassScheduleService(academicEventService);
     }
 
     private static RecurringEventResponseDto recurring(long id, DayOfWeek day, LocalTime start, long minutes) {
@@ -44,35 +44,35 @@ class CursadoScheduleServiceTest {
     }
 
     @Test
-    @DisplayName("requireCursadoDay: día que la comisión no dicta → rechazado")
+    @DisplayName("requireClassDay: día que la comisión no dicta → rechazado")
     void dayNotTaught() {
         when(academicEventService.findRecurringEventsBySubjectAndCommission(1L, 9L))
                 .thenReturn(List.of(recurring(100L, DayOfWeek.TUESDAY, LocalTime.of(18, 0), 120)));
 
-        assertThatThrownBy(() -> service.requireCursadoDay(1L, 9L, DayOfWeek.MONDAY))
+        assertThatThrownBy(() -> service.requireClassDay(1L, 9L, DayOfWeek.MONDAY))
                 .isInstanceOf(InvalidRoomRequestException.class)
                 .hasMessageContaining("no dicta clase");
     }
 
     @Test
-    @DisplayName("requireCursadoDay: más de un bloque el mismo día → rechazado, no deriva un horario al azar")
+    @DisplayName("requireClassDay: más de un bloque el mismo día → rechazado, no deriva un horario al azar")
     void ambiguousDay() {
         when(academicEventService.findRecurringEventsBySubjectAndCommission(1L, 9L)).thenReturn(List.of(
                 recurring(100L, DayOfWeek.MONDAY, LocalTime.of(8, 0), 120),
                 recurring(101L, DayOfWeek.MONDAY, LocalTime.of(14, 0), 120)));
 
-        assertThatThrownBy(() -> service.requireCursadoDay(1L, 9L, DayOfWeek.MONDAY))
+        assertThatThrownBy(() -> service.requireClassDay(1L, 9L, DayOfWeek.MONDAY))
                 .isInstanceOf(InvalidRoomRequestException.class)
                 .hasMessageContaining("más de un bloque");
     }
 
     @Test
-    @DisplayName("requireCursadoDay: un único bloque → devuelve ese slot")
+    @DisplayName("requireClassDay: un único bloque → devuelve ese slot")
     void singleBlock() {
         when(academicEventService.findRecurringEventsBySubjectAndCommission(1L, 9L))
                 .thenReturn(List.of(recurring(100L, DayOfWeek.TUESDAY, LocalTime.of(18, 0), 120)));
 
-        CursadoSlot slot = service.requireCursadoDay(1L, 9L, DayOfWeek.TUESDAY);
+        ClassSlot slot = service.requireClassDay(1L, 9L, DayOfWeek.TUESDAY);
 
         assertThat(slot.recurringEventId()).isEqualTo(100L);
         assertThat(slot.startTime()).isEqualTo(LocalTime.of(18, 0));
@@ -80,28 +80,28 @@ class CursadoScheduleServiceTest {
     }
 
     @Test
-    @DisplayName("requireCursadoDate: resuelve el slot por el evento de la ocurrencia, no por el día")
+    @DisplayName("requireClassDate: resuelve el slot por el evento de la ocurrencia, no por el día")
     void dateResolvesByOccurrenceEvent() {
         LocalDate monday = LocalDate.of(2026, 9, 7);
-        when(academicEventService.findCursadoOccurrences(eq(1L), eq(9L), any())).thenReturn(List.of(
+        when(academicEventService.findClassOccurrences(eq(1L), eq(9L), any())).thenReturn(List.of(
                 new OccurrenceResponseDto(1L, 101L, monday, OccurrenceStatus.NEEDS_ROOM,
                         LocalTime.of(14, 0), LocalTime.of(16, 0))));
         when(academicEventService.findRecurringEventsBySubjectAndCommission(1L, 9L)).thenReturn(List.of(
                 recurring(100L, DayOfWeek.MONDAY, LocalTime.of(8, 0), 120),
                 recurring(101L, DayOfWeek.MONDAY, LocalTime.of(14, 0), 120)));
 
-        CursadoSlot slot = service.requireCursadoDate(1L, 9L, monday);
+        ClassSlot slot = service.requireClassDate(1L, 9L, monday);
 
         assertThat(slot.recurringEventId()).isEqualTo(101L);
         assertThat(slot.startTime()).isEqualTo(LocalTime.of(14, 0));
     }
 
     @Test
-    @DisplayName("requireCursadoDate: fecha sin clase → rechazado")
+    @DisplayName("requireClassDate: fecha sin clase → rechazado")
     void dateNotTaught() {
-        when(academicEventService.findCursadoOccurrences(eq(1L), eq(9L), any())).thenReturn(List.of());
+        when(academicEventService.findClassOccurrences(eq(1L), eq(9L), any())).thenReturn(List.of());
 
-        assertThatThrownBy(() -> service.requireCursadoDate(1L, 9L, LocalDate.of(2026, 9, 7)))
+        assertThatThrownBy(() -> service.requireClassDate(1L, 9L, LocalDate.of(2026, 9, 7)))
                 .isInstanceOf(InvalidRoomRequestException.class)
                 .hasMessageContaining("no tiene clase");
     }

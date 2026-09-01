@@ -9,21 +9,20 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.validator.AcademicReferenceValidator;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassroomReferenceValidator;
-import ar.edu.utn.frc.siga.roomrequest.validator.CursadoScheduleService;
-import ar.edu.utn.frc.siga.roomrequest.validator.CursadoSlot;
+import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
+import ar.edu.utn.frc.siga.roomrequest.validator.ClassSlot;
 import ar.edu.utn.frc.siga.roomrequest.validator.ItemConsistency;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/** Cambio de aula regular: uno o más días de dictado, sin fecha. N días = N ítems, misma comisión. */
 @Component
 public class RegularRoomChangeHandler extends AbstractRoomRequestHandler {
 
     public RegularRoomChangeHandler(AcademicReferenceValidator academicReference,
                                     ClassroomReferenceValidator classroomReference,
-                                    CursadoScheduleService cursadoSchedule) {
-        super(academicReference, classroomReference, cursadoSchedule);
+                                    ClassScheduleService classSchedule) {
+        super(academicReference, classroomReference, classSchedule);
     }
 
     @Override
@@ -54,13 +53,13 @@ public class RegularRoomChangeHandler extends AbstractRoomRequestHandler {
         academicReference.requireSubject(dto.subjectId());
         academicReference.requireCommissionOfSubject(dto.subjectId(), dto.commissionId());
         for (ScheduledItemDto item : ((CreateRegularRoomChangeDto) dto).items()) {
-            cursadoSchedule.requireCursadoDay(dto.subjectId(), dto.commissionId(), item.dayOfWeek());
+            classSchedule.requireClassDay(dto.subjectId(), dto.commissionId(), item.dayOfWeek());
         }
     }
 
     @Override
     protected RoomRequestItem buildItem(CreateRoomRequestItemDto item, CreateRoomRequestDto dto) {
-        CursadoSlot slot = cursadoSchedule.requireCursadoDay(dto.subjectId(), dto.commissionId(), item.dayOfWeek());
+        ClassSlot slot = classSchedule.requireClassDay(dto.subjectId(), dto.commissionId(), item.dayOfWeek());
         return baseItem(item)
                 .commissionId(dto.commissionId())
                 .dayOfWeek(item.dayOfWeek())

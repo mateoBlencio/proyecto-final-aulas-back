@@ -27,17 +27,9 @@ public interface AcademicEventService {
     List<AcademicEventResponseDto> findByIds(Collection<Long> eventIds);
     List<OccurrenceResponseDto> findOccurrencesByEventId(Long eventId);
 
-    /**
-     * Cursado vigente de una comisión en una materia, como slots recurrentes (día + horario).
-     * Fuente de "días y horarios de cursado" para las solicitudes de aula. Lista vacía si no hay cursado.
-     */
     List<RecurringEventResponseDto> findRecurringEventsBySubjectAndCommission(Long subjectId, Long commissionId);
 
-    /**
-     * Fechas concretas de cursado de una comisión desde {@code from} en adelante (ocurrencias de los
-     * eventos recurrentes vigentes), ordenadas. Sostiene el calendario del cambio de aula "por única vez".
-     */
-    List<OccurrenceResponseDto> findCursadoOccurrences(Long subjectId, Long commissionId, LocalDate from);
+    List<OccurrenceResponseDto> findClassOccurrences(Long subjectId, Long commissionId, LocalDate from);
 
     AcademicEventResponseDto createRecurringEvent(CreateRecurringEventRequestDto dto);
 

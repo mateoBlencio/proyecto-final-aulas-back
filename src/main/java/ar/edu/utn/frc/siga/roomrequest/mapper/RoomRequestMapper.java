@@ -16,10 +16,6 @@ import org.mapstruct.Mapping;
 
 import java.util.List;
 
-/**
- * Sólo entidad → DTO de respuesta. El armado de la entidad desde el request lo hace cada handler con
- * builders (el request es polimórfico y cada tipo deriva sus campos de forma distinta).
- */
 @Mapper(config = CentralMapperConfig.class)
 public interface RoomRequestMapper {
 

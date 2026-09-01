@@ -12,7 +12,6 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
-/** Sólo verifica que las aulas de preferencia existan (no capacidad ni disponibilidad: son preferencias). */
 @Component
 @RequiredArgsConstructor
 public class ClassroomReferenceValidator {

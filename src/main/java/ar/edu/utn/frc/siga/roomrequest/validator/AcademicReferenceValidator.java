@@ -8,7 +8,6 @@ import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** Existencia y pertenencia de materia y comisión contra el módulo {@code academic}. */
 @Component
 @RequiredArgsConstructor
 public class AcademicReferenceValidator {

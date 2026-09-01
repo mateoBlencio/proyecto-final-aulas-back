@@ -43,7 +43,7 @@ class RoomRequestScheduleValidationIntegrationTest extends AbstractIntegrationTe
     private Long commissionId;
 
     @BeforeEach
-    void seedCursado() {
+    void seedClassSchedule() {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
         subjectId = academic.subjectId();
         commissionId = academic.commissionId();
@@ -70,7 +70,7 @@ class RoomRequestScheduleValidationIntegrationTest extends AbstractIntegrationTe
 
     @Test
     @DisplayName("regular: día en que la comisión no dicta → rechazado")
-    void regular_nonCursadoDay_isRejected() {
+    void regular_nonClassDay_isRejected() {
         assertThatThrownBy(() -> roomRequestService.create(new CreateRegularRoomChangeDto(
                 RoomRequestType.REGULAR_ROOM_CHANGE, requester(), subjectId, commissionId,
                 List.of(scheduled(null, DayOfWeek.MONDAY)))))
@@ -80,7 +80,7 @@ class RoomRequestScheduleValidationIntegrationTest extends AbstractIntegrationTe
 
     @Test
     @DisplayName("por única vez: fecha de cursado real → 201")
-    void oneTime_cursadoDate_isAccepted() {
+    void oneTime_classDate_isAccepted() {
         LocalDate nextTuesday = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.TUESDAY));
 
         assertThatCode(() -> roomRequestService.create(new CreateOneTimeRoomChangeDto(
@@ -90,7 +90,7 @@ class RoomRequestScheduleValidationIntegrationTest extends AbstractIntegrationTe
 
     @Test
     @DisplayName("por única vez: fecha sin clase (un lunes) → rechazado")
-    void oneTime_nonCursadoDate_isRejected() {
+    void oneTime_nonClassDate_isRejected() {
         LocalDate nextMonday = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY));
 
         assertThatThrownBy(() -> roomRequestService.create(new CreateOneTimeRoomChangeDto(

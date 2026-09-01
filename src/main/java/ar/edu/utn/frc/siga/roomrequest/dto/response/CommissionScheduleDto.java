@@ -8,6 +8,6 @@ import java.util.List;
  * {@code dates} de cursado futuras (calendario del cambio de aula "por única vez").
  */
 public record CommissionScheduleDto(
-        List<CursadoSlotDto> slots,
+        List<ClassSlotDto> slots,
         List<LocalDate> dates
 ) {}

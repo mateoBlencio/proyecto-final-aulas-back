@@ -9,20 +9,19 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.validator.AcademicReferenceValidator;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassroomReferenceValidator;
-import ar.edu.utn.frc.siga.roomrequest.validator.CursadoScheduleService;
+import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
 import ar.edu.utn.frc.siga.roomrequest.validator.ItemConsistency;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/** Final: por materia, sin comisión, un solo pedido. */
 @Component
 public class FinalExamHandler extends AbstractRoomRequestHandler {
 
     public FinalExamHandler(AcademicReferenceValidator academicReference,
                             ClassroomReferenceValidator classroomReference,
-                            CursadoScheduleService cursadoSchedule) {
-        super(academicReference, classroomReference, cursadoSchedule);
+                            ClassScheduleService classSchedule) {
+        super(academicReference, classroomReference, classSchedule);
     }
 
     @Override

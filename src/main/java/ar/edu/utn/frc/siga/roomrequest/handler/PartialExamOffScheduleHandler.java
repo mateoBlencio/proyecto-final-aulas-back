@@ -9,23 +9,19 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.validator.AcademicReferenceValidator;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassroomReferenceValidator;
-import ar.edu.utn.frc.siga.roomrequest.validator.CursadoScheduleService;
+import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
 import ar.edu.utn.frc.siga.roomrequest.validator.ItemConsistency;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/**
- * Parcial fuera de horario de clases: fecha y franja horaria libres. El front expande "todas /
- * algunas / una" comisión a un ítem por comisión, cada uno con su {@code commissionId}.
- */
 @Component
 public class PartialExamOffScheduleHandler extends AbstractRoomRequestHandler {
 
     public PartialExamOffScheduleHandler(AcademicReferenceValidator academicReference,
                                          ClassroomReferenceValidator classroomReference,
-                                         CursadoScheduleService cursadoSchedule) {
-        super(academicReference, classroomReference, cursadoSchedule);
+                                         ClassScheduleService classSchedule) {
+        super(academicReference, classroomReference, classSchedule);
     }
 
     @Override

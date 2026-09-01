@@ -9,21 +9,20 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.validator.AcademicReferenceValidator;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassroomReferenceValidator;
-import ar.edu.utn.frc.siga.roomrequest.validator.CursadoScheduleService;
-import ar.edu.utn.frc.siga.roomrequest.validator.CursadoSlot;
+import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
+import ar.edu.utn.frc.siga.roomrequest.validator.ClassSlot;
 import ar.edu.utn.frc.siga.roomrequest.validator.ItemConsistency;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/** Cambio de aula por única vez: una fecha de cursado real por ítem; día y horario salen del cursado. */
 @Component
 public class OneTimeRoomChangeHandler extends AbstractRoomRequestHandler {
 
     public OneTimeRoomChangeHandler(AcademicReferenceValidator academicReference,
                                     ClassroomReferenceValidator classroomReference,
-                                    CursadoScheduleService cursadoSchedule) {
-        super(academicReference, classroomReference, cursadoSchedule);
+                                    ClassScheduleService classSchedule) {
+        super(academicReference, classroomReference, classSchedule);
     }
 
     @Override
@@ -55,13 +54,13 @@ public class OneTimeRoomChangeHandler extends AbstractRoomRequestHandler {
         academicReference.requireSubject(dto.subjectId());
         academicReference.requireCommissionOfSubject(dto.subjectId(), dto.commissionId());
         for (ScheduledItemDto item : ((CreateOneTimeRoomChangeDto) dto).items()) {
-            cursadoSchedule.requireCursadoDate(dto.subjectId(), dto.commissionId(), item.date());
+            classSchedule.requireClassDate(dto.subjectId(), dto.commissionId(), item.date());
         }
     }
 
     @Override
     protected RoomRequestItem buildItem(CreateRoomRequestItemDto item, CreateRoomRequestDto dto) {
-        CursadoSlot slot = cursadoSchedule.requireCursadoDate(dto.subjectId(), dto.commissionId(), item.date());
+        ClassSlot slot = classSchedule.requireClassDate(dto.subjectId(), dto.commissionId(), item.date());
         return baseItem(item)
                 .commissionId(dto.commissionId())
                 .date(item.date())

@@ -99,7 +99,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<OccurrenceResponseDto> findCursadoOccurrences(Long subjectId, Long commissionId, LocalDate from) {
+    public List<OccurrenceResponseDto> findClassOccurrences(Long subjectId, Long commissionId, LocalDate from) {
         List<Long> eventIds = recurringEventRepository
                 .findActiveBySubjectAndCommission(subjectId, commissionId, LocalDate.now())
                 .stream()

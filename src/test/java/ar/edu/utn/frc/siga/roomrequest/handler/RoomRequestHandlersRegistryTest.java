@@ -3,7 +3,7 @@ package ar.edu.utn.frc.siga.roomrequest.handler;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.validator.AcademicReferenceValidator;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassroomReferenceValidator;
-import ar.edu.utn.frc.siga.roomrequest.validator.CursadoScheduleService;
+import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,17 +25,17 @@ class RoomRequestHandlersRegistryTest {
     @Mock
     private ClassroomReferenceValidator classroomReference;
     @Mock
-    private CursadoScheduleService cursadoSchedule;
+    private ClassScheduleService classSchedule;
 
     private List<RoomRequestTypeHandler> allHandlers() {
         return List.of(
-                new OneTimeRoomChangeHandler(academicReference, classroomReference, cursadoSchedule),
-                new RegularRoomChangeHandler(academicReference, classroomReference, cursadoSchedule),
-                new PartialExamInClassHandler(academicReference, classroomReference, cursadoSchedule),
-                new PartialExamOffScheduleHandler(academicReference, classroomReference, cursadoSchedule),
-                new FinalExamHandler(academicReference, classroomReference, cursadoSchedule),
-                new ConferenceHandler(academicReference, classroomReference, cursadoSchedule),
-                new OtherHandler(academicReference, classroomReference, cursadoSchedule));
+                new OneTimeRoomChangeHandler(academicReference, classroomReference, classSchedule),
+                new RegularRoomChangeHandler(academicReference, classroomReference, classSchedule),
+                new PartialExamInClassHandler(academicReference, classroomReference, classSchedule),
+                new PartialExamOffScheduleHandler(academicReference, classroomReference, classSchedule),
+                new FinalExamHandler(academicReference, classroomReference, classSchedule),
+                new ConferenceHandler(academicReference, classroomReference, classSchedule),
+                new OtherHandler(academicReference, classroomReference, classSchedule));
     }
 
     @Test
@@ -52,7 +52,7 @@ class RoomRequestHandlersRegistryTest {
     @DisplayName("falta un handler: falla al construir el registro")
     void missingHandlerFailsFast() {
         assertThatThrownBy(() -> new RoomRequestHandlers(
-                List.of(new OtherHandler(academicReference, classroomReference, cursadoSchedule))))
+                List.of(new OtherHandler(academicReference, classroomReference, classSchedule))))
                 .isInstanceOf(IllegalStateException.class);
     }
 }

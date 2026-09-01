@@ -12,11 +12,13 @@ post {
 
 body:json {
   {
-    "type": "PARTIAL_EXAM",
-    "scope": "GRADO",
-    "teacherName": "Ada Lovelace",
-    "teacherEmail": "ada@frc.utn.edu.ar",
-    "teacherPhone": "351-1234567",
+    "type": "PARTIAL_EXAM_OFF_SCHEDULE",
+    "requester": {
+      "scope": "GRADO",
+      "teacherName": "Ada Lovelace",
+      "teacherEmail": "ada@frc.utn.edu.ar",
+      "teacherPhone": "351-1234567"
+    },
     "subjectId": 1,
     "items": [
       {
@@ -24,10 +26,8 @@ body:json {
         "date": "2026-09-15",
         "startTime": "10:00",
         "endTime": "12:00",
-        "enrolled": 120,
         "estimated": 100,
         "classroomCount": 2,
-        "currentClassroomId": 1,
         "requiresProjector": true,
         "requiresComputers": true,
         "computerCount": 30,
@@ -48,46 +48,45 @@ docs {
   abuso la da el RateLimitFilter general por IP; queda pendiente sumar una
   validación de humanidad (captcha).
 
-  ESTRUCTURA: cabecera + N ítems. La cabecera lleva los datos de contacto,
-  el tipo, el ámbito y la materia; cada ítem es un pedido concreto (una
-  comisión, una fecha, un horario). El campo "cantidad de pedidos" del
-  formulario original es simplemente la cantidad de ítems.
+  ESTRUCTURA: cabecera + N ítems. La cabecera lleva "requester" (ámbito y
+  datos de contacto), el tipo y la materia; cada ítem es un pedido concreto.
+  El cuerpo es polimórfico por "type" (@JsonSubTypes): según el tipo cambian
+  los campos obligatorios de cabecera y la forma de cada ítem.
 
-  type: PARTIAL_EXAM | FINAL_EXAM | CONFERENCE | ONE_TIME_ROOM_CHANGE |
-  REGULAR_ROOM_CHANGE | OTHER.
-  scope: GRADO | TECNICATURA | LICENCIATURA | EXTENSION | POSTGRADO.
+  type:
+    ONE_TIME_ROOM_CHANGE | REGULAR_ROOM_CHANGE  -> ítems "scheduled" (dayOfWeek)
+    PARTIAL_EXAM_IN_CLASS                        -> ítems "scheduled" (dayOfWeek)   [ver 05b]
+    PARTIAL_EXAM_OFF_SCHEDULE | FINAL_EXAM       -> ítems "free-form" (date + horario)
+    CONFERENCE | OTHER                           -> ítems "free-form", materia opcional
+  requester.scope: GRADO | TECNICATURA | LICENCIATURA | EXTENSION | POSTGRADO.
 
-  subjectId y commissionId son obligatorios para todos los tipos MENOS
-  CONFERENCE y OTHER (una charla o un pedido sin tipo definido no están
-  atados a una materia). Si vienen, se valida que existan y que la comisión
-  pertenezca a la materia → 400 si no.
+  Cabecera:
+  - subjectId: obligatorio salvo CONFERENCE y OTHER (opcional).
+  - commissionId (cabecera): obligatorio en ONE_TIME_ROOM_CHANGE,
+    REGULAR_ROOM_CHANGE y PARTIAL_EXAM_IN_CLASS. En los free-form la comisión
+    va DENTRO de cada ítem (así una solicitud puede pedir para varias
+    comisiones a la vez).
 
-  startTime/endTime/enrolled son obligatorios salvo en ONE_TIME_ROOM_CHANGE
-  y REGULAR_ROOM_CHANGE: ahí esos datos ya salen de la comisión/ocurrencia y
-  pedirlos de nuevo sería redundante. Se envía hora de inicio y hora de FIN;
-  el backend guarda inicio + duración para que traducir la solicitud a un
-  evento académico sea directo.
+  Ítem free-form (este ejemplo): commissionId, date, startTime, endTime,
+  estimated son obligatorios. Se envía hora de inicio y hora de FIN; el
+  backend guarda inicio + duración.
 
-  OTHER no exige materia ni horario, pero exige "observations" no vacío: es
-  la única forma de saber de qué se trata un pedido de este tipo.
+  Ítem scheduled (ver 05b): NO lleva date ni horario; lleva dayOfWeek y
+  estimated. El día/horario se derivan del dictado de esa comisión y quedan
+  con trazabilidad al evento recurrente de origen.
 
-  classroomCount > 1 significa aulas EN SIMULTÁNEO para la misma franja
-  (ej. un parcial repartido en varias aulas).
+  classroomCount > 1 = aulas EN SIMULTÁNEO para la misma franja.
 
-  Los booleanos se pueden omitir: ausente significa false.
-  computerCount es obligatorio si requiresComputers=true, y tiene que
-  omitirse si es false.
+  Booleanos: se pueden omitir (ausente = false).
+  computerCount: obligatorio si requiresComputers=true, se omite si es false.
+  requiredSoftware: solo si requiresComputers=true.
+  requiresExamUsers: en exámenes, obligatorio si requiresComputers=true;
+    prohibido en cualquier otro caso (dejarlo ausente).
 
-  preferredClassroomIds es una lista ordenada por prioridad (el primero es
-  la primera opción). No se puede repetir un aula. Es una preferencia
-  declarada: no se valida disponibilidad ni capacidad, solo que el aula
-  exista.
+  preferredClassroomIds: lista ordenada por prioridad, sin repetir. Solo se
+  valida que el aula exista (no disponibilidad ni capacidad).
 
-  Respuesta 201: la solicitud creada, con materia, comisión y aulas ya
-  resueltas. La cabecera NO tiene estado: cada ítem trae su propio estado
-  (PENDING al crear). Es lo que alimenta la pantalla de confirmación del
-  docente.
-
-  La solicitud NO asigna aulas ni crea eventos: es un pedido que
-  subsecretaría analiza después.
+  Respuesta 201: la solicitud creada, con materia, comisión y aulas
+  resueltas. Cada ítem trae su estado (PENDING al crear). No asigna aulas ni
+  crea eventos: es un pedido que subsecretaría analiza después.
 }

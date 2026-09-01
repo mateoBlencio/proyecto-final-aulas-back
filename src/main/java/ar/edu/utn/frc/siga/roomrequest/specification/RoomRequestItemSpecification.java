@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.springframework.data.jpa.domain.Specification;
 
-/** Mismo patrón que {@code space.specification.ClassroomSpecification}. */
 public class RoomRequestItemSpecification {
 
     public static Specification<RoomRequestItem> withFilter(RoomRequestItemFilter filter) {
