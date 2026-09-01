@@ -52,7 +52,7 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
     void filtersByTypesAndStatuses() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
 
-        RoomRequest partial = seedRequest(RoomRequestType.PARTIAL_EXAM, academic.subjectId());
+        RoomRequest partial = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
         seedItem(partial, academic.commissionId(), LocalDate.now().plusDays(10), RoomRequestStatus.PENDING);
         seedItem(partial, academic.commissionId(), LocalDate.now().plusDays(20), RoomRequestStatus.PRE_APPROVED);
         roomRequestRepository.save(partial);
@@ -63,13 +63,13 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/v1/room-requests/items")
                         .param("subjectId", String.valueOf(academic.subjectId()))
-                        .param("types", "PARTIAL_EXAM"))
+                        .param("types", "PARTIAL_EXAM_OFF_SCHEDULE"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page.totalElements").value(2));
 
         mockMvc.perform(get("/v1/room-requests/items")
                         .param("subjectId", String.valueOf(academic.subjectId()))
-                        .param("types", "PARTIAL_EXAM")
+                        .param("types", "PARTIAL_EXAM_OFF_SCHEDULE")
                         .param("statuses", "PRE_APPROVED"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page.totalElements").value(1))
@@ -81,7 +81,7 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("combina types con dateFrom/dateTo")
     void combinesTypeAndDateRangeFilters() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
-        RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM, academic.subjectId());
+        RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
         seedItem(request, academic.commissionId(), LocalDate.now().plusDays(5), RoomRequestStatus.PENDING);
         seedItem(request, academic.commissionId(), LocalDate.now().plusDays(50), RoomRequestStatus.PENDING);
         roomRequestRepository.save(request);
@@ -99,7 +99,7 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("includePast=false oculta pedidos vencidos; includePast=true los trae")
     void includePastTogglesVisibilityOfPastItems() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
-        RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM, academic.subjectId());
+        RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
         seedItem(request, academic.commissionId(), LocalDate.now().minusDays(5), RoomRequestStatus.CANCELLED);
         seedItem(request, academic.commissionId(), LocalDate.now().plusDays(5), RoomRequestStatus.PENDING);
         roomRequestRepository.save(request);
@@ -120,7 +120,7 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("pagina de a 2: totalElements y totalPages reflejan el total real")
     void pagesResultsWithSizeParam() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
-        RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM, academic.subjectId());
+        RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
         seedItem(request, academic.commissionId(), LocalDate.now().plusDays(1), RoomRequestStatus.PENDING);
         seedItem(request, academic.commissionId(), LocalDate.now().plusDays(2), RoomRequestStatus.PENDING);
         seedItem(request, academic.commissionId(), LocalDate.now().plusDays(3), RoomRequestStatus.PENDING);
@@ -149,11 +149,11 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
 
         // createdAt lo sella @CreationTimestamp al persistir: el orden de alta define el orden esperado.
-        RoomRequest olderRequest = seedRequest(RoomRequestType.PARTIAL_EXAM, academic.subjectId());
+        RoomRequest olderRequest = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
         seedItem(olderRequest, academic.commissionId(), LocalDate.now().plusDays(30), RoomRequestStatus.PENDING);
         roomRequestRepository.saveAndFlush(olderRequest);
 
-        RoomRequest newerRequest = seedRequest(RoomRequestType.PARTIAL_EXAM, academic.subjectId());
+        RoomRequest newerRequest = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
         seedItem(newerRequest, academic.commissionId(), LocalDate.now().plusDays(31), RoomRequestStatus.PENDING);
         roomRequestRepository.saveAndFlush(newerRequest);
 
@@ -198,7 +198,6 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
                 .date(date)
                 .startTime(LocalTime.of(10, 0))
                 .duration(Duration.ofMinutes(120))
-                .enrolled(30)
                 .estimated(35)
                 .classroomCount(1)
                 .build();

@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.UpdateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.mapper.AcademicEventComposer;
 import ar.edu.utn.frc.siga.events.mapper.OccurrenceMapper;
 import ar.edu.utn.frc.siga.events.model.AcademicEvent;
@@ -36,6 +37,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -83,6 +85,33 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         return occurrenceRepository.findByEvent_Id(eventId).stream()
                 .map(occurrenceMapper::toDto)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RecurringEventResponseDto> findRecurringEventsBySubjectAndCommission(Long subjectId, Long commissionId) {
+        List<RecurringEvent> events =
+                recurringEventRepository.findActiveBySubjectAndCommission(subjectId, commissionId, LocalDate.now());
+        return composer.compose(events).stream()
+                .map(RecurringEventResponseDto.class::cast)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OccurrenceResponseDto> findClassOccurrences(Long subjectId, Long commissionId, LocalDate from) {
+        List<Long> eventIds = recurringEventRepository
+                .findActiveBySubjectAndCommission(subjectId, commissionId, LocalDate.now())
+                .stream()
+                .map(RecurringEvent::getId)
+                .toList();
+        if (eventIds.isEmpty()) {
+            return List.of();
+        }
+        return occurrenceRepository.findByEvent_IdInAndDateGreaterThanEqual(eventIds, from).stream()
+                .map(occurrenceMapper::toDto)
+                .sorted(Comparator.comparing(OccurrenceResponseDto::date))
+                .toList();
     }
 
     @Override

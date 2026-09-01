@@ -28,8 +28,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Verifica la superficie pública del módulo: el alta y los catálogos tienen que
- * funcionar <b>sin</b> token, y el resto de {@code /v1/**} tiene que seguir cerrado.
+ * Superficie pública del módulo: el alta (cuerpo polimórfico por {@code type}) y los catálogos tienen
+ * que funcionar <b>sin</b> token, y el resto de {@code /v1/**} tiene que seguir cerrado.
  */
 @Import(IntegrationTestData.class)
 @DisplayName("Solicitudes de aula API (integración)")
@@ -44,7 +44,6 @@ class RoomRequestApiIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    /** MockMvc sin header de Authorization, para probar los endpoints públicos. */
     private MockMvc anonymousMockMvc;
 
     @BeforeEach
@@ -58,27 +57,10 @@ class RoomRequestApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("POST sin autenticación: crea la solicitud y devuelve 201")
     void create_withoutAuthentication_returnsCreated() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
-        Building building = testData.edificio();
-        Classroom classroom = testData.aula(building);
+        Classroom classroom = testData.aula(testData.edificio());
 
-        Map<String, Object> body = Map.of(
-                "type", "PARTIAL_EXAM",
-                "scope", "GRADO",
-                "teacherName", "Ada Lovelace",
-                "teacherEmail", "ada@frc.utn.edu.ar",
-                "teacherPhone", "351-1234567",
-                "subjectId", academic.subjectId(),
-                "items", java.util.List.of(Map.of(
-                        "commissionId", academic.commissionId(),
-                        "date", LocalDate.now().plusDays(7).toString(),
-                        "startTime", "10:00:00",
-                        "endTime", "12:00:00",
-                        "enrolled", 30,
-                        "estimated", 35,
-                        "classroomCount", 1,
-                        "requiresProjector", true,
-                        "requiresComputers", false,
-                        "preferredClassroomIds", java.util.List.of(classroom.getId()))));
+        Map<String, Object> body = validRequest(academic, item ->
+                item.put("preferredClassroomIds", List.of(classroom.getId())));
 
         anonymousMockMvc.perform(post("/v1/room-requests")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -94,11 +76,26 @@ class RoomRequestApiIntegrationTest extends AbstractIntegrationTest {
     void create_withInvalidPayload_returnsBadRequest() throws Exception {
         Map<String, Object> body = Map.of(
                 "type", "CONFERENCE",
-                "scope", "EXTENSION",
-                "teacherName", "",
-                "teacherEmail", "no-es-un-email",
-                "teacherPhone", "351-1234567",
-                "items", java.util.List.of());
+                "requester", Map.of(
+                        "scope", "EXTENSION",
+                        "teacherName", "",
+                        "teacherEmail", "no-es-un-email",
+                        "teacherPhone", "351-1234567"),
+                "items", List.of());
+
+        anonymousMockMvc.perform(post("/v1/room-requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("type desconocido: 400")
+    void create_withUnknownType_returnsBadRequest() throws Exception {
+        Map<String, Object> body = Map.of(
+                "type", "NO_EXISTE",
+                "requester", requester(),
+                "items", List.of());
 
         anonymousMockMvc.perform(post("/v1/room-requests")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -262,11 +259,7 @@ class RoomRequestApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("tipo OTHER sin observations: 400")
     void create_otherTypeWithoutObservations_returnsBadRequest() throws Exception {
-        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
-
-        Map<String, Object> body = validRequest(academic, item -> item.remove("commissionId"));
-        body.put("type", "OTHER");
-        body.remove("subjectId");
+        Map<String, Object> body = otherRequest(item -> {});
 
         anonymousMockMvc.perform(post("/v1/room-requests")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -277,14 +270,8 @@ class RoomRequestApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("tipo OTHER con observations: 201, sin materia ni comisión")
     void create_otherTypeWithObservations_returnsCreated() throws Exception {
-        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
-
-        Map<String, Object> body = validRequest(academic, item -> {
-            item.remove("commissionId");
-            item.put("observations", "Necesito un aula para grabar un video institucional");
-        });
-        body.put("type", "OTHER");
-        body.remove("subjectId");
+        Map<String, Object> body = otherRequest(item ->
+                item.put("observations", "Necesito un aula para grabar un video institucional"));
 
         anonymousMockMvc.perform(post("/v1/room-requests")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -312,6 +299,12 @@ class RoomRequestApiIntegrationTest extends AbstractIntegrationTest {
         anonymousMockMvc.perform(get("/v1/room-requests/catalog/subjects")
                         .param("specialtyCode", "1"))
                 .andExpect(status().isOk());
+        anonymousMockMvc.perform(get("/v1/room-requests/catalog/commission-schedule")
+                        .param("subjectId", String.valueOf(academic.subjectId()))
+                        .param("commissionId", String.valueOf(academic.commissionId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.slots").isArray())
+                .andExpect(jsonPath("$.dates").isArray());
     }
 
     @Test
@@ -331,10 +324,16 @@ class RoomRequestApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    /**
-     * Payload de un parcial válido; el {@code mutation} toca sólo el pedido que
-     * a cada test le interesa romper, para que el motivo del 400 quede a la vista.
-     */
+    private static Map<String, Object> requester() {
+        Map<String, Object> requester = new LinkedHashMap<>();
+        requester.put("scope", "GRADO");
+        requester.put("teacherName", "Ada Lovelace");
+        requester.put("teacherEmail", "ada@frc.utn.edu.ar");
+        requester.put("teacherPhone", "351-1234567");
+        return requester;
+    }
+
+    /** Parcial fuera de horario válido; el {@code mutation} rompe sólo el ítem que a cada test le interesa. */
     private Map<String, Object> validRequest(IntegrationTestData.SubjectAndCommission academic,
                                              Consumer<Map<String, Object>> mutation) {
         Map<String, Object> item = new LinkedHashMap<>();
@@ -342,7 +341,6 @@ class RoomRequestApiIntegrationTest extends AbstractIntegrationTest {
         item.put("date", LocalDate.now().plusDays(7).toString());
         item.put("startTime", "10:00:00");
         item.put("endTime", "12:00:00");
-        item.put("enrolled", 30);
         item.put("estimated", 35);
         item.put("classroomCount", 1);
         item.put("requiresProjector", true);
@@ -351,12 +349,26 @@ class RoomRequestApiIntegrationTest extends AbstractIntegrationTest {
         mutation.accept(item);
 
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("type", "PARTIAL_EXAM");
-        body.put("scope", "GRADO");
-        body.put("teacherName", "Ada Lovelace");
-        body.put("teacherEmail", "ada@frc.utn.edu.ar");
-        body.put("teacherPhone", "351-1234567");
+        body.put("type", "PARTIAL_EXAM_OFF_SCHEDULE");
+        body.put("requester", requester());
         body.put("subjectId", academic.subjectId());
+        body.put("items", List.of(item));
+        return body;
+    }
+
+    private Map<String, Object> otherRequest(Consumer<Map<String, Object>> mutation) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("date", LocalDate.now().plusDays(7).toString());
+        item.put("startTime", "10:00:00");
+        item.put("endTime", "12:00:00");
+        item.put("estimated", 35);
+        item.put("classroomCount", 1);
+        item.put("preferredClassroomIds", List.of());
+        mutation.accept(item);
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("type", "OTHER");
+        body.put("requester", requester());
         body.put("items", List.of(item));
         return body;
     }

@@ -3,8 +3,6 @@ package ar.edu.utn.frc.siga.roomrequest.mapper;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.common.mapper.CentralMapperConfig;
-import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
-import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailHeaderDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
@@ -21,24 +19,6 @@ import java.util.List;
 @Mapper(config = CentralMapperConfig.class)
 public interface RoomRequestMapper {
 
-    @Mapping(target = "id", ignore = true)
-    @Mapping(target = "glpiTicketId", ignore = true)
-    @Mapping(target = "items", ignore = true)
-    RoomRequest toEntity(CreateRoomRequestDto dto);
-
-    @Mapping(target = "id", ignore = true)
-    @Mapping(target = "request", ignore = true)
-    @Mapping(target = "position", ignore = true)
-    @Mapping(target = "status", ignore = true)
-    @Mapping(target = "decidedBy", ignore = true)
-    @Mapping(target = "decidedAt", ignore = true)
-    @Mapping(target = "decisionReason", ignore = true)
-    @Mapping(target = "preferences", ignore = true)
-    @Mapping(target = "duration", expression = "java(dto.duration())")
-    @Mapping(target = "requiresProjector", source = "requiresProjector", defaultValue = "false")
-    @Mapping(target = "requiresComputers", source = "requiresComputers", defaultValue = "false")
-    RoomRequestItem toEntity(CreateRoomRequestItemDto dto);
-
     @Mapping(target = "id", source = "request.id")
     @Mapping(target = "subject", source = "subject")
     @Mapping(target = "items", source = "itemDtos")
@@ -48,14 +28,12 @@ public interface RoomRequestMapper {
 
     @Mapping(target = "id", source = "item.id")
     @Mapping(target = "commission", source = "commission")
-    @Mapping(target = "currentClassroom", source = "currentClassroom")
     @Mapping(target = "preferredClassrooms", source = "preferredClassrooms")
     @Mapping(target = "endTime", expression = "java(item.endTime())")
     @Mapping(target = "durationMinutes",
              expression = "java(item.getDuration() == null ? null : item.getDuration().toMinutes())")
     RoomRequestItemResponseDto toDto(RoomRequestItem item,
                                      CommissionResponseDto commission,
-                                     ClassroomOptionDto currentClassroom,
                                      List<ClassroomOptionDto> preferredClassrooms);
 
     @Mapping(target = "id", source = "request.id")
