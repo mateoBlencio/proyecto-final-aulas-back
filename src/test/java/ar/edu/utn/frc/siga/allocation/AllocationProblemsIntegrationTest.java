@@ -183,7 +183,9 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
 
         Long eventId = seedUniqueEventWithoutClassroom(period.endDate());
 
-        mockMvc.perform(get("/v1/allocations/conflicts").param("types", "UNALLOCATED"))
+        mockMvc.perform(get("/v1/allocations/conflicts")
+                        .param("types", "UNALLOCATED")
+                        .param("from", period.endDate().toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[?(@.event.id == " + eventId + ")]").exists());
     }
