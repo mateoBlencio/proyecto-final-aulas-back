@@ -29,6 +29,8 @@ public class ConferenceHandler extends AbstractRoomRequestHandler {
     @Override
     protected void validateItems(CreateRoomRequestDto dto) {
         for (FreeFormItemDto item : ((CreateConferenceDto) dto).items()) {
+            ItemConsistency.requireNoCommission(item,
+                    "Una charla o conferencia no pertenece al cursado de una comisión: los pedidos no llevan comisión.");
             ItemConsistency.requireExamUsersConsistent(false, item);
         }
     }
@@ -36,11 +38,10 @@ public class ConferenceHandler extends AbstractRoomRequestHandler {
     @Override
     protected void validateReferences(CreateRoomRequestDto dto) {
         academicReference.validateOptionalSubject(dto.subjectId());
-        academicReference.validateOptionalCommission(dto.subjectId(), dto.commissionId());
     }
 
     @Override
     protected RoomRequestItem buildItem(CreateRoomRequestItemDto item, CreateRoomRequestDto dto) {
-        return freeFormItem((FreeFormItemDto) item, dto.commissionId());
+        return freeFormItem((FreeFormItemDto) item, null);
     }
 }

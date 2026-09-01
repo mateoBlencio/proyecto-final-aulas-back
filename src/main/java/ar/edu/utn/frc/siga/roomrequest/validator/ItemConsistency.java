@@ -24,6 +24,12 @@ public final class ItemConsistency {
         }
     }
 
+    public static void requireNoCommission(CreateRoomRequestItemDto item, String message) {
+        if (item.commissionId() != null) {
+            throw new InvalidRoomRequestException(message);
+        }
+    }
+
     public static void requireExamUsersConsistent(boolean examType, CreateRoomRequestItemDto item) {
         boolean applies = examType && Boolean.TRUE.equals(item.requiresComputers());
         if (applies && item.requiresExamUsers() == null) {

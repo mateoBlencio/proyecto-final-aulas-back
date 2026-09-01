@@ -198,6 +198,6 @@ class RoomRequestServiceImplTest {
     }
 
     private static CreateOtherDto otherDto() {
-        return new CreateOtherDto(RoomRequestType.OTHER, requester(), null, null, List.of(freeFormItem()));
+        return new CreateOtherDto(RoomRequestType.OTHER, requester(), null, List.of(freeFormItem()));
     }
 }

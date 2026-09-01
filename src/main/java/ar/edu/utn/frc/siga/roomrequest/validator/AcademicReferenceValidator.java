@@ -37,14 +37,6 @@ public class AcademicReferenceValidator {
         requireBelongs(subjectId, commissionId);
     }
 
-    public void validateOptionalCommission(Long subjectId, Long commissionId) {
-        if (commissionId == null) {
-            return;
-        }
-        commissionService.findById(commissionId);
-        requireBelongs(subjectId, commissionId);
-    }
-
     private void requireBelongs(Long subjectId, Long commissionId) {
         if (subjectId == null) {
             return;
