@@ -53,9 +53,6 @@ public class OneTimeRoomChangeHandler extends AbstractRoomRequestHandler {
     protected void validateReferences(CreateRoomRequestDto dto) {
         academicReference.requireSubject(dto.subjectId());
         academicReference.requireCommissionOfSubject(dto.subjectId(), dto.commissionId());
-        for (ScheduledItemDto item : ((CreateOneTimeRoomChangeDto) dto).items()) {
-            classSchedule.requireClassDate(dto.subjectId(), dto.commissionId(), item.date());
-        }
     }
 
     @Override

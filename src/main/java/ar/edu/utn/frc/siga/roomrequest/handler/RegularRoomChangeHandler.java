@@ -52,9 +52,6 @@ public class RegularRoomChangeHandler extends AbstractRoomRequestHandler {
     protected void validateReferences(CreateRoomRequestDto dto) {
         academicReference.requireSubject(dto.subjectId());
         academicReference.requireCommissionOfSubject(dto.subjectId(), dto.commissionId());
-        for (ScheduledItemDto item : ((CreateRegularRoomChangeDto) dto).items()) {
-            classSchedule.requireClassDay(dto.subjectId(), dto.commissionId(), item.dayOfWeek());
-        }
     }
 
     @Override

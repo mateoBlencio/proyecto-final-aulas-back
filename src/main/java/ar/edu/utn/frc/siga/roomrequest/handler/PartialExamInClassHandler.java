@@ -52,9 +52,6 @@ public class PartialExamInClassHandler extends AbstractRoomRequestHandler {
     protected void validateReferences(CreateRoomRequestDto dto) {
         academicReference.requireSubject(dto.subjectId());
         academicReference.requireCommissionOfSubject(dto.subjectId(), dto.commissionId());
-        for (ScheduledItemDto item : ((CreatePartialExamInClassDto) dto).items()) {
-            classSchedule.requireClassDay(dto.subjectId(), dto.commissionId(), item.dayOfWeek());
-        }
     }
 
     @Override
