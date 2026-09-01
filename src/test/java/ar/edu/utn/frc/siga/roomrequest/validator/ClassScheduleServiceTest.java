@@ -56,7 +56,7 @@ class ClassScheduleServiceTest {
     }
 
     @Test
-    @DisplayName("requireClassDay: más de un bloque el mismo día → rechazado, no deriva un horario al azar")
+    @DisplayName("requireClassDay: más de una clase el mismo día → rechazado, no deriva un horario al azar")
     void ambiguousDay() {
         when(academicEventService.findRecurringEventsBySubjectAndCommission(1L, 9L)).thenReturn(List.of(
                 recurring(100L, DayOfWeek.MONDAY, LocalTime.of(8, 0), 120),
@@ -64,7 +64,9 @@ class ClassScheduleServiceTest {
 
         assertThatThrownBy(() -> service.requireClassDay(1L, 9L, DayOfWeek.MONDAY))
                 .isInstanceOf(InvalidRoomRequestException.class)
-                .hasMessageContaining("más de un bloque");
+                .hasMessageContaining("más de una clase")
+                .hasMessageContaining("08:00 a 10:00")
+                .hasMessageContaining("14:00 a 16:00");
     }
 
     @Test
@@ -125,6 +127,44 @@ class ClassScheduleServiceTest {
 
         assertThat(slot.recurringEventId()).isEqualTo(101L);
         assertThat(slot.startTime()).isEqualTo(LocalTime.of(14, 0));
+    }
+
+    @Test
+    @DisplayName("requireClassDate: dos clases en esa fecha → rechazado, no elige una al azar")
+    void ambiguousDate() {
+        LocalDate monday = LocalDate.of(2026, 9, 7);
+        when(academicEventService.findClassOccurrences(eq(1L), eq(9L), any())).thenReturn(List.of(
+                new OccurrenceResponseDto(1L, 100L, monday, OccurrenceStatus.NEEDS_ROOM,
+                        LocalTime.of(8, 0), LocalTime.of(10, 0)),
+                new OccurrenceResponseDto(2L, 101L, monday, OccurrenceStatus.NEEDS_ROOM,
+                        LocalTime.of(14, 0), LocalTime.of(16, 0))));
+        when(academicEventService.findRecurringEventsBySubjectAndCommission(1L, 9L)).thenReturn(List.of(
+                recurring(100L, DayOfWeek.MONDAY, LocalTime.of(8, 0), 120),
+                recurring(101L, DayOfWeek.MONDAY, LocalTime.of(14, 0), 120)));
+
+        assertThatThrownBy(() -> service.requireClassDate(1L, 9L, monday))
+                .isInstanceOf(InvalidRoomRequestException.class)
+                .hasMessageContaining("más de una clase")
+                .hasMessageContaining("subsecretaría");
+    }
+
+    @Test
+    @DisplayName("requireClassDate: dos tramos de la misma franja en esa fecha → no es ambiguo, deriva el horario")
+    void annualSplitOnDateIsNotAmbiguous() {
+        LocalDate tuesday = LocalDate.of(2026, 9, 8);
+        when(academicEventService.findClassOccurrences(eq(1L), eq(9L), any())).thenReturn(List.of(
+                new OccurrenceResponseDto(1L, 100L, tuesday, OccurrenceStatus.NEEDS_ROOM,
+                        LocalTime.of(18, 0), LocalTime.of(20, 0)),
+                new OccurrenceResponseDto(2L, 101L, tuesday, OccurrenceStatus.NEEDS_ROOM,
+                        LocalTime.of(18, 0), LocalTime.of(20, 0))));
+        when(academicEventService.findRecurringEventsBySubjectAndCommission(1L, 9L)).thenReturn(List.of(
+                recurring(100L, DayOfWeek.TUESDAY, LocalTime.of(18, 0), 120),
+                recurring(101L, DayOfWeek.TUESDAY, LocalTime.of(18, 0), 120)));
+
+        ClassSlot slot = service.requireClassDate(1L, 9L, tuesday);
+
+        assertThat(slot.startTime()).isEqualTo(LocalTime.of(18, 0));
+        assertThat(slot.endTime()).isEqualTo(LocalTime.of(20, 0));
     }
 
     @Test
