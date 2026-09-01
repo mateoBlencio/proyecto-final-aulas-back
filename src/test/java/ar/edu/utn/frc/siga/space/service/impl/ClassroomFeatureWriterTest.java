@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -51,7 +53,11 @@ class ClassroomFeatureWriterTest {
     }
 
     private ResourceType type(long id, String name) {
-        return ResourceType.builder().id(id).name(name).valueKind(ResourceValueKind.COUNT).build();
+        return type(id, name, ResourceValueKind.COUNT);
+    }
+
+    private ResourceType type(long id, String name, ResourceValueKind kind) {
+        return ResourceType.builder().id(id).name(name).valueKind(kind).build();
     }
 
     @Test
@@ -62,6 +68,8 @@ class ClassroomFeatureWriterTest {
         ClassroomResource dropProjector = ClassroomResource.builder()
                 .classroom(classroom).resourceType(type(2L, "Proyector")).quantity(1).build();
         when(classroomResourceRepository.findByClassroomId(1L)).thenReturn(List.of(keepPc, dropProjector));
+        when(resourceTypeRepository.findActiveById(1L))
+                .thenReturn(Optional.of(type(1L, "Cantidad de PC")));
         when(resourceTypeRepository.findActiveById(3L))
                 .thenReturn(Optional.of(type(3L, "Aire acondicionado")));
 
@@ -72,6 +80,70 @@ class ClassroomFeatureWriterTest {
         assertThat(keepPc.getQuantity()).isEqualTo(25);
         verify(classroomResourceRepository).softDelete(dropProjector);
         verify(classroomResourceRepository).save(keepPc);
+    }
+
+    @Test
+    @DisplayName("applyResources: tipo de recurso inactivo también falla al actualizar uno existente")
+    void applyResourcesInactiveResourceTypeOnUpdateThrows() {
+        ClassroomResource existing = ClassroomResource.builder()
+                .classroom(classroom).resourceType(type(1L, "Cantidad de PC")).quantity(10).build();
+        when(classroomResourceRepository.findByClassroomId(1L)).thenReturn(List.of(existing));
+        when(resourceTypeRepository.findActiveById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> writer.applyResources(classroom,
+                List.of(new ClassroomResourceRequestDto(1L, 5))))
+                .isInstanceOf(SpaceDomainException.class)
+                .hasMessageContaining("1");
+        verify(classroomResourceRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("applyResources: resourceTypeId repetido no duplica filas, gana la última cantidad")
+    void applyResourcesDuplicateResourceTypeIdKeepsLastQuantity() {
+        when(classroomResourceRepository.findByClassroomId(1L)).thenReturn(List.of());
+        when(resourceTypeRepository.findActiveById(1L))
+                .thenReturn(Optional.of(type(1L, "Cantidad de PC")));
+        when(classroomResourceRepository.save(any(ClassroomResource.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        writer.applyResources(classroom, List.of(
+                new ClassroomResourceRequestDto(1L, 5),
+                new ClassroomResourceRequestDto(1L, 9)));
+
+        ArgumentCaptor<ClassroomResource> captor = ArgumentCaptor.forClass(ClassroomResource.class);
+        verify(classroomResourceRepository, times(2)).save(captor.capture());
+        assertThat(captor.getAllValues()).allSatisfy(r -> assertThat(r.getResourceType().getId()).isEqualTo(1L));
+        assertThat(captor.getValue().getQuantity()).isEqualTo(9);
+    }
+
+    @Test
+    @DisplayName("applyResources: tipo BOOLEAN con quantity > 1 lanza SpaceDomainException")
+    void applyResourcesBooleanQuantityAboveOneThrows() {
+        when(classroomResourceRepository.findByClassroomId(1L)).thenReturn(List.of());
+        when(resourceTypeRepository.findActiveById(2L))
+                .thenReturn(Optional.of(type(2L, "Proyector", ResourceValueKind.BOOLEAN)));
+
+        assertThatThrownBy(() -> writer.applyResources(classroom,
+                List.of(new ClassroomResourceRequestDto(2L, 3))))
+                .isInstanceOf(SpaceDomainException.class)
+                .hasMessageContaining("Proyector");
+        verify(classroomResourceRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("applyResources: tipo BOOLEAN acepta quantity 0 y 1")
+    void applyResourcesBooleanQuantityZeroOrOneOk() {
+        when(classroomResourceRepository.findByClassroomId(1L)).thenReturn(List.of());
+        when(resourceTypeRepository.findActiveById(2L))
+                .thenReturn(Optional.of(type(2L, "Proyector", ResourceValueKind.BOOLEAN)));
+        when(resourceTypeRepository.findActiveById(3L))
+                .thenReturn(Optional.of(type(3L, "Aire acondicionado", ResourceValueKind.BOOLEAN)));
+
+        writer.applyResources(classroom, List.of(
+                new ClassroomResourceRequestDto(2L, 1),
+                new ClassroomResourceRequestDto(3L, 0)));
+
+        verify(classroomResourceRepository, times(2)).save(any(ClassroomResource.class));
     }
 
     @Test

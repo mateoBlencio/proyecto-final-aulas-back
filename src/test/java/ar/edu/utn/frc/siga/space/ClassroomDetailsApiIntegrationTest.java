@@ -70,6 +70,28 @@ class ClassroomDetailsApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("PUT /details con SUBSET sin targets se normaliza a NONE")
+    void updateDetails_subsetWithoutTargets_normalizesToNone() throws Exception {
+        Building building = testData.edificio();
+        ClassroomType normal = testData.tipoAulaNormal();
+        Classroom classroom = testData.aula(building, normal, 30);
+
+        String body = """
+                {"classroomTypeId": %d, "permissionMode": "SUBSET", "permissionTargets": []}
+                """.formatted(normal.getId());
+
+        mockMvc.perform(put("/v1/classrooms/" + classroom.getId() + "/details")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.permissionMode").value("NONE"))
+                .andExpect(jsonPath("$.allowedDisplay").value("Ninguna"))
+                .andExpect(jsonPath("$.permissionTargets.length()").value(0));
+
+        Classroom reloaded = classroomRepository.findById(classroom.getId()).orElseThrow();
+        assertThat(reloaded.getPermissionMode()).isEqualTo(ar.edu.utn.frc.siga.space.model.PermissionMode.NONE);
+    }
+
+    @Test
     @DisplayName("PUT /details con id de tipo de recurso desconocido responde 400")
     void updateDetails_unknownResourceTypeId_returns400() throws Exception {
         Building building = testData.edificio();
@@ -80,6 +102,25 @@ class ClassroomDetailsApiIntegrationTest extends AbstractIntegrationTest {
                 {"classroomTypeId": %d, "permissionMode": "ALL",
                  "resources": [{"resourceTypeId": 999999999, "quantity": 1}]}
                 """.formatted(normal.getId());
+
+        mockMvc.perform(put("/v1/classrooms/" + classroom.getId() + "/details")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    @Test
+    @DisplayName("PUT /details con recurso BOOLEAN y quantity > 1 responde 400")
+    void updateDetails_booleanResourceQuantityAboveOne_returns400() throws Exception {
+        Building building = testData.edificio();
+        ClassroomType normal = testData.tipoAulaNormal();
+        Classroom classroom = testData.aula(building, normal, 40);
+        long projectorId = testData.tipoRecurso("Proyector", ResourceValueKind.BOOLEAN).getId();
+
+        String body = """
+                {"classroomTypeId": %d, "permissionMode": "ALL",
+                 "resources": [{"resourceTypeId": %d, "quantity": 3}]}
+                """.formatted(normal.getId(), projectorId);
 
         mockMvc.perform(put("/v1/classrooms/" + classroom.getId() + "/details")
                         .contentType(MediaType.APPLICATION_JSON).content(body))

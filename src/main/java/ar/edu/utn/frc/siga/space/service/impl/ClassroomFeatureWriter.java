@@ -8,6 +8,7 @@ import ar.edu.utn.frc.siga.space.model.ClassroomPermission;
 import ar.edu.utn.frc.siga.space.model.ClassroomResource;
 import ar.edu.utn.frc.siga.space.model.PermissionMode;
 import ar.edu.utn.frc.siga.space.model.ResourceType;
+import ar.edu.utn.frc.siga.space.model.ResourceValueKind;
 import ar.edu.utn.frc.siga.space.repository.ClassroomPermissionRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomResourceRepository;
 import ar.edu.utn.frc.siga.space.repository.ResourceTypeRepository;
@@ -37,14 +38,17 @@ public class ClassroomFeatureWriter {
 
         Set<Long> keep = new HashSet<>();
         for (ClassroomResourceRequestDto request : desired) {
+            ResourceType resourceType = resolveResourceType(request.resourceTypeId());
+            validateQuantity(resourceType, request.quantity());
             keep.add(request.resourceTypeId());
             ClassroomResource resource = existing.get(request.resourceTypeId());
             if (resource == null) {
-                classroomResourceRepository.save(ClassroomResource.builder()
+                ClassroomResource created = classroomResourceRepository.save(ClassroomResource.builder()
                         .classroom(classroom)
-                        .resourceType(resolveResourceType(request.resourceTypeId()))
+                        .resourceType(resourceType)
                         .quantity(request.quantity())
                         .build());
+                existing.put(request.resourceTypeId(), created);
             } else {
                 resource.setQuantity(request.quantity());
                 if (resource.isDeleted()) {
@@ -97,6 +101,13 @@ public class ClassroomFeatureWriter {
     private ResourceType resolveResourceType(Long resourceTypeId) {
         return resourceTypeRepository.findActiveById(resourceTypeId)
                 .orElseThrow(() -> new SpaceDomainException("Unknown resource type id: " + resourceTypeId));
+    }
+
+    private static void validateQuantity(ResourceType resourceType, Integer quantity) {
+        if (resourceType.getValueKind() == ResourceValueKind.BOOLEAN && quantity != null && quantity > 1) {
+            throw new SpaceDomainException(
+                    "Boolean resource type quantity must be 0 or 1: " + resourceType.getName());
+        }
     }
 
     private static String key(String kind, Long targetId) {

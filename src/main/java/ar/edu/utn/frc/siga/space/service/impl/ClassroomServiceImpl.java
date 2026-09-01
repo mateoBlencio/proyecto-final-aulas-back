@@ -15,6 +15,8 @@ import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
+import ar.edu.utn.frc.siga.space.model.PermissionMode;
+import ar.edu.utn.frc.siga.space.dto.request.ClassroomPermissionTargetRequestDto;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
@@ -142,14 +144,16 @@ public class ClassroomServiceImpl implements ClassroomService {
     public ClassroomListItemDto updateDetails(Long id, ClassroomDetailsUpdateDto dto) {
         log.debug("Actualizando campos locales del aula: id={}, permissionMode={}", id, dto.permissionMode());
 
+        PermissionMode mode = normalizePermissionMode(dto.permissionMode(), dto.permissionTargets());
+
         Classroom classroom = this.findExistingClassroomById(id);
         classroom.setClassroomType(classroomTypeService.findById(dto.classroomTypeId()));
         classroom.setObservations(dto.observations());
-        classroom.setPermissionMode(dto.permissionMode());
+        classroom.setPermissionMode(mode);
         classroomRepository.save(classroom);
 
         classroomFeatureWriter.applyResources(classroom, dto.resources());
-        classroomFeatureWriter.applyPermissions(classroom, dto.permissionMode(), dto.permissionTargets());
+        classroomFeatureWriter.applyPermissions(classroom, mode, dto.permissionTargets());
 
         log.info("Campos locales del aula actualizados: id={}", id);
         return classroomListComposer.compose(classroom);
@@ -221,6 +225,12 @@ public class ClassroomServiceImpl implements ClassroomService {
                     log.warn("Edificio no encontrado: id={}", id);
                     return ResourceNotFoundException.of("Building", id);
                 });
+    }
+
+    private static PermissionMode normalizePermissionMode(PermissionMode mode,
+                                                         List<ClassroomPermissionTargetRequestDto> targets) {
+        boolean emptySubset = mode == PermissionMode.SUBSET && (targets == null || targets.isEmpty());
+        return emptySubset ? PermissionMode.NONE : mode;
     }
 
     private void validateCapacity(ClassroomRequestDto dto) {
