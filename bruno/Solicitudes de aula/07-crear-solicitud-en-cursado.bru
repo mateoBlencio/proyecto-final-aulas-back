@@ -48,8 +48,17 @@ docs {
     mayúscula: MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY.
   - estimated sigue siendo obligatorio.
   - date en el ítem => 400 ("se ata a un día de dictado, no a una fecha").
-  - Se valida que la comisión efectivamente dicte clase ese día (400 si no,
-    o si dicta más de un bloque ese día).
+  - Se valida que la comisión efectivamente dicte clase ese día (400 si no).
+
+  Comisión con DOS clases el mismo día en horarios distintos (ej. lunes 10:25
+  y lunes 20:40): 400. El día no alcanza para saber cuál pide el docente, y
+  el back no elige una al azar. Mismo corte por fecha en ONE_TIME_ROOM_CHANGE.
+  El detail nombra los horarios y deriva a subsecretaría. Es un caso raro (1
+  comisión en database_dev, hoy no vigente); la solución de fondo —elegir la
+  franja y no el día— está pendiente de definición y cambiaría el contrato.
+
+  Dos slots del mismo día con el MISMO horario no son ese caso: es una cursada
+  anual partida en un evento por cuatrimestre, y se cuentan como una sola.
 
   requiresExamUsers: dejar ausente cuando requiresComputers=false.
 }

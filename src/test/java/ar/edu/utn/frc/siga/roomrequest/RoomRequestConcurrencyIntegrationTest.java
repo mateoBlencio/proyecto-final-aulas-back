@@ -71,7 +71,7 @@ class RoomRequestConcurrencyIntegrationTest extends AbstractIntegrationTest {
     private CreateRoomRequestDto twoItemRequest(int index) {
         RequesterInfo requester = new RequesterInfo(AcademicScope.EXTENSION, "Docente " + index,
                 "docente" + index + "@frc.utn.edu.ar", "351-000000" + index);
-        return new CreateConferenceDto(RoomRequestType.CONFERENCE, requester, null, null,
+        return new CreateConferenceDto(RoomRequestType.CONFERENCE, requester, null,
                 List.of(item(LocalDate.now().plusDays(10)), item(LocalDate.now().plusDays(11))));
     }
 

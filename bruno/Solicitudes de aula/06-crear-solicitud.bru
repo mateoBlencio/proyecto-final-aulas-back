@@ -62,14 +62,19 @@ docs {
 
   Cabecera:
   - subjectId: obligatorio salvo CONFERENCE y OTHER (opcional).
-  - commissionId (cabecera): obligatorio en ONE_TIME_ROOM_CHANGE,
-    REGULAR_ROOM_CHANGE y PARTIAL_EXAM_IN_CLASS. En los free-form la comisión
-    va DENTRO de cada ítem (así una solicitud puede pedir para varias
-    comisiones a la vez).
+  - commissionId (cabecera): solo en ONE_TIME_ROOM_CHANGE,
+    REGULAR_ROOM_CHANGE y PARTIAL_EXAM_IN_CLASS, y ahí es obligatorio. Los
+    tipos free-form no lo llevan en la cabecera.
 
-  Ítem free-form (este ejemplo): commissionId, date, startTime, endTime,
-  estimated son obligatorios. Se envía hora de inicio y hora de FIN; el
-  backend guarda inicio + duración.
+  Comisión en los free-form:
+  - PARTIAL_EXAM_OFF_SCHEDULE: va DENTRO de cada ítem y es obligatoria (así
+    una solicitud puede pedir para varias comisiones a la vez, sin repetirlas).
+  - FINAL_EXAM, CONFERENCE y OTHER: no llevan comisión en ningún lado; un ítem
+    con commissionId da 400.
+
+  Ítem free-form (este ejemplo, PARTIAL_EXAM_OFF_SCHEDULE): commissionId,
+  date, startTime, endTime, estimated son obligatorios. Se envía hora de
+  inicio y hora de FIN; el backend guarda inicio + duración.
 
   Ítem scheduled (ver 07): NO lleva date ni horario; lleva dayOfWeek y
   estimated. El día/horario se derivan del dictado de esa comisión y quedan

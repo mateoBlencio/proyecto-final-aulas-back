@@ -350,34 +350,53 @@ class RoomRequestHandlersTest {
         }
 
         @Test
-        @DisplayName("conferencia: materia y comisión opcionales; requiresExamUsers debe venir null")
+        @DisplayName("conferencia: materia opcional; requiresExamUsers debe venir null")
         void conference() {
             CreateConferenceDto ok = new CreateConferenceDto(RoomRequestType.CONFERENCE, requester(),
-                    null, null, List.of(freeFormItem(null)));
+                    null, List.of(freeFormItem(null)));
             assertThatCode(() -> conference.validate(ok)).doesNotThrowAnyException();
             verify(academicReference).validateOptionalSubject(null);
 
             FreeFormItemDto withExamUsers = new FreeFormItemDto(null, LocalDate.now().plusDays(7),
                     LocalTime.of(10, 0), LocalTime.of(12, 0), 35, 1, false, true, 5, true, null, null, List.of());
             CreateConferenceDto bad = new CreateConferenceDto(RoomRequestType.CONFERENCE, requester(),
-                    null, null, List.of(withExamUsers));
+                    null, List.of(withExamUsers));
             assertThatThrownBy(() -> conference.validate(bad)).isInstanceOf(InvalidRoomRequestException.class);
         }
 
         @Test
         @DisplayName("otro: cada ítem exige observations")
         void other() {
-            FreeFormItemDto withObs = new FreeFormItemDto(null, LocalDate.now().plusDays(7),
-                    LocalTime.of(10, 0), LocalTime.of(12, 0), 35, 1, false, false, null, null, null,
-                    "Grabación de video", List.of());
-            CreateOtherDto ok = new CreateOtherDto(RoomRequestType.OTHER, requester(), null, null, List.of(withObs));
+            CreateOtherDto ok = new CreateOtherDto(RoomRequestType.OTHER, requester(), null, List.of(withObservations(null)));
             assertThatCode(() -> other.validate(ok)).doesNotThrowAnyException();
 
-            CreateOtherDto bad = new CreateOtherDto(RoomRequestType.OTHER, requester(), null, null,
+            CreateOtherDto bad = new CreateOtherDto(RoomRequestType.OTHER, requester(), null,
                     List.of(freeFormItem(null)));
             assertThatThrownBy(() -> other.validate(bad))
                     .isInstanceOf(InvalidRoomRequestException.class)
                     .hasMessageContaining("observations");
+        }
+
+        @Test
+        @DisplayName("conferencia y otro no llevan comisión: un ítem que la declara se rechaza")
+        void commissionIsNotAllowed() {
+            CreateConferenceDto conferenceWithCommission = new CreateConferenceDto(RoomRequestType.CONFERENCE,
+                    requester(), null, List.of(freeFormItem(COMMISSION)));
+            assertThatThrownBy(() -> conference.validate(conferenceWithCommission))
+                    .isInstanceOf(InvalidRoomRequestException.class)
+                    .hasMessageContaining("no llevan comisión");
+
+            CreateOtherDto otherWithCommission = new CreateOtherDto(RoomRequestType.OTHER,
+                    requester(), null, List.of(withObservations(COMMISSION)));
+            assertThatThrownBy(() -> other.validate(otherWithCommission))
+                    .isInstanceOf(InvalidRoomRequestException.class)
+                    .hasMessageContaining("no llevan comisión");
+        }
+
+        private FreeFormItemDto withObservations(Long commissionId) {
+            return new FreeFormItemDto(commissionId, LocalDate.now().plusDays(7),
+                    LocalTime.of(10, 0), LocalTime.of(12, 0), 35, 1, false, false, null, null, null,
+                    "Grabación de video", List.of());
         }
     }
 }

@@ -4,7 +4,6 @@ import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateFinalExamDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.FreeFormItemDto;
-import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.validator.AcademicReferenceValidator;
@@ -34,9 +33,8 @@ public class FinalExamHandler extends AbstractRoomRequestHandler {
         List<FreeFormItemDto> items = ((CreateFinalExamDto) dto).items();
         ItemConsistency.requireExactlyOne(items.size());
         for (FreeFormItemDto item : items) {
-            if (item.commissionId() != null) {
-                throw new InvalidRoomRequestException("El final se solicita por materia: los pedidos no llevan comisión.");
-            }
+            ItemConsistency.requireNoCommission(item,
+                    "El final se solicita por materia: los pedidos no llevan comisión.");
             ItemConsistency.requireExamUsersConsistent(true, item);
         }
     }

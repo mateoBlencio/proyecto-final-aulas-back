@@ -68,7 +68,7 @@ public class RoomRequestCatalogServiceImpl implements RoomRequestCatalogService 
         subjectService.findById(subjectId);
         subjectCommissionService.findBySubjectAndCommission(subjectId, commissionId);
 
-        List<ClassSlotDto> slots = classScheduleService.slots(subjectId, commissionId).stream()
+        List<ClassSlotDto> slots = classScheduleService.distinctSlots(subjectId, commissionId).stream()
                 .map(slot -> new ClassSlotDto(slot.recurringEventId(), slot.dayOfWeek(),
                         slot.startTime(), slot.endTime()))
                 .toList();

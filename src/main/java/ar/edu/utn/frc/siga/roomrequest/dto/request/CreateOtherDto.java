@@ -11,6 +11,5 @@ public record CreateOtherDto(
         RoomRequestType type,
         @Valid @NotNull RequesterInfo requester,
         Long subjectId,
-        Long commissionId,
         @NotEmpty @Valid List<FreeFormItemDto> items
 ) implements CreateRoomRequestDto {}
