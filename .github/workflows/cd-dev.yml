@@ -36,7 +36,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: reports-${{ github.run_id }}
+          name: reports-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             target/surefire-reports/
             target/site/jacoco/
@@ -70,15 +70,31 @@ jobs:
             echo "::error::No existe $ENV_FILE en el server"
             exit 1
           fi
+          # Solo el bloque del servicio de este perfil: si no, el deploy a un entorno
+          # exigiria las variables del otro.
+          block=$(awk '/^  backend-dev:/{f=1;next} /^  [a-zA-Z]|^[a-zA-Z]/{f=0} f' \
+            docker-compose.deploy.yml)
+          required=$(printf '%s' "$block" \
+            | grep -oE '\$\{[A-Z_][A-Z0-9_]*(:-[^}]*)?\}' \
+            | { grep -v ':-' || true; } | tr -d '${}' | sort -u)
+          if [ -z "$required" ]; then
+            echo "::error::No se extrajo ninguna variable para backend-dev; revisar el chequeo"
+            exit 1
+          fi
+          # Un secret vacio esta tan roto como uno ausente: solo se toleran las
+          # que legitimamente pueden ir en blanco.
+          allow_empty=" SYSACAD_API_KEY "
           missing=0
-          required=$(grep -oE '\$\{[A-Z_][A-Z0-9_]*(:-[^}]*)?\}' docker-compose.deploy.yml \
-            | grep -v ':-' | tr -d '\${}' | sort -u)
           for key in $required; do
             if ! grep -qE "^[[:space:]]*${key}=" "$ENV_FILE"; then
               echo "::error::Falta en el .env del server: ${key}"
               missing=1
             elif ! grep -qE "^[[:space:]]*${key}=.+" "$ENV_FILE"; then
-              echo "::warning::Definida pero vacia en el .env del server: ${key}"
+              case "$allow_empty" in
+                *" ${key} "*) echo "::warning::Vacia a proposito: ${key}" ;;
+                *) echo "::error::Definida pero vacia en el .env del server: ${key}"
+                   missing=1 ;;
+              esac
             fi
           done
           [ "$missing" -eq 0 ]
@@ -111,5 +127,5 @@ jobs:
       - name: Free disk space
         if: always()
         run: |
-          docker image prune -f
+          docker image prune -f --filter until=24h
           docker builder prune -f --filter until=168h

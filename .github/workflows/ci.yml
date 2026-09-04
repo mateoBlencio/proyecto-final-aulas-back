@@ -44,7 +44,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: reports-${{ github.run_id }}
+          name: reports-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             target/surefire-reports/
             target/site/jacoco/
@@ -63,11 +63,15 @@ jobs:
       - name: Build Docker image
         run: docker build -t "$IMAGE" .
 
+      - name: Trivy cache key
+        id: trivy-key
+        run: echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
       - name: Cache Trivy DB
         uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/trivy-cache
-          key: trivy-db-${{ github.run_id }}
+          key: trivy-db-${{ steps.trivy-key.outputs.date }}
           restore-keys: trivy-db-
 
       - name: Scan image
@@ -87,6 +91,8 @@ jobs:
         with:
           sarif_file: trivy-results.sarif
 
-      - name: Remove CI image
+      - name: Free disk space
         if: always()
-        run: docker image rm -f "$IMAGE" || true
+        run: |
+          docker image rm -f "$IMAGE" || true
+          docker builder prune -f --filter until=168h
