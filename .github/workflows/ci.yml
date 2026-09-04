@@ -10,16 +10,24 @@ on:
       - develop
       - main
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Tests
     runs-on: self-hosted
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      checks: write           # action-junit-report publica el resumen como check
+      security-events: write  # upload-sarif publica los hallazgos de Trivy
     env:
-      DB_HOST: localhost
-      DB_PORT: 5432
-      DB_NAME: testdb
-      DB_USERNAME: test
-      DB_PASSWORD: test
+      IMAGE: siga-back:ci-${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
 
@@ -29,5 +37,56 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Run tests
-        run: ./mvnw test -Dspring.profiles.active=integration
+      - name: Build and test
+        run: ./mvnw -B --no-transfer-progress verify
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports-${{ github.run_id }}
+          path: |
+            target/surefire-reports/
+            target/site/jacoco/
+            target/spring-modulith-docs/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Publish test results
+        if: always()
+        uses: mikepenz/action-junit-report@v6
+        with:
+          report_paths: target/surefire-reports/TEST-*.xml
+          detailed_summary: true
+          fail_on_failure: false
+
+      - name: Build Docker image
+        run: docker build -t "$IMAGE" .
+
+      - name: Cache Trivy DB
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/trivy-cache
+          key: trivy-db-${{ github.run_id }}
+          restore-keys: trivy-db-
+
+      - name: Scan image
+        uses: aquasecurity/trivy-action@0.36.0
+        env:
+          TRIVY_CACHE_DIR: ${{ runner.temp }}/trivy-cache
+        with:
+          image-ref: ${{ env.IMAGE }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - name: Upload scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+
+      - name: Remove CI image
+        if: always()
+        run: docker image rm -f "$IMAGE" || true
