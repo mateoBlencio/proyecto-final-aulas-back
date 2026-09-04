@@ -1,9 +1,7 @@
 package ar.edu.utn.frc.siga.academic;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -20,10 +18,8 @@ import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
-import ar.edu.utn.frc.siga.auth.model.Role;
-import ar.edu.utn.frc.siga.auth.security.JwtService;
+import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
-import java.util.Set;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,8 +27,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.context.WebApplicationContext;
 
 @Import(IntegrationTestData.class)
 @DisplayName("Academic – endpoints de activación (integración)")
@@ -40,12 +34,6 @@ class AcademicActivationApiIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private IntegrationTestData testData;
-
-    @Autowired
-    private WebApplicationContext webApplicationContext;
-
-    @Autowired
-    private JwtService jwtService;
 
     @Autowired
     private SubjectRepository subjectRepository;
@@ -66,12 +54,7 @@ class AcademicActivationApiIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUpAuxiliarMockMvc() {
-        String token = jwtService.generateAccessToken(
-                "auxiliar@frc.utn.edu.ar", Set.of(Role.AUXILIAR_AULICO));
-        auxiliarMockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
-                .apply(springSecurity())
-                .defaultRequest(get("/").header("Authorization", "Bearer " + token))
-                .build();
+        auxiliarMockMvc = mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
     }
 
     @Test

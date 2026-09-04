@@ -15,9 +15,14 @@ import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationCandidate;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.security.BuildingScope;
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
+import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
+import ar.edu.utn.frc.siga.space.service.ClassroomService;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,6 +31,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDate;
 import java.time.Instant;
@@ -43,6 +49,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -70,12 +77,19 @@ class AllocationServiceImplTest {
     private AllocationTargetResolver targetResolver;
     @Mock
     private AllocationWriter writer;
+    @Mock
+    private ClassroomService classroomService;
+    @Mock
+    private BuildingScopeResolver buildingScopeResolver;
 
     private AllocationServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new AllocationServiceImpl(allocationRepository, occurrenceService, composer, validator, targetResolver, writer);
+        service = new AllocationServiceImpl(allocationRepository, occurrenceService, composer, validator, targetResolver,
+                writer, classroomService, buildingScopeResolver);
+        lenient().when(classroomService.findByIds(any())).thenReturn(List.of());
+        lenient().when(buildingScopeResolver.scopeFor(any())).thenReturn(BuildingScope.unrestricted());
     }
 
     // ---------- allocate ----------
@@ -175,6 +189,25 @@ class AllocationServiceImplTest {
 
         verify(writer, never()).create(any(), any(), any());
         verify(validator, never()).validateNoOverlap(anyList());
+    }
+
+    @Test
+    @DisplayName("allocate: aula fuera del alcance del usuario → AccessDeniedException, no valida disponibilidad ni escribe")
+    void allocateSinAlcanceSobreElEdificioNoEscribe() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
+        ClassroomResponseDto classroom = new ClassroomResponseDto(5L, 101, 40, 9L, "Edificio Ajeno", 1L, "Normal");
+        when(classroomService.findByIds(Set.of(5L))).thenReturn(List.of(classroom));
+        doThrow(new AccessDeniedException("sin acceso"))
+                .when(buildingScopeResolver).requireAccess(Permission.ALLOCATION_WRITE, Set.of(9L));
+
+        assertThatThrownBy(() -> service.allocate(command)).isInstanceOf(AccessDeniedException.class);
+
+        verify(validator, never()).validateClassroomsAvailable(any());
+        verify(writer, never()).create(any(), any(), any());
     }
 
     @Test
@@ -371,6 +404,24 @@ class AllocationServiceImplTest {
     }
 
     @Test
+    @DisplayName("deallocate: aula actual fuera del alcance del usuario → AccessDeniedException, no libera")
+    void deallocateSinAlcanceSobreElEdificioActualNoLibera() {
+        DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(10L))), "obs");
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
+        when(targetResolver.resolveAll(command.targets(), null)).thenReturn(List.of(occ));
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L)))
+                .thenReturn(List.of(allocation(100L, 10L, 5, AllocationSource.MANUAL)));
+        ClassroomResponseDto classroom = new ClassroomResponseDto(5L, 101, 40, 9L, "Edificio Ajeno", 1L, "Normal");
+        when(classroomService.findByIds(Set.of(5L))).thenReturn(List.of(classroom));
+        doThrow(new AccessDeniedException("sin acceso"))
+                .when(buildingScopeResolver).requireAccess(Permission.ALLOCATION_WRITE, Set.of(9L));
+
+        assertThatThrownBy(() -> service.deallocate(command)).isInstanceOf(AccessDeniedException.class);
+
+        verify(writer, never()).delete(any());
+    }
+
+    @Test
     @DisplayName("deallocate: sin occurrences que liberar (occurrences sin asignación se ignoran) → lista vacía")
     void deallocateSinOccurrencesEsNoOp() {
         DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(10L))), "obs");
@@ -479,6 +530,35 @@ class AllocationServiceImplTest {
         assertThat(result).hasSize(1);
     }
 
+    @Test
+    @DisplayName("findById: aula fuera del alcance de lectura → ResourceNotFoundException, no AccessDeniedException")
+    void findByIdFueraDeAlcanceEsNotFound() {
+        Allocation alloc = allocation(1L, 10L, 5, AllocationSource.MANUAL);
+        ClassroomResponseDto classroom = new ClassroomResponseDto(5L, 101, 40, 9L, "Edificio Ajeno", 1L, "Normal");
+        when(allocationRepository.findById(1L)).thenReturn(Optional.of(alloc));
+        when(composer.compose(alloc)).thenReturn(responseDtoWithClassroom(classroom));
+        when(buildingScopeResolver.scopeFor(Permission.ALLOCATION_READ)).thenReturn(BuildingScope.of(Set.of(1L)));
+
+        assertThatThrownBy(() -> service.findById(1L)).isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("findByDate: filtra las asignaciones cuyo edificio está fuera del alcance de lectura")
+    void findByDateFiltraFueraDeAlcance() {
+        LocalDate date = futureDate(1);
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, date);
+        Allocation alloc = allocation(1L, 10L, 5, AllocationSource.MANUAL);
+        ClassroomResponseDto classroom = new ClassroomResponseDto(5L, 101, 40, 9L, "Edificio Ajeno", 1L, "Normal");
+        when(occurrenceService.findSlotsByDate(date)).thenReturn(List.of(occ));
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of(alloc));
+        when(composer.composeAll(List.of(alloc))).thenReturn(List.of(responseDtoWithClassroom(classroom)));
+        when(buildingScopeResolver.scopeFor(Permission.ALLOCATION_READ)).thenReturn(BuildingScope.of(Set.of(1L)));
+
+        List<AllocationResponseDto> result = service.findByDate(date);
+
+        assertThat(result).isEmpty();
+    }
+
     // ---------- helpers ----------
 
     private OccurrenceSlotDto occurrenceSlot(long id, long eventId, LocalDate date) {
@@ -496,6 +576,10 @@ class AllocationServiceImplTest {
 
     private AllocationResponseDto dummyResponseDto() {
         return new AllocationResponseDto(1L, AllocationSource.MANUAL, Instant.now(), null, null, null, null);
+    }
+
+    private AllocationResponseDto responseDtoWithClassroom(ClassroomResponseDto classroom) {
+        return new AllocationResponseDto(1L, AllocationSource.MANUAL, Instant.now(), null, null, null, classroom);
     }
 
     private Map<OccurrenceSlotDto, Long> mapOf(OccurrenceSlotDto occ, long classroomId) {

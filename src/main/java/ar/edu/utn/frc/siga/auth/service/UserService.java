@@ -7,11 +7,9 @@ import org.springframework.data.domain.Pageable;
 
 public interface UserService {
 
-    UserResponseDto create(CreateUserRequestDto dto);
+    UserResponseDto create(CreateUserRequestDto dto, String currentUserEmail);
 
     UserResponseDto setEnabled(Long id, boolean enabled);
-
-    UserResponseDto changeRole(Long id, String rol, String currentUserEmail);
 
     Page<UserResponseDto> findEnabled(Pageable pageable);
 

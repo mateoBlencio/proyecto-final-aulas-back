@@ -23,7 +23,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("${siga.api.base-path}/sysacad/sync")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('SUBSECRETARIA')")
 @ConditionalOnProperty(prefix = "siga.sysacad", name = "enabled", havingValue = "true")
 @Tag(name = "Sincronización con SysAcad", description = "Disparo manual y estado del sync de catálogos")
 public class SysacadSyncController {
@@ -32,6 +31,7 @@ public class SysacadSyncController {
     private final SysacadSyncStateService syncStateService;
 
     @PostMapping
+    @PreAuthorize("hasAuthority('PERM_SYSACAD_SYNC')")
     @Operation(summary = "Resincronizar todas las vistas de SysAcad",
                description = "Dispara el resync de Edificios, Aulas, Especialidades y Comisiones en el orden de "
                        + "FK. Espera a que termine (incluyendo reintentos ante errores transitorios) y devuelve "
@@ -54,6 +54,7 @@ public class SysacadSyncController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('PERM_SYSACAD_READ')")
     @Operation(summary = "Consultar el estado del sync",
                description = "Devuelve, por vista, el último sync exitoso, las filas afectadas y el último error.")
     public ResponseEntity<List<SysacadSyncStateDto>> findState() {

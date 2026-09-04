@@ -1,0 +1,23 @@
+meta {
+  name: Revocar rol de usuario
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/v1/users/:id/role-assignments/:assignmentId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: 1
+  assignmentId: 1
+}
+
+docs {
+  DELETE /v1/users/{id}/role-assignments/{assignmentId}. Permiso: PERM_ROLE_ASSIGN.
+  404 si la asignación no existe o no pertenece a ese usuario. 400 si el
+  usuario autenticado intenta revocarse su propia asignación (no se puede
+  auto-revocar, para evitar quedarse sin acceso por accidente).
+}

@@ -20,7 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("${siga.api.base-path}/imports")
 @RequiredArgsConstructor
 @Tag(name = "Importación masiva", description = "Carga masiva de horarios/comisiones desde un archivo")
-@PreAuthorize("hasRole('SUBSECRETARIA')")
+@PreAuthorize("hasAuthority('PERM_INGEST_RUN')")
 public class IngestController {
 
     private final IngestService ingestService;

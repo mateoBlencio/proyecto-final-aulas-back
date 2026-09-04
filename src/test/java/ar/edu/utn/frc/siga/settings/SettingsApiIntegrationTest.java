@@ -1,8 +1,7 @@
 package ar.edu.utn.frc.siga.settings;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
-import ar.edu.utn.frc.siga.auth.model.Role;
-import ar.edu.utn.frc.siga.auth.security.JwtService;
+import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.common.audit.RevisionReader;
 import ar.edu.utn.frc.siga.common.dto.response.RevisionDto;
 import ar.edu.utn.frc.siga.settings.config.SettingsCatalogProperties;
@@ -19,28 +18,20 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.context.WebApplicationContext;
 
 import java.util.List;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 @DisplayName("Settings API (integración)")
 class SettingsApiIntegrationTest extends AbstractIntegrationTest {
 
     private static final String USER = "integration-test@frc.utn.edu.ar";
 
-    @Autowired
-    private WebApplicationContext webApplicationContext;
-    @Autowired
-    private JwtService jwtService;
     @Autowired
     private SettingRepository settingRepository;
     @Autowired
@@ -148,11 +139,7 @@ class SettingsApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("Un AUXILIAR_AULICO no puede modificar configuración (403)")
     void put_asAuxiliar_isForbidden() throws Exception {
-        String auxToken = jwtService.generateAccessToken("auxiliar@frc.utn.edu.ar", Set.of(Role.AUXILIAR_AULICO));
-        MockMvc auxiliarMockMvc = webAppContextSetup(webApplicationContext)
-                .apply(springSecurity())
-                .defaultRequest(get("/").header("Authorization", "Bearer " + auxToken))
-                .build();
+        MockMvc auxiliarMockMvc = mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
 
         auxiliarMockMvc.perform(put("/v1/settings/{key}", "optimizer.weights.overcrowding")
                         .contentType(MediaType.APPLICATION_JSON)

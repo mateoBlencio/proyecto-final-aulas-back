@@ -7,13 +7,27 @@ meta {
 post {
   url: {{baseUrl}}/v1/users
   body: json
-  auth: none
+  auth: inherit
 }
 
 body:json {
   {
     "email": "nuevo@frc.utn.edu.ar",
     "password": "supersegura",
-    "rol": "AUXILIAR_AULICO"
+    "firstName": "Nombre",
+    "lastName": "Apellido",
+    "initialRole": {
+      "roleId": 2,
+      "scopeType": "BUILDING",
+      "scopeId": 1
+    }
   }
+}
+
+docs {
+  POST /v1/users. Permiso: PERM_USER_MANAGE.
+  Crea el usuario. "initialRole" es opcional: si se omite (o se manda null),
+  el usuario queda sin ninguna asignación de rol, para asignársela después vía
+  POST /v1/users/{id}/role-assignments. Si se incluye, "scopeType" es GLOBAL o
+  BUILDING; "scopeId" va null para GLOBAL y el id de edificio para BUILDING.
 }

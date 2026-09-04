@@ -1,0 +1,28 @@
+meta {
+  name: Actualizar permisos de un rol
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/v1/roles/:id/permissions
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: 2
+}
+
+body:json {
+  {
+    "permissions": ["CLASSROOM_READ", "CLASSROOM_CREATE", "ALLOCATION_READ", "ALLOCATION_WRITE"]
+  }
+}
+
+docs {
+  PATCH /v1/roles/{id}/permissions. Permiso: PERM_ROLE_MANAGE.
+  Reemplaza el set completo de permisos del rol indicado, sea de sistema o
+  propio (un superusuario puede ajustar en caliente qué puede hacer
+  AUXILIAR_AULICO sin deploy). 404 si el rol no existe.
+}

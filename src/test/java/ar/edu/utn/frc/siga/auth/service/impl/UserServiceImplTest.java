@@ -13,15 +13,15 @@ import ar.edu.utn.frc.siga.auth.config.AuthDomainProperties;
 import ar.edu.utn.frc.siga.auth.dto.request.CreateUserRequestDto;
 import ar.edu.utn.frc.siga.auth.dto.response.UserResponseDto;
 import ar.edu.utn.frc.siga.auth.exception.UserDomainException;
+import ar.edu.utn.frc.siga.auth.mapper.RoleAssignmentComposer;
 import ar.edu.utn.frc.siga.auth.mapper.UserMapper;
-import ar.edu.utn.frc.siga.auth.model.Role;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import ar.edu.utn.frc.siga.auth.service.RefreshTokenService;
+import ar.edu.utn.frc.siga.auth.service.RoleAssignmentService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,48 +48,57 @@ class UserServiceImplTest {
     @Mock
     private UserMapper userMapper;
     @Mock
+    private RoleAssignmentComposer roleAssignmentComposer;
+    @Mock
+    private RoleAssignmentService roleAssignmentService;
+    @Mock
     private AuthDomainProperties authDomainProperties;
 
     private UserServiceImpl service;
 
+    private static final String CREATOR_EMAIL = "admin@frc.utn.edu.ar";
+
     @BeforeEach
     void setUp() {
         service = new UserServiceImpl(userRepository, passwordEncoder, refreshTokenService,
-                userMapper, authDomainProperties);
+                userMapper, roleAssignmentComposer, roleAssignmentService, authDomainProperties);
+        lenient().when(roleAssignmentComposer.composeAll(any())).thenReturn(List.of());
     }
 
     private CreateUserRequestDto createDto(String email) {
-        return new CreateUserRequestDto(email, "supersegura", Role.AUXILIAR_AULICO.name());
+        return new CreateUserRequestDto(email, "supersegura", "Nombre", "Apellido", null);
     }
 
-    private User existing(Long id, String email, Role rol) {
+    private User existing(Long id, String email) {
         User user = new User();
         user.setId(id);
         user.setEmail(email);
         user.setEnabled(true);
-        user.setRoles(new java.util.HashSet<>(Set.of(rol)));
+        user.setFirstName("Nombre");
+        user.setLastName("Apellido");
         return user;
     }
 
     @Test
-    @DisplayName("create: email institucional nuevo → hashea password, guarda con el rol y devuelve DTO")
+    @DisplayName("create: email institucional nuevo → hashea password, guarda con nombre/apellido y devuelve DTO")
     void createHappyPath() {
         when(authDomainProperties.isAllowedEmail(any())).thenReturn(true);
         when(userRepository.existsByEmail("nuevo@frc.utn.edu.ar")).thenReturn(false);
         when(passwordEncoder.encode("supersegura")).thenReturn("HASH");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         when(userMapper.toDto(any(User.class)))
-                .thenReturn(new UserResponseDto(1L, "nuevo@frc.utn.edu.ar", Role.AUXILIAR_AULICO.name()));
+                .thenReturn(new UserResponseDto(1L, "nuevo@frc.utn.edu.ar", "Nombre", "Apellido", List.of()));
 
-        UserResponseDto result = service.create(createDto("nuevo@frc.utn.edu.ar"));
+        UserResponseDto result = service.create(createDto("nuevo@frc.utn.edu.ar"), CREATOR_EMAIL);
 
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(captor.capture());
         User saved = captor.getValue();
         assertThat(saved.getPasswordHash()).isEqualTo("HASH");
         assertThat(saved.getEnabled()).isTrue();
-        assertThat(saved.getRoles()).containsExactly(Role.AUXILIAR_AULICO);
-        assertThat(result.rol()).isEqualTo(Role.AUXILIAR_AULICO.name());
+        assertThat(saved.getFirstName()).isEqualTo("Nombre");
+        assertThat(saved.getLastName()).isEqualTo("Apellido");
+        assertThat(result.firstName()).isEqualTo("Nombre");
     }
 
     @Test
@@ -98,7 +107,7 @@ class UserServiceImplTest {
         when(authDomainProperties.isAllowedEmail(any())).thenReturn(true);
         when(userRepository.existsByEmail("dup@frc.utn.edu.ar")).thenReturn(true);
 
-        assertThatThrownBy(() -> service.create(createDto("dup@frc.utn.edu.ar")))
+        assertThatThrownBy(() -> service.create(createDto("dup@frc.utn.edu.ar"), CREATOR_EMAIL))
                 .isInstanceOf(UserDomainException.class);
 
         verify(userRepository, never()).save(any());
@@ -107,7 +116,7 @@ class UserServiceImplTest {
     @Test
     @DisplayName("create: dominio no institucional → UserDomainException y no consulta existencia")
     void createNonInstitutionalDomainThrows() {
-        assertThatThrownBy(() -> service.create(createDto("ajeno@gmail.com")))
+        assertThatThrownBy(() -> service.create(createDto("ajeno@gmail.com"), CREATOR_EMAIL))
                 .isInstanceOf(UserDomainException.class);
 
         verify(userRepository, never()).existsByEmail(any());
@@ -117,10 +126,11 @@ class UserServiceImplTest {
     @Test
     @DisplayName("setEnabled(false): inhabilita y revoca los refresh tokens")
     void disableRevokesTokens() {
-        User user = existing(7L, "u@frc.utn.edu.ar", Role.AUXILIAR_AULICO);
+        User user = existing(7L, "u@frc.utn.edu.ar");
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-        lenient().when(userMapper.toDto(any(User.class))).thenReturn(null);
+        lenient().when(userMapper.toDto(any(User.class)))
+                .thenReturn(new UserResponseDto(7L, "u@frc.utn.edu.ar", "Nombre", "Apellido", null));
 
         service.setEnabled(7L, false);
 
@@ -131,11 +141,12 @@ class UserServiceImplTest {
     @Test
     @DisplayName("setEnabled(true): habilita y NO revoca refresh tokens")
     void enableDoesNotRevoke() {
-        User user = existing(7L, "u@frc.utn.edu.ar", Role.AUXILIAR_AULICO);
+        User user = existing(7L, "u@frc.utn.edu.ar");
         user.setEnabled(false);
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-        lenient().when(userMapper.toDto(any(User.class))).thenReturn(null);
+        lenient().when(userMapper.toDto(any(User.class)))
+                .thenReturn(new UserResponseDto(7L, "u@frc.utn.edu.ar", "Nombre", "Apellido", null));
 
         service.setEnabled(7L, true);
 
@@ -150,53 +161,6 @@ class UserServiceImplTest {
 
         assertThatThrownBy(() -> service.setEnabled(99L, false))
                 .isInstanceOf(ResourceNotFoundException.class);
-    }
-
-    @Test
-    @DisplayName("changeRole: cambia el rol y revoca los refresh tokens")
-    void changeRoleRevokesTokens() {
-        User user = existing(5L, "otro@frc.utn.edu.ar", Role.AUXILIAR_AULICO);
-        when(userRepository.findById(5L)).thenReturn(Optional.of(user));
-        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-        lenient().when(userMapper.toDto(any(User.class))).thenReturn(null);
-
-        service.changeRole(5L, Role.SUBSECRETARIA.name(), "admin@frc.utn.edu.ar");
-
-        assertThat(user.getRoles()).containsExactly(Role.SUBSECRETARIA);
-        verify(refreshTokenService).revokeAllByUserId(5L);
-    }
-
-    @Test
-    @DisplayName("changeRole: no puede editar su propio rol → UserDomainException, no guarda ni revoca")
-    void changeOwnRoleThrows() {
-        User user = existing(5L, "admin@frc.utn.edu.ar", Role.SUBSECRETARIA);
-        when(userRepository.findById(5L)).thenReturn(Optional.of(user));
-
-        assertThatThrownBy(() -> service.changeRole(5L, Role.AUXILIAR_AULICO.name(), "admin@frc.utn.edu.ar"))
-                .isInstanceOf(UserDomainException.class);
-
-        verify(userRepository, never()).save(any());
-        verify(refreshTokenService, never()).revokeAllByUserId(any());
-    }
-
-    @Test
-    @DisplayName("changeRole: usuario inexistente → ResourceNotFoundException")
-    void changeRoleNotFoundThrows() {
-        when(userRepository.findById(99L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.changeRole(99L, Role.AUXILIAR_AULICO.name(), "admin@frc.utn.edu.ar"))
-                .isInstanceOf(ResourceNotFoundException.class);
-    }
-
-    @Test
-    @DisplayName("changeRole: rol inválido → UserDomainException, no busca ni guarda ni revoca")
-    void changeRoleInvalidRoleThrows() {
-        assertThatThrownBy(() -> service.changeRole(5L, "NO_EXISTE", "admin@frc.utn.edu.ar"))
-                .isInstanceOf(UserDomainException.class);
-
-        verify(userRepository, never()).findById(any());
-        verify(userRepository, never()).save(any());
-        verify(refreshTokenService, never()).revokeAllByUserId(any());
     }
 
     // ---- listados ----

@@ -16,6 +16,9 @@ import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationConflictService;
 import ar.edu.utn.frc.siga.allocation.model.ConflictType;
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
+import ar.edu.utn.frc.siga.common.security.BuildingScope;
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
+import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.common.util.Clashes;
 import ar.edu.utn.frc.siga.common.util.DateRanges;
 import ar.edu.utn.frc.siga.common.util.Maps;
@@ -57,6 +60,7 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
     private final AllocationOccupancyReader occupancyReader;
     private final OccurrenceService occurrenceService;
     private final AllocationRepository allocationRepository;
+    private final BuildingScopeResolver buildingScopeResolver;
 
     @Override
     public Page<AllocationConflictDto> findConflicts(Set<ConflictType> types, LocalDate from, LocalDate to,
@@ -75,6 +79,14 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         if (effectiveTypes.contains(ConflictType.OVERLAP)) {
             merged.addAll(buildOverlapConflicts(range, includePast));
         }
+
+        BuildingScope scope = buildingScopeResolver.scopeFor(Permission.CONFLICT_READ);
+        merged.removeIf(dto -> !switch (dto) {
+            case UnallocatedConflictDto ignored -> true;
+            case OvercrowdedConflictDto o -> scope.allows(o.classroom().buildingId());
+            case OverlapConflictDto o -> scope.allows(o.classroom().buildingId());
+        });
+
         log.info("Conflictos de asignación listados: types={}, count={}", effectiveTypes, merged.size());
         return Paging.of(merged, pageable);
     }

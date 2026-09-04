@@ -1,0 +1,18 @@
+meta {
+  name: Listar catálogo de permisos
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/roles/permissions
+  body: none
+  auth: inherit
+}
+
+docs {
+  GET /v1/roles/permissions. Permiso: PERM_ROLE_MANAGE.
+  Devuelve todo el catálogo de Permission (fuente de verdad en código) con su
+  tipo de alcance (GLOBAL o BUILDING). Para armar el formulario de creación o
+  edición de un rol.
+}

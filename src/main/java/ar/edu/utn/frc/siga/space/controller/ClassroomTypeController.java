@@ -30,13 +30,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("${siga.api.base-path}/classroom-types")
 @RequiredArgsConstructor
 @Tag(name = "Tipos de aula", description = "ABM de tipos de aula")
-@PreAuthorize("hasRole('SUBSECRETARIA')")
+@PreAuthorize("hasAuthority('PERM_CLASSROOM_TYPE_MANAGE')")
 public class ClassroomTypeController {
 
     private final ClassroomTypeService classroomTypeService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @PreAuthorize("hasAuthority('PERM_CLASSROOM_TYPE_READ')")
     @Operation(summary = "Listar tipos de aula",
                description = "Listado paginado. Por defecto devuelve solo los tipos activos; con "
                        + "includeDeactivated=true incluye también los desactivados. Pensado para poblar el "
@@ -50,7 +50,7 @@ public class ClassroomTypeController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @PreAuthorize("hasAuthority('PERM_CLASSROOM_TYPE_READ')")
     @Operation(summary = "Buscar tipo de aula por id", description = "404 si el tipo de aula no existe.")
     public ResponseEntity<ClassroomTypeResponseDto> findById(@PathVariable Long id) {
         log.debug("GET /v1/classroom-types/{}", id);
@@ -80,7 +80,7 @@ public class ClassroomTypeController {
     }
 
     @PutMapping("/{id}/activation")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_CLASSROOM_TYPE_MANAGE')")
     @Operation(summary = "Activar tipo de aula",
                description = "Reactiva un tipo de aula previamente desactivado (idempotente). "
                        + "204 si queda activo; 404 si el tipo de aula no existe.")
@@ -92,7 +92,7 @@ public class ClassroomTypeController {
     }
 
     @DeleteMapping("/{id}/activation")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_CLASSROOM_TYPE_MANAGE')")
     @Operation(summary = "Desactivar tipo de aula",
                description = "Soft-delete idempotente. 204 si queda inactivo; 404 si el tipo de aula no existe.")
     public ResponseEntity<Void> deactivate(@PathVariable Long id) {

@@ -3,13 +3,11 @@ package ar.edu.utn.frc.siga.auth.service;
 import ar.edu.utn.frc.siga.auth.config.JwtProperties;
 import ar.edu.utn.frc.siga.auth.exception.InvalidRefreshTokenException;
 import ar.edu.utn.frc.siga.auth.model.RefreshToken;
-import ar.edu.utn.frc.siga.auth.model.Role;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.RefreshTokenRepository;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import ar.edu.utn.frc.siga.auth.service.impl.RefreshTokenServiceImpl;
 import java.time.Instant;
-import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,7 +45,8 @@ class RefreshTokenServiceImplTest {
                 .email("rotacion.test@frc.utn.edu.ar")
                 .passwordHash("irrelevante")
                 .enabled(true)
-                .roles(Set.of(Role.AUXILIAR_AULICO))
+                .firstName("Rotacion")
+                .lastName("Test")
                 .build());
     }
 

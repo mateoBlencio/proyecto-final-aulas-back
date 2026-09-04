@@ -12,6 +12,9 @@ import ar.edu.utn.frc.siga.allocation.model.ConflictType;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
 import ar.edu.utn.frc.siga.common.exception.InvalidDateRangeException;
+import ar.edu.utn.frc.siga.common.security.BuildingScope;
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
+import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.model.EventType;
@@ -64,6 +67,8 @@ class AllocationConflictServiceImplTest {
     private OccurrenceService occurrenceService;
     @Mock
     private AllocationRepository allocationRepository;
+    @Mock
+    private BuildingScopeResolver buildingScopeResolver;
 
     @InjectMocks
     private AllocationConflictServiceImpl service;
@@ -76,6 +81,7 @@ class AllocationConflictServiceImplTest {
         lenient().when(classroomService.findByIds(any())).thenReturn(List.of());
         lenient().when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of());
         lenient().when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of());
+        lenient().when(buildingScopeResolver.scopeFor(any())).thenReturn(BuildingScope.unrestricted());
     }
 
     @Test
@@ -303,6 +309,61 @@ class AllocationConflictServiceImplTest {
 
         assertThatThrownBy(() -> service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, PAGEABLE))
                 .isInstanceOf(InvalidDateRangeException.class);
+    }
+
+    @Test
+    @DisplayName("Filtra sobrecupo cuyo aula está fuera del alcance de CONFLICT_READ")
+    void filtraSobrecupoFueraDeAlcance() {
+        LocalDate from = futureDate(0);
+        LocalDate to = futureDate(30);
+        RecurringEventResponseDto event = recurringEvent(1L, 40, LocalTime.of(8, 0));
+        OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
+        Allocation allocation = allocation(100L, 10L, 5);
+        mockOccupancy(List.of(slot), List.of(allocation), List.of(event));
+        ClassroomResponseDto outOfScope = new ClassroomResponseDto(5L, 5, 30, 9L, "Edificio Ajeno", 1L, "Tipo");
+        when(classroomService.findByIds(any())).thenReturn(List.of(outOfScope));
+        when(buildingScopeResolver.scopeFor(Permission.CONFLICT_READ)).thenReturn(BuildingScope.of(Set.of(1L)));
+
+        assertThat(service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, PAGEABLE)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Filtra superposición cuyo aula está fuera del alcance de CONFLICT_READ")
+    void filtraSolapeFueraDeAlcance() {
+        LocalDate from = futureDate(0);
+        LocalDate to = futureDate(30);
+        LocalDate date = futureDate(2);
+        RecurringEventResponseDto eventA = recurringEvent(1L, 10, LocalTime.of(8, 0));
+        RecurringEventResponseDto eventB = recurringEvent(2L, 10, LocalTime.of(8, 30));
+        OccurrenceSlotDto slotA = occurrenceSlot(10L, eventA, date);
+        OccurrenceSlotDto slotB = occurrenceSlot(11L, eventB, date);
+        Allocation allocA = allocation(100L, 10L, 5);
+        Allocation allocB = allocation(101L, 11L, 5);
+        mockOccupancy(List.of(slotA, slotB), List.of(allocA, allocB), List.of(eventA, eventB));
+        ClassroomResponseDto outOfScope = new ClassroomResponseDto(5L, 5, 100, 9L, "Edificio Ajeno", 1L, "Tipo");
+        when(classroomService.findByIds(any())).thenReturn(List.of(outOfScope));
+        when(buildingScopeResolver.scopeFor(Permission.CONFLICT_READ)).thenReturn(BuildingScope.of(Set.of(1L)));
+
+        assertThat(service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, PAGEABLE)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Nunca filtra eventos sin aula por alcance: no hay edificio contra el cual chequear")
+    void nuncaFiltraSinAulaPorAlcance() {
+        LocalDate from = futureDate(0);
+        LocalDate to = futureDate(30);
+        RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0));
+        OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
+        when(occurrenceService.findSlotsByStatusBetween(eq(OccurrenceStatus.NEEDS_ROOM), any(), any()))
+                .thenReturn(List.of(slot));
+        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of());
+        when(academicEventService.findByIds(any())).thenReturn(List.of(event));
+        when(buildingScopeResolver.scopeFor(Permission.CONFLICT_READ)).thenReturn(BuildingScope.of(Set.of(999L)));
+
+        List<AllocationConflictDto> result =
+                service.findConflicts(Set.of(ConflictType.UNALLOCATED), from, to, false, PAGEABLE).getContent();
+
+        assertThat(result).hasSize(1);
     }
 
     @Test
