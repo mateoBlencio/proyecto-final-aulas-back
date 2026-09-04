@@ -131,8 +131,7 @@ siga:
   sysacad:
     enabled: ${SYSACAD_ENABLED}
 
-    # TEMPORAL: sirven fixtures estáticos en vez de las vistas reales. Eliminar cuando estén completas.
-    materias-mock-enabled: true
+    # TEMPORAL: sirve un fixture estático en vez de la vista real. Eliminar cuando esté completa.
     asignaciones-mock-enabled: true
 
     base-url: https://dataview.frc.utn.edu.ar

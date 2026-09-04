@@ -12,13 +12,13 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * TEMPORAL — igual que {@link SubjectMockViewFetcher}, sirve un fixture estático en lugar de la vista real
- * {@code HorariosComisionesCupos} ({@link ScheduleViewFetcher}). Existe para tener asignaciones durante el
- * desarrollo mientras las vistas reales no están completas/alineadas (los cursos con horario y los que son
- * comisión vigente hoy no se solapan). Devuelve exactamente el mismo tipo ({@code List<RawSchedule>}) que el
- * fetcher real, así el reemplazo es apagar {@code siga.sysacad.asignaciones-mock-enabled} (o borrar esta
- * clase + el fixture): {@link ar.edu.utn.frc.siga.sysacad.internal.service.impl.SysacadCatalogReaderImpl}
- * vuelve a la vista real sin más cambios.
+ * TEMPORAL — sirve un fixture estático en lugar de la vista real {@code HorariosComisionesCupos}
+ * ({@link ScheduleViewFetcher}). Existe para tener asignaciones durante el desarrollo mientras las vistas
+ * reales no están completas/alineadas (los cursos con horario y los que son comisión vigente hoy no se
+ * solapan). Devuelve exactamente el mismo tipo ({@code List<RawSchedule>}) que el fetcher real, así el
+ * reemplazo es apagar {@code siga.sysacad.asignaciones-mock-enabled} (o borrar esta clase + el fixture):
+ * {@link ar.edu.utn.frc.siga.sysacad.internal.service.impl.SysacadCatalogReaderImpl} vuelve a la vista real
+ * sin más cambios.
  */
 @Slf4j
 @Component

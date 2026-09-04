@@ -23,11 +23,9 @@ public class SysacadProperties {
 
     private int maxRetries = 3;
 
-    private boolean materiasMockEnabled = false;
-
     // TEMPORAL: sirve las asignaciones desde un fixture en vez de la vista real HorariosComisionesCupos,
     // para tener asignaciones durante el desarrollo. Apagar (o borrar el mock) cuando las vistas reales
-    // estén completas y alineadas. Mismo criterio que materias-mock-enabled.
+    // estén completas y alineadas.
     private boolean asignacionesMockEnabled = false;
 
     private Sync sync = new Sync(null, null, null, null, null, null, null);
