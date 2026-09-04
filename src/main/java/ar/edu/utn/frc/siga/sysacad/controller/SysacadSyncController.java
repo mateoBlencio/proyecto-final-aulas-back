@@ -33,12 +33,13 @@ public class SysacadSyncController {
 
     @PostMapping
     @Operation(summary = "Resincronizar todas las vistas de SysAcad",
-               description = "Dispara el resync de Edificios, Aulas, Especialidades y Comisiones en el orden de "
-                       + "FK. Espera a que termine (incluyendo reintentos ante errores transitorios) y devuelve "
-                       + "el estado resultante, con el error de cada vista si lo hubo. Responde 200 si las 4 "
-                       + "vistas sincronizaron bien, 207 si al menos una falló por datos, 503 si no se pudo "
-                       + "establecer conexión con SysAcad (red/VPN caída). Si ya hay un resync en curso, el "
-                       + "disparo se ignora y devuelve 200 con el estado previo.")
+               description = "Dispara el resync de las 7 vistas de SysAcad (Edificios, Aulas, Especialidades, "
+                       + "Materias, Comisiones, Eventos y Asignaciones) en el orden de FK. Espera a que termine "
+                       + "(incluyendo reintentos ante errores transitorios) y devuelve el estado resultante, con "
+                       + "el error de cada vista si lo hubo. Responde 200 si las 7 vistas sincronizaron bien, "
+                       + "207 si al menos una falló por datos, 503 si no se pudo establecer conexión con SysAcad "
+                       + "(red/VPN caída). Si ya hay un resync en curso, el disparo se ignora y devuelve 200 con "
+                       + "el estado previo.")
     public ResponseEntity<List<SysacadSyncStateDto>> resyncAll() {
         log.info("POST /v1/sysacad/sync: resync manual de todas las vistas");
         for (SysacadView view : SysacadView.values()) {

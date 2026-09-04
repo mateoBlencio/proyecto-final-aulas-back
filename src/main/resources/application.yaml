@@ -131,9 +131,6 @@ siga:
   sysacad:
     enabled: ${SYSACAD_ENABLED}
 
-    # TEMPORAL: sirve un fixture estático en vez de la vista real. Eliminar cuando esté completa.
-    asignaciones-mock-enabled: true
-
     base-url: https://dataview.frc.utn.edu.ar
     api-key: ${SYSACAD_API_KEY}
     connect-timeout: 5s

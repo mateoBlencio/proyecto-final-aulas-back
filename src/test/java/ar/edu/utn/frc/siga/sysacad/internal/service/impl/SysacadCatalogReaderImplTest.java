@@ -12,7 +12,6 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,7 +38,7 @@ class SysacadCatalogReaderImplTest {
     private SysacadCatalogReaderImpl reader() {
         return new SysacadCatalogReaderImpl(
                 null, null, null, null,
-                scheduleViewFetcher, subjectViewFetcher, Optional.empty(), mapper);
+                scheduleViewFetcher, subjectViewFetcher, mapper);
     }
 
     private static RawSchedule scheduleRow(Integer especialidad, Integer plan, Integer materia, Integer horarioCuatrimestre) {
