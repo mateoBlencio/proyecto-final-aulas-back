@@ -3,6 +3,9 @@ package ar.edu.utn.frc.siga.preview.service.impl;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.service.AllocationOccupancyService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.security.BuildingScope;
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
+import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.UniqueEventResponseDto;
@@ -51,14 +54,18 @@ class PreviewEngineTest {
     private AllocationOccupancyService occupancyService;
     @Mock
     private OptimizerService optimizerService;
+    @Mock
+    private BuildingScopeResolver buildingScopeResolver;
 
     private PreviewEngine engine;
 
     @BeforeEach
     void setUp() {
-        engine = new PreviewEngine(academicEventService, occurrenceService, classroomService, occupancyService, optimizerService);
+        engine = new PreviewEngine(academicEventService, occurrenceService, classroomService, occupancyService,
+                optimizerService, buildingScopeResolver);
         lenient().when(classroomService.findAllAvailable()).thenReturn(List.of());
         lenient().when(occupancyService.findOccupancy(any(), any())).thenReturn(List.of());
+        lenient().when(buildingScopeResolver.scopeFor(Permission.PREVIEW_RUN)).thenReturn(BuildingScope.unrestricted());
     }
 
     @Test
@@ -111,6 +118,21 @@ class PreviewEngineTest {
         ArgumentCaptor<Integer> timeLimitCaptor = ArgumentCaptor.forClass(Integer.class);
         org.mockito.Mockito.verify(optimizerService).optimize(any(), any(), any(), timeLimitCaptor.capture());
         assertThat(timeLimitCaptor.getValue()).isEqualTo(45);
+    }
+
+    @Test
+    @DisplayName("loadInputs: aulas fuera del alcance del usuario no llegan al optimizador")
+    void loadInputsFiltraAulasFueraDeAlcance() {
+        RecurringEventResponseDto event = recurringEvent(1L);
+        when(academicEventService.findByIds(any())).thenReturn(List.of(event));
+        when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of());
+        ClassroomResponseDto outOfScope = new ClassroomResponseDto(6L, 6, 100, 9L, "Edificio Ajeno", 1L, "Tipo");
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5L, 100), outOfScope));
+        when(buildingScopeResolver.scopeFor(Permission.PREVIEW_RUN)).thenReturn(BuildingScope.of(Set.of(1L)));
+
+        PreviewEngine.Inputs inputs = engine.loadInputs(Set.of(1L));
+
+        assertThat(inputs.rooms()).extracting("id").containsExactly(5L);
     }
 
     @Test

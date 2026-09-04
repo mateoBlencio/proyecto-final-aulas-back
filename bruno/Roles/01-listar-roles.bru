@@ -1,0 +1,16 @@
+meta {
+  name: Listar roles
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/roles
+  body: none
+  auth: inherit
+}
+
+docs {
+  GET /v1/roles. Permiso: PERM_ROLE_ASSIGN.
+  Devuelve todos los roles (de sistema y propios) con su set de permisos.
+}

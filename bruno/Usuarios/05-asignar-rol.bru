@@ -1,0 +1,32 @@
+meta {
+  name: Asignar rol a usuario
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/v1/users/:id/role-assignments
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: 1
+}
+
+body:json {
+  {
+    "roleId": 2,
+    "scopeType": "BUILDING",
+    "scopeId": 1
+  }
+}
+
+docs {
+  POST /v1/users/{id}/role-assignments. Permiso: PERM_ROLE_ASSIGN.
+  "scopeType" es GLOBAL o BUILDING; "scopeId" va null para GLOBAL y el id de
+  edificio (existente) para BUILDING. 400 si la asignación ya existe o si
+  scopeId es inconsistente con scopeType; 404 si el usuario, el rol o el
+  edificio no existen. Tiene efecto inmediato: no hace falta reloguear, el
+  permiso se resuelve contra la base en cada request.
+}

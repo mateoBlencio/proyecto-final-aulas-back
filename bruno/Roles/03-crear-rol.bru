@@ -1,0 +1,24 @@
+meta {
+  name: Crear rol
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/v1/roles
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "COORDINADOR_TURNO_NOCHE",
+    "permissions": ["CLASSROOM_READ", "ALLOCATION_READ", "CONFLICT_READ"]
+  }
+}
+
+docs {
+  POST /v1/roles. Permiso: PERM_ROLE_MANAGE.
+  Crea un rol nuevo, siempre no-sistema (systemRole=false, sin importar lo que
+  se mande). 400 si el nombre ya existe.
+}

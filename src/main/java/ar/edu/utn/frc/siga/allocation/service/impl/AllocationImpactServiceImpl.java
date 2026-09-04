@@ -14,6 +14,8 @@ import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationCandidate;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
+import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.common.util.TimeRanges;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
@@ -50,6 +52,7 @@ class AllocationImpactServiceImpl implements AllocationImpactService {
     private final AllocationRepository allocationRepository;
     private final ClassroomService classroomService;
     private final AcademicEventService academicEventService;
+    private final BuildingScopeResolver buildingScopeResolver;
 
     @Override
     @Transactional(readOnly = true)
@@ -62,7 +65,12 @@ class AllocationImpactServiceImpl implements AllocationImpactService {
             return EMPTY;
         }
 
-        validator.validateClassroomsAvailable(Set.copyOf(classroomByOccurrence.values()));
+        Set<Long> classroomIds = Set.copyOf(classroomByOccurrence.values());
+        Set<Long> buildingIds = classroomService.findByIds(classroomIds).stream()
+                .map(ClassroomResponseDto::buildingId)
+                .collect(Collectors.toSet());
+        buildingScopeResolver.requireAccess(Permission.ALLOCATION_WRITE, buildingIds);
+        validator.validateClassroomsAvailable(classroomIds);
 
         List<AllocationCandidate> candidates = classroomByOccurrence.entrySet().stream()
                 .map(e -> new AllocationCandidate(e.getKey(), e.getValue()))

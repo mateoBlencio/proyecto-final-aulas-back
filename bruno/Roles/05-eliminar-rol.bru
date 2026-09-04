@@ -1,0 +1,21 @@
+meta {
+  name: Eliminar rol
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/v1/roles/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: 5
+}
+
+docs {
+  DELETE /v1/roles/{id}. Permiso: PERM_ROLE_MANAGE.
+  404 si no existe. 400 si es un rol de sistema (SUBSECRETARIA, AUXILIAR_AULICO,
+  CONSULTA nunca se pueden borrar) o si tiene al menos una asignación activa.
+}

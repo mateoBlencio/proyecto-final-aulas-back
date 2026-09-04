@@ -4,6 +4,9 @@ import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.service.AllocationOccupancyService;
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.security.BuildingScope;
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
+import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
@@ -39,6 +42,7 @@ class PreviewEngine {
     private final ClassroomService classroomService;
     private final AllocationOccupancyService occupancyService;
     private final OptimizerService optimizerService;
+    private final BuildingScopeResolver buildingScopeResolver;
 
     record Inputs(List<RecurringEventResponseDto> events, Map<Long, List<LocalDate>> datesByEvent,
                   List<OptimizerRoom> rooms, List<OptimizerOccupancy> occupancy,
@@ -50,7 +54,9 @@ class PreviewEngine {
     Inputs loadInputs(Set<Long> eventIds) {
         List<RecurringEventResponseDto> events = loadRecurringEvents(eventIds);
         Map<Long, List<LocalDate>> datesByEvent = datesByEvent(eventIds);
+        BuildingScope scope = buildingScopeResolver.scopeFor(Permission.PREVIEW_RUN);
         List<OptimizerRoom> rooms = classroomService.findAllAvailable().stream()
+                .filter(c -> scope.allows(c.buildingId()))
                 .map(this::toSolverRoom)
                 .toList();
 

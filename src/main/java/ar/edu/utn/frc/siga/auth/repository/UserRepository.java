@@ -4,10 +4,12 @@ import ar.edu.utn.frc.siga.auth.model.User;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface UserRepository extends JpaRepository<User, Long> {
 
+    @EntityGraph(attributePaths = {"roleAssignments", "roleAssignments.role"})
     Optional<User> findByEmailAndEnabledTrue(String email);
 
     boolean existsByEmail(String email);

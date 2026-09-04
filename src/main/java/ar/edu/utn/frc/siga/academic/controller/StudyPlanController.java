@@ -23,7 +23,7 @@ import java.util.List;
 @RequestMapping("${siga.api.base-path}/study-plans")
 @RequiredArgsConstructor
 @Tag(name = "Planes de estudio", description = "Consulta del catálogo de planes de estudio")
-@PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+@PreAuthorize("hasAuthority('PERM_ACADEMIC_READ')")
 public class StudyPlanController {
 
     private final StudyPlanService studyPlanService;
@@ -46,7 +46,7 @@ public class StudyPlanController {
     }
 
     @PutMapping("/{id}/activation")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ACADEMIC_ACTIVATE')")
     @Operation(summary = "Activar plan de estudio",
                description = "Reactiva un plan de estudio previamente desactivado (idempotente). "
                        + "204 si queda activo; 404 si el plan no existe.")
@@ -58,7 +58,7 @@ public class StudyPlanController {
     }
 
     @DeleteMapping("/{id}/activation")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ACADEMIC_ACTIVATE')")
     @Operation(summary = "Desactivar plan de estudio",
                description = "Soft-delete idempotente. 204 si queda inactivo; 404 si el plan no existe.")
     public ResponseEntity<Void> deactivate(@PathVariable Long id) {

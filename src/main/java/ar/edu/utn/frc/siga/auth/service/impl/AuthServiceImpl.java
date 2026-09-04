@@ -6,7 +6,6 @@ import ar.edu.utn.frc.siga.auth.dto.request.RefreshTokenRequest;
 import ar.edu.utn.frc.siga.auth.dto.response.TokenResponse;
 import ar.edu.utn.frc.siga.auth.exception.InvalidCredentialsException;
 import ar.edu.utn.frc.siga.auth.exception.LoginRateLimitExceededException;
-import ar.edu.utn.frc.siga.auth.model.Role;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import ar.edu.utn.frc.siga.auth.security.JwtService;
@@ -92,8 +91,10 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private TokenResponse buildTokenResponse(User user, IssuedRefreshToken refreshToken) {
-        Set<Role> roles = user.getRoles();
-        String accessToken = jwtService.generateAccessToken(user.getEmail(), roles);
+        String accessToken = jwtService.generateAccessToken(user.getEmail());
+        Set<String> roleNames = user.getRoleAssignments().stream()
+                .map(assignment -> assignment.getRole().getName())
+                .collect(Collectors.toSet());
 
         return TokenResponse.builder()
                 .accessToken(accessToken)
@@ -101,7 +102,7 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(refreshToken.rawToken())
                 .refreshExpiresInSeconds(refreshToken.expiresInSeconds())
                 .email(user.getEmail())
-                .roles(roles.stream().map(Enum::name).collect(Collectors.toSet()))
+                .roles(roleNames)
                 .build();
     }
 }

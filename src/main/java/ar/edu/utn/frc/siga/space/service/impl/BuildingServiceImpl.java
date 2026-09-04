@@ -1,6 +1,11 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
+import ar.edu.utn.frc.siga.common.security.BuildingScope;
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
+import ar.edu.utn.frc.siga.common.security.BuildingScopedSpecifications;
+import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.dto.request.BuildingActiveBatchItemDto;
@@ -18,6 +23,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,11 +38,16 @@ public class BuildingServiceImpl implements BuildingService {
 
     private final BuildingRepository buildingRepository;
     private final BuildingMapper buildingMapper;
+    private final BuildingScopeResolver buildingScopeResolver;
 
     @Override
     public List<BuildingResponseDto> findAll(boolean includeDeactivated) {
         log.debug("Listando edificios: includeDeactivated={}", includeDeactivated);
-        return (includeDeactivated ? buildingRepository.findAll() : buildingRepository.findAllActive()).stream()
+        BuildingScope scope = buildingScopeResolver.scopeFor(Permission.BUILDING_READ);
+        Specification<Building> spec = includeDeactivated
+                ? BuildingScopedSpecifications.withinScope(scope, "id")
+                : SoftDeleteSpecifications.<Building>active().and(BuildingScopedSpecifications.withinScope(scope, "id"));
+        return buildingRepository.findAll(spec).stream()
                 .map(buildingMapper::toDto)
                 .toList();
     }

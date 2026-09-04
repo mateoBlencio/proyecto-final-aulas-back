@@ -1,6 +1,9 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.security.BuildingScope;
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
+import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.SpaceTestData;
 import ar.edu.utn.frc.siga.space.dto.request.BuildingActiveBatchItemDto;
@@ -16,13 +19,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -35,12 +41,15 @@ class BuildingServiceImplTest {
     private BuildingRepository buildingRepository;
     @Mock
     private BuildingMapper buildingMapper;
+    @Mock
+    private BuildingScopeResolver buildingScopeResolver;
 
     private BuildingServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new BuildingServiceImpl(buildingRepository, buildingMapper);
+        service = new BuildingServiceImpl(buildingRepository, buildingMapper, buildingScopeResolver);
+        lenient().when(buildingScopeResolver.scopeFor(Permission.BUILDING_READ)).thenReturn(BuildingScope.unrestricted());
     }
 
     @Test
@@ -48,7 +57,7 @@ class BuildingServiceImplTest {
     void findAllReturnsOnlyActiveBuildingsMapped() {
         Building active = SpaceTestData.building().id(1L).build();
         BuildingResponseDto dto = new BuildingResponseDto(1L, "Edificio Central", true);
-        when(buildingRepository.findAllActive()).thenReturn(List.of(active));
+        when(buildingRepository.findAll(any(Specification.class))).thenReturn(List.of(active));
         when(buildingMapper.toDto(active)).thenReturn(dto);
 
         List<BuildingResponseDto> result = service.findAll(false);
@@ -63,13 +72,24 @@ class BuildingServiceImplTest {
         Building inactive = SpaceTestData.deactivated(SpaceTestData.building().id(2L).build());
         BuildingResponseDto activeDto = new BuildingResponseDto(1L, "Edificio Central", true);
         BuildingResponseDto inactiveDto = new BuildingResponseDto(2L, "Edificio Anexo", false);
-        when(buildingRepository.findAll()).thenReturn(List.of(active, inactive));
+        when(buildingRepository.findAll(any(Specification.class))).thenReturn(List.of(active, inactive));
         when(buildingMapper.toDto(active)).thenReturn(activeDto);
         when(buildingMapper.toDto(inactive)).thenReturn(inactiveDto);
 
         List<BuildingResponseDto> result = service.findAll(true);
 
         assertThat(result).containsExactly(activeDto, inactiveDto);
+    }
+
+    @Test
+    @DisplayName("findAll: resuelve el alcance de BUILDING_READ para acotar el listado")
+    void findAllConsultsBuildingReadScope() {
+        when(buildingScopeResolver.scopeFor(Permission.BUILDING_READ)).thenReturn(BuildingScope.of(Set.of(5L)));
+        when(buildingRepository.findAll(any(Specification.class))).thenReturn(List.of());
+
+        service.findAll(false);
+
+        verify(buildingScopeResolver).scopeFor(Permission.BUILDING_READ);
     }
 
     @Test

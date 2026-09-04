@@ -1,24 +1,22 @@
 package ar.edu.utn.frc.siga.auth.model;
 
-import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.EnumType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.envers.Audited;
+import org.hibernate.envers.NotAudited;
 
 @Entity
 @Audited
@@ -45,10 +43,15 @@ public class User {
     @Column(name = "habilitado", nullable = false)
     private Boolean enabled = true;
 
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "usuario_rol", joinColumns = @JoinColumn(name = "id_usuario"))
-    @Enumerated(EnumType.STRING)
-    @Column(name = "rol", nullable = false)
-    private Set<Role> roles;
+    @Column(name = "nombre", nullable = false, length = 100)
+    private String firstName;
+
+    @Column(name = "apellido", nullable = false, length = 100)
+    private String lastName;
+
+    @Builder.Default
+    @NotAudited
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    private List<RoleAssignment> roleAssignments = new ArrayList<>();
 
 }

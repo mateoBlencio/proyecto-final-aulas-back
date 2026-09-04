@@ -21,7 +21,7 @@ escucha vía `@ApplicationModuleListener` para desasignar automáticamente.
 | Módulo | Depende de | Responsabilidad |
 |---|---|---|
 | `common` | (OPEN) | Manejo de errores centralizado, resultado uniforme "buscar o crear", auditoría (Envers), config de mapeo/CORS/API |
-| `auth` | `common` | Autenticación (JWT), usuarios, rate limiting de login |
+| `auth` | `common`, `space::api` | Autenticación (JWT), usuarios, RBAC (roles, permisos, asignaciones con alcance por edificio), rate limiting de login |
 | `space` | `common` | Aulas, edificios, tipos de aula |
 | `academic` | `common` | Especialidades, planes, materias, períodos académicos, comisiones |
 | `settings` | `common` | Store de configuración en runtime (pesos del optimizer, ventanas horarias, TTLs de preview), con validación y defaults declarados en `application.yaml` |

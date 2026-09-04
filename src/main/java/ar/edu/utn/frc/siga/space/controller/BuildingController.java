@@ -27,7 +27,7 @@ import java.util.List;
 @RequestMapping("${siga.api.base-path}/buildings")
 @RequiredArgsConstructor
 @Tag(name = "Edificios", description = "Consulta de edificios disponibles")
-@PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+@PreAuthorize("hasAuthority('PERM_BUILDING_READ')")
 public class BuildingController {
 
     private final BuildingService buildingService;
@@ -46,7 +46,7 @@ public class BuildingController {
     }
 
     @PutMapping("/{id}/activation")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_BUILDING_ACTIVATE')")
     @Operation(summary = "Activar edificio",
                description = "Reactiva un edificio previamente desactivado (idempotente). "
                        + "204 si queda activo; 404 si el edificio no existe.")
@@ -58,7 +58,7 @@ public class BuildingController {
     }
 
     @DeleteMapping("/{id}/activation")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_BUILDING_ACTIVATE')")
     @Operation(summary = "Desactivar edificio",
                description = "Soft-delete idempotente. Pensado para ocultar edificios que sincroniza SysAcad "
                        + "pero que la facultad no usa. 204 si queda inactivo; 404 si el edificio no existe.")
@@ -70,7 +70,7 @@ public class BuildingController {
     }
 
     @PatchMapping("/activation")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_BUILDING_ACTIVATE')")
     @Operation(summary = "Activar/desactivar edificios en lote",
                description = "Aplica el cambio de estado activo a varios edificios en una única transacción: si "
                        + "alguno falla (ej. 404), no se aplica ninguno. Pensado para desactivar de una los "

@@ -39,7 +39,7 @@ public class ClassroomController {
     private final ClassroomService classroomService;
 
     @PostMapping
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_CLASSROOM_CREATE')")
     @Operation(summary = "Crear aula",
                description = "400 si el roomNumber ya existe en el edificio o si la capacidad no es positiva. "
                        + "404 si el edificio o el tipo de aula no existen.")
@@ -51,7 +51,7 @@ public class ClassroomController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @PreAuthorize("hasAuthority('PERM_CLASSROOM_READ')")
     @Operation(summary = "Buscar aula por id", description = "404 si el aula no existe.")
     public ResponseEntity<ClassroomResponseDto> findById(@PathVariable Long id) {
         log.debug("GET /v1/classrooms/{}", id);
@@ -59,7 +59,7 @@ public class ClassroomController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @PreAuthorize("hasAuthority('PERM_CLASSROOM_READ')")
     @Operation(summary = "Listar aulas", description = "Listado paginado con filtros opcionales por número, "
             + "edificio, tipo y capacidad. Por defecto solo devuelve las aulas activas; con "
             + "includeDeactivated=true incluye también las desactivadas.")
@@ -82,7 +82,7 @@ public class ClassroomController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_CLASSROOM_UPDATE')")
     @Operation(summary = "Actualizar aula",
                description = "404 si el aula, el edificio o el tipo de aula no existen. 400 si la capacidad no "
                        + "es positiva.")
@@ -95,7 +95,7 @@ public class ClassroomController {
     }
 
     @PutMapping("/{id}/details")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_CLASSROOM_UPDATE')")
     @Operation(summary = "Actualizar campos locales del aula",
                description = "Actualiza tipo de aula, observaciones, recursos y política de permitido. No toca "
                        + "número, edificio ni capacidad (SysAcad-owned). 404 si el aula o el tipo no existen; "
@@ -109,7 +109,7 @@ public class ClassroomController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_CLASSROOM_DELETE')")
     @Operation(summary = "Eliminar aula", description = "Soft-delete. 404 si el aula no existe.")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.debug("DELETE /v1/classrooms/{}", id);
@@ -119,7 +119,7 @@ public class ClassroomController {
     }
 
     @PutMapping("/{id}/activation")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_CLASSROOM_ACTIVATE')")
     @Operation(summary = "Activar aula",
                description = "Reactiva un aula previamente desactivada (idempotente). "
                        + "204 si queda activa; 404 si el aula no existe.")
@@ -131,7 +131,7 @@ public class ClassroomController {
     }
 
     @DeleteMapping("/{id}/activation")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_CLASSROOM_ACTIVATE')")
     @Operation(summary = "Desactivar aula",
                description = "Soft-delete idempotente. 204 si queda inactiva; 404 si el aula no existe.")
     public ResponseEntity<Void> deactivate(@PathVariable Long id) {

@@ -24,7 +24,7 @@ import java.util.List;
 @RequestMapping("${siga.api.base-path}/subject-commissions")
 @RequiredArgsConstructor
 @Tag(name = "Materia-Comisión", description = "Consulta de materias dictadas por comisión")
-@PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+@PreAuthorize("hasAuthority('PERM_ACADEMIC_READ')")
 public class SubjectCommissionController {
 
     private final SubjectCommissionService subjectCommissionService;
@@ -46,7 +46,7 @@ public class SubjectCommissionController {
     }
 
     @PutMapping("/{subjectId}/{commissionId}/activation")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ACADEMIC_ACTIVATE')")
     @Operation(summary = "Activar materia-comisión",
                description = "Reactiva un vínculo materia-comisión previamente desactivado (idempotente). "
                        + "204 si queda activo; 404 si el vínculo no existe.")
@@ -58,7 +58,7 @@ public class SubjectCommissionController {
     }
 
     @DeleteMapping("/{subjectId}/{commissionId}/activation")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ACADEMIC_ACTIVATE')")
     @Operation(summary = "Desactivar materia-comisión",
                description = "Soft-delete idempotente. 204 si queda inactivo; 404 si el vínculo no existe.")
     public ResponseEntity<Void> deactivate(@PathVariable Long subjectId, @PathVariable Long commissionId) {

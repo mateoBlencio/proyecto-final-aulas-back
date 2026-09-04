@@ -23,7 +23,7 @@ import java.util.List;
 @RequestMapping("${siga.api.base-path}/academic-periods")
 @RequiredArgsConstructor
 @Tag(name = "Períodos académicos", description = "Consulta de períodos académicos")
-@PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+@PreAuthorize("hasAuthority('PERM_ACADEMIC_READ')")
 public class AcademicPeriodController {
 
     private final AcademicPeriodService academicPeriodService;
@@ -46,7 +46,7 @@ public class AcademicPeriodController {
     }
 
     @PutMapping("/{id}/activation")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ACADEMIC_ACTIVATE')")
     @Operation(summary = "Activar período académico",
                description = "Reactiva un período académico previamente desactivado (idempotente). "
                        + "204 si queda activo; 404 si el período no existe.")
@@ -58,7 +58,7 @@ public class AcademicPeriodController {
     }
 
     @DeleteMapping("/{id}/activation")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ACADEMIC_ACTIVATE')")
     @Operation(summary = "Desactivar período académico",
                description = "Soft-delete idempotente. 204 si queda inactivo; 404 si el período no existe.")
     public ResponseEntity<Void> deactivate(@PathVariable Long id) {

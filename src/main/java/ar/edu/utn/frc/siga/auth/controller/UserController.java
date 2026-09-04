@@ -1,10 +1,12 @@
 package ar.edu.utn.frc.siga.auth.controller;
 
+import ar.edu.utn.frc.siga.auth.dto.request.AssignRoleRequestDto;
 import ar.edu.utn.frc.siga.auth.dto.request.CreateUserRequestDto;
 import ar.edu.utn.frc.siga.auth.dto.request.UpdateUserEnabledRequestDto;
-import ar.edu.utn.frc.siga.auth.dto.request.UpdateUserRoleRequestDto;
+import ar.edu.utn.frc.siga.auth.dto.response.RoleAssignmentDto;
 import ar.edu.utn.frc.siga.auth.dto.response.UserResponseDto;
 import ar.edu.utn.frc.siga.auth.security.SecurityUser;
+import ar.edu.utn.frc.siga.auth.service.RoleAssignmentService;
 import ar.edu.utn.frc.siga.auth.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,18 +35,20 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final UserService userService;
+    private final RoleAssignmentService roleAssignmentService;
 
     @PostMapping
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
-    public ResponseEntity<UserResponseDto> create(@Valid @RequestBody CreateUserRequestDto dto) {
+    @PreAuthorize("hasAuthority('PERM_USER_MANAGE')")
+    public ResponseEntity<UserResponseDto> create(@Valid @RequestBody CreateUserRequestDto dto,
+                                                   @AuthenticationPrincipal SecurityUser principal) {
         log.debug("POST /v1/users: email={}", dto.email());
-        UserResponseDto response = userService.create(dto);
+        UserResponseDto response = userService.create(dto, principal.getEmail());
         log.info("Usuario creado vía controller: id={}", response.id());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PatchMapping("/{id}/enabled")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_USER_MANAGE')")
     public ResponseEntity<UserResponseDto> setEnabled(@PathVariable Long id,
                                                       @Valid @RequestBody UpdateUserEnabledRequestDto dto) {
         log.debug("PATCH /v1/users/{}/enabled: enabled={}", id, dto.enabled());
@@ -52,19 +57,8 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
-    @PatchMapping("/{id}/role")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
-    public ResponseEntity<UserResponseDto> changeRole(@PathVariable Long id,
-                                                      @Valid @RequestBody UpdateUserRoleRequestDto dto,
-                                                      @AuthenticationPrincipal SecurityUser principal) {
-        log.debug("PATCH /v1/users/{}/role: rol={}", id, dto.rol());
-        UserResponseDto response = userService.changeRole(id, dto.rol(), principal.getEmail());
-        log.info("Rol de usuario actualizado vía controller: id={}, rol={}", response.id(), dto.rol());
-        return ResponseEntity.ok(response);
-    }
-
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @PreAuthorize("hasAuthority('PERM_USER_READ')")
     public ResponseEntity<Page<UserResponseDto>> findEnabled(
             @PageableDefault(size = 15, sort = "id", direction = Sort.Direction.ASC) Pageable pageable) {
         log.debug("GET /v1/users: page={}", pageable.getPageNumber());
@@ -74,12 +68,33 @@ public class UserController {
     }
 
     @GetMapping("/disabled")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_USER_MANAGE')")
     public ResponseEntity<Page<UserResponseDto>> findDisabled(
             @PageableDefault(size = 15, sort = "id", direction = Sort.Direction.ASC) Pageable pageable) {
         log.debug("GET /v1/users/disabled: page={}", pageable.getPageNumber());
         Page<UserResponseDto> page = userService.findDisabled(pageable);
         log.info("Usuarios inhabilitados listados: total={}", page.getTotalElements());
         return ResponseEntity.ok(page);
+    }
+
+    @PostMapping("/{id}/role-assignments")
+    @PreAuthorize("hasAuthority('PERM_ROLE_ASSIGN')")
+    public ResponseEntity<RoleAssignmentDto> assignRole(@PathVariable Long id,
+                                                         @Valid @RequestBody AssignRoleRequestDto dto,
+                                                         @AuthenticationPrincipal SecurityUser principal) {
+        log.debug("POST /v1/users/{}/role-assignments: roleId={}", id, dto.roleId());
+        RoleAssignmentDto response = roleAssignmentService.assign(id, dto, principal.getEmail());
+        log.info("Rol asignado vía controller: userId={}, assignmentId={}", id, response.id());
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @DeleteMapping("/{id}/role-assignments/{assignmentId}")
+    @PreAuthorize("hasAuthority('PERM_ROLE_ASSIGN')")
+    public ResponseEntity<Void> revokeRole(@PathVariable Long id, @PathVariable Long assignmentId,
+                                           @AuthenticationPrincipal SecurityUser principal) {
+        log.debug("DELETE /v1/users/{}/role-assignments/{}", id, assignmentId);
+        roleAssignmentService.revoke(id, assignmentId, principal.getEmail());
+        log.info("Asignación revocada vía controller: userId={}, assignmentId={}", id, assignmentId);
+        return ResponseEntity.noContent().build();
     }
 }
