@@ -9,14 +9,7 @@ public record ViewQuery(
         Integer limit
 ) {
 
-    private static final String ASCENDING = "asc";
-    private static final String DESCENDING = "desc";
-
-    public static ViewQuery ascendingBy(String sort, Integer limit) {
-        return new ViewQuery(Map.of(), sort, ASCENDING, limit);
-    }
-
-    public static ViewQuery descendingBy(String sort, Integer limit) {
-        return new ViewQuery(Map.of(), sort, DESCENDING, limit);
+    public static ViewQuery none() {
+        return new ViewQuery(Map.of(), null, null, null);
     }
 }
