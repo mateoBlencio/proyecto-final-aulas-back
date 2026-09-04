@@ -73,16 +73,16 @@ final class SysacadCommissionResolver {
             log.warn("HorarioCuatrimestre nulo para curso={} materia={}: fila salteada", courseCode, subjectCode);
             return List.of();
         }
-        return switch (semester) {
-            case 0 -> List.of(TermType.PRIMER_CUATRIMESTRE, TermType.SEGUNDO_CUATRIMESTRE);
-            case 1 -> List.of(TermType.PRIMER_CUATRIMESTRE);
-            case 2 -> List.of(TermType.SEGUNDO_CUATRIMESTRE);
-            default -> {
-                log.warn("HorarioCuatrimestre fuera de rango (0,1,2) para curso={} materia={}: {}",
-                        courseCode, subjectCode, semester);
-                yield List.of();
-            }
-        };
+        if (semester == 0) {
+            return List.of(TermType.PRIMER_CUATRIMESTRE, TermType.SEGUNDO_CUATRIMESTRE);
+        }
+        return TermType.fromSemester(semester)
+                .map(List::of)
+                .orElseGet(() -> {
+                    log.warn("HorarioCuatrimestre fuera de rango (0,1,2) para curso={} materia={}: {}",
+                            courseCode, subjectCode, semester);
+                    return List.of();
+                });
     }
 
     record LinkKey(Long commissionId, Integer subjectCode) {

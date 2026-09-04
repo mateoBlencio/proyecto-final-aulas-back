@@ -61,23 +61,6 @@ public class SysacadClient {
         }
     }
 
-    /**
-     * TEMPORAL — workaround al tope {@code maxRows} por vista de SysAcad (200 en la mayoría) hasta tener
-     * paginación real. Trae el tope en orden ascendente y descendente por {@code sortColumn} y une ambas
-     * deduplicando (por {@code equals} del record de fila), consiguiendo ~2x cobertura: los dos extremos
-     * del orden. NO garantiza traer todo si la vista tiene más de {@code 2*maxRows} filas — un hueco en el
-     * medio sigue perdiéndose. Quitar y reemplazar por paginación cuando exista (pendiente, junto con la
-     * vista real de Materias). No usar como solución definitiva.
-     */
-    public <T> List<T> fetchRowsSpanning(String view, String sortColumn, Integer limit,
-                                         ParameterizedTypeReference<ViewResponse<T>> responseType) {
-        List<T> ascending = fetchRows(view, ViewQuery.ascendingBy(sortColumn, limit), responseType);
-        List<T> descending = fetchRows(view, ViewQuery.descendingBy(sortColumn, limit), responseType);
-        java.util.LinkedHashSet<T> merged = new java.util.LinkedHashSet<>(ascending);
-        merged.addAll(descending);
-        return new java.util.ArrayList<>(merged);
-    }
-
     static boolean isRetryable(HttpStatusCode status) {
         return status.value() == HttpStatus.TOO_MANY_REQUESTS.value() || status.is5xxServerError();
     }

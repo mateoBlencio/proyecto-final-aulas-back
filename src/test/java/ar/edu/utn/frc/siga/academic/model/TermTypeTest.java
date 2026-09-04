@@ -41,6 +41,27 @@ class TermTypeTest {
     }
 
     @Test
+    @DisplayName("fromSemester resuelve 0/1/2 a ANUAL/1er/2do cuatrimestre")
+    void fromSemesterResolvesKnownValues() {
+        assertThat(TermType.fromSemester(0)).contains(TermType.ANUAL);
+        assertThat(TermType.fromSemester(1)).contains(TermType.PRIMER_CUATRIMESTRE);
+        assertThat(TermType.fromSemester(2)).contains(TermType.SEGUNDO_CUATRIMESTRE);
+    }
+
+    @Test
+    @DisplayName("fromSemester(null) devuelve Optional vacío")
+    void fromSemesterWithNullReturnsEmpty() {
+        assertThat(TermType.fromSemester(null)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("fromSemester fuera de rango (0,1,2) devuelve Optional vacío")
+    void fromSemesterOutOfRangeReturnsEmpty() {
+        assertThat(TermType.fromSemester(3)).isEmpty();
+        assertThat(TermType.fromSemester(-1)).isEmpty();
+    }
+
+    @Test
     @DisplayName("fromLabel resuelve por match exacto de etiqueta")
     void fromLabelResolvesExactMatch() {
         assertThat(TermType.fromLabel("Anual")).contains(TermType.ANUAL);

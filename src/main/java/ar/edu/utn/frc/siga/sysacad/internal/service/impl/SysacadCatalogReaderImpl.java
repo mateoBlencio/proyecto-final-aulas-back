@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.sysacad.internal.service.impl;
 
 import ar.edu.utn.frc.siga.sysacad.internal.mapper.SysacadCatalogMapper;
 
+import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadAcademicEventDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadAllocationDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadBuildingDto;
@@ -11,23 +12,27 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadCommissionDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSpecialtyDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectCommissionDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectDto;
-import ar.edu.utn.frc.siga.sysacad.internal.client.view.AcademicEventMockViewFetcher;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSchedule;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSubject;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.BuildingViewFetcher;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.ClassroomViewFetcher;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.CommissionViewFetcher;
-import ar.edu.utn.frc.siga.sysacad.internal.client.view.ScheduleMockViewFetcher;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.ScheduleViewFetcher;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.SpecialtyViewFetcher;
-import ar.edu.utn.frc.siga.sysacad.internal.client.view.SubjectCommissionMockViewFetcher;
-import ar.edu.utn.frc.siga.sysacad.internal.client.view.SubjectMockViewFetcher;
+import ar.edu.utn.frc.siga.sysacad.internal.client.view.SubjectViewFetcher;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
+import java.util.Set;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "siga.sysacad", name = "enabled", havingValue = "true")
@@ -38,10 +43,7 @@ public class SysacadCatalogReaderImpl implements SysacadCatalogReader {
     private final SpecialtyViewFetcher specialtyViewFetcher;
     private final CommissionViewFetcher commissionViewFetcher;
     private final ScheduleViewFetcher scheduleViewFetcher;
-    private final Optional<SubjectMockViewFetcher> subjectMockViewFetcher;
-    private final Optional<SubjectCommissionMockViewFetcher> subjectCommissionMockViewFetcher;
-    private final Optional<AcademicEventMockViewFetcher> academicEventMockViewFetcher;
-    private final Optional<ScheduleMockViewFetcher> scheduleMockViewFetcher;
+    private final SubjectViewFetcher subjectViewFetcher;
     private final SysacadCatalogMapper mapper;
 
     @Override
@@ -61,16 +63,15 @@ public class SysacadCatalogReaderImpl implements SysacadCatalogReader {
 
     @Override
     public List<SysacadSubjectDto> findSubjects() {
-        return subjectMockViewFetcher
-                .map(fetcher -> fetcher.fetch().stream().map(mapper::toSubject).toList())
-                .orElseGet(List::of);
+        Map<SubjectNaturalKey, Set<Integer>> semestersByKey = groupSemesters(scheduleViewFetcher.fetch());
+        return subjectViewFetcher.fetch().stream()
+                .map(raw -> mapper.toSubject(raw, resolveTerm(semestersByKey, raw)))
+                .toList();
     }
 
     @Override
     public List<SysacadSubjectCommissionDto> findSubjectCommissions() {
-        return subjectCommissionMockViewFetcher
-                .map(fetcher -> fetcher.fetch().stream().map(mapper::toSubjectCommission).toList())
-                .orElseGet(List::of);
+        return scheduleViewFetcher.fetch().stream().map(mapper::toSubjectCommission).toList();
     }
 
     @Override
@@ -80,24 +81,44 @@ public class SysacadCatalogReaderImpl implements SysacadCatalogReader {
 
     @Override
     public List<SysacadAcademicEventDto> findAcademicEvents() {
-        return academicEventMockViewFetcher
-                .map(fetcher -> fetcher.fetch().stream()
-                        .map(mapper::toAcademicEvent)
-                        .filter(Objects::nonNull)
-                        .toList())
-                .orElseGet(List::of);
+        return scheduleViewFetcher.fetch().stream()
+                .map(mapper::toAcademicEvent)
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     @Override
     public List<SysacadAllocationDto> findAllocations() {
-        // TEMPORAL: si está el mock de asignaciones, se usa en lugar de la vista real (mismo tipo de fila).
-        // Apagar siga.sysacad.asignaciones-mock-enabled para volver a HorariosComisionesCupos.
-        List<ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSchedule> rows = scheduleMockViewFetcher
-                .map(ScheduleMockViewFetcher::fetch)
-                .orElseGet(scheduleViewFetcher::fetch);
+        List<RawSchedule> rows = scheduleViewFetcher.fetch();
         return rows.stream()
                 .map(mapper::toAllocation)
                 .filter(Objects::nonNull)
                 .toList();
+    }
+
+    private static Map<SubjectNaturalKey, Set<Integer>> groupSemesters(List<RawSchedule> schedule) {
+        Map<SubjectNaturalKey, Set<Integer>> semestersByKey = new HashMap<>();
+        for (RawSchedule row : schedule) {
+            SubjectNaturalKey key = new SubjectNaturalKey(row.especialidad(), row.plan(), row.materia());
+            semestersByKey.computeIfAbsent(key, k -> new HashSet<>()).add(row.horarioCuatrimestre());
+        }
+        return semestersByKey;
+    }
+
+    private String resolveTerm(Map<SubjectNaturalKey, Set<Integer>> semestersByKey, RawSubject raw) {
+        SubjectNaturalKey key = new SubjectNaturalKey(raw.especialid(), raw.plan(), raw.materia());
+        Set<Integer> semesters = semestersByKey.getOrDefault(key, Set.of());
+        if (semesters.isEmpty()) {
+            return null;
+        }
+        if (semesters.size() == 1) {
+            return TermType.fromSemester(semesters.iterator().next()).map(TermType::getLabel).orElse(null);
+        }
+        log.warn("HorarioCuatrimestre en conflicto para especialidad={} plan={} materia={}: {}",
+                raw.especialid(), raw.plan(), raw.materia(), semesters);
+        return null;
+    }
+
+    private record SubjectNaturalKey(Integer especialidad, Integer plan, Integer materia) {
     }
 }

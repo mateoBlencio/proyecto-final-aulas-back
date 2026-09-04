@@ -8,14 +8,12 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadCommissionDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSpecialtyDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectCommissionDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectDto;
-import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawAcademicEventMock;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawBuilding;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawClassroom;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawCommission;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSpecialty;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSubject;
-import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSubjectCommission;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalTime;
@@ -62,28 +60,23 @@ public class SysacadCatalogMapper {
                 raw.comision());
     }
 
-    public SysacadSubjectDto toSubject(RawSubject raw) {
+    public SysacadSubjectDto toSubject(RawSubject raw, String term) {
         return new SysacadSubjectDto(
                 raw.especialid(),
                 raw.plan(),
                 raw.materia(),
                 trim(raw.materiaNombre()),
-                trim(raw.materiaDictado()));
+                term);
     }
 
-    public SysacadSubjectCommissionDto toSubjectCommission(RawSubjectCommission raw) {
+    public SysacadSubjectCommissionDto toSubjectCommission(RawSchedule raw) {
         return new SysacadSubjectCommissionDto(
                 trim(raw.curso()),
                 raw.materia(),
                 raw.inscriptos());
     }
 
-    /**
-     * Ocurrencia semanal de clase (mock), sin aula. WARN + descarta la fila (devuelve {@code null}) si
-     * {@code Dia} no es un día ISO-8601 válido (1..7) o si {@code HoraComienzo} no se puede parsear — no
-     * hay forma de armar la clave natural de la fila sin esos dos campos (plan §2).
-     */
-    public SysacadAcademicEventDto toAcademicEvent(RawAcademicEventMock raw) {
+    public SysacadAcademicEventDto toAcademicEvent(RawSchedule raw) {
         String curso = trim(raw.curso());
         DayOfWeek dayOfWeek = parseDayOfWeek(raw.dia(), curso, raw.materia());
         if (dayOfWeek == null) {
@@ -102,12 +95,6 @@ public class SysacadCatalogMapper {
                 raw.horarioCuatrimestre());
     }
 
-    /**
-     * Ocurrencia semanal de clase con aula (vista real). Mismo criterio de descarte que
-     * {@link #toAcademicEvent(RawAcademicEventMock)} para {@code Dia}/{@code HoraComienzo}; además
-     * loguea WARN si {@code DURACION} no coincide con {@code HoraFin - HoraComienzo} — no se recalcula,
-     * se usa {@code DURACION} tal cual (plan §2), la fila igual se emite.
-     */
     public SysacadAllocationDto toAllocation(RawSchedule raw) {
         String curso = trim(raw.curso());
         DayOfWeek dayOfWeek = parseDayOfWeek(raw.dia(), curso, raw.materia());

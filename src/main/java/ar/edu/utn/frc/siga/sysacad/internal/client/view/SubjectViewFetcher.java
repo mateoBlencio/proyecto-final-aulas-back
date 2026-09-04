@@ -2,7 +2,7 @@ package ar.edu.utn.frc.siga.sysacad.internal.client.view;
 
 import ar.edu.utn.frc.siga.sysacad.internal.client.SysacadClient;
 import ar.edu.utn.frc.siga.sysacad.internal.client.ViewQuery;
-import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawClassroom;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSubject;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.ViewResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -14,15 +14,15 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "siga.sysacad", name = "enabled", havingValue = "true")
-public class ClassroomViewFetcher {
+public class SubjectViewFetcher {
 
-    private static final String VIEW = "Aulas";
-    private static final ParameterizedTypeReference<ViewResponse<RawClassroom>> RESPONSE_TYPE =
+    private static final String VIEW = "Materias";
+    private static final ParameterizedTypeReference<ViewResponse<RawSubject>> RESPONSE_TYPE =
             new ParameterizedTypeReference<>() {};
 
     private final SysacadClient client;
 
-    public List<RawClassroom> fetch() {
+    public List<RawSubject> fetch() {
         return client.fetchRows(VIEW, ViewQuery.none(), RESPONSE_TYPE);
     }
 }

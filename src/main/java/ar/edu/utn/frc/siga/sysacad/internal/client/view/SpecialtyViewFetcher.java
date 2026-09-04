@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.sysacad.internal.client.view;
 
 import ar.edu.utn.frc.siga.sysacad.internal.client.SysacadClient;
+import ar.edu.utn.frc.siga.sysacad.internal.client.ViewQuery;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSpecialty;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.ViewResponse;
 import lombok.RequiredArgsConstructor;
@@ -16,14 +17,12 @@ import java.util.List;
 public class SpecialtyViewFetcher {
 
     private static final String VIEW = "Especialidades";
-    private static final String SORT_COLUMN = "especialid";
-    private static final int MAX_ROWS = 300;
     private static final ParameterizedTypeReference<ViewResponse<RawSpecialty>> RESPONSE_TYPE =
             new ParameterizedTypeReference<>() {};
 
     private final SysacadClient client;
 
     public List<RawSpecialty> fetch() {
-        return client.fetchRowsSpanning(VIEW, SORT_COLUMN, MAX_ROWS, RESPONSE_TYPE);
+        return client.fetchRows(VIEW, ViewQuery.none(), RESPONSE_TYPE);
     }
 }
