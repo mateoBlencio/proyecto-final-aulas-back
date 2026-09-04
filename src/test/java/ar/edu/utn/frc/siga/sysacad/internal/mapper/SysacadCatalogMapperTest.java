@@ -74,12 +74,21 @@ class SysacadCatalogMapperTest {
     }
 
     @Test
-    @DisplayName("toSubject: recorta el nombre y el dictado de la materia; no propaga el nombre de especialidad")
+    @DisplayName("toSubject: recorta el nombre de la materia y propaga el term recibido")
     void recortaNombreDeMateria() {
         SysacadSubjectDto subject = mapper.toSubject(
-                new RawSubject(17, 94, 519, "Análisis Matemático I   ", "C   ", "Ingeniería Mecánica"));
+                new RawSubject(17, 94, 519, "Análisis Matemático I   "), "1 Cuat.");
 
-        assertThat(subject).isEqualTo(new SysacadSubjectDto(17, 94, 519, "Análisis Matemático I", "C"));
+        assertThat(subject).isEqualTo(new SysacadSubjectDto(17, 94, 519, "Análisis Matemático I", "1 Cuat."));
+    }
+
+    @Test
+    @DisplayName("toSubject: propaga term null tal cual")
+    void propagaTermNulo() {
+        SysacadSubjectDto subject = mapper.toSubject(
+                new RawSubject(17, 94, 519, "Análisis Matemático I"), null);
+
+        assertThat(subject.term()).isNull();
     }
 
     @Test
@@ -169,5 +178,39 @@ class SysacadCatalogMapperTest {
         SysacadAllocationDto allocation = mapper.toAllocation(row);
 
         assertThat(allocation.durationMinutes()).isEqualTo(135);
+    }
+
+    @Test
+    @DisplayName("toAcademicEvent(RawSchedule): mapea Dia a DayOfWeek ISO, recorta el curso y parsea HoraComienzo")
+    void mapeaEventoAcademicoDesdeSchedule() {
+        SysacadAcademicEventDto event = mapper.toAcademicEvent(new RawSchedule(
+                "1H90SR", 90, 805, 15, "Edif. Ing.Possetto",
+                2, 0, "A", "A",
+                "10:30", "12:45", "10:30-12:45", 135,
+                5, "Ingeniería en Sistemas de Información", 2008, 115, "Sistemas de Representación", 30));
+
+        assertThat(event).isEqualTo(new SysacadAcademicEventDto(
+                "1H90SR", 115, DayOfWeek.TUESDAY, LocalTime.of(10, 30), 135, 0));
+    }
+
+    @Test
+    @DisplayName("toAcademicEvent(RawSchedule): Dia fuera de rango ISO-8601 (1..7) descarta la fila")
+    void descartaEventoDesdeScheduleConDiaFueraDeRango() {
+        RawSchedule row = new RawSchedule("1H90SR", 90, 805, 15, "Edif. X", 9, 0, "A", "A",
+                "10:30", "12:45", "10:30-12:45", 135, 5, "Especialidad", 2008, 115, "Materia", 30);
+
+        assertThat(mapper.toAcademicEvent(row)).isNull();
+    }
+
+    @Test
+    @DisplayName("toSubjectCommission(RawSchedule): recorta el curso y toma materia/inscriptos tal cual")
+    void mapeaSubjectCommissionDesdeSchedule() {
+        SysacadSubjectCommissionDto subjectCommission = mapper.toSubjectCommission(new RawSchedule(
+                "1H90SR", 90, 805, 15, "Edif. Ing.Possetto",
+                2, 0, "A", "A",
+                "10:30", "12:45", "10:30-12:45", 135,
+                5, "Ingeniería en Sistemas de Información", 2008, 115, "Sistemas de Representación", 30));
+
+        assertThat(subjectCommission).isEqualTo(new SysacadSubjectCommissionDto("1H90SR", 115, 30));
     }
 }

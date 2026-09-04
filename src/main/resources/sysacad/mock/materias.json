@@ -1,6 +1,6 @@
 [
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2008,
     "materia": 115,
     "MateriaNombre": "Sistemas de Representación",
@@ -8,7 +8,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2008,
     "materia": 121,
     "MateriaNombre": "Matemática Discreta",
@@ -16,7 +16,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2008,
     "materia": 123,
     "MateriaNombre": "Arquitectura de Computadoras",
@@ -24,7 +24,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2008,
     "materia": 124,
     "MateriaNombre": "Química",
@@ -32,7 +32,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2008,
     "materia": 125,
     "MateriaNombre": "Sistemas y Organizaciones",
@@ -40,7 +40,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2008,
     "materia": 228,
     "MateriaNombre": "Sintaxis y Semántica de los Lenguajes",
@@ -48,7 +48,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2008,
     "materia": 330,
     "MateriaNombre": "Comunicaciones y Redes",
@@ -56,7 +56,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2008,
     "materia": 331,
     "MateriaNombre": "Diseño de Sistemas",
@@ -64,7 +64,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 101,
     "MateriaNombre": "Análisis Matemático I",
@@ -72,7 +72,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 102,
     "MateriaNombre": "Álgebra y Geometría Analítica",
@@ -80,7 +80,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 103,
     "MateriaNombre": "Física I",
@@ -88,7 +88,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 104,
     "MateriaNombre": "Inglés I",
@@ -96,7 +96,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 105,
     "MateriaNombre": "Lógica y Estructuras Discretas",
@@ -104,7 +104,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 106,
     "MateriaNombre": "Algoritmos y Estructuras de Datos",
@@ -112,7 +112,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 107,
     "MateriaNombre": "Arquitectura de Computadoras",
@@ -120,7 +120,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 108,
     "MateriaNombre": "Sistemas y Procesos de Negocio",
@@ -128,7 +128,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 201,
     "MateriaNombre": "Análisis Matemático II",
@@ -136,7 +136,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 202,
     "MateriaNombre": "Física II",
@@ -144,7 +144,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 204,
     "MateriaNombre": "Inglés II",
@@ -152,7 +152,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 205,
     "MateriaNombre": "Sintaxis y Semántica de los Lenguajes",
@@ -160,7 +160,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 206,
     "MateriaNombre": "Paradigmas de Programación",
@@ -168,7 +168,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 207,
     "MateriaNombre": "Sistemas Operativos",
@@ -176,7 +176,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 208,
     "MateriaNombre": "Análisis de Sistemas de Información",
@@ -184,7 +184,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 301,
     "MateriaNombre": "Probabilidad y Estadística",
@@ -192,7 +192,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 302,
     "MateriaNombre": "Economía",
@@ -200,7 +200,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 303,
     "MateriaNombre": "Bases de Datos",
@@ -208,7 +208,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 304,
     "MateriaNombre": "Desarrollo de Software",
@@ -216,7 +216,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 305,
     "MateriaNombre": "Comunicación de Datos",
@@ -224,7 +224,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 306,
     "MateriaNombre": "Análisis Numérico",
@@ -232,7 +232,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 307,
     "MateriaNombre": "Diseño de Sistemas de Información",
@@ -240,7 +240,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 333,
     "MateriaNombre": "Backend de Aplicaciones (Elec.)",
@@ -248,7 +248,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 401,
     "MateriaNombre": "Legislación",
@@ -256,7 +256,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 402,
     "MateriaNombre": "Ingeniería y Calidad de Software",
@@ -264,7 +264,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 403,
     "MateriaNombre": "Redes de Datos",
@@ -272,7 +272,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 404,
     "MateriaNombre": "Investigación Operativa",
@@ -280,7 +280,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 405,
     "MateriaNombre": "Simulación",
@@ -288,7 +288,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 406,
     "MateriaNombre": "Tecnologías para la Automatización",
@@ -296,7 +296,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 407,
     "MateriaNombre": "Administración de Sistemas de Información",
@@ -304,7 +304,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 434,
     "MateriaNombre": "Gestión de la Mejora de Procesos (Elec.)",
@@ -312,7 +312,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 435,
     "MateriaNombre": "Gestión Industrial de la Producción (Elec.)",
@@ -320,7 +320,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 472,
     "MateriaNombre": "Experiencia e Interfaces de Usuario (Elec.)",
@@ -328,7 +328,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 501,
     "MateriaNombre": "Inteligencia Artificial",
@@ -336,7 +336,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 502,
     "MateriaNombre": "Ciencia de Datos",
@@ -344,7 +344,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 503,
     "MateriaNombre": "Sistemas de Gestión",
@@ -352,7 +352,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 504,
     "MateriaNombre": "Gestión Gerencial",
@@ -360,7 +360,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 505,
     "MateriaNombre": "Seguridad en los Sistemas de Información",
@@ -368,7 +368,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 506,
     "MateriaNombre": "Proyecto Final",
@@ -376,7 +376,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 551,
     "MateriaNombre": "Decisiones en Escenarios Complejos (Elec.)",
@@ -384,7 +384,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 552,
     "MateriaNombre": "Emprendimientos Tecnológicos (Elec.)",
@@ -392,7 +392,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 553,
     "MateriaNombre": "Gerenciamiento Estratégico (Elec.)",
@@ -400,7 +400,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 554,
     "MateriaNombre": "Green Software (Elec.)",
@@ -408,7 +408,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 555,
     "MateriaNombre": "Ingeniería de Software de Fuentes Abiertas/Libres (Elec.)",
@@ -416,7 +416,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 5,
+    "ESPECIALID": 5,
     "plan": 2023,
     "materia": 633,
     "MateriaNombre": "Creatividad y Desarrollo de Entornos Virtuales (Elec.)",
@@ -424,7 +424,7 @@
     "EspecialidadNombre": "Ingeniería en Sistemas de Información"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 95,
     "materia": 519,
     "MateriaNombre": "Avances en Metalurgia y Nuevos Materiales (Elec.)",
@@ -432,7 +432,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 101,
     "MateriaNombre": "Análisis Matemático I",
@@ -440,7 +440,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 102,
     "MateriaNombre": "Álgebra y Geometría Analítica",
@@ -448,7 +448,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 103,
     "MateriaNombre": "Ingeniería y Sociedad",
@@ -456,7 +456,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 104,
     "MateriaNombre": "Sistemas de Representación",
@@ -464,7 +464,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 105,
     "MateriaNombre": "Física I",
@@ -472,7 +472,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 106,
     "MateriaNombre": "Química General",
@@ -480,7 +480,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 107,
     "MateriaNombre": "Integración Eléctrica I",
@@ -488,7 +488,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 108,
     "MateriaNombre": "Fundamentos de Informática",
@@ -496,7 +496,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 201,
     "MateriaNombre": "Física II",
@@ -504,7 +504,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 202,
     "MateriaNombre": "Probabilidad y Estadística",
@@ -512,7 +512,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 203,
     "MateriaNombre": "Electrotecnia I",
@@ -520,7 +520,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 204,
     "MateriaNombre": "Estabilidad",
@@ -528,7 +528,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 205,
     "MateriaNombre": "Mecánica Técnica",
@@ -536,7 +536,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 206,
     "MateriaNombre": "Integración Eléctrica II",
@@ -544,7 +544,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 207,
     "MateriaNombre": "Inglés I",
@@ -552,7 +552,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 208,
     "MateriaNombre": "Cálculo Numérico",
@@ -560,7 +560,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 209,
     "MateriaNombre": "Análisis Matemático II",
@@ -568,7 +568,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 301,
     "MateriaNombre": "Tecnologías y Ensayos de Materiales Eléctricos",
@@ -576,7 +576,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 302,
     "MateriaNombre": "Instrumentos y Mediciones Eléctricas",
@@ -584,7 +584,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 303,
     "MateriaNombre": "Teoría de los Campos",
@@ -592,7 +592,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 304,
     "MateriaNombre": "Física III",
@@ -600,7 +600,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 305,
     "MateriaNombre": "Máquinas Eléctricas I",
@@ -608,7 +608,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 306,
     "MateriaNombre": "Electrotecnia II",
@@ -616,7 +616,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 307,
     "MateriaNombre": "Termodinámica",
@@ -624,7 +624,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 308,
     "MateriaNombre": "Fundamentos para el Análisis de Señales",
@@ -632,7 +632,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 309,
     "MateriaNombre": "Taller Interdisciplinario",
@@ -640,7 +640,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 401,
     "MateriaNombre": "Inglés II",
@@ -648,7 +648,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 402,
     "MateriaNombre": "Economía",
@@ -656,7 +656,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 403,
     "MateriaNombre": "Electrónica I",
@@ -664,7 +664,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 404,
     "MateriaNombre": "Máquinas Eléctricas II",
@@ -672,7 +672,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 405,
     "MateriaNombre": "Seguridad, Riesgo Eléctrico y Medio Ambiente",
@@ -680,7 +680,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 406,
     "MateriaNombre": "Instalaciones Eléctricas y Luminotecnia",
@@ -688,7 +688,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 407,
     "MateriaNombre": "Control Automático",
@@ -696,7 +696,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 408,
     "MateriaNombre": "Máquinas Térmicas, Hidráulicas y de Fluído",
@@ -704,7 +704,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 409,
     "MateriaNombre": "Legislación",
@@ -712,7 +712,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 501,
     "MateriaNombre": "Electrónica II",
@@ -720,7 +720,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 502,
     "MateriaNombre": "Generación, Transmisión y Distribución de la Energía Eléctrica",
@@ -728,7 +728,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 503,
     "MateriaNombre": "Sistemas de Potencia",
@@ -736,7 +736,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 504,
     "MateriaNombre": "Accionamientos y Controles Eléctricos",
@@ -744,7 +744,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 505,
     "MateriaNombre": "Organización y Administración de Empresas",
@@ -752,7 +752,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 506,
     "MateriaNombre": "Proyecto Final",
@@ -760,7 +760,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 512,
     "MateriaNombre": "Impacto Ambiental de Líneas y Centrales Eléctricas (Elec.)",
@@ -768,7 +768,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 523,
     "MateriaNombre": "Centrales y Protecciones Eléctricas (Elec.)",
@@ -776,7 +776,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 524,
     "MateriaNombre": "Elementos de Máquinas y Tecnología Mecánica (Elec.)",
@@ -784,7 +784,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 525,
     "MateriaNombre": "Fuentes No Convencionales de Energía (Elec.)",
@@ -792,7 +792,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 526,
     "MateriaNombre": "Legislación Laboral (Elec.)",
@@ -800,7 +800,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 527,
     "MateriaNombre": "Transmisión de Datos en Sistemas Eléctricos (Elec.)",
@@ -808,7 +808,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 7,
+    "ESPECIALID": 7,
     "plan": 2023,
     "materia": 568,
     "MateriaNombre": "Transporte Eléctrico (Elec.)",
@@ -816,7 +816,7 @@
     "EspecialidadNombre": "Ingeniería Eléctrica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 95,
     "materia": 519,
     "MateriaNombre": "Avances en Metalurgia y Nuevos Materiales (Elec.)",
@@ -824,7 +824,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 101,
     "MateriaNombre": "Informática I",
@@ -832,7 +832,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 102,
     "MateriaNombre": "Álgebra y Geometría Analítica",
@@ -840,7 +840,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 103,
     "MateriaNombre": "Análisis Matemático I",
@@ -848,7 +848,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 104,
     "MateriaNombre": "Ingeniería y Sociedad",
@@ -856,7 +856,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 105,
     "MateriaNombre": "Análisis Matemático II",
@@ -864,7 +864,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 106,
     "MateriaNombre": "Física I",
@@ -872,7 +872,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 107,
     "MateriaNombre": "Diseño Asistido por Computadora",
@@ -880,7 +880,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 201,
     "MateriaNombre": "Informática II",
@@ -888,7 +888,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 202,
     "MateriaNombre": "Análisis de Señales y Sistemas",
@@ -896,7 +896,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 203,
     "MateriaNombre": "Química General",
@@ -904,7 +904,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 204,
     "MateriaNombre": "Física II",
@@ -912,7 +912,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 205,
     "MateriaNombre": "Probabilidad y Estadística",
@@ -920,7 +920,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 207,
     "MateriaNombre": "Inglés I",
@@ -928,7 +928,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 301,
     "MateriaNombre": "Teoría de los Circuitos I",
@@ -936,7 +936,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 302,
     "MateriaNombre": "Técnicas Digitales I",
@@ -944,7 +944,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 303,
     "MateriaNombre": "Dispositivos Electrónicos",
@@ -952,7 +952,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 304,
     "MateriaNombre": "Legislación",
@@ -960,7 +960,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 305,
     "MateriaNombre": "Electrónica Aplicada I",
@@ -968,7 +968,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 306,
     "MateriaNombre": "Medios de Enlace",
@@ -976,7 +976,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 307,
     "MateriaNombre": "Inglés II",
@@ -984,7 +984,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 401,
     "MateriaNombre": "Técnicas Digitales II",
@@ -992,7 +992,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 402,
     "MateriaNombre": "Medidas Electrónicas I",
@@ -1000,7 +1000,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 403,
     "MateriaNombre": "Teoría de los Circuitos II",
@@ -1008,7 +1008,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 404,
     "MateriaNombre": "Máquinas e Instalaciones Eléctricas",
@@ -1016,7 +1016,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 405,
     "MateriaNombre": "Sistemas de Comunicaciones",
@@ -1024,7 +1024,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 406,
     "MateriaNombre": "Electrónica Aplicada II",
@@ -1032,7 +1032,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 407,
     "MateriaNombre": "Seguridad, Higiene y Medio Ambiente",
@@ -1040,7 +1040,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 501,
     "MateriaNombre": "Técnicas Digitales III",
@@ -1048,7 +1048,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 502,
     "MateriaNombre": "Medidas Electrónicas II",
@@ -1056,7 +1056,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 503,
     "MateriaNombre": "Sistemas de Control",
@@ -1064,7 +1064,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 504,
     "MateriaNombre": "Electrónica Aplicada III",
@@ -1072,7 +1072,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 505,
     "MateriaNombre": "Tecnología Electrónica",
@@ -1080,7 +1080,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 506,
     "MateriaNombre": "Electrónica de Potencia",
@@ -1088,7 +1088,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 507,
     "MateriaNombre": "Organización Industrial",
@@ -1096,7 +1096,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 601,
     "MateriaNombre": "Economía",
@@ -1104,7 +1104,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 602,
     "MateriaNombre": "Proyecto Final",
@@ -1112,7 +1112,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 604,
     "MateriaNombre": "Control de Procesos (Elec.)",
@@ -1120,7 +1120,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 607,
     "MateriaNombre": "Equipos de Microondas (Elec.)",
@@ -1128,7 +1128,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 608,
     "MateriaNombre": "Sistemas de Comunicaciones II (Elec.)",
@@ -1136,7 +1136,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 610,
     "MateriaNombre": "Sistemas de Comunicaciones III (Elec.)",
@@ -1144,7 +1144,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 626,
     "MateriaNombre": "Fundamentos de Acústica y Electroacústica (Elec.)",
@@ -1152,7 +1152,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 627,
     "MateriaNombre": "Fundamentos de Robótica Móvil (Elec.)",
@@ -1160,7 +1160,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 628,
     "MateriaNombre": "Bioelectrónica (Elec.)",
@@ -1168,7 +1168,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 630,
     "MateriaNombre": "Sistemas de Telecomunicaciones (Elec.)",
@@ -1176,7 +1176,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 631,
     "MateriaNombre": "Software en Tiempo Real (Elec.)",
@@ -1184,7 +1184,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 632,
     "MateriaNombre": "Técnicas Digitales IV (Elec.)",
@@ -1192,7 +1192,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 634,
     "MateriaNombre": "Visión por Computadoras (Elec.)",
@@ -1200,7 +1200,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 9,
+    "ESPECIALID": 9,
     "plan": 2023,
     "materia": 693,
     "MateriaNombre": "Arquitectura de Computadoras en Plataformas Reconfigurables (Elec.)",
@@ -1208,7 +1208,7 @@
     "EspecialidadNombre": "Ingeniería Electrónica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 94,
     "materia": 519,
     "MateriaNombre": "Avances en Metalurgia y Nuevos Materiales (Elec.)",
@@ -1216,7 +1216,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 101,
     "MateriaNombre": "Análisis Matemático I",
@@ -1224,7 +1224,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 102,
     "MateriaNombre": "Química General",
@@ -1232,7 +1232,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 103,
     "MateriaNombre": "Álgebra y Geometría Analítica",
@@ -1240,7 +1240,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 104,
     "MateriaNombre": "Física I",
@@ -1248,7 +1248,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 105,
     "MateriaNombre": "Ingeniería y Sociedad",
@@ -1256,7 +1256,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 106,
     "MateriaNombre": "Ingeniería Mecánica I",
@@ -1264,7 +1264,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 107,
     "MateriaNombre": "Sistemas de Representación",
@@ -1272,7 +1272,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 108,
     "MateriaNombre": "Fundamentos de Informática",
@@ -1280,7 +1280,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 201,
     "MateriaNombre": "Materiales No Metálicos",
@@ -1288,7 +1288,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 202,
     "MateriaNombre": "Estabilidad I",
@@ -1296,7 +1296,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 203,
     "MateriaNombre": "Materiales Metálicos",
@@ -1304,7 +1304,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 204,
     "MateriaNombre": "Análisis Matemático II",
@@ -1312,7 +1312,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 205,
     "MateriaNombre": "Física II",
@@ -1320,7 +1320,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 206,
     "MateriaNombre": "Ingeniería Ambiental y Seguridad Industrial",
@@ -1328,7 +1328,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 207,
     "MateriaNombre": "Ingeniería Mecánica II",
@@ -1336,7 +1336,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 208,
     "MateriaNombre": "Inglés I",
@@ -1344,7 +1344,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 209,
     "MateriaNombre": "Introducción a la Programación Computacional en Ingeniería (Elec.)",
@@ -1352,7 +1352,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 301,
     "MateriaNombre": "Termodinámica",
@@ -1360,7 +1360,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 302,
     "MateriaNombre": "Mecánica Racional",
@@ -1368,7 +1368,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 303,
     "MateriaNombre": "Estabilidad II",
@@ -1376,7 +1376,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 304,
     "MateriaNombre": "Mediciones y Ensayos",
@@ -1384,7 +1384,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 305,
     "MateriaNombre": "Diseño Mecánico",
@@ -1392,7 +1392,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 306,
     "MateriaNombre": "Cálculo Avanzado",
@@ -1400,7 +1400,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 307,
     "MateriaNombre": "Ingeniería Mecánica III",
@@ -1408,7 +1408,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 308,
     "MateriaNombre": "Probabilidad y Estadística",
@@ -1416,7 +1416,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 309,
     "MateriaNombre": "Inglés II",
@@ -1424,7 +1424,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 323,
     "MateriaNombre": "Metodología para la Resolución de Problemas de la Calidad y Producción (Elec.)",
@@ -1432,7 +1432,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 401,
     "MateriaNombre": "Economía",
@@ -1440,7 +1440,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 402,
     "MateriaNombre": "Elementos de Máquinas",
@@ -1448,7 +1448,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 403,
     "MateriaNombre": "Tecnología del Calor",
@@ -1456,7 +1456,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 404,
     "MateriaNombre": "Metrología e Ingeniería de Calidad",
@@ -1464,7 +1464,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 405,
     "MateriaNombre": "Mecánica de los Fluídos",
@@ -1472,7 +1472,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 406,
     "MateriaNombre": "Electrotecnia y Máquinas Eléctricas",
@@ -1480,7 +1480,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 407,
     "MateriaNombre": "Electrónica y Sistemas de Control",
@@ -1488,7 +1488,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 408,
     "MateriaNombre": "Estabilidad III",
@@ -1496,7 +1496,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 501,
     "MateriaNombre": "Tecnología de Fabricación",
@@ -1504,7 +1504,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 502,
     "MateriaNombre": "Máquinas Alternativas y Turbomáquinas",
@@ -1512,7 +1512,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 503,
     "MateriaNombre": "Instalaciones Industriales",
@@ -1520,7 +1520,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 504,
     "MateriaNombre": "Organización Industrial",
@@ -1528,7 +1528,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 505,
     "MateriaNombre": "Legislación",
@@ -1536,7 +1536,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 506,
     "MateriaNombre": "Mantenimiento",
@@ -1544,7 +1544,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 507,
     "MateriaNombre": "Proyecto Final",
@@ -1552,7 +1552,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 533,
     "MateriaNombre": "Automotores I (Elec.)",
@@ -1560,7 +1560,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 534,
     "MateriaNombre": "Diseño de Instalaciones Térmicas (Elec.)",
@@ -1568,7 +1568,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 535,
     "MateriaNombre": "Gestión Ambiental (Elec.)",
@@ -1576,7 +1576,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 536,
     "MateriaNombre": "Gestión Emprendedora (Elec.)",
@@ -1584,7 +1584,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 537,
     "MateriaNombre": "Gestión de Proyectos (Elec.)",
@@ -1592,7 +1592,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 538,
     "MateriaNombre": "Logística (Elec.)",
@@ -1600,7 +1600,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 539,
     "MateriaNombre": "Fundamentos de Optimización en Ingeniería (Elec.)",
@@ -1608,7 +1608,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 17,
+    "ESPECIALID": 17,
     "plan": 2023,
     "materia": 540,
     "MateriaNombre": "Introducción al Método de Elementos Finitos (Elec.)",
@@ -1616,7 +1616,7 @@
     "EspecialidadNombre": "Ingeniería Mecánica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 95,
     "materia": 519,
     "MateriaNombre": "Avances en Metalurgia y Nuevos Materiales (Elec.)",
@@ -1624,7 +1624,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 101,
     "MateriaNombre": "Análisis Matemático I",
@@ -1632,7 +1632,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 102,
     "MateriaNombre": "Algebra y Geometría Analítica",
@@ -1640,7 +1640,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 103,
     "MateriaNombre": "Física I",
@@ -1648,7 +1648,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 104,
     "MateriaNombre": "Química General",
@@ -1656,7 +1656,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 105,
     "MateriaNombre": "Ingeniería de los Procesos I",
@@ -1664,7 +1664,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 106,
     "MateriaNombre": "Ingeniería y Sociedad",
@@ -1672,7 +1672,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 107,
     "MateriaNombre": "Sistemas de Representación",
@@ -1680,7 +1680,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 108,
     "MateriaNombre": "Fundamentos de la Informática",
@@ -1688,7 +1688,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 109,
     "MateriaNombre": "Inglés I",
@@ -1696,7 +1696,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 201,
     "MateriaNombre": "Física II",
@@ -1704,7 +1704,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 202,
     "MateriaNombre": "Ingeniería de los Procesos II",
@@ -1712,7 +1712,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 203,
     "MateriaNombre": "Análisis Matemático II",
@@ -1720,7 +1720,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 204,
     "MateriaNombre": "Termodinámica Metalúrgica",
@@ -1728,7 +1728,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 205,
     "MateriaNombre": "Química Inorgánica y Orgánica",
@@ -1736,7 +1736,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 207,
     "MateriaNombre": "Mineralogía y Tratamientos de los Minerales",
@@ -1744,7 +1744,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 208,
     "MateriaNombre": "Probabilidad y Estadística",
@@ -1752,7 +1752,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 209,
     "MateriaNombre": "Inglés II",
@@ -1760,7 +1760,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 301,
     "MateriaNombre": "Higiene y Seguridad e Ingeniería Ambiental",
@@ -1768,7 +1768,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 302,
     "MateriaNombre": "Metalurgia Física I",
@@ -1776,7 +1776,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 304,
     "MateriaNombre": "Estabilidad y Resistencia de Materiales",
@@ -1784,7 +1784,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 305,
     "MateriaNombre": "Fisicoquímica Metalúrgica",
@@ -1792,7 +1792,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 307,
     "MateriaNombre": "Ciencia de Materiales",
@@ -1800,7 +1800,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 308,
     "MateriaNombre": "Ensayos de Materiales",
@@ -1808,7 +1808,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 310,
     "MateriaNombre": "Técnicas de Estudio Aplicada a Materiales",
@@ -1816,7 +1816,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 401,
     "MateriaNombre": "Metalurgia Física II",
@@ -1824,7 +1824,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 403,
     "MateriaNombre": "Refractarios y Cerámicos",
@@ -1832,7 +1832,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 404,
     "MateriaNombre": "Degradación, Corrosión y Protección de Materiales",
@@ -1840,7 +1840,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 406,
     "MateriaNombre": "Metalografía y Tratamientos Térmicos de los Ferrosos",
@@ -1848,7 +1848,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 408,
     "MateriaNombre": "Cálculo y Modelización Numérica",
@@ -1856,7 +1856,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 409,
     "MateriaNombre": "Economía",
@@ -1864,7 +1864,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 410,
     "MateriaNombre": "Legislación",
@@ -1872,7 +1872,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 501,
     "MateriaNombre": "Soldadura",
@@ -1880,7 +1880,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 503,
     "MateriaNombre": "Metalografía y Tratamientos Térmicos de los no Ferrosos",
@@ -1888,7 +1888,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 504,
     "MateriaNombre": "Procesos de Conformación Plástica",
@@ -1896,7 +1896,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 505,
     "MateriaNombre": "Procesos de Reducción y Aceración",
@@ -1904,7 +1904,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 508,
     "MateriaNombre": "Reciclado y Economía Circular",
@@ -1912,7 +1912,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 509,
     "MateriaNombre": "Proyecto Final",
@@ -1920,7 +1920,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 518,
     "MateriaNombre": "Ingeniería Gerencial (Elec.)",
@@ -1928,7 +1928,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 18,
+    "ESPECIALID": 18,
     "plan": 2023,
     "materia": 519,
     "MateriaNombre": "Avances en Metalurgia y Nuevos Materiales (Elec.)",
@@ -1936,7 +1936,7 @@
     "EspecialidadNombre": "Ingeniería Metalúrgica"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 101,
     "MateriaNombre": "Análisis Matemático I",
@@ -1944,7 +1944,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 102,
     "MateriaNombre": "Química General",
@@ -1952,7 +1952,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 103,
     "MateriaNombre": "Sistemas de Representación",
@@ -1960,7 +1960,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 104,
     "MateriaNombre": "Informática I",
@@ -1968,7 +1968,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 105,
     "MateriaNombre": "Pensamiento Sistémico",
@@ -1976,7 +1976,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 106,
     "MateriaNombre": "Física I",
@@ -1984,7 +1984,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 107,
     "MateriaNombre": "Álgebra y Geometría Analítica",
@@ -1992,7 +1992,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 108,
     "MateriaNombre": "Ingeniería y Sociedad",
@@ -2000,7 +2000,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 201,
     "MateriaNombre": "Análisis Matemático II",
@@ -2008,7 +2008,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 202,
     "MateriaNombre": "Administración General",
@@ -2016,7 +2016,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 203,
     "MateriaNombre": "Probabilidad y Estadística",
@@ -2024,7 +2024,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 204,
     "MateriaNombre": "Ciencia de los Materiales",
@@ -2032,7 +2032,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 205,
     "MateriaNombre": "Física II",
@@ -2040,7 +2040,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 206,
     "MateriaNombre": "Economía General",
@@ -2048,7 +2048,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 207,
     "MateriaNombre": "Informática II",
@@ -2056,7 +2056,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 208,
     "MateriaNombre": "Inglés I",
@@ -2064,7 +2064,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 301,
     "MateriaNombre": "Costos y Presupuestos",
@@ -2072,7 +2072,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 302,
     "MateriaNombre": "Estudio del Trabajo",
@@ -2080,7 +2080,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 303,
     "MateriaNombre": "Comercialización",
@@ -2088,7 +2088,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 304,
     "MateriaNombre": "Termodinámica y Máquinas Térmicas",
@@ -2096,7 +2096,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 305,
     "MateriaNombre": "Estática y Resistencia de Materiales",
@@ -2104,7 +2104,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 306,
     "MateriaNombre": "Mecánica de los Fluídos",
@@ -2112,7 +2112,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 307,
     "MateriaNombre": "Economía de la Empresa",
@@ -2120,7 +2120,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 308,
     "MateriaNombre": "Electrotecnia y Máquinas Eléctricas",
@@ -2128,7 +2128,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 309,
     "MateriaNombre": "Análisis Numérico y Cálculo Avanzado",
@@ -2136,7 +2136,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 401,
     "MateriaNombre": "Seguridad, Higiene e Ingeniería Ambiental",
@@ -2144,7 +2144,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 402,
     "MateriaNombre": "Investigación Operativa",
@@ -2152,7 +2152,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 403,
     "MateriaNombre": "Procesos Industriales",
@@ -2160,7 +2160,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 404,
     "MateriaNombre": "Mecánica y Mecanismos",
@@ -2168,7 +2168,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 405,
     "MateriaNombre": "Evaluación de Proyectos",
@@ -2176,7 +2176,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 406,
     "MateriaNombre": "Planificación y Control de la Producción",
@@ -2184,7 +2184,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 407,
     "MateriaNombre": "Diseño de Producto",
@@ -2192,7 +2192,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 408,
     "MateriaNombre": "Inglés II",
@@ -2200,7 +2200,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 409,
     "MateriaNombre": "Instalaciones Industriales",
@@ -2208,7 +2208,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 410,
     "MateriaNombre": "Legislación",
@@ -2216,7 +2216,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 501,
     "MateriaNombre": "Mantenimiento",
@@ -2224,7 +2224,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 502,
     "MateriaNombre": "Manejo de Materiales y Distribución de Plantas",
@@ -2232,7 +2232,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 503,
     "MateriaNombre": "Comercio Exterior",
@@ -2240,7 +2240,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 504,
     "MateriaNombre": "Relaciones Industriales",
@@ -2248,7 +2248,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 505,
     "MateriaNombre": "Ingeniería en Calidad",
@@ -2256,7 +2256,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 506,
     "MateriaNombre": "Control de Gestión",
@@ -2264,7 +2264,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 507,
     "MateriaNombre": "Proyecto Final",
@@ -2272,7 +2272,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 536,
     "MateriaNombre": "Sustentabilidad y Nuevas Economías (Elec.)",
@@ -2280,7 +2280,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 544,
     "MateriaNombre": "Gestión Ambiental (Elec.)",
@@ -2288,7 +2288,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 545,
     "MateriaNombre": "Logística (Elec.)",
@@ -2296,7 +2296,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 546,
     "MateriaNombre": "Gestión Emprendedora (Elec.)",
@@ -2304,7 +2304,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 547,
     "MateriaNombre": "Gestión de Proyectos (Elec.)",
@@ -2312,7 +2312,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 24,
+    "ESPECIALID": 24,
     "plan": 2023,
     "materia": 7146,
     "MateriaNombre": "Innovación Estratégica(Elect)",
@@ -2320,7 +2320,7 @@
     "EspecialidadNombre": "Ingeniería Industrial"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 95,
     "materia": 519,
     "MateriaNombre": "Avances en Metalurgia y Nuevos Materiales (Elec.)",
@@ -2328,7 +2328,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 95,
     "materia": 5029,
     "MateriaNombre": "Materia 5029",
@@ -2336,7 +2336,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 101,
     "MateriaNombre": "Introducción a la Ingeniería Química",
@@ -2344,7 +2344,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 102,
     "MateriaNombre": "Ingeniería y Sociedad",
@@ -2352,7 +2352,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 103,
     "MateriaNombre": "Álgebra y Geometría Analítica",
@@ -2360,7 +2360,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 104,
     "MateriaNombre": "Análisis Matemático I",
@@ -2368,7 +2368,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 105,
     "MateriaNombre": "Física I",
@@ -2376,7 +2376,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 106,
     "MateriaNombre": "Química",
@@ -2384,7 +2384,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 108,
     "MateriaNombre": "Fundamentos de Informática",
@@ -2392,7 +2392,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 202,
     "MateriaNombre": "Probabilidad y Estadística",
@@ -2400,7 +2400,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 203,
     "MateriaNombre": "Química Inorgánica",
@@ -2408,7 +2408,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 302,
     "MateriaNombre": "Termodinámica",
@@ -2416,7 +2416,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 304,
     "MateriaNombre": "Ciencia de los Materiales",
@@ -2424,7 +2424,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 307,
     "MateriaNombre": "Química Analítica",
@@ -2432,7 +2432,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 308,
     "MateriaNombre": "Microbiología y Química Biológica",
@@ -2440,7 +2440,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 310,
     "MateriaNombre": "Inglés II",
@@ -2448,7 +2448,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 402,
     "MateriaNombre": "Operaciones Unitarias I",
@@ -2456,7 +2456,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 403,
     "MateriaNombre": "Tecnología de la Energía Térmica",
@@ -2464,7 +2464,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 404,
     "MateriaNombre": "Economía",
@@ -2472,7 +2472,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 406,
     "MateriaNombre": "Ingeniería de las Reacciones Químicas",
@@ -2480,7 +2480,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 501,
     "MateriaNombre": "Control Automático de Procesos",
@@ -2488,7 +2488,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 502,
     "MateriaNombre": "Mecánica Industrial",
@@ -2496,7 +2496,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 503,
     "MateriaNombre": "Ingeniería Ambiental",
@@ -2504,7 +2504,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 506,
     "MateriaNombre": "Máquinas e Instalaciones Eléctricas",
@@ -2512,7 +2512,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 507,
     "MateriaNombre": "Proyecto Final",
@@ -2520,7 +2520,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 508,
     "MateriaNombre": "Práctica Profesional Supervisada",
@@ -2528,7 +2528,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 532,
     "MateriaNombre": "Gestión de Potencial Humano (Elec.)",
@@ -2536,7 +2536,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 533,
     "MateriaNombre": "Tecnología de los Alimentos (Elec.)",
@@ -2544,7 +2544,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 556,
     "MateriaNombre": "Planificación, Desarrollo y Seguimiento de Proyectos Industriales (Elec.)",
@@ -2552,7 +2552,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 27,
+    "ESPECIALID": 27,
     "plan": 2023,
     "materia": 581,
     "MateriaNombre": "Hidrógeno y Power-to-X Renovable (Elec.)",
@@ -2560,7 +2560,7 @@
     "EspecialidadNombre": "Ingeniería Química"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 95,
     "materia": 519,
     "MateriaNombre": "Avances en Metalurgia y Nuevos Materiales (Elec.)",
@@ -2568,7 +2568,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 101,
     "MateriaNombre": "Análisis Matemático I",
@@ -2576,7 +2576,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 102,
     "MateriaNombre": "Álgebra y Geometría Analítica",
@@ -2584,7 +2584,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 103,
     "MateriaNombre": "Ingeniería y Sociedad",
@@ -2592,7 +2592,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 104,
     "MateriaNombre": "Ingeniería Civil I",
@@ -2600,7 +2600,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 106,
     "MateriaNombre": "Química General",
@@ -2608,7 +2608,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 107,
     "MateriaNombre": "Física I",
@@ -2616,7 +2616,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 201,
     "MateriaNombre": "Análisis Matemático II",
@@ -2624,7 +2624,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 202,
     "MateriaNombre": "Estabilidad",
@@ -2632,7 +2632,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 203,
     "MateriaNombre": "Ingeniería Civil II",
@@ -2640,7 +2640,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 204,
     "MateriaNombre": "Tecnología de los Materiales",
@@ -2648,7 +2648,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 205,
     "MateriaNombre": "Física II",
@@ -2656,7 +2656,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 206,
     "MateriaNombre": "Probabilidad y Estadística",
@@ -2664,7 +2664,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 207,
     "MateriaNombre": "Inglés I",
@@ -2672,7 +2672,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 301,
     "MateriaNombre": "Resistencia de Materiales",
@@ -2680,7 +2680,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 303,
     "MateriaNombre": "Tecnología de la Construcción",
@@ -2688,7 +2688,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 304,
     "MateriaNombre": "Geotopografía",
@@ -2696,7 +2696,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 305,
     "MateriaNombre": "Hidráulica General y Aplicada",
@@ -2704,7 +2704,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 308,
     "MateriaNombre": "Instalaciones Termomecánicas",
@@ -2712,7 +2712,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 309,
     "MateriaNombre": "Economía",
@@ -2720,7 +2720,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 310,
     "MateriaNombre": "Inglés II",
@@ -2728,7 +2728,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 401,
     "MateriaNombre": "Geotecnia",
@@ -2736,7 +2736,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 402,
     "MateriaNombre": "Instalaciones Sanitarias y de Gas",
@@ -2744,7 +2744,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 403,
     "MateriaNombre": "Diseño Arquitectónico, Planeamiento y Urbanismo",
@@ -2752,7 +2752,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 404,
     "MateriaNombre": "Análisis Estructural I",
@@ -2760,7 +2760,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 406,
     "MateriaNombre": "Hidrología y Obras Hidráulicas",
@@ -2768,7 +2768,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 410,
     "MateriaNombre": "Puentes (Elec.)",
@@ -2776,7 +2776,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 502,
     "MateriaNombre": "Cimentaciones",
@@ -2784,7 +2784,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 503,
     "MateriaNombre": "Ingeniería Sanitaria",
@@ -2792,7 +2792,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 504,
     "MateriaNombre": "Organización y Conducción de Obras",
@@ -2800,7 +2800,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 505,
     "MateriaNombre": "Vías de Comunicación I",
@@ -2808,7 +2808,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 506,
     "MateriaNombre": "Análisis Estructural II",
@@ -2816,7 +2816,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 555,
     "MateriaNombre": "Diseño Arquitectónico y Planeamiento (Elec.)",
@@ -2824,7 +2824,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 556,
     "MateriaNombre": "Vialidad Especial (Elec.)",
@@ -2832,7 +2832,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 601,
     "MateriaNombre": "Proyecto Final",
@@ -2840,7 +2840,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 618,
     "MateriaNombre": "Hidrología Urbana (Elec.)",
@@ -2848,7 +2848,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 31,
+    "ESPECIALID": 31,
     "plan": 2023,
     "materia": 619,
     "MateriaNombre": "Línea de Ribera y Ordenamiento Territorial (Elec.)",
@@ -2856,7 +2856,7 @@
     "EspecialidadNombre": "Ingeniería Civil"
   },
   {
-    "especialid": 32,
+    "ESPECIALID": 32,
     "plan": 95,
     "materia": 121,
     "MateriaNombre": "Matemática Discreta",
@@ -2864,7 +2864,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 32,
+    "ESPECIALID": 32,
     "plan": 95,
     "materia": 122,
     "MateriaNombre": "Materia 122",
@@ -2872,7 +2872,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 32,
+    "ESPECIALID": 32,
     "plan": 95,
     "materia": 123,
     "MateriaNombre": "Arquitectura de Computadoras",
@@ -2880,7 +2880,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 32,
+    "ESPECIALID": 32,
     "plan": 95,
     "materia": 124,
     "MateriaNombre": "Química",
@@ -2888,7 +2888,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 32,
+    "ESPECIALID": 32,
     "plan": 95,
     "materia": 125,
     "MateriaNombre": "Sistemas y Organizaciones",
@@ -2896,7 +2896,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 32,
+    "ESPECIALID": 32,
     "plan": 95,
     "materia": 126,
     "MateriaNombre": "Materia 126",
@@ -2904,7 +2904,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 32,
+    "ESPECIALID": 32,
     "plan": 95,
     "materia": 127,
     "MateriaNombre": "Materia 127",
@@ -2912,7 +2912,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 32,
+    "ESPECIALID": 32,
     "plan": 95,
     "materia": 228,
     "MateriaNombre": "Sintaxis y Semántica de los Lenguajes",
@@ -2920,7 +2920,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 32,
+    "ESPECIALID": 32,
     "plan": 95,
     "materia": 229,
     "MateriaNombre": "Materia 229",
@@ -2928,7 +2928,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 32,
+    "ESPECIALID": 32,
     "plan": 95,
     "materia": 230,
     "MateriaNombre": "Materia 230",
@@ -2936,7 +2936,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 32,
+    "ESPECIALID": 32,
     "plan": 95,
     "materia": 231,
     "MateriaNombre": "Materia 231",
@@ -2944,7 +2944,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 32,
+    "ESPECIALID": 32,
     "plan": 95,
     "materia": 232,
     "MateriaNombre": "Materia 232",
@@ -2952,7 +2952,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 32,
+    "ESPECIALID": 32,
     "plan": 95,
     "materia": 233,
     "MateriaNombre": "Materia 233",
@@ -2960,7 +2960,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 32,
+    "ESPECIALID": 32,
     "plan": 95,
     "materia": 234,
     "MateriaNombre": "Materia 234",
@@ -2968,7 +2968,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 32,
+    "ESPECIALID": 32,
     "plan": 95,
     "materia": 335,
     "MateriaNombre": "Materia 335",
@@ -2976,7 +2976,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 1,
     "MateriaNombre": "Mecatrónica I",
@@ -2984,7 +2984,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 2,
     "MateriaNombre": "Física",
@@ -2992,7 +2992,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 3,
     "MateriaNombre": "Matemática",
@@ -3000,7 +3000,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 4,
     "MateriaNombre": "Inglés",
@@ -3008,7 +3008,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 5,
     "MateriaNombre": "Herramientas Informáticas",
@@ -3016,7 +3016,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 6,
     "MateriaNombre": "Sistemas de Representación-CAD",
@@ -3024,7 +3024,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 7,
     "MateriaNombre": "Mecánica",
@@ -3032,7 +3032,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mantenimiento Industrial"
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 8,
     "MateriaNombre": "Sistemas de Representación",
@@ -3040,7 +3040,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mantenimiento Industrial"
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 9,
     "MateriaNombre": "Conocimiento de los Materiales",
@@ -3048,7 +3048,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mantenimiento Industrial"
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 10,
     "MateriaNombre": "Hidraúlica y Neumática",
@@ -3056,7 +3056,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mantenimiento Industrial"
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 11,
     "MateriaNombre": "Mantenimiento Industrial II",
@@ -3064,7 +3064,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mantenimiento Industrial"
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 12,
     "MateriaNombre": "Elementos de Máquinas",
@@ -3072,7 +3072,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mantenimiento Industrial"
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 13,
     "MateriaNombre": "Tecnología de Frío y Calor",
@@ -3080,7 +3080,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mantenimiento Industrial"
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 14,
     "MateriaNombre": "Instalaciones y Máquinas Eléctricas",
@@ -3088,7 +3088,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mantenimiento Industrial"
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 15,
     "MateriaNombre": "Informática II",
@@ -3096,7 +3096,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mantenimiento Industrial"
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 16,
     "MateriaNombre": "Seguridad, Higiene y Protección Ambiental",
@@ -3104,7 +3104,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mantenimiento Industrial"
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 17,
     "MateriaNombre": "Inglés",
@@ -3112,7 +3112,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mantenimiento Industrial"
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 18,
     "MateriaNombre": "Costos y Control de Gestión",
@@ -3120,7 +3120,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mantenimiento Industrial"
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 19,
     "MateriaNombre": "Elementos de Automatización",
@@ -3128,7 +3128,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mantenimiento Industrial"
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 20,
     "MateriaNombre": "Aseguramiento de la Calidad",
@@ -3136,7 +3136,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mantenimiento Industrial"
   },
   {
-    "especialid": 41,
+    "ESPECIALID": 41,
     "plan": 2001,
     "materia": 21,
     "MateriaNombre": "Pasantía",
@@ -3144,7 +3144,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mantenimiento Industrial"
   },
   {
-    "especialid": 42,
+    "ESPECIALID": 42,
     "plan": 2001,
     "materia": 1,
     "MateriaNombre": "Mecatrónica I",
@@ -3152,7 +3152,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mecatrónica"
   },
   {
-    "especialid": 42,
+    "ESPECIALID": 42,
     "plan": 2001,
     "materia": 2,
     "MateriaNombre": "Física",
@@ -3160,7 +3160,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mecatrónica"
   },
   {
-    "especialid": 42,
+    "ESPECIALID": 42,
     "plan": 2001,
     "materia": 3,
     "MateriaNombre": "Matemática",
@@ -3168,7 +3168,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mecatrónica"
   },
   {
-    "especialid": 42,
+    "ESPECIALID": 42,
     "plan": 2001,
     "materia": 4,
     "MateriaNombre": "Inglés",
@@ -3176,7 +3176,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mecatrónica"
   },
   {
-    "especialid": 42,
+    "ESPECIALID": 42,
     "plan": 2001,
     "materia": 5,
     "MateriaNombre": "Herramientas Informáticas",
@@ -3184,7 +3184,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mecatrónica"
   },
   {
-    "especialid": 42,
+    "ESPECIALID": 42,
     "plan": 2001,
     "materia": 6,
     "MateriaNombre": "Sistemas de Representación-CAD",
@@ -3192,7 +3192,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mecatrónica"
   },
   {
-    "especialid": 42,
+    "ESPECIALID": 42,
     "plan": 2001,
     "materia": 7,
     "MateriaNombre": "Materiales",
@@ -3200,7 +3200,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mecatrónica"
   },
   {
-    "especialid": 42,
+    "ESPECIALID": 42,
     "plan": 2001,
     "materia": 8,
     "MateriaNombre": "Electrotecnia I",
@@ -3208,7 +3208,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mecatrónica"
   },
   {
-    "especialid": 42,
+    "ESPECIALID": 42,
     "plan": 2001,
     "materia": 9,
     "MateriaNombre": "Sistemas Digitales",
@@ -3216,7 +3216,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mecatrónica"
   },
   {
-    "especialid": 42,
+    "ESPECIALID": 42,
     "plan": 2001,
     "materia": 10,
     "MateriaNombre": "Mecatrónica II",
@@ -3224,7 +3224,7 @@
     "EspecialidadNombre": "Tecnicatura Universitaria en Mecatrónica"
   },
   {
-    "especialid": 42,
+    "ESPECIALID": 42,
     "plan": 2001,
     "materia": 11,
     "MateriaNombre": "Mantenimiento Industrial II",
@@ -3232,7 +3232,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 42,
+    "ESPECIALID": 42,
     "plan": 2001,
     "materia": 12,
     "MateriaNombre": "Elementos de Máquinas",
@@ -3240,7 +3240,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 42,
+    "ESPECIALID": 42,
     "plan": 2001,
     "materia": 13,
     "MateriaNombre": "Tecnología de Frío y Calor",
@@ -3248,7 +3248,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 42,
+    "ESPECIALID": 42,
     "plan": 2001,
     "materia": 14,
     "MateriaNombre": "Instalaciones y Máquinas Eléctricas",
@@ -3256,7 +3256,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 42,
+    "ESPECIALID": 42,
     "plan": 2001,
     "materia": 15,
     "MateriaNombre": "Informática II",
@@ -3264,7 +3264,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 42,
+    "ESPECIALID": 42,
     "plan": 2001,
     "materia": 16,
     "MateriaNombre": "Seguridad, Higiene y Protección Ambiental",
@@ -3272,7 +3272,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 42,
+    "ESPECIALID": 42,
     "plan": 2001,
     "materia": 17,
     "MateriaNombre": "Inglés",
@@ -3280,7 +3280,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 42,
+    "ESPECIALID": 42,
     "plan": 2001,
     "materia": 18,
     "MateriaNombre": "Costos y Control de Gestión",
@@ -3288,7 +3288,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 42,
+    "ESPECIALID": 42,
     "plan": 2001,
     "materia": 19,
     "MateriaNombre": "Elementos de Automatización",
@@ -3296,7 +3296,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 42,
+    "ESPECIALID": 42,
     "plan": 2001,
     "materia": 20,
     "MateriaNombre": "Aseguramiento de la Calidad",
@@ -3304,7 +3304,7 @@
     "EspecialidadNombre": null
   },
   {
-    "especialid": 119,
+    "ESPECIALID": 119,
     "plan": 2003,
     "materia": 1,
     "MateriaNombre": "Mecatrónica I",
