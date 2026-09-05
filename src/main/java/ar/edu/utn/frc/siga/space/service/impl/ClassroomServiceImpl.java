@@ -50,8 +50,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ClassroomServiceImpl implements ClassroomService {
 
-    private static final String DEFAULT_CLASSROOM_TYPE = "Normal";
-
     private final ClassroomRepository classroomRepository;
     private final BuildingRepository buildingRepository;
     private final ClassroomTypeService classroomTypeService;
@@ -321,7 +319,9 @@ public class ClassroomServiceImpl implements ClassroomService {
     private ClassroomType resolveDefaultClassroomType() {
         return classroomTypeRepository.findByDescriptionIgnoreCaseAndDeletedAtIsNull(DEFAULT_CLASSROOM_TYPE)
                 .orElseThrow(() -> new IllegalStateException(
-                        "Falta el tipo de aula por defecto '" + DEFAULT_CLASSROOM_TYPE + "' (seed de data.sql)"));
+                        "Falta el tipo de aula por defecto '" + DEFAULT_CLASSROOM_TYPE
+                                + "': hay que cargarlo en la base de este ambiente"
+                                + " (data.sql solo corre en dev-local)"));
     }
 
     private static ClassroomKey keyOf(Classroom classroom) {

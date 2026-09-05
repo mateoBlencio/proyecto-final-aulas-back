@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 
+import static ar.edu.utn.frc.siga.space.service.ClassroomService.DEFAULT_CLASSROOM_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -107,5 +108,53 @@ class ClassroomTypeServiceImplTest {
         assertThatThrownBy(() -> service.update(1L, new ClassroomTypeRequestDto("Laboratorio")))
                 .isInstanceOf(SpaceDomainException.class);
         verify(classroomTypeRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update: renombrar el tipo por defecto lanza SpaceDomainException")
+    void updateRenamingDefaultTypeThrows() {
+        ClassroomType type = SpaceTestData.classroomType().description(DEFAULT_CLASSROOM_TYPE).build();
+        when(classroomTypeRepository.findActiveById(1L)).thenReturn(Optional.of(type));
+
+        assertThatThrownBy(() -> service.update(1L, new ClassroomTypeRequestDto("Laboratorio")))
+                .isInstanceOf(SpaceDomainException.class)
+                .hasMessageContaining(DEFAULT_CLASSROOM_TYPE);
+        verify(classroomTypeRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update: guardar el tipo por defecto sin cambiarle el nombre no se bloquea")
+    void updateDefaultTypeWithSameDescriptionIsAllowed() {
+        ClassroomType type = SpaceTestData.classroomType().description(DEFAULT_CLASSROOM_TYPE).build();
+        when(classroomTypeRepository.findActiveById(1L)).thenReturn(Optional.of(type));
+        when(classroomTypeRepository.existsByDescriptionIgnoreCaseAndIdNot(any(), any())).thenReturn(false);
+        when(classroomTypeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.update(1L, new ClassroomTypeRequestDto(DEFAULT_CLASSROOM_TYPE.toUpperCase()));
+
+        verify(classroomTypeRepository).save(type);
+    }
+
+    @Test
+    @DisplayName("deactivate: desactivar el tipo por defecto lanza SpaceDomainException")
+    void deactivateDefaultTypeThrows() {
+        ClassroomType type = SpaceTestData.classroomType().description(DEFAULT_CLASSROOM_TYPE).build();
+        when(classroomTypeRepository.findById(1L)).thenReturn(Optional.of(type));
+
+        assertThatThrownBy(() -> service.deactivate(1L))
+                .isInstanceOf(SpaceDomainException.class)
+                .hasMessageContaining(DEFAULT_CLASSROOM_TYPE);
+        verify(classroomTypeRepository, never()).softDelete(any());
+    }
+
+    @Test
+    @DisplayName("deactivate: un tipo que no es el default se desactiva normalmente")
+    void deactivateRegularTypeSoftDeletes() {
+        ClassroomType type = SpaceTestData.classroomType().description("Laboratorio").build();
+        when(classroomTypeRepository.findById(1L)).thenReturn(Optional.of(type));
+
+        service.deactivate(1L);
+
+        verify(classroomTypeRepository).softDelete(type);
     }
 }

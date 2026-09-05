@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.space;
 
+import static ar.edu.utn.frc.siga.space.service.ClassroomService.DEFAULT_CLASSROOM_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -34,7 +35,7 @@ class ClassroomDetailsApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("PUT /details actualiza tipo, observaciones, recursos y permitido sin tocar número ni capacidad")
     void updateDetails_updatesLocalFieldsOnly() throws Exception {
         Building building = testData.edificio();
-        ClassroomType normal = testData.tipoAulaNormal();
+        ClassroomType normal = testData.tipoAulaPorDefecto();
         Classroom classroom = testData.aula(building, normal, 55);
         long pcId = testData.tipoRecurso("Cantidad de PC", ResourceValueKind.COUNT).getId();
         long projectorId = testData.tipoRecurso("Proyector", ResourceValueKind.BOOLEAN).getId();
@@ -73,7 +74,7 @@ class ClassroomDetailsApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("PUT /details con SUBSET sin targets se normaliza a NONE")
     void updateDetails_subsetWithoutTargets_normalizesToNone() throws Exception {
         Building building = testData.edificio();
-        ClassroomType normal = testData.tipoAulaNormal();
+        ClassroomType normal = testData.tipoAulaPorDefecto();
         Classroom classroom = testData.aula(building, normal, 30);
 
         String body = """
@@ -95,7 +96,7 @@ class ClassroomDetailsApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("PUT /details con id de tipo de recurso desconocido responde 400")
     void updateDetails_unknownResourceTypeId_returns400() throws Exception {
         Building building = testData.edificio();
-        ClassroomType normal = testData.tipoAulaNormal();
+        ClassroomType normal = testData.tipoAulaPorDefecto();
         Classroom classroom = testData.aula(building, normal, 40);
 
         String body = """
@@ -113,7 +114,7 @@ class ClassroomDetailsApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("PUT /details con recurso BOOLEAN y quantity > 1 responde 400")
     void updateDetails_booleanResourceQuantityAboveOne_returns400() throws Exception {
         Building building = testData.edificio();
-        ClassroomType normal = testData.tipoAulaNormal();
+        ClassroomType normal = testData.tipoAulaPorDefecto();
         Classroom classroom = testData.aula(building, normal, 40);
         long projectorId = testData.tipoRecurso("Proyector", ResourceValueKind.BOOLEAN).getId();
 
@@ -131,11 +132,11 @@ class ClassroomDetailsApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("GET /v1/classroom-types lista paginada de tipos activos")
     void listClassroomTypes() throws Exception {
-        testData.tipoAulaNormal();
+        testData.tipoAulaPorDefecto();
 
         mockMvc.perform(get("/v1/classroom-types"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[?(@.description == 'Normal')].enabled")
+                .andExpect(jsonPath("$.content[?(@.description == '" + DEFAULT_CLASSROOM_TYPE + "')].enabled")
                         .value(org.hamcrest.Matchers.hasItem(true)));
     }
 }

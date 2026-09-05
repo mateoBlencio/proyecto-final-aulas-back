@@ -41,7 +41,7 @@ class ClassroomApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("POST /v1/classrooms crea el aula (201) y persiste en BD")
     void create_persistsClassroomInDatabase() throws Exception {
         Building building = testData.edificio();
-        ClassroomType tipo = testData.tipoAulaNormal();
+        ClassroomType tipo = testData.tipoAulaPorDefecto();
         int roomNumber = (int) IntegrationTestData.nextSeq();
         ClassroomRequestDto dto = new ClassroomRequestDto(roomNumber, 40, tipo.getId(), building.getId());
 
@@ -62,7 +62,7 @@ class ClassroomApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("roomNumber duplicado responde 400 ProblemDetail")
     void create_duplicateRoomNumber_returns400ProblemDetail() throws Exception {
         Building building = testData.edificio();
-        ClassroomType tipo = testData.tipoAulaNormal();
+        ClassroomType tipo = testData.tipoAulaPorDefecto();
         int roomNumber = (int) IntegrationTestData.nextSeq();
         ClassroomRequestDto first = new ClassroomRequestDto(roomNumber, 40, tipo.getId(), building.getId());
         mockMvc.perform(post("/v1/classrooms")
@@ -84,7 +84,7 @@ class ClassroomApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("edificio inactivo responde 404")
     void create_inactiveBuilding_returns404() throws Exception {
         Building building = testData.edificio("Edificio-Inactivo", false);
-        ClassroomType tipo = testData.tipoAulaNormal();
+        ClassroomType tipo = testData.tipoAulaPorDefecto();
         ClassroomRequestDto dto = new ClassroomRequestDto(
                 (int) IntegrationTestData.nextSeq(), 40, tipo.getId(), building.getId());
 
@@ -116,7 +116,7 @@ class ClassroomApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("DELETE hace soft-delete: GET por id responde 404 y no aparece en el listado")
     void delete_softDeletesClassroom_notFoundAfterwards() throws Exception {
         Building building = testData.edificio();
-        ClassroomType tipo = testData.tipoAulaNormal();
+        ClassroomType tipo = testData.tipoAulaPorDefecto();
         int roomNumber = (int) IntegrationTestData.nextSeq();
         ClassroomRequestDto dto = new ClassroomRequestDto(roomNumber, 40, tipo.getId(), building.getId());
 
@@ -146,7 +146,7 @@ class ClassroomApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("GET listado filtra por buildingId + rango de capacidad y pagina")
     void findAll_filtersByBuildingAndCapacity_andPaginates() throws Exception {
         Building building = testData.edificio();
-        ClassroomType tipo = testData.tipoAulaNormal();
+        ClassroomType tipo = testData.tipoAulaPorDefecto();
         Classroom chica = testData.aula(building, tipo, 20);
         Classroom mediana = testData.aula(building, tipo, 40);
         Classroom grande = testData.aula(building, tipo, 80);
