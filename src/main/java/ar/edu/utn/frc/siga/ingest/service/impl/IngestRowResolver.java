@@ -14,7 +14,6 @@ import ar.edu.utn.frc.siga.academic.service.StudyPlanService;
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
-import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.ingest.dto.RowDto;
@@ -39,12 +38,12 @@ class IngestRowResolver {
     private final AcademicPeriodService academicPeriodService;
     private final CommissionService commissionService;
     private final SubjectCommissionService subjectCommissionService;
-    private final AcademicEventService academicEventService;
     private final BuildingService buildingService;
     private final ClassroomService classroomService;
 
-    record ResolvedRow(Long eventId, boolean eventCreated, SubjectResponseDto subject,
-            CommissionResponseDto commission, BuildingResponseDto building, ClassroomResponseDto classroom) {
+    record ResolvedRefs(SubjectResponseDto subject, CommissionResponseDto commission,
+            BuildingResponseDto building, ClassroomResponseDto classroom,
+            CreateRecurringEventRequestDto eventRequest) {
     }
 
     private record AcademicRefs(SubjectResponseDto subject, CommissionResponseDto commission) {
@@ -54,7 +53,7 @@ class IngestRowResolver {
     }
 
     @Transactional
-    ResolvedRow resolve(RowDto dto, TermType termType, int year, LocalDate startDate, LocalDate endDate,
+    ResolvedRefs resolveRefs(RowDto dto, TermType termType, int year, LocalDate startDate, LocalDate endDate,
             IngestCache cache, AtomicInteger periodsCreated) {
         AcademicRefs academic = resolveAcademicRefs(dto, termType, year, cache, periodsCreated);
         SpaceRefs space = resolveSpaceRefs(dto, cache);
@@ -63,21 +62,19 @@ class IngestRowResolver {
             ? dto.durationMinutes()
             : (int) Duration.between(dto.startTime(), dto.endTime()).toMinutes();
 
-        FindOrCreateResult<Long> eventResult = academicEventService.findOrCreateRecurringEvent(
-            new CreateRecurringEventRequestDto(
-                dto.enrolledCount(),
-                dto.startTime(),
-                durationMinutes,
-                dto.dayOfWeek(),
-                startDate,
-                endDate,
-                academic.subject().id(),
-                academic.commission().id()
-            )
+        CreateRecurringEventRequestDto eventRequest = new CreateRecurringEventRequestDto(
+            dto.enrolledCount(),
+            dto.startTime(),
+            durationMinutes,
+            dto.dayOfWeek(),
+            startDate,
+            endDate,
+            academic.subject().id(),
+            academic.commission().id()
         );
 
-        return new ResolvedRow(eventResult.value(), eventResult.created(), academic.subject(), academic.commission(),
-            space.building(), space.classroom());
+        return new ResolvedRefs(academic.subject(), academic.commission(),
+            space.building(), space.classroom(), eventRequest);
     }
 
     private AcademicRefs resolveAcademicRefs(RowDto dto, TermType termType, int year, IngestCache cache,
