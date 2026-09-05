@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.space.controller;
 
+import ar.edu.utn.frc.siga.space.dto.BuildingFilter;
 import ar.edu.utn.frc.siga.space.dto.request.BuildingActiveBatchRequestDto;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.service.BuildingService;
@@ -8,6 +9,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -34,14 +39,19 @@ public class BuildingController {
 
     @GetMapping
     @Operation(summary = "Listar edificios",
-               description = "Por defecto devuelve solo los edificios activos. Con includeDeactivated=true "
+               description = "Listado paginado con filtro opcional por nombre (contiene, case-insensitive). "
+                       + "Por defecto devuelve solo los edificios activos. Con includeDeactivated=true "
                        + "devuelve todos; útil para la pantalla de administración donde se activan/desactivan "
                        + "edificios.")
-    public ResponseEntity<List<BuildingResponseDto>> findAll(
+    public ResponseEntity<Page<BuildingResponseDto>> findAll(
+            @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
+            @RequestParam(required = false) String name,
             @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
-        log.debug("GET /v1/buildings: includeDeactivated={}", includeDeactivated);
-        List<BuildingResponseDto> buildings = buildingService.findAll(includeDeactivated);
-        log.info("Edificios listados: count={}", buildings.size());
+        log.debug("GET /v1/buildings: name={}, page={}, includeDeactivated={}",
+                name, pageable.getPageNumber(), includeDeactivated);
+        Page<BuildingResponseDto> buildings = buildingService.findAll(
+                new BuildingFilter(name), pageable, includeDeactivated);
+        log.info("Edificios listados: total={}", buildings.getTotalElements());
         return ResponseEntity.ok(buildings);
     }
 

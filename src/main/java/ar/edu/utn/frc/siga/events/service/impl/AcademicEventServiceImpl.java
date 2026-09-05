@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.events.service.impl;
 
+import ar.edu.utn.frc.siga.events.dto.AcademicEventFilter;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.UpdateUniqueEventRequestDto;
@@ -20,6 +21,7 @@ import ar.edu.utn.frc.siga.events.repository.UniqueEventRepository;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.command.SyncRecurringEventCommand;
 import ar.edu.utn.frc.siga.events.service.command.UpsertRecurringEventResult;
+import ar.edu.utn.frc.siga.events.specification.AcademicEventSpecification;
 import ar.edu.utn.frc.siga.events.validator.EventScheduleValidator;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
@@ -31,6 +33,9 @@ import ar.edu.utn.frc.siga.common.util.RecurringEventKey;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -66,9 +71,11 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<AcademicEventResponseDto> findAll() {
-        log.debug("Listando todos los eventos académicos");
-        return composer.compose(eventRepository.findAll());
+    public Page<AcademicEventResponseDto> findAll(AcademicEventFilter filter, Pageable pageable) {
+        log.debug("Listando eventos académicos: filter={}, page={}", filter, pageable.getPageNumber());
+        Page<AcademicEvent> page = eventRepository.findAll(
+                AcademicEventSpecification.withFilter(filter), pageable);
+        return new PageImpl<>(composer.compose(page.getContent()), pageable, page.getTotalElements());
     }
 
     @Override

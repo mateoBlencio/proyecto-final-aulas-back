@@ -1,5 +1,8 @@
 package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
+import ar.edu.utn.frc.siga.academic.dto.SpecialtyFilter;
+import ar.edu.utn.frc.siga.academic.dto.SubjectCommissionFilter;
+import ar.edu.utn.frc.siga.academic.dto.SubjectFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.service.SpecialtyService;
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
@@ -16,6 +19,7 @@ import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,20 +41,24 @@ public class RoomRequestCatalogServiceImpl implements RoomRequestCatalogService 
     @Override
     @Transactional(readOnly = true)
     public List<SpecialtyOptionDto> findSpecialties() {
-        return mapper.toSpecialtyOptions(specialtyService.findAll());
+        return mapper.toSpecialtyOptions(
+                specialtyService.findAll(new SpecialtyFilter(null, null), Pageable.unpaged()).getContent());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<SubjectOptionDto> findSubjectsBySpecialty(Integer specialtyCode) {
-        return mapper.toSubjectOptions(subjectService.findBySpecialtyCode(specialtyCode, false));
+        return mapper.toSubjectOptions(
+                subjectService.findAll(new SubjectFilter(null, null, specialtyCode, null),
+                        Pageable.unpaged(), false).getContent());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<CommissionOptionDto> findCommissionsBySubject(Long subjectId) {
         subjectService.findById(subjectId);
-        return subjectCommissionService.findBySubjectId(subjectId, false).stream()
+        return subjectCommissionService.findAll(new SubjectCommissionFilter(subjectId, null),
+                        Pageable.unpaged(), false).getContent().stream()
                 .map(SubjectCommissionResponseDto::commission)
                 .map(mapper::toOption)
                 .toList();
