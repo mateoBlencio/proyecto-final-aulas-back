@@ -40,8 +40,8 @@ public class BuildingServiceImpl implements BuildingService {
 
     @Override
     public Page<BuildingResponseDto> findAll(BuildingFilter filter, Pageable pageable, boolean includeDeactivated) {
-        log.debug("Listando edificios: filter={}, page={}, includeDeactivated={}",
-                filter, pageable.getPageNumber(), includeDeactivated);
+        log.debug("Listando edificios: filter={}, pageable={}, includeDeactivated={}",
+                filter, pageable, includeDeactivated);
         return buildingRepository.findAll(
                         BuildingSpecification.withFilter(filter)
                                 .and(SoftDeleteSpecifications.activeUnless(includeDeactivated)),

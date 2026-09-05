@@ -72,7 +72,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     @Override
     @Transactional(readOnly = true)
     public Page<AcademicEventResponseDto> findAll(AcademicEventFilter filter, Pageable pageable) {
-        log.debug("Listando eventos académicos: filter={}, page={}", filter, pageable.getPageNumber());
+        log.debug("Listando eventos académicos: filter={}, pageable={}", filter, pageable);
         Page<AcademicEvent> page = eventRepository.findAll(
                 AcademicEventSpecification.withFilter(filter), pageable);
         return new PageImpl<>(composer.compose(page.getContent()), pageable, page.getTotalElements());
