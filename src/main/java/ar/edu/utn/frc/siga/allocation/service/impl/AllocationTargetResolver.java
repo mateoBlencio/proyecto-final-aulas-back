@@ -1,11 +1,13 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 
@@ -25,9 +27,11 @@ class AllocationTargetResolver {
     private final AllocationValidator validator;
 
     Map<OccurrenceSlotDto, Long> resolveClassroomByOccurrence(List<AllocationItem> items, LocalDate clampFrom) {
+        Map<Long, List<OccurrenceSlotDto>> slotsByEvent = collectSlotsByEvent(
+                items.stream().map(AllocationItem::target).toList(), clampFrom);
         Map<OccurrenceSlotDto, Long> classroomByOccurrence = new LinkedHashMap<>();
         for (AllocationItem item : items) {
-            for (OccurrenceSlotDto occurrence : resolveApplicable(item.target(), clampFrom)) {
+            for (OccurrenceSlotDto occurrence : resolveApplicable(item.target(), clampFrom, slotsByEvent)) {
                 Long previous = classroomByOccurrence.putIfAbsent(occurrence, item.classroomId());
                 if (previous != null) {
                     throw new AllocationConflictException(
@@ -39,14 +43,32 @@ class AllocationTargetResolver {
     }
 
     List<OccurrenceSlotDto> resolveAll(List<AllocationTarget> targets, LocalDate clampFrom) {
+        Map<Long, List<OccurrenceSlotDto>> slotsByEvent = collectSlotsByEvent(targets, clampFrom);
         Set<OccurrenceSlotDto> occurrences = new LinkedHashSet<>();
         for (AllocationTarget target : targets) {
-            occurrences.addAll(resolveApplicable(target, clampFrom));
+            occurrences.addAll(resolveApplicable(target, clampFrom, slotsByEvent));
         }
         return List.copyOf(occurrences);
     }
 
-    private List<OccurrenceSlotDto> resolveApplicable(AllocationTarget target, LocalDate clampFrom) {
+    private Map<Long, List<OccurrenceSlotDto>> collectSlotsByEvent(Collection<AllocationTarget> targets, LocalDate clampFrom) {
+        Set<Long> eventIds = new LinkedHashSet<>();
+        for (AllocationTarget target : targets) {
+            if (target instanceof AllocationTarget.Event(Long eventId)) {
+                eventIds.add(eventId);
+            }
+        }
+        if (eventIds.isEmpty()) {
+            return Map.of();
+        }
+        List<OccurrenceSlotDto> slots = clampFrom == null
+                ? occurrenceService.findSlotsByEvents(eventIds)
+                : occurrenceService.findSlotsByEvents(eventIds, clampFrom);
+        return slots.stream().collect(Collectors.groupingBy(OccurrenceSlotDto::eventId));
+    }
+
+    private List<OccurrenceSlotDto> resolveApplicable(AllocationTarget target, LocalDate clampFrom,
+            Map<Long, List<OccurrenceSlotDto>> slotsByEvent) {
         return switch (target) {
             case AllocationTarget.Occurrences(List<Long> occurrenceIds) -> {
                 List<OccurrenceSlotDto> occurrences = occurrenceService.findSlots(occurrenceIds);
@@ -54,7 +76,7 @@ class AllocationTargetResolver {
                 occurrences.forEach(validator::validateNotPast);
                 yield occurrences;
             }
-            case AllocationTarget.Event(Long eventId) -> occurrenceService.findSlotsByEvent(eventId, clampFrom)
+            case AllocationTarget.Event(Long eventId) -> slotsByEvent.getOrDefault(eventId, List.of())
                     .stream()
                     .filter(o -> clampFrom == null || !o.isPast())
                     .toList();

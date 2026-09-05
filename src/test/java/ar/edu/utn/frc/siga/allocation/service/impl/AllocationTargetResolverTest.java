@@ -24,8 +24,10 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -161,7 +163,79 @@ class AllocationTargetResolverTest {
         assertThat(resolved).isEmpty();
     }
 
+    @Test
+    @DisplayName("target Event: un lote con varios items Event hace una sola llamada bulk y da el mismo resultado que el camino por evento")
+    void loteConVariosEventTargetsHaceUnaSolaLlamada() {
+        LocalDate d = LocalDate.now().plusDays(30);
+        OccurrenceSlotDto s55 = slotForEvent(1L, 55L, d);
+        OccurrenceSlotDto s56 = slotForEvent(2L, 56L, d);
+        OccurrenceSlotDto s57 = slotForEvent(3L, 57L, d);
+        when(occurrenceService.findSlotsByEvents(anyCollection())).thenReturn(List.of(s55, s56, s57));
+
+        Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
+                List.of(eventItem(55L, 100L), eventItem(56L, 200L), eventItem(57L, 300L)), null);
+
+        assertThat(resolved).containsExactly(
+                org.assertj.core.api.Assertions.entry(s55, 100L),
+                org.assertj.core.api.Assertions.entry(s56, 200L),
+                org.assertj.core.api.Assertions.entry(s57, 300L));
+        verify(occurrenceService, times(1)).findSlotsByEvents(anyCollection());
+        verify(occurrenceService, never()).findSlotsByEvent(any(), any());
+    }
+
+    @Test
+    @DisplayName("target Event: con clamp no nulo se descartan las ocurrencias pasadas")
+    void eventDescartaPasadasConClamp() {
+        LocalDate today = LocalDate.now();
+        OccurrenceSlotDto pasada = new OccurrenceSlotDto(
+                1L, 55L, today, LocalTime.MIN, LocalTime.MIN.plusHours(1), OccurrenceStatus.NEEDS_ROOM, 30);
+        OccurrenceSlotDto futura = slotForEvent(2L, 55L, today.plusDays(10));
+        when(occurrenceService.findSlotsByEvents(anyCollection(), any())).thenReturn(List.of(pasada, futura));
+
+        Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
+                List.of(eventItem(55L, 100L)), today);
+
+        assertThat(resolved.keySet()).extracting(OccurrenceSlotDto::occurrenceId).containsExactly(2L);
+    }
+
+    @Test
+    @DisplayName("target Event: dos items apuntando a la misma ocurrencia → 409")
+    void dosEventItemsMismaOcurrencia() {
+        LocalDate d = LocalDate.now().plusDays(30);
+        OccurrenceSlotDto shared = slotForEvent(1L, 55L, d);
+        when(occurrenceService.findSlotsByEvents(anyCollection())).thenReturn(List.of(shared));
+
+        assertThatThrownBy(() -> resolver.resolveClassroomByOccurrence(
+                List.of(eventItem(55L, 100L), eventItem(55L, 200L)), null))
+                .isInstanceOf(AllocationConflictException.class);
+    }
+
+    @Test
+    @DisplayName("target Occurrences: devuelve lo que trae findSlots y no toca el bulk por evento")
+    void occurrencesNoUsaBulkPorEvento() {
+        OccurrenceSlotDto a = slotForEvent(1L, 55L, LocalDate.now().plusDays(5));
+        OccurrenceSlotDto b = slotForEvent(2L, 55L, LocalDate.now().plusDays(6));
+        when(occurrenceService.findSlots(List.of(1L, 2L))).thenReturn(List.of(a, b));
+
+        Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
+                List.of(new AllocationItem(new AllocationTarget.Occurrences(List.of(1L, 2L)), CLASSROOM_ID)),
+                LocalDate.now());
+
+        assertThat(resolved.keySet()).extracting(OccurrenceSlotDto::occurrenceId).containsExactly(1L, 2L);
+        verify(occurrenceService, never()).findSlotsByEvents(anyCollection());
+        verify(occurrenceService, never()).findSlotsByEvents(anyCollection(), any());
+    }
+
     // ---------- helpers ----------
+
+    private static AllocationItem eventItem(long eventId, long classroomId) {
+        return new AllocationItem(new AllocationTarget.Event(eventId), classroomId);
+    }
+
+    private static OccurrenceSlotDto slotForEvent(long occurrenceId, long eventId, LocalDate date) {
+        return new OccurrenceSlotDto(occurrenceId, eventId, date, LocalTime.of(8, 0), LocalTime.of(10, 0),
+                OccurrenceStatus.NEEDS_ROOM, 30);
+    }
 
     /** Delega {@code validateRange} al método real: es la regla bajo prueba, no una colaboración. */
     private void realValidateRange() {
