@@ -23,6 +23,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -62,7 +63,7 @@ public class AllocationSyncService implements SysacadViewSyncer {
         SysacadCommissionResolver resolver = new SysacadCommissionResolver(commissionService, subjectCommissionService);
         Map<ClassroomKey, Optional<ClassroomResponseDto>> classroomCache = new HashMap<>();
         Map<OverlapKey, List<OverlapEntry>> overlapsBySlot = new LinkedHashMap<>();
-        List<AllocationItem> items = new ArrayList<>();
+        Set<AllocationItem> items = new LinkedHashSet<>();
 
         Map<RecurringEventKey, Long> eventIdsByKey = academicEventService.findSysacadRecurringEvents().stream()
                 .collect(Collectors.toMap(AllocationSyncService::keyOf, SysacadRecurringEventRefDto::eventId));
@@ -108,7 +109,7 @@ public class AllocationSyncService implements SysacadViewSyncer {
 
         warnOverlaps(overlapsBySlot);
 
-        return allocationService.syncFromSysacad(items);
+        return allocationService.syncFromSysacad(List.copyOf(items));
     }
 
     private static boolean isSentinel(SysacadAllocationDto row) {

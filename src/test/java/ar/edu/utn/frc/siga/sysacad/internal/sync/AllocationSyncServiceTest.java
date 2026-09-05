@@ -256,6 +256,25 @@ class AllocationSyncServiceTest {
     }
 
     @Test
+    @DisplayName("sync: filas idénticas del origen (mismo curso, materia, aula, edificio) → un solo AllocationItem, no lo aborta")
+    void syncDeduplicatesIdenticalRows() {
+        SysacadAllocationDto duplicated = row("101", 55, 1, 200, 5);
+        when(catalogReader.findAllocations()).thenReturn(List.of(duplicated, duplicated));
+        when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
+        when(academicEventService.findSysacadRecurringEvents())
+                .thenReturn(List.of(eventRef(100L, 9L, 1L, TermType.PRIMER_CUATRIMESTRE, 2026)));
+
+        service.sync(catalogReader);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<AllocationItem>> captor = ArgumentCaptor.forClass(List.class);
+        verify(allocationService).syncFromSysacad(captor.capture());
+        assertThat(captor.getValue()).containsExactly(new AllocationItem(new AllocationTarget.Event(100L), 50L));
+    }
+
+    @Test
     @DisplayName("sync: dos filas comparten (edificio, aula, dia, hora, cuatrimestre) con curso/materia distintos → "
             + "WARN con el detalle del grupo, sin deduplicar ni abortar (supuestos §3)")
     void syncWarnsOverlapDetailWithoutDeduplicating() {
