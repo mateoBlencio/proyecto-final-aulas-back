@@ -66,6 +66,26 @@ class CommissionSyncServiceTest {
     }
 
     @Test
+    @DisplayName("sync: varias franjas del mismo curso+materia no rompen el índice y se toma el mayor de inscriptos")
+    void syncMergesRepeatedEnrollmentRowsKeepingHigherCount() {
+        SysacadCommissionDto row = new SysacadCommissionDto("101", 1, 2024, 55, 2026, 1);
+        when(catalogReader.findCommissions()).thenReturn(List.of(row));
+        when(catalogReader.findSubjectCommissions()).thenReturn(List.of(
+                new SysacadSubjectCommissionDto("101", 55, 12),
+                new SysacadSubjectCommissionDto("101", 55, 30),
+                new SysacadSubjectCommissionDto("101", 55, 7)));
+        when(commissionService.syncCommissions(anyList())).thenReturn(1);
+
+        service.sync(catalogReader);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<CommissionSyncCommand>> captor = ArgumentCaptor.forClass(List.class);
+        verify(commissionService).syncCommissions(captor.capture());
+        assertThat(captor.getValue()).containsExactly(
+                new CommissionSyncCommand("101", 1, 2024, 55, 2026, 30));
+    }
+
+    @Test
     @DisplayName("sync: si no hay inscriptos para curso+materia, el comando lleva enrolledCount nulo")
     void syncBuildsCommandWithNullEnrolledCountWhenUnresolved() {
         SysacadCommissionDto row = new SysacadCommissionDto("101", 1, 2024, 55, 2026, 1);

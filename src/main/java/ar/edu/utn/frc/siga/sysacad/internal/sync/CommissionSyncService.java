@@ -33,13 +33,24 @@ public class CommissionSyncService implements SysacadViewSyncer {
     @Override
     public void sync(SysacadCatalogReader catalog) {
         ViewSyncRunner.run(syncStateService, SysacadView.COMISIONES, "Comisiones", log, () -> {
-            Map<EnrollmentKey, SysacadSubjectCommissionDto> enrollments =
-                    Maps.byId(catalog.findSubjectCommissions(), EnrollmentKey::of);
+            Map<EnrollmentKey, SysacadSubjectCommissionDto> enrollments = Maps.byId(
+                    catalog.findSubjectCommissions(), EnrollmentKey::of, CommissionSyncService::higherEnrollment);
             List<CommissionSyncCommand> commands = catalog.findCommissions().stream()
                     .map(row -> toCommand(row, enrollments))
                     .toList();
             return commissionService.syncCommissions(commands);
         });
+    }
+
+    private static SysacadSubjectCommissionDto higherEnrollment(SysacadSubjectCommissionDto a,
+            SysacadSubjectCommissionDto b) {
+        if (a.enrolledCount() == null) {
+            return b;
+        }
+        if (b.enrolledCount() == null) {
+            return a;
+        }
+        return b.enrolledCount() > a.enrolledCount() ? b : a;
     }
 
     private static CommissionSyncCommand toCommand(SysacadCommissionDto row,
