@@ -19,7 +19,6 @@ import org.springframework.stereotype.Service;
 @ConditionalOnProperty(prefix = "siga.sysacad", name = "enabled", havingValue = "true")
 public class SubjectSyncService implements SysacadViewSyncer {
 
-    private final SysacadCatalogReader catalogReader;
     private final SubjectService subjectService;
     private final SysacadSyncStateService syncStateService;
 
@@ -29,9 +28,9 @@ public class SubjectSyncService implements SysacadViewSyncer {
     }
 
     @Override
-    public void sync() {
+    public void sync(SysacadCatalogReader catalog) {
         ViewSyncRunner.run(syncStateService, SysacadView.MATERIAS, "Materias", log, () -> {
-            List<SubjectSyncCommand> commands = catalogReader.findSubjects().stream()
+            List<SubjectSyncCommand> commands = catalog.findSubjects().stream()
                     .map(SubjectSyncService::toCommand)
                     .toList();
             return subjectService.syncSubjects(commands);

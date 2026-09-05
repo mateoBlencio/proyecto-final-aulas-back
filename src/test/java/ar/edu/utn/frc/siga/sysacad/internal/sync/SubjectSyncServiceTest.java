@@ -36,7 +36,7 @@ class SubjectSyncServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SubjectSyncService(catalogReader, subjectService, syncStateService);
+        service = new SubjectSyncService(subjectService, syncStateService);
     }
 
     @Test
@@ -52,7 +52,7 @@ class SubjectSyncServiceTest {
                 .thenReturn(List.of(new SysacadSubjectDto(17, 94, 519, "Análisis Matemático I", "C")));
         when(subjectService.syncSubjects(anyList())).thenReturn(1);
 
-        service.sync();
+        service.sync(catalogReader);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<SubjectSyncCommand>> captor = ArgumentCaptor.forClass(List.class);
@@ -67,7 +67,7 @@ class SubjectSyncServiceTest {
     void syncRecordsFailureAndRethrows() {
         when(catalogReader.findSubjects()).thenThrow(new IllegalStateException("SysAcad caído"));
 
-        assertThatThrownBy(() -> service.sync()).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(IllegalStateException.class);
 
         verify(syncStateService).recordFailure(SysacadView.MATERIAS, "SysAcad caído");
     }

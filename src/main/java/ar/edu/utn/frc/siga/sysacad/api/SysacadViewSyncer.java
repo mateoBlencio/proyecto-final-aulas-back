@@ -4,5 +4,5 @@ public interface SysacadViewSyncer {
 
     SysacadView view();
 
-    void sync();
+    void sync(SysacadCatalogReader catalog);
 }

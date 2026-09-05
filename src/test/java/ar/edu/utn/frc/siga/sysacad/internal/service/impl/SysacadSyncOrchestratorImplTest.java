@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.sysacad.internal.service.impl;
 import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadUnavailableException;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadResyncOutcome;
 
+import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadViewSyncer;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,9 +18,11 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,6 +41,10 @@ class SysacadSyncOrchestratorImplTest {
     private SysacadViewSyncer subjects;
     @Mock
     private SysacadViewSyncer commissions;
+    @Mock
+    private SysacadCatalogSnapshotFactory snapshotFactory;
+
+    private final SysacadCatalogReader snapshot = mock(SysacadCatalogReader.class);
 
     private SysacadSyncOrchestratorImpl orchestrator;
 
@@ -48,8 +55,10 @@ class SysacadSyncOrchestratorImplTest {
         when(specialties.view()).thenReturn(SysacadView.ESPECIALIDADES);
         when(subjects.view()).thenReturn(SysacadView.MATERIAS);
         when(commissions.view()).thenReturn(SysacadView.COMISIONES);
+        when(snapshotFactory.newSnapshot()).thenReturn(snapshot);
         // El orden de registro es el inverso al de FK para probar que no lo define la inyección.
-        orchestrator = new SysacadSyncOrchestratorImpl(List.of(commissions, subjects, specialties, classrooms, buildings));
+        orchestrator = new SysacadSyncOrchestratorImpl(
+                List.of(commissions, subjects, specialties, classrooms, buildings), snapshotFactory);
     }
 
     @Test
@@ -58,25 +67,49 @@ class SysacadSyncOrchestratorImplTest {
         orchestrator.resyncAll();
 
         InOrder order = inOrder(buildings, classrooms, specialties, subjects, commissions);
-        order.verify(buildings).sync();
-        order.verify(classrooms).sync();
-        order.verify(specialties).sync();
-        order.verify(subjects).sync();
-        order.verify(commissions).sync();
+        order.verify(buildings).sync(any());
+        order.verify(classrooms).sync(any());
+        order.verify(specialties).sync(any());
+        order.verify(subjects).sync(any());
+        order.verify(commissions).sync(any());
         order.verifyNoMoreInteractions();
+    }
+
+    @Test
+    @DisplayName("resyncAll arma un único snapshot y lo pasa a todos los syncers registrados")
+    void resyncAll_buildsSingleSnapshotSharedByAllSyncers() {
+        orchestrator.resyncAll();
+
+        verify(snapshotFactory, times(1)).newSnapshot();
+        verify(buildings).sync(snapshot);
+        verify(classrooms).sync(snapshot);
+        verify(specialties).sync(snapshot);
+        verify(subjects).sync(snapshot);
+        verify(commissions).sync(snapshot);
+    }
+
+    @Test
+    @DisplayName("sync(view) arma un snapshot nuevo por cada invocación")
+    void sync_buildsOneSnapshotPerInvocation() {
+        orchestrator.sync(SysacadView.EDIFICIOS);
+        orchestrator.sync(SysacadView.AULAS);
+
+        verify(snapshotFactory, times(2)).newSnapshot();
+        verify(buildings).sync(snapshot);
+        verify(classrooms).sync(snapshot);
     }
 
     @Test
     @DisplayName("Una vista que falla no frena el resync de las siguientes")
     void resyncAll_continuesAfterFailedView() {
-        doThrow(new IllegalStateException("SysAcad no responde")).when(buildings).sync();
+        doThrow(new IllegalStateException("SysAcad no responde")).when(buildings).sync(any());
 
         orchestrator.resyncAll();
 
-        verify(classrooms).sync();
-        verify(specialties).sync();
-        verify(subjects).sync();
-        verify(commissions).sync();
+        verify(classrooms).sync(any());
+        verify(specialties).sync(any());
+        verify(subjects).sync(any());
+        verify(commissions).sync(any());
     }
 
     @Test
@@ -90,7 +123,7 @@ class SysacadSyncOrchestratorImplTest {
     @Test
     @DisplayName("Una vista con error de datos (no de conexión) da PARTIAL_FAILURE")
     void resyncAll_dataError_returnsPartialFailure() {
-        doThrow(new IllegalStateException("dato inválido")).when(buildings).sync();
+        doThrow(new IllegalStateException("dato inválido")).when(buildings).sync(any());
 
         SysacadResyncOutcome outcome = orchestrator.resyncAll();
 
@@ -100,11 +133,11 @@ class SysacadSyncOrchestratorImplTest {
     @Test
     @DisplayName("Todas las vistas fallando por conexión da CONNECTIVITY_FAILURE")
     void resyncAll_allConnectivityErrors_returnsConnectivityFailure() {
-        doThrow(new SysacadUnavailableException("I/O error", null)).when(buildings).sync();
-        doThrow(new SysacadUnavailableException("I/O error", null)).when(classrooms).sync();
-        doThrow(new SysacadUnavailableException("I/O error", null)).when(specialties).sync();
-        doThrow(new SysacadUnavailableException("I/O error", null)).when(subjects).sync();
-        doThrow(new SysacadUnavailableException("I/O error", null)).when(commissions).sync();
+        doThrow(new SysacadUnavailableException("I/O error", null)).when(buildings).sync(any());
+        doThrow(new SysacadUnavailableException("I/O error", null)).when(classrooms).sync(any());
+        doThrow(new SysacadUnavailableException("I/O error", null)).when(specialties).sync(any());
+        doThrow(new SysacadUnavailableException("I/O error", null)).when(subjects).sync(any());
+        doThrow(new SysacadUnavailableException("I/O error", null)).when(commissions).sync(any());
 
         SysacadResyncOutcome outcome = orchestrator.resyncAll();
 
@@ -114,8 +147,8 @@ class SysacadSyncOrchestratorImplTest {
     @Test
     @DisplayName("Conexión caída en una vista y otra con error de datos da PARTIAL_FAILURE")
     void resyncAll_mixedErrors_returnsPartialFailure() {
-        doThrow(new SysacadUnavailableException("I/O error", null)).when(buildings).sync();
-        doThrow(new IllegalStateException("dato inválido")).when(classrooms).sync();
+        doThrow(new SysacadUnavailableException("I/O error", null)).when(buildings).sync(any());
+        doThrow(new IllegalStateException("dato inválido")).when(classrooms).sync(any());
 
         SysacadResyncOutcome outcome = orchestrator.resyncAll();
 
@@ -131,7 +164,7 @@ class SysacadSyncOrchestratorImplTest {
             firstRunStarted.countDown();
             firstRunReleased.await();
             return null;
-        }).when(buildings).sync();
+        }).when(buildings).sync(any());
 
         Thread firstRun = new Thread(orchestrator::resyncAll);
         firstRun.start();
@@ -142,10 +175,10 @@ class SysacadSyncOrchestratorImplTest {
         firstRunReleased.countDown();
         firstRun.join();
 
-        verify(buildings, times(1)).sync();
-        verify(classrooms, times(1)).sync();
-        verify(specialties, times(1)).sync();
-        verify(subjects, times(1)).sync();
-        verify(commissions, times(1)).sync();
+        verify(buildings, times(1)).sync(any());
+        verify(classrooms, times(1)).sync(any());
+        verify(specialties, times(1)).sync(any());
+        verify(subjects, times(1)).sync(any());
+        verify(commissions, times(1)).sync(any());
     }
 }
