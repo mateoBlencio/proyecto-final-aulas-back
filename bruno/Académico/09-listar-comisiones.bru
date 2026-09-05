@@ -5,11 +5,21 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/commissions?includeDeactivated=false
+  url: {{baseUrl}}/v1/commissions?page=0&size=20&includeDeactivated=false
   body: none
   auth: inherit
 }
 
 params:query {
+  page: 0
+  size: 20
+  ~courseCode: K10
+  ~academicPeriodId: 1
   includeDeactivated: false
+}
+
+docs {
+  Listado paginado. Filtros opcionales: courseCode (contiene, case-insensitive),
+  academicPeriodId. La respuesta es
+  { content: [...], page: { size, number, totalElements, totalPages } }.
 }
