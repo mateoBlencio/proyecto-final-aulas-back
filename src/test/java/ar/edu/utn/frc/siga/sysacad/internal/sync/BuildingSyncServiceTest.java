@@ -36,7 +36,7 @@ class BuildingSyncServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new BuildingSyncService(catalogReader, buildingService, syncStateService);
+        service = new BuildingSyncService(buildingService, syncStateService);
     }
 
     @Test
@@ -51,7 +51,7 @@ class BuildingSyncServiceTest {
         when(catalogReader.findBuildings()).thenReturn(List.of(new SysacadBuildingDto(4, "Edif.Malvinas")));
         when(buildingService.syncBuildings(anyList())).thenReturn(1);
 
-        service.sync();
+        service.sync(catalogReader);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<BuildingSyncCommand>> captor = ArgumentCaptor.forClass(List.class);
@@ -65,7 +65,7 @@ class BuildingSyncServiceTest {
     void syncRecordsFailureAndRethrows() {
         when(catalogReader.findBuildings()).thenThrow(new IllegalStateException("SysAcad caído"));
 
-        assertThatThrownBy(() -> service.sync()).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(IllegalStateException.class);
 
         verify(syncStateService).recordFailure(SysacadView.EDIFICIOS, "SysAcad caído");
     }

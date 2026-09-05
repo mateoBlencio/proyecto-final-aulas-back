@@ -36,7 +36,7 @@ class ClassroomSyncServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ClassroomSyncService(catalogReader, classroomService, syncStateService);
+        service = new ClassroomSyncService(classroomService, syncStateService);
     }
 
     @Test
@@ -51,7 +51,7 @@ class ClassroomSyncServiceTest {
         when(catalogReader.findClassrooms()).thenReturn(List.of(new SysacadClassroomDto(101, 2, true, 70)));
         when(classroomService.syncClassrooms(anyList())).thenReturn(1);
 
-        service.sync();
+        service.sync(catalogReader);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<ClassroomSyncCommand>> captor = ArgumentCaptor.forClass(List.class);
@@ -65,7 +65,7 @@ class ClassroomSyncServiceTest {
     void syncRecordsFailureAndRethrows() {
         when(catalogReader.findClassrooms()).thenThrow(new IllegalStateException("SysAcad caído"));
 
-        assertThatThrownBy(() -> service.sync()).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(IllegalStateException.class);
 
         verify(syncStateService).recordFailure(SysacadView.AULAS, "SysAcad caído");
     }

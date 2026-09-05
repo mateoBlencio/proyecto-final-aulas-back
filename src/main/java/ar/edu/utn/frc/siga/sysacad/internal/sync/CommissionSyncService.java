@@ -22,7 +22,6 @@ import org.springframework.stereotype.Service;
 @ConditionalOnProperty(prefix = "siga.sysacad", name = "enabled", havingValue = "true")
 public class CommissionSyncService implements SysacadViewSyncer {
 
-    private final SysacadCatalogReader catalogReader;
     private final CommissionService commissionService;
     private final SysacadSyncStateService syncStateService;
 
@@ -32,11 +31,11 @@ public class CommissionSyncService implements SysacadViewSyncer {
     }
 
     @Override
-    public void sync() {
+    public void sync(SysacadCatalogReader catalog) {
         ViewSyncRunner.run(syncStateService, SysacadView.COMISIONES, "Comisiones", log, () -> {
             Map<EnrollmentKey, SysacadSubjectCommissionDto> enrollments =
-                    Maps.byId(catalogReader.findSubjectCommissions(), EnrollmentKey::of);
-            List<CommissionSyncCommand> commands = catalogReader.findCommissions().stream()
+                    Maps.byId(catalog.findSubjectCommissions(), EnrollmentKey::of);
+            List<CommissionSyncCommand> commands = catalog.findCommissions().stream()
                     .map(row -> toCommand(row, enrollments))
                     .toList();
             return commissionService.syncCommissions(commands);

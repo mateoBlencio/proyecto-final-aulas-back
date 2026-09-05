@@ -70,7 +70,7 @@ class AllocationSyncServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AllocationSyncService(catalogReader, commissionService, subjectCommissionService,
+        service = new AllocationSyncService(commissionService, subjectCommissionService,
                 academicEventService, classroomService, allocationService, syncStateService);
     }
 
@@ -105,7 +105,7 @@ class AllocationSyncServiceTest {
     void syncSkipsSentinelRoom(int roomNumber, int buildingCode) {
         when(catalogReader.findAllocations()).thenReturn(List.of(row("101", 55, 1, roomNumber, buildingCode)));
 
-        service.sync();
+        service.sync(catalogReader);
 
         verify(commissionService, never()).findActiveByCourseCode(any());
         verify(classroomService, never()).findByRoomNumberAndBuildingCode(any(), any());
@@ -121,7 +121,7 @@ class AllocationSyncServiceTest {
         when(commissionService.findActiveByCourseCode("999"))
                 .thenThrow(ResourceNotFoundException.of("Commission", "999"));
 
-        service.sync();
+        service.sync(catalogReader);
 
         verify(subjectCommissionService, never()).findByCommissionAndSubjectCode(any(), any());
         verify(classroomService, never()).findByRoomNumberAndBuildingCode(any(), any());
@@ -136,7 +136,7 @@ class AllocationSyncServiceTest {
         when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
         when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.empty());
 
-        service.sync();
+        service.sync(catalogReader);
 
         verify(academicEventService, never()).findRecurringEventId(any(), any(), any(), any(), any(), any());
         verify(allocationService).syncFromSysacad(List.of());
@@ -153,7 +153,7 @@ class AllocationSyncServiceTest {
                 TermType.PRIMER_CUATRIMESTRE.startDate(2026), TermType.PRIMER_CUATRIMESTRE.endDate(2026)))
                 .thenReturn(Optional.empty());
 
-        service.sync();
+        service.sync(catalogReader);
 
         verify(allocationService).syncFromSysacad(List.of());
     }
@@ -170,7 +170,7 @@ class AllocationSyncServiceTest {
                 .thenReturn(Optional.of(100L));
         when(allocationService.syncFromSysacad(anyList())).thenReturn(1);
 
-        service.sync();
+        service.sync(catalogReader);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<AllocationItem>> captor = ArgumentCaptor.forClass(List.class);
@@ -193,7 +193,7 @@ class AllocationSyncServiceTest {
                 TermType.SEGUNDO_CUATRIMESTRE.startDate(2026), TermType.SEGUNDO_CUATRIMESTRE.endDate(2026)))
                 .thenReturn(Optional.of(101L));
 
-        service.sync();
+        service.sync(catalogReader);
 
         verify(academicEventService, times(2)).findRecurringEventId(any(), any(), any(), any(), any(), any());
         @SuppressWarnings("unchecked")
@@ -229,7 +229,7 @@ class AllocationSyncServiceTest {
         appender.start();
         logger.addAppender(appender);
         try {
-            service.sync();
+            service.sync(catalogReader);
         } finally {
             logger.detachAppender(appender);
         }
@@ -252,7 +252,7 @@ class AllocationSyncServiceTest {
     void syncRecordsFailureAndRethrows() {
         when(catalogReader.findAllocations()).thenThrow(new IllegalStateException("SysAcad caído"));
 
-        assertThatThrownBy(() -> service.sync()).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(IllegalStateException.class);
 
         verify(syncStateService).recordFailure(SysacadView.ASIGNACIONES, "SysAcad caído");
         verify(allocationService, never()).syncFromSysacad(any());

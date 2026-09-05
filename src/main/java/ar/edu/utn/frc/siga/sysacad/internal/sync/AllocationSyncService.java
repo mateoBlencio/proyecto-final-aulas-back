@@ -38,7 +38,6 @@ public class AllocationSyncService implements SysacadViewSyncer {
 
     private static final Set<Integer> SENTINEL_ROOM_NUMBERS = Set.of(999, 0);
 
-    private final SysacadCatalogReader catalogReader;
     private final CommissionService commissionService;
     private final SubjectCommissionService subjectCommissionService;
     private final AcademicEventService academicEventService;
@@ -52,17 +51,17 @@ public class AllocationSyncService implements SysacadViewSyncer {
     }
 
     @Override
-    public void sync() {
-        ViewSyncRunner.run(syncStateService, SysacadView.ASIGNACIONES, "Asignaciones", log, this::doSync);
+    public void sync(SysacadCatalogReader catalog) {
+        ViewSyncRunner.run(syncStateService, SysacadView.ASIGNACIONES, "Asignaciones", log, () -> doSync(catalog));
     }
 
-    private int doSync() {
+    private int doSync(SysacadCatalogReader catalog) {
         SysacadCommissionResolver resolver = new SysacadCommissionResolver(commissionService, subjectCommissionService);
         Map<ClassroomKey, Optional<ClassroomResponseDto>> classroomCache = new HashMap<>();
         Map<OverlapKey, List<OverlapEntry>> overlapsBySlot = new LinkedHashMap<>();
         List<AllocationItem> items = new ArrayList<>();
 
-        for (SysacadAllocationDto row : catalogReader.findAllocations()) {
+        for (SysacadAllocationDto row : catalog.findAllocations()) {
             if (isSentinel(row)) {
                 continue;
             }

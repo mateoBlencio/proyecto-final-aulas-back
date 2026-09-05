@@ -57,7 +57,7 @@ class AcademicEventSyncServiceTest {
     @BeforeEach
     void setUp() {
         service = new AcademicEventSyncService(
-                catalogReader, commissionService, subjectCommissionService, academicEventService, syncStateService);
+                commissionService, subjectCommissionService, academicEventService, syncStateService);
     }
 
     @Test
@@ -86,7 +86,7 @@ class AcademicEventSyncServiceTest {
         when(academicEventService.syncRecurringEvent(any()))
                 .thenReturn(new UpsertRecurringEventResult(100L, true, false));
 
-        service.sync();
+        service.sync(catalogReader);
 
         ArgumentCaptor<SyncRecurringEventCommand> captor = ArgumentCaptor.forClass(SyncRecurringEventCommand.class);
         verify(academicEventService).syncRecurringEvent(captor.capture());
@@ -115,7 +115,7 @@ class AcademicEventSyncServiceTest {
         when(academicEventService.syncRecurringEvent(any()))
                 .thenReturn(new UpsertRecurringEventResult(101L, true, false));
 
-        service.sync();
+        service.sync(catalogReader);
 
         ArgumentCaptor<SyncRecurringEventCommand> captor = ArgumentCaptor.forClass(SyncRecurringEventCommand.class);
         verify(academicEventService).syncRecurringEvent(captor.capture());
@@ -135,7 +135,7 @@ class AcademicEventSyncServiceTest {
                 .thenReturn(new UpsertRecurringEventResult(100L, true, false))
                 .thenReturn(new UpsertRecurringEventResult(101L, true, false));
 
-        service.sync();
+        service.sync(catalogReader);
 
         ArgumentCaptor<SyncRecurringEventCommand> captor = ArgumentCaptor.forClass(SyncRecurringEventCommand.class);
         verify(academicEventService, times(2)).syncRecurringEvent(captor.capture());
@@ -155,7 +155,7 @@ class AcademicEventSyncServiceTest {
         when(commissionService.findActiveByCourseCode("999"))
                 .thenThrow(ResourceNotFoundException.of("Commission", "999"));
 
-        service.sync();
+        service.sync(catalogReader);
 
         verify(academicEventService, never()).syncRecurringEvent(any());
         verify(subjectCommissionService, never()).findByCommissionAndSubjectCode(any(), any());
@@ -173,7 +173,7 @@ class AcademicEventSyncServiceTest {
         when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 77))
                 .thenThrow(ResourceNotFoundException.of("SubjectCommission", "1-77"));
 
-        service.sync();
+        service.sync(catalogReader);
 
         verify(academicEventService, never()).syncRecurringEvent(any());
         verify(academicEventService).markRecurringEventsAbsent(Set.of());
@@ -188,7 +188,7 @@ class AcademicEventSyncServiceTest {
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
         when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
 
-        service.sync();
+        service.sync(catalogReader);
 
         verify(academicEventService, never()).syncRecurringEvent(any());
         verify(academicEventService).markRecurringEventsAbsent(Set.of());
@@ -208,7 +208,7 @@ class AcademicEventSyncServiceTest {
                 .thenReturn(new UpsertRecurringEventResult(100L, true, false))
                 .thenReturn(new UpsertRecurringEventResult(101L, true, false));
 
-        service.sync();
+        service.sync(catalogReader);
 
         verify(commissionService, times(1)).findActiveByCourseCode("101");
         verify(subjectCommissionService, times(1)).findByCommissionAndSubjectCode(1L, 55);
@@ -220,7 +220,7 @@ class AcademicEventSyncServiceTest {
     void syncRecordsFailureAndRethrows() {
         when(catalogReader.findAcademicEvents()).thenThrow(new IllegalStateException("SysAcad caído"));
 
-        assertThatThrownBy(() -> service.sync()).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(IllegalStateException.class);
 
         verify(syncStateService).recordFailure(SysacadView.EVENTOS, "SysAcad caído");
         verify(academicEventService, never()).markRecurringEventsAbsent(anyCollection());

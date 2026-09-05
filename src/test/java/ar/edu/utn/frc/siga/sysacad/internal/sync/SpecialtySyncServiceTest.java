@@ -36,7 +36,7 @@ class SpecialtySyncServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SpecialtySyncService(catalogReader, specialtyService, syncStateService);
+        service = new SpecialtySyncService(specialtyService, syncStateService);
     }
 
     @Test
@@ -52,7 +52,7 @@ class SpecialtySyncServiceTest {
                 .thenReturn(List.of(new SysacadSpecialtyDto(5, "Ingeniería en Sistemas de Información", "Ing. Sist. Inf.")));
         when(specialtyService.syncSpecialties(anyList())).thenReturn(1);
 
-        service.sync();
+        service.sync(catalogReader);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<SpecialtySyncCommand>> captor = ArgumentCaptor.forClass(List.class);
@@ -67,7 +67,7 @@ class SpecialtySyncServiceTest {
     void syncRecordsFailureAndRethrows() {
         when(catalogReader.findSpecialties()).thenThrow(new IllegalStateException("SysAcad caído"));
 
-        assertThatThrownBy(() -> service.sync()).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(IllegalStateException.class);
 
         verify(syncStateService).recordFailure(SysacadView.ESPECIALIDADES, "SysAcad caído");
     }
