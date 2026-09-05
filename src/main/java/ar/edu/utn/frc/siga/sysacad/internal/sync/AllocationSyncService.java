@@ -8,6 +8,7 @@ import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
+import ar.edu.utn.frc.siga.common.util.RecurringEventKey;
 import ar.edu.utn.frc.siga.events.dto.response.SysacadRecurringEventRefDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
@@ -18,7 +19,6 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadViewSyncer;
 import java.time.DayOfWeek;
-import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -142,10 +142,6 @@ public class AllocationSyncService implements SysacadViewSyncer {
                         entries.size(), entries);
             }
         });
-    }
-
-    private record RecurringEventKey(Long subjectId, Long commissionId, DayOfWeek dayOfWeek, LocalTime startTime,
-            LocalDate startDate, LocalDate endDate) {
     }
 
     private record ClassroomKey(Integer roomNumber, Integer buildingCode) {
