@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.events.dto.request.UpdateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.SysacadRecurringEventRefDto;
 import ar.edu.utn.frc.siga.events.mapper.AcademicEventComposer;
 import ar.edu.utn.frc.siga.events.mapper.OccurrenceMapper;
 import ar.edu.utn.frc.siga.events.model.AcademicEvent;
@@ -255,6 +256,15 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 .findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
                         subjectId, commissionId, dayOfWeek, startTime, startDate, endDate)
                 .map(RecurringEvent::getId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SysacadRecurringEventRefDto> findSysacadRecurringEvents() {
+        return recurringEventRepository.findBySysacadHashIsNotNull().stream()
+                .map(r -> new SysacadRecurringEventRefDto(r.getId(), r.getSubjectId(), r.getCommissionId(),
+                        r.getDayOfWeek(), r.getStartTime(), r.getStartDate(), r.getEndDate()))
+                .toList();
     }
 
     @Override

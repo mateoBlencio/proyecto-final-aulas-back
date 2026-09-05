@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.events.dto.request.UpdateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.SysacadRecurringEventRefDto;
 import ar.edu.utn.frc.siga.events.service.command.SyncRecurringEventCommand;
 import ar.edu.utn.frc.siga.events.service.command.UpsertRecurringEventResult;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
@@ -61,6 +62,8 @@ public interface AcademicEventService {
      */
     Optional<Long> findRecurringEventId(Long subjectId, Long commissionId, DayOfWeek dayOfWeek,
             LocalTime startTime, LocalDate startDate, LocalDate endDate);
+
+    List<SysacadRecurringEventRefDto> findSysacadRecurringEvents();
 
     AcademicEventResponseDto createUniqueEvent(CreateUniqueEventRequestDto dto);
 

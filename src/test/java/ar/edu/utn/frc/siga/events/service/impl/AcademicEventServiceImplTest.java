@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.events.dto.request.UpdateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.SysacadRecurringEventRefDto;
 import ar.edu.utn.frc.siga.events.dto.response.UniqueEventResponseDto;
 import ar.edu.utn.frc.siga.events.exception.InvalidCommissionForSubjectException;
 import ar.edu.utn.frc.siga.events.exception.MissingAcademicReferenceException;
@@ -399,6 +400,52 @@ class AcademicEventServiceImplTest {
 
         assertThat(affected).isZero();
         verify(recurringEventRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("findSysacadRecurringEvents: mapea cada evento sync-owned a una ref liviana, campo por campo")
+    void findSysacadRecurringEventsMapeaCampoPorCampo() {
+        RecurringEvent first = RecurringEvent.builder()
+                .id(10L)
+                .enrolled(30)
+                .startTime(LocalTime.of(8, 0))
+                .duration(Duration.ofMinutes(90))
+                .dayOfWeek(DayOfWeek.MONDAY)
+                .startDate(LocalDate.of(2026, 3, 1))
+                .endDate(LocalDate.of(2026, 7, 31))
+                .subjectId(1L)
+                .commissionId(2L)
+                .sysacadHash(Hashes.sha256Hex(90))
+                .build();
+        RecurringEvent second = RecurringEvent.builder()
+                .id(11L)
+                .enrolled(45)
+                .startTime(LocalTime.of(14, 30))
+                .duration(Duration.ofMinutes(120))
+                .dayOfWeek(DayOfWeek.WEDNESDAY)
+                .startDate(LocalDate.of(2026, 8, 1))
+                .endDate(LocalDate.of(2026, 12, 15))
+                .subjectId(3L)
+                .commissionId(4L)
+                .sysacadHash(Hashes.sha256Hex(120))
+                .build();
+        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(first, second));
+
+        List<SysacadRecurringEventRefDto> result = service.findSysacadRecurringEvents();
+
+        assertThat(result).containsExactly(
+                new SysacadRecurringEventRefDto(10L, 1L, 2L, DayOfWeek.MONDAY, LocalTime.of(8, 0),
+                        LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31)),
+                new SysacadRecurringEventRefDto(11L, 3L, 4L, DayOfWeek.WEDNESDAY, LocalTime.of(14, 30),
+                        LocalDate.of(2026, 8, 1), LocalDate.of(2026, 12, 15)));
+    }
+
+    @Test
+    @DisplayName("findSysacadRecurringEvents: sin eventos sync-owned → lista vacía")
+    void findSysacadRecurringEventsSinSyncOwned() {
+        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of());
+
+        assertThat(service.findSysacadRecurringEvents()).isEmpty();
     }
 
 
