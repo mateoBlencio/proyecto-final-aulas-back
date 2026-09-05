@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,6 +19,15 @@ public interface RecurringEventRepository extends JpaRepository<RecurringEvent, 
     Optional<RecurringEvent> findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
             Long subjectId, Long commissionId, DayOfWeek dayOfWeek, LocalTime startTime,
             LocalDate startDate, LocalDate endDate);
+
+    /**
+     * Prefetch del sync EVENTOS batcheado: todos los candidatos a reusar por clave natural para una
+     * corrida del sync, incluidos los que cargó el ingest de Excel ({@code sysacadHash} nulo) — el sync
+     * los reutiliza en vez de duplicarlos. Sobre-trae el producto cartesiano de materias × comisiones
+     * del lote; el filtrado real lo hace la clave natural completa en memoria.
+     */
+    List<RecurringEvent> findBySubjectIdInAndCommissionIdIn(Collection<Long> subjectIds,
+            Collection<Long> commissionIds);
 
     /**
      * Cursado vigente de una comisión en una materia: eventos que SysAcad tiene activos

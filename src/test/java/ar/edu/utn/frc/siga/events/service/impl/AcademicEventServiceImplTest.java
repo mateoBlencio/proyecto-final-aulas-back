@@ -274,7 +274,7 @@ class AcademicEventServiceImplTest {
     @DisplayName("syncRecurringEvent: no existe evento con esa clave natural → lo crea con sysacadHash inicial (hash de la duración escrita) y expande ocurrencias")
     void syncRecurringEventCreaNuevo() {
         SyncRecurringEventCommand cmd = syncCommand(90, 30);
-        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of());
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of());
         when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(5L));
 
         UpsertRecurringEventResult result = service.syncRecurringEvent(cmd);
@@ -302,7 +302,7 @@ class AcademicEventServiceImplTest {
     void syncRecurringEventPisaEnrolledSiempre() {
         SyncRecurringEventCommand cmd = syncCommand(90, 45);
         RecurringEvent existing = existingSyncedEvent(7L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
-        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(existing));
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of(existing));
 
         UpsertRecurringEventResult result = service.syncRecurringEvent(cmd);
 
@@ -324,7 +324,7 @@ class AcademicEventServiceImplTest {
     void syncRecurringEventPisaDurationSinDrift() {
         SyncRecurringEventCommand cmd = syncCommand(120, 30);
         RecurringEvent existing = existingSyncedEvent(7L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
-        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(existing));
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of(existing));
 
         UpsertRecurringEventResult result = service.syncRecurringEvent(cmd);
 
@@ -338,7 +338,7 @@ class AcademicEventServiceImplTest {
     void syncRecurringEventNoPisaDurationConDrift() {
         SyncRecurringEventCommand cmd = syncCommand(120, 30);
         RecurringEvent existing = existingSyncedEvent(7L, Duration.ofMinutes(100), Hashes.sha256Hex(90), true);
-        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(existing));
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of(existing));
 
         UpsertRecurringEventResult result = service.syncRecurringEvent(cmd);
 
@@ -354,7 +354,7 @@ class AcademicEventServiceImplTest {
     void syncRecurringEventPrimerResyncNoFalsoDrift() {
         SyncRecurringEventCommand cmd = syncCommand(90, 30);
         RecurringEvent justCreated = existingSyncedEvent(9L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
-        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(justCreated));
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of(justCreated));
 
         UpsertRecurringEventResult result = service.syncRecurringEvent(cmd);
 
@@ -365,9 +365,9 @@ class AcademicEventServiceImplTest {
     }
 
     @Test
-    @DisplayName("syncRecurringEvents: una sola lectura de prefetch del índice sync-owned para N comandos")
+    @DisplayName("syncRecurringEvents: una sola lectura de prefetch de candidatos por materia+comisión para N comandos")
     void syncRecurringEventsPrefetchUnaSolaVez() {
-        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of());
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of());
         when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(1L));
 
         service.syncRecurringEvents(List.of(
@@ -375,13 +375,13 @@ class AcademicEventServiceImplTest {
                 syncCommand(DayOfWeek.TUESDAY, 90, 30),
                 syncCommand(DayOfWeek.WEDNESDAY, 90, 30)));
 
-        verify(recurringEventRepository, times(1)).findBySysacadHashIsNotNull();
+        verify(recurringEventRepository, times(1)).findBySubjectIdInAndCommissionIdIn(any(), any());
     }
 
     @Test
     @DisplayName("syncRecurringEvents: dos comandos con la misma clave natural y evento inexistente → un solo insert, el segundo reconcilia el objeto en memoria")
     void syncRecurringEventsMismaClaveUnSoloInsert() {
-        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of());
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of());
         when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(3L));
 
         List<UpsertRecurringEventResult> results = service.syncRecurringEvents(List.of(
@@ -404,7 +404,7 @@ class AcademicEventServiceImplTest {
     @DisplayName("syncRecurringEvents: mezcla create + update en una sola llamada → sólo los nuevos van a eventRepository.saveAll, resultados con created/updated correctos")
     void syncRecurringEventsMezclaCreateUpdate() {
         RecurringEvent existing = existingSyncedEvent(7L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
-        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(existing));
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of(existing));
         when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(11L));
 
         List<UpsertRecurringEventResult> results = service.syncRecurringEvents(List.of(
@@ -428,7 +428,7 @@ class AcademicEventServiceImplTest {
     @DisplayName("syncRecurringEvents: el orden de los resultados coincide con el orden de los comandos de entrada")
     void syncRecurringEventsRespetaOrden() {
         RecurringEvent wednesday = syncedEventOn(3L, DayOfWeek.WEDNESDAY);
-        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(wednesday));
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of(wednesday));
         when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(20L));
 
         List<UpsertRecurringEventResult> results = service.syncRecurringEvents(List.of(

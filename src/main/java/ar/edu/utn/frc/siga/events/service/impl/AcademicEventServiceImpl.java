@@ -166,8 +166,12 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     @Override
     @Transactional
     public List<UpsertRecurringEventResult> syncRecurringEvents(List<SyncRecurringEventCommand> commands) {
+        Set<Long> subjectIds = commands.stream()
+                .map(SyncRecurringEventCommand::subjectId).collect(Collectors.toSet());
+        Set<Long> commissionIds = commands.stream()
+                .map(SyncRecurringEventCommand::commissionId).collect(Collectors.toSet());
         Map<RecurringEventKey, RecurringEvent> byKey = Maps.byId(
-                recurringEventRepository.findBySysacadHashIsNotNull(),
+                recurringEventRepository.findBySubjectIdInAndCommissionIdIn(subjectIds, commissionIds),
                 AcademicEventServiceImpl::keyOf, (first, ignored) -> first);
 
         Instant now = Instant.now();
