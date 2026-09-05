@@ -5,16 +5,21 @@ on:
     branches:
       - test
 
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-test
+  cancel-in-progress: false
+
 jobs:
   test:
     name: Tests
     runs-on: self-hosted
-    env:
-      DB_HOST: localhost
-      DB_PORT: 5432
-      DB_NAME: testdb
-      DB_USERNAME: test
-      DB_PASSWORD: test
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      checks: write
     steps:
       - uses: actions/checkout@v4
 
@@ -24,21 +29,85 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Run tests
-        run: ./mvnw test -Dspring.profiles.active=integration
+      - name: Build and test
+        run: ./mvnw -B --no-transfer-progress verify
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            target/surefire-reports/
+            target/site/jacoco/
+            target/spring-modulith-docs/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Publish test results
+        if: always()
+        uses: mikepenz/action-junit-report@v6
+        with:
+          report_paths: target/surefire-reports/TEST-*.xml
+          detailed_summary: true
+          fail_on_failure: false
 
   deploy-test:
     name: Deploy — backend-test
     needs: test
     runs-on: self-hosted
+    timeout-minutes: 15
+    environment: test
+    env:
+      ENV_FILE: /home/adminmate/proyecto-aulas/proyecto-final-aulas-back/.env
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check env file
+        run: |
+          set -euo pipefail
+          if [ ! -f "$ENV_FILE" ]; then
+            echo "::error::No existe $ENV_FILE en el server"
+            exit 1
+          fi
+          # Solo el bloque del servicio de este perfil: si no, el deploy a un entorno
+          # exigiria las variables del otro.
+          block=$(awk '/^  backend-test:/{f=1;next} /^  [a-zA-Z]|^[a-zA-Z]/{f=0} f' \
+            docker-compose.deploy.yml)
+          required=$(printf '%s' "$block" \
+            | grep -oE '\$\{[A-Z_][A-Z0-9_]*(:-[^}]*)?\}' \
+            | { grep -v ':-' || true; } | tr -d '${}' | sort -u)
+          if [ -z "$required" ]; then
+            echo "::error::No se extrajo ninguna variable para backend-test; revisar el chequeo"
+            exit 1
+          fi
+          # Un secret vacio esta tan roto como uno ausente: solo se toleran las
+          # que legitimamente pueden ir en blanco.
+          allow_empty=" SYSACAD_API_KEY "
+          missing=0
+          for key in $required; do
+            if ! grep -qE "^[[:space:]]*${key}=" "$ENV_FILE"; then
+              echo "::error::Falta en el .env del server: ${key}"
+              missing=1
+            elif ! grep -qE "^[[:space:]]*${key}=.+" "$ENV_FILE"; then
+              case "$allow_empty" in
+                *" ${key} "*) echo "::warning::Vacia a proposito: ${key}" ;;
+                *) echo "::error::Definida pero vacia en el .env del server: ${key}"
+                   missing=1 ;;
+              esac
+            fi
+          done
+          [ "$missing" -eq 0 ]
+
+      - name: Validate compose
+        run: |
+          docker compose -f docker-compose.deploy.yml --profile test \
+            --env-file "$ENV_FILE" config --quiet
 
       - name: Build and deploy
         run: |
           docker compose -f docker-compose.deploy.yml --profile test \
-            --env-file /home/adminmate/proyecto-aulas/proyecto-final-aulas-back/.env \
-            up -d --build
+            --env-file "$ENV_FILE" up -d --build
 
       - name: Health check
         run: |
@@ -54,3 +123,9 @@ jobs:
           echo "El contenedor no llegó a healthy a tiempo"
           docker logs "$container" --tail 50
           exit 1
+
+      - name: Free disk space
+        if: always()
+        run: |
+          docker image prune -f --filter until=24h
+          docker builder prune -f --filter until=168h
