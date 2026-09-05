@@ -67,17 +67,17 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
         return occurrences.getFirst();
     }
 
-    private static AllocationBatchRequestDto byOccurrence(Long occurrenceId, Integer classroomId) {
+    private static AllocationBatchRequestDto byOccurrence(Long occurrenceId, Long classroomId) {
         return new AllocationBatchRequestDto(
                 List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, null, null, classroomId)), null);
     }
 
-    private static AllocationBatchRequestDto byEvent(Long eventId, Integer classroomId, String observation) {
+    private static AllocationBatchRequestDto byEvent(Long eventId, Long classroomId, String observation) {
         return new AllocationBatchRequestDto(
                 List.of(new AllocationItemRequestDto(null, eventId, null, null, classroomId)), observation);
     }
 
-    private static AllocationBatchRequestDto byRange(Long eventId, LocalDate from, LocalDate to, Integer classroomId) {
+    private static AllocationBatchRequestDto byRange(Long eventId, LocalDate from, LocalDate to, Long classroomId) {
         return new AllocationBatchRequestDto(
                 List.of(new AllocationItemRequestDto(null, eventId, from, to, classroomId)), "movimiento por rango");
     }
@@ -89,12 +89,12 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
         return academicEventService.createRecurringEvent(dto).id();
     }
 
-    private Integer classroomOf(Long occurrenceId) {
+    private Long classroomOf(Long occurrenceId) {
         return allocationRepository.findByOccurrenceIdIn(List.of(occurrenceId)).stream()
                 .map(Allocation::getClassroomId).findFirst().orElse(null);
     }
 
-    private MvcResult allocateOk(Long occurrenceId, Integer classroomId) throws Exception {
+    private MvcResult allocateOk(Long occurrenceId, Long classroomId) throws Exception {
         return mockMvc.perform(post("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(byOccurrence(occurrenceId, classroomId))))
@@ -300,7 +300,6 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
                 .occurrenceId(past.getId())
                 .classroomId(aulaOriginal.getId())
                 .source(AllocationSource.MANUAL)
-                .createdAt(java.time.LocalDateTime.now())
                 .build()).getId();
 
         mockMvc.perform(put("/v1/allocations")

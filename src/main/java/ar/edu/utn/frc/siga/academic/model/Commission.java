@@ -1,22 +1,22 @@
 package ar.edu.utn.frc.siga.academic.model;
 
+import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.SQLRestriction;
 
 @Entity
-@Table(name = "comision", uniqueConstraints = @UniqueConstraint(columnNames = {"id_periodo", "codigo_curso", "numero_comision"}))
-@SQLRestriction("eliminado = false")
+@Table(name = "comision")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Commission {
+public class Commission extends SoftDeletableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -26,17 +26,21 @@ public class Commission {
     @Column(name = "codigo_curso", nullable = false)
     private String courseCode;
 
-    @Column(name = "numero_comision")
-    private Integer commissionNumber;
-
-    @Column(name = "anio_nivel")
-    private Integer yearLevel;
-
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_periodo", nullable = false)
+    @JoinColumn(name = "id_periodo_academico", nullable = false)
     private AcademicPeriod academicPeriod;
 
-    @Column(name = "eliminado")
+    @Column(name = "sincronizado_en")
+    private Instant syncedAt;
+
+    @Column(name = "hash_sysacad", length = 64)
+    private String sysacadHash;
+
     @Builder.Default
-    private Boolean deleted = false;
+    @Column(name = "habilitado_sysacad", nullable = false)
+    private Boolean sysacadEnabled = false;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 }

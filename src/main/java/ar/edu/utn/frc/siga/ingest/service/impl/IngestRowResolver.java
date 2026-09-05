@@ -16,6 +16,7 @@ import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
+import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.ingest.dto.RowDto;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
@@ -99,9 +100,8 @@ class IngestRowResolver {
             });
 
         CommissionResponseDto commission = cache.get(CommissionResponseDto.class,
-            dto.courseCode() + "-" + dto.commissionNumber() + "-" + period.year() + "-" + period.semester(), () ->
-                commissionService.findByCourseAndNumberAndPeriod(
-                    dto.courseCode(), dto.commissionNumber(), period.year(), period.semester()));
+            dto.courseCode() + "-" + period.year() + "-" + period.semester(), () ->
+                commissionService.findByCourseAndPeriod(dto.courseCode(), period.year(), period.semester()));
 
         cache.get(SubjectCommissionResponseDto.class, subject.id() + "-" + commission.id(), () ->
             subjectCommissionService.findBySubjectAndCommission(subject.id(), commission.id()));
@@ -113,10 +113,19 @@ class IngestRowResolver {
         BuildingResponseDto building = cache.get(BuildingResponseDto.class, dto.buildingName(), () ->
             buildingService.findByName(dto.buildingName()));
 
+        Integer roomNumber = parseRoomNumber(dto.roomNumber());
         ClassroomResponseDto classroom = cache.get(ClassroomResponseDto.class,
-            dto.roomNumber() + "-" + building.id(), () ->
-                classroomService.findByRoomNumberAndBuilding(dto.roomNumber(), building.id()));
+            roomNumber + "-" + building.id(), () ->
+                classroomService.findByRoomNumberAndBuilding(roomNumber, building.id()));
 
         return new SpaceRefs(building, classroom);
+    }
+
+    private Integer parseRoomNumber(String roomNumber) {
+        try {
+            return Integer.parseInt(roomNumber.trim());
+        } catch (NumberFormatException e) {
+            throw ResourceNotFoundException.of("Classroom", roomNumber);
+        }
     }
 }

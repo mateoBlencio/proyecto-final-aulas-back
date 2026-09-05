@@ -1,0 +1,42 @@
+meta {
+  name: Contar pedidos por estado
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/v1/room-requests/items/status-counts?includePast=false
+  body: none
+  auth: inherit
+}
+
+params:query {
+  includePast: false
+}
+
+docs {
+  Total de pedidos por estado, para los badges de las solapas de la bandeja.
+  Requiere autenticación (hasAnyRole SUBSECRETARIA, AUXILIAR_AULICO).
+
+  A diferencia de 06-listar-pedidos, NO toma los filtros del listado (types,
+  scope, subjectId, dateFrom, dateTo, statuses): cada badge es el total de ese
+  estado. Único parámetro:
+
+  - includePast: default false, oculta los pedidos con fecha ya pasada (mismo
+    criterio que la bandeja). includePast=true suma el histórico completo.
+
+  Respuesta 200: siempre los 3 estados, en este orden, con 0 cuando no hay
+  pedidos. Sin envoltorio de paginación.
+
+  [
+    { "status": "PENDING",      "count": 12 },
+    { "status": "PRE_APPROVED", "count": 3  },
+    { "status": "CANCELLED",    "count": 47 }
+  ]
+
+  Uso en el front: se pide una sola vez al entrar a la bandeja (y al togglear
+  includePast, si existe ese control). El badge de la solapa ACTIVA se pisa con
+  el page.totalElements del listado, que sí refleja todos los filtros. Los
+  badges de las otras solapas quedan quietos: solo status es un eje primario,
+  el resto de los filtros es secundario.
+}

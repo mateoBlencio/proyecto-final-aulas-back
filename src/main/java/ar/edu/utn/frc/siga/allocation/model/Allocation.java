@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.allocation.model;
 
+import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -17,8 +18,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.envers.Audited;
 
-import java.time.LocalDateTime;
-
 @Entity
 @Table(name = "asignacion_aula")
 @Audited
@@ -27,8 +26,8 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class Allocation {
+@EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
+public class Allocation extends TimestampedEntity {
 
     @EqualsAndHashCode.Include
     @Id
@@ -41,14 +40,11 @@ public class Allocation {
     private Long occurrenceId;
 
     @Column(name = "id_aula", nullable = false)
-    private Integer classroomId;
+    private Long classroomId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "origen", nullable = false)
     private AllocationSource source;
-
-    @Column(name = "fecha_creacion", nullable = false)
-    private LocalDateTime createdAt;
 
     @Column(name = "observaciones")
     private String observation;

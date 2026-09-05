@@ -1,0 +1,19 @@
+meta {
+  name: Activar / desactivar edificios en lote
+  type: http
+  seq: 8
+}
+
+patch {
+  url: {{baseUrl}}/v1/buildings/activation
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "buildings": [
+      { "id": 143, "active": false }
+    ]
+  }
+}

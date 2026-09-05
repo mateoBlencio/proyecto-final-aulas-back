@@ -55,9 +55,9 @@ public class EventAllocationComposer {
         Map<Long, Allocation> allocationByOccurrenceId = Maps.byId(
                 allocationRepository.findByOccurrenceIdIn(occurrenceIds), Allocation::getOccurrenceId);
 
-        Set<Integer> classroomIds = allocationByOccurrenceId.values().stream().map(Allocation::getClassroomId)
+        Set<Long> classroomIds = allocationByOccurrenceId.values().stream().map(Allocation::getClassroomId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
-        Map<Integer, ClassroomResponseDto> classroomById = Maps.byId(
+        Map<Long, ClassroomResponseDto> classroomById = Maps.byId(
                 classroomService.findByIds(classroomIds), ClassroomResponseDto::id);
 
         List<UniqueEventAllocationResponseDto> result = new ArrayList<>(uniqueEvents.size());

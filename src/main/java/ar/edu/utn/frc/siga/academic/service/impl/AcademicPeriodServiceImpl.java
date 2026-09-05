@@ -8,6 +8,7 @@ import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.util.Finder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -45,21 +46,36 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
     @Override
     public List<AcademicPeriodResponseDto> findActive() {
         log.debug("Buscando períodos académicos activos");
-        return academicPeriodRepository.findByActiveTrue().stream()
+        return academicPeriodRepository.findAllActive().stream()
                 .map(academicPeriodMapper::toDto)
                 .toList();
     }
 
     @Override
-    public List<AcademicPeriodResponseDto> findAll() {
-        return academicPeriodRepository.findAll().stream()
+    public List<AcademicPeriodResponseDto> findAll(boolean includeDeactivated) {
+        List<AcademicPeriod> periods = includeDeactivated
+                ? academicPeriodRepository.findAll()
+                : academicPeriodRepository.findAllActive();
+        return periods.stream()
                 .map(academicPeriodMapper::toDto)
                 .toList();
     }
 
     @Override
     public AcademicPeriodResponseDto findById(Long id) {
-        return academicPeriodMapper.toDto(academicPeriodRepository.findById(id)
+        return academicPeriodMapper.toDto(academicPeriodRepository.findActiveById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("AcademicPeriod", id)));
+    }
+
+    @Override
+    @Transactional
+    public void activate(Long id) {
+        academicPeriodRepository.restore(Finder.orThrow(academicPeriodRepository::findById, id, "AcademicPeriod"));
+    }
+
+    @Override
+    @Transactional
+    public void deactivate(Long id) {
+        academicPeriodRepository.softDelete(Finder.orThrow(academicPeriodRepository::findById, id, "AcademicPeriod"));
     }
 }

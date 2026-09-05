@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
+import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
@@ -16,12 +17,22 @@ import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import static ar.edu.utn.frc.siga.space.service.ClassroomService.DEFAULT_CLASSROOM_TYPE;
+
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
+import ar.edu.utn.frc.siga.space.model.ClassroomPermission;
+import ar.edu.utn.frc.siga.space.model.ClassroomResource;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
+import ar.edu.utn.frc.siga.space.model.PermissionTargetKind;
+import ar.edu.utn.frc.siga.space.model.ResourceType;
+import ar.edu.utn.frc.siga.space.model.ResourceValueKind;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
+import ar.edu.utn.frc.siga.space.repository.ClassroomPermissionRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
+import ar.edu.utn.frc.siga.space.repository.ClassroomResourceRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
+import ar.edu.utn.frc.siga.space.repository.ResourceTypeRepository;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -29,7 +40,6 @@ import java.time.LocalTime;
 import java.util.concurrent.atomic.AtomicLong;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.TestConfiguration;
 
 @TestConfiguration
@@ -41,6 +51,9 @@ public class IntegrationTestData {
     private final BuildingRepository buildingRepository;
     private final ClassroomRepository classroomRepository;
     private final ClassroomTypeRepository classroomTypeRepository;
+    private final ResourceTypeRepository resourceTypeRepository;
+    private final ClassroomResourceRepository classroomResourceRepository;
+    private final ClassroomPermissionRepository classroomPermissionRepository;
 
     private final SpecialtyRepository specialtyRepository;
     private final StudyPlanRepository studyPlanRepository;
@@ -51,61 +64,78 @@ public class IntegrationTestData {
     private final AcademicPeriodService academicPeriodService;
     private final AcademicEventService academicEventService;
 
-    @Value("${siga.space.default-classroom-type:Normal}")
-    private String defaultClassroomTypeDescription;
-
     public static long nextSeq() {
         return SEQ.incrementAndGet();
     }
 
-    public ClassroomType tipoAulaNormal() {
-        return classroomTypeRepository.findByDescriptionIgnoreCase(defaultClassroomTypeDescription)
+    public ClassroomType tipoAulaPorDefecto() {
+        return classroomTypeRepository.findByDescriptionIgnoreCaseAndDeletedAtIsNull(DEFAULT_CLASSROOM_TYPE)
                 .orElseGet(() -> classroomTypeRepository.save(
                         ClassroomType.builder()
-                                .description(defaultClassroomTypeDescription)
-                                .deleted(false)
+                                .description(DEFAULT_CLASSROOM_TYPE)
                                 .build()));
     }
 
-    public Building edificio(String namePrefix, int floorCount, boolean active) {
-        return buildingRepository.save(Building.builder()
+    public Building edificio(String namePrefix, boolean active) {
+        Building building = Building.builder()
                 .name(namePrefix + "-" + nextSeq())
-                .floorCount(floorCount)
-                .active(active)
-                .deleted(false)
-                .build());
+                .build();
+        if (!active) {
+            building.deactivate();
+        }
+        return buildingRepository.save(building);
     }
 
     public Building edificio() {
-        return edificio("Edificio-IT", 5, true);
+        return edificio("Edificio-IT", true);
     }
 
     public Building edificioConNombre(String name) {
         return buildingRepository.save(Building.builder()
                 .name(name)
-                .floorCount(5)
-                .active(true)
-                .deleted(false)
                 .build());
     }
 
-    public Classroom aula(Building building, ClassroomType tipo, int floor, int capacity, boolean available) {
-        return aulaConNumero("AULA-" + nextSeq(), building, tipo, floor, capacity, available);
+    public Classroom aula(Building building, ClassroomType tipo, int capacity) {
+        return aulaConNumero((int) nextSeq(), building, tipo, capacity);
     }
 
     public Classroom aula(Building building) {
-        return aula(building, tipoAulaNormal(), 1, 40, true);
+        return aula(building, tipoAulaPorDefecto(), 40);
     }
 
-    public Classroom aulaConNumero(String roomNumber, Building building, ClassroomType tipo, int floor, int capacity, boolean available) {
+    public Classroom aulaConNumero(Integer roomNumber, Building building, ClassroomType tipo, int capacity) {
         return classroomRepository.save(Classroom.builder()
                 .roomNumber(roomNumber)
-                .floor(floor)
                 .capacity(capacity)
-                .available(available)
-                .deleted(false)
                 .building(building)
                 .classroomType(tipo)
+                .build());
+    }
+
+    public ResourceType tipoRecurso(String name, ResourceValueKind valueKind) {
+        return resourceTypeRepository.findAll().stream()
+                .filter(type -> type.getName().equalsIgnoreCase(name))
+                .findFirst()
+                .orElseGet(() -> resourceTypeRepository.save(ResourceType.builder()
+                        .name(name)
+                        .valueKind(valueKind)
+                        .build()));
+    }
+
+    public ClassroomResource recursoDeAula(Classroom classroom, ResourceType tipo, int quantity) {
+        return classroomResourceRepository.save(ClassroomResource.builder()
+                .classroom(classroom)
+                .resourceType(tipo)
+                .quantity(quantity)
+                .build());
+    }
+
+    public ClassroomPermission permisoDeAula(Classroom classroom, Long subjectId) {
+        return classroomPermissionRepository.save(ClassroomPermission.builder()
+                .classroom(classroom)
+                .targetKind(PermissionTargetKind.SUBJECT)
+                .targetId(subjectId)
                 .build());
     }
 
@@ -144,7 +174,7 @@ public class IntegrationTestData {
 
         int year = 2100 + (int) (nextSeq() % 500);
         AcademicPeriod period = periodoAcademico(year, TermType.ANUAL);
-        Commission commission = comision("CUR-" + nextSeq(), 1, period);
+        Commission commission = comision("CUR-" + nextSeq(), period);
         materiaComision(subject, commission, 30);
 
         return new SubjectAndCommission(subject.getId(), commission.getId());
@@ -155,17 +185,16 @@ public class IntegrationTestData {
         return academicPeriodRepository.findByYearAndSemester(year, termType.getSemester()).orElseThrow();
     }
 
-    public Commission comision(String courseCode, int commissionNumber, AcademicPeriod period) {
+    public Commission comision(String courseCode, AcademicPeriod period) {
         return commissionRepository.save(Commission.builder()
                 .courseCode(courseCode)
-                .commissionNumber(commissionNumber)
-                .yearLevel(1)
                 .academicPeriod(period)
                 .build());
     }
 
     public SubjectCommission materiaComision(Subject subject, Commission commission, int enrolledCount) {
         return subjectCommissionRepository.save(SubjectCommission.builder()
+                .id(new SubjectCommissionId())
                 .subject(subject)
                 .commission(commission)
                 .enrolledCount(enrolledCount)

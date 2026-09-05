@@ -5,7 +5,7 @@ import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import org.springframework.modulith.NamedInterface;
 
@@ -13,7 +13,7 @@ import org.springframework.modulith.NamedInterface;
 public record AllocationResponseDto(
         Long id,
         AllocationSource source,
-        LocalDateTime createdAt,
+        Instant createdAt,
         String observation,
         OccurrenceResponseDto occurrence,
         AcademicEventResponseDto event,

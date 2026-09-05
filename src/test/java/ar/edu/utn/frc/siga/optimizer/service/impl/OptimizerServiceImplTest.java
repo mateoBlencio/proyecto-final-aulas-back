@@ -82,7 +82,7 @@ class OptimizerServiceImplTest {
         void overlappingEventsAreSymmetricallyConflicting() throws Exception {
             OptimizerEvent a = event("a", LocalTime.of(8, 0), LocalTime.of(10, 0), DATE);
             OptimizerEvent b = event("b", LocalTime.of(9, 0), LocalTime.of(11, 0), DATE);
-            OptimizerRoom room = new OptimizerRoom(1, 50, 10);
+            OptimizerRoom room = new OptimizerRoom(1L, 50, 10L);
 
             ArgumentCaptor<ScheduleSolution> captor = stubSolverToEchoProblem();
             service.optimize(List.of(a, b), List.of(room), List.of(), 5);
@@ -97,7 +97,7 @@ class OptimizerServiceImplTest {
         void contiguousEventsDoNotConflict() throws Exception {
             OptimizerEvent a = event("a", LocalTime.of(8, 0), LocalTime.of(10, 0), DATE);
             OptimizerEvent b = event("b", LocalTime.of(10, 0), LocalTime.of(12, 0), DATE);
-            OptimizerRoom room = new OptimizerRoom(1, 50, 10);
+            OptimizerRoom room = new OptimizerRoom(1L, 50, 10L);
 
             ArgumentCaptor<ScheduleSolution> captor = stubSolverToEchoProblem();
             service.optimize(List.of(a, b), List.of(room), List.of(), 5);
@@ -112,7 +112,7 @@ class OptimizerServiceImplTest {
         void sharedMultipleDatesDoesNotDuplicate() throws Exception {
             OptimizerEvent a = event("a", LocalTime.of(8, 0), LocalTime.of(10, 0), DATE, OTHER_DATE);
             OptimizerEvent b = event("b", LocalTime.of(9, 0), LocalTime.of(11, 0), DATE, OTHER_DATE);
-            OptimizerRoom room = new OptimizerRoom(1, 50, 10);
+            OptimizerRoom room = new OptimizerRoom(1L, 50, 10L);
 
             ArgumentCaptor<ScheduleSolution> captor = stubSolverToEchoProblem();
             service.optimize(List.of(a, b), List.of(room), List.of(), 5);
@@ -126,7 +126,7 @@ class OptimizerServiceImplTest {
         void differentDatesDoNotConflict() throws Exception {
             OptimizerEvent a = event("a", LocalTime.of(8, 0), LocalTime.of(10, 0), DATE);
             OptimizerEvent b = event("b", LocalTime.of(9, 0), LocalTime.of(11, 0), OTHER_DATE);
-            OptimizerRoom room = new OptimizerRoom(1, 50, 10);
+            OptimizerRoom room = new OptimizerRoom(1L, 50, 10L);
 
             ArgumentCaptor<ScheduleSolution> captor = stubSolverToEchoProblem();
             service.optimize(List.of(a, b), List.of(room), List.of(), 5);
@@ -144,8 +144,8 @@ class OptimizerServiceImplTest {
         @Test
         @DisplayName("ocupación cuya aula no está entre las candidatas se descarta")
         void occupancyWithNonCandidateRoomIsDiscarded() throws Exception {
-            OptimizerRoom candidateRoom = new OptimizerRoom(1, 50, 10);
-            OptimizerOccupancy occupancy = new OptimizerOccupancy(99, DATE, LocalTime.of(8, 0), LocalTime.of(10, 0));
+            OptimizerRoom candidateRoom = new OptimizerRoom(1L, 50, 10L);
+            OptimizerOccupancy occupancy = new OptimizerOccupancy(99L, DATE, LocalTime.of(8, 0), LocalTime.of(10, 0));
 
             ArgumentCaptor<ScheduleSolution> captor = stubSolverToEchoProblem();
             service.optimize(List.of(), List.of(candidateRoom), List.of(occupancy), 5);
@@ -157,9 +157,9 @@ class OptimizerServiceImplTest {
         @Test
         @DisplayName("ocupaciones duplicadas por planningId (misma aula/fecha/hora) colapsan a una sola")
         void duplicateOccupancyByPlanningIdCollapses() throws Exception {
-            OptimizerRoom room = new OptimizerRoom(1, 50, 10);
-            OptimizerOccupancy occupancyA = new OptimizerOccupancy(1, DATE, LocalTime.of(8, 0), LocalTime.of(10, 0));
-            OptimizerOccupancy occupancyB = new OptimizerOccupancy(1, DATE, LocalTime.of(8, 0), LocalTime.of(10, 0));
+            OptimizerRoom room = new OptimizerRoom(1L, 50, 10L);
+            OptimizerOccupancy occupancyA = new OptimizerOccupancy(1L, DATE, LocalTime.of(8, 0), LocalTime.of(10, 0));
+            OptimizerOccupancy occupancyB = new OptimizerOccupancy(1L, DATE, LocalTime.of(8, 0), LocalTime.of(10, 0));
 
             ArgumentCaptor<ScheduleSolution> captor = stubSolverToEchoProblem();
             service.optimize(List.of(), List.of(room), List.of(occupancyA, occupancyB), 5);
@@ -171,8 +171,8 @@ class OptimizerServiceImplTest {
         @Test
         @DisplayName("la ocupación existente se modela como allocation pinned con el aula fija como única candidata")
         void occupancyBecomesPinnedAllocation() throws Exception {
-            OptimizerRoom room = new OptimizerRoom(1, 50, 10);
-            OptimizerOccupancy occupancy = new OptimizerOccupancy(1, DATE, LocalTime.of(8, 0), LocalTime.of(10, 0));
+            OptimizerRoom room = new OptimizerRoom(1L, 50, 10L);
+            OptimizerOccupancy occupancy = new OptimizerOccupancy(1L, DATE, LocalTime.of(8, 0), LocalTime.of(10, 0));
 
             ArgumentCaptor<ScheduleSolution> captor = stubSolverToEchoProblem();
             service.optimize(List.of(), List.of(room), List.of(occupancy), 5);
@@ -193,9 +193,9 @@ class OptimizerServiceImplTest {
         @Test
         @DisplayName("las allocations pinned quedan excluidas del resultado")
         void pinnedAllocationsAreExcluded() throws Exception {
-            OptimizerRoom room = new OptimizerRoom(1, 50, 10);
+            OptimizerRoom room = new OptimizerRoom(1L, 50, 10L);
             OptimizerEvent newEvent = event("nuevo", LocalTime.of(8, 0), LocalTime.of(10, 0), DATE);
-            OptimizerOccupancy occupancy = new OptimizerOccupancy(1, OTHER_DATE, LocalTime.of(8, 0), LocalTime.of(10, 0));
+            OptimizerOccupancy occupancy = new OptimizerOccupancy(1L, OTHER_DATE, LocalTime.of(8, 0), LocalTime.of(10, 0));
 
             stubSolverToEchoProblem();
             OptimizationResult result = service.optimize(List.of(newEvent), List.of(room), List.of(occupancy), 5);

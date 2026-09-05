@@ -15,13 +15,13 @@ import org.springframework.security.core.userdetails.UserDetails;
 @Getter
 public class SecurityUser implements UserDetails {
 
-    private final Integer id;
+    private final Long id;
     private final String email;
     private final String password;
     private final Set<Role> roles;
     private final boolean enabled;
 
-    public SecurityUser(Integer id, String email, String password, Set<Role> roles, boolean enabled) {
+    public SecurityUser(Long id, String email, String password, Set<Role> roles, boolean enabled) {
         this.id = id;
         this.email = email;
         this.password = password;

@@ -1,14 +1,12 @@
 package ar.edu.utn.frc.siga.academic.repository;
 
 import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
-import java.util.List;
+import ar.edu.utn.frc.siga.common.repository.SoftDeletableRepository;
 import java.util.Optional;
-import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface AcademicPeriodRepository extends JpaRepository<AcademicPeriod, Long> {
-    Optional<AcademicPeriod> findByYearAndSemester(Integer year, Integer semester);
+public interface AcademicPeriodRepository extends SoftDeletableRepository<AcademicPeriod, Long> {
 
-    List<AcademicPeriod> findByActiveTrue();
+    Optional<AcademicPeriod> findByYearAndSemester(Integer year, Integer semester);
 }

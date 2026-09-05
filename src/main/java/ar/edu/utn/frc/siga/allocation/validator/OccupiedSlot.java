@@ -10,10 +10,10 @@ import ar.edu.utn.frc.siga.common.util.TimeSpan;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 
 @NamedInterface("api")
-public record OccupiedSlot(Integer classroomId, LocalDate date, LocalTime startTime, LocalTime endTime,
+public record OccupiedSlot(Long classroomId, LocalDate date, LocalTime startTime, LocalTime endTime,
                             Long eventId, Long allocationId, Long occurrenceId) implements TimeSpan {
 
-    public OccupiedSlot(Integer classroomId, LocalDate date, LocalTime startTime, LocalTime endTime,
+    public OccupiedSlot(Long classroomId, LocalDate date, LocalTime startTime, LocalTime endTime,
                         Long eventId, Long allocationId) {
         this(classroomId, date, startTime, endTime, eventId, allocationId, null);
     }

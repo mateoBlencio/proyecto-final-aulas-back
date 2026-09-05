@@ -5,7 +5,11 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/commissions
+  url: {{baseUrl}}/v1/commissions?includeDeactivated=false
   body: none
   auth: inherit
+}
+
+params:query {
+  includeDeactivated: false
 }

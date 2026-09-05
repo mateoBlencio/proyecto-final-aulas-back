@@ -70,7 +70,7 @@ class RoomRequestItemStatusCountsApiIntegrationTest extends AbstractIntegrationT
         long preApprovedBefore = count(RoomRequestStatus.PRE_APPROVED, false);
         long cancelledBefore = count(RoomRequestStatus.CANCELLED, false);
 
-        RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM, academic.subjectId());
+        RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
         seedItem(request, academic.commissionId(), LocalDate.now().plusDays(10), RoomRequestStatus.PENDING);
         seedItem(request, academic.commissionId(), LocalDate.now().plusDays(11), RoomRequestStatus.PENDING);
         seedItem(request, academic.commissionId(), LocalDate.now().plusDays(12), RoomRequestStatus.PRE_APPROVED);
@@ -89,7 +89,7 @@ class RoomRequestItemStatusCountsApiIntegrationTest extends AbstractIntegrationT
         long cancelledVigentesBefore = count(RoomRequestStatus.CANCELLED, false);
         long cancelledTodosBefore = count(RoomRequestStatus.CANCELLED, true);
 
-        RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM, academic.subjectId());
+        RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
         seedItem(request, academic.commissionId(), LocalDate.now().minusDays(5), RoomRequestStatus.CANCELLED);
         roomRequestRepository.save(request);
 
@@ -129,7 +129,6 @@ class RoomRequestItemStatusCountsApiIntegrationTest extends AbstractIntegrationT
                 .teacherEmail("ada@frc.utn.edu.ar")
                 .teacherPhone("351-1234567")
                 .subjectId(subjectId)
-                .createdAt(LocalDateTime.now())
                 .build();
     }
 
@@ -140,7 +139,6 @@ class RoomRequestItemStatusCountsApiIntegrationTest extends AbstractIntegrationT
                 .date(date)
                 .startTime(LocalTime.of(10, 0))
                 .duration(Duration.ofMinutes(120))
-                .enrolled(30)
                 .estimated(35)
                 .classroomCount(1)
                 .build();

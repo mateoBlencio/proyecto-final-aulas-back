@@ -1,7 +1,9 @@
 package ar.edu.utn.frc.siga.space.controller;
 
 import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
+import ar.edu.utn.frc.siga.space.dto.request.ClassroomDetailsUpdateDto;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomListItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,8 +41,8 @@ public class ClassroomController {
     @PostMapping
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Crear aula",
-               description = "400 si el roomNumber ya existe, si el piso excede el floorCount del edificio o si "
-                       + "la capacidad no es positiva. 404 si el edificio o el tipo de aula no existen.")
+               description = "400 si el roomNumber ya existe en el edificio o si la capacidad no es positiva. "
+                       + "404 si el edificio o el tipo de aula no existen.")
     public ResponseEntity<ClassroomResponseDto> create(@Valid @RequestBody ClassroomRequestDto dto) {
         log.debug("POST /v1/classrooms: roomNumber={}, buildingId={}", dto.roomNumber(), dto.buildingId());
         ClassroomResponseDto response = classroomService.create(dto);
@@ -51,7 +53,7 @@ public class ClassroomController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     @Operation(summary = "Buscar aula por id", description = "404 si el aula no existe.")
-    public ResponseEntity<ClassroomResponseDto> findById(@PathVariable Integer id) {
+    public ResponseEntity<ClassroomResponseDto> findById(@PathVariable Long id) {
         log.debug("GET /v1/classrooms/{}", id);
         return ResponseEntity.ok(classroomService.findById(id));
     }
@@ -59,21 +61,22 @@ public class ClassroomController {
     @GetMapping
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     @Operation(summary = "Listar aulas", description = "Listado paginado con filtros opcionales por número, "
-            + "edificio, tipo, capacidad, piso y disponibilidad.")
-    public ResponseEntity<Page<ClassroomResponseDto>> findAll(
+            + "edificio, tipo y capacidad. Por defecto solo devuelve las aulas activas; con "
+            + "includeDeactivated=true incluye también las desactivadas.")
+    public ResponseEntity<Page<ClassroomListItemDto>> findAll(
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
-            @RequestParam(required = false) String roomNumber,
-            @RequestParam(required = false) Integer buildingId,
-            @RequestParam(required = false) Integer classroomTypeId,
+            @RequestParam(required = false) Integer roomNumber,
+            @RequestParam(required = false) Long buildingId,
+            @RequestParam(required = false) Long classroomTypeId,
             @RequestParam(required = false) Integer capacityMin,
             @RequestParam(required = false) Integer capacityMax,
-            @RequestParam(required = false) Integer floor,
-            @RequestParam(required = false) Boolean available) {
+            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
 
-        log.debug("GET /v1/classrooms: buildingId={}, page={}", buildingId, pageable.getPageNumber());
+        log.debug("GET /v1/classrooms: buildingId={}, page={}, includeDeactivated={}",
+                buildingId, pageable.getPageNumber(), includeDeactivated);
         ClassroomFilter filter = new ClassroomFilter(roomNumber, buildingId, classroomTypeId,
-                capacityMin, capacityMax, floor, available);
-        Page<ClassroomResponseDto> page = classroomService.findAll(filter, pageable);
+                capacityMin, capacityMax);
+        Page<ClassroomListItemDto> page = classroomService.findAll(filter, pageable, includeDeactivated);
         log.info("Aulas listadas: total={}", page.getTotalElements());
         return ResponseEntity.ok(page);
     }
@@ -81,9 +84,9 @@ public class ClassroomController {
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Actualizar aula",
-               description = "404 si el aula, el edificio o el tipo de aula no existen. 400 si el piso excede "
-                       + "el floorCount del edificio o si la capacidad no es positiva.")
-    public ResponseEntity<ClassroomResponseDto> update(@PathVariable Integer id,
+               description = "404 si el aula, el edificio o el tipo de aula no existen. 400 si la capacidad no "
+                       + "es positiva.")
+    public ResponseEntity<ClassroomResponseDto> update(@PathVariable Long id,
                                                         @Valid @RequestBody ClassroomRequestDto dto) {
         log.debug("PUT /v1/classrooms/{}: roomNumber={}", id, dto.roomNumber());
         ClassroomResponseDto response = classroomService.update(id, dto);
@@ -91,13 +94,50 @@ public class ClassroomController {
         return ResponseEntity.ok(response);
     }
 
+    @PutMapping("/{id}/details")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Actualizar campos locales del aula",
+               description = "Actualiza tipo de aula, observaciones, recursos y política de permitido. No toca "
+                       + "número, edificio ni capacidad (SysAcad-owned). 404 si el aula o el tipo no existen; "
+                       + "400 si un código de recurso es desconocido.")
+    public ResponseEntity<ClassroomListItemDto> updateDetails(@PathVariable Long id,
+                                                              @Valid @RequestBody ClassroomDetailsUpdateDto dto) {
+        log.debug("PUT /v1/classrooms/{}/details: permissionMode={}", id, dto.permissionMode());
+        ClassroomListItemDto response = classroomService.updateDetails(id, dto);
+        log.info("Campos locales del aula actualizados vía controller: id={}", id);
+        return ResponseEntity.ok(response);
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('SUBSECRETARIA')")
     @Operation(summary = "Eliminar aula", description = "Soft-delete. 404 si el aula no existe.")
-    public ResponseEntity<Void> delete(@PathVariable Integer id) {
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.debug("DELETE /v1/classrooms/{}", id);
         classroomService.delete(id);
         log.info("Aula eliminada vía controller: id={}", id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{id}/activation")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Activar aula",
+               description = "Reactiva un aula previamente desactivada (idempotente). "
+                       + "204 si queda activa; 404 si el aula no existe.")
+    public ResponseEntity<Void> activate(@PathVariable Long id) {
+        log.debug("PUT /v1/classrooms/{}/activation", id);
+        classroomService.activate(id);
+        log.info("Aula activada vía controller: id={}", id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{id}/activation")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Desactivar aula",
+               description = "Soft-delete idempotente. 204 si queda inactiva; 404 si el aula no existe.")
+    public ResponseEntity<Void> deactivate(@PathVariable Long id) {
+        log.debug("DELETE /v1/classrooms/{}/activation", id);
+        classroomService.deactivate(id);
+        log.info("Aula desactivada vía controller: id={}", id);
         return ResponseEntity.noContent().build();
     }
 

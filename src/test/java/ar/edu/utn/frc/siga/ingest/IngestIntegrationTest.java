@@ -29,6 +29,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.DayOfWeek;
@@ -42,6 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @Import(IntegrationTestData.class)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_CLASS)
 @DisplayName("Excel Import (integración)")
 class IngestIntegrationTest extends AbstractIntegrationTest {
 
@@ -74,7 +76,7 @@ class IngestIntegrationTest extends AbstractIntegrationTest {
         return DataRow.builder()
                 .courseCode("6" + seq)
                 .commissionNumber(1)
-                .roomNumber("AULA-" + seq)
+                .roomNumber(code)
                 .buildingName(buildingName)
                 .day("Lunes")
                 .termType("Anual")
@@ -98,13 +100,13 @@ class IngestIntegrationTest extends AbstractIntegrationTest {
         var plan = integrationTestData.planDeEstudio(row.studyPlanCode(), specialty);
         Subject subject = integrationTestData.materia(row.subjectCode(), row.subjectName(), plan, row.termType());
         var building = integrationTestData.edificioConNombre(row.buildingName());
-        integrationTestData.aulaConNumero((String) row.roomNumber(), building,
-                integrationTestData.tipoAulaNormal(), 1, row.enrolledCount(), true);
+        integrationTestData.aulaConNumero((Integer) row.roomNumber(), building,
+                integrationTestData.tipoAulaPorDefecto(), row.enrolledCount());
 
         int year = 2026;
         TermType termType = TermType.fromLabel(row.termType()).orElseThrow();
         AcademicPeriod period = integrationTestData.periodoAcademico(year, termType);
-        Commission commission = integrationTestData.comision(row.courseCode(), row.commissionNumber(), period);
+        Commission commission = integrationTestData.comision(row.courseCode(), period);
         integrationTestData.materiaComision(subject, commission, row.enrolledCount());
         integrationTestData.eventoRecurrente(subject.getId(), commission.getId(), DayOfWeek.MONDAY,
                 LocalTime.of(18, 30), 90, termType.startDate(year), termType.endDate(year), row.enrolledCount());
@@ -135,7 +137,7 @@ class IngestIntegrationTest extends AbstractIntegrationTest {
         assertThat(eventRepository.count()).isEqualTo(eventsBefore);
         assertThat(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester())).isPresent();
 
-        Classroom classroom1 = classroomRepository.findByRoomNumber((String) row1.roomNumber()).orElseThrow();
+        Classroom classroom1 = classroomRepository.findByRoomNumberAndDeletedAtIsNull((Integer) row1.roomNumber()).orElseThrow();
         assertThat(classroom1.getCapacity()).isEqualTo(row1.enrolledCount());
 
         Long eventId1 = jdbcTemplate.queryForObject(

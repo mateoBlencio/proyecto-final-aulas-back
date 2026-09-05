@@ -5,7 +5,11 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/academic-periods
+  url: {{baseUrl}}/v1/academic-periods?includeDeactivated=false
   body: none
   auth: inherit
+}
+
+params:query {
+  includeDeactivated: false
 }

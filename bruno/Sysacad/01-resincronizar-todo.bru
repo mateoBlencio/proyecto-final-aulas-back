@@ -1,0 +1,22 @@
+meta {
+  name: Resincronizar todo
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/sysacad/sync
+  body: none
+  auth: inherit
+}
+
+docs {
+  Dispara el resync de las 7 vistas de SysAcad (Edificios, Aulas,
+  Especialidades, Materias, Comisiones, Eventos y Asignaciones) contra
+  SysAcad, en ese orden (por FK). Espera a que termine (incluyendo reintentos
+  ante errores transitorios) y devuelve el estado resultante. Responde 200 si
+  las 7 vistas sincronizaron bien, 207 si al menos una falló por datos, 503 si
+  no se pudo establecer conexión con SysAcad (red/VPN caída). Si ya hay un
+  resync en curso, el disparo se ignora y devuelve 200 con el estado previo.
+  Requiere rol SUBSECRETARIA y siga.sysacad.enabled=true en el backend.
+}

@@ -70,7 +70,7 @@ public class ClassAllocation {
         return event.commissionKey();
     }
 
-    public Integer getBuildingId() {
+    public Long getBuildingId() {
         return classroom != null ? classroom.buildingId() : null;
     }
 }

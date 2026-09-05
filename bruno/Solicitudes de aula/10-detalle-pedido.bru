@@ -1,0 +1,24 @@
+meta {
+  name: Detalle de pedido
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/v1/room-requests/items/1
+  body: none
+  auth: inherit
+}
+
+docs {
+  Detalle completo de un pedido (item), no de la solicitud. Requiere autenticación
+  (hasAnyRole SUBSECRETARIA, AUXILIAR_AULICO).
+  
+  A diferencia de la bandeja (08-listar-pedidos), acá "request" trae la
+  cabecera completa (incluido teacherEmail/teacherPhone, para poder contactar
+  al docente) e "item" trae todos los campos del pedido: decidedBy,
+  decisionReason, requiresProjector, requiresComputers, computerCount,
+  requiresExamUsers, requiredSoftware, observations, preferredClassrooms.
+  
+  404 si el id no existe.
+}

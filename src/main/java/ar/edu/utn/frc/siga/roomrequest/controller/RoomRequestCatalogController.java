@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.roomrequest.controller;
 
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CommissionOptionDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.CommissionScheduleDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.SpecialtyOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.SubjectOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestCatalogService;
@@ -54,10 +55,21 @@ public class RoomRequestCatalogController {
 
     @GetMapping("/classrooms")
     @Operation(summary = "Listar aulas disponibles",
-               description = "Para elegir el aula donde se cursa actualmente y las aulas de preferencia. "
-                       + "Devuelve solo identificación y edificio.")
+               description = "Para elegir las aulas de preferencia. Devuelve solo identificación y edificio.")
     public ResponseEntity<List<ClassroomOptionDto>> findClassrooms() {
         log.debug("GET /v1/room-requests/catalog/classrooms");
         return ResponseEntity.ok(catalogService.findClassrooms());
+    }
+
+    @GetMapping("/commission-schedule")
+    @Operation(summary = "Días y horarios de cursado de una comisión",
+               description = "Slots de cursado (día + horario) y fechas de cursado futuras de la comisión, "
+                       + "para el calendario y los checkboxes de día del formulario. 404 si la comisión no "
+                       + "pertenece a la materia.")
+    public ResponseEntity<CommissionScheduleDto> findCommissionSchedule(
+            @RequestParam Long subjectId, @RequestParam Long commissionId) {
+        log.debug("GET /v1/room-requests/catalog/commission-schedule: subjectId={}, commissionId={}",
+                subjectId, commissionId);
+        return ResponseEntity.ok(catalogService.findCommissionSchedule(subjectId, commissionId));
     }
 }

@@ -30,7 +30,7 @@ public class RefreshToken {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id_refresh_token")
-    private Integer id;
+    private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_usuario", nullable = false)
@@ -56,9 +56,5 @@ public class RefreshToken {
 
     @Column(name = "fecha_expiracion", nullable = false)
     private Instant expiresAt;
-
-    @Builder.Default
-    @Column(name = "fecha_creacion", nullable = false)
-    private Instant createdAt = Instant.now();
 
 }

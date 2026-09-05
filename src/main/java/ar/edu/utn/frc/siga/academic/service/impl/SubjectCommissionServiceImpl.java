@@ -4,11 +4,13 @@ import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SubjectCommissionMapper;
 import ar.edu.utn.frc.siga.academic.model.Commission;
 import ar.edu.utn.frc.siga.academic.model.Subject;
+import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.util.Finder;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,10 +32,24 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
     public SubjectCommissionResponseDto findBySubjectAndCommission(Long subjectId, Long commissionId) {
         Subject subject = requireSubject(subjectId);
         Commission commission = requireCommission(commissionId);
-        return subjectCommissionRepository.findBySubjectAndCommission(subject, commission)
+        return subjectCommissionRepository.findBySubjectAndCommissionAndDeletedAtIsNull(subject, commission)
                 .map(subjectCommissionMapper::toDto)
                 .orElseThrow(() -> ResourceNotFoundException.of("SubjectCommission",
                         subjectId + "-" + commissionId));
+    }
+
+    @Override
+    @Transactional
+    public void activate(SubjectCommissionId id) {
+        subjectCommissionRepository.restore(
+                Finder.orThrow(subjectCommissionRepository::findById, id, "SubjectCommission"));
+    }
+
+    @Override
+    @Transactional
+    public void deactivate(SubjectCommissionId id) {
+        subjectCommissionRepository.softDelete(
+                Finder.orThrow(subjectCommissionRepository::findById, id, "SubjectCommission"));
     }
 
     private Subject requireSubject(Long id) {
@@ -47,21 +63,26 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
     }
 
     @Override
-    public List<SubjectCommissionResponseDto> findAll() {
+    public SubjectCommissionResponseDto findByCommissionAndSubjectCode(Long commissionId, Integer subjectCode) {
+        return subjectCommissionRepository
+                .findFirstByCommission_IdAndSubject_CodeAndDeletedAtIsNullOrderBySubject_IdAsc(commissionId, subjectCode)
+                .map(subjectCommissionMapper::toDto)
+                .orElseThrow(() -> ResourceNotFoundException.of("SubjectCommission",
+                        commissionId + "-" + subjectCode));
+    }
+
+    @Override
+    public List<SubjectCommissionResponseDto> findAll(boolean includeDeactivated) {
         return subjectCommissionRepository.findAll().stream()
+                .filter(link -> includeDeactivated || link.isActive())
                 .map(subjectCommissionMapper::toDto)
                 .toList();
     }
 
     @Override
-    public SubjectCommissionResponseDto findById(Long id) {
-        return subjectCommissionMapper.toDto(subjectCommissionRepository.findById(id)
-                .orElseThrow(() -> ResourceNotFoundException.of("SubjectCommission", id)));
-    }
-
-    @Override
-    public List<SubjectCommissionResponseDto> findBySubjectId(Long subjectId) {
+    public List<SubjectCommissionResponseDto> findBySubjectId(Long subjectId, boolean includeDeactivated) {
         return subjectCommissionRepository.findBySubject_Id(subjectId).stream()
+                .filter(link -> includeDeactivated || link.isActive())
                 .map(subjectCommissionMapper::toDto)
                 .toList();
     }

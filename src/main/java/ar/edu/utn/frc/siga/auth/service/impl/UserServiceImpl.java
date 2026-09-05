@@ -66,7 +66,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public UserResponseDto setEnabled(Integer id, boolean enabled) {
+    public UserResponseDto setEnabled(Long id, boolean enabled) {
         log.debug("{} usuario: id={}", enabled ? "Habilitando" : "Inhabilitando", id);
         User user = findExisting(id);
         user.setEnabled(enabled);
@@ -81,7 +81,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public UserResponseDto changeRole(Integer id, String rol, String currentUserEmail) {
+    public UserResponseDto changeRole(Long id, String rol, String currentUserEmail) {
         log.debug("Cambiando rol: id={}, rol={}", id, rol);
         Role parsedRole = parseRole(rol);
         User user = findExisting(id);
@@ -119,7 +119,7 @@ public class UserServiceImpl implements UserService {
         return userRepository.findAllByEnabled(false, fixedSize(pageable)).map(userMapper::toDto);
     }
 
-    private User findExisting(Integer id) {
+    private User findExisting(Long id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> {
                     log.warn("Usuario no encontrado: id={}", id);

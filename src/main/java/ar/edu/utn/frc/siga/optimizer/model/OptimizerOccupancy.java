@@ -6,5 +6,5 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 
 @NamedInterface("api")
-public record OptimizerOccupancy(Integer classroomId, LocalDate date, LocalTime startTime, LocalTime endTime) {
+public record OptimizerOccupancy(Long classroomId, LocalDate date, LocalTime startTime, LocalTime endTime) {
 }

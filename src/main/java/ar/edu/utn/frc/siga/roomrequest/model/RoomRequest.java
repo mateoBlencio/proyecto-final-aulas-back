@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.roomrequest.model;
 
+import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -10,8 +11,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import org.hibernate.envers.Audited;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,19 +20,19 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 @Entity
+@Audited
 @Table(name = "solicitud_aula")
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class RoomRequest {
+@EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
+public class RoomRequest extends TimestampedEntity {
 
     @EqualsAndHashCode.Include
     @Id
@@ -56,14 +57,9 @@ public class RoomRequest {
     @Column(name = "docente_telefono", nullable = false, length = 40)
     private String teacherPhone;
 
-    /** Referencia a {@code academic} sin relación JPA (ver ADR-004). Null para conferencias. */
     @Column(name = "id_materia")
     private Long subjectId;
 
-    @Column(name = "fecha_creacion", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    /** {@code Long} porque {@code glpi_tickets.id} es {@code int unsigned} y desborda un {@code Integer}. */
     @Column(name = "id_glpi", unique = true)
     private Long glpiTicketId;
 
@@ -71,14 +67,6 @@ public class RoomRequest {
     @OrderBy("position ASC")
     @Builder.Default
     private List<RoomRequestItem> items = new ArrayList<>();
-
-    /** Sella {@code createdAt} al persistir; no usa {@code @CreationTimestamp} para que los tests puedan fijar la fecha. */
-    @PrePersist
-    void onCreate() {
-        if (createdAt == null) {
-            createdAt = LocalDateTime.now();
-        }
-    }
 
     public void addItem(RoomRequestItem item) {
         item.attachTo(this, items.size() + 1);

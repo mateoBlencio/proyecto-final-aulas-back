@@ -23,3 +23,6 @@ siga:
   jwt:
     secret: integration-test-fixed-secret-not-for-prod-0123456789
     refresh-grace-seconds: 10
+  sysacad:
+    enabled: false
+    api-key: integration-test-unused

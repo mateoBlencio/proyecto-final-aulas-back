@@ -5,13 +5,14 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/subject-commissions?subjectId=1
+  url: {{baseUrl}}/v1/subject-commissions?subjectId=1&includeDeactivated=false
   body: none
   auth: inherit
 }
 
 params:query {
   subjectId: 1
+  includeDeactivated: false
 }
 
 docs {

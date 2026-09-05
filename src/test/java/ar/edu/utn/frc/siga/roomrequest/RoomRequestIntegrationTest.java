@@ -1,8 +1,12 @@
 package ar.edu.utn.frc.siga.roomrequest;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
-import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
-import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestItemDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateConferenceDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateFinalExamDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateOtherDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.CreatePartialExamOffScheduleDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.FreeFormItemDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.RequesterInfo;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
@@ -38,38 +42,24 @@ class RoomRequestIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("crear con dos pedidos y preferencias: persiste todo y lo devuelve compuesto")
     void create_withItemsAndPreferences_persistsAndComposes() {
-        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
         Building building = testData.edificio();
         Classroom preferred = testData.aula(building);
-        Classroom current = testData.aula(building);
 
-        CreateRoomRequestDto dto = new CreateRoomRequestDto(
-                RoomRequestType.PARTIAL_EXAM,
-                AcademicScope.GRADO,
-                "Ada Lovelace",
-                "ada@frc.utn.edu.ar",
-                "351-1234567",
-                academic.subjectId(),
-                List.of(
-                        item(academic.commissionId(), LocalDate.now().plusDays(10), current.getId(),
-                                List.of(preferred.getId())),
-                        item(academic.commissionId(), LocalDate.now().plusDays(11), null, List.of())));
-
-        RoomRequestResponseDto created = roomRequestService.create(dto);
+        RoomRequestResponseDto created = roomRequestService.create(new CreateConferenceDto(
+                RoomRequestType.CONFERENCE, requester(), null,
+                List.of(item(null, LocalDate.now().plusDays(10), List.of(preferred.getId())),
+                        item(null, LocalDate.now().plusDays(11), List.of()))));
 
         assertThat(created.id()).isNotNull();
         assertThat(created.createdAt()).isNotNull();
         assertThat(created.items()).allSatisfy(
                 item -> assertThat(item.status()).isEqualTo(RoomRequestStatus.PENDING));
-        assertThat(created.subject().id()).isEqualTo(academic.subjectId());
         assertThat(created.items()).hasSize(2);
 
         var first = created.items().getFirst();
         assertThat(first.position()).isEqualTo(1);
         assertThat(first.durationMinutes()).isEqualTo(120);
         assertThat(first.endTime()).isEqualTo(LocalTime.of(12, 0));
-        assertThat(first.commission().id()).isEqualTo(academic.commissionId());
-        assertThat(first.currentClassroom().id()).isEqualTo(current.getId());
         assertThat(first.preferredClassrooms()).singleElement()
                 .satisfies(room -> assertThat(room.id()).isEqualTo(preferred.getId()));
         assertThat(created.items().get(1).position()).isEqualTo(2);
@@ -79,21 +69,15 @@ class RoomRequestIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("preferencias múltiples: se guardan en el orden de prioridad declarado")
     void create_withSeveralPreferences_keepsDeclaredOrder() {
-        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
         Building building = testData.edificio();
         Classroom first = testData.aula(building);
         Classroom second = testData.aula(building);
         Classroom third = testData.aula(building);
-        List<Integer> priority = List.of(third.getId(), first.getId(), second.getId());
+        List<Long> priority = List.of(third.getId(), first.getId(), second.getId());
 
-        RoomRequestResponseDto created = roomRequestService.create(new CreateRoomRequestDto(
-                RoomRequestType.PARTIAL_EXAM,
-                AcademicScope.GRADO,
-                "Ada Lovelace",
-                "ada@frc.utn.edu.ar",
-                "351-1234567",
-                academic.subjectId(),
-                List.of(item(academic.commissionId(), LocalDate.now().plusDays(10), null, priority))));
+        RoomRequestResponseDto created = roomRequestService.create(new CreateConferenceDto(
+                RoomRequestType.CONFERENCE, requester(), null,
+                List.of(item(null, LocalDate.now().plusDays(10), priority))));
 
         assertThat(created.items().getFirst().preferredClassrooms())
                 .extracting(ClassroomOptionDto::id)
@@ -103,27 +87,18 @@ class RoomRequestIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("booleanos opcionales en null: projector/computers se persisten como false, examUsers queda null")
     void create_withNullBooleans_normalizesToFalse() {
-        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
-
-        CreateRoomRequestItemDto itemWithNulls = new CreateRoomRequestItemDto(
-                academic.commissionId(), LocalDate.now().plusDays(5),
-                LocalTime.of(10, 0), LocalTime.of(12, 0),
-                30, 35, 1, null,
+        FreeFormItemDto itemWithNulls = new FreeFormItemDto(null, LocalDate.now().plusDays(5),
+                LocalTime.of(10, 0), LocalTime.of(12, 0), 35, null,
                 null, null, null, null, null, null, null);
 
-        RoomRequestResponseDto created = roomRequestService.create(new CreateRoomRequestDto(
-                RoomRequestType.PARTIAL_EXAM,
-                AcademicScope.GRADO,
-                "Ada Lovelace",
-                "ada@frc.utn.edu.ar",
-                "351-1234567",
-                academic.subjectId(),
-                List.of(itemWithNulls)));
+        RoomRequestResponseDto created = roomRequestService.create(new CreateConferenceDto(
+                RoomRequestType.CONFERENCE, requester(), null, List.of(itemWithNulls)));
 
         var item = created.items().getFirst();
         assertThat(item.requiresProjector()).isFalse();
         assertThat(item.requiresComputers()).isFalse();
         assertThat(item.requiresExamUsers()).isNull();
+        assertThat(item.classroomCount()).isEqualTo(1);
         assertThat(item.preferredClassrooms()).isEmpty();
     }
 
@@ -132,19 +107,12 @@ class RoomRequestIntegrationTest extends AbstractIntegrationTest {
     void create_examWithComputers_acceptsExamUsers() {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
 
-        CreateRoomRequestItemDto itemWithExamUsers = new CreateRoomRequestItemDto(
-                academic.commissionId(), LocalDate.now().plusDays(5),
-                LocalTime.of(10, 0), LocalTime.of(12, 0),
-                30, 35, 1, null,
+        FreeFormItemDto itemWithExamUsers = new FreeFormItemDto(academic.commissionId(),
+                LocalDate.now().plusDays(5), LocalTime.of(10, 0), LocalTime.of(12, 0), 35, 1,
                 true, true, 20, true, "Office", null, List.of());
 
-        RoomRequestResponseDto created = roomRequestService.create(new CreateRoomRequestDto(
-                RoomRequestType.PARTIAL_EXAM,
-                AcademicScope.GRADO,
-                "Ada Lovelace",
-                "ada@frc.utn.edu.ar",
-                "351-1234567",
-                academic.subjectId(),
+        RoomRequestResponseDto created = roomRequestService.create(new CreatePartialExamOffScheduleDto(
+                RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, requester(), academic.subjectId(),
                 List.of(itemWithExamUsers)));
 
         var item = created.items().getFirst();
@@ -153,22 +121,15 @@ class RoomRequestIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("examUsers en una conferencia: se rechaza porque no es parcial ni final")
+    @DisplayName("examUsers en una conferencia: se rechaza porque no es un examen")
     void create_examUsers_onNonExamType_isRejected() {
-        CreateRoomRequestItemDto itemWithExamUsers = new CreateRoomRequestItemDto(
-                null, LocalDate.now().plusDays(5),
-                LocalTime.of(10, 0), LocalTime.of(12, 0),
-                30, 35, 1, null,
+        FreeFormItemDto itemWithExamUsers = new FreeFormItemDto(null, LocalDate.now().plusDays(5),
+                LocalTime.of(10, 0), LocalTime.of(12, 0), 35, 1,
                 true, true, 20, true, "Office", null, List.of());
 
-        CreateRoomRequestDto dto = new CreateRoomRequestDto(
-                RoomRequestType.CONFERENCE,
-                AcademicScope.EXTENSION,
-                "Grace Hopper",
-                "grace@frc.utn.edu.ar",
-                "351-0000000",
-                null,
-                List.of(itemWithExamUsers));
+        CreateConferenceDto dto = new CreateConferenceDto(RoomRequestType.CONFERENCE,
+                new RequesterInfo(AcademicScope.EXTENSION, "Grace Hopper", "grace@frc.utn.edu.ar", "351-0000000"),
+                null, List.of(itemWithExamUsers));
 
         assertThatThrownBy(() -> roomRequestService.create(dto))
                 .isInstanceOf(InvalidRoomRequestException.class)
@@ -176,16 +137,11 @@ class RoomRequestIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("conferencia sin materia ni comisión: se acepta")
+    @DisplayName("conferencia sin materia: se acepta y el pedido queda sin comisión")
     void create_conference_withoutAcademicReference_isAccepted() {
-        RoomRequestResponseDto created = roomRequestService.create(new CreateRoomRequestDto(
-                RoomRequestType.CONFERENCE,
-                AcademicScope.EXTENSION,
-                "Grace Hopper",
-                "grace@frc.utn.edu.ar",
-                "351-0000000",
-                null,
-                List.of(item(null, LocalDate.now().plusDays(20), null, List.of()))));
+        RoomRequestResponseDto created = roomRequestService.create(new CreateConferenceDto(
+                RoomRequestType.CONFERENCE, requester(), null,
+                List.of(item(null, LocalDate.now().plusDays(20), List.of()))));
 
         assertThat(created.subject()).isNull();
         assertThat(created.items()).singleElement()
@@ -193,16 +149,40 @@ class RoomRequestIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("parcial sin materia: se rechaza por referencia académica faltante")
+    @DisplayName("conferencia con comisión en el pedido: se rechaza, no pertenece al cursado de ninguna")
+    void create_conference_withCommission_isRejected() {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+        CreateConferenceDto dto = new CreateConferenceDto(RoomRequestType.CONFERENCE, requester(),
+                academic.subjectId(),
+                List.of(item(academic.commissionId(), LocalDate.now().plusDays(20), List.of())));
+
+        assertThatThrownBy(() -> roomRequestService.create(dto))
+                .isInstanceOf(InvalidRoomRequestException.class)
+                .hasMessageContaining("no llevan comisión");
+    }
+
+    @Test
+    @DisplayName("tipo OTHER con comisión en el pedido: se rechaza igual que la conferencia")
+    void create_otherType_withCommission_isRejected() {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+        FreeFormItemDto withCommission = new FreeFormItemDto(academic.commissionId(),
+                LocalDate.now().plusDays(15), LocalTime.of(10, 0), LocalTime.of(12, 0),
+                35, 1, false, false, null, null, null, "Un evento cualquiera", List.of());
+        CreateOtherDto dto = new CreateOtherDto(RoomRequestType.OTHER, requester(),
+                academic.subjectId(), List.of(withCommission));
+
+        assertThatThrownBy(() -> roomRequestService.create(dto))
+                .isInstanceOf(InvalidRoomRequestException.class)
+                .hasMessageContaining("no llevan comisión");
+    }
+
+    @Test
+    @DisplayName("parcial fuera de horario sin materia: se rechaza por referencia académica faltante")
     void create_partialExam_withoutSubject_isRejected() {
-        CreateRoomRequestDto dto = new CreateRoomRequestDto(
-                RoomRequestType.PARTIAL_EXAM,
-                AcademicScope.GRADO,
-                "Ada Lovelace",
-                "ada@frc.utn.edu.ar",
-                "351-1234567",
-                null,
-                List.of(item(null, LocalDate.now().plusDays(3), null, List.of())));
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+        CreatePartialExamOffScheduleDto dto = new CreatePartialExamOffScheduleDto(
+                RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, requester(), null,
+                List.of(item(academic.commissionId(), LocalDate.now().plusDays(3), List.of())));
 
         assertThatThrownBy(() -> roomRequestService.create(dto))
                 .isInstanceOf(InvalidRoomRequestException.class)
@@ -212,63 +192,113 @@ class RoomRequestIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("tipo OTHER con observations: se persiste y el enum vuelve intacto de la base")
     void create_otherType_roundTripsThroughDatabase() {
-        RoomRequestResponseDto created = roomRequestService.create(new CreateRoomRequestDto(
-                RoomRequestType.OTHER,
-                AcademicScope.EXTENSION,
-                "Grace Hopper",
-                "grace@frc.utn.edu.ar",
-                "351-0000000",
-                null,
-                List.of(item(null, LocalDate.now().plusDays(15), null, List.of()))));
+        RoomRequestResponseDto created = roomRequestService.create(new CreateOtherDto(
+                RoomRequestType.OTHER, requester(), null,
+                List.of(otherItem("Necesito el aula para un evento no contemplado"))));
 
         assertThat(created.type()).isEqualTo(RoomRequestType.OTHER);
         assertThat(created.subject()).isNull();
         assertThat(created.items()).singleElement().satisfies(item -> {
             assertThat(item.status()).isEqualTo(RoomRequestStatus.PENDING);
-            assertThat(item.observations()).isEqualTo("Observación de prueba");
+            assertThat(item.observations()).isEqualTo("Necesito el aula para un evento no contemplado");
         });
     }
 
     @Test
     @DisplayName("tipo OTHER sin observations: se rechaza, es el único dato que describe el pedido")
     void create_otherType_withoutObservations_isRejected() {
-        CreateRoomRequestItemDto itemWithoutObservations = new CreateRoomRequestItemDto(
-                null, LocalDate.now().plusDays(15),
-                LocalTime.of(10, 0), LocalTime.of(12, 0),
-                30, 35, 1, null,
-                false, false, null, null, null, null, List.of());
-
-        CreateRoomRequestDto dto = new CreateRoomRequestDto(
-                RoomRequestType.OTHER,
-                AcademicScope.EXTENSION,
-                "Grace Hopper",
-                "grace@frc.utn.edu.ar",
-                "351-0000000",
-                null,
-                List.of(itemWithoutObservations));
+        CreateOtherDto dto = new CreateOtherDto(RoomRequestType.OTHER, requester(), null,
+                List.of(item(null, LocalDate.now().plusDays(15), List.of())));
 
         assertThatThrownBy(() -> roomRequestService.create(dto))
                 .isInstanceOf(InvalidRoomRequestException.class)
                 .hasMessageContaining("observations");
     }
 
-    private CreateRoomRequestItemDto item(Long commissionId, LocalDate date,
-                                          Integer currentClassroomId, List<Integer> preferredClassroomIds) {
-        return new CreateRoomRequestItemDto(
-                commissionId,
-                date,
-                LocalTime.of(10, 0),
-                LocalTime.of(12, 0),
-                30,
-                35,
-                1,
-                currentClassroomId,
-                true,
-                false,
-                null,
-                null,
-                null,
-                "Observación de prueba",
-                preferredClassroomIds);
+    @Test
+    @DisplayName("final: un pedido por materia, sin comisión → 201 con el horario que cargó el docente")
+    void create_finalExam_persistsSingleItemWithoutCommission() {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+
+        RoomRequestResponseDto created = roomRequestService.create(new CreateFinalExamDto(
+                RoomRequestType.FINAL_EXAM, requester(), academic.subjectId(),
+                List.of(item(null, LocalDate.now().plusDays(30), List.of()))));
+
+        assertThat(created.type()).isEqualTo(RoomRequestType.FINAL_EXAM);
+        assertThat(created.subject()).isNotNull();
+        assertThat(created.items()).singleElement().satisfies(item -> {
+            assertThat(item.status()).isEqualTo(RoomRequestStatus.PENDING);
+            assertThat(item.commission()).isNull();
+            assertThat(item.dayOfWeek()).isNull();
+            assertThat(item.date()).isEqualTo(LocalDate.now().plusDays(30));
+            assertThat(item.startTime()).isEqualTo(LocalTime.of(10, 0));
+            assertThat(item.durationMinutes()).isEqualTo(120);
+        });
+    }
+
+    @Test
+    @DisplayName("final: más de un pedido → rechazado, rinden todas las comisiones juntas")
+    void create_finalExam_withSeveralItems_isRejected() {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+        CreateFinalExamDto dto = new CreateFinalExamDto(RoomRequestType.FINAL_EXAM, requester(),
+                academic.subjectId(),
+                List.of(item(null, LocalDate.now().plusDays(30), List.of()),
+                        item(null, LocalDate.now().plusDays(31), List.of())));
+
+        assertThatThrownBy(() -> roomRequestService.create(dto))
+                .isInstanceOf(InvalidRoomRequestException.class)
+                .hasMessageContaining("un solo pedido");
+    }
+
+    @Test
+    @DisplayName("final: pedido con comisión → rechazado, el final se pide por materia")
+    void create_finalExam_withCommission_isRejected() {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+        CreateFinalExamDto dto = new CreateFinalExamDto(RoomRequestType.FINAL_EXAM, requester(),
+                academic.subjectId(),
+                List.of(item(academic.commissionId(), LocalDate.now().plusDays(30), List.of())));
+
+        assertThatThrownBy(() -> roomRequestService.create(dto))
+                .isInstanceOf(InvalidRoomRequestException.class)
+                .hasMessageContaining("no llevan comisión");
+    }
+
+    @Test
+    @DisplayName("final con computadoras sin responder por los usuarios de examen: rechazado")
+    void create_finalExam_withComputersAndNoExamUsersAnswer_isRejected() {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+        FreeFormItemDto withComputers = new FreeFormItemDto(null, LocalDate.now().plusDays(30),
+                LocalTime.of(10, 0), LocalTime.of(12, 0), 35, 1, false, true, 20, null, null, null, List.of());
+        CreateFinalExamDto dto = new CreateFinalExamDto(RoomRequestType.FINAL_EXAM, requester(),
+                academic.subjectId(), List.of(withComputers));
+
+        assertThatThrownBy(() -> roomRequestService.create(dto))
+                .isInstanceOf(InvalidRoomRequestException.class)
+                .hasMessageContaining("requiresExamUsers");
+    }
+
+    @Test
+    @DisplayName("final sin materia: se rechaza, es el único nivel académico que lleva")
+    void create_finalExam_withoutSubject_isRejected() {
+        CreateFinalExamDto dto = new CreateFinalExamDto(RoomRequestType.FINAL_EXAM, requester(), null,
+                List.of(item(null, LocalDate.now().plusDays(30), List.of())));
+
+        assertThatThrownBy(() -> roomRequestService.create(dto))
+                .isInstanceOf(InvalidRoomRequestException.class)
+                .hasMessageContaining("subjectId es obligatorio");
+    }
+
+    private static RequesterInfo requester() {
+        return new RequesterInfo(AcademicScope.GRADO, "Ada Lovelace", "ada@frc.utn.edu.ar", "351-1234567");
+    }
+
+    private FreeFormItemDto item(Long commissionId, LocalDate date, List<Long> preferredClassroomIds) {
+        return new FreeFormItemDto(commissionId, date, LocalTime.of(10, 0), LocalTime.of(12, 0),
+                35, 1, true, false, null, null, null, null, preferredClassroomIds);
+    }
+
+    private FreeFormItemDto otherItem(String observations) {
+        return new FreeFormItemDto(null, LocalDate.now().plusDays(15), LocalTime.of(10, 0), LocalTime.of(12, 0),
+                35, 1, false, false, null, null, null, observations, List.of());
     }
 }

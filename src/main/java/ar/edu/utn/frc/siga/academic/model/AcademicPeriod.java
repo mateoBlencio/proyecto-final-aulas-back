@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.model;
 
+import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -22,7 +23,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class AcademicPeriod {
+public class AcademicPeriod extends SoftDeletableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -40,8 +41,4 @@ public class AcademicPeriod {
 
     @Column(name = "fecha_fin")
     private LocalDate endDate;
-
-    @Column(name = "activo", nullable = false)
-    @Builder.Default
-    private Boolean active = true;
 }

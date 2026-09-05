@@ -4,7 +4,6 @@ import org.springframework.modulith.NamedInterface;
 
 @NamedInterface("api")
 public record SubjectCommissionResponseDto(
-        Long id,
         Long subjectId,
         Long commissionId,
         CommissionResponseDto commission,

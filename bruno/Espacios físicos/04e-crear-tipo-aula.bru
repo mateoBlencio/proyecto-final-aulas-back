@@ -1,0 +1,23 @@
+meta {
+  name: Crear tipo de aula
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/v1/classroom-types
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "description": "Laboratorio"
+  }
+}
+
+docs {
+  POST /v1/classroom-types. Rol: SUBSECRETARIA.
+  description: obligatoria, máx. 50 caracteres.
+  400 si ya existe un tipo de aula con esa descripción (incluye desactivados).
+}

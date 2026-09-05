@@ -1,27 +1,28 @@
 package ar.edu.utn.frc.siga.academic.model;
 
+import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "especialidad")
-@SQLRestriction("eliminado = false")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Specialty {
+public class Specialty extends TimestampedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -34,7 +35,16 @@ public class Specialty {
     @Column(name = "nombre")
     private String name;
 
-    @Column(name = "eliminado")
-    @Builder.Default
-    private Boolean deleted = false;
+    @Column(name = "abreviatura")
+    private String abbreviation;
+
+    @Column(name = "sincronizado_en")
+    private Instant syncedAt;
+
+    @Column(name = "hash_sysacad", length = 64)
+    private String sysacadHash;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 }

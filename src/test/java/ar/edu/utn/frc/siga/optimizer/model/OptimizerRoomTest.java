@@ -11,7 +11,7 @@ class OptimizerRoomTest {
     @Test
     @DisplayName("overcrowding: inscriptos por encima de la capacidad devuelve el excedente")
     void overcrowdingWhenOverCapacity() {
-        OptimizerRoom room = new OptimizerRoom(1, 30, 100);
+        OptimizerRoom room = new OptimizerRoom(1L, 30, 100L);
 
         assertThat(room.overcrowding(35)).isEqualTo(5);
     }
@@ -19,7 +19,7 @@ class OptimizerRoomTest {
     @Test
     @DisplayName("overcrowding: inscriptos por debajo o igual a la capacidad se clampea a 0")
     void overcrowdingClampsToZero() {
-        OptimizerRoom room = new OptimizerRoom(1, 30, 100);
+        OptimizerRoom room = new OptimizerRoom(1L, 30, 100L);
 
         assertThat(room.overcrowding(30)).isZero();
         assertThat(room.overcrowding(20)).isZero();
@@ -28,7 +28,7 @@ class OptimizerRoomTest {
     @Test
     @DisplayName("undercrowding: inscriptos por debajo de la capacidad devuelve los asientos libres")
     void undercrowdingWhenUnderCapacity() {
-        OptimizerRoom room = new OptimizerRoom(1, 30, 100);
+        OptimizerRoom room = new OptimizerRoom(1L, 30, 100L);
 
         assertThat(room.undercrowding(20)).isEqualTo(10);
     }
@@ -36,7 +36,7 @@ class OptimizerRoomTest {
     @Test
     @DisplayName("undercrowding: inscriptos por encima o igual a la capacidad se clampea a 0")
     void undercrowdingClampsToZero() {
-        OptimizerRoom room = new OptimizerRoom(1, 30, 100);
+        OptimizerRoom room = new OptimizerRoom(1L, 30, 100L);
 
         assertThat(room.undercrowding(30)).isZero();
         assertThat(room.undercrowding(35)).isZero();

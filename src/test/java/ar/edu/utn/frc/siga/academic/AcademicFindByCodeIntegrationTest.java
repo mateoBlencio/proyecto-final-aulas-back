@@ -97,10 +97,10 @@ class AcademicFindByCodeIntegrationTest extends AbstractIntegrationTest {
         StudyPlan plan = testData.planDeEstudio((int) IntegrationTestData.nextSeq(), specialty);
         Subject subject = testData.materia((int) IntegrationTestData.nextSeq(), "Materia IT", plan, "Anual");
         AcademicPeriod period = testData.periodoAcademico(2100 + (int) (IntegrationTestData.nextSeq() % 500), TermType.ANUAL);
-        Commission commission = testData.comision("CUR-" + IntegrationTestData.nextSeq(), 1, period);
+        Commission commission = testData.comision("CUR-" + IntegrationTestData.nextSeq(), period);
         testData.materiaComision(subject, commission, 30);
 
-        List<SubjectCommissionResponseDto> result = subjectCommissionService.findBySubjectId(subject.getId());
+        List<SubjectCommissionResponseDto> result = subjectCommissionService.findBySubjectId(subject.getId(), false);
 
         assertThat(result).hasSize(1);
         SubjectCommissionResponseDto dto = result.getFirst();

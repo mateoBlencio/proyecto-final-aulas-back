@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.roomrequest.model;
 
 import ar.edu.utn.frc.siga.common.converter.DurationMinutesConverter;
+import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -24,7 +25,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.BatchSize;
+import org.hibernate.envers.Audited;
 
+import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -32,11 +35,8 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Unidad de decisión: cada ítem tiene su propio estado porque pueden resolverse en momentos
- * distintos (ej. pre-aprobar abril y dejar pendiente julio).
- */
 @Entity
+@Audited
 @Table(name = "solicitud_aula_item",
        uniqueConstraints = @UniqueConstraint(name = "uq_solicitud_item_orden",
                                              columnNames = {"id_solicitud", "orden"}))
@@ -44,8 +44,8 @@ import java.util.List;
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class RoomRequestItem {
+@EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
+public class RoomRequestItem extends TimestampedEntity {
 
     @EqualsAndHashCode.Include
     @Id
@@ -65,7 +65,6 @@ public class RoomRequestItem {
     @Builder.Default
     private RoomRequestStatus status = RoomRequestStatus.PENDING;
 
-    /** No es FK: {@code auth} no expone fachada de usuarios. */
     @Column(name = "decidido_por", length = 150)
     private String decidedBy;
 
@@ -75,36 +74,36 @@ public class RoomRequestItem {
     @Column(name = "motivo_decision")
     private String decisionReason;
 
-    /** Null para conferencias. */
     @Column(name = "id_comision")
     private Long commissionId;
 
-    @Column(name = "fecha", nullable = false)
+    /** Fecha puntual del pedido. Nula en los tipos que se atan a un día de dictado ({@link #dayOfWeek}). */
+    @Column(name = "fecha")
     private LocalDate date;
 
-    /** Null en ONE_TIME_ROOM_CHANGE/REGULAR_ROOM_CHANGE: sale de la comisión. */
+    /** Día de dictado del pedido. Nulo en los tipos que se atan a una fecha puntual ({@link #date}). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "dia_semana", length = 20)
+    private DayOfWeek dayOfWeek;
+
+    /** Evento recurrente del que se derivó día y horario, cuando el tipo usa el cursado. Trazabilidad. */
+    @Column(name = "id_evento_recurrente")
+    private Long sourceRecurringEventId;
+
     @Column(name = "hora_inicio")
     private LocalTime startTime;
 
-    /** Null en ONE_TIME_ROOM_CHANGE/REGULAR_ROOM_CHANGE: sale de la comisión. */
     @Convert(converter = DurationMinutesConverter.class)
     @Column(name = "duracion_minutos")
     private Duration duration;
 
-    /** Null en ONE_TIME_ROOM_CHANGE/REGULAR_ROOM_CHANGE: sale de los inscriptos de la materia. */
-    @Column(name = "cantidad_inscriptos")
-    private Integer enrolled;
-
-    @Column(name = "cantidad_estimada", nullable = false)
+    /** Cantidad estimada de asistentes. Nula en los cambios de aula, que no la piden. */
+    @Column(name = "cantidad_estimada")
     private Integer estimated;
 
-    /** Aulas necesarias en simultáneo para la misma franja. */
     @Column(name = "cantidad_aulas", nullable = false)
     @Builder.Default
     private Integer classroomCount = 1;
-
-    @Column(name = "id_aula_actual")
-    private Integer currentClassroomId;
 
     @Column(name = "requiere_proyector", nullable = false)
     @Builder.Default
@@ -120,15 +119,12 @@ public class RoomRequestItem {
     @Column(name = "requiere_usuarios_examen")
     private Boolean requiresExamUsers;
 
-    /** Listado corto ("Office, MATLAB"), no un párrafo: alcanza con el default de 255. */
     @Column(name = "software_requerido", length = 255)
     private String requiredSoftware;
 
-    /** Largo explícito (no el default 255): en OTHER es el único campo que describe el pedido. */
     @Column(name = "observaciones", length = 1000)
     private String observations;
 
-    /** Fuera del entity graph de la solicitud (dos bags en la misma query = {@code MultipleBagFetchException}). */
     @OneToMany(mappedBy = "item", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("position ASC")
     @BatchSize(size = 50)
@@ -144,7 +140,6 @@ public class RoomRequestItem {
         this.position = position;
     }
 
-    /** La legalidad de la transición ya la validó {@code RoomRequestValidator}. */
     public void decide(RoomRequestStatus target, String decidedBy, String reason, LocalDateTime decidedAt) {
         this.status = target;
         this.decidedBy = decidedBy;
@@ -152,11 +147,11 @@ public class RoomRequestItem {
         this.decidedAt = decidedAt;
     }
 
-    public void addPreferences(List<Integer> classroomIds) {
+    public void addPreferences(List<Long> classroomIds) {
         classroomIds.forEach(this::addPreference);
     }
 
-    public void addPreference(Integer classroomId) {
+    public void addPreference(Long classroomId) {
         preferences.add(RoomPreference.builder()
                 .item(this)
                 .classroomId(classroomId)

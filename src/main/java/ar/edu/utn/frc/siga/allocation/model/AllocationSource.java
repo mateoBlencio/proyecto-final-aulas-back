@@ -6,5 +6,6 @@ import org.springframework.modulith.NamedInterface;
 public enum AllocationSource {
     MANUAL,
     AUTOMATIC,
-    IMPORTED
+    IMPORTED,
+    SYSACAD
 }

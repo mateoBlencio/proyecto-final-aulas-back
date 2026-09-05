@@ -1,15 +1,12 @@
 package ar.edu.utn.frc.siga.space.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
 public record ClassroomRequestDto(
-    @NotBlank String roomNumber,
+    @NotNull Integer roomNumber,
     @NotNull @Positive Integer capacity,
-    @NotNull Integer floor,
-    @NotNull Integer classroomTypeId,
-    @NotNull Boolean available,
-    @NotNull Integer buildingId
+    @NotNull Long classroomTypeId,
+    @NotNull Long buildingId
 ) {
 }

@@ -1,0 +1,64 @@
+meta {
+  name: Crear solicitud - parcial en horario de clase
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/v1/room-requests
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "type": "PARTIAL_EXAM_IN_CLASS",
+    "requester": {
+      "scope": "GRADO",
+      "teacherName": "Ada Lovelace",
+      "teacherEmail": "ada@frc.utn.edu.ar",
+      "teacherPhone": "351-1234567"
+    },
+    "subjectId": 1,
+    "commissionId": 1,
+    "items": [
+      {
+        "dayOfWeek": "MONDAY",
+        "estimated": 100,
+        "classroomCount": 1,
+        "requiresProjector": true,
+        "requiresComputers": false,
+        "observations": "Parcial dentro del horario de cursado",
+        "preferredClassroomIds": [2, 3]
+      }
+    ]
+  }
+}
+
+docs {
+  Variante "scheduled" del alta (type = PARTIAL_EXAM_IN_CLASS). También sirve
+  de molde para ONE_TIME_ROOM_CHANGE y REGULAR_ROOM_CHANGE.
+
+  Diferencias con 06 (free-form):
+  - commissionId va en la CABECERA, no en el ítem.
+  - El ítem NO lleva date ni startTime/endTime: se ata a "dayOfWeek" y el
+    backend deriva día y horario del dictado de esa comisión (evento
+    recurrente), guardando id_evento_recurrente para trazabilidad.
+  - dayOfWeek usa el nombre del enum java.time.DayOfWeek en INGLÉS y
+    mayúscula: MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY.
+  - estimated sigue siendo obligatorio.
+  - date en el ítem => 400 ("se ata a un día de dictado, no a una fecha").
+  - Se valida que la comisión efectivamente dicte clase ese día (400 si no).
+
+  Comisión con DOS clases el mismo día en horarios distintos (ej. lunes 10:25
+  y lunes 20:40): 400. El día no alcanza para saber cuál pide el docente, y
+  el back no elige una al azar. Mismo corte por fecha en ONE_TIME_ROOM_CHANGE.
+  El detail nombra los horarios y deriva a subsecretaría. Es un caso raro (1
+  comisión en database_dev, hoy no vigente); la solución de fondo —elegir la
+  franja y no el día— está pendiente de definición y cambiaría el contrato.
+
+  Dos slots del mismo día con el MISMO horario no son ese caso: es una cursada
+  anual partida en un evento por cuatrimestre, y se cuentan como una sola.
+
+  requiresExamUsers: dejar ausente cuando requiresComputers=false.
+}

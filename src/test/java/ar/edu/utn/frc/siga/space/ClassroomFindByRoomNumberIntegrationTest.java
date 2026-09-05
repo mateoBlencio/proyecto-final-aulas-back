@@ -28,7 +28,7 @@ class ClassroomFindByRoomNumberIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("aula existente en el edificio: devuelve el DTO")
     void findByRoomNumberAndBuilding_existingClassroom_returnsDto() {
-        testData.tipoAulaNormal();
+        testData.tipoAulaPorDefecto();
         Building building = testData.edificio();
         var classroom = testData.aula(building);
 
@@ -41,17 +41,17 @@ class ClassroomFindByRoomNumberIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("aula inexistente en el edificio: lanza ResourceNotFoundException, no crea nada")
     void findByRoomNumberAndBuilding_missingClassroom_throwsResourceNotFound() {
-        testData.tipoAulaNormal();
+        testData.tipoAulaPorDefecto();
         Building building = testData.edificio();
 
-        assertThatThrownBy(() -> classroomService.findByRoomNumberAndBuilding("NO-EXISTE", building.getId()))
+        assertThatThrownBy(() -> classroomService.findByRoomNumberAndBuilding(-999, building.getId()))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
     @DisplayName("edificio inexistente: lanza ResourceNotFoundException")
     void findByRoomNumberAndBuilding_missingBuilding_throwsResourceNotFound() {
-        assertThatThrownBy(() -> classroomService.findByRoomNumberAndBuilding("101", -1))
+        assertThatThrownBy(() -> classroomService.findByRoomNumberAndBuilding(101, -1L))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 }

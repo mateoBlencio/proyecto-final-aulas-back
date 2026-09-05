@@ -36,6 +36,16 @@ public enum TermType {
         };
     }
 
+    public static Optional<TermType> fromSemester(Integer semester) {
+        if (semester == null) return Optional.empty();
+        return switch (semester) {
+            case 0 -> Optional.of(ANUAL);
+            case 1 -> Optional.of(PRIMER_CUATRIMESTRE);
+            case 2 -> Optional.of(SEGUNDO_CUATRIMESTRE);
+            default -> Optional.empty();
+        };
+    }
+
     public static Optional<TermType> fromLabel(String label) {
         if (label == null) return Optional.empty();
         String normalized = normalize(label);

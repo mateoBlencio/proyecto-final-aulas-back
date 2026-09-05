@@ -13,7 +13,7 @@ public record ImpactConflictDto(
         LocalDate date,
         LocalTime startTime,
         LocalTime endTime,
-        Integer requestedClassroomId,
+        Long requestedClassroomId,
         ImpactBlockerDto blockedBy,
         List<ClassroomResponseDto> alternativeClassrooms) {
 }

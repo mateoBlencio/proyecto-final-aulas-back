@@ -1,0 +1,20 @@
+meta {
+  name: Obtener tipo de aula
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/v1/classroom-types/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: 1
+}
+
+docs {
+  GET /v1/classroom-types/{id}. Roles: SUBSECRETARIA o AUXILIAR_AULICO.
+  404 si el tipo de aula no existe.
+}

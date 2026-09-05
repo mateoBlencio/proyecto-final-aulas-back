@@ -27,8 +27,11 @@ import ar.edu.utn.frc.siga.events.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.events.repository.RecurringEventRepository;
 import ar.edu.utn.frc.siga.events.repository.UniqueEventRepository;
+import ar.edu.utn.frc.siga.events.service.command.SyncRecurringEventCommand;
+import ar.edu.utn.frc.siga.events.service.command.UpsertRecurringEventResult;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.util.Hashes;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,11 +48,13 @@ import java.time.LocalTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -163,6 +168,237 @@ class AcademicEventServiceImplTest {
         assertThat(result.created()).isTrue();
         assertThat(result.value()).isEqualTo(9L);
         verify(eventRepository).save(any());
+    }
+
+
+    @Test
+    @DisplayName("findRecurringEventId: existe evento con esa clave natural → devuelve su id, sin crear nada")
+    void findRecurringEventIdEncuentraExistente() {
+        LocalDate startDate = LocalDate.of(2026, 3, 1);
+        LocalDate endDate = LocalDate.of(2026, 7, 31);
+        RecurringEvent existing = EventTestData.recurringEvent(7L, DayOfWeek.MONDAY, startDate, endDate);
+        when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
+                1L, 1L, DayOfWeek.MONDAY, LocalTime.of(8, 0), startDate, endDate))
+                .thenReturn(Optional.of(existing));
+
+        Optional<Long> result = service.findRecurringEventId(
+                1L, 1L, DayOfWeek.MONDAY, LocalTime.of(8, 0), startDate, endDate);
+
+        assertThat(result).contains(7L);
+        verify(eventRepository, never()).save(any());
+        verify(subjectService, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("findRecurringEventId: no existe evento con esa clave natural → vacío, no lo crea (a diferencia de findOrCreateRecurringEvent)")
+    void findRecurringEventIdVacioCuandoNoExiste() {
+        LocalDate startDate = LocalDate.of(2026, 3, 1);
+        LocalDate endDate = LocalDate.of(2026, 7, 31);
+        when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
+                1L, 1L, DayOfWeek.MONDAY, LocalTime.of(8, 0), startDate, endDate))
+                .thenReturn(Optional.empty());
+
+        Optional<Long> result = service.findRecurringEventId(
+                1L, 1L, DayOfWeek.MONDAY, LocalTime.of(8, 0), startDate, endDate);
+
+        assertThat(result).isEmpty();
+        verify(eventRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("findRecurringEventsBySubjectAndCommission: consulta el cursado vigente (a partir de hoy) y devuelve los slots recurrentes compuestos")
+    void findRecurringEventsBySubjectAndCommissionDevuelveSlots() {
+        RecurringEvent lunes = EventTestData.recurringEvent(1L, DayOfWeek.MONDAY,
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31));
+        RecurringEvent miercoles = EventTestData.recurringEvent(2L, DayOfWeek.WEDNESDAY,
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31));
+        when(recurringEventRepository.findActiveBySubjectAndCommission(eq(1L), eq(9L), any(LocalDate.class)))
+                .thenReturn(List.of(lunes, miercoles));
+        when(composer.compose(anyCollection()))
+                .thenReturn(List.of(dummyRecurringResponseDto(1L), dummyRecurringResponseDto(2L)));
+
+        List<RecurringEventResponseDto> result = service.findRecurringEventsBySubjectAndCommission(1L, 9L);
+
+        assertThat(result).extracting(RecurringEventResponseDto::id).containsExactly(1L, 2L);
+        verify(recurringEventRepository).findActiveBySubjectAndCommission(eq(1L), eq(9L), any(LocalDate.class));
+    }
+
+    @Test
+    @DisplayName("findRecurringEventsBySubjectAndCommission: sin cursado vigente → lista vacía")
+    void findRecurringEventsBySubjectAndCommissionSinCursado() {
+        when(recurringEventRepository.findActiveBySubjectAndCommission(eq(1L), eq(9L), any(LocalDate.class)))
+                .thenReturn(List.of());
+        when(composer.compose(anyCollection())).thenReturn(List.of());
+
+        assertThat(service.findRecurringEventsBySubjectAndCommission(1L, 9L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("findClassOccurrences: junta las ocurrencias de los eventos vigentes desde 'from' y las devuelve ordenadas por fecha")
+    void findClassOccurrencesOrdenadasPorFecha() {
+        RecurringEvent lunes = EventTestData.recurringEvent(1L, DayOfWeek.MONDAY,
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31));
+        LocalDate from = LocalDate.of(2026, 4, 1);
+        when(recurringEventRepository.findActiveBySubjectAndCommission(eq(1L), eq(9L), any(LocalDate.class)))
+                .thenReturn(List.of(lunes));
+        Occurrence o1 = EventTestData.occurrence(11L, lunes, LocalDate.of(2026, 4, 20), OccurrenceStatus.NEEDS_ROOM);
+        Occurrence o2 = EventTestData.occurrence(12L, lunes, LocalDate.of(2026, 4, 6), OccurrenceStatus.NEEDS_ROOM);
+        when(occurrenceRepository.findByEvent_IdInAndDateGreaterThanEqual(List.of(1L), from))
+                .thenReturn(List.of(o1, o2));
+        when(occurrenceMapper.toDto(o1)).thenReturn(new OccurrenceResponseDto(11L, 1L, o1.getDate(),
+                OccurrenceStatus.NEEDS_ROOM, LocalTime.of(8, 0), LocalTime.of(9, 30)));
+        when(occurrenceMapper.toDto(o2)).thenReturn(new OccurrenceResponseDto(12L, 1L, o2.getDate(),
+                OccurrenceStatus.NEEDS_ROOM, LocalTime.of(8, 0), LocalTime.of(9, 30)));
+
+        List<OccurrenceResponseDto> result = service.findClassOccurrences(1L, 9L, from);
+
+        assertThat(result).extracting(OccurrenceResponseDto::date)
+                .containsExactly(LocalDate.of(2026, 4, 6), LocalDate.of(2026, 4, 20));
+    }
+
+    @Test
+    @DisplayName("findClassOccurrences: sin cursado vigente → lista vacía, no consulta ocurrencias")
+    void findClassOccurrencesSinCursado() {
+        when(recurringEventRepository.findActiveBySubjectAndCommission(eq(1L), eq(9L), any(LocalDate.class)))
+                .thenReturn(List.of());
+
+        assertThat(service.findClassOccurrences(1L, 9L, LocalDate.of(2026, 4, 1))).isEmpty();
+        verify(occurrenceRepository, never()).findByEvent_IdInAndDateGreaterThanEqual(anyCollection(), any());
+    }
+
+    @Test
+    @DisplayName("syncRecurringEvent: no existe evento con esa clave natural → lo crea con sysacadHash inicial (hash de la duración escrita) y expande ocurrencias")
+    void syncRecurringEventCreaNuevo() {
+        SyncRecurringEventCommand cmd = syncCommand(90, 30);
+        when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
+                cmd.subjectId(), cmd.commissionId(), cmd.dayOfWeek(), cmd.startTime(), cmd.startDate(), cmd.endDate()))
+                .thenReturn(Optional.empty());
+        RecurringEvent saved = EventTestData.recurringEvent(5L, cmd.dayOfWeek(), cmd.startDate(), cmd.endDate());
+        when(eventRepository.save(any())).thenReturn(saved);
+
+        UpsertRecurringEventResult result = service.syncRecurringEvent(cmd);
+
+        assertThat(result.eventId()).isEqualTo(5L);
+        assertThat(result.created()).isTrue();
+        assertThat(result.updated()).isFalse();
+
+        ArgumentCaptor<RecurringEvent> captor = ArgumentCaptor.forClass(RecurringEvent.class);
+        verify(eventRepository).save(captor.capture());
+        RecurringEvent persisted = captor.getValue();
+        assertThat(persisted.getEnrolled()).isEqualTo(30);
+        assertThat(persisted.getDuration()).isEqualTo(Duration.ofMinutes(90));
+        assertThat(persisted.getSysacadEnabled()).isTrue();
+        assertThat(persisted.getSyncedAt()).isNotNull();
+        assertThat(persisted.getSysacadHash()).isEqualTo(Hashes.sha256Hex(90));
+
+        verify(occurrenceRepository).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("syncRecurringEvent: evento existente → enrolled se pisa siempre, sin condición")
+    void syncRecurringEventPisaEnrolledSiempre() {
+        SyncRecurringEventCommand cmd = syncCommand(90, 45);
+        RecurringEvent existing = existingSyncedEvent(7L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
+        when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
+                cmd.subjectId(), cmd.commissionId(), cmd.dayOfWeek(), cmd.startTime(), cmd.startDate(), cmd.endDate()))
+                .thenReturn(Optional.of(existing));
+
+        UpsertRecurringEventResult result = service.syncRecurringEvent(cmd);
+
+        assertThat(result.created()).isFalse();
+        assertThat(result.updated()).isTrue();
+        assertThat(existing.getEnrolled()).isEqualTo(45);
+        assertThat(existing.getSyncedAt()).isNotNull();
+        assertThat(existing.getSysacadEnabled()).isTrue();
+        verify(recurringEventRepository).save(existing);
+        verify(occurrenceRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("syncRecurringEvent: duration sin drift (nadie la tocó desde el último sync) y cambió en SysAcad → se pisa y se actualiza el hash")
+    void syncRecurringEventPisaDurationSinDrift() {
+        SyncRecurringEventCommand cmd = syncCommand(120, 30);
+        RecurringEvent existing = existingSyncedEvent(7L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
+        when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
+                cmd.subjectId(), cmd.commissionId(), cmd.dayOfWeek(), cmd.startTime(), cmd.startDate(), cmd.endDate()))
+                .thenReturn(Optional.of(existing));
+
+        UpsertRecurringEventResult result = service.syncRecurringEvent(cmd);
+
+        assertThat(result.updated()).isTrue();
+        assertThat(existing.getDuration()).isEqualTo(Duration.ofMinutes(120));
+        assertThat(existing.getSysacadHash()).isEqualTo(Hashes.sha256Hex(120));
+    }
+
+    @Test
+    @DisplayName("syncRecurringEvent: duration editada a mano fuera del sync (drift) y el valor entrante difiere → NO se pisa, la edición manual se preserva")
+    void syncRecurringEventNoPisaDurationConDrift() {
+        SyncRecurringEventCommand cmd = syncCommand(120, 30);
+        // sincronizado por última vez con 90 min (sysacadHash = hash(90)), pero alguien lo editó a mano a 100 sin resync
+        RecurringEvent existing = existingSyncedEvent(7L, Duration.ofMinutes(100), Hashes.sha256Hex(90), true);
+        when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
+                cmd.subjectId(), cmd.commissionId(), cmd.dayOfWeek(), cmd.startTime(), cmd.startDate(), cmd.endDate()))
+                .thenReturn(Optional.of(existing));
+
+        UpsertRecurringEventResult result = service.syncRecurringEvent(cmd);
+
+        assertThat(result.updated()).isTrue();
+        assertThat(existing.getDuration()).isEqualTo(Duration.ofMinutes(100));
+        assertThat(existing.getSysacadHash()).isEqualTo(Hashes.sha256Hex(90));
+        // enrolled se sigue pisando aunque duration no se toque: son reconciliaciones independientes
+        assertThat(existing.getEnrolled()).isEqualTo(30);
+        verify(recurringEventRepository).save(existing);
+    }
+
+    @Test
+    @DisplayName("syncRecurringEvent: primer resync inmediato tras la creación por sync no lee drift falso (sysacadHash ya quedó seteado al crear)")
+    void syncRecurringEventPrimerResyncNoFalsoDrift() {
+        SyncRecurringEventCommand cmd = syncCommand(90, 30);
+        RecurringEvent justCreated = existingSyncedEvent(9L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
+        when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
+                cmd.subjectId(), cmd.commissionId(), cmd.dayOfWeek(), cmd.startTime(), cmd.startDate(), cmd.endDate()))
+                .thenReturn(Optional.of(justCreated));
+
+        UpsertRecurringEventResult result = service.syncRecurringEvent(cmd);
+
+        assertThat(result.updated()).isTrue();
+        assertThat(justCreated.getDuration()).isEqualTo(Duration.ofMinutes(90));
+        assertThat(justCreated.getSysacadHash()).isEqualTo(Hashes.sha256Hex(90));
+        verify(recurringEventRepository).save(justCreated);
+    }
+
+
+    @Test
+    @DisplayName("markRecurringEventsAbsent: marca sysacadEnabled=false sólo en los sync-owned ausentes de la corrida, sin tocar los presentes, los ya deshabilitados, ni ocurrencias/eventos")
+    void markRecurringEventsAbsentMarcaSoloAusentesSyncOwned() {
+        RecurringEvent present = existingSyncedEvent(1L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
+        RecurringEvent absent = existingSyncedEvent(2L, Duration.ofMinutes(60), Hashes.sha256Hex(60), true);
+        RecurringEvent alreadyDisabled = existingSyncedEvent(3L, Duration.ofMinutes(45), Hashes.sha256Hex(45), false);
+        when(recurringEventRepository.findBySysacadHashIsNotNull())
+                .thenReturn(List.of(present, absent, alreadyDisabled));
+
+        int affected = service.markRecurringEventsAbsent(Set.of(1L));
+
+        assertThat(affected).isEqualTo(1);
+        assertThat(absent.getSysacadEnabled()).isFalse();
+        assertThat(absent.getSyncedAt()).isNotNull();
+        assertThat(present.getSysacadEnabled()).isTrue();
+        verify(recurringEventRepository).save(absent);
+        verify(recurringEventRepository, never()).save(present);
+        verify(recurringEventRepository, never()).save(alreadyDisabled);
+        verifyNoInteractions(eventRepository);
+        verifyNoInteractions(occurrenceRepository);
+    }
+
+    @Test
+    @DisplayName("markRecurringEventsAbsent: sin eventos sync-owned, no marca nada")
+    void markRecurringEventsAbsentSinSyncOwnedNoHaceNada() {
+        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of());
+
+        int affected = service.markRecurringEventsAbsent(Set.of(1L));
+
+        assertThat(affected).isZero();
+        verify(recurringEventRepository, never()).save(any());
     }
 
 
@@ -404,6 +640,27 @@ class AcademicEventServiceImplTest {
 
     private CreateRecurringEventRequestDto recurringDto(DayOfWeek dayOfWeek, LocalDate startDate, LocalDate endDate) {
         return new CreateRecurringEventRequestDto(30, LocalTime.of(8, 0), 90, dayOfWeek, startDate, endDate, 1L, 1L);
+    }
+
+    private SyncRecurringEventCommand syncCommand(int durationMinutes, int enrolled) {
+        return new SyncRecurringEventCommand(1L, 1L, DayOfWeek.MONDAY, LocalTime.of(8, 0), durationMinutes,
+                enrolled, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31));
+    }
+
+    private RecurringEvent existingSyncedEvent(Long id, Duration duration, String sysacadHash, boolean sysacadEnabled) {
+        return RecurringEvent.builder()
+                .id(id)
+                .enrolled(30)
+                .startTime(LocalTime.of(8, 0))
+                .duration(duration)
+                .dayOfWeek(DayOfWeek.MONDAY)
+                .startDate(LocalDate.of(2026, 3, 1))
+                .endDate(LocalDate.of(2026, 7, 31))
+                .subjectId(1L)
+                .commissionId(1L)
+                .sysacadHash(sysacadHash)
+                .sysacadEnabled(sysacadEnabled)
+                .build();
     }
 
     private RecurringEventResponseDto dummyRecurringResponseDto(Long id) {

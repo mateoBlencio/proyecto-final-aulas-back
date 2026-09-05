@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.space.model;
 
+import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -11,27 +12,21 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "tipo_aula")
-@SQLRestriction("eliminado = false")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ClassroomType {
+public class ClassroomType extends SoftDeletableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id_tipo_aula")
-    private Integer id;
+    private Long id;
 
     @Column(name = "descripcion", nullable = false, length = 50)
     private String description;
-
-    @Builder.Default
-    @Column(name = "eliminado", nullable = false)
-    private Boolean deleted = false;
 }

@@ -44,7 +44,7 @@ public class UserController {
 
     @PatchMapping("/{id}/enabled")
     @PreAuthorize("hasRole('SUBSECRETARIA')")
-    public ResponseEntity<UserResponseDto> setEnabled(@PathVariable Integer id,
+    public ResponseEntity<UserResponseDto> setEnabled(@PathVariable Long id,
                                                       @Valid @RequestBody UpdateUserEnabledRequestDto dto) {
         log.debug("PATCH /v1/users/{}/enabled: enabled={}", id, dto.enabled());
         UserResponseDto response = userService.setEnabled(id, dto.enabled());
@@ -54,7 +54,7 @@ public class UserController {
 
     @PatchMapping("/{id}/role")
     @PreAuthorize("hasRole('SUBSECRETARIA')")
-    public ResponseEntity<UserResponseDto> changeRole(@PathVariable Integer id,
+    public ResponseEntity<UserResponseDto> changeRole(@PathVariable Long id,
                                                       @Valid @RequestBody UpdateUserRoleRequestDto dto,
                                                       @AuthenticationPrincipal SecurityUser principal) {
         log.debug("PATCH /v1/users/{}/role: rol={}", id, dto.rol());

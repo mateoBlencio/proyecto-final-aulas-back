@@ -9,38 +9,36 @@ public class SpaceTestData {
 
     public static Building.BuildingBuilder building() {
         return Building.builder()
-                .id(1)
-                .name("Edificio Central")
-                .floorCount(5)
-                .active(true)
-                .deleted(false);
+                .id(1L)
+                .name("Edificio Central");
+    }
+
+    public static Building deactivated(Building building) {
+        building.deactivate();
+        return building;
     }
 
     public static ClassroomType.ClassroomTypeBuilder classroomType() {
         return ClassroomType.builder()
-                .id(1)
-                .description("Normal")
-                .deleted(false);
+                .id(1L)
+                .description("Normal");
     }
 
     public static Classroom.ClassroomBuilder classroom() {
         return Classroom.builder()
-                .id(1)
-                .roomNumber("101")
-                .floor(1)
+                .id(1L)
+                .roomNumber(101)
                 .capacity(40)
-                .available(true)
-                .deleted(false)
                 .building(building().build())
                 .classroomType(classroomType().build());
     }
 
     public static ClassroomRequestDto classroomRequestDto() {
-        return new ClassroomRequestDto("101", 40, 1, 1, true, 1);
+        return new ClassroomRequestDto(101, 40, 1L, 1L);
     }
 
-    public static ClassroomRequestDto classroomRequestDto(String roomNumber, Integer capacity, Integer floor,
-                                                            Integer classroomTypeId, Boolean available, Integer buildingId) {
-        return new ClassroomRequestDto(roomNumber, capacity, floor, classroomTypeId, available, buildingId);
+    public static ClassroomRequestDto classroomRequestDto(Integer roomNumber, Integer capacity,
+                                                            Long classroomTypeId, Long buildingId) {
+        return new ClassroomRequestDto(roomNumber, capacity, classroomTypeId, buildingId);
     }
 }

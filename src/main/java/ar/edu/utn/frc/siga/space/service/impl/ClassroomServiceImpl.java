@@ -1,30 +1,48 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
+import ar.edu.utn.frc.siga.space.dto.request.ClassroomDetailsUpdateDto;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomListItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
 import ar.edu.utn.frc.siga.space.exception.SpaceDomainException;
+import ar.edu.utn.frc.siga.space.mapper.ClassroomListComposer;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomMapper;
+import ar.edu.utn.frc.siga.common.util.Finder;
+import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
+import ar.edu.utn.frc.siga.space.model.PermissionMode;
+import ar.edu.utn.frc.siga.space.dto.request.ClassroomPermissionTargetRequestDto;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
+import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import ar.edu.utn.frc.siga.space.service.ClassroomTypeService;
+import ar.edu.utn.frc.siga.space.service.command.ClassroomSyncCommand;
+import ar.edu.utn.frc.siga.space.specification.ClassroomListSort;
 import ar.edu.utn.frc.siga.space.specification.ClassroomSpecification;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -35,7 +53,10 @@ public class ClassroomServiceImpl implements ClassroomService {
     private final ClassroomRepository classroomRepository;
     private final BuildingRepository buildingRepository;
     private final ClassroomTypeService classroomTypeService;
+    private final ClassroomTypeRepository classroomTypeRepository;
     private final ClassroomMapper classroomMapper;
+    private final ClassroomListComposer classroomListComposer;
+    private final ClassroomFeatureWriter classroomFeatureWriter;
 
     @Override
     @Transactional
@@ -46,12 +67,11 @@ public class ClassroomServiceImpl implements ClassroomService {
         Building building = findActiveBuilding(dto.buildingId());
         ClassroomType classroomType = classroomTypeService.findById(dto.classroomTypeId());
 
-        if (classroomRepository.findByRoomNumber(dto.roomNumber()).isPresent()) {
+        if (classroomRepository.findByRoomNumberAndDeletedAtIsNull(dto.roomNumber()).isPresent()) {
             log.warn("Creación de aula rechazada: roomNumber '{}' ya existe", dto.roomNumber());
             throw new SpaceDomainException("Classroom roomNumber already exists: " + dto.roomNumber());
         }
 
-        validateFloor(dto, building);
         validateCapacity(dto);
 
         Classroom entity = classroomMapper.toEntity(dto);
@@ -64,7 +84,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     @Override
-    public ClassroomResponseDto findById(Integer id) {
+    public ClassroomResponseDto findById(Long id) {
         log.debug("Buscando aula por id={}", id);
         return classroomMapper.toDto(this.findExistingClassroomById(id));
     }
@@ -72,36 +92,40 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Override
     public List<ClassroomResponseDto> findAllAvailable() {
         log.debug("Listando todas las aulas disponibles");
-        return classroomRepository.findByAvailableTrue().stream()
+        return classroomRepository.findAllActive().stream()
                 .map(classroomMapper::toDto)
                 .toList();
     }
 
     @Override
-    public List<ClassroomResponseDto> findByIds(Collection<Integer> ids) {
+    public List<ClassroomResponseDto> findByIds(Collection<Long> ids) {
         log.debug("Buscando aulas por ids: {}", ids);
         return classroomRepository.findAllById(ids).stream()
+                .filter(Classroom::isActive)
                 .map(classroomMapper::toDto)
                 .toList();
     }
 
     @Override
-    public Page<ClassroomResponseDto> findAll(ClassroomFilter filter, Pageable pageable) {
-        log.debug("Listando aulas: filter={}, page={}, size={}", filter, pageable.getPageNumber(), pageable.getPageSize());
-        return classroomRepository.findAll(ClassroomSpecification.withFilter(filter), pageable)
-                .map(classroomMapper::toDto);
+    public Page<ClassroomListItemDto> findAll(ClassroomFilter filter, Pageable pageable, boolean includeDeactivated) {
+        log.debug("Listando aulas: filter={}, page={}, size={}, includeDeactivated={}",
+                filter, pageable.getPageNumber(), pageable.getPageSize(), includeDeactivated);
+        Specification<Classroom> spec = includeDeactivated
+                ? ClassroomSpecification.withFilter(filter)
+                : ClassroomSpecification.withFilter(filter).and(SoftDeleteSpecifications.active());
+        return classroomListComposer.compose(
+                classroomRepository.findAll(spec, ClassroomListSort.apply(pageable)));
     }
 
     @Override
     @Transactional
-    public ClassroomResponseDto update(Integer id, ClassroomRequestDto dto) {
+    public ClassroomResponseDto update(Long id, ClassroomRequestDto dto) {
         log.debug("Actualizando aula: id={}, roomNumber={}", id, dto.roomNumber());
 
         Classroom entity = this.findExistingClassroomById(id);
         Building building = findActiveBuilding(dto.buildingId());
         ClassroomType classroomType = classroomTypeService.findById(dto.classroomTypeId());
 
-        validateFloor(dto, building);
         validateCapacity(dto);
 
         classroomMapper.updateEntity(entity, dto);
@@ -115,24 +139,62 @@ public class ClassroomServiceImpl implements ClassroomService {
 
     @Override
     @Transactional
-    public void delete(Integer id) {
+    public ClassroomListItemDto updateDetails(Long id, ClassroomDetailsUpdateDto dto) {
+        log.debug("Actualizando campos locales del aula: id={}, permissionMode={}", id, dto.permissionMode());
+
+        PermissionMode mode = normalizePermissionMode(dto.permissionMode(), dto.permissionTargets());
+
+        Classroom classroom = this.findExistingClassroomById(id);
+        classroom.setClassroomType(classroomTypeService.findById(dto.classroomTypeId()));
+        classroom.setObservations(dto.observations());
+        classroom.setPermissionMode(mode);
+        classroomRepository.save(classroom);
+
+        classroomFeatureWriter.applyResources(classroom, dto.resources());
+        classroomFeatureWriter.applyPermissions(classroom, mode, dto.permissionTargets());
+
+        log.info("Campos locales del aula actualizados: id={}", id);
+        return classroomListComposer.compose(classroom);
+    }
+
+    @Override
+    @Transactional
+    public void delete(Long id) {
         log.debug("Eliminando (soft-delete) aula: id={}", id);
         Classroom classroom = this.findExistingClassroomById(id);
-        classroom.setDeleted(true);
-        classroomRepository.save(classroom);
+        classroomRepository.softDelete(classroom);
         log.info("Aula eliminada: id={}", id);
     }
 
     @Override
-    public ClassroomResponseDto findByRoomNumberAndBuilding(String roomNumber, Integer buildingId) {
+    @Transactional
+    public void activate(Long id) {
+        classroomRepository.restore(Finder.orThrow(classroomRepository::findById, id, "Classroom"));
+    }
+
+    @Override
+    @Transactional
+    public void deactivate(Long id) {
+        classroomRepository.softDelete(Finder.orThrow(classroomRepository::findById, id, "Classroom"));
+    }
+
+    @Override
+    public ClassroomResponseDto findByRoomNumberAndBuilding(Integer roomNumber, Long buildingId) {
         Building building = findBuildingById(buildingId);
-        return classroomMapper.toDto(classroomRepository.findByRoomNumberAndBuilding(roomNumber, building)
+        return classroomMapper.toDto(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(roomNumber, building)
                 .or(() -> fallbackByRoomNumberOnly(roomNumber, buildingId))
                 .orElseThrow(() -> ResourceNotFoundException.of("Classroom", roomNumber)));
     }
 
-    private Optional<Classroom> fallbackByRoomNumberOnly(String roomNumber, Integer buildingId) {
-        List<Classroom> matches = classroomRepository.findAllByRoomNumber(roomNumber);
+    @Override
+    public Optional<ClassroomResponseDto> findByRoomNumberAndBuildingCode(Integer roomNumber, Integer buildingCode) {
+        return buildingRepository.findByBuildingCode(buildingCode)
+                .flatMap(building -> classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(roomNumber, building))
+                .map(classroomMapper::toDto);
+    }
+
+    private Optional<Classroom> fallbackByRoomNumberOnly(Integer roomNumber, Long buildingId) {
+        List<Classroom> matches = classroomRepository.findAllByRoomNumberAndDeletedAtIsNull(roomNumber);
         if (matches.size() != 1) {
             return Optional.empty();
         }
@@ -142,35 +204,31 @@ public class ClassroomServiceImpl implements ClassroomService {
         return Optional.of(found);
     }
 
-    private Classroom findExistingClassroomById(Integer id) {
-        return classroomRepository.findById(id)
+    private Classroom findExistingClassroomById(Long id) {
+        return classroomRepository.findActiveById(id)
                 .orElseThrow(() -> {
                     log.warn("Aula no encontrada: id={}", id);
                     return ResourceNotFoundException.of("Classroom", id);
                 });
     }
 
-    private Building findBuildingById(Integer id) {
+    private Building findBuildingById(Long id) {
         return buildingRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("Building", id));
     }
 
-    private Building findActiveBuilding(Integer id) {
-        Building building = findBuildingById(id);
-        if (!building.getActive()) {
-            log.warn("Edificio no encontrado: id={}", id);
-            throw ResourceNotFoundException.of("Building", id);
-        }
-        return building;
+    private Building findActiveBuilding(Long id) {
+        return buildingRepository.findActiveById(id)
+                .orElseThrow(() -> {
+                    log.warn("Edificio no encontrado: id={}", id);
+                    return ResourceNotFoundException.of("Building", id);
+                });
     }
 
-    private void validateFloor(ClassroomRequestDto dto, Building building) {
-        if (dto.floor() > building.getFloorCount()) {
-            log.warn("Validación de piso fallida: floor={} excede floorCount={} del edificio, buildingId={}",
-                    dto.floor(), building.getFloorCount(), building.getId());
-            throw new SpaceDomainException(
-                    "Floor " + dto.floor() + " exceeds building floor count " + building.getFloorCount());
-        }
+    private static PermissionMode normalizePermissionMode(PermissionMode mode,
+                                                         List<ClassroomPermissionTargetRequestDto> targets) {
+        boolean emptySubset = mode == PermissionMode.SUBSET && (targets == null || targets.isEmpty());
+        return emptySubset ? PermissionMode.NONE : mode;
     }
 
     private void validateCapacity(ClassroomRequestDto dto) {
@@ -180,4 +238,99 @@ public class ClassroomServiceImpl implements ClassroomService {
         }
     }
 
+    @Override
+    @Transactional
+    public int syncClassrooms(List<ClassroomSyncCommand> commands) {
+        Instant syncedAt = Instant.now();
+        ClassroomType defaultType = null;
+        Map<Integer, Building> buildingsByCode = buildingRepository.findAll().stream()
+                .filter(building -> building.getBuildingCode() != null)
+                .collect(Collectors.toMap(Building::getBuildingCode, Function.identity()));
+        Map<ClassroomKey, Classroom> existing = classroomRepository.findAll().stream()
+                .collect(Collectors.toMap(ClassroomServiceImpl::keyOf, Function.identity()));
+        Set<ClassroomKey> incoming = new HashSet<>();
+        int affected = 0;
+
+        for (ClassroomSyncCommand command : commands) {
+            if (command.roomNumber() == null || command.buildingCode() == null) {
+                log.warn("Aula de SysAcad ignorada por clave incompleta: aula={}, edificio={}",
+                        command.roomNumber(), command.buildingCode());
+                continue;
+            }
+            Building building = buildingsByCode.get(command.buildingCode());
+            if (building == null) {
+                log.warn("Aula de SysAcad ignorada: no existe el edificio con codigo={}", command.buildingCode());
+                continue;
+            }
+
+            ClassroomKey key = new ClassroomKey(building.getId(), command.roomNumber());
+            incoming.add(key);
+            String hash = Hashes.sha256Hex(command.capacity(), command.enabled());
+            Classroom classroom = existing.get(key);
+
+            if (classroom == null) {
+                if (defaultType == null) {
+                    defaultType = resolveDefaultClassroomType();
+                }
+                Classroom saved = classroomRepository.save(Classroom.builder()
+                        .roomNumber(key.roomNumber())
+                        .building(building)
+                        .classroomType(defaultType)
+                        .capacity(command.capacity())
+                        .sysacadEnabled(command.enabled())
+                        .syncedAt(syncedAt)
+                        .sysacadHash(hash)
+                        .build());
+                existing.put(key, saved);
+                affected++;
+                continue;
+            }
+            if (isUpToDate(classroom, hash)) {
+                continue;
+            }
+            // `classroomType` es local-owned: el sync nunca lo pisa en un update (§4.3).
+            // Al crear sí se asigna un default (§ constraint NOT NULL), ver resolveDefaultClassroomType().
+            classroom.setCapacity(command.capacity());
+            classroom.setSysacadEnabled(command.enabled());
+            classroom.setSyncedAt(syncedAt);
+            classroom.setSysacadHash(hash);
+            classroomRepository.save(classroom);
+            affected++;
+        }
+
+        return affected + markAbsent(existing.values(), incoming, syncedAt);
+    }
+
+    private int markAbsent(Iterable<Classroom> existing, Set<ClassroomKey> incoming, Instant syncedAt) {
+        int affected = 0;
+        for (Classroom classroom : existing) {
+            if (incoming.contains(keyOf(classroom)) || Boolean.FALSE.equals(classroom.getSysacadEnabled())) {
+                continue;
+            }
+            classroom.setSysacadEnabled(false);
+            classroom.setSyncedAt(syncedAt);
+            classroomRepository.save(classroom);
+            affected++;
+            log.info("Aula marcada como no vigente en SysAcad: id={}", classroom.getId());
+        }
+        return affected;
+    }
+
+    private ClassroomType resolveDefaultClassroomType() {
+        return classroomTypeRepository.findByDescriptionIgnoreCaseAndDeletedAtIsNull(DEFAULT_CLASSROOM_TYPE)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Falta el tipo de aula por defecto '" + DEFAULT_CLASSROOM_TYPE
+                                + "': hay que cargarlo en la base de este ambiente"
+                                + " (data.sql solo corre en dev-local)"));
+    }
+
+    private static ClassroomKey keyOf(Classroom classroom) {
+        return new ClassroomKey(classroom.getBuilding().getId(), classroom.getRoomNumber());
+    }
+
+    private static boolean isUpToDate(Classroom classroom, String hash) {
+        return hash.equals(classroom.getSysacadHash()) && Boolean.TRUE.equals(classroom.getSysacadEnabled());
+    }
+
+    private record ClassroomKey(Long buildingId, Integer roomNumber) {}
 }

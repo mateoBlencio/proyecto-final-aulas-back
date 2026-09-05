@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.roomrequest.model;
 
+import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -16,8 +17,10 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.envers.Audited;
 
 @Entity
+@Audited
 @Table(name = "solicitud_aula_preferencia",
        uniqueConstraints = {
            @UniqueConstraint(name = "uq_solicitud_preferencia_item_aula",
@@ -29,8 +32,8 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class RoomPreference {
+@EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
+public class RoomPreference extends TimestampedEntity {
 
     @EqualsAndHashCode.Include
     @Id
@@ -43,7 +46,7 @@ public class RoomPreference {
     private RoomRequestItem item;
 
     @Column(name = "id_aula", nullable = false)
-    private Integer classroomId;
+    private Long classroomId;
 
     @Column(name = "orden", nullable = false)
     private Integer position;

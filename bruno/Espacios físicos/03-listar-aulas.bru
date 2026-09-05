@@ -5,15 +5,15 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/classrooms?buildingId=1&capacityMin=60&available=true&page=0&size=20
+  url: {{baseUrl}}/v1/classrooms
   body: none
   auth: inherit
 }
 
 params:query {
-  buildingId: 1
-  capacityMin: 60
-  available: true
-  page: 0
-  size: 20
+  ~buildingId: 1
+  ~capacityMin: 60
+  ~page: 0
+  ~size: 20
+  ~includeDeactivated: true
 }

@@ -10,7 +10,7 @@ public interface RefreshTokenService {
 
     void revoke(String rawToken);
 
-    void revokeAllByUserId(Integer userId);
+    void revokeAllByUserId(Long userId);
 
     record IssuedRefreshToken(String rawToken, long expiresInSeconds) {
     }

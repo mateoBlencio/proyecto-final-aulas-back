@@ -1,0 +1,25 @@
+meta {
+  name: Actualizar tipo de recurso
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/v1/resource-types/1
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Cantidad de PC",
+    "valueKind": "COUNT"
+  }
+}
+
+docs {
+  PUT /v1/resource-types/{id}. Rol: SUBSECRETARIA. Actualiza name y valueKind.
+  El id es inmutable; los recursos de aula siguen apuntando al mismo tipo aunque
+  cambie el nombre. 400 si el nombre ya lo usa otro tipo (incluye desactivados);
+  404 si el tipo de recurso no existe.
+}

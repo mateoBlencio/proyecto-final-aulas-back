@@ -1,7 +1,7 @@
 package ar.edu.utn.frc.siga.roomrequest.dto.response;
 
 public record ClassroomOptionDto(
-        Integer id,
-        String roomNumber,
+        Long id,
+        Integer roomNumber,
         String buildingName
 ) {}
