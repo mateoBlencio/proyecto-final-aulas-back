@@ -205,10 +205,10 @@ public class CommissionServiceImpl implements CommissionService {
                     command.subjectCode(), command.courseCode());
             return 0;
         }
+        Integer enrolledCount = command.enrolledCount() != null ? command.enrolledCount() : 0;
         if (command.enrolledCount() == null) {
-            log.warn("No se pudo resolver la cantidad de inscriptos: curso={}, materia={}",
+            log.info("Inscriptos no informados para curso={}, materia={}: se crea el link con 0 provisional",
                     command.courseCode(), command.subjectCode());
-            return 0;
         }
         SubjectCommissionId id = new SubjectCommissionId(subject.getId(), commission.getId());
         SubjectCommission link = existingLinks.get(id);
@@ -218,7 +218,7 @@ public class CommissionServiceImpl implements CommissionService {
                     .id(new SubjectCommissionId())
                     .subject(subject)
                     .commission(commission)
-                    .enrolledCount(command.enrolledCount())
+                    .enrolledCount(enrolledCount)
                     .build();
             subjectCommissionRepository.save(created);
             // Registrar el link recién creado para que un duplicado (mismo subject+commission) en el
@@ -226,10 +226,10 @@ public class CommissionServiceImpl implements CommissionService {
             existingLinks.put(id, created);
             return 1;
         }
-        if (command.enrolledCount().equals(link.getEnrolledCount())) {
+        if (enrolledCount.equals(link.getEnrolledCount())) {
             return 0;
         }
-        link.setEnrolledCount(command.enrolledCount());
+        link.setEnrolledCount(enrolledCount);
         subjectCommissionRepository.save(link);
         return 1;
     }

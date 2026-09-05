@@ -342,8 +342,8 @@ class CommissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("syncCommissions: si el comando no trae inscriptos para curso+materia, no crea el link")
-    void syncCommissionsSkipsLinkWhenEnrollmentUnresolved() {
+    @DisplayName("syncCommissions: si el comando no trae inscriptos, crea el link con 0 provisional")
+    void syncCommissionsCreatesLinkWithZeroWhenEnrollmentUnresolved() {
         CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, null);
         AcademicPeriod annualPeriod = annualPeriod();
         StudyPlan studyPlan = studyPlan();
@@ -351,6 +351,7 @@ class CommissionServiceImplTest {
 
         when(commissionRepository.findAll()).thenReturn(List.of());
         when(subjectRepository.findAll()).thenReturn(List.of(subject));
+        when(subjectCommissionRepository.findAll()).thenReturn(List.of());
         when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any())).thenReturn(Optional.of(studyPlan));
         when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
                 .thenReturn(Optional.of(annualPeriod));
@@ -358,6 +359,34 @@ class CommissionServiceImplTest {
 
         service.syncCommissions(List.of(command));
 
-        verify(subjectCommissionRepository, never()).save(any());
+        ArgumentCaptor<SubjectCommission> saved = ArgumentCaptor.forClass(SubjectCommission.class);
+        verify(subjectCommissionRepository).save(saved.capture());
+        assertThat(saved.getValue().getEnrolledCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("syncCommissions: el proximo sync con inscriptos reales pisa el 0 provisional")
+    void syncCommissionsOverwritesProvisionalZeroWithRealCount() {
+        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, 30);
+        AcademicPeriod annualPeriod = annualPeriod();
+        StudyPlan studyPlan = studyPlan();
+        Subject subject = Subject.builder().id(3L).code(55).studyPlan(studyPlan).build();
+        Commission commission = Commission.builder().id(9L).courseCode("101").academicPeriod(annualPeriod)
+                .sysacadHash(Hashes.sha256Hex("101", 9L, 1, 2024, 55)).sysacadEnabled(true).build();
+        SubjectCommission provisionalLink = SubjectCommission.builder()
+                .id(new SubjectCommissionId(3L, 9L))
+                .subject(subject).commission(commission).enrolledCount(0).build();
+
+        when(commissionRepository.findAll()).thenReturn(List.of(commission));
+        when(subjectRepository.findAll()).thenReturn(List.of(subject));
+        when(subjectCommissionRepository.findAll()).thenReturn(List.of(provisionalLink));
+        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any())).thenReturn(Optional.of(studyPlan));
+        when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
+                .thenReturn(Optional.of(annualPeriod));
+
+        service.syncCommissions(List.of(command));
+
+        assertThat(provisionalLink.getEnrolledCount()).isEqualTo(30);
+        verify(subjectCommissionRepository).save(provisionalLink);
     }
 }
