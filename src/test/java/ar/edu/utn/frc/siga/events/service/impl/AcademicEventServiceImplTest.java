@@ -139,39 +139,59 @@ class AcademicEventServiceImplTest {
         CreateRecurringEventRequestDto dto = recurringDto(DayOfWeek.MONDAY,
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19));
         RecurringEvent existing = EventTestData.recurringEvent(7L, dto.dayOfWeek(), dto.startDate(), dto.endDate());
-        when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
-                dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startTime(), dto.startDate(), dto.endDate()))
-                .thenReturn(Optional.of(existing));
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any()))
+                .thenReturn(List.of(existing));
 
         FindOrCreateResult<Long> result = service.findOrCreateRecurringEvent(dto);
 
         assertThat(result.created()).isFalse();
         assertThat(result.value()).isEqualTo(7L);
-        verify(eventRepository, never()).save(any());
+        verify(eventRepository).saveAll(List.of());
         verify(subjectService, never()).findById(any());
         verify(commissionService, never()).findById(any());
         verify(composer, never()).compose(any(AcademicEvent.class));
     }
 
     @Test
-    @DisplayName("findOrCreateRecurringEvent: no existe ninguno con esa sextupla → lo crea")
+    @DisplayName("findOrCreateRecurringEvent: no existe ninguno con esa sextupla → lo crea vía el bulk, sin validar refs")
     void findOrCreateCreaNuevo() {
         CreateRecurringEventRequestDto dto = recurringDto(DayOfWeek.MONDAY,
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19));
-        when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
-                dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startTime(), dto.startDate(), dto.endDate()))
-                .thenReturn(Optional.empty());
-        when(subjectService.findById(1L)).thenReturn(EventTestData.subjectResponseDto(1L));
-        when(commissionService.findById(1L)).thenReturn(EventTestData.commissionResponseDto(1L));
-        RecurringEvent saved = EventTestData.recurringEvent(9L, dto.dayOfWeek(), dto.startDate(), dto.endDate());
-        when(eventRepository.save(any())).thenReturn(saved);
-        when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyRecurringResponseDto(9L));
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of());
+        when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(9L));
 
         FindOrCreateResult<Long> result = service.findOrCreateRecurringEvent(dto);
 
         assertThat(result.created()).isTrue();
         assertThat(result.value()).isEqualTo(9L);
-        verify(eventRepository).save(any());
+        verify(subjectService, never()).findById(any());
+        verify(commissionService, never()).findById(any());
+        verify(occurrenceRepository).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("findOrCreateRecurringEvents: prefetch único, dos requests con la misma clave → un solo insert, resultados en orden")
+    void findOrCreateRecurringEventsBulk() {
+        CreateRecurringEventRequestDto monday = recurringDto(DayOfWeek.MONDAY,
+                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19));
+        CreateRecurringEventRequestDto tuesday = recurringDto(DayOfWeek.TUESDAY,
+                LocalDate.of(2026, 1, 6), LocalDate.of(2026, 1, 20));
+        RecurringEvent existingTuesday = EventTestData.recurringEvent(4L, DayOfWeek.TUESDAY,
+                tuesday.startDate(), tuesday.endDate());
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any()))
+                .thenReturn(List.of(existingTuesday));
+        when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(10L));
+
+        List<FindOrCreateResult<Long>> results = service.findOrCreateRecurringEvents(
+                List.of(monday, tuesday, monday));
+
+        verify(recurringEventRepository, times(1)).findBySubjectIdInAndCommissionIdIn(any(), any());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<RecurringEvent>> captor = ArgumentCaptor.forClass(List.class);
+        verify(eventRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).hasSize(1);
+        assertThat(results).extracting(FindOrCreateResult::value).containsExactly(10L, 4L, 10L);
+        assertThat(results).extracting(FindOrCreateResult::created).containsExactly(true, false, false);
     }
 
 

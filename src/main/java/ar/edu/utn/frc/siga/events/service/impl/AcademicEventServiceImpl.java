@@ -152,15 +152,60 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     @Override
     @Transactional
     public FindOrCreateResult<Long> findOrCreateRecurringEvent(CreateRecurringEventRequestDto dto) {
-        return recurringEventRepository
-                .findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
-                        dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startTime(),
-                        dto.startDate(), dto.endDate())
-                .map(existing -> {
-                    log.debug("Reutilizando evento recurrente existente: id={}", existing.getId());
-                    return new FindOrCreateResult<>(existing.getId(), false);
-                })
-                .orElseGet(() -> new FindOrCreateResult<>(createRecurringEvent(dto).id(), true));
+        return findOrCreateRecurringEvents(List.of(dto)).getFirst();
+    }
+
+    @Override
+    @Transactional
+    public List<FindOrCreateResult<Long>> findOrCreateRecurringEvents(List<CreateRecurringEventRequestDto> requests) {
+        Set<Long> subjectIds = requests.stream()
+                .map(CreateRecurringEventRequestDto::subjectId).collect(Collectors.toSet());
+        Set<Long> commissionIds = requests.stream()
+                .map(CreateRecurringEventRequestDto::commissionId).collect(Collectors.toSet());
+        Map<RecurringEventKey, RecurringEvent> byKey = Maps.byId(
+                recurringEventRepository.findBySubjectIdInAndCommissionIdIn(subjectIds, commissionIds),
+                AcademicEventServiceImpl::keyOf, (first, ignored) -> first);
+
+        List<RecurringEvent> resolved = new ArrayList<>(requests.size());
+        boolean[] createdFlags = new boolean[requests.size()];
+        List<RecurringEvent> created = new ArrayList<>();
+
+        for (int i = 0; i < requests.size(); i++) {
+            CreateRecurringEventRequestDto dto = requests.get(i);
+            RecurringEventKey key = keyOf(dto);
+            RecurringEvent existing = byKey.get(key);
+            if (existing != null) {
+                resolved.add(existing);
+            } else {
+                RecurringEvent event = RecurringEvent.builder()
+                        .enrolled(dto.enrolled())
+                        .startTime(dto.startTime())
+                        .duration(Duration.ofMinutes(dto.durationMinutes()))
+                        .dayOfWeek(dto.dayOfWeek())
+                        .startDate(dto.startDate())
+                        .endDate(dto.endDate())
+                        .subjectId(dto.subjectId())
+                        .commissionId(dto.commissionId())
+                        .build();
+                byKey.put(key, event);
+                created.add(event);
+                resolved.add(event);
+                createdFlags[i] = true;
+            }
+        }
+
+        eventRepository.saveAll(created);
+        occurrenceRepository.saveAll(created.stream()
+                .flatMap(event -> event.toOccurrences().stream())
+                .toList());
+
+        List<FindOrCreateResult<Long>> results = new ArrayList<>(requests.size());
+        for (int i = 0; i < requests.size(); i++) {
+            results.add(new FindOrCreateResult<>(resolved.get(i).getId(), createdFlags[i]));
+        }
+        log.info("Find-or-create bulk de eventos recurrentes: {} creados de {} pedidos",
+                created.size(), requests.size());
+        return results;
     }
 
     @Override
@@ -246,6 +291,11 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     private static RecurringEventKey keyOf(SyncRecurringEventCommand command) {
         return new RecurringEventKey(command.subjectId(), command.commissionId(), command.dayOfWeek(),
                 command.startTime(), command.startDate(), command.endDate());
+    }
+
+    private static RecurringEventKey keyOf(CreateRecurringEventRequestDto dto) {
+        return new RecurringEventKey(dto.subjectId(), dto.commissionId(), dto.dayOfWeek(),
+                dto.startTime(), dto.startDate(), dto.endDate());
     }
 
     /**
