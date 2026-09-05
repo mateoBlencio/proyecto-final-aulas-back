@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -41,12 +42,24 @@ class StudyPlanResolverTest {
     }
 
     @Test
-    @DisplayName("findOrCreate: vacío si la especialidad no está sincronizada")
-    void emptyWhenSpecialtyUnresolved() {
+    @DisplayName("findOrCreate: crea un stub de especialidad cuando no está sincronizada y sigue")
+    void createsSpecialtyStubWhenUnresolved() {
+        Instant syncedAt = Instant.now();
         when(specialtyRepository.findBySpecialtyCode(17)).thenReturn(Optional.empty());
+        when(specialtyRepository.save(any(Specialty.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(studyPlanRepository.findByPlanCodeAndSpecialty(eq(94), any(Specialty.class))).thenReturn(Optional.empty());
+        when(studyPlanRepository.save(any(StudyPlan.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertThat(resolver().findOrCreate(17, 94, Instant.now())).isEmpty();
-        verify(studyPlanRepository, never()).findByPlanCodeAndSpecialty(any(), any());
+        Optional<StudyPlan> result = resolver().findOrCreate(17, 94, syncedAt);
+
+        assertThat(result).isPresent();
+        ArgumentCaptor<Specialty> stub = ArgumentCaptor.forClass(Specialty.class);
+        verify(specialtyRepository).save(stub.capture());
+        assertThat(stub.getValue().getSpecialtyCode()).isEqualTo(17);
+        assertThat(stub.getValue().getName()).isEqualTo("Especialidad 17");
+        assertThat(stub.getValue().getSysacadHash()).isNull();
+        assertThat(stub.getValue().getSyncedAt()).isEqualTo(syncedAt);
+        assertThat(result.get().getSpecialty()).isEqualTo(stub.getValue());
     }
 
     @Test

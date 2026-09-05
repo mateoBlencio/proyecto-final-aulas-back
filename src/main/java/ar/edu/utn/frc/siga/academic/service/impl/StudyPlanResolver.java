@@ -24,14 +24,23 @@ class StudyPlanResolver {
         if (specialtyCode == null || planCode == null) {
             return Optional.empty();
         }
-        Optional<Specialty> specialty = specialtyRepository.findBySpecialtyCode(specialtyCode);
-        return specialty.map(value -> FindOrCreateResult.resolve(
-                studyPlanRepository.findByPlanCodeAndSpecialty(planCode, value),
+        Specialty specialty = specialtyRepository.findBySpecialtyCode(specialtyCode)
+                .orElseGet(() -> {
+                    log.info("Creando Specialty stub: especialidad={}", specialtyCode);
+                    return specialtyRepository.save(Specialty.builder()
+                            .specialtyCode(specialtyCode)
+                            .name("Especialidad " + specialtyCode)
+                            .syncedAt(syncedAt)
+                            .sysacadHash(null)
+                            .build());
+                });
+        return Optional.of(FindOrCreateResult.resolve(
+                studyPlanRepository.findByPlanCodeAndSpecialty(planCode, specialty),
                 () -> {
                     log.info("Creando StudyPlan: especialidad={}, plan={}", specialtyCode, planCode);
                     return studyPlanRepository.save(StudyPlan.builder()
                             .planCode(planCode)
-                            .specialty(value)
+                            .specialty(specialty)
                             .syncedAt(syncedAt)
                             .sysacadHash(Hashes.sha256Hex(specialtyCode, planCode))
                             .build());
