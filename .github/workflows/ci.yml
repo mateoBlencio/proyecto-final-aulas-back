@@ -8,6 +8,7 @@ on:
   pull_request:
     branches:
       - develop
+      - test
       - main
 
 permissions:
@@ -24,8 +25,8 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-      checks: write           # action-junit-report publica el resumen como check
-      security-events: write  # upload-sarif publica los hallazgos de Trivy
+      checks: write
+      security-events: write
     env:
       IMAGE: siga-back:ci-${{ github.sha }}
     steps:
