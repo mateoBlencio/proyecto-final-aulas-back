@@ -33,7 +33,7 @@ class AllocationTargetResolver {
         for (AllocationItem item : items) {
             for (OccurrenceSlotDto occurrence : resolveApplicable(item.target(), clampFrom, slotsByEvent)) {
                 Long previous = classroomByOccurrence.putIfAbsent(occurrence, item.classroomId());
-                if (previous != null) {
+                if (previous != null && !previous.equals(item.classroomId())) {
                     throw new AllocationConflictException(
                             "La ocurrencia " + occurrence.occurrenceId() + " está apuntada por más de un item del lote.");
                 }

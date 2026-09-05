@@ -199,8 +199,8 @@ class AllocationTargetResolverTest {
     }
 
     @Test
-    @DisplayName("target Event: dos items apuntando a la misma ocurrencia → 409")
-    void dosEventItemsMismaOcurrencia() {
+    @DisplayName("target Event: dos items apuntando a la misma ocurrencia con aula distinta → 409")
+    void dosEventItemsMismaOcurrenciaAulaDistinta() {
         LocalDate d = LocalDate.now().plusDays(30);
         OccurrenceSlotDto shared = slotForEvent(1L, 55L, d);
         when(occurrenceService.findSlotsByEvents(anyCollection())).thenReturn(List.of(shared));
@@ -208,6 +208,20 @@ class AllocationTargetResolverTest {
         assertThatThrownBy(() -> resolver.resolveClassroomByOccurrence(
                 List.of(eventItem(55L, 100L), eventItem(55L, 200L)), null))
                 .isInstanceOf(AllocationConflictException.class);
+    }
+
+    @Test
+    @DisplayName("target Event: dos items idénticos (misma ocurrencia, misma aula) no son conflicto")
+    void dosEventItemsMismaOcurrenciaMismaAula() {
+        LocalDate d = LocalDate.now().plusDays(30);
+        OccurrenceSlotDto shared = slotForEvent(1L, 55L, d);
+        when(occurrenceService.findSlotsByEvents(anyCollection())).thenReturn(List.of(shared));
+
+        Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
+                List.of(eventItem(55L, 100L), eventItem(55L, 100L)), null);
+
+        assertThat(resolved).containsExactly(
+                org.assertj.core.api.Assertions.entry(shared, 100L));
     }
 
     @Test
