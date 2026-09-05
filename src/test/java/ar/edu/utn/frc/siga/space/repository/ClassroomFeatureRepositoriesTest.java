@@ -44,7 +44,8 @@ class ClassroomFeatureRepositoriesTest {
     @BeforeEach
     void seedClassroom() {
         Building building = buildingRepository.save(Building.builder().name("Edificio Test " + System.nanoTime()).build());
-        ClassroomType type = classroomTypeRepository.save(ClassroomType.builder().description("Normal").build());
+        ClassroomType type = classroomTypeRepository.save(
+                ClassroomType.builder().description("Tipo Test " + System.nanoTime()).build());
         classroom = classroomRepository.save(Classroom.builder()
                 .roomNumber((int) (System.nanoTime() % 100_000))
                 .capacity(40)

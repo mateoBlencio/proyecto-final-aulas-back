@@ -37,6 +37,14 @@ spring:
           envers:
             store_data_at_delete: true
 
+  flyway:
+    enabled: true
+    # dev y test ya tienen el schema: Flyway las marca en la baseline y salta la V1.
+    # Sobre una base vacia (tests, ambiente nuevo) aplica todo desde cero.
+    baseline-on-migrate: true
+    baseline-version: 1
+    baseline-description: schema de dev al 04/09/2026
+
   docker:
     compose:
       enabled: false
