@@ -42,7 +42,7 @@ public abstract class AcademicEvent extends TimestampedEntity {
     @EqualsAndHashCode.Include
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "evento_academico_seq")
-    @SequenceGenerator(name = "evento_academico_seq", sequenceName = "evento_academico_id_evento_academico_seq", allocationSize = 1)
+    @SequenceGenerator(name = "evento_academico_seq", sequenceName = "evento_academico_id_evento_academico_seq", allocationSize = 50)
     @Column(name = "id_evento_academico")
     protected Long id;
 
