@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadUnavailableExceptio
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadResyncOutcome;
 import ar.edu.utn.frc.siga.sysacad.internal.service.SysacadSyncOrchestrator;
 
+import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadViewSyncer;
 import java.util.EnumMap;
@@ -21,19 +22,25 @@ public class SysacadSyncOrchestratorImpl implements SysacadSyncOrchestrator {
 
     private final Map<SysacadView, SysacadViewSyncer> syncersByView = new EnumMap<>(SysacadView.class);
     private final AtomicBoolean running = new AtomicBoolean(false);
+    private final SysacadCatalogSnapshotFactory snapshotFactory;
 
-    public SysacadSyncOrchestratorImpl(List<SysacadViewSyncer> syncers) {
+    public SysacadSyncOrchestratorImpl(List<SysacadViewSyncer> syncers, SysacadCatalogSnapshotFactory snapshotFactory) {
         syncers.forEach(syncer -> syncersByView.put(syncer.view(), syncer));
+        this.snapshotFactory = snapshotFactory;
     }
 
     @Override
     public void sync(SysacadView view) {
+        sync(view, snapshotFactory.newSnapshot());
+    }
+
+    private void sync(SysacadView view, SysacadCatalogReader snapshot) {
         SysacadViewSyncer syncer = syncersByView.get(view);
         if (syncer == null) {
             log.warn("No hay sync registrado para la vista {}", view);
             return;
         }
-        syncer.sync();
+        syncer.sync(snapshot);
     }
 
     @Override
@@ -45,6 +52,7 @@ public class SysacadSyncOrchestratorImpl implements SysacadSyncOrchestrator {
         int attemptedViews = 0;
         int failedViews = 0;
         int connectivityFailures = 0;
+        SysacadCatalogReader snapshot = snapshotFactory.newSnapshot();
         try {
             for (SysacadView view : SysacadView.values()) {
                 // Vistas sin syncer registrado (todavía) no cuentan ni como intento ni como falla — ver
@@ -55,7 +63,7 @@ public class SysacadSyncOrchestratorImpl implements SysacadSyncOrchestrator {
                     attemptedViews++;
                 }
                 try {
-                    sync(view);
+                    sync(view, snapshot);
                 } catch (RuntimeException e) {
                     log.error("Falló el sync de la vista {}: {}", view, e.getMessage());
                     failedViews++;

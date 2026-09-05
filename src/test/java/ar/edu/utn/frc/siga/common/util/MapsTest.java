@@ -39,4 +39,15 @@ class MapsTest {
 
         assertThatThrownBy(() -> Maps.byId(items, Item::id)).isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    @DisplayName("byId con merge: clave duplicada se resuelve con el operador en vez de lanzar")
+    void claveDuplicadaSeResuelveConMerge() {
+        List<Item> items = List.of(new Item(1L, "a"), new Item(1L, "b"), new Item(2L, "c"));
+
+        Map<Long, Item> byId = Maps.byId(items, Item::id, (first, second) -> second);
+
+        assertThat(byId).containsOnlyKeys(1L, 2L);
+        assertThat(byId.get(1L).name()).isEqualTo("b");
+    }
 }

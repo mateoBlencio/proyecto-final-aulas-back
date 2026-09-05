@@ -132,7 +132,7 @@ siga:
     base-url: https://dataview.frc.utn.edu.ar
     api-key: ${SYSACAD_API_KEY}
     connect-timeout: 5s
-    read-timeout: 30s
+    read-timeout: 120s
     max-retries: 3
     sync:
 
