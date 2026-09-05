@@ -698,14 +698,17 @@ class AcademicEventServiceImplTest {
 
 
     @Test
-    @DisplayName("findAll: delega en el composer sobre todos los eventos")
+    @DisplayName("findAll: delega en el composer sobre la página del repositorio")
     void findAllDelegaEnComposer() {
-        when(eventRepository.findAll()).thenReturn(List.of());
+        when(eventRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class),
+                any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
         when(composer.compose(anyCollection())).thenReturn(List.of());
 
-        List<AcademicEventResponseDto> result = service.findAll();
+        var result = service.findAll(new ar.edu.utn.frc.siga.events.dto.AcademicEventFilter(null, null, null),
+                org.springframework.data.domain.Pageable.unpaged());
 
-        assertThat(result).isEmpty();
+        assertThat(result.getContent()).isEmpty();
         verify(composer).compose(anyCollection());
     }
 
