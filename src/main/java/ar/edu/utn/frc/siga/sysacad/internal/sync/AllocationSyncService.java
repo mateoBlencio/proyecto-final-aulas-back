@@ -8,6 +8,7 @@ import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
+import ar.edu.utn.frc.siga.events.dto.response.SysacadRecurringEventRefDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
@@ -17,6 +18,7 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadViewSyncer;
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -61,6 +64,9 @@ public class AllocationSyncService implements SysacadViewSyncer {
         Map<OverlapKey, List<OverlapEntry>> overlapsBySlot = new LinkedHashMap<>();
         List<AllocationItem> items = new ArrayList<>();
 
+        Map<RecurringEventKey, Long> eventIdsByKey = academicEventService.findSysacadRecurringEvents().stream()
+                .collect(Collectors.toMap(AllocationSyncService::keyOf, SysacadRecurringEventRefDto::eventId));
+
         for (SysacadAllocationDto row : catalog.findAllocations()) {
             if (isSentinel(row)) {
                 continue;
@@ -85,18 +91,18 @@ public class AllocationSyncService implements SysacadViewSyncer {
             int year = commission.academicPeriod().year();
             for (TermType termType : SysacadCommissionResolver.termTypes(
                     row.semester(), row.courseCode(), row.subjectCode())) {
-                Optional<Long> eventId = academicEventService.findRecurringEventId(
+                Long eventId = eventIdsByKey.get(new RecurringEventKey(
                         link.subjectId(), commission.id(), row.dayOfWeek(), row.startTime(),
-                        termType.startDate(year), termType.endDate(year));
-                if (eventId.isEmpty()) {
+                        termType.startDate(year), termType.endDate(year)));
+                if (eventId == null) {
                     log.warn("No se encontró el evento ya creado por EVENTOS para curso={}, materia={}, "
                                     + "dia={}, hora={}, cuatrimestre={}: fila de asignación salteada",
                             row.courseCode(), row.subjectCode(), row.dayOfWeek(), row.startTime(), termType);
                     continue;
                 }
 
-                recordOverlap(overlapsBySlot, row, termType, eventId.get());
-                items.add(new AllocationItem(new AllocationTarget.Event(eventId.get()), classroom.get().id()));
+                recordOverlap(overlapsBySlot, row, termType, eventId);
+                items.add(new AllocationItem(new AllocationTarget.Event(eventId), classroom.get().id()));
             }
         }
 
@@ -107,6 +113,11 @@ public class AllocationSyncService implements SysacadViewSyncer {
 
     private static boolean isSentinel(SysacadAllocationDto row) {
         return row.roomNumber() != null && SENTINEL_ROOM_NUMBERS.contains(row.roomNumber());
+    }
+
+    private static RecurringEventKey keyOf(SysacadRecurringEventRefDto ref) {
+        return new RecurringEventKey(ref.subjectId(), ref.commissionId(), ref.dayOfWeek(), ref.startTime(),
+                ref.startDate(), ref.endDate());
     }
 
     private Optional<ClassroomResponseDto> resolveClassroom(
@@ -131,6 +142,10 @@ public class AllocationSyncService implements SysacadViewSyncer {
                         entries.size(), entries);
             }
         });
+    }
+
+    private record RecurringEventKey(Long subjectId, Long commissionId, DayOfWeek dayOfWeek, LocalTime startTime,
+            LocalDate startDate, LocalDate endDate) {
     }
 
     private record ClassroomKey(Integer roomNumber, Integer buildingCode) {

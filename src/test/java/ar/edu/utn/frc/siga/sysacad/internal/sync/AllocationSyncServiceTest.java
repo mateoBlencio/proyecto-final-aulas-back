@@ -10,6 +10,7 @@ import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.events.dto.response.SysacadRecurringEventRefDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
@@ -99,6 +100,12 @@ class AllocationSyncServiceTest {
                 courseCode, subjectCode, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, semester, roomNumber, buildingCode);
     }
 
+    private SysacadRecurringEventRefDto eventRef(Long eventId, Long subjectId, Long commissionId,
+            TermType termType, int year) {
+        return new SysacadRecurringEventRefDto(eventId, subjectId, commissionId, DayOfWeek.MONDAY, LocalTime.of(8, 0),
+                termType.startDate(year), termType.endDate(year));
+    }
+
     @ParameterizedTest
     @CsvSource({"999, 24", "999, 2", "999, 6", "0, 5"})
     @DisplayName("sync: aula centinela (999 o 0, cualquier edificio) → saltea la fila sin resolver comisión, materia ni aula")
@@ -109,7 +116,6 @@ class AllocationSyncServiceTest {
 
         verify(commissionService, never()).findActiveByCourseCode(any());
         verify(classroomService, never()).findByRoomNumberAndBuildingCode(any(), any());
-        verify(academicEventService, never()).findRecurringEventId(any(), any(), any(), any(), any(), any());
         verify(allocationService).syncFromSysacad(List.of());
         verify(syncStateService).recordSuccess(SysacadView.ASIGNACIONES, 0);
     }
@@ -129,7 +135,7 @@ class AllocationSyncServiceTest {
     }
 
     @Test
-    @DisplayName("sync: no se resuelve el aula por (roomNumber, buildingCode) → saltea la fila con WARN, no busca el evento")
+    @DisplayName("sync: no se resuelve el aula por (roomNumber, buildingCode) → saltea la fila con WARN")
     void syncSkipsRowWhenClassroomUnresolved() {
         when(catalogReader.findAllocations()).thenReturn(List.of(row("101", 55, 1, 200, 5)));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
@@ -138,23 +144,48 @@ class AllocationSyncServiceTest {
 
         service.sync(catalogReader);
 
-        verify(academicEventService, never()).findRecurringEventId(any(), any(), any(), any(), any(), any());
         verify(allocationService).syncFromSysacad(List.of());
     }
 
     @Test
-    @DisplayName("sync: el aula resuelve pero el evento no fue creado todavía por EVENTOS → saltea la fila con WARN, no crea el evento")
+    @DisplayName("sync: el índice de eventos sync-owned se pide una sola vez por corrida")
+    void syncFetchesRecurringEventIndexOnce() {
+        when(catalogReader.findAllocations()).thenReturn(List.of(row("101", 55, 1, 200, 5)));
+        when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
+        when(academicEventService.findSysacadRecurringEvents())
+                .thenReturn(List.of(eventRef(100L, 9L, 1L, TermType.PRIMER_CUATRIMESTRE, 2026)));
+        when(allocationService.syncFromSysacad(anyList())).thenReturn(1);
+
+        service.sync(catalogReader);
+
+        verify(academicEventService, times(1)).findSysacadRecurringEvents();
+    }
+
+    @Test
+    @DisplayName("sync: el aula resuelve pero ninguna clave del índice matchea la fila → saltea la fila con WARN")
     void syncSkipsRowWhenEventNotFound() {
         when(catalogReader.findAllocations()).thenReturn(List.of(row("101", 55, 1, 200, 5)));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
         when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
         when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
-        when(academicEventService.findRecurringEventId(9L, 1L, DayOfWeek.MONDAY, LocalTime.of(8, 0),
-                TermType.PRIMER_CUATRIMESTRE.startDate(2026), TermType.PRIMER_CUATRIMESTRE.endDate(2026)))
-                .thenReturn(Optional.empty());
+        when(academicEventService.findSysacadRecurringEvents()).thenReturn(List.of());
 
-        service.sync(catalogReader);
+        Logger logger = (Logger) LoggerFactory.getLogger(AllocationSyncService.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            service.sync(catalogReader);
+        } finally {
+            logger.detachAppender(appender);
+        }
 
+        boolean warned = appender.list.stream()
+                .anyMatch(event -> event.getFormattedMessage().contains("No se encontró el evento ya creado por EVENTOS")
+                        && event.getFormattedMessage().contains("101"));
+        assertThat(warned).as("debe loguear WARN cuando la fila no tiene evento en el índice").isTrue();
         verify(allocationService).syncFromSysacad(List.of());
     }
 
@@ -165,9 +196,8 @@ class AllocationSyncServiceTest {
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
         when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
         when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
-        when(academicEventService.findRecurringEventId(9L, 1L, DayOfWeek.MONDAY, LocalTime.of(8, 0),
-                TermType.PRIMER_CUATRIMESTRE.startDate(2026), TermType.PRIMER_CUATRIMESTRE.endDate(2026)))
-                .thenReturn(Optional.of(100L));
+        when(academicEventService.findSysacadRecurringEvents())
+                .thenReturn(List.of(eventRef(100L, 9L, 1L, TermType.PRIMER_CUATRIMESTRE, 2026)));
         when(allocationService.syncFromSysacad(anyList())).thenReturn(1);
 
         service.sync(catalogReader);
@@ -180,28 +210,49 @@ class AllocationSyncServiceTest {
     }
 
     @Test
-    @DisplayName("sync: HorarioCuatrimestre=0 (\"ambos cuatrimestres\") → busca el evento dos veces, uno por cuatrimestre")
-    void syncLooksUpTwiceWhenBothSemesters() {
+    @DisplayName("sync: HorarioCuatrimestre=0 (\"ambos cuatrimestres\") → resuelve un item por cuatrimestre desde el índice")
+    void syncResolvesBothSemestersFromIndex() {
         when(catalogReader.findAllocations()).thenReturn(List.of(row("101", 55, 0, 200, 5)));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
         when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
         when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
-        when(academicEventService.findRecurringEventId(9L, 1L, DayOfWeek.MONDAY, LocalTime.of(8, 0),
-                TermType.PRIMER_CUATRIMESTRE.startDate(2026), TermType.PRIMER_CUATRIMESTRE.endDate(2026)))
-                .thenReturn(Optional.of(100L));
-        when(academicEventService.findRecurringEventId(9L, 1L, DayOfWeek.MONDAY, LocalTime.of(8, 0),
-                TermType.SEGUNDO_CUATRIMESTRE.startDate(2026), TermType.SEGUNDO_CUATRIMESTRE.endDate(2026)))
-                .thenReturn(Optional.of(101L));
+        when(academicEventService.findSysacadRecurringEvents()).thenReturn(List.of(
+                eventRef(100L, 9L, 1L, TermType.PRIMER_CUATRIMESTRE, 2026),
+                eventRef(101L, 9L, 1L, TermType.SEGUNDO_CUATRIMESTRE, 2026)));
 
         service.sync(catalogReader);
 
-        verify(academicEventService, times(2)).findRecurringEventId(any(), any(), any(), any(), any(), any());
+        verify(academicEventService, times(1)).findSysacadRecurringEvents();
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<AllocationItem>> captor = ArgumentCaptor.forClass(List.class);
         verify(allocationService).syncFromSysacad(captor.capture());
         assertThat(captor.getValue()).containsExactlyInAnyOrder(
                 new AllocationItem(new AllocationTarget.Event(100L), 50L),
                 new AllocationItem(new AllocationTarget.Event(101L), 50L));
+    }
+
+    @Test
+    @DisplayName("sync: N filas que comparten el mismo evento del índice → todas resuelven al mismo Event")
+    void syncResolvesMultipleRowsSharingOneEvent() {
+        SysacadAllocationDto rowA = row("101", 55, 1, 200, 5);
+        SysacadAllocationDto rowB = row("101", 55, 1, 201, 6);
+        when(catalogReader.findAllocations()).thenReturn(List.of(rowA, rowB));
+        when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
+        when(classroomService.findByRoomNumberAndBuildingCode(201, 6)).thenReturn(Optional.of(classroom(51L)));
+        when(academicEventService.findSysacadRecurringEvents())
+                .thenReturn(List.of(eventRef(100L, 9L, 1L, TermType.PRIMER_CUATRIMESTRE, 2026)));
+
+        service.sync(catalogReader);
+
+        verify(academicEventService, times(1)).findSysacadRecurringEvents();
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<AllocationItem>> captor = ArgumentCaptor.forClass(List.class);
+        verify(allocationService).syncFromSysacad(captor.capture());
+        assertThat(captor.getValue()).containsExactlyInAnyOrder(
+                new AllocationItem(new AllocationTarget.Event(100L), 50L),
+                new AllocationItem(new AllocationTarget.Event(100L), 51L));
     }
 
     @Test
@@ -217,12 +268,9 @@ class AllocationSyncServiceTest {
         when(commissionService.findActiveByCourseCode("102")).thenReturn(commission(2L, "102", 2026));
         when(subjectCommissionService.findByCommissionAndSubjectCode(2L, 66)).thenReturn(link(10L, 2L, 25));
         when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
-        when(academicEventService.findRecurringEventId(9L, 1L, DayOfWeek.MONDAY, LocalTime.of(8, 0),
-                TermType.PRIMER_CUATRIMESTRE.startDate(2026), TermType.PRIMER_CUATRIMESTRE.endDate(2026)))
-                .thenReturn(Optional.of(100L));
-        when(academicEventService.findRecurringEventId(10L, 2L, DayOfWeek.MONDAY, LocalTime.of(8, 0),
-                TermType.PRIMER_CUATRIMESTRE.startDate(2026), TermType.PRIMER_CUATRIMESTRE.endDate(2026)))
-                .thenReturn(Optional.of(200L));
+        when(academicEventService.findSysacadRecurringEvents()).thenReturn(List.of(
+                eventRef(100L, 9L, 1L, TermType.PRIMER_CUATRIMESTRE, 2026),
+                eventRef(200L, 10L, 2L, TermType.PRIMER_CUATRIMESTRE, 2026)));
 
         Logger logger = (Logger) LoggerFactory.getLogger(AllocationSyncService.class);
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
@@ -240,7 +288,6 @@ class AllocationSyncServiceTest {
                         && event.getFormattedMessage().contains("102"));
         assertThat(overlapWarned).as("debe loguear WARN con el detalle (courseCode) de ambas filas del grupo").isTrue();
 
-        // no deduplica: las dos filas siguen mandándose, aunque compartan aula/horario
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<AllocationItem>> captor = ArgumentCaptor.forClass(List.class);
         verify(allocationService).syncFromSysacad(captor.capture());
