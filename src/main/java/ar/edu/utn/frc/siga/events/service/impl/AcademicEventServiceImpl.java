@@ -26,6 +26,8 @@ import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
+import ar.edu.utn.frc.siga.common.util.Maps;
+import ar.edu.utn.frc.siga.common.util.RecurringEventKey;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,10 +39,14 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -159,47 +165,83 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
     @Override
     @Transactional
-    public UpsertRecurringEventResult syncRecurringEvent(SyncRecurringEventCommand cmd) {
-        Optional<RecurringEvent> existing = recurringEventRepository
-                .findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
-                        cmd.subjectId(), cmd.commissionId(), cmd.dayOfWeek(), cmd.startTime(),
-                        cmd.startDate(), cmd.endDate());
+    public List<UpsertRecurringEventResult> syncRecurringEvents(List<SyncRecurringEventCommand> commands) {
+        Map<RecurringEventKey, RecurringEvent> byKey = Maps.byId(
+                recurringEventRepository.findBySysacadHashIsNotNull(),
+                AcademicEventServiceImpl::keyOf, (first, ignored) -> first);
 
         Instant now = Instant.now();
-        if (existing.isEmpty()) {
-            String hash = Hashes.sha256Hex(cmd.durationMinutes());
-            RecurringEvent event = RecurringEvent.builder()
-                    .enrolled(cmd.enrolled())
-                    .startTime(cmd.startTime())
-                    .duration(Duration.ofMinutes(cmd.durationMinutes()))
-                    .dayOfWeek(cmd.dayOfWeek())
-                    .startDate(cmd.startDate())
-                    .endDate(cmd.endDate())
-                    .subjectId(cmd.subjectId())
-                    .commissionId(cmd.commissionId())
-                    .syncedAt(now)
-                    .sysacadHash(hash)
-                    .sysacadEnabled(true)
-                    .build();
+        List<RecurringEvent> resolved = new ArrayList<>(commands.size());
+        boolean[] createdFlags = new boolean[commands.size()];
+        Set<RecurringEvent> updated = new LinkedHashSet<>();
+        List<RecurringEvent> created = new ArrayList<>();
 
-            AcademicEvent saved = eventRepository.save(event);
-            List<Occurrence> occurrences = saved.toOccurrences();
-            occurrenceRepository.saveAll(occurrences);
-
-            log.info("Evento recurrente creado por sync de SysAcad: id={}, occurrences={}",
-                    saved.getId(), occurrences.size());
-            return new UpsertRecurringEventResult(saved.getId(), true, false);
+        for (int i = 0; i < commands.size(); i++) {
+            SyncRecurringEventCommand cmd = commands.get(i);
+            RecurringEventKey key = keyOf(cmd);
+            RecurringEvent existing = byKey.get(key);
+            if (existing != null) {
+                existing.setEnrolled(cmd.enrolled());
+                reconcileDuration(existing, cmd.durationMinutes());
+                existing.setSyncedAt(now);
+                existing.setSysacadEnabled(true);
+                if (existing.getId() != null) {
+                    updated.add(existing);
+                }
+                resolved.add(existing);
+            } else {
+                RecurringEvent event = RecurringEvent.builder()
+                        .enrolled(cmd.enrolled())
+                        .startTime(cmd.startTime())
+                        .duration(Duration.ofMinutes(cmd.durationMinutes()))
+                        .dayOfWeek(cmd.dayOfWeek())
+                        .startDate(cmd.startDate())
+                        .endDate(cmd.endDate())
+                        .subjectId(cmd.subjectId())
+                        .commissionId(cmd.commissionId())
+                        .syncedAt(now)
+                        .sysacadHash(Hashes.sha256Hex(cmd.durationMinutes()))
+                        .sysacadEnabled(true)
+                        .build();
+                byKey.put(key, event);
+                created.add(event);
+                resolved.add(event);
+                createdFlags[i] = true;
+            }
         }
 
-        RecurringEvent event = existing.get();
-        event.setEnrolled(cmd.enrolled());
-        reconcileDuration(event, cmd.durationMinutes());
-        event.setSyncedAt(now);
-        event.setSysacadEnabled(true);
-        recurringEventRepository.save(event);
+        recurringEventRepository.saveAll(updated);
+        eventRepository.saveAll(created);
+        occurrenceRepository.saveAll(created.stream()
+                .flatMap(event -> event.toOccurrences().stream())
+                .toList());
 
-        log.info("Evento recurrente actualizado por sync de SysAcad: id={}", event.getId());
-        return new UpsertRecurringEventResult(event.getId(), false, true);
+        List<UpsertRecurringEventResult> results = new ArrayList<>(commands.size());
+        for (int i = 0; i < commands.size(); i++) {
+            RecurringEvent event = resolved.get(i);
+            boolean wasCreated = createdFlags[i];
+            results.add(new UpsertRecurringEventResult(event.getId(), wasCreated, !wasCreated));
+        }
+
+        log.info("Sync EVENTOS de SysAcad: {} eventos recurrentes creados, {} actualizados",
+                created.size(), commands.size() - created.size());
+        return results;
+    }
+
+    @Override
+    @Transactional
+    public UpsertRecurringEventResult syncRecurringEvent(SyncRecurringEventCommand cmd) {
+        return syncRecurringEvents(List.of(cmd)).getFirst();
+    }
+
+    private static RecurringEventKey keyOf(RecurringEvent event) {
+        return new RecurringEventKey(event.getSubjectId(), event.getCommissionId(), event.getDayOfWeek(),
+                event.getStartTime(), event.getStartDate(), event.getEndDate());
+    }
+
+    private static RecurringEventKey keyOf(SyncRecurringEventCommand command) {
+        return new RecurringEventKey(command.subjectId(), command.commissionId(), command.dayOfWeek(),
+                command.startTime(), command.startDate(), command.endDate());
     }
 
     /**

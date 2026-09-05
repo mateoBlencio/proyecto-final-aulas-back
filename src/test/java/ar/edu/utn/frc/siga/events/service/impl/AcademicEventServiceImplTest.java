@@ -41,6 +41,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.stubbing.Answer;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -58,6 +60,7 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -271,11 +274,8 @@ class AcademicEventServiceImplTest {
     @DisplayName("syncRecurringEvent: no existe evento con esa clave natural → lo crea con sysacadHash inicial (hash de la duración escrita) y expande ocurrencias")
     void syncRecurringEventCreaNuevo() {
         SyncRecurringEventCommand cmd = syncCommand(90, 30);
-        when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
-                cmd.subjectId(), cmd.commissionId(), cmd.dayOfWeek(), cmd.startTime(), cmd.startDate(), cmd.endDate()))
-                .thenReturn(Optional.empty());
-        RecurringEvent saved = EventTestData.recurringEvent(5L, cmd.dayOfWeek(), cmd.startDate(), cmd.endDate());
-        when(eventRepository.save(any())).thenReturn(saved);
+        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of());
+        when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(5L));
 
         UpsertRecurringEventResult result = service.syncRecurringEvent(cmd);
 
@@ -283,9 +283,11 @@ class AcademicEventServiceImplTest {
         assertThat(result.created()).isTrue();
         assertThat(result.updated()).isFalse();
 
-        ArgumentCaptor<RecurringEvent> captor = ArgumentCaptor.forClass(RecurringEvent.class);
-        verify(eventRepository).save(captor.capture());
-        RecurringEvent persisted = captor.getValue();
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<RecurringEvent>> captor = ArgumentCaptor.forClass(List.class);
+        verify(eventRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).hasSize(1);
+        RecurringEvent persisted = captor.getValue().getFirst();
         assertThat(persisted.getEnrolled()).isEqualTo(30);
         assertThat(persisted.getDuration()).isEqualTo(Duration.ofMinutes(90));
         assertThat(persisted.getSysacadEnabled()).isTrue();
@@ -300,9 +302,7 @@ class AcademicEventServiceImplTest {
     void syncRecurringEventPisaEnrolledSiempre() {
         SyncRecurringEventCommand cmd = syncCommand(90, 45);
         RecurringEvent existing = existingSyncedEvent(7L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
-        when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
-                cmd.subjectId(), cmd.commissionId(), cmd.dayOfWeek(), cmd.startTime(), cmd.startDate(), cmd.endDate()))
-                .thenReturn(Optional.of(existing));
+        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(existing));
 
         UpsertRecurringEventResult result = service.syncRecurringEvent(cmd);
 
@@ -311,8 +311,12 @@ class AcademicEventServiceImplTest {
         assertThat(existing.getEnrolled()).isEqualTo(45);
         assertThat(existing.getSyncedAt()).isNotNull();
         assertThat(existing.getSysacadEnabled()).isTrue();
-        verify(recurringEventRepository).save(existing);
-        verify(occurrenceRepository, never()).saveAll(any());
+        assertThat(savedRecurringEvents()).containsExactly(existing);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Occurrence>> occCaptor = ArgumentCaptor.forClass(List.class);
+        verify(occurrenceRepository).saveAll(occCaptor.capture());
+        assertThat(occCaptor.getValue()).isEmpty();
     }
 
     @Test
@@ -320,9 +324,7 @@ class AcademicEventServiceImplTest {
     void syncRecurringEventPisaDurationSinDrift() {
         SyncRecurringEventCommand cmd = syncCommand(120, 30);
         RecurringEvent existing = existingSyncedEvent(7L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
-        when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
-                cmd.subjectId(), cmd.commissionId(), cmd.dayOfWeek(), cmd.startTime(), cmd.startDate(), cmd.endDate()))
-                .thenReturn(Optional.of(existing));
+        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(existing));
 
         UpsertRecurringEventResult result = service.syncRecurringEvent(cmd);
 
@@ -335,20 +337,16 @@ class AcademicEventServiceImplTest {
     @DisplayName("syncRecurringEvent: duration editada a mano fuera del sync (drift) y el valor entrante difiere → NO se pisa, la edición manual se preserva")
     void syncRecurringEventNoPisaDurationConDrift() {
         SyncRecurringEventCommand cmd = syncCommand(120, 30);
-        // sincronizado por última vez con 90 min (sysacadHash = hash(90)), pero alguien lo editó a mano a 100 sin resync
         RecurringEvent existing = existingSyncedEvent(7L, Duration.ofMinutes(100), Hashes.sha256Hex(90), true);
-        when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
-                cmd.subjectId(), cmd.commissionId(), cmd.dayOfWeek(), cmd.startTime(), cmd.startDate(), cmd.endDate()))
-                .thenReturn(Optional.of(existing));
+        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(existing));
 
         UpsertRecurringEventResult result = service.syncRecurringEvent(cmd);
 
         assertThat(result.updated()).isTrue();
         assertThat(existing.getDuration()).isEqualTo(Duration.ofMinutes(100));
         assertThat(existing.getSysacadHash()).isEqualTo(Hashes.sha256Hex(90));
-        // enrolled se sigue pisando aunque duration no se toque: son reconciliaciones independientes
         assertThat(existing.getEnrolled()).isEqualTo(30);
-        verify(recurringEventRepository).save(existing);
+        assertThat(savedRecurringEvents()).containsExactly(existing);
     }
 
     @Test
@@ -356,16 +354,90 @@ class AcademicEventServiceImplTest {
     void syncRecurringEventPrimerResyncNoFalsoDrift() {
         SyncRecurringEventCommand cmd = syncCommand(90, 30);
         RecurringEvent justCreated = existingSyncedEvent(9L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
-        when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
-                cmd.subjectId(), cmd.commissionId(), cmd.dayOfWeek(), cmd.startTime(), cmd.startDate(), cmd.endDate()))
-                .thenReturn(Optional.of(justCreated));
+        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(justCreated));
 
         UpsertRecurringEventResult result = service.syncRecurringEvent(cmd);
 
         assertThat(result.updated()).isTrue();
         assertThat(justCreated.getDuration()).isEqualTo(Duration.ofMinutes(90));
         assertThat(justCreated.getSysacadHash()).isEqualTo(Hashes.sha256Hex(90));
-        verify(recurringEventRepository).save(justCreated);
+        assertThat(savedRecurringEvents()).containsExactly(justCreated);
+    }
+
+    @Test
+    @DisplayName("syncRecurringEvents: una sola lectura de prefetch del índice sync-owned para N comandos")
+    void syncRecurringEventsPrefetchUnaSolaVez() {
+        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of());
+        when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(1L));
+
+        service.syncRecurringEvents(List.of(
+                syncCommand(DayOfWeek.MONDAY, 90, 30),
+                syncCommand(DayOfWeek.TUESDAY, 90, 30),
+                syncCommand(DayOfWeek.WEDNESDAY, 90, 30)));
+
+        verify(recurringEventRepository, times(1)).findBySysacadHashIsNotNull();
+    }
+
+    @Test
+    @DisplayName("syncRecurringEvents: dos comandos con la misma clave natural y evento inexistente → un solo insert, el segundo reconcilia el objeto en memoria")
+    void syncRecurringEventsMismaClaveUnSoloInsert() {
+        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of());
+        when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(3L));
+
+        List<UpsertRecurringEventResult> results = service.syncRecurringEvents(List.of(
+                syncCommand(90, 30), syncCommand(120, 45)));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<RecurringEvent>> captor = ArgumentCaptor.forClass(List.class);
+        verify(eventRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).hasSize(1);
+        RecurringEvent inserted = captor.getValue().getFirst();
+        assertThat(inserted.getEnrolled()).isEqualTo(45);
+        assertThat(inserted.getDuration()).isEqualTo(Duration.ofMinutes(120));
+
+        assertThat(results).hasSize(2);
+        assertThat(results.get(0)).isEqualTo(new UpsertRecurringEventResult(3L, true, false));
+        assertThat(results.get(1)).isEqualTo(new UpsertRecurringEventResult(3L, false, true));
+    }
+
+    @Test
+    @DisplayName("syncRecurringEvents: mezcla create + update en una sola llamada → sólo los nuevos van a eventRepository.saveAll, resultados con created/updated correctos")
+    void syncRecurringEventsMezclaCreateUpdate() {
+        RecurringEvent existing = existingSyncedEvent(7L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
+        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(existing));
+        when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(11L));
+
+        List<UpsertRecurringEventResult> results = service.syncRecurringEvents(List.of(
+                syncCommand(90, 55),
+                syncCommand(DayOfWeek.FRIDAY, 60, 20)));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<RecurringEvent>> createdCaptor = ArgumentCaptor.forClass(List.class);
+        verify(eventRepository).saveAll(createdCaptor.capture());
+        assertThat(createdCaptor.getValue()).hasSize(1);
+        assertThat(createdCaptor.getValue().getFirst().getDayOfWeek()).isEqualTo(DayOfWeek.FRIDAY);
+        assertThat(existing.getEnrolled()).isEqualTo(55);
+
+        assertThat(results).containsExactly(
+                new UpsertRecurringEventResult(7L, false, true),
+                new UpsertRecurringEventResult(11L, true, false));
+        verify(occurrenceRepository).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("syncRecurringEvents: el orden de los resultados coincide con el orden de los comandos de entrada")
+    void syncRecurringEventsRespetaOrden() {
+        RecurringEvent wednesday = syncedEventOn(3L, DayOfWeek.WEDNESDAY);
+        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(wednesday));
+        when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(20L));
+
+        List<UpsertRecurringEventResult> results = service.syncRecurringEvents(List.of(
+                syncCommand(DayOfWeek.MONDAY, 90, 30),
+                syncCommand(DayOfWeek.WEDNESDAY, 90, 30),
+                syncCommand(DayOfWeek.FRIDAY, 90, 30)));
+
+        assertThat(results).extracting(UpsertRecurringEventResult::eventId).containsExactly(20L, 3L, 21L);
+        assertThat(results).extracting(UpsertRecurringEventResult::created).containsExactly(true, false, true);
     }
 
 
@@ -690,7 +762,11 @@ class AcademicEventServiceImplTest {
     }
 
     private SyncRecurringEventCommand syncCommand(int durationMinutes, int enrolled) {
-        return new SyncRecurringEventCommand(1L, 1L, DayOfWeek.MONDAY, LocalTime.of(8, 0), durationMinutes,
+        return syncCommand(DayOfWeek.MONDAY, durationMinutes, enrolled);
+    }
+
+    private SyncRecurringEventCommand syncCommand(DayOfWeek dayOfWeek, int durationMinutes, int enrolled) {
+        return new SyncRecurringEventCommand(1L, 1L, dayOfWeek, LocalTime.of(8, 0), durationMinutes,
                 enrolled, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31));
     }
 
@@ -708,6 +784,40 @@ class AcademicEventServiceImplTest {
                 .sysacadHash(sysacadHash)
                 .sysacadEnabled(sysacadEnabled)
                 .build();
+    }
+
+    private RecurringEvent syncedEventOn(Long id, DayOfWeek dayOfWeek) {
+        return RecurringEvent.builder()
+                .id(id)
+                .enrolled(30)
+                .startTime(LocalTime.of(8, 0))
+                .duration(Duration.ofMinutes(90))
+                .dayOfWeek(dayOfWeek)
+                .startDate(LocalDate.of(2026, 3, 1))
+                .endDate(LocalDate.of(2026, 7, 31))
+                .subjectId(1L)
+                .commissionId(1L)
+                .sysacadHash(Hashes.sha256Hex(90))
+                .sysacadEnabled(true)
+                .build();
+    }
+
+    private Iterable<RecurringEvent> savedRecurringEvents() {
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Iterable<RecurringEvent>> captor = ArgumentCaptor.forClass(Iterable.class);
+        verify(recurringEventRepository).saveAll(captor.capture());
+        return captor.getValue();
+    }
+
+    private static Answer<List<RecurringEvent>> assignSequentialIds(long firstId) {
+        return invocation -> {
+            List<RecurringEvent> events = invocation.getArgument(0);
+            long id = firstId;
+            for (RecurringEvent event : events) {
+                ReflectionTestUtils.setField(event, "id", id++);
+            }
+            return events;
+        };
     }
 
     private RecurringEventResponseDto dummyRecurringResponseDto(Long id) {

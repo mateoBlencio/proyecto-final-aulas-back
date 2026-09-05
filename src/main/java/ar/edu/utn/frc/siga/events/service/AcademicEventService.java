@@ -37,11 +37,19 @@ public interface AcademicEventService {
     FindOrCreateResult<Long> findOrCreateRecurringEvent(CreateRecurringEventRequestDto dto);
 
     /**
-     * Upsert por clave natural (subjectId, commissionId, dayOfWeek, startTime, startDate, endDate)
-     * desde una fuente externa (p. ej. sync de SysAcad): crea si no existe, o reconcilia
-     * asimétricamente si ya existe — {@code enrolled} se pisa siempre, {@code duration} sólo si nadie
-     * la tocó desde la última vez que el sync escribió (ver .claude/docs/plan-sync-eventos-sysacad.md
-     * §4). No re-expande ocurrencias en el camino de actualización.
+     * Upsert bulk por clave natural (subjectId, commissionId, dayOfWeek, startTime, startDate, endDate)
+     * desde una fuente externa (p. ej. sync de SysAcad): batchea una corrida entera del sync EVENTOS
+     * con un único prefetch del índice sync-owned, un único insert de los nuevos y una única expansión
+     * de ocurrencias. Cada comando crea si no existe, o reconcilia asimétricamente si ya existe —
+     * {@code enrolled} se pisa siempre, {@code duration} sólo si nadie la tocó desde la última vez que
+     * el sync escribió (ver .claude/docs/plan-sync-eventos-sysacad.md §4). No re-expande ocurrencias en
+     * el camino de actualización. El resultado respeta el orden de {@code commands}.
+     */
+    List<UpsertRecurringEventResult> syncRecurringEvents(List<SyncRecurringEventCommand> commands);
+
+    /**
+     * Upsert de un único evento recurrente entrante del sync: {@link #syncRecurringEvents} con una
+     * lista de un solo elemento.
      */
     UpsertRecurringEventResult syncRecurringEvent(SyncRecurringEventCommand cmd);
 
