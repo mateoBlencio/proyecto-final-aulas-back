@@ -72,9 +72,9 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
 
     @Override
     public List<SysacadSubjectDto> findSubjects() {
-        Map<SubjectNaturalKey, Set<Integer>> semestersByKey = groupSemesters(schedulesRaw.get());
+        Map<SubjectNaturalKey, SubjectSchedule> scheduleByKey = groupSchedule(schedulesRaw.get());
         return subjectsRaw.get().stream()
-                .map(raw -> mapper.toSubject(raw, resolveTerm(semestersByKey, raw)))
+                .map(raw -> mapper.toSubject(raw, resolveTerm(scheduleByKey, raw)))
                 .toList();
     }
 
@@ -105,29 +105,63 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
                 .toList();
     }
 
-    private static Map<SubjectNaturalKey, Set<Integer>> groupSemesters(List<RawSchedule> schedule) {
-        Map<SubjectNaturalKey, Set<Integer>> semestersByKey = new HashMap<>();
+    private static Map<SubjectNaturalKey, SubjectSchedule> groupSchedule(List<RawSchedule> schedule) {
+        Map<SubjectNaturalKey, SubjectSchedule> byKey = new HashMap<>();
         for (RawSchedule row : schedule) {
             SubjectNaturalKey key = new SubjectNaturalKey(row.especialidad(), row.plan(), row.materia());
-            semestersByKey.computeIfAbsent(key, k -> new HashSet<>()).add(row.horarioCuatrimestre());
+            SubjectSchedule facts = byKey.computeIfAbsent(key, k -> new SubjectSchedule());
+            facts.subjectTerms().add(trimToNull(row.materiaDictado()));
+            facts.commissionSemesters().add(row.horarioCuatrimestre());
         }
-        return semestersByKey;
+        return byKey;
     }
 
-    private String resolveTerm(Map<SubjectNaturalKey, Set<Integer>> semestersByKey, RawSubject raw) {
+    private String resolveTerm(Map<SubjectNaturalKey, SubjectSchedule> scheduleByKey, RawSubject raw) {
         SubjectNaturalKey key = new SubjectNaturalKey(raw.especialid(), raw.plan(), raw.materia());
-        Set<Integer> semesters = semestersByKey.getOrDefault(key, Set.of());
-        if (semesters.isEmpty()) {
+        SubjectSchedule facts = scheduleByKey.get(key);
+        if (facts == null) {
             return null;
         }
-        if (semesters.size() == 1) {
-            return TermType.fromSemester(semesters.iterator().next()).map(TermType::getLabel).orElse(null);
+        Set<String> subjectTerms = new HashSet<>(facts.subjectTerms());
+        subjectTerms.remove(null);
+        if (subjectTerms.size() > 1) {
+            log.warn("MateriaDictado en conflicto para especialidad={} plan={} materia={}: {}",
+                    raw.especialid(), raw.plan(), raw.materia(), subjectTerms);
+            return null;
         }
-        log.warn("HorarioCuatrimestre en conflicto para especialidad={} plan={} materia={}: {}",
-                raw.especialid(), raw.plan(), raw.materia(), semesters);
+        String subjectTerm = subjectTerms.isEmpty() ? "" : subjectTerms.iterator().next();
+        return switch (subjectTerm) {
+            case "A" -> TermType.ANUAL.getLabel();
+            case "1" -> TermType.PRIMER_CUATRIMESTRE.getLabel();
+            case "2" -> TermType.SEGUNDO_CUATRIMESTRE.getLabel();
+            default -> semesterFromCommissions(facts.commissionSemesters());
+        };
+    }
+
+    private static String semesterFromCommissions(Set<Integer> semesters) {
+        Set<Integer> cuatrimestrales = new HashSet<>(semesters);
+        cuatrimestrales.remove(null);
+        cuatrimestrales.remove(0);
+        if (cuatrimestrales.size() == 1) {
+            return TermType.fromSemester(cuatrimestrales.iterator().next()).map(TermType::getLabel).orElse(null);
+        }
         return null;
     }
 
+    private static String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
     private record SubjectNaturalKey(Integer especialidad, Integer plan, Integer materia) {
+    }
+
+    private record SubjectSchedule(Set<String> subjectTerms, Set<Integer> commissionSemesters) {
+        SubjectSchedule() {
+            this(new HashSet<>(), new HashSet<>());
+        }
     }
 }
