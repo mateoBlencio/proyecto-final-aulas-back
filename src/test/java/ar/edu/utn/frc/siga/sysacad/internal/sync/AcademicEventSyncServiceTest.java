@@ -25,6 +25,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -32,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -51,6 +53,8 @@ class AcademicEventSyncServiceTest {
     private AcademicEventService academicEventService;
     @Mock
     private SysacadSyncStateService syncStateService;
+    @Captor
+    private ArgumentCaptor<List<SyncRecurringEventCommand>> commandsCaptor;
 
     private AcademicEventSyncService service;
 
@@ -75,22 +79,46 @@ class AcademicEventSyncServiceTest {
         return new SubjectCommissionResponseDto(subjectId, commissionId, null, enrolled);
     }
 
+    private UpsertRecurringEventResult created(long eventId) {
+        return new UpsertRecurringEventResult(eventId, true, false);
+    }
+
     @Test
-    @DisplayName("sync: HorarioCuatrimestre=1 → un solo evento, con las fechas del 1er cuatrimestre")
-    void syncMapsFirstSemesterToSingleEvent() {
+    @DisplayName("sync: arma los commands y llama a syncRecurringEvents una sola vez, sin importar cuántas filas")
+    void syncCallsBulkOnce() {
+        SysacadAcademicEventDto monday = new SysacadAcademicEventDto(
+                "101", 55, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
+        SysacadAcademicEventDto thursday = new SysacadAcademicEventDto(
+                "101", 55, DayOfWeek.THURSDAY, LocalTime.of(8, 0), 90, 1);
+        when(catalogReader.findAcademicEvents()).thenReturn(List.of(monday, thursday));
+        when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(academicEventService.syncRecurringEvents(anyList()))
+                .thenReturn(List.of(created(100L), created(101L)));
+
+        service.sync(catalogReader);
+
+        verify(academicEventService, times(1)).syncRecurringEvents(commandsCaptor.capture());
+        assertThat(commandsCaptor.getValue()).hasSize(2);
+        verify(commissionService, times(1)).findActiveByCourseCode("101");
+        verify(subjectCommissionService, times(1)).findByCommissionAndSubjectCode(1L, 55);
+    }
+
+    @Test
+    @DisplayName("sync: HorarioCuatrimestre=1 → un solo command, con las fechas del 1er cuatrimestre")
+    void syncMapsFirstSemesterToSingleCommand() {
         SysacadAcademicEventDto row = new SysacadAcademicEventDto(
                 "101", 55, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
         when(catalogReader.findAcademicEvents()).thenReturn(List.of(row));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
         when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
-        when(academicEventService.syncRecurringEvent(any()))
-                .thenReturn(new UpsertRecurringEventResult(100L, true, false));
+        when(academicEventService.syncRecurringEvents(anyList())).thenReturn(List.of(created(100L)));
 
         service.sync(catalogReader);
 
-        ArgumentCaptor<SyncRecurringEventCommand> captor = ArgumentCaptor.forClass(SyncRecurringEventCommand.class);
-        verify(academicEventService).syncRecurringEvent(captor.capture());
-        SyncRecurringEventCommand cmd = captor.getValue();
+        verify(academicEventService).syncRecurringEvents(commandsCaptor.capture());
+        assertThat(commandsCaptor.getValue()).hasSize(1);
+        SyncRecurringEventCommand cmd = commandsCaptor.getValue().getFirst();
         assertThat(cmd.subjectId()).isEqualTo(9L);
         assertThat(cmd.commissionId()).isEqualTo(1L);
         assertThat(cmd.dayOfWeek()).isEqualTo(DayOfWeek.MONDAY);
@@ -105,49 +133,46 @@ class AcademicEventSyncServiceTest {
     }
 
     @Test
-    @DisplayName("sync: HorarioCuatrimestre=2 → un solo evento, con las fechas del 2do cuatrimestre")
-    void syncMapsSecondSemesterToSingleEvent() {
+    @DisplayName("sync: HorarioCuatrimestre=2 → un solo command, con las fechas del 2do cuatrimestre")
+    void syncMapsSecondSemesterToSingleCommand() {
         SysacadAcademicEventDto row = new SysacadAcademicEventDto(
                 "101", 55, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 2);
         when(catalogReader.findAcademicEvents()).thenReturn(List.of(row));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
         when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
-        when(academicEventService.syncRecurringEvent(any()))
-                .thenReturn(new UpsertRecurringEventResult(101L, true, false));
+        when(academicEventService.syncRecurringEvents(anyList())).thenReturn(List.of(created(101L)));
 
         service.sync(catalogReader);
 
-        ArgumentCaptor<SyncRecurringEventCommand> captor = ArgumentCaptor.forClass(SyncRecurringEventCommand.class);
-        verify(academicEventService).syncRecurringEvent(captor.capture());
-        assertThat(captor.getValue().startDate()).isEqualTo(TermType.SEGUNDO_CUATRIMESTRE.startDate(2026));
-        assertThat(captor.getValue().endDate()).isEqualTo(TermType.SEGUNDO_CUATRIMESTRE.endDate(2026));
+        verify(academicEventService).syncRecurringEvents(commandsCaptor.capture());
+        SyncRecurringEventCommand cmd = commandsCaptor.getValue().getFirst();
+        assertThat(cmd.startDate()).isEqualTo(TermType.SEGUNDO_CUATRIMESTRE.startDate(2026));
+        assertThat(cmd.endDate()).isEqualTo(TermType.SEGUNDO_CUATRIMESTRE.endDate(2026));
     }
 
     @Test
-    @DisplayName("sync: HorarioCuatrimestre=0 (\"ambos cuatrimestres\") → emite DOS eventos, uno por cuatrimestre")
-    void syncMapsBothSemestersToTwoEvents() {
+    @DisplayName("sync: HorarioCuatrimestre=0 (\"ambos cuatrimestres\") → emite DOS commands, uno por cuatrimestre")
+    void syncMapsBothSemestersToTwoCommands() {
         SysacadAcademicEventDto row = new SysacadAcademicEventDto(
                 "101", 55, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 0);
         when(catalogReader.findAcademicEvents()).thenReturn(List.of(row));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
         when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
-        when(academicEventService.syncRecurringEvent(any()))
-                .thenReturn(new UpsertRecurringEventResult(100L, true, false))
-                .thenReturn(new UpsertRecurringEventResult(101L, true, false));
+        when(academicEventService.syncRecurringEvents(anyList()))
+                .thenReturn(List.of(created(100L), created(101L)));
 
         service.sync(catalogReader);
 
-        ArgumentCaptor<SyncRecurringEventCommand> captor = ArgumentCaptor.forClass(SyncRecurringEventCommand.class);
-        verify(academicEventService, times(2)).syncRecurringEvent(captor.capture());
-        List<SyncRecurringEventCommand> commands = captor.getAllValues();
-        assertThat(commands).extracting(SyncRecurringEventCommand::startDate).containsExactlyInAnyOrder(
-                TermType.PRIMER_CUATRIMESTRE.startDate(2026), TermType.SEGUNDO_CUATRIMESTRE.startDate(2026));
+        verify(academicEventService).syncRecurringEvents(commandsCaptor.capture());
+        assertThat(commandsCaptor.getValue()).extracting(SyncRecurringEventCommand::startDate)
+                .containsExactlyInAnyOrder(
+                        TermType.PRIMER_CUATRIMESTRE.startDate(2026), TermType.SEGUNDO_CUATRIMESTRE.startDate(2026));
         verify(academicEventService).markRecurringEventsAbsent(Set.of(100L, 101L));
         verify(syncStateService).recordSuccess(SysacadView.EVENTOS, 2);
     }
 
     @Test
-    @DisplayName("sync: no se resuelve una comisión vigente para el curso → saltea la fila con WARN, no llama a syncRecurringEvent")
+    @DisplayName("sync: no se resuelve una comisión vigente para el curso → saltea la fila con WARN, command no emitido")
     void syncSkipsRowWhenCommissionUnresolved() {
         SysacadAcademicEventDto row = new SysacadAcademicEventDto(
                 "999", 55, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
@@ -157,14 +182,15 @@ class AcademicEventSyncServiceTest {
 
         service.sync(catalogReader);
 
-        verify(academicEventService, never()).syncRecurringEvent(any());
+        verify(academicEventService).syncRecurringEvents(commandsCaptor.capture());
+        assertThat(commandsCaptor.getValue()).isEmpty();
         verify(subjectCommissionService, never()).findByCommissionAndSubjectCode(any(), any());
         verify(academicEventService).markRecurringEventsAbsent(Set.of());
         verify(syncStateService).recordSuccess(SysacadView.EVENTOS, 0);
     }
 
     @Test
-    @DisplayName("sync: no se resuelve el link materia-comisión → saltea la fila con WARN, no llama a syncRecurringEvent")
+    @DisplayName("sync: no se resuelve el link materia-comisión → saltea la fila con WARN, command no emitido")
     void syncSkipsRowWhenLinkUnresolved() {
         SysacadAcademicEventDto row = new SysacadAcademicEventDto(
                 "101", 77, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
@@ -175,12 +201,13 @@ class AcademicEventSyncServiceTest {
 
         service.sync(catalogReader);
 
-        verify(academicEventService, never()).syncRecurringEvent(any());
+        verify(academicEventService).syncRecurringEvents(commandsCaptor.capture());
+        assertThat(commandsCaptor.getValue()).isEmpty();
         verify(academicEventService).markRecurringEventsAbsent(Set.of());
     }
 
     @Test
-    @DisplayName("sync: DURACION nula → saltea la fila con WARN, no llama a syncRecurringEvent")
+    @DisplayName("sync: DURACION nula → saltea la fila con WARN, command no emitido")
     void syncSkipsRowWhenDurationMissing() {
         SysacadAcademicEventDto row = new SysacadAcademicEventDto(
                 "101", 55, DayOfWeek.MONDAY, LocalTime.of(8, 0), null, 1);
@@ -190,29 +217,9 @@ class AcademicEventSyncServiceTest {
 
         service.sync(catalogReader);
 
-        verify(academicEventService, never()).syncRecurringEvent(any());
+        verify(academicEventService).syncRecurringEvents(commandsCaptor.capture());
+        assertThat(commandsCaptor.getValue()).isEmpty();
         verify(academicEventService).markRecurringEventsAbsent(Set.of());
-    }
-
-    @Test
-    @DisplayName("sync: cachea las resoluciones de comisión y link por corrida — dos filas del mismo curso+materia no repiten la consulta")
-    void syncCachesResolutionsPerRun() {
-        SysacadAcademicEventDto monday = new SysacadAcademicEventDto(
-                "101", 55, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
-        SysacadAcademicEventDto thursday = new SysacadAcademicEventDto(
-                "101", 55, DayOfWeek.THURSDAY, LocalTime.of(8, 0), 90, 1);
-        when(catalogReader.findAcademicEvents()).thenReturn(List.of(monday, thursday));
-        when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
-        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
-        when(academicEventService.syncRecurringEvent(any()))
-                .thenReturn(new UpsertRecurringEventResult(100L, true, false))
-                .thenReturn(new UpsertRecurringEventResult(101L, true, false));
-
-        service.sync(catalogReader);
-
-        verify(commissionService, times(1)).findActiveByCourseCode("101");
-        verify(subjectCommissionService, times(1)).findByCommissionAndSubjectCode(1L, 55);
-        verify(academicEventService, times(2)).syncRecurringEvent(any());
     }
 
     @Test

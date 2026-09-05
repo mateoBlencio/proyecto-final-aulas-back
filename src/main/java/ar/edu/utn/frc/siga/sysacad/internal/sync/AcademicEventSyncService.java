@@ -13,9 +13,11 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadViewSyncer;
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -45,8 +47,7 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
 
     private int doSync(SysacadCatalogReader catalog) {
         SysacadCommissionResolver resolver = new SysacadCommissionResolver(commissionService, subjectCommissionService);
-        Set<Long> presentEventIds = new HashSet<>();
-        int affected = 0;
+        List<SyncRecurringEventCommand> commands = new ArrayList<>();
 
         for (SysacadAcademicEventDto row : catalog.findAcademicEvents()) {
             Optional<SysacadCommissionResolver.ResolvedLink> resolved =
@@ -65,7 +66,7 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
             int year = commission.academicPeriod().year();
             for (TermType termType : SysacadCommissionResolver.termTypes(
                     row.semester(), row.courseCode(), row.subjectCode())) {
-                SyncRecurringEventCommand cmd = new SyncRecurringEventCommand(
+                commands.add(new SyncRecurringEventCommand(
                         link.subjectId(),
                         commission.id(),
                         row.dayOfWeek(),
@@ -73,14 +74,14 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
                         row.durationMinutes(),
                         link.enrolledCount(),
                         termType.startDate(year),
-                        termType.endDate(year));
-                UpsertRecurringEventResult result = academicEventService.syncRecurringEvent(cmd);
-                presentEventIds.add(result.eventId());
-                affected++;
+                        termType.endDate(year)));
             }
         }
 
-        affected += academicEventService.markRecurringEventsAbsent(presentEventIds);
-        return affected;
+        Set<Long> presentEventIds = academicEventService.syncRecurringEvents(commands).stream()
+                .map(UpsertRecurringEventResult::eventId)
+                .collect(Collectors.toSet());
+
+        return presentEventIds.size() + academicEventService.markRecurringEventsAbsent(presentEventIds);
     }
 }
