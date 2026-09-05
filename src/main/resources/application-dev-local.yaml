@@ -11,6 +11,7 @@ spring:
   sql:
     init:
       mode: always
+      encoding: UTF-8
   jpa:
     show-sql: false
     defer-datasource-initialization: true

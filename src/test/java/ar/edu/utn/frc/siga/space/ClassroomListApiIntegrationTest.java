@@ -56,7 +56,7 @@ class ClassroomListApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("GET listado expone recursos, columnas derivadas, observaciones y estado")
     void list_exposesFeatureColumns() throws Exception {
         Building building = testData.edificio();
-        ClassroomType tipo = testData.tipoAulaNormal();
+        ClassroomType tipo = testData.tipoAulaPorDefecto();
         Classroom classroom = testData.aula(building, tipo, 50);
         classroom.setObservations("Sin ventanas");
         classroomRepository.save(classroom);
@@ -81,7 +81,7 @@ class ClassroomListApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("includeDeactivated=true incluye las no habilitadas con enabled=false")
     void list_includeDeactivated_showsDisabledClassrooms() throws Exception {
         Building building = testData.edificio();
-        ClassroomType tipo = testData.tipoAulaNormal();
+        ClassroomType tipo = testData.tipoAulaPorDefecto();
         Classroom classroom = testData.aula(building, tipo, 30);
         classroom.deactivate();
         classroomRepository.save(classroom);
@@ -102,7 +102,7 @@ class ClassroomListApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("SUBSET con una materia permitida muestra su nombre en allowedDisplay")
     void list_subsetSingleSubject_showsResolvedName() throws Exception {
         Building building = testData.edificio();
-        ClassroomType tipo = testData.tipoAulaNormal();
+        ClassroomType tipo = testData.tipoAulaPorDefecto();
         Classroom classroom = testData.aula(building, tipo, 40);
         classroom.setPermissionMode(PermissionMode.SUBSET);
         classroomRepository.save(classroom);

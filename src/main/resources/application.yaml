@@ -112,8 +112,6 @@ siga:
   optimizer:
     parallel-solver-count: AUTO
     environment-mode: PHASE_ASSERT
-  space:
-    default-classroom-type: Normal
   jwt:
     secret: ${JWT_SECRET}
     access-expiration-minutes: ${JWT_ACCESS_EXPIRATION_MINUTES:20}

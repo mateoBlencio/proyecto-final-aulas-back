@@ -1,9 +1,34 @@
 -- Seed de datos de referencia requeridos para el funcionamiento del sistema.
 -- Spring Boot ejecuta este archivo automáticamente solo cuando
 -- spring.sql.init.mode=always (activo únicamente en el perfil dev-local).
+
+-- Tipo de aula por defecto. Las tres sentencias son idempotentes y van en este orden.
+-- El codigo lo busca sin distinguir mayusculas, por eso las comparaciones usan upper().
+
+-- 1) Bases sembradas antes del cambio tienen el 'Normal' viejo, y es el que ya usan sus
+-- aulas: se renombra en vez de crear uno nuevo al lado. Match exacto porque el
+-- UNIQUE(descripcion) garantiza que a lo sumo hay una fila asi.
+UPDATE tipo_aula
+SET descripcion = 'Aula común', actualizado_en = now()
+WHERE descripcion = 'Normal'
+  AND NOT EXISTS (SELECT 1 FROM tipo_aula t WHERE upper(t.descripcion) = upper('Aula común'));
+
+-- 2) Si quedo borrado logicamente hay que revivirlo: el UNIQUE(descripcion) no deja
+-- insertar otro. Revive una sola fila y solo si no hay ninguna activa, porque dos activas
+-- que matcheen romperian la busqueda del sync con IncorrectResultSizeDataAccessException.
+UPDATE tipo_aula
+SET eliminado_en = NULL, actualizado_en = now()
+WHERE id_tipo_aula = (
+        SELECT min(id_tipo_aula) FROM tipo_aula
+        WHERE upper(descripcion) = upper('Aula común') AND eliminado_en IS NOT NULL)
+  AND NOT EXISTS (
+        SELECT 1 FROM tipo_aula t
+        WHERE upper(t.descripcion) = upper('Aula común') AND t.eliminado_en IS NULL);
+
+-- 3) Base nueva: no habia nada que renombrar ni revivir.
 INSERT INTO tipo_aula (descripcion, creado_en, actualizado_en)
-SELECT 'Normal', now(), now()
-WHERE NOT EXISTS (SELECT 1 FROM tipo_aula WHERE descripcion = 'Normal');
+SELECT 'Aula común', now(), now()
+WHERE NOT EXISTS (SELECT 1 FROM tipo_aula WHERE upper(descripcion) = upper('Aula común'));
 
 INSERT INTO tipo_recurso (nombre, tipo_valor, creado_en, actualizado_en)
 SELECT v.nombre, v.tipo_valor, now(), now()

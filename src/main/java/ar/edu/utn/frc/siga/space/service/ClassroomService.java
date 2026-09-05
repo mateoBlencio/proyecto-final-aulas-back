@@ -18,6 +18,8 @@ import java.util.Optional;
 @NamedInterface("api")
 public interface ClassroomService extends ActivationService<Long> {
 
+    String DEFAULT_CLASSROOM_TYPE = "Aula común";
+
     ClassroomResponseDto create(ClassroomRequestDto dto);
 
     ClassroomResponseDto findById(Long id);
@@ -36,11 +38,6 @@ public interface ClassroomService extends ActivationService<Long> {
 
     ClassroomResponseDto findByRoomNumberAndBuilding(Integer roomNumber, Long buildingId);
 
-    /**
-     * Resuelve un aula por los códigos que trae SysAcad (edificio, número) — no por los ids internos de
-     * SIGA. Lectura pura para el sync ASIGNACIONES: no crea ni actualiza nada. Vacío si el edificio o el
-     * aula no existen con esos códigos (el caller decide si eso es un WARN-y-saltear).
-     */
     Optional<ClassroomResponseDto> findByRoomNumberAndBuildingCode(Integer roomNumber, Integer buildingCode);
 
     /**

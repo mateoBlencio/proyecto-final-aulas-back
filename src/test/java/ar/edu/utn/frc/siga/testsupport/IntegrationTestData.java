@@ -17,6 +17,8 @@ import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import static ar.edu.utn.frc.siga.space.service.ClassroomService.DEFAULT_CLASSROOM_TYPE;
+
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.model.ClassroomPermission;
@@ -38,7 +40,6 @@ import java.time.LocalTime;
 import java.util.concurrent.atomic.AtomicLong;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.TestConfiguration;
 
 @TestConfiguration
@@ -63,18 +64,15 @@ public class IntegrationTestData {
     private final AcademicPeriodService academicPeriodService;
     private final AcademicEventService academicEventService;
 
-    @Value("${siga.space.default-classroom-type:Normal}")
-    private String defaultClassroomTypeDescription;
-
     public static long nextSeq() {
         return SEQ.incrementAndGet();
     }
 
-    public ClassroomType tipoAulaNormal() {
-        return classroomTypeRepository.findByDescriptionIgnoreCaseAndDeletedAtIsNull(defaultClassroomTypeDescription)
+    public ClassroomType tipoAulaPorDefecto() {
+        return classroomTypeRepository.findByDescriptionIgnoreCaseAndDeletedAtIsNull(DEFAULT_CLASSROOM_TYPE)
                 .orElseGet(() -> classroomTypeRepository.save(
                         ClassroomType.builder()
-                                .description(defaultClassroomTypeDescription)
+                                .description(DEFAULT_CLASSROOM_TYPE)
                                 .build()));
     }
 
@@ -103,7 +101,7 @@ public class IntegrationTestData {
     }
 
     public Classroom aula(Building building) {
-        return aula(building, tipoAulaNormal(), 40);
+        return aula(building, tipoAulaPorDefecto(), 40);
     }
 
     public Classroom aulaConNumero(Integer roomNumber, Building building, ClassroomType tipo, int capacity) {

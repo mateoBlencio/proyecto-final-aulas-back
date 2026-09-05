@@ -16,6 +16,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import static ar.edu.utn.frc.siga.space.service.ClassroomService.DEFAULT_CLASSROOM_TYPE;
+
 @Slf4j
 @Service
 @Transactional(readOnly = true)
@@ -64,6 +66,7 @@ public class ClassroomTypeServiceImpl implements ClassroomTypeService {
     public ClassroomTypeResponseDto update(Long id, ClassroomTypeRequestDto dto) {
         log.debug("Actualizando tipo de aula: id={}", id);
         ClassroomType classroomType = findExistingById(id);
+        rejectDefaultTypeChange(classroomType, dto.description());
         rejectDuplicateDescription(dto.description(), id);
         classroomType.setDescription(dto.description());
         ClassroomType saved = classroomTypeRepository.save(classroomType);
@@ -80,7 +83,26 @@ public class ClassroomTypeServiceImpl implements ClassroomTypeService {
     @Override
     @Transactional
     public void deactivate(Long id) {
-        classroomTypeRepository.softDelete(Finder.orThrow(classroomTypeRepository::findById, id, "ClassroomType"));
+        ClassroomType classroomType = Finder.orThrow(classroomTypeRepository::findById, id, "ClassroomType");
+        rejectDefaultTypeChange(classroomType, null);
+        classroomTypeRepository.softDelete(classroomType);
+    }
+
+    // El sync de SysAcad busca el tipo por defecto por descripcion y falla la corrida entera
+    // si no lo encuentra, asi que ni se renombra ni se desactiva desde la API.
+    // newDescription == null significa que se lo esta desactivando.
+    private void rejectDefaultTypeChange(ClassroomType classroomType, String newDescription) {
+        if (!DEFAULT_CLASSROOM_TYPE.equalsIgnoreCase(classroomType.getDescription())) {
+            return;
+        }
+        if (newDescription == null) {
+            throw new SpaceDomainException("No se puede desactivar el tipo de aula por defecto: "
+                    + DEFAULT_CLASSROOM_TYPE);
+        }
+        if (!DEFAULT_CLASSROOM_TYPE.equalsIgnoreCase(newDescription)) {
+            throw new SpaceDomainException("No se puede renombrar el tipo de aula por defecto: "
+                    + DEFAULT_CLASSROOM_TYPE);
+        }
     }
 
     private void rejectDuplicateDescription(String description, Long selfId) {

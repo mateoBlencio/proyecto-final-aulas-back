@@ -132,7 +132,7 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
         LocalDate from = LocalDate.now().plusDays(60);
         LocalDate to = LocalDate.now().plusDays(70);
         var sc = testData.materiaYComision();
-        Classroom aulaChica = testData.aula(testData.edificio(), testData.tipoAulaNormal(), 10);
+        Classroom aulaChica = testData.aula(testData.edificio(), testData.tipoAulaPorDefecto(), 10);
         Occurrence overcrowdOcc = seedOccurrence(sc, from.plusDays(2), 50);
         Long overcrowdEventId = overcrowdOcc.getEvent().getId();
         allocateOk(overcrowdOcc.getId(), aulaChica.getId());
@@ -155,7 +155,7 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
         LocalDate to = LocalDate.now().plusDays(70);
         var scOverlapA = testData.materiaYComision();
         var scOverlapB = testData.materiaYComision();
-        Classroom aulaOverlap = testData.aula(testData.edificio(), testData.tipoAulaNormal(), 100);
+        Classroom aulaOverlap = testData.aula(testData.edificio(), testData.tipoAulaPorDefecto(), 100);
         LocalDate overlapDate = from.plusDays(3);
         Occurrence overlapOccA = seedOccurrence(scOverlapA, overlapDate, 20);
         Occurrence overlapOccB = seedOccurrence(scOverlapB, overlapDate, 20);

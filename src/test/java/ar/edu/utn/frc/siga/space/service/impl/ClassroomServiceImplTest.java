@@ -35,6 +35,7 @@ import org.springframework.data.jpa.domain.Specification;
 import java.util.List;
 import java.util.Optional;
 
+import static ar.edu.utn.frc.siga.space.service.ClassroomService.DEFAULT_CLASSROOM_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -428,10 +429,10 @@ class ClassroomServiceImplTest {
     @Test
     @DisplayName("syncClassrooms: inserta el aula nueva enlazada al edificio por su código de SysAcad, con tipo por defecto")
     void syncClassroomsInsertsUnknownClassroom() {
-        ClassroomType defaultType = SpaceTestData.classroomType().description("Normal").build();
+        ClassroomType defaultType = SpaceTestData.classroomType().description(DEFAULT_CLASSROOM_TYPE).build();
         when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
         when(classroomRepository.findAll()).thenReturn(List.of());
-        when(classroomTypeRepository.findByDescriptionIgnoreCaseAndDeletedAtIsNull("Normal")).thenReturn(Optional.of(defaultType));
+        when(classroomTypeRepository.findByDescriptionIgnoreCaseAndDeletedAtIsNull(DEFAULT_CLASSROOM_TYPE)).thenReturn(Optional.of(defaultType));
         when(classroomRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)));
@@ -453,11 +454,11 @@ class ClassroomServiceImplTest {
     void syncClassroomsFailsWhenDefaultClassroomTypeMissing() {
         when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
         when(classroomRepository.findAll()).thenReturn(List.of());
-        when(classroomTypeRepository.findByDescriptionIgnoreCaseAndDeletedAtIsNull("Normal")).thenReturn(Optional.empty());
+        when(classroomTypeRepository.findByDescriptionIgnoreCaseAndDeletedAtIsNull(DEFAULT_CLASSROOM_TYPE)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70))))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Normal");
+                .hasMessageContaining(DEFAULT_CLASSROOM_TYPE);
         verify(classroomRepository, never()).save(any());
     }
 

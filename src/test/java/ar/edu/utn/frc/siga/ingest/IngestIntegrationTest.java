@@ -101,7 +101,7 @@ class IngestIntegrationTest extends AbstractIntegrationTest {
         Subject subject = integrationTestData.materia(row.subjectCode(), row.subjectName(), plan, row.termType());
         var building = integrationTestData.edificioConNombre(row.buildingName());
         integrationTestData.aulaConNumero((Integer) row.roomNumber(), building,
-                integrationTestData.tipoAulaNormal(), row.enrolledCount());
+                integrationTestData.tipoAulaPorDefecto(), row.enrolledCount());
 
         int year = 2026;
         TermType termType = TermType.fromLabel(row.termType()).orElseThrow();
