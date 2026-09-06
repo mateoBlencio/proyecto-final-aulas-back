@@ -8,6 +8,12 @@ spring:
       maximum-pool-size: 10
       minimum-idle: 2
 
+  # Flyway corre con un usuario aparte: el de la app tiene solo DML y no es dueno de las
+  # tablas, asi que un ALTER TABLE en una migracion le daria "must be owner of table".
+  flyway:
+    user: ${DB_MIGRATION_USERNAME}
+    password: ${DB_MIGRATION_PASSWORD}
+
 springdoc:
   swagger-ui:
     enabled: true

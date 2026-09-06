@@ -143,10 +143,11 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
     void allocateManually_pastOccurrence_returns409() throws Exception {
         Classroom aula = testData.aula(testData.edificio());
         LocalDate yesterday = LocalDate.now().minusDays(1);
+        var sc = testData.materiaYComision();
         RecurringEvent event = eventRepository.save(RecurringEvent.builder()
                 .enrolled(30).startTime(START).duration(Duration.ofMinutes(DURATION))
                 .dayOfWeek(yesterday.getDayOfWeek()).startDate(yesterday).endDate(yesterday)
-                .subjectId(999_999L).commissionId(999_999L)
+                .subjectId(sc.subjectId()).commissionId(sc.commissionId())
                 .build());
         Occurrence past = occurrenceRepository.save(Occurrence.builder()
                 .event(event).date(yesterday).status(OccurrenceStatus.NEEDS_ROOM).build());
@@ -322,10 +323,11 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
     void reallocateByEvent_onlyPastOccurrences_isNoOp() throws Exception {
         Classroom aula = testData.aula(testData.edificio());
         LocalDate yesterday = LocalDate.now().minusDays(1);
+        var sc = testData.materiaYComision();
         RecurringEvent event = eventRepository.save(RecurringEvent.builder()
                 .enrolled(30).startTime(START).duration(Duration.ofMinutes(DURATION))
                 .dayOfWeek(yesterday.getDayOfWeek()).startDate(yesterday).endDate(yesterday)
-                .subjectId(999_999L).commissionId(999_999L)
+                .subjectId(sc.subjectId()).commissionId(sc.commissionId())
                 .build());
         Occurrence past = occurrenceRepository.save(Occurrence.builder()
                 .event(event).date(yesterday).status(OccurrenceStatus.NEEDS_ROOM).build());

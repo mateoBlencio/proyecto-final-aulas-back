@@ -5,9 +5,14 @@ spring:
     password: test
     driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
 
+  # El schema lo arma Flyway, no Hibernate: es la unica corrida automatica que prueba las
+  # migraciones. validate falla si una entidad no coincide con lo que dicen los .sql.
+  flyway:
+    enabled: true
+
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: validate
 
   docker:
     compose:
