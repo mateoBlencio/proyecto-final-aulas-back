@@ -11,6 +11,7 @@ import ar.edu.utn.frc.siga.events.mapper.AcademicEventComposer;
 import ar.edu.utn.frc.siga.events.mapper.OccurrenceMapper;
 import ar.edu.utn.frc.siga.events.model.AcademicEvent;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
+import ar.edu.utn.frc.siga.events.model.OccurrenceWindow;
 import ar.edu.utn.frc.siga.events.model.RecurringEvent;
 import ar.edu.utn.frc.siga.events.model.UniqueEvent;
 import ar.edu.utn.frc.siga.events.repository.AcademicEventRepository;
@@ -21,6 +22,8 @@ import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.command.SyncRecurringEventCommand;
 import ar.edu.utn.frc.siga.events.service.command.UpsertRecurringEventResult;
 import ar.edu.utn.frc.siga.events.validator.EventScheduleValidator;
+import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
+import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
@@ -128,7 +131,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startDate());
 
         subjectService.findById(dto.subjectId());
-        commissionService.findById(dto.commissionId());
+        CommissionResponseDto commission = commissionService.findById(dto.commissionId());
 
         RecurringEvent event = RecurringEvent.builder()
                 .enrolled(dto.enrolled())
@@ -141,12 +144,12 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 .commissionId(dto.commissionId())
                 .build();
 
-        AcademicEvent saved = eventRepository.save(event);
-        List<Occurrence> occurrences = saved.toOccurrences();
+        eventRepository.save(event);
+        List<Occurrence> occurrences = event.toOccurrences(windowFor(commission.academicPeriod()));
         occurrenceRepository.saveAll(occurrences);
 
-        log.info("Evento recurrente creado: id={}, occurrences={}", saved.getId(), occurrences.size());
-        return composer.compose(saved);
+        log.info("Evento recurrente creado: id={}, occurrences={}", event.getId(), occurrences.size());
+        return composer.compose(event);
     }
 
     @Override
@@ -216,8 +219,12 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
         recurringEventRepository.saveAll(updated);
         eventRepository.saveAll(created);
+
+        Map<Long, OccurrenceWindow> windowByCommission = windowsByCommission(created.stream()
+                .map(RecurringEvent::getCommissionId).collect(Collectors.toSet()));
         occurrenceRepository.saveAll(created.stream()
-                .flatMap(event -> event.toOccurrences().stream())
+                .flatMap(event -> event.toOccurrences(windowByCommission.getOrDefault(
+                        event.getCommissionId(), windowFor(null))).stream())
                 .toList());
 
         List<UpsertRecurringEventResult> results = new ArrayList<>(commands.size());
@@ -246,6 +253,23 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     private static RecurringEventKey keyOf(SyncRecurringEventCommand command) {
         return new RecurringEventKey(command.subjectId(), command.commissionId(), command.dayOfWeek(),
                 command.startTime(), command.startDate(), command.endDate());
+    }
+
+    private Map<Long, OccurrenceWindow> windowsByCommission(Set<Long> commissionIds) {
+        if (commissionIds.isEmpty()) {
+            return Map.of();
+        }
+        return commissionService.findByIds(commissionIds).stream()
+                .collect(Collectors.toMap(CommissionResponseDto::id,
+                        commission -> windowFor(commission.academicPeriod())));
+    }
+
+    private static OccurrenceWindow windowFor(AcademicPeriodResponseDto period) {
+        if (period == null) {
+            return OccurrenceWindow.unbounded(null, null);
+        }
+        return new OccurrenceWindow(period.startDate(), period.endDate(),
+                period.recessStart(), period.recessEnd());
     }
 
     /**
