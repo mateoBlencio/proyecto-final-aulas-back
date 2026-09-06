@@ -1,10 +1,13 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.academic.dto.request.UpdateAcademicPeriodRequestDto;
 import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
+import ar.edu.utn.frc.siga.academic.exception.InvalidAcademicPeriodUpdateException;
 import ar.edu.utn.frc.siga.academic.mapper.AcademicPeriodMapperImpl;
 import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
+import ar.edu.utn.frc.siga.academic.validator.AcademicPeriodUpdateValidator;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -32,12 +36,15 @@ class AcademicPeriodServiceImplTest {
 
     @Mock
     private AcademicPeriodRepository academicPeriodRepository;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     private AcademicPeriodServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new AcademicPeriodServiceImpl(academicPeriodRepository, new AcademicPeriodMapperImpl());
+        service = new AcademicPeriodServiceImpl(academicPeriodRepository, new AcademicPeriodMapperImpl(),
+                new AcademicPeriodUpdateValidator(), eventPublisher);
     }
 
     @Test
@@ -176,5 +183,90 @@ class AcademicPeriodServiceImplTest {
         assertThatThrownBy(() -> service.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("AcademicPeriod not found with id: 99");
+    }
+
+    @Test
+    @DisplayName("update: setear el receso en el ANUAL sincroniza el fin de 1C y el inicio de 2C y publica el cambio")
+    void updateAnnualRecessSyncsTerms() {
+        AcademicPeriod annual = AcademicPeriod.builder()
+                .id(1L).year(2026).semester(0)
+                .startDate(LocalDate.of(2026, 3, 16)).endDate(LocalDate.of(2026, 11, 30))
+                .build();
+        AcademicPeriod firstTerm = AcademicPeriod.builder()
+                .id(2L).year(2026).semester(1)
+                .startDate(LocalDate.of(2026, 3, 16)).endDate(LocalDate.of(2026, 7, 31))
+                .build();
+        AcademicPeriod secondTerm = AcademicPeriod.builder()
+                .id(3L).year(2026).semester(2)
+                .startDate(LocalDate.of(2026, 8, 1)).endDate(LocalDate.of(2026, 11, 30))
+                .build();
+        when(academicPeriodRepository.findActiveById(1L)).thenReturn(Optional.of(annual));
+        when(academicPeriodRepository.findByYearAndSemester(2026, 1)).thenReturn(Optional.of(firstTerm));
+        when(academicPeriodRepository.findByYearAndSemester(2026, 2)).thenReturn(Optional.of(secondTerm));
+
+        service.update(1L, new UpdateAcademicPeriodRequestDto(null, LocalDate.of(2026, 11, 30),
+                LocalDate.of(2026, 7, 6), LocalDate.of(2026, 7, 27)));
+
+        assertThat(annual.getRecessStart()).isEqualTo(LocalDate.of(2026, 7, 6));
+        assertThat(firstTerm.getEndDate()).isEqualTo(LocalDate.of(2026, 7, 5));
+        assertThat(secondTerm.getStartDate()).isEqualTo(LocalDate.of(2026, 7, 28));
+        verify(eventPublisher, org.mockito.Mockito.times(3))
+                .publishEvent(any(ar.edu.utn.frc.siga.academic.event.AcademicPeriodChanged.class));
+    }
+
+    @Test
+    @DisplayName("update: pedir receso en un período no ANUAL es 422")
+    void updateRecessOnNonAnnualRejected() {
+        AcademicPeriod firstTerm = AcademicPeriod.builder()
+                .id(2L).year(2026).semester(1)
+                .startDate(LocalDate.now().plusDays(30)).endDate(LocalDate.of(2026, 7, 31))
+                .build();
+        when(academicPeriodRepository.findActiveById(2L)).thenReturn(Optional.of(firstTerm));
+
+        assertThatThrownBy(() -> service.update(2L, new UpdateAcademicPeriodRequestDto(
+                null, LocalDate.of(2026, 7, 31), LocalDate.of(2026, 7, 6), LocalDate.of(2026, 7, 27))))
+                .isInstanceOf(InvalidAcademicPeriodUpdateException.class);
+        verify(academicPeriodRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update: cambiar la fecha de inicio cuando ya ocurrió es 422")
+    void updateStartDateInPastRejected() {
+        AcademicPeriod annual = AcademicPeriod.builder()
+                .id(1L).year(2026).semester(0)
+                .startDate(LocalDate.now().minusDays(1)).endDate(LocalDate.now().plusMonths(6))
+                .build();
+        when(academicPeriodRepository.findActiveById(1L)).thenReturn(Optional.of(annual));
+
+        assertThatThrownBy(() -> service.update(1L, new UpdateAcademicPeriodRequestDto(
+                LocalDate.now().plusDays(5), LocalDate.now().plusMonths(6), null, null)))
+                .isInstanceOf(InvalidAcademicPeriodUpdateException.class);
+    }
+
+    @Test
+    @DisplayName("findVigente: sin filas del año en curso, materializa las del año previo ajustadas a la semana")
+    void findVigenteRollsOverFromPreviousYear() {
+        int thisYear = LocalDate.now().getYear();
+        AcademicPeriod previousAnnual = AcademicPeriod.builder()
+                .id(1L).year(thisYear - 1).semester(0)
+                .startDate(LocalDate.of(thisYear - 1, 3, 9)).endDate(LocalDate.of(thisYear - 1, 11, 30))
+                .build();
+        when(academicPeriodRepository.findByYearAndDeletedAtIsNull(thisYear)).thenReturn(List.of());
+        when(academicPeriodRepository.findByYearAndDeletedAtIsNull(thisYear - 1)).thenReturn(List.of(previousAnnual));
+        when(academicPeriodRepository.findByYearAndSemester(thisYear, 0)).thenReturn(Optional.empty());
+        when(academicPeriodRepository.findAllActive()).thenReturn(List.of());
+        when(academicPeriodRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.findVigente();
+
+        ArgumentCaptor<AcademicPeriod> captor = ArgumentCaptor.forClass(AcademicPeriod.class);
+        verify(academicPeriodRepository).save(captor.capture());
+        AcademicPeriod materialized = captor.getValue();
+        assertThat(materialized.getYear()).isEqualTo(thisYear);
+        assertThat(materialized.getSemester()).isEqualTo(0);
+        assertThat(materialized.getStartDate().getYear()).isEqualTo(thisYear);
+        assertThat(materialized.getStartDate().getMonthValue()).isEqualTo(3);
+        assertThat(materialized.getStartDate().getDayOfWeek())
+                .isEqualTo(LocalDate.of(thisYear - 1, 3, 9).getDayOfWeek());
     }
 }

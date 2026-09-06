@@ -1,9 +1,11 @@
 package ar.edu.utn.frc.siga.academic.controller;
 
+import ar.edu.utn.frc.siga.academic.dto.request.UpdateAcademicPeriodRequestDto;
 import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -43,6 +46,24 @@ public class AcademicPeriodController {
     public ResponseEntity<AcademicPeriodResponseDto> findById(@PathVariable Long id) {
         log.debug("GET /v1/academic-periods/{}", id);
         return ResponseEntity.ok(academicPeriodService.findById(id));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @Operation(summary = "Modificar un período académico",
+               description = "Ajusta fecha de fin y, sólo para el período ANUAL, el receso invernal "
+                       + "(inicio/fin). Al definir el receso en el ANUAL sincroniza el fin del 1.º "
+                       + "cuatrimestre y el inicio del 2.º. Publica AcademicPeriodChanged: recalcula las "
+                       + "ocurrencias futuras no asignadas de los eventos afectados. 404 si no existe; "
+                       + "422 si la fecha de inicio ya ocurrió, el orden es inconsistente o se pide "
+                       + "receso en un período no ANUAL.")
+    public ResponseEntity<AcademicPeriodResponseDto> update(
+            @PathVariable Long id, @Valid @RequestBody UpdateAcademicPeriodRequestDto dto) {
+        log.debug("PUT /v1/academic-periods/{}: endDate={}, recessStart={}, recessEnd={}",
+                id, dto.endDate(), dto.recessStart(), dto.recessEnd());
+        AcademicPeriodResponseDto updated = academicPeriodService.update(id, dto);
+        log.info("Período académico modificado vía controller: id={}", id);
+        return ResponseEntity.ok(updated);
     }
 
     @PutMapping("/{id}/activation")
