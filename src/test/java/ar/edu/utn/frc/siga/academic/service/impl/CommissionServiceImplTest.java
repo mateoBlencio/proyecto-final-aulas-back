@@ -221,7 +221,7 @@ class CommissionServiceImplTest {
         StudyPlan studyPlan = studyPlan();
 
         when(commissionRepository.findAll()).thenReturn(List.of());
-        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any())).thenReturn(Optional.of(studyPlan));
+        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any(), any())).thenReturn(Optional.of(studyPlan));
         when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
                 .thenReturn(Optional.of(annualPeriod));
         when(commissionRepository.save(any(Commission.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -243,14 +243,14 @@ class CommissionServiceImplTest {
         AcademicPeriod annualPeriod = annualPeriod();
 
         when(commissionRepository.findAll()).thenReturn(List.of());
-        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any())).thenReturn(Optional.empty());
+        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any(), any())).thenReturn(Optional.empty());
         when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
                 .thenReturn(Optional.of(annualPeriod));
         when(commissionRepository.save(any(Commission.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.syncCommissions(List.of(command));
 
-        verify(studyPlanResolver).findOrCreate(eq(1), eq(2024), any());
+        verify(studyPlanResolver).findOrCreate(eq(1), eq(2024), any(), any());
     }
 
     @Test
@@ -260,7 +260,7 @@ class CommissionServiceImplTest {
         AcademicPeriod annualPeriod = annualPeriod();
 
         when(commissionRepository.findAll()).thenReturn(List.of());
-        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any())).thenReturn(Optional.empty());
+        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any(), any())).thenReturn(Optional.empty());
         when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
                 .thenReturn(Optional.of(annualPeriod));
         when(commissionRepository.save(any(Commission.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -281,7 +281,7 @@ class CommissionServiceImplTest {
         when(commissionRepository.findAll()).thenReturn(List.of());
         when(subjectRepository.findAll()).thenReturn(List.of(subject));
         when(subjectCommissionRepository.findAll()).thenReturn(List.of());
-        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any())).thenReturn(Optional.of(studyPlan));
+        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any(), any())).thenReturn(Optional.of(studyPlan));
         when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
                 .thenReturn(Optional.of(annualPeriod));
         when(commissionRepository.save(any(Commission.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -311,7 +311,7 @@ class CommissionServiceImplTest {
         when(commissionRepository.findAll()).thenReturn(List.of(commission));
         when(subjectRepository.findAll()).thenReturn(List.of(subject));
         when(subjectCommissionRepository.findAll()).thenReturn(List.of(existingLink));
-        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any())).thenReturn(Optional.of(studyPlan));
+        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any(), any())).thenReturn(Optional.of(studyPlan));
         when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
                 .thenReturn(Optional.of(annualPeriod));
 
@@ -330,7 +330,7 @@ class CommissionServiceImplTest {
 
         when(commissionRepository.findAll()).thenReturn(List.of());
         when(subjectRepository.findAll()).thenReturn(List.of());
-        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any())).thenReturn(Optional.of(studyPlan));
+        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any(), any())).thenReturn(Optional.of(studyPlan));
         when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
                 .thenReturn(Optional.of(annualPeriod));
         when(commissionRepository.save(any(Commission.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -352,7 +352,7 @@ class CommissionServiceImplTest {
         when(commissionRepository.findAll()).thenReturn(List.of());
         when(subjectRepository.findAll()).thenReturn(List.of(subject));
         when(subjectCommissionRepository.findAll()).thenReturn(List.of());
-        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any())).thenReturn(Optional.of(studyPlan));
+        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any(), any())).thenReturn(Optional.of(studyPlan));
         when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
                 .thenReturn(Optional.of(annualPeriod));
         when(commissionRepository.save(any(Commission.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -380,7 +380,7 @@ class CommissionServiceImplTest {
         when(commissionRepository.findAll()).thenReturn(List.of(commission));
         when(subjectRepository.findAll()).thenReturn(List.of(subject));
         when(subjectCommissionRepository.findAll()).thenReturn(List.of(provisionalLink));
-        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any())).thenReturn(Optional.of(studyPlan));
+        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any(), any())).thenReturn(Optional.of(studyPlan));
         when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
                 .thenReturn(Optional.of(annualPeriod));
 

@@ -205,7 +205,7 @@ class SubjectServiceImplTest {
     @DisplayName("syncSubjects: inserta la materia que no existe con columnas de control")
     void syncSubjectsInsertsUnknownSubject() {
         StudyPlan syncStudyPlan = syncStudyPlan();
-        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any())).thenReturn(Optional.of(syncStudyPlan));
+        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any(), any())).thenReturn(Optional.of(syncStudyPlan));
         when(subjectRepository.findAll()).thenReturn(List.of());
         when(subjectRepository.save(any(Subject.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -230,7 +230,7 @@ class SubjectServiceImplTest {
         StudyPlan syncStudyPlan = syncStudyPlan();
         Subject existing = Subject.builder().id(1L).code(519).name("Analisis I").term("A").studyPlan(syncStudyPlan)
                 .sysacadHash(Hashes.sha256Hex("Analisis I", "A")).build();
-        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any())).thenReturn(Optional.of(syncStudyPlan));
+        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any(), any())).thenReturn(Optional.of(syncStudyPlan));
         when(subjectRepository.findAll()).thenReturn(List.of(existing));
 
         service.syncSubjects(List.of(new SubjectSyncCommand(17, 94, 519, "Análisis Matemático I", "C")));
@@ -246,7 +246,7 @@ class SubjectServiceImplTest {
         StudyPlan syncStudyPlan = syncStudyPlan();
         Subject existing = Subject.builder().id(1L).code(519).name("Análisis Matemático I").term("C")
                 .studyPlan(syncStudyPlan).sysacadHash(Hashes.sha256Hex("Análisis Matemático I", "C")).build();
-        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any())).thenReturn(Optional.of(syncStudyPlan));
+        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any(), any())).thenReturn(Optional.of(syncStudyPlan));
         when(subjectRepository.findAll()).thenReturn(List.of(existing));
 
         int affected = service.syncSubjects(
@@ -265,21 +265,25 @@ class SubjectServiceImplTest {
                 List.of(new SubjectSyncCommand(17, null, 519, "Análisis Matemático I", "C")));
 
         verify(subjectRepository, never()).save(any());
-        verify(studyPlanResolver, never()).findOrCreate(any(), any(), any());
+        verify(studyPlanResolver, never()).findOrCreate(any(), any(), any(), any());
         assertThat(affected).isZero();
     }
 
     @Test
-    @DisplayName("syncSubjects: si no se resuelve el plan de estudio, la materia se ignora")
-    void syncSubjectsSkipsWhenStudyPlanUnresolved() {
-        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any())).thenReturn(Optional.empty());
+    @DisplayName("syncSubjects: con la especialidad ausente, el resolver crea el stub y la materia se da de alta igual")
+    void syncSubjectsCreatesSubjectWhenSpecialtyWasAbsent() {
+        StudyPlan stubBackedPlan = syncStudyPlan();
+        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any(), any())).thenReturn(Optional.of(stubBackedPlan));
         when(subjectRepository.findAll()).thenReturn(List.of());
+        when(subjectRepository.save(any(Subject.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         int affected = service.syncSubjects(
                 List.of(new SubjectSyncCommand(17, 94, 519, "Análisis Matemático I", "C")));
 
-        verify(subjectRepository, never()).save(any());
-        assertThat(affected).isZero();
+        ArgumentCaptor<Subject> saved = ArgumentCaptor.forClass(Subject.class);
+        verify(subjectRepository).save(saved.capture());
+        assertThat(saved.getValue().getStudyPlan()).isEqualTo(stubBackedPlan);
+        assertThat(affected).isEqualTo(1);
     }
 
     private static StudyPlan syncStudyPlan() {

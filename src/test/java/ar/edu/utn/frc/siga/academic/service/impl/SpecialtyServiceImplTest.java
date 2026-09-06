@@ -72,6 +72,28 @@ class SpecialtyServiceImplTest {
     }
 
     @Test
+    @DisplayName("syncSpecialties: pisa el stub con sysacad_hash nulo cuando llega la especialidad real")
+    void syncSpecialtiesOverwritesStubWithNullHash() {
+        Specialty stub = Specialty.builder()
+                .id(5L)
+                .specialtyCode(5)
+                .name("Especialidad 5")
+                .sysacadHash(null)
+                .build();
+        when(specialtyRepository.findAll()).thenReturn(List.of(stub));
+
+        int affected = service.syncSpecialties(
+                List.of(new SpecialtySyncCommand(5, "Ingeniería en Sistemas de Información", "Ing. Sist. Inf.")));
+
+        assertThat(stub.getName()).isEqualTo("Ingeniería en Sistemas de Información");
+        assertThat(stub.getAbbreviation()).isEqualTo("Ing. Sist. Inf.");
+        assertThat(stub.getSysacadHash())
+                .isEqualTo(Hashes.sha256Hex("Ingeniería en Sistemas de Información", "Ing. Sist. Inf."));
+        verify(specialtyRepository).save(stub);
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("syncSpecialties: actualiza cuando solo cambió la abreviatura")
     void syncSpecialtiesUpdatesWhenOnlyAbbreviationChanged() {
         Specialty existing = sysacadSpecialty(5, "Ing. Sistemas", Hashes.sha256Hex("Ing. Sistemas", "Sist."));

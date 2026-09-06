@@ -7,6 +7,8 @@ import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,19 +23,25 @@ class StudyPlanResolver {
     private final StudyPlanRepository studyPlanRepository;
 
     Optional<StudyPlan> findOrCreate(Integer specialtyCode, Integer planCode, Instant syncedAt) {
+        return findOrCreate(specialtyCode, planCode, syncedAt, new HashMap<>());
+    }
+
+    Optional<StudyPlan> findOrCreate(Integer specialtyCode, Integer planCode, Instant syncedAt,
+            Map<Integer, Specialty> specialtyCache) {
         if (specialtyCode == null || planCode == null) {
             return Optional.empty();
         }
-        Specialty specialty = specialtyRepository.findBySpecialtyCode(specialtyCode)
-                .orElseGet(() -> {
-                    log.info("Creando Specialty stub: especialidad={}", specialtyCode);
-                    return specialtyRepository.save(Specialty.builder()
-                            .specialtyCode(specialtyCode)
-                            .name("Especialidad " + specialtyCode)
-                            .syncedAt(syncedAt)
-                            .sysacadHash(null)
-                            .build());
-                });
+        Specialty specialty = specialtyCache.computeIfAbsent(specialtyCode, code ->
+                specialtyRepository.findBySpecialtyCode(code)
+                        .orElseGet(() -> {
+                            log.info("Creando Specialty stub: especialidad={}", code);
+                            return specialtyRepository.save(Specialty.builder()
+                                    .specialtyCode(code)
+                                    .name("Especialidad " + code)
+                                    .syncedAt(syncedAt)
+                                    .sysacadHash(null)
+                                    .build());
+                        }));
         return Optional.of(FindOrCreateResult.resolve(
                 studyPlanRepository.findByPlanCodeAndSpecialty(planCode, specialty),
                 () -> {

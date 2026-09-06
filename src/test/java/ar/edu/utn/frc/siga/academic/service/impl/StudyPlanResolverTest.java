@@ -5,6 +5,8 @@ import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
 import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -79,6 +82,25 @@ class StudyPlanResolverTest {
         assertThat(saved.getValue().getPlanCode()).isEqualTo(94);
         assertThat(saved.getValue().getSpecialty()).isEqualTo(specialty);
         assertThat(saved.getValue().getSyncedAt()).isEqualTo(syncedAt);
+    }
+
+    @Test
+    @DisplayName("findOrCreate: con dos planes de la misma especialidad ausente, inserta un solo stub de especialidad")
+    void createsSpecialtyStubOnceForTwoPlansOfSameSpecialty() {
+        Instant syncedAt = Instant.now();
+        Map<Integer, Specialty> specialtyCache = new HashMap<>();
+        when(specialtyRepository.findBySpecialtyCode(17)).thenReturn(Optional.empty());
+        when(specialtyRepository.save(any(Specialty.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(studyPlanRepository.findByPlanCodeAndSpecialty(any(), any(Specialty.class))).thenReturn(Optional.empty());
+        when(studyPlanRepository.save(any(StudyPlan.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        StudyPlanResolver resolver = resolver();
+        resolver.findOrCreate(17, 94, syncedAt, specialtyCache);
+        resolver.findOrCreate(17, 95, syncedAt, specialtyCache);
+
+        verify(specialtyRepository, times(1)).findBySpecialtyCode(17);
+        verify(specialtyRepository, times(1)).save(any(Specialty.class));
+        verify(studyPlanRepository, times(2)).save(any(StudyPlan.class));
     }
 
     @Test
