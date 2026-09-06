@@ -21,6 +21,8 @@ import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.command.SyncRecurringEventCommand;
 import ar.edu.utn.frc.siga.events.service.command.UpsertRecurringEventResult;
 import ar.edu.utn.frc.siga.events.validator.EventScheduleValidator;
+import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
+import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
@@ -47,6 +49,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -158,123 +162,153 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     @Override
     @Transactional
     public List<FindOrCreateResult<Long>> findOrCreateRecurringEvents(List<CreateRecurringEventRequestDto> requests) {
-        Set<Long> subjectIds = requests.stream()
-                .map(CreateRecurringEventRequestDto::subjectId).collect(Collectors.toSet());
-        Set<Long> commissionIds = requests.stream()
-                .map(CreateRecurringEventRequestDto::commissionId).collect(Collectors.toSet());
-        Map<RecurringEventKey, RecurringEvent> byKey = Maps.byId(
-                recurringEventRepository.findBySubjectIdInAndCommissionIdIn(subjectIds, commissionIds),
-                AcademicEventServiceImpl::keyOf, (first, ignored) -> first);
+        Partition partition = partitionByKey(requests, AcademicEventServiceImpl::keyOf,
+                AcademicEventServiceImpl::buildRecurringEvent, null);
 
-        List<RecurringEvent> resolved = new ArrayList<>(requests.size());
-        boolean[] createdFlags = new boolean[requests.size()];
-        List<RecurringEvent> created = new ArrayList<>();
+        requireExistingReferences(partition.created());
+        persistCreated(partition.created());
 
+        List<FindOrCreateResult<Long>> results = new ArrayList<>(requests.size());
         for (int i = 0; i < requests.size(); i++) {
-            CreateRecurringEventRequestDto dto = requests.get(i);
-            RecurringEventKey key = keyOf(dto);
-            RecurringEvent existing = byKey.get(key);
-            if (existing != null) {
-                resolved.add(existing);
-            } else {
-                RecurringEvent event = RecurringEvent.builder()
-                        .enrolled(dto.enrolled())
-                        .startTime(dto.startTime())
-                        .duration(Duration.ofMinutes(dto.durationMinutes()))
-                        .dayOfWeek(dto.dayOfWeek())
-                        .startDate(dto.startDate())
-                        .endDate(dto.endDate())
-                        .subjectId(dto.subjectId())
-                        .commissionId(dto.commissionId())
-                        .build();
-                byKey.put(key, event);
-                created.add(event);
-                resolved.add(event);
-                createdFlags[i] = true;
-            }
+            results.add(new FindOrCreateResult<>(partition.resolved().get(i).getId(), partition.createdFlags()[i]));
         }
+        log.info("Find-or-create bulk de eventos recurrentes: {} creados de {} pedidos",
+                partition.created().size(), requests.size());
+        return results;
+    }
 
+    private static RecurringEvent buildRecurringEvent(CreateRecurringEventRequestDto dto) {
+        return RecurringEvent.builder()
+                .enrolled(dto.enrolled())
+                .startTime(dto.startTime())
+                .duration(Duration.ofMinutes(dto.durationMinutes()))
+                .dayOfWeek(dto.dayOfWeek())
+                .startDate(dto.startDate())
+                .endDate(dto.endDate())
+                .subjectId(dto.subjectId())
+                .commissionId(dto.commissionId())
+                .build();
+    }
+
+    /**
+     * El bulk construye el evento inline (no pasa por createRecurringEvent), así que valida acá el set
+     * distinto de referencias que va a crear -- una consulta batch por servicio -- para no insertar
+     * eventos con subjectId/commissionId inexistentes.
+     */
+    private void requireExistingReferences(List<RecurringEvent> toCreate) {
+        if (toCreate.isEmpty()) {
+            return;
+        }
+        Set<Long> subjectIds = toCreate.stream().map(RecurringEvent::getSubjectId).collect(Collectors.toSet());
+        Set<Long> commissionIds = toCreate.stream().map(RecurringEvent::getCommissionId).collect(Collectors.toSet());
+        Set<Long> knownSubjects = subjectService.findByIds(subjectIds).stream()
+                .map(SubjectResponseDto::id).collect(Collectors.toSet());
+        subjectIds.stream().filter(id -> !knownSubjects.contains(id)).findFirst()
+                .ifPresent(id -> { throw ResourceNotFoundException.of("Subject", id); });
+        Set<Long> knownCommissions = commissionService.findByIds(commissionIds).stream()
+                .map(CommissionResponseDto::id).collect(Collectors.toSet());
+        commissionIds.stream().filter(id -> !knownCommissions.contains(id)).findFirst()
+                .ifPresent(id -> { throw ResourceNotFoundException.of("Commission", id); });
+    }
+
+    private void persistCreated(List<RecurringEvent> created) {
+        if (created.isEmpty()) {
+            return;
+        }
         eventRepository.saveAll(created);
         occurrenceRepository.saveAll(created.stream()
                 .flatMap(event -> event.toOccurrences().stream())
                 .toList());
-
-        List<FindOrCreateResult<Long>> results = new ArrayList<>(requests.size());
-        for (int i = 0; i < requests.size(); i++) {
-            results.add(new FindOrCreateResult<>(resolved.get(i).getId(), createdFlags[i]));
-        }
-        log.info("Find-or-create bulk de eventos recurrentes: {} creados de {} pedidos",
-                created.size(), requests.size());
-        return results;
     }
 
     @Override
     @Transactional
     public List<UpsertRecurringEventResult> syncRecurringEvents(List<SyncRecurringEventCommand> commands) {
-        Set<Long> subjectIds = commands.stream()
-                .map(SyncRecurringEventCommand::subjectId).collect(Collectors.toSet());
-        Set<Long> commissionIds = commands.stream()
-                .map(SyncRecurringEventCommand::commissionId).collect(Collectors.toSet());
+        Instant now = Instant.now();
+        Set<RecurringEvent> updated = new LinkedHashSet<>();
+
+        Partition partition = partitionByKey(commands, AcademicEventServiceImpl::keyOf,
+                cmd -> buildRecurringEvent(cmd, now),
+                (existing, cmd) -> {
+                    existing.setEnrolled(cmd.enrolled());
+                    reconcileDuration(existing, cmd.durationMinutes());
+                    existing.setSyncedAt(now);
+                    existing.setSysacadEnabled(true);
+                    if (existing.getId() != null) {
+                        updated.add(existing);
+                    }
+                });
+
+        recurringEventRepository.saveAll(updated);
+        persistCreated(partition.created());
+
+        List<UpsertRecurringEventResult> results = new ArrayList<>(commands.size());
+        for (int i = 0; i < commands.size(); i++) {
+            boolean wasCreated = partition.createdFlags()[i];
+            results.add(new UpsertRecurringEventResult(partition.resolved().get(i).getId(), wasCreated, !wasCreated));
+        }
+
+        log.info("Sync EVENTOS de SysAcad: {} eventos recurrentes creados, {} actualizados",
+                partition.created().size(), commands.size() - partition.created().size());
+        return results;
+    }
+
+    private static RecurringEvent buildRecurringEvent(SyncRecurringEventCommand cmd, Instant now) {
+        return RecurringEvent.builder()
+                .enrolled(cmd.enrolled())
+                .startTime(cmd.startTime())
+                .duration(Duration.ofMinutes(cmd.durationMinutes()))
+                .dayOfWeek(cmd.dayOfWeek())
+                .startDate(cmd.startDate())
+                .endDate(cmd.endDate())
+                .subjectId(cmd.subjectId())
+                .commissionId(cmd.commissionId())
+                .syncedAt(now)
+                .sysacadHash(Hashes.sha256Hex(cmd.durationMinutes()))
+                .sysacadEnabled(true)
+                .build();
+    }
+
+    /**
+     * Prefetch por (subjectId, commissionId) del lote, índice por {@link RecurringEventKey} y
+     * partición hit/miss preservando el orden de entrada. Lo comparten el find-or-create bulk y el
+     * sync: en un miss construye el evento con {@code buildFn}; en un hit, si {@code onExisting} no es
+     * null, lo aplica (el sync lo usa para su rama de actualización).
+     */
+    private <C> Partition partitionByKey(List<C> commands, Function<C, RecurringEventKey> keyFn,
+            Function<C, RecurringEvent> buildFn, BiConsumer<RecurringEvent, C> onExisting) {
+        List<RecurringEventKey> keys = commands.stream().map(keyFn).toList();
+        Set<Long> subjectIds = keys.stream().map(RecurringEventKey::subjectId).collect(Collectors.toSet());
+        Set<Long> commissionIds = keys.stream().map(RecurringEventKey::commissionId).collect(Collectors.toSet());
         Map<RecurringEventKey, RecurringEvent> byKey = Maps.byId(
                 recurringEventRepository.findBySubjectIdInAndCommissionIdIn(subjectIds, commissionIds),
                 AcademicEventServiceImpl::keyOf, (first, ignored) -> first);
 
-        Instant now = Instant.now();
         List<RecurringEvent> resolved = new ArrayList<>(commands.size());
         boolean[] createdFlags = new boolean[commands.size()];
-        Set<RecurringEvent> updated = new LinkedHashSet<>();
         List<RecurringEvent> created = new ArrayList<>();
 
         for (int i = 0; i < commands.size(); i++) {
-            SyncRecurringEventCommand cmd = commands.get(i);
-            RecurringEventKey key = keyOf(cmd);
+            C cmd = commands.get(i);
+            RecurringEventKey key = keys.get(i);
             RecurringEvent existing = byKey.get(key);
             if (existing != null) {
-                existing.setEnrolled(cmd.enrolled());
-                reconcileDuration(existing, cmd.durationMinutes());
-                existing.setSyncedAt(now);
-                existing.setSysacadEnabled(true);
-                if (existing.getId() != null) {
-                    updated.add(existing);
+                if (onExisting != null) {
+                    onExisting.accept(existing, cmd);
                 }
                 resolved.add(existing);
             } else {
-                RecurringEvent event = RecurringEvent.builder()
-                        .enrolled(cmd.enrolled())
-                        .startTime(cmd.startTime())
-                        .duration(Duration.ofMinutes(cmd.durationMinutes()))
-                        .dayOfWeek(cmd.dayOfWeek())
-                        .startDate(cmd.startDate())
-                        .endDate(cmd.endDate())
-                        .subjectId(cmd.subjectId())
-                        .commissionId(cmd.commissionId())
-                        .syncedAt(now)
-                        .sysacadHash(Hashes.sha256Hex(cmd.durationMinutes()))
-                        .sysacadEnabled(true)
-                        .build();
+                RecurringEvent event = buildFn.apply(cmd);
                 byKey.put(key, event);
                 created.add(event);
                 resolved.add(event);
                 createdFlags[i] = true;
             }
         }
+        return new Partition(resolved, createdFlags, created);
+    }
 
-        recurringEventRepository.saveAll(updated);
-        eventRepository.saveAll(created);
-        occurrenceRepository.saveAll(created.stream()
-                .flatMap(event -> event.toOccurrences().stream())
-                .toList());
-
-        List<UpsertRecurringEventResult> results = new ArrayList<>(commands.size());
-        for (int i = 0; i < commands.size(); i++) {
-            RecurringEvent event = resolved.get(i);
-            boolean wasCreated = createdFlags[i];
-            results.add(new UpsertRecurringEventResult(event.getId(), wasCreated, !wasCreated));
-        }
-
-        log.info("Sync EVENTOS de SysAcad: {} eventos recurrentes creados, {} actualizados",
-                created.size(), commands.size() - created.size());
-        return results;
+    private record Partition(List<RecurringEvent> resolved, boolean[] createdFlags, List<RecurringEvent> created) {
     }
 
     @Override

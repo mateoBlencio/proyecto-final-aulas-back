@@ -119,6 +119,30 @@ class IngestRowBatchProcessorTest {
     }
 
     @Test
+    @DisplayName("lote de varias filas: eventsCreated cuenta sólo los created y cada fila arma su asignación pendiente")
+    void loteConVariasFilasMezclaCreatedYFound() {
+        when(rowResolver.resolveRefs(any(), any(), anyInt(), any(), any(), any(), any()))
+                .thenReturn(resolved(5L));
+        when(academicEventService.findOrCreateRecurringEvents(any())).thenReturn(List.of(
+                new FindOrCreateResult<>(1L, true),
+                new FindOrCreateResult<>(2L, false),
+                new FindOrCreateResult<>(3L, true)));
+
+        IngestRowBatchProcessor.BatchResult result = processor().process(List.of(
+                new ImportedRow(7, row("Anual")),
+                new ImportedRow(8, row("Anual")),
+                new ImportedRow(9, row("Anual"))), 2026);
+
+        assertThat(result.processedRows()).isEqualTo(3);
+        assertThat(result.eventsCreated()).isEqualTo(2);
+        assertThat(result.skippedRows()).isEmpty();
+        assertThat(result.pendingAllocations()).extracting(pa -> pa.target())
+                .containsExactly(new AllocationTarget.Event(1L), new AllocationTarget.Event(2L),
+                        new AllocationTarget.Event(3L));
+        verify(academicEventService, times(1)).findOrCreateRecurringEvents(any());
+    }
+
+    @Test
     @DisplayName("término (dictado) desconocido: InvalidRowException corta antes de resolver, no es un skip")
     void terminoDesconocidoLanzaYCortaElLote() {
         assertThatThrownBy(() -> processor().process(List.of(new ImportedRow(7, row("Trimestre Fantasma"))), 2026))
