@@ -53,7 +53,8 @@ class SpaceActivationApiIntegrationTest extends AbstractIntegrationTest {
         assertActivationLifecycle(
                 "/v1/buildings/" + id + "/activation",
                 "/v1/buildings/999999999/activation",
-                () -> buildingRepository.findActiveById(id).isPresent());
+                () -> buildingRepository.findActiveById(id).isPresent(),
+                true);
     }
 
     @Test
@@ -64,7 +65,8 @@ class SpaceActivationApiIntegrationTest extends AbstractIntegrationTest {
         assertActivationLifecycle(
                 "/v1/classrooms/" + id + "/activation",
                 "/v1/classrooms/999999999/activation",
-                () -> classroomRepository.findActiveById(id).isPresent());
+                () -> classroomRepository.findActiveById(id).isPresent(),
+                false);
     }
 
     @Test
@@ -76,11 +78,12 @@ class SpaceActivationApiIntegrationTest extends AbstractIntegrationTest {
         assertActivationLifecycle(
                 "/v1/classroom-types/" + id + "/activation",
                 "/v1/classroom-types/999999999/activation",
-                () -> classroomTypeRepository.findActiveById(id).isPresent());
+                () -> classroomTypeRepository.findActiveById(id).isPresent(),
+                true);
     }
 
-    private void assertActivationLifecycle(String activationPath, String missingPath, BooleanSupplier active)
-            throws Exception {
+    private void assertActivationLifecycle(String activationPath, String missingPath, BooleanSupplier active,
+            boolean auxiliarForbidden) throws Exception {
         assertThat(active.getAsBoolean()).isTrue();
 
         mockMvc.perform(delete(activationPath)).andExpect(status().isNoContent());
@@ -96,7 +99,13 @@ class SpaceActivationApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(put(missingPath)).andExpect(status().isNotFound());
         mockMvc.perform(delete(missingPath)).andExpect(status().isNotFound());
 
-        auxiliarMockMvc.perform(put(activationPath)).andExpect(status().isForbidden());
-        auxiliarMockMvc.perform(delete(activationPath)).andExpect(status().isForbidden());
+        if (auxiliarForbidden) {
+            auxiliarMockMvc.perform(put(activationPath)).andExpect(status().isForbidden());
+            auxiliarMockMvc.perform(delete(activationPath)).andExpect(status().isForbidden());
+        } else {
+            // El AUXILIAR_AULICO sí tiene CLASSROOM_ACTIVATE en la matriz RBAC (decisión de negocio,
+            // ver plan maestro §RBAC punto 5).
+            auxiliarMockMvc.perform(put(activationPath)).andExpect(status().isNoContent());
+        }
     }
 }

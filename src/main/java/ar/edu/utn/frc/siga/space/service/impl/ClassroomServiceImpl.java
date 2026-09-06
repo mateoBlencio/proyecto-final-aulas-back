@@ -7,14 +7,11 @@ import ar.edu.utn.frc.siga.space.dto.response.ClassroomListItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
-import ar.edu.utn.frc.siga.common.security.BuildingScope;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
-import ar.edu.utn.frc.siga.common.security.BuildingScopedSpecifications;
 import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.space.exception.SpaceDomainException;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomListComposer;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomMapper;
-import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
@@ -62,6 +59,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     private final ClassroomListComposer classroomListComposer;
     private final ClassroomFeatureWriter classroomFeatureWriter;
     private final BuildingScopeResolver buildingScopeResolver;
+    private final ScopedClassroomFinder scopedClassroom;
 
     @Override
     @Transactional
@@ -92,18 +90,13 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Override
     public ClassroomResponseDto findById(Long id) {
         log.debug("Buscando aula por id={}", id);
-        Classroom classroom = this.findExistingClassroomById(id);
-        BuildingScope scope = buildingScopeResolver.scopeFor(Permission.CLASSROOM_READ);
-        if (!scope.allows(classroom.getBuilding().getId())) {
-            throw ResourceNotFoundException.of("Classroom", id);
-        }
-        return classroomMapper.toDto(classroom);
+        return classroomMapper.toDto(scopedClassroom.requireActiveInScope(id, Permission.CLASSROOM_READ));
     }
 
     @Override
     public List<ClassroomResponseDto> findAllAvailable() {
         log.debug("Listando todas las aulas disponibles");
-        return classroomRepository.findAllActive().stream()
+        return scopedClassroom.findAllActiveInScope(Permission.CLASSROOM_READ).stream()
                 .map(classroomMapper::toDto)
                 .toList();
     }
@@ -121,13 +114,11 @@ public class ClassroomServiceImpl implements ClassroomService {
     public Page<ClassroomListItemDto> findAll(ClassroomFilter filter, Pageable pageable, boolean includeDeactivated) {
         log.debug("Listando aulas: filter={}, page={}, size={}, includeDeactivated={}",
                 filter, pageable.getPageNumber(), pageable.getPageSize(), includeDeactivated);
-        BuildingScope scope = buildingScopeResolver.scopeFor(Permission.CLASSROOM_READ);
         Specification<Classroom> spec = includeDeactivated
                 ? ClassroomSpecification.withFilter(filter)
                 : ClassroomSpecification.withFilter(filter).and(SoftDeleteSpecifications.active());
-        spec = spec.and(BuildingScopedSpecifications.withinScope(scope, "building.id"));
         return classroomListComposer.compose(
-                classroomRepository.findAll(spec, ClassroomListSort.apply(pageable)));
+                scopedClassroom.findAll(spec, Permission.CLASSROOM_READ, ClassroomListSort.apply(pageable)));
     }
 
     @Override
@@ -135,10 +126,11 @@ public class ClassroomServiceImpl implements ClassroomService {
     public ClassroomResponseDto update(Long id, ClassroomRequestDto dto) {
         log.debug("Actualizando aula: id={}, roomNumber={}", id, dto.roomNumber());
 
-        Classroom entity = this.findExistingClassroomById(id);
+        Classroom entity = scopedClassroom.requireActiveInScope(id, Permission.CLASSROOM_UPDATE);
         Building building = findActiveBuilding(dto.buildingId());
-        buildingScopeResolver.requireAccess(
-                Permission.CLASSROOM_UPDATE, Set.copyOf(List.of(entity.getBuilding().getId(), dto.buildingId())));
+        if (!entity.getBuilding().getId().equals(dto.buildingId())) {
+            buildingScopeResolver.requireAccess(Permission.CLASSROOM_UPDATE, dto.buildingId());
+        }
         ClassroomType classroomType = classroomTypeService.findById(dto.classroomTypeId());
 
         validateCapacity(dto);
@@ -159,8 +151,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
         PermissionMode mode = normalizePermissionMode(dto.permissionMode(), dto.permissionTargets());
 
-        Classroom classroom = this.findExistingClassroomById(id);
-        buildingScopeResolver.requireAccess(Permission.CLASSROOM_UPDATE, classroom.getBuilding().getId());
+        Classroom classroom = scopedClassroom.requireActiveInScope(id, Permission.CLASSROOM_UPDATE);
         classroom.setClassroomType(classroomTypeService.findById(dto.classroomTypeId()));
         classroom.setObservations(dto.observations());
         classroom.setPermissionMode(mode);
@@ -177,8 +168,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Transactional
     public void delete(Long id) {
         log.debug("Eliminando (soft-delete) aula: id={}", id);
-        Classroom classroom = this.findExistingClassroomById(id);
-        buildingScopeResolver.requireAccess(Permission.CLASSROOM_DELETE, classroom.getBuilding().getId());
+        Classroom classroom = scopedClassroom.requireActiveInScope(id, Permission.CLASSROOM_DELETE);
         classroomRepository.softDelete(classroom);
         log.info("Aula eliminada: id={}", id);
     }
@@ -186,16 +176,14 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Override
     @Transactional
     public void activate(Long id) {
-        Classroom classroom = Finder.orThrow(classroomRepository::findById, id, "Classroom");
-        buildingScopeResolver.requireAccess(Permission.CLASSROOM_ACTIVATE, classroom.getBuilding().getId());
+        Classroom classroom = scopedClassroom.requireAnyInScope(id, Permission.CLASSROOM_ACTIVATE);
         classroomRepository.restore(classroom);
     }
 
     @Override
     @Transactional
     public void deactivate(Long id) {
-        Classroom classroom = Finder.orThrow(classroomRepository::findById, id, "Classroom");
-        buildingScopeResolver.requireAccess(Permission.CLASSROOM_ACTIVATE, classroom.getBuilding().getId());
+        Classroom classroom = scopedClassroom.requireAnyInScope(id, Permission.CLASSROOM_ACTIVATE);
         classroomRepository.softDelete(classroom);
     }
 
@@ -223,14 +211,6 @@ public class ClassroomServiceImpl implements ClassroomService {
         log.warn("Aula '{}' no está en el edificio informado (buildingId={}); se usa la única "
                 + "coincidencia por número, en buildingId={}", roomNumber, buildingId, found.getBuilding().getId());
         return Optional.of(found);
-    }
-
-    private Classroom findExistingClassroomById(Long id) {
-        return classroomRepository.findActiveById(id)
-                .orElseThrow(() -> {
-                    log.warn("Aula no encontrada: id={}", id);
-                    return ResourceNotFoundException.of("Classroom", id);
-                });
     }
 
     private Building findBuildingById(Long id) {

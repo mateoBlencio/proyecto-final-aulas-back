@@ -77,9 +77,12 @@ class ClassroomServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        ScopedClassroomFinder scopedClassroom =
+                new ScopedClassroomFinder(classroomRepository, buildingScopeResolver);
         service = new ClassroomServiceImpl(
                 classroomRepository, buildingRepository, classroomTypeService, classroomTypeRepository,
-                classroomMapper, classroomListComposer, classroomFeatureWriter, buildingScopeResolver);
+                classroomMapper, classroomListComposer, classroomFeatureWriter, buildingScopeResolver,
+                scopedClassroom);
         lenient().when(buildingScopeResolver.scopeFor(any())).thenReturn(BuildingScope.unrestricted());
     }
 
@@ -207,7 +210,8 @@ class ClassroomServiceImplTest {
     void findAllAvailableMapsRepositoryResult() {
         Classroom classroom = SpaceTestData.classroom().build();
         ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
-        when(classroomRepository.findAllActive()).thenReturn(List.of(classroom));
+        when(classroomRepository.findAll(ArgumentMatchers.<Specification<Classroom>>any()))
+                .thenReturn(List.of(classroom));
         when(classroomMapper.toDto(classroom)).thenReturn(dto);
 
         assertThat(service.findAllAvailable()).containsExactly(dto);
@@ -306,17 +310,15 @@ class ClassroomServiceImplTest {
     }
 
     @Test
-    @DisplayName("update: sin alcance sobre el edificio origen o destino → AccessDeniedException, no guarda")
-    void updateWithoutBuildingScopeThrowsAccessDenied() {
+    @DisplayName("update: sin alcance sobre el edificio del aula → 404 (el fetch acotado no la ve), no guarda")
+    void updateWithoutBuildingScopeThrowsNotFound() {
         Classroom existing = SpaceTestData.classroom().build();
-        Building building = SpaceTestData.building().build();
         ClassroomRequestDto dto = SpaceTestData.classroomRequestDto();
         when(classroomRepository.findActiveById(1L)).thenReturn(Optional.of(existing));
-        when(buildingRepository.findActiveById(1L)).thenReturn(Optional.of(building));
-        doThrow(new AccessDeniedException("sin acceso"))
-                .when(buildingScopeResolver).requireAccess(Permission.CLASSROOM_UPDATE, Set.of(1L));
+        when(buildingScopeResolver.scopeFor(Permission.CLASSROOM_UPDATE))
+                .thenReturn(BuildingScope.of(Set.of(2L)));
 
-        assertThatThrownBy(() -> service.update(1L, dto)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> service.update(1L, dto)).isInstanceOf(ResourceNotFoundException.class);
 
         verify(classroomRepository, never()).save(any());
     }
@@ -344,27 +346,27 @@ class ClassroomServiceImplTest {
     }
 
     @Test
-    @DisplayName("delete: sin alcance sobre el edificio del aula → AccessDeniedException, no borra")
-    void deleteWithoutBuildingScopeThrowsAccessDenied() {
+    @DisplayName("delete: sin alcance sobre el edificio del aula → 404 (el fetch acotado no la ve), no borra")
+    void deleteWithoutBuildingScopeThrowsNotFound() {
         Classroom existing = SpaceTestData.classroom().build();
         when(classroomRepository.findActiveById(1L)).thenReturn(Optional.of(existing));
-        doThrow(new AccessDeniedException("sin acceso"))
-                .when(buildingScopeResolver).requireAccess(Permission.CLASSROOM_DELETE, 1L);
+        when(buildingScopeResolver.scopeFor(Permission.CLASSROOM_DELETE))
+                .thenReturn(BuildingScope.of(Set.of(2L)));
 
-        assertThatThrownBy(() -> service.delete(1L)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> service.delete(1L)).isInstanceOf(ResourceNotFoundException.class);
 
         verify(classroomRepository, never()).softDelete(any());
     }
 
     @Test
-    @DisplayName("activate: sin alcance sobre el edificio del aula → AccessDeniedException, no reactiva")
-    void activateWithoutBuildingScopeThrowsAccessDenied() {
+    @DisplayName("activate: sin alcance sobre el edificio del aula → 404 (el fetch acotado no la ve), no reactiva")
+    void activateWithoutBuildingScopeThrowsNotFound() {
         Classroom existing = SpaceTestData.classroom().build();
         when(classroomRepository.findById(1L)).thenReturn(Optional.of(existing));
-        doThrow(new AccessDeniedException("sin acceso"))
-                .when(buildingScopeResolver).requireAccess(Permission.CLASSROOM_ACTIVATE, 1L);
+        when(buildingScopeResolver.scopeFor(Permission.CLASSROOM_ACTIVATE))
+                .thenReturn(BuildingScope.of(Set.of(2L)));
 
-        assertThatThrownBy(() -> service.activate(1L)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> service.activate(1L)).isInstanceOf(ResourceNotFoundException.class);
 
         verify(classroomRepository, never()).restore(any());
     }

@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.auth.security;
 import ar.edu.utn.frc.siga.common.security.BuildingScope;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.Permission;
+import ar.edu.utn.frc.siga.common.security.SystemScope;
 import java.util.Collection;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -14,6 +15,9 @@ public class DefaultBuildingScopeResolver implements BuildingScopeResolver {
 
     @Override
     public BuildingScope scopeFor(Permission permission) {
+        if (SystemScope.isActive()) {
+            return BuildingScope.unrestricted();
+        }
         SecurityUser principal = currentSecurityUser();
         return principal == null ? BuildingScope.denied() : principal.scopeFor(permission);
     }
