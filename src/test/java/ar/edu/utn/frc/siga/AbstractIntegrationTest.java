@@ -11,7 +11,7 @@ import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import ar.edu.utn.frc.siga.auth.security.JwtService;
 import ar.edu.utn.frc.siga.auth.security.SecurityUser;
 import ar.edu.utn.frc.siga.common.security.ScopeType;
-import org.junit.jupiter.api.AfterEach;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -51,15 +51,30 @@ public abstract class AbstractIntegrationTest {
     @BeforeEach
     void setUpAuthenticatedMockMvc() {
         mockMvc = mockMvcAs(FIXTURE_EMAIL, SystemRole.SUBSECRETARIA);
+    }
+
+    /**
+     * Corre {@code action} con el {@link SecurityContextHolder} poblado por el usuario fixture
+     * (SUBSECRETARIA / GLOBAL). Para los tests de integración que invocan servicios acotados por
+     * edificio directamente (no vía {@code mockMvc}), donde no hay filtro que establezca el contexto.
+     */
+    protected <T> T asFixtureUser(Supplier<T> action) {
         User fixture = userRepository.findByEmailAndEnabledTrue(FIXTURE_EMAIL).orElseThrow();
         SecurityUser principal = SecurityUser.fromUser(fixture);
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()));
+        try {
+            return action.get();
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
-    @AfterEach
-    void clearSecurityContext() {
-        SecurityContextHolder.clearContext();
+    protected void asFixtureUser(Runnable action) {
+        asFixtureUser(() -> {
+            action.run();
+            return null;
+        });
     }
 
     protected MockMvc mockMvcAs(String email, SystemRole systemRole) {

@@ -62,7 +62,7 @@ class ClassroomSoftDeleteIntegrationTest extends AbstractIntegrationTest {
         Long id = classroom.getId();
         Integer roomNumber = classroom.getRoomNumber();
 
-        classroomService.delete(id);
+        asFixtureUser(() -> classroomService.delete(id));
 
         Classroom deleted = classroomRepository.findById(id).orElseThrow();
         assertThat(deleted.isDeleted()).isTrue();
