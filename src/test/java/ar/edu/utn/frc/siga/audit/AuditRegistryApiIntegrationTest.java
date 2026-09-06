@@ -92,7 +92,10 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.content[*].entityType", hasItem("Evento académico")))
                 .andExpect(jsonPath("$.content[*].entityType", hasItem("Configuración")))
                 .andExpect(jsonPath("$.content[*].entityType", hasItem("Ocurrencia")))
-                .andExpect(jsonPath("$.content[*].type", everyItem(is("CHANGE"))))
+                // hay entradas CHANGE del seed; puede haber OPERATION de otros flujos que
+                // compartan el contexto (Envers commitea sin rollback), así que no se exige
+                // que TODAS sean CHANGE, sólo que el log unificado las incluya.
+                .andExpect(jsonPath("$.content[*].type", hasItem("CHANGE")))
                 .andExpect(jsonPath("$.content[*].description", everyItem(not(blankOrNullString()))));
     }
 

@@ -45,7 +45,7 @@ public class AuditRegistryServiceImpl implements AuditRegistryService {
     @Override
     @Transactional(readOnly = true)
     public Page<AuditLogEntryDto> findAll(AuditLogFilter filter, Pageable pageable) {
-        DateRanges.requireNotBefore(filter.to(), filter.from());
+        DateRanges.requireNotBefore(filter.to(), DateRanges.defaultFrom(filter.from()));
 
         Collection<AuditedEntity> targets = resolveTargets(filter.entityType());
         LocalDateTime from = atStartOfDay(filter.from());
@@ -62,11 +62,17 @@ public class AuditRegistryServiceImpl implements AuditRegistryService {
                 .filter(row -> row.metadata().operationId() == null)
                 .map(row -> auditLogEntryMapper.toChange(row.metadata(), row.label()));
 
-        Stream<AuditLogEntryDto> operations = rows.stream()
-                .filter(row -> row.metadata().operationId() != null)
-                .collect(Collectors.groupingBy(row -> row.metadata().operationId(), LinkedHashMap::new, Collectors.toList()))
-                .values().stream()
-                .map(this::toOperationEntry);
+        // Filtrar por 'kind' pide cambios de ese tipo: una operación no tiene un único kind,
+        // así que cuando se filtra por kind no se emiten entradas OPERATION (colapsarían filas
+        // CREATED/MODIFIED bajo una entrada con kind nulo, que se colaría por el filtro).
+        Stream<AuditLogEntryDto> operations = filter.kind() != null
+                ? Stream.empty()
+                : rows.stream()
+                        .filter(row -> row.metadata().operationId() != null)
+                        .collect(Collectors.groupingBy(row -> row.metadata().operationId(),
+                                LinkedHashMap::new, Collectors.toList()))
+                        .values().stream()
+                        .map(this::toOperationEntry);
 
         List<AuditLogEntryDto> entries = Stream.concat(changes, operations)
                 .sorted(BY_REVISION_DESC)

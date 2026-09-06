@@ -159,6 +159,26 @@ class AuditRegistryServiceImplTest {
     }
 
     @Test
+    @DisplayName("'to' en el futuro sin 'from': no revienta (from se defaultea a hoy), antes tiraba NPE")
+    void findAll_toWithoutFrom_doesNotThrow() {
+        when(revisionReader.readMetadata(any(), any(), any(), any(), any(), isNull())).thenReturn(List.of());
+        AuditLogFilter onlyTo = new AuditLogFilter(null, LocalDate.now().plusDays(30), null, null, null);
+
+        Page<AuditLogEntryDto> result = service.findAll(onlyTo, PageRequest.of(0, 10));
+
+        assertThat(result.getContent()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("'to' en el pasado sin 'from': 400 (from se defaultea a hoy, queda 'to' antes de 'from')")
+    void findAll_pastToWithoutFrom_throws() {
+        AuditLogFilter pastTo = new AuditLogFilter(null, LocalDate.now().minusDays(1), null, null, null);
+
+        assertThatThrownBy(() -> service.findAll(pastTo, PageRequest.of(0, 10)))
+                .isInstanceOf(InvalidDateRangeException.class);
+    }
+
+    @Test
     @DisplayName("traduce el rango de fechas a límites de día y propaga usuario y kind")
     void findAll_passesDayBoundsUserAndKind() {
         when(revisionReader.readMetadata(any(), any(), any(), any(), any(), isNull())).thenReturn(List.of());
