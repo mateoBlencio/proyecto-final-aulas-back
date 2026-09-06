@@ -60,7 +60,13 @@ public class SecurityUser implements UserDetails {
         if (assignment.getScopeType() == ScopeType.GLOBAL) {
             return BuildingScope.unrestricted();
         }
-        return BuildingScope.of(Set.of(assignment.getScopeId()));
+        Long scopeId = assignment.getScopeId();
+        if (scopeId == null) {
+            // Dato inconsistente (fila vieja / insert manual): un alcance BUILDING sin edificio
+            // no habilita nada. Antes reventaba con NPE en Set.of(null) y tumbaba el login.
+            return BuildingScope.denied();
+        }
+        return BuildingScope.of(Set.of(scopeId));
     }
 
     public BuildingScope scopeFor(Permission permission) {
