@@ -51,7 +51,7 @@ public class User {
 
     @Builder.Default
     @NotAudited
-    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "user", fetch = FetchType.EAGER)
     private List<RoleAssignment> roleAssignments = new ArrayList<>();
 
 }

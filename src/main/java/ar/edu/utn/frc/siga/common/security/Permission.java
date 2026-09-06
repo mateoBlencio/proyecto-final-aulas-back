@@ -38,8 +38,7 @@ public enum Permission {
     SYSACAD_SYNC(ScopeType.GLOBAL),
     USER_READ(ScopeType.GLOBAL),
     USER_MANAGE(ScopeType.GLOBAL),
-    ROLE_ASSIGN(ScopeType.GLOBAL),
-    ROLE_MANAGE(ScopeType.GLOBAL);
+    ROLE_ASSIGN(ScopeType.GLOBAL);
 
     private final ScopeType scopeType;
 

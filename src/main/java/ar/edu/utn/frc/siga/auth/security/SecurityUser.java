@@ -45,7 +45,7 @@ public class SecurityUser implements UserDetails {
     private static Map<Permission, BuildingScope> resolveScopes(List<RoleAssignment> assignments) {
         Map<Permission, BuildingScope> scopes = new EnumMap<>(Permission.class);
         for (RoleAssignment assignment : assignments) {
-            for (Permission permission : assignment.getRole().getPermissions()) {
+            for (Permission permission : assignment.getRole().permissions()) {
                 BuildingScope granted = grantedScope(permission, assignment);
                 scopes.merge(permission, granted, BuildingScope::union);
             }

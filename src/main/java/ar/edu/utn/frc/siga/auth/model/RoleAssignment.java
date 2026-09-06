@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,7 +22,9 @@ import org.hibernate.envers.Audited;
 
 @Entity
 @Audited
-@Table(name = "usuario_rol")
+@Table(name = "usuario_rol",
+       uniqueConstraints = @UniqueConstraint(name = "uq_usuario_rol",
+               columnNames = {"id_usuario", "rol", "tipo_alcance", "id_alcance"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -38,9 +41,9 @@ public class RoleAssignment {
     @JoinColumn(name = "id_usuario", nullable = false)
     private User user;
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "id_rol", nullable = false)
-    private Role role;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "rol", nullable = false, length = 50)
+    private SystemRole role;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "tipo_alcance", nullable = false, length = 20)

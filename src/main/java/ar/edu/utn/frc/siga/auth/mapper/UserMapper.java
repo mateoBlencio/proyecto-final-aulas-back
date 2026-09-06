@@ -14,7 +14,7 @@ public interface UserMapper {
     @Mapping(target = "roleAssignments", ignore = true)
     UserResponseDto toDto(User user);
 
-    @Mapping(target = "roleName", source = "role.name")
+    @Mapping(target = "roleName", source = "role")
     @Mapping(target = "scopeName", ignore = true)
     RoleAssignmentDto toDto(RoleAssignment assignment);
 }

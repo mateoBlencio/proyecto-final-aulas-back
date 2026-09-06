@@ -40,12 +40,10 @@ INSERT INTO usuario (correo, password_hash, habilitado, nombre, apellido)
 SELECT 'admin@frc.utn.edu.ar', '$2y$10$entcSj2YEpWjWBz8UaCICuk98/ex9c9p4Gr4F.i/ZL6lRHA5OcjFy', true, 'Admin', 'Siga'
 WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE correo = 'admin@frc.utn.edu.ar');
 
-INSERT INTO usuario_rol (id_usuario, id_rol, tipo_alcance, id_alcance)
-SELECT u.id_usuario, r.id_rol, 'GLOBAL', NULL
+INSERT INTO usuario_rol (id_usuario, rol, tipo_alcance, id_alcance)
+SELECT u.id_usuario, 'SUBSECRETARIA', 'GLOBAL', NULL
 FROM usuario u
-JOIN rol r ON r.nombre = 'SUBSECRETARIA'
 WHERE u.correo = 'admin@frc.utn.edu.ar'
-  AND EXISTS (SELECT 1 FROM rol WHERE nombre = 'SUBSECRETARIA')
   AND NOT EXISTS (
-      SELECT 1 FROM usuario_rol ur WHERE ur.id_usuario = u.id_usuario AND ur.id_rol = r.id_rol
+      SELECT 1 FROM usuario_rol ur WHERE ur.id_usuario = u.id_usuario AND ur.rol = 'SUBSECRETARIA'
   );

@@ -1,13 +1,12 @@
 package ar.edu.utn.frc.siga.auth.security;
 
-import ar.edu.utn.frc.siga.auth.model.Role;
+import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.model.RoleAssignment;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.common.security.BuildingScope;
 import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.common.security.ScopeType;
 import java.util.List;
-import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -29,12 +28,7 @@ class DefaultBuildingScopeResolverTest {
         SecurityContextHolder.clearContext();
     }
 
-    private Role role(Permission... permissions) {
-        return Role.builder().id(1L).name("TEST_ROLE").systemRole(false)
-                .permissions(Set.of(permissions)).build();
-    }
-
-    private RoleAssignment assignment(Role role, ScopeType scopeType, Long scopeId) {
+    private RoleAssignment assignment(SystemRole role, ScopeType scopeType, Long scopeId) {
         return RoleAssignment.builder().role(role).scopeType(scopeType).scopeId(scopeId).build();
     }
 
@@ -56,9 +50,8 @@ class DefaultBuildingScopeResolverTest {
     @Test
     @DisplayName("permiso BUILDING con asignación acotada: permite solo el edificio asignado")
     void permisoBuildingAcotado() {
-        Role auxiliar = role(Permission.CLASSROOM_READ);
         User user = User.builder().id(1L).email("aux@frc.utn.edu.ar").enabled(true)
-                .roleAssignments(List.of(assignment(auxiliar, ScopeType.BUILDING, 5L)))
+                .roleAssignments(List.of(assignment(SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, 5L)))
                 .build();
         authenticateAs(user);
 
@@ -71,11 +64,10 @@ class DefaultBuildingScopeResolverTest {
     @Test
     @DisplayName("multi-rol: dos asignaciones del mismo permiso sobre distinto edificio se unen")
     void multiRolUneAlcances() {
-        Role auxiliar = role(Permission.CLASSROOM_READ);
         User user = User.builder().id(1L).email("ana@frc.utn.edu.ar").enabled(true)
                 .roleAssignments(List.of(
-                        assignment(auxiliar, ScopeType.BUILDING, 5L),
-                        assignment(auxiliar, ScopeType.BUILDING, 9L)))
+                        assignment(SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, 5L),
+                        assignment(SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, 9L)))
                 .build();
         authenticateAs(user);
 
@@ -87,9 +79,8 @@ class DefaultBuildingScopeResolverTest {
     @Test
     @DisplayName("permiso GLOBAL con asignación acotada a un edificio: igual queda irrestricto")
     void permisoGlobalSiempreIrrestricto() {
-        Role auxiliar = role(Permission.ACADEMIC_READ);
         User user = User.builder().id(1L).email("aux@frc.utn.edu.ar").enabled(true)
-                .roleAssignments(List.of(assignment(auxiliar, ScopeType.BUILDING, 5L)))
+                .roleAssignments(List.of(assignment(SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, 5L)))
                 .build();
         authenticateAs(user);
 
@@ -100,9 +91,8 @@ class DefaultBuildingScopeResolverTest {
     @Test
     @DisplayName("asignación GLOBAL sobre un permiso BUILDING: concede todos los edificios")
     void asignacionGlobalConcedeTodo() {
-        Role subsecretaria = role(Permission.CLASSROOM_READ);
         User user = User.builder().id(1L).email("sub@frc.utn.edu.ar").enabled(true)
-                .roleAssignments(List.of(assignment(subsecretaria, ScopeType.GLOBAL, null)))
+                .roleAssignments(List.of(assignment(SystemRole.AUXILIAR_AULICO, ScopeType.GLOBAL, null)))
                 .build();
         authenticateAs(user);
 
@@ -113,9 +103,8 @@ class DefaultBuildingScopeResolverTest {
     @Test
     @DisplayName("requireAccess en lote: si un solo edificio del lote está fuera de alcance, lanza")
     void requireAccessLoteFallaSiUnoEstaFueraDeAlcance() {
-        Role auxiliar = role(Permission.ALLOCATION_WRITE);
         User user = User.builder().id(1L).email("aux@frc.utn.edu.ar").enabled(true)
-                .roleAssignments(List.of(assignment(auxiliar, ScopeType.BUILDING, 5L)))
+                .roleAssignments(List.of(assignment(SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, 5L)))
                 .build();
         authenticateAs(user);
 

@@ -82,7 +82,7 @@ public class UserController {
     public ResponseEntity<RoleAssignmentDto> assignRole(@PathVariable Long id,
                                                          @Valid @RequestBody AssignRoleRequestDto dto,
                                                          @AuthenticationPrincipal SecurityUser principal) {
-        log.debug("POST /v1/users/{}/role-assignments: roleId={}", id, dto.roleId());
+        log.debug("POST /v1/users/{}/role-assignments: role={}", id, dto.role());
         RoleAssignmentDto response = roleAssignmentService.assign(id, dto, principal.getEmail());
         log.info("Rol asignado vía controller: userId={}, assignmentId={}", id, response.id());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

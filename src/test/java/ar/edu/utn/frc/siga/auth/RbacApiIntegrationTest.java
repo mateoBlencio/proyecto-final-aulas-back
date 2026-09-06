@@ -11,7 +11,6 @@ import ar.edu.utn.frc.siga.AbstractIntegrationTest;
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.RoleAssignmentRepository;
-import ar.edu.utn.frc.siga.auth.repository.RoleRepository;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import ar.edu.utn.frc.siga.common.security.ScopeType;
 import ar.edu.utn.frc.siga.space.model.Building;
@@ -36,8 +35,6 @@ class RbacApiIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private UserRepository userRepository;
     @Autowired
-    private RoleRepository roleRepository;
-    @Autowired
     private RoleAssignmentRepository roleAssignmentRepository;
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -59,11 +56,11 @@ class RbacApiIntegrationTest extends AbstractIntegrationTest {
         return userRepository.save(user).getId();
     }
 
-    private String assignRoleBody(Long roleId, ScopeType scopeType, Long scopeId) {
+    private String assignRoleBody(String role, ScopeType scopeType, Long scopeId) {
         String scopeIdJson = scopeId == null ? "null" : String.valueOf(scopeId);
         return """
-                {"roleId": %d, "scopeType": "%s", "scopeId": %s}
-                """.formatted(roleId, scopeType, scopeIdJson);
+                {"role": "%s", "scopeType": "%s", "scopeId": %s}
+                """.formatted(role, scopeType, scopeIdJson);
     }
 
     // ---- asignar / revocar ----
@@ -72,12 +69,11 @@ class RbacApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("POST role-assignments con alcance BUILDING: 201, refleja roleName/scopeType/scopeId/scopeName")
     void assign_withBuildingScope_returnsAssignment() throws Exception {
         Building building = testData.edificio();
-        Long roleId = roleRepository.findByName("AUXILIAR_AULICO").orElseThrow().getId();
         Long userId = createPlainUser(uniqueEmail("assign"));
 
         mockMvc.perform(post("/v1/users/{id}/role-assignments", userId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(assignRoleBody(roleId, ScopeType.BUILDING, building.getId())))
+                        .content(assignRoleBody("AUXILIAR_AULICO", ScopeType.BUILDING, building.getId())))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.roleName").value("AUXILIAR_AULICO"))
                 .andExpect(jsonPath("$.scopeType").value("BUILDING"))
@@ -88,9 +84,8 @@ class RbacApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("POST role-assignments duplicada: 400, no crea una segunda fila")
     void assign_duplicate_returns400() throws Exception {
-        Long roleId = roleRepository.findByName("CONSULTA").orElseThrow().getId();
         Long userId = createPlainUser(uniqueEmail("dup"));
-        String body = assignRoleBody(roleId, ScopeType.GLOBAL, null);
+        String body = assignRoleBody("CONSULTA", ScopeType.GLOBAL, null);
 
         mockMvc.perform(post("/v1/users/{id}/role-assignments", userId)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
@@ -106,38 +101,35 @@ class RbacApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("POST role-assignments con scopeId para alcance GLOBAL: 400")
     void assign_globalWithScopeId_returns400() throws Exception {
-        Long roleId = roleRepository.findByName("CONSULTA").orElseThrow().getId();
         Long userId = createPlainUser(uniqueEmail("badscope"));
 
         mockMvc.perform(post("/v1/users/{id}/role-assignments", userId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"roleId": %d, "scopeType": "GLOBAL", "scopeId": 1}
-                                """.formatted(roleId)))
+                                {"role": "%s", "scopeType": "GLOBAL", "scopeId": 1}
+                                """.formatted("CONSULTA")))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     @DisplayName("POST role-assignments con edificio inexistente: 404")
     void assign_nonExistentBuilding_returns404() throws Exception {
-        Long roleId = roleRepository.findByName("AUXILIAR_AULICO").orElseThrow().getId();
         Long userId = createPlainUser(uniqueEmail("noedif"));
 
         mockMvc.perform(post("/v1/users/{id}/role-assignments", userId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(assignRoleBody(roleId, ScopeType.BUILDING, 999_999_999L)))
+                        .content(assignRoleBody("AUXILIAR_AULICO", ScopeType.BUILDING, 999_999_999L)))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     @DisplayName("DELETE role-assignments: 204 y la asignación desaparece")
     void revoke_removesAssignment() throws Exception {
-        Long roleId = roleRepository.findByName("CONSULTA").orElseThrow().getId();
         Long userId = createPlainUser(uniqueEmail("revoke"));
 
         MvcResult created = mockMvc.perform(post("/v1/users/{id}/role-assignments", userId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(assignRoleBody(roleId, ScopeType.GLOBAL, null)))
+                        .content(assignRoleBody("CONSULTA", ScopeType.GLOBAL, null)))
                 .andExpect(status().isCreated())
                 .andReturn();
         long assignmentId = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
@@ -151,13 +143,12 @@ class RbacApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("DELETE role-assignments de otro usuario: 404, no revoca")
     void revoke_wrongUser_returns404() throws Exception {
-        Long roleId = roleRepository.findByName("CONSULTA").orElseThrow().getId();
         Long ownerId = createPlainUser(uniqueEmail("owner"));
         Long otherId = createPlainUser(uniqueEmail("other"));
 
         MvcResult created = mockMvc.perform(post("/v1/users/{id}/role-assignments", ownerId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(assignRoleBody(roleId, ScopeType.GLOBAL, null)))
+                        .content(assignRoleBody("CONSULTA", ScopeType.GLOBAL, null)))
                 .andExpect(status().isCreated())
                 .andReturn();
         long assignmentId = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
@@ -197,11 +188,10 @@ class RbacApiIntegrationTest extends AbstractIntegrationTest {
         String email = uniqueEmail("multirol");
         MockMvc userMockMvc = mockMvcAsScoped(email, SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, b1.getId());
         Long userId = userRepository.findByEmailAndEnabledTrue(email).orElseThrow().getId();
-        Long roleId = roleRepository.findByName("AUXILIAR_AULICO").orElseThrow().getId();
 
         mockMvc.perform(post("/v1/users/{id}/role-assignments", userId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(assignRoleBody(roleId, ScopeType.BUILDING, b2.getId())))
+                        .content(assignRoleBody("AUXILIAR_AULICO", ScopeType.BUILDING, b2.getId())))
                 .andExpect(status().isCreated());
 
         userMockMvc.perform(get("/v1/classrooms"))

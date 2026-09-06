@@ -3,12 +3,10 @@ package ar.edu.utn.frc.siga;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
-import ar.edu.utn.frc.siga.auth.model.Role;
 import ar.edu.utn.frc.siga.auth.model.RoleAssignment;
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.RoleAssignmentRepository;
-import ar.edu.utn.frc.siga.auth.repository.RoleRepository;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import ar.edu.utn.frc.siga.auth.security.JwtService;
 import ar.edu.utn.frc.siga.common.security.ScopeType;
@@ -37,9 +35,6 @@ public abstract class AbstractIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
-
-    @Autowired
-    private RoleRepository roleRepository;
 
     @Autowired
     private RoleAssignmentRepository roleAssignmentRepository;
@@ -81,12 +76,9 @@ public abstract class AbstractIntegrationTest {
         });
 
         if (user.getRoleAssignments().isEmpty()) {
-            Role role = roleRepository.findByName(systemRole.name())
-                    .orElseThrow(() -> new IllegalStateException(
-                            systemRole + " no está sembrado, RoleCatalogSeeder no corrió"));
             roleAssignmentRepository.save(RoleAssignment.builder()
                     .user(user)
-                    .role(role)
+                    .role(systemRole)
                     .scopeType(scopeType)
                     .scopeId(scopeId)
                     .build());

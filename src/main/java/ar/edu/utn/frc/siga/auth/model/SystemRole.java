@@ -37,13 +37,13 @@ public enum SystemRole {
             Permission.CONFLICT_READ,
             Permission.ROOM_REQUEST_READ));
 
-    private final Set<Permission> defaultPermissions;
+    private final Set<Permission> permissions;
 
-    SystemRole(Set<Permission> defaultPermissions) {
-        this.defaultPermissions = defaultPermissions;
+    SystemRole(Set<Permission> permissions) {
+        this.permissions = permissions;
     }
 
-    public Set<Permission> defaultPermissions() {
-        return defaultPermissions;
+    public Set<Permission> permissions() {
+        return permissions;
     }
 }

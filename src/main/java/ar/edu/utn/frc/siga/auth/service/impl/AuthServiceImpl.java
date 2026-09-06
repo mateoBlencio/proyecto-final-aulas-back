@@ -93,7 +93,7 @@ public class AuthServiceImpl implements AuthService {
     private TokenResponse buildTokenResponse(User user, IssuedRefreshToken refreshToken) {
         String accessToken = jwtService.generateAccessToken(user.getEmail());
         Set<String> roleNames = user.getRoleAssignments().stream()
-                .map(assignment -> assignment.getRole().getName())
+                .map(assignment -> assignment.getRole().name())
                 .collect(Collectors.toSet());
 
         return TokenResponse.builder()
