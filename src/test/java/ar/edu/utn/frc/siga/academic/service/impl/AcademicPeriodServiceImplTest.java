@@ -15,6 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -244,8 +246,19 @@ class AcademicPeriodServiceImplTest {
     }
 
     @Test
-    @DisplayName("findVigente: sin filas del año en curso, materializa las del año previo ajustadas a la semana")
-    void findVigenteRollsOverFromPreviousYear() {
+    @DisplayName("findCurrent: es lectura pura, no materializa nada aunque falte el año en curso")
+    void findCurrentDoesNotWrite() {
+        when(academicPeriodRepository.findAllActive()).thenReturn(List.of());
+
+        service.findCurrent();
+
+        verify(academicPeriodRepository, never()).save(any());
+        verify(academicPeriodRepository, never()).findByYearAndDeletedAtIsNull(any());
+    }
+
+    @Test
+    @DisplayName("materializeCurrentYear: sin filas del año en curso, las genera desde el año previo ajustadas a la semana")
+    void materializeCurrentYearRollsOverFromPreviousYear() {
         int thisYear = LocalDate.now().getYear();
         AcademicPeriod previousAnnual = AcademicPeriod.builder()
                 .id(1L).year(thisYear - 1).semester(0)
@@ -254,10 +267,9 @@ class AcademicPeriodServiceImplTest {
         when(academicPeriodRepository.findByYearAndDeletedAtIsNull(thisYear)).thenReturn(List.of());
         when(academicPeriodRepository.findByYearAndDeletedAtIsNull(thisYear - 1)).thenReturn(List.of(previousAnnual));
         when(academicPeriodRepository.findByYearAndSemester(thisYear, 0)).thenReturn(Optional.empty());
-        when(academicPeriodRepository.findAllActive()).thenReturn(List.of());
         when(academicPeriodRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        service.findVigente();
+        service.materializeCurrentYear();
 
         ArgumentCaptor<AcademicPeriod> captor = ArgumentCaptor.forClass(AcademicPeriod.class);
         verify(academicPeriodRepository).save(captor.capture());
@@ -268,5 +280,22 @@ class AcademicPeriodServiceImplTest {
         assertThat(materialized.getStartDate().getMonthValue()).isEqualTo(3);
         assertThat(materialized.getStartDate().getDayOfWeek())
                 .isEqualTo(LocalDate.of(thisYear - 1, 3, 9).getDayOfWeek());
+    }
+
+    @Test
+    @DisplayName("materializeCurrentYear: si otra transacción concurrente ya insertó, la violación de integridad se ignora")
+    void materializeCurrentYearToleratesRace() {
+        int thisYear = LocalDate.now().getYear();
+        AcademicPeriod previousAnnual = AcademicPeriod.builder()
+                .id(1L).year(thisYear - 1).semester(0)
+                .startDate(LocalDate.of(thisYear - 1, 3, 9)).endDate(LocalDate.of(thisYear - 1, 11, 30))
+                .build();
+        when(academicPeriodRepository.findByYearAndDeletedAtIsNull(thisYear)).thenReturn(List.of());
+        when(academicPeriodRepository.findByYearAndDeletedAtIsNull(thisYear - 1)).thenReturn(List.of(previousAnnual));
+        when(academicPeriodRepository.findByYearAndSemester(thisYear, 0)).thenReturn(Optional.empty());
+        when(academicPeriodRepository.save(any()))
+                .thenThrow(new DataIntegrityViolationException("uq (anio, cuatrimestre)"));
+
+        assertThatCode(() -> service.materializeCurrentYear()).doesNotThrowAnyException();
     }
 }

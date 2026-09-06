@@ -18,12 +18,18 @@ public interface AcademicPeriodService extends ActivationService<Long> {
     List<AcademicPeriodResponseDto> findActive();
 
     /**
-     * Período(s) vigente(s) hoy (por año + cuatrimestre en curso). Si el año en curso todavía no tiene
-     * filas porque el anterior ya terminó, las materializa copiando las del año previo ajustadas a la
-     * semana (rollover perezoso). No re-significa {@link #findActive()}, que sigue devolviendo todos
-     * los activos.
+     * Período(s) en vigencia hoy (año + cuatrimestre en curso). Lectura pura: no re-significa
+     * {@link #findActive()} ni materializa nada. Si el año en curso todavía no tiene filas, ver
+     * {@link #materializeCurrentYear()}.
      */
-    List<AcademicPeriodResponseDto> findVigente();
+    List<AcademicPeriodResponseDto> findCurrent();
+
+    /**
+     * Comando explícito de materialización: si el año en curso no tiene filas, las genera desde el
+     * año previo (rollover perezoso, fechas ajustadas a la semana). Idempotente y tolerante a la
+     * carrera contra el índice único (anio, cuatrimestre).
+     */
+    void materializeCurrentYear();
 
     List<AcademicPeriodResponseDto> findAll(boolean includeDeactivated);
 

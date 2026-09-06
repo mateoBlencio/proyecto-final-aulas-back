@@ -16,6 +16,7 @@ import ar.edu.utn.frc.siga.common.util.Finder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,17 +61,32 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
     }
 
     @Override
-    @Transactional
-    public List<AcademicPeriodResponseDto> findVigente() {
+    public List<AcademicPeriodResponseDto> findCurrent() {
         LocalDate today = LocalDate.now();
-        int year = today.getYear();
-        if (academicPeriodRepository.findByYearAndDeletedAtIsNull(year).isEmpty()) {
-            rolloverFrom(year - 1, year);
-        }
         return academicPeriodRepository.findAllActive().stream()
                 .filter(period -> isCurrent(period, today))
                 .map(academicPeriodMapper::toDto)
                 .toList();
+    }
+
+    /**
+     * Comando explícito de materialización: si el año en curso no tiene filas, las genera desde el
+     * año previo (rollover perezoso). Separado de {@link #findCurrent()} para que una lectura no
+     * escriba. Tolera la carrera contra {@code @UniqueConstraint(anio, cuatrimestre)}: si otra
+     * transacción concurrente ya insertó, la violación de integridad se ignora.
+     */
+    @Override
+    @Transactional
+    public void materializeCurrentYear() {
+        int year = LocalDate.now().getYear();
+        if (!academicPeriodRepository.findByYearAndDeletedAtIsNull(year).isEmpty()) {
+            return;
+        }
+        try {
+            rolloverFrom(year - 1, year);
+        } catch (DataIntegrityViolationException e) {
+            log.info("Rollover de {} ya materializado por otra transacción concurrente", year);
+        }
     }
 
     @Override
