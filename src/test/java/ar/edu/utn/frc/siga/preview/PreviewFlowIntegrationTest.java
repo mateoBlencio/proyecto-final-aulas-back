@@ -221,10 +221,11 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("POST /v1/previews: evento sin ocurrencias pendientes responde 409; UniqueEvent responde 409")
     void autoPreview_noPendingOccurrences_and_uniqueEvent_return409() throws Exception {
         LocalDate pastDate = LocalDate.now().minusMonths(2);
+        var pastSc = testData.materiaYComision();
         RecurringEvent pastEvent = eventRepository.save(RecurringEvent.builder()
                 .enrolled(30).startTime(START).duration(Duration.ofMinutes(DURATION))
                 .dayOfWeek(pastDate.getDayOfWeek()).startDate(pastDate).endDate(pastDate)
-                .subjectId(999_999L).commissionId(999_999L).build());
+                .subjectId(pastSc.subjectId()).commissionId(pastSc.commissionId()).build());
         occurrenceRepository.save(Occurrence.builder()
                 .event(pastEvent).date(pastDate).status(OccurrenceStatus.NEEDS_ROOM).build());
 
