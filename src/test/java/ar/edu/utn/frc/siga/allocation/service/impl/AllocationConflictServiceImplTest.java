@@ -84,7 +84,7 @@ class AllocationConflictServiceImplTest {
 
     @Test
     @DisplayName("types vacío evalúa todos los tipos de conflicto")
-    void typesVacioDevuelveLosTresTipos() {
+    void typesVacioEvaluaTodosLosTipos() {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
         RecurringEventResponseDto event = recurringEvent(1L, 40, LocalTime.of(8, 0));

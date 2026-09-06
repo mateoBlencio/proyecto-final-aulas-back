@@ -159,9 +159,9 @@ class AllocationImpactServiceImpl implements AllocationImpactService {
                         c -> subjectByEventId.get(c.occurrence().eventId()), (x, y) -> x));
     }
 
-    private List<ClassroomResponseDto> permittedRooms(List<ClassroomResponseDto> rooms,
-                                                      Map<Long, ClassroomSubjectPermissionDto> permissionByRoom,
-                                                      Long subjectId) {
+    List<ClassroomResponseDto> permittedRooms(List<ClassroomResponseDto> rooms,
+                                              Map<Long, ClassroomSubjectPermissionDto> permissionByRoom,
+                                              Long subjectId) {
         if (subjectId == null) {
             return rooms;
         }

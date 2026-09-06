@@ -105,16 +105,16 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
     private List<OvercrowdedConflictDto> buildOvercrowdedConflicts(Range range, boolean includePast) {
         List<OccupiedSlot> occupancy = readOccupancy(range, includePast);
 
-        Map<OvercrowdKey, OvercrowdAcc> overcrowdAccs = new LinkedHashMap<>();
+        Map<EventRoomKey, EventRoomAcc> overcrowdAccs = new LinkedHashMap<>();
         for (OccupiedSlot slot : occupancy) {
-            overcrowdAccs.computeIfAbsent(new OvercrowdKey(slot.eventId(), slot.classroomId()),
-                            k -> new OvercrowdAcc(slot.eventId(), slot.classroomId()))
+            overcrowdAccs.computeIfAbsent(new EventRoomKey(slot.eventId(), slot.classroomId()),
+                            k -> new EventRoomAcc(slot.eventId(), slot.classroomId()))
                     .dates.add(slot.date());
         }
 
         Set<Long> eventIds = new LinkedHashSet<>();
         Set<Long> classroomIds = new LinkedHashSet<>();
-        for (OvercrowdAcc acc : overcrowdAccs.values()) {
+        for (EventRoomAcc acc : overcrowdAccs.values()) {
             eventIds.add(acc.eventId);
             classroomIds.add(acc.classroomId);
         }
@@ -140,10 +140,10 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
     private List<NotPermittedConflictDto> buildNotPermittedConflicts(Range range, boolean includePast) {
         List<OccupiedSlot> occupancy = readOccupancy(range, includePast);
 
-        Map<OvercrowdKey, OvercrowdAcc> accs = new LinkedHashMap<>();
+        Map<EventRoomKey, EventRoomAcc> accs = new LinkedHashMap<>();
         for (OccupiedSlot slot : occupancy) {
-            accs.computeIfAbsent(new OvercrowdKey(slot.eventId(), slot.classroomId()),
-                            k -> new OvercrowdAcc(slot.eventId(), slot.classroomId()))
+            accs.computeIfAbsent(new EventRoomKey(slot.eventId(), slot.classroomId()),
+                            k -> new EventRoomAcc(slot.eventId(), slot.classroomId()))
                     .dates.add(slot.date());
         }
         if (accs.isEmpty()) {
@@ -152,7 +152,7 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
 
         Set<Long> eventIds = new LinkedHashSet<>();
         Set<Long> classroomIds = new LinkedHashSet<>();
-        for (OvercrowdAcc acc : accs.values()) {
+        for (EventRoomAcc acc : accs.values()) {
             eventIds.add(acc.eventId);
             classroomIds.add(acc.classroomId);
         }
@@ -163,7 +163,7 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
                 classroomService.findSubjectPermissions(classroomIds);
 
         List<NotPermittedConflictDto> conflicts = new ArrayList<>();
-        for (OvercrowdAcc acc : accs.values()) {
+        for (EventRoomAcc acc : accs.values()) {
             AcademicEventResponseDto event = eventById.get(acc.eventId);
             ClassroomResponseDto classroom = classroomById.get(acc.classroomId);
             if (event == null || classroom == null || event.subject() == null) continue;
@@ -249,10 +249,10 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         return overlapAccs;
     }
 
-    private List<OvercrowdedConflictDto> buildOvercrowded(Map<OvercrowdKey, OvercrowdAcc> overcrowdAccs,
+    private List<OvercrowdedConflictDto> buildOvercrowded(Map<EventRoomKey, EventRoomAcc> overcrowdAccs,
             Map<Long, AcademicEventResponseDto> eventDtoById, Map<Long, ClassroomResponseDto> classroomDtoById) {
         List<OvercrowdedConflictDto> overcrowded = new ArrayList<>();
-        for (OvercrowdAcc acc : overcrowdAccs.values()) {
+        for (EventRoomAcc acc : overcrowdAccs.values()) {
             ClassroomResponseDto classroom = classroomDtoById.get(acc.classroomId);
             if (classroom == null || classroom.capacity() == null) continue;
 
@@ -284,15 +284,15 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
     private record Range(LocalDate from, LocalDate to) {
     }
 
-    private record OvercrowdKey(Long eventId, Long classroomId) {
+    private record EventRoomKey(Long eventId, Long classroomId) {
     }
 
-    private static final class OvercrowdAcc {
+    private static final class EventRoomAcc {
         final Long eventId;
         final Long classroomId;
         final Set<LocalDate> dates = new TreeSet<>();
 
-        OvercrowdAcc(Long eventId, Long classroomId) {
+        EventRoomAcc(Long eventId, Long classroomId) {
             this.eventId = eventId;
             this.classroomId = classroomId;
         }

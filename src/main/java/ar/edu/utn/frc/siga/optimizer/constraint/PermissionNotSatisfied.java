@@ -21,9 +21,19 @@ public class PermissionNotSatisfied implements OptimizerConstraint {
     public Constraint define(ConstraintFactory factory) {
         return factory
                 .forEach(ClassAllocation.class)
-                .filter(a -> a.getClassroom() != null
-                        && !a.getClassroom().permits(a.getEvent().subjectIds()))
+                .filter(PermissionNotSatisfied::violates)
                 .penalize(HardMediumSoftScore.ONE_HARD)
                 .asConstraint(NAME);
+    }
+
+    /**
+     * Una asignación viola el permiso cuando tiene aula, no está fijada y el aula no habilita
+     * la materia del evento. Las fijadas se excluyen igual que en {@code NoOverlap}: el solver no
+     * las puede corregir, así que penalizarlas sólo vuelve el preview infeasible sin arreglo.
+     */
+    static boolean violates(ClassAllocation allocation) {
+        return !allocation.isPinned()
+                && allocation.getClassroom() != null
+                && !allocation.getClassroom().permits(allocation.getEvent().subjectIds());
     }
 }

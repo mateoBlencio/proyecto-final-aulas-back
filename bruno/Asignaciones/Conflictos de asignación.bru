@@ -5,13 +5,13 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/allocations/conflicts?types=UNALLOCATED,OVERCROWDED,OVERLAP&from=2026-01-01&to=2026-12-31&includePast=false&page=0&size=20
+  url: {{baseUrl}}/v1/allocations/conflicts?types=UNALLOCATED,OVERCROWDED,OVERLAP,NOT_PERMITTED&from=2026-01-01&to=2026-12-31&includePast=false&page=0&size=20
   body: none
   auth: inherit
 }
 
 params:query {
-  types: UNALLOCATED,OVERCROWDED,OVERLAP
+  types: UNALLOCATED,OVERCROWDED,OVERLAP,NOT_PERMITTED
   from: 2026-01-01
   to: 2026-12-31
   includePast: false
@@ -22,9 +22,11 @@ params:query {
 docs {
   Unifica los tres listados que antes eran endpoints separados (eventos sin aula,
   aulas con sobrecupo, superposiciones de horario-aula) en uno solo, filtrable por
-  "types" (los tres si se omite). Cada fila trae un discriminador "type" en el JSON
-  (UNALLOCATED / OVERCROWDED / OVERLAP) con forma distinta según el tipo — ver el
-  ejemplo de respuesta en la descripción del endpoint en el backend.
+  "types" (todos si se omite). Cada fila trae un discriminador "type" en el JSON
+  (UNALLOCATED / OVERCROWDED / OVERLAP / NOT_PERMITTED) con forma distinta según el
+  tipo — ver el ejemplo de respuesta en la descripción del endpoint en el backend.
+  NOT_PERMITTED: asignación en un aula que no habilita la materia del evento; el
+  subtipo trae event, classroom, subjectId y las fechas afectadas.
   
   Rango por defecto: from=hoy, to=fin del período académico activo (o from + 6 meses
   si no hay uno con fecha de fin). 'to' anterior a 'from' → 400.
