@@ -14,10 +14,10 @@ public class SubjectCommissionSpecification {
             List<Predicate> predicates = new ArrayList<>();
 
             if (filter.subjectId() != null) {
-                predicates.add(cb.equal(root.get("subject").get("id"), filter.subjectId()));
+                predicates.add(cb.equal(root.get("id").get("subjectId"), filter.subjectId()));
             }
             if (filter.commissionId() != null) {
-                predicates.add(cb.equal(root.get("commission").get("id"), filter.commissionId()));
+                predicates.add(cb.equal(root.get("id").get("commissionId"), filter.commissionId()));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

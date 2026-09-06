@@ -7,6 +7,14 @@ spring:
       max-file-size: 10MB
       max-request-size: 10MB
 
+  data:
+    web:
+      pageable:
+        # Tope global de tamaño de página para todos los listados paginados
+        # (?size=100000 queda acotado a 200 en vez de traer toda la tabla).
+        max-page-size: 200
+        default-page-size: 20
+
   datasource:
     url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
     username: ${DB_USERNAME}

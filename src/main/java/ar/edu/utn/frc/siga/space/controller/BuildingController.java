@@ -47,8 +47,8 @@ public class BuildingController {
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
             @RequestParam(required = false) String name,
             @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
-        log.debug("GET /v1/buildings: name={}, page={}, includeDeactivated={}",
-                name, pageable.getPageNumber(), includeDeactivated);
+        log.debug("GET /v1/buildings: name={}, pageable={}, includeDeactivated={}",
+                name, pageable, includeDeactivated);
         Page<BuildingResponseDto> buildings = buildingService.findAll(
                 new BuildingFilter(name), pageable, includeDeactivated);
         log.info("Edificios listados: total={}", buildings.getTotalElements());
