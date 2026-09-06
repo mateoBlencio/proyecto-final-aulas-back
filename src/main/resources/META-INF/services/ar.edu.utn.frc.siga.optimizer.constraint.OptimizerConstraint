@@ -4,3 +4,4 @@ ar.edu.utn.frc.siga.optimizer.constraint.MinimizeOvercrowding
 ar.edu.utn.frc.siga.optimizer.constraint.MinimizeUnusedCapacity
 ar.edu.utn.frc.siga.optimizer.constraint.PreferSameRoomSameCommission
 ar.edu.utn.frc.siga.optimizer.constraint.PreferSameBuildingSameCommission
+ar.edu.utn.frc.siga.optimizer.constraint.PermissionNotSatisfied
