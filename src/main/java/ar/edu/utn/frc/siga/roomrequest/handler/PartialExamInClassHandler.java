@@ -34,18 +34,18 @@ public class PartialExamInClassHandler extends AbstractRoomRequestHandler {
     protected void validateItems(CreateRoomRequestDto dto) {
         List<ScheduledItemDto> items = ((CreatePartialExamInClassDto) dto).items();
         for (ScheduledItemDto item : items) {
-            if (item.dayOfWeek() == null) {
-                throw new InvalidRoomRequestException("Cada pedido de parcial en horario de clases requiere un día de dictado.");
+            if (item.date() == null) {
+                throw new InvalidRoomRequestException("Cada pedido de parcial en horario de clases requiere una fecha.");
             }
-            if (item.date() != null) {
-                throw new InvalidRoomRequestException("El parcial en horario de clases se ata a un día de dictado, no a una fecha.");
+            if (item.dayOfWeek() != null) {
+                throw new InvalidRoomRequestException("El parcial en horario de clases se ata a una fecha, no a un día de dictado.");
             }
             if (item.estimated() == null) {
                 throw new InvalidRoomRequestException("Cada pedido de parcial requiere la cantidad estimada de asistentes.");
             }
             ItemConsistency.requireExamUsersConsistent(true, item);
         }
-        ItemConsistency.requireDistinct(items.stream().map(ScheduledItemDto::dayOfWeek).toList(), "un día de dictado");
+        ItemConsistency.requireDistinct(items.stream().map(ScheduledItemDto::date).toList(), "una fecha");
     }
 
     @Override
@@ -56,10 +56,10 @@ public class PartialExamInClassHandler extends AbstractRoomRequestHandler {
 
     @Override
     protected RoomRequestItem buildItem(CreateRoomRequestItemDto item, CreateRoomRequestDto dto) {
-        ClassSlot slot = classSchedule.requireClassDay(dto.subjectId(), dto.commissionId(), item.dayOfWeek());
+        ClassSlot slot = classSchedule.requireClassDate(dto.subjectId(), dto.commissionId(), item.date());
         return baseItem(item)
                 .commissionId(dto.commissionId())
-                .dayOfWeek(item.dayOfWeek())
+                .date(item.date())
                 .startTime(slot.startTime())
                 .duration(slot.duration())
                 .estimated(item.estimated())

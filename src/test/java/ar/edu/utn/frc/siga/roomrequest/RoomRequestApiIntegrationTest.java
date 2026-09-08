@@ -283,6 +283,30 @@ class RoomRequestApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("parcial en clase con fecha pasada: 400 antes de mirar el cursado")
+    void create_partialInClassWithPastDate_returnsBadRequest() throws Exception {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("date", LocalDate.now().minusDays(1).toString());
+        item.put("estimated", 40);
+        item.put("classroomCount", 1);
+        item.put("preferredClassroomIds", List.of());
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("type", "PARTIAL_EXAM_IN_CLASS");
+        body.put("requester", requester());
+        body.put("subjectId", academic.subjectId());
+        body.put("commissionId", academic.commissionId());
+        body.put("items", List.of(item));
+
+        anonymousMockMvc.perform(post("/v1/room-requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("catálogos sin autenticación: responden 200")
     void catalogs_withoutAuthentication_returnOk() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();

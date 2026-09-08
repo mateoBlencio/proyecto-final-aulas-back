@@ -23,7 +23,7 @@ body:json {
     "commissionId": 1,
     "items": [
       {
-        "dayOfWeek": "MONDAY",
+        "date": "2026-09-22",
         "estimated": 100,
         "classroomCount": 1,
         "requiresProjector": true,
@@ -37,22 +37,28 @@ body:json {
 
 docs {
   Variante "scheduled" del alta (type = PARTIAL_EXAM_IN_CLASS). También sirve
-  de molde para ONE_TIME_ROOM_CHANGE y REGULAR_ROOM_CHANGE.
+  de molde para ONE_TIME_ROOM_CHANGE (mismo contrato de ítem) y, cambiando
+  date por dayOfWeek, para REGULAR_ROOM_CHANGE.
 
   Diferencias con 06 (free-form):
   - commissionId va en la CABECERA, no en el ítem.
-  - El ítem NO lleva date ni startTime/endTime: se ata a "dayOfWeek" y el
-    backend deriva día y horario del dictado de esa comisión (evento
-    recurrente), guardando id_evento_recurrente para trazabilidad.
-  - dayOfWeek usa el nombre del enum java.time.DayOfWeek en INGLÉS y
-    mayúscula: MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY.
+  - El ítem lleva "date" pero NO startTime/endTime: el backend deriva el
+    horario del dictado de esa comisión en esa fecha (evento recurrente),
+    guardando id_evento_recurrente para trazabilidad.
+  - El parcial se toma UN día concreto, no todos los martes: por eso va la
+    fecha. El que se ata a dayOfWeek es REGULAR_ROOM_CHANGE, que sí afecta
+    toda la cursada.
+  - Las fechas válidas salen de "dates" en 05 (horario de comisión): son las
+    fechas de cursado futuras de esa comisión.
   - estimated sigue siendo obligatorio.
-  - date en el ítem => 400 ("se ata a un día de dictado, no a una fecha").
-  - Se valida que la comisión efectivamente dicte clase ese día (400 si no).
+  - dayOfWeek en el ítem => 400 ("se ata a una fecha, no a un día de dictado").
+  - Fecha pasada => 400 (@FutureOrPresent).
+  - No se puede repetir la misma fecha en dos ítems => 400.
+  - Se valida que la comisión efectivamente tenga clase esa fecha (400 si no).
 
-  Comisión con DOS clases el mismo día en horarios distintos (ej. lunes 10:25
-  y lunes 20:40): 400. El día no alcanza para saber cuál pide el docente, y
-  el back no elige una al azar. Mismo corte por fecha en ONE_TIME_ROOM_CHANGE.
+  Comisión con DOS clases esa fecha en horarios distintos (ej. lunes 10:25
+  y lunes 20:40): 400. La fecha no alcanza para saber cuál pide el docente, y
+  el back no elige una al azar. Mismo corte en ONE_TIME_ROOM_CHANGE.
   El detail nombra los horarios y deriva a subsecretaría. Es un caso raro (1
   comisión en database_dev, hoy no vigente); la solución de fondo —elegir la
   franja y no el día— está pendiente de definición y cambiaría el contrato.

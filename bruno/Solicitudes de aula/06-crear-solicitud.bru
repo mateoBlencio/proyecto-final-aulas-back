@@ -54,8 +54,8 @@ docs {
   los campos obligatorios de cabecera y la forma de cada ítem.
 
   type:
-    ONE_TIME_ROOM_CHANGE | REGULAR_ROOM_CHANGE  -> ítems "scheduled" (dayOfWeek)
-    PARTIAL_EXAM_IN_CLASS                        -> ítems "scheduled" (dayOfWeek)   [ver 07]
+    ONE_TIME_ROOM_CHANGE | PARTIAL_EXAM_IN_CLASS -> ítems "scheduled" (date)   [ver 07]
+    REGULAR_ROOM_CHANGE                          -> ítems "scheduled" (dayOfWeek)
     PARTIAL_EXAM_OFF_SCHEDULE | FINAL_EXAM       -> ítems "free-form" (date + horario)
     CONFERENCE | OTHER                           -> ítems "free-form", materia opcional
   requester.scope: GRADO | TECNICATURA | LICENCIATURA | EXTENSION | POSTGRADO.
@@ -76,9 +76,13 @@ docs {
   date, startTime, endTime, estimated son obligatorios. Se envía hora de
   inicio y hora de FIN; el backend guarda inicio + duración.
 
-  Ítem scheduled (ver 07): NO lleva date ni horario; lleva dayOfWeek y
-  estimated. El día/horario se derivan del dictado de esa comisión y quedan
-  con trazabilidad al evento recurrente de origen.
+  Ítem scheduled (ver 07): NO lleva horario. Lleva "date" en
+  ONE_TIME_ROOM_CHANGE y PARTIAL_EXAM_IN_CLASS —eventos de una sola fecha— y
+  "dayOfWeek" en REGULAR_ROOM_CHANGE, que afecta toda la cursada. Mandar el
+  campo del otro molde da 400. El horario se deriva del dictado de esa
+  comisión y queda con trazabilidad al evento recurrente de origen.
+  estimated: obligatorio en PARTIAL_EXAM_IN_CLASS, prohibido en los cambios
+  de aula.
 
   classroomCount > 1 = aulas EN SIMULTÁNEO para la misma franja.
 
