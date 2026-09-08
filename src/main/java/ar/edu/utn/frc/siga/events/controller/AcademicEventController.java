@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.events.controller;
 
+import ar.edu.utn.frc.siga.events.dto.AcademicEventFilter;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.UpdateUniqueEventRequestDto;
@@ -7,15 +8,20 @@ import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.EventHistorySnapshotDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceHistorySnapshotDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
-import ar.edu.utn.frc.siga.common.dto.response.RevisionDto;
+import ar.edu.utn.frc.siga.audit.dto.response.RevisionDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.EventAuditHistoryService;
+import ar.edu.utn.frc.siga.events.model.EventType;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,6 +31,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -43,11 +50,17 @@ public class AcademicEventController {
     @GetMapping
     @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
     @Operation(summary = "Listar eventos académicos",
-               description = "Devuelve todos los eventos académicos registrados.")
-    public ResponseEntity<List<AcademicEventResponseDto>> findAll() {
-        log.debug("GET /v1/events");
-        List<AcademicEventResponseDto> events = academicEventService.findAll();
-        log.info("Eventos listados: count={}", events.size());
+               description = "Listado paginado con filtros opcionales por materia, comisión y tipo "
+                       + "(RECURRING / UNIQUE_EVENT).")
+    public ResponseEntity<Page<AcademicEventResponseDto>> findAll(
+            @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
+            @RequestParam(required = false) Long subjectId,
+            @RequestParam(required = false) Long commissionId,
+            @RequestParam(required = false) EventType type) {
+        log.debug("GET /v1/events?subjectId={}&commissionId={}&type={}", subjectId, commissionId, type);
+        Page<AcademicEventResponseDto> events = academicEventService.findAll(
+                new AcademicEventFilter(subjectId, commissionId, type), pageable);
+        log.info("Eventos listados: total={}", events.getTotalElements());
         return ResponseEntity.ok(events);
     }
 

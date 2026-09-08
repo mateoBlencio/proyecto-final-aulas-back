@@ -5,7 +5,20 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/specialties
+  url: {{baseUrl}}/v1/specialties?page=0&size=20
   body: none
   auth: inherit
+}
+
+params:query {
+  page: 0
+  size: 20
+  ~specialtyCode: 17
+  ~name: inge
+}
+
+docs {
+  Listado paginado. Filtros opcionales: specialtyCode, name (contiene,
+  case-insensitive). La respuesta es
+  { content: [...], page: { size, number, totalElements, totalPages } }.
 }

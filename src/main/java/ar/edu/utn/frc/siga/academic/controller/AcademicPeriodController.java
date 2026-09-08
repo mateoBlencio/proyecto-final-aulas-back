@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.controller;
 
+import ar.edu.utn.frc.siga.academic.dto.AcademicPeriodFilter;
 import ar.edu.utn.frc.siga.academic.dto.request.UpdateAcademicPeriodRequestDto;
 import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
@@ -8,6 +9,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -18,8 +23,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 @Slf4j
 @RestController
@@ -33,12 +36,18 @@ public class AcademicPeriodController {
 
     @GetMapping
     @Operation(summary = "Listar períodos académicos",
-               description = "Por defecto solo devuelve los activos; con includeDeactivated=true incluye "
+               description = "Listado paginado con filtros opcionales por año y cuatrimestre. "
+                       + "Por defecto solo devuelve los activos; con includeDeactivated=true incluye "
                        + "también los desactivados.")
-    public ResponseEntity<List<AcademicPeriodResponseDto>> findAll(
+    public ResponseEntity<Page<AcademicPeriodResponseDto>> findAll(
+            @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer semester,
             @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
-        log.debug("GET /v1/academic-periods?includeDeactivated={}", includeDeactivated);
-        return ResponseEntity.ok(academicPeriodService.findAll(includeDeactivated));
+        log.debug("GET /v1/academic-periods?year={}&semester={}&includeDeactivated={}",
+                year, semester, includeDeactivated);
+        AcademicPeriodFilter filter = new AcademicPeriodFilter(year, semester);
+        return ResponseEntity.ok(academicPeriodService.findAll(filter, pageable, includeDeactivated));
     }
 
     @GetMapping("/{id}")

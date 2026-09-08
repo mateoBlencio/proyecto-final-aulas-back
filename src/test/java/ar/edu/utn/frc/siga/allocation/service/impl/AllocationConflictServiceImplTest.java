@@ -2,7 +2,9 @@ package ar.edu.utn.frc.siga.allocation.service.impl;
 
 import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
+import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationConflictDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.NotPermittedConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OverlapConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OvercrowdedConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.UnallocatedConflictDto;
@@ -19,6 +21,7 @@ import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomSubjectPermissionDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +39,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -79,8 +83,8 @@ class AllocationConflictServiceImplTest {
     }
 
     @Test
-    @DisplayName("types vacío devuelve los tres tipos de conflicto")
-    void typesVacioDevuelveLosTresTipos() {
+    @DisplayName("types vacío evalúa todos los tipos de conflicto")
+    void typesVacioEvaluaTodosLosTipos() {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
         RecurringEventResponseDto event = recurringEvent(1L, 40, LocalTime.of(8, 0));
@@ -237,6 +241,46 @@ class AllocationConflictServiceImplTest {
     }
 
     @Test
+    @DisplayName("Detecta aula no permitida: la materia del evento no está habilitada en el aula asignada")
+    void detectaAulaNoPermitida() {
+        LocalDate from = futureDate(0);
+        LocalDate to = futureDate(30);
+        SubjectResponseDto subject = new SubjectResponseDto(7L, 700, "Análisis", "1C", null);
+        RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0), subject);
+        OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
+        mockOccupancy(List.of(slot), List.of(allocation(100L, 10L, 5)), List.of(event));
+        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, 100)));
+        when(classroomService.findSubjectPermissions(any())).thenReturn(Map.of(
+                5L, new ClassroomSubjectPermissionDto(5L, false, Set.of(99L))));
+
+        List<AllocationConflictDto> result =
+                service.findConflicts(Set.of(ConflictType.NOT_PERMITTED), from, to, false, PAGEABLE).getContent();
+
+        assertThat(result).hasSize(1);
+        NotPermittedConflictDto conflict = (NotPermittedConflictDto) result.getFirst();
+        assertThat(conflict.event().id()).isEqualTo(1L);
+        assertThat(conflict.classroom().id()).isEqualTo(5L);
+        assertThat(conflict.subjectId()).isEqualTo(7L);
+        assertThat(conflict.dates()).containsExactly(futureDate(2));
+    }
+
+    @Test
+    @DisplayName("No reporta aula no permitida cuando el aula habilita la materia (SUBSET con match) o es ALL")
+    void noReportaAulaPermitida() {
+        LocalDate from = futureDate(0);
+        LocalDate to = futureDate(30);
+        SubjectResponseDto subject = new SubjectResponseDto(7L, 700, "Análisis", "1C", null);
+        RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0), subject);
+        OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
+        mockOccupancy(List.of(slot), List.of(allocation(100L, 10L, 5)), List.of(event));
+        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, 100)));
+        when(classroomService.findSubjectPermissions(any())).thenReturn(Map.of(
+                5L, new ClassroomSubjectPermissionDto(5L, false, Set.of(7L))));
+
+        assertThat(service.findConflicts(Set.of(ConflictType.NOT_PERMITTED), from, to, false, PAGEABLE)).isEmpty();
+    }
+
+    @Test
     @DisplayName("Detecta ocurrencia sin aula: NEEDS_ROOM sin fila de asignación")
     void detectaSinAula() {
         LocalDate from = futureDate(0);
@@ -335,8 +379,13 @@ class AllocationConflictServiceImplTest {
     }
 
     private RecurringEventResponseDto recurringEvent(long id, Integer enrolled, LocalTime startTime) {
+        return recurringEvent(id, enrolled, startTime, null);
+    }
+
+    private RecurringEventResponseDto recurringEvent(long id, Integer enrolled, LocalTime startTime,
+            SubjectResponseDto subject) {
         return new RecurringEventResponseDto(id, EventType.RECURRING, enrolled, startTime, 60,
-                DayOfWeek.MONDAY, LocalDate.of(2026, 1, 1), null, null, null);
+                DayOfWeek.MONDAY, LocalDate.of(2026, 1, 1), null, subject, null);
     }
 
     private OccurrenceSlotDto occurrenceSlot(long id, RecurringEventResponseDto event, LocalDate date) {

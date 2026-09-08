@@ -5,18 +5,21 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/subject-commissions?subjectId=1&includeDeactivated=false
+  url: {{baseUrl}}/v1/subject-commissions?page=0&size=20&subjectId=1&includeDeactivated=false
   body: none
   auth: inherit
 }
 
 params:query {
+  page: 0
+  size: 20
   subjectId: 1
+  ~commissionId: 2
   includeDeactivated: false
 }
 
 docs {
-  Sin subjectId devuelve el catálogo completo materia×comisión. Con subjectId,
-  filtra las comisiones vinculadas a esa materia (no valida que la materia exista:
-  id inexistente devuelve lista vacía).
+  Listado paginado. Filtros opcionales: subjectId, commissionId. La respuesta es
+  { content: [...], page: { size, number, totalElements, totalPages } }.
+  sort por defecto id.subjectId.
 }

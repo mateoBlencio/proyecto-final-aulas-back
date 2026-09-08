@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.space.service.impl;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.SpaceTestData;
+import ar.edu.utn.frc.siga.space.dto.BuildingFilter;
 import ar.edu.utn.frc.siga.space.dto.request.BuildingActiveBatchItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.mapper.BuildingMapper;
@@ -16,6 +17,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
 import java.util.Optional;
@@ -44,32 +48,32 @@ class BuildingServiceImplTest {
     }
 
     @Test
-    @DisplayName("findAll: sin includeDeactivated, devuelve solo los edificios activos")
-    void findAllReturnsOnlyActiveBuildingsMapped() {
+    @DisplayName("findAll: devuelve la página de edificios mapeados según el Specification")
+    void findAllReturnsMappedPage() {
         Building active = SpaceTestData.building().id(1L).build();
         BuildingResponseDto dto = new BuildingResponseDto(1L, "Edificio Central", true);
-        when(buildingRepository.findAllActive()).thenReturn(List.of(active));
+        when(buildingRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(active)));
         when(buildingMapper.toDto(active)).thenReturn(dto);
 
-        List<BuildingResponseDto> result = service.findAll(false);
-
-        assertThat(result).containsExactly(dto);
+        assertThat(service.findAll(new BuildingFilter(null), Pageable.unpaged(), false).getContent())
+                .containsExactly(dto);
     }
 
     @Test
-    @DisplayName("findAll: con includeDeactivated=true, devuelve todos los edificios")
-    void findAllReturnsAllBuildingsWhenIncludeDeactivatedRequested() {
+    @DisplayName("findAll: con includeDeactivated=true, no restringe por deletedAt")
+    void findAllWithIncludeDeactivatedMapsEveryStatus() {
         Building active = SpaceTestData.building().id(1L).build();
         Building inactive = SpaceTestData.deactivated(SpaceTestData.building().id(2L).build());
         BuildingResponseDto activeDto = new BuildingResponseDto(1L, "Edificio Central", true);
         BuildingResponseDto inactiveDto = new BuildingResponseDto(2L, "Edificio Anexo", false);
-        when(buildingRepository.findAll()).thenReturn(List.of(active, inactive));
+        when(buildingRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(active, inactive)));
         when(buildingMapper.toDto(active)).thenReturn(activeDto);
         when(buildingMapper.toDto(inactive)).thenReturn(inactiveDto);
 
-        List<BuildingResponseDto> result = service.findAll(true);
-
-        assertThat(result).containsExactly(activeDto, inactiveDto);
+        assertThat(service.findAll(new BuildingFilter(null), Pageable.unpaged(), true).getContent())
+                .containsExactly(activeDto, inactiveDto);
     }
 
     @Test

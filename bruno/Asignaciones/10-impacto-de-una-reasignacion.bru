@@ -76,6 +76,9 @@ docs {
   - blockedBy.kind SAME_BATCH significa que dos items del propio pedido se pisan
     entre sí. No hay nada escrito que mover: hay que corregir el lote.
 
+  Las aulas de alternativeClassrooms se filtran por permiso: no aparece un aula
+  que no habilita la materia del evento (aula SUBSET sin esa materia, o NONE).
+
   Recordá que blockedClasses > 0 significa que el PUT equivalente falla ENTERO.
   movableClasses dice cuántas se salvarían si se resolvieran los conflictos, no
   que se vayan a aplicar sueltas.
