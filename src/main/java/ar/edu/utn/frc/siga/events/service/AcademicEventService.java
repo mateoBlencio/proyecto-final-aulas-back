@@ -40,6 +40,16 @@ public interface AcademicEventService {
     FindOrCreateResult<Long> findOrCreateRecurringEvent(CreateRecurringEventRequestDto dto);
 
     /**
+     * Find-or-create bulk por clave natural (subjectId, commissionId, dayOfWeek, startTime, startDate,
+     * endDate) para una corrida entera de importación de Excel: un único prefetch del superset por
+     * (materia, comisión) del lote, un único insert de los nuevos y una única expansión de ocurrencias.
+     * A diferencia de {@link #syncRecurringEvents}, nunca toca el evento existente ni escribe campos de
+     * sync. El resultado respeta el orden de {@code requests}. El singular
+     * {@link #findOrCreateRecurringEvent} delega acá con una lista de un elemento.
+     */
+    List<FindOrCreateResult<Long>> findOrCreateRecurringEvents(List<CreateRecurringEventRequestDto> requests);
+
+    /**
      * Upsert bulk por clave natural (subjectId, commissionId, dayOfWeek, startTime, startDate, endDate)
      * desde una fuente externa (p. ej. sync de SysAcad): batchea una corrida entera del sync EVENTOS
      * con un único prefetch del índice sync-owned, un único insert de los nuevos y una única expansión
