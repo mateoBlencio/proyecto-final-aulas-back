@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.controller;
 
+import ar.edu.utn.frc.siga.academic.dto.SubjectCommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
@@ -7,6 +8,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -16,8 +21,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 @Slf4j
 @RestController
@@ -31,18 +34,18 @@ public class SubjectCommissionController {
 
     @GetMapping
     @Operation(summary = "Listar materia-comisión",
-               description = "Sin parámetros devuelve el catálogo completo. Con subjectId, "
-                       + "filtra las comisiones vinculadas a esa materia. "
+               description = "Listado paginado con filtros opcionales por materia y comisión. "
                        + "Por defecto solo devuelve los vínculos activos; con includeDeactivated=true "
                        + "incluye también los desactivados.")
-    public ResponseEntity<List<SubjectCommissionResponseDto>> findAll(
+    public ResponseEntity<Page<SubjectCommissionResponseDto>> findAll(
+            @PageableDefault(size = 20, sort = "id.subjectId", direction = Sort.Direction.ASC) Pageable pageable,
             @RequestParam(required = false) Long subjectId,
+            @RequestParam(required = false) Long commissionId,
             @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
-        log.debug("GET /v1/subject-commissions?subjectId={}&includeDeactivated={}", subjectId, includeDeactivated);
-        List<SubjectCommissionResponseDto> result = subjectId != null
-                ? subjectCommissionService.findBySubjectId(subjectId, includeDeactivated)
-                : subjectCommissionService.findAll(includeDeactivated);
-        return ResponseEntity.ok(result);
+        log.debug("GET /v1/subject-commissions?subjectId={}&commissionId={}&includeDeactivated={}",
+                subjectId, commissionId, includeDeactivated);
+        SubjectCommissionFilter filter = new SubjectCommissionFilter(subjectId, commissionId);
+        return ResponseEntity.ok(subjectCommissionService.findAll(filter, pageable, includeDeactivated));
     }
 
     @PutMapping("/{subjectId}/{commissionId}/activation")

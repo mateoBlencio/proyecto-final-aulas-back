@@ -1,11 +1,14 @@
 package ar.edu.utn.frc.siga.academic.service;
 
+import ar.edu.utn.frc.siga.academic.dto.CommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.service.command.CommissionSyncCommand;
 import ar.edu.utn.frc.siga.common.service.ActivationService;
 import java.util.Collection;
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.modulith.NamedInterface;
 
 @NamedInterface("api")
@@ -15,7 +18,7 @@ public interface CommissionService extends ActivationService<Long> {
 
     List<CommissionResponseDto> findByIds(Collection<Long> ids);
 
-    List<CommissionResponseDto> findAll(boolean includeDeactivated);
+    Page<CommissionResponseDto> findAll(CommissionFilter filter, Pageable pageable, boolean includeDeactivated);
 
     CommissionResponseDto findByCourseAndPeriod(String courseCode, Integer periodYear, Integer periodSemester);
 

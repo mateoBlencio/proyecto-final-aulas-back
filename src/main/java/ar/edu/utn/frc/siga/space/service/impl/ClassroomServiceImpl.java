@@ -137,9 +137,8 @@ public class ClassroomServiceImpl implements ClassroomService {
     public Page<ClassroomListItemDto> findAll(ClassroomFilter filter, Pageable pageable, boolean includeDeactivated) {
         log.debug("Listando aulas: filter={}, page={}, size={}, includeDeactivated={}",
                 filter, pageable.getPageNumber(), pageable.getPageSize(), includeDeactivated);
-        Specification<Classroom> spec = includeDeactivated
-                ? ClassroomSpecification.withFilter(filter)
-                : ClassroomSpecification.withFilter(filter).and(SoftDeleteSpecifications.active());
+        Specification<Classroom> spec = ClassroomSpecification.withFilter(filter)
+                .and(SoftDeleteSpecifications.activeUnless(includeDeactivated));
         return classroomListComposer.compose(
                 classroomRepository.findAll(spec, ClassroomListSort.apply(pageable)));
     }

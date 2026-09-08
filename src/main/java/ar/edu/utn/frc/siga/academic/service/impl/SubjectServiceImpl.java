@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.academic.dto.SubjectFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SubjectMapper;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
@@ -10,7 +11,9 @@ import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.academic.service.command.SubjectSyncCommand;
+import ar.edu.utn.frc.siga.academic.specification.SubjectSpecification;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.common.util.Maps;
@@ -22,6 +25,8 @@ import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,13 +43,12 @@ public class SubjectServiceImpl implements SubjectService {
     private final StudyPlanResolver studyPlanResolver;
 
     @Override
-    public List<SubjectResponseDto> findAll(boolean includeDeactivated) {
-        List<Subject> subjects = includeDeactivated
-                ? subjectRepository.findAll()
-                : subjectRepository.findAllActive();
-        return subjects.stream()
-                .map(subjectMapper::toDto)
-                .toList();
+    public Page<SubjectResponseDto> findAll(SubjectFilter filter, Pageable pageable, boolean includeDeactivated) {
+        return subjectRepository.findAll(
+                        SubjectSpecification.withFilter(filter)
+                                .and(SoftDeleteSpecifications.activeUnless(includeDeactivated)),
+                        pageable)
+                .map(subjectMapper::toDto);
     }
 
     @Override
@@ -79,14 +83,6 @@ public class SubjectServiceImpl implements SubjectService {
                 .orElseThrow(() -> ResourceNotFoundException.of("Subject", code)));
     }
 
-    @Override
-    public List<SubjectResponseDto> findBySpecialtyCode(Integer specialtyCode, boolean includeDeactivated) {
-        return subjectRepository.findByStudyPlan_Specialty_SpecialtyCode(specialtyCode).stream()
-                .filter(subject -> includeDeactivated || subject.isActive())
-                .map(subjectMapper::toDto)
-                .toList();
-    }
-
     private StudyPlan requireStudyPlan(Integer studyPlanCode, Integer specialtyCode) {
         Specialty specialty = Finder.orThrow(specialtyRepository::findBySpecialtyCode, specialtyCode, "Specialty");
         return studyPlanRepository.findByPlanCodeAndSpecialtyAndDeletedAtIsNull(studyPlanCode, specialty)
@@ -99,6 +95,7 @@ public class SubjectServiceImpl implements SubjectService {
         Instant syncedAt = Instant.now();
         Map<SubjectKey, Subject> existing = Maps.byId(subjectRepository.findAll(), SubjectKey::of);
         Map<StudyPlanKey, Optional<StudyPlan>> studyPlansByKey = new HashMap<>();
+        Map<Integer, Specialty> specialtyCache = new HashMap<>();
         int affected = 0;
 
         for (SubjectSyncCommand command : commands) {
@@ -109,23 +106,21 @@ public class SubjectServiceImpl implements SubjectService {
                 continue;
             }
             StudyPlanKey key = new StudyPlanKey(command.specialtyCode(), command.studyPlanCode());
-            Optional<StudyPlan> studyPlan = studyPlansByKey.computeIfAbsent(key,
-                    k -> studyPlanResolver.findOrCreate(command.specialtyCode(), command.studyPlanCode(), syncedAt));
-            if (studyPlan.isEmpty()) {
-                log.warn("No se pudo resolver la especialidad {} para la materia {}",
-                        command.specialtyCode(), command.subjectCode());
-                continue;
-            }
+            StudyPlan studyPlan = studyPlansByKey.computeIfAbsent(key,
+                            k -> studyPlanResolver.findOrCreate(command.specialtyCode(), command.studyPlanCode(),
+                                    syncedAt, specialtyCache))
+                    .orElseThrow(() -> new IllegalStateException(
+                            "StudyPlanResolver devolvió vacío con especialidad y plan no nulos"));
 
             String hash = Hashes.sha256Hex(command.name(), command.term());
-            Subject subject = existing.get(new SubjectKey(command.subjectCode(), studyPlan.get().getId()));
+            Subject subject = existing.get(new SubjectKey(command.subjectCode(), studyPlan.getId()));
 
             if (subject == null) {
                 subjectRepository.save(Subject.builder()
                         .code(command.subjectCode())
                         .name(command.name())
                         .term(command.term())
-                        .studyPlan(studyPlan.get())
+                        .studyPlan(studyPlan)
                         .syncedAt(syncedAt)
                         .sysacadHash(hash)
                         .build());

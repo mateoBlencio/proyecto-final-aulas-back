@@ -13,4 +13,8 @@ public final class SoftDeleteSpecifications {
     public static <T> Specification<T> inactive() {
         return (root, query, cb) -> cb.isNotNull(root.get("deletedAt"));
     }
+
+    public static <T> Specification<T> activeUnless(boolean includeDeactivated) {
+        return includeDeactivated ? Specification.unrestricted() : active();
+    }
 }

@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.events.service;
 
+import ar.edu.utn.frc.siga.events.dto.AcademicEventFilter;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.UpdateUniqueEventRequestDto;
@@ -18,11 +19,13 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.modulith.NamedInterface;
 
 @NamedInterface("api")
 public interface AcademicEventService {
-    List<AcademicEventResponseDto> findAll();
+    Page<AcademicEventResponseDto> findAll(AcademicEventFilter filter, Pageable pageable);
     AcademicEventResponseDto findById(Long eventId);
 
     List<AcademicEventResponseDto> findByIds(Collection<Long> eventIds);
@@ -35,6 +38,16 @@ public interface AcademicEventService {
     AcademicEventResponseDto createRecurringEvent(CreateRecurringEventRequestDto dto);
 
     FindOrCreateResult<Long> findOrCreateRecurringEvent(CreateRecurringEventRequestDto dto);
+
+    /**
+     * Find-or-create bulk por clave natural (subjectId, commissionId, dayOfWeek, startTime, startDate,
+     * endDate) para una corrida entera de importación de Excel: un único prefetch del superset por
+     * (materia, comisión) del lote, un único insert de los nuevos y una única expansión de ocurrencias.
+     * A diferencia de {@link #syncRecurringEvents}, nunca toca el evento existente ni escribe campos de
+     * sync. El resultado respeta el orden de {@code requests}. El singular
+     * {@link #findOrCreateRecurringEvent} delega acá con una lista de un elemento.
+     */
+    List<FindOrCreateResult<Long>> findOrCreateRecurringEvents(List<CreateRecurringEventRequestDto> requests);
 
     /**
      * Upsert bulk por clave natural (subjectId, commissionId, dayOfWeek, startTime, startDate, endDate)

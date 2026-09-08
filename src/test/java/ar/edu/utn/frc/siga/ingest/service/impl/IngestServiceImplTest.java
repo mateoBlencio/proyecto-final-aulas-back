@@ -88,9 +88,9 @@ class IngestServiceImplTest {
     @BeforeEach
     void setUp() {
         IngestRowResolver rowResolver = new IngestRowResolver(specialtyService, studyPlanService, subjectService,
-            academicPeriodService, commissionService, subjectCommissionService, academicEventService,
+            academicPeriodService, commissionService, subjectCommissionService,
             buildingService, classroomService);
-        IngestRowBatchProcessor batchProcessor = new IngestRowBatchProcessor(rowResolver);
+        IngestRowBatchProcessor batchProcessor = new IngestRowBatchProcessor(rowResolver, academicEventService);
         ExcelIngestSource excelSource = new ExcelIngestSource(new ExcelTemplateValidator(), new ExcelRowMapper());
         service = new IngestServiceImpl(List.of(excelSource), batchProcessor, allocationService);
     }
@@ -115,10 +115,10 @@ class IngestServiceImplTest {
         verify(buildingService).findByName("Edificio Central");
         verify(classroomService).findByRoomNumberAndBuilding(105, 5L);
 
-        ArgumentCaptor<CreateRecurringEventRequestDto> eventCaptor =
-            ArgumentCaptor.forClass(CreateRecurringEventRequestDto.class);
-        verify(academicEventService).findOrCreateRecurringEvent(eventCaptor.capture());
-        CreateRecurringEventRequestDto eventDto = eventCaptor.getValue();
+        ArgumentCaptor<List<CreateRecurringEventRequestDto>> eventCaptor =
+            ArgumentCaptor.forClass(List.class);
+        verify(academicEventService).findOrCreateRecurringEvents(eventCaptor.capture());
+        CreateRecurringEventRequestDto eventDto = eventCaptor.getValue().getFirst();
         assertThat(eventDto.subjectId()).isEqualTo(10L);
         assertThat(eventDto.commissionId()).isEqualTo(20L);
         assertThat(eventDto.dayOfWeek()).isEqualTo(DayOfWeek.MONDAY);
@@ -176,10 +176,10 @@ class IngestServiceImplTest {
 
         service.ingestFile(file);
 
-        ArgumentCaptor<CreateRecurringEventRequestDto> eventCaptor =
-            ArgumentCaptor.forClass(CreateRecurringEventRequestDto.class);
-        verify(academicEventService).findOrCreateRecurringEvent(eventCaptor.capture());
-        assertThat(eventCaptor.getValue().durationMinutes()).isEqualTo(90);
+        ArgumentCaptor<List<CreateRecurringEventRequestDto>> eventCaptor =
+            ArgumentCaptor.forClass(List.class);
+        verify(academicEventService).findOrCreateRecurringEvents(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getFirst().durationMinutes()).isEqualTo(90);
     }
 
     @Test
@@ -310,8 +310,10 @@ class IngestServiceImplTest {
         RecurringEventResponseDto event = new RecurringEventResponseDto(1L, EventType.RECURRING,
             row.enrolledCount(), LocalTime.of(18, 30), 90L, DayOfWeek.MONDAY,
             LocalDate.of(2026, 3, 1), LocalDate.of(2026, 11, 30), subject, commission);
-        when(academicEventService.findOrCreateRecurringEvent(any()))
-            .thenReturn(new FindOrCreateResult<>(event.id(), true));
+        when(academicEventService.findOrCreateRecurringEvents(any())).thenAnswer(inv -> {
+                java.util.List<CreateRecurringEventRequestDto> reqs = inv.getArgument(0);
+                return reqs.stream().map(r -> new FindOrCreateResult<>(event.id(), true)).toList();
+            });
     }
 
     private void stubRestOfChain(SpecialtyResponseDto specialty, int subjectCode, String subjectName,
@@ -346,8 +348,10 @@ class IngestServiceImplTest {
         RecurringEventResponseDto event = new RecurringEventResponseDto(eventId, EventType.RECURRING, 30,
             LocalTime.of(18, 30), 90L, DayOfWeek.MONDAY, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 11, 30),
             subject, commission);
-        when(academicEventService.findOrCreateRecurringEvent(any()))
-            .thenReturn(new FindOrCreateResult<>(event.id(), true));
+        when(academicEventService.findOrCreateRecurringEvents(any())).thenAnswer(inv -> {
+                java.util.List<CreateRecurringEventRequestDto> reqs = inv.getArgument(0);
+                return reqs.stream().map(r -> new FindOrCreateResult<>(event.id(), true)).toList();
+            });
     }
 
     private void stubForSecondSubject(SpecialtyResponseDto specialty) {
