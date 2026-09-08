@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.auth.dto.request.CreateUserRequestDto;
 import ar.edu.utn.frc.siga.auth.dto.request.UpdateUserEnabledRequestDto;
 import ar.edu.utn.frc.siga.auth.dto.response.RoleAssignmentDto;
 import ar.edu.utn.frc.siga.auth.dto.response.UserResponseDto;
+import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.security.SecurityUser;
 import ar.edu.utn.frc.siga.auth.service.RoleAssignmentService;
 import ar.edu.utn.frc.siga.auth.service.UserService;
@@ -26,7 +27,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -75,6 +79,16 @@ public class UserController {
         Page<UserResponseDto> page = userService.findDisabled(pageable);
         log.info("Usuarios inhabilitados listados: total={}", page.getTotalElements());
         return ResponseEntity.ok(page);
+    }
+
+    @GetMapping("/with-role")
+    @PreAuthorize("hasAuthority('PERM_USER_READ')")
+    public ResponseEntity<List<UserResponseDto>> findByRoleForBuilding(@RequestParam SystemRole role,
+                                                                       @RequestParam Long buildingId) {
+        log.debug("GET /v1/users/with-role: role={}, buildingId={}", role, buildingId);
+        List<UserResponseDto> users = userService.findByRoleForBuilding(role, buildingId);
+        log.info("Usuarios con rol {} sobre el edificio {}: total={}", role, buildingId, users.size());
+        return ResponseEntity.ok(users);
     }
 
     @PostMapping("/{id}/role-assignments")

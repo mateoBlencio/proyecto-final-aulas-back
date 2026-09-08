@@ -6,12 +6,14 @@ import ar.edu.utn.frc.siga.auth.dto.response.UserResponseDto;
 import ar.edu.utn.frc.siga.auth.exception.UserDomainException;
 import ar.edu.utn.frc.siga.auth.mapper.RoleAssignmentComposer;
 import ar.edu.utn.frc.siga.auth.mapper.UserMapper;
+import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import ar.edu.utn.frc.siga.auth.service.RefreshTokenService;
 import ar.edu.utn.frc.siga.auth.service.RoleAssignmentService;
 import ar.edu.utn.frc.siga.auth.service.UserService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -95,6 +97,16 @@ public class UserServiceImpl implements UserService {
     public Page<UserResponseDto> findDisabled(Pageable pageable) {
         log.debug("Listando usuarios inhabilitados: page={}", pageable.getPageNumber());
         return userRepository.findAllByEnabled(false, fixedSize(pageable)).map(this::toDto);
+    }
+
+    @Override
+    public List<UserResponseDto> findByRoleForBuilding(SystemRole role, Long buildingId) {
+        log.debug("Listando usuarios habilitados con rol {} sobre el edificio {}", role, buildingId);
+        List<UserResponseDto> users = userRepository.findEnabledByRoleCoveringBuilding(role, buildingId).stream()
+                .map(this::toDto)
+                .toList();
+        log.info("Usuarios con rol {} sobre el edificio {}: count={}", role, buildingId, users.size());
+        return users;
     }
 
     private User findExisting(Long id) {

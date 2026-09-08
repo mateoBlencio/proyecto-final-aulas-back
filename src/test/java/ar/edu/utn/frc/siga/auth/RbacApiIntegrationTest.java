@@ -227,6 +227,33 @@ class RbacApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.content").isEmpty());
     }
 
+    // ---- listado por rol y edificio ----
+
+    @Test
+    @DisplayName("GET /v1/users/with-role: trae los AUXILIAR_AULICO acotados al edificio y los GLOBAL, no los de otro edificio ni otros roles")
+    void findByRoleForBuilding_returnsScopedAndGlobalAuxiliaries() throws Exception {
+        Building target = testData.edificio();
+        Building other = testData.edificio();
+
+        String scopedEmail = uniqueEmail("aux-scoped");
+        mockMvcAsScoped(scopedEmail, SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, target.getId());
+        String globalEmail = uniqueEmail("aux-global");
+        mockMvcAsScoped(globalEmail, SystemRole.AUXILIAR_AULICO, ScopeType.GLOBAL, null);
+        String otherBuildingEmail = uniqueEmail("aux-other");
+        mockMvcAsScoped(otherBuildingEmail, SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, other.getId());
+        String consultaEmail = uniqueEmail("consulta-scoped");
+        mockMvcAsScoped(consultaEmail, SystemRole.CONSULTA, ScopeType.BUILDING, target.getId());
+
+        mockMvc.perform(get("/v1/users/with-role")
+                        .param("role", "AUXILIAR_AULICO")
+                        .param("buildingId", String.valueOf(target.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.email == '" + scopedEmail + "')]").isNotEmpty())
+                .andExpect(jsonPath("$[?(@.email == '" + globalEmail + "')]").isNotEmpty())
+                .andExpect(jsonPath("$[?(@.email == '" + otherBuildingEmail + "')]").isEmpty())
+                .andExpect(jsonPath("$[?(@.email == '" + consultaEmail + "')]").isEmpty());
+    }
+
     // ---- CONSULTA no escribe ----
 
     @Test
