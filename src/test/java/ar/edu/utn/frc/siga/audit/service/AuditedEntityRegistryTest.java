@@ -23,7 +23,7 @@ class AuditedEntityRegistryTest extends AbstractIntegrationTest {
     void discoversExactlyTheExpectedRootAuditedTypes() {
         assertThat(registry.all()).extracting(AuditedEntity::jpaName)
                 .containsExactlyInAnyOrder(
-                        "Allocation", "User", "AcademicEvent", "Occurrence",
+                        "Allocation", "User", "RoleAssignment", "AcademicEvent", "Occurrence",
                         "RoomRequest", "RoomRequestItem", "RoomPreference", "Setting");
     }
 

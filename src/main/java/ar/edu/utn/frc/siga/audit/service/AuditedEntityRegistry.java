@@ -24,6 +24,7 @@ public class AuditedEntityRegistry {
     private static final Map<String, String> LABELS = Map.of(
             "Allocation", "Asignación",
             "User", "Usuario",
+            "RoleAssignment", "Asignación de rol",
             "AcademicEvent", "Evento académico",
             "Occurrence", "Ocurrencia",
             "RoomRequest", "Solicitud de aula",
