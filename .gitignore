@@ -194,6 +194,10 @@ CLAUDE.md
 # Claude
 .claude
 
+# graphify
+graphify-out/
+.graphifyignore
+
 # VSCode
 .vscode
 .codegraph
