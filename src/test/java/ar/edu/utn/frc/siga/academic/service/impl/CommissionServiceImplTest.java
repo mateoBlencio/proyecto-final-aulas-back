@@ -389,4 +389,30 @@ class CommissionServiceImplTest {
         assertThat(provisionalLink.getEnrolledCount()).isEqualTo(30);
         verify(subjectCommissionRepository).save(provisionalLink);
     }
+
+    @Test
+    @DisplayName("syncCommissions: si el comando no trae inscriptos, conserva el valor existente del link")
+    void syncCommissionsKeepsExistingEnrolledCountWhenEnrollmentUnresolved() {
+        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, null);
+        AcademicPeriod annualPeriod = annualPeriod();
+        StudyPlan studyPlan = studyPlan();
+        Subject subject = Subject.builder().id(3L).code(55).studyPlan(studyPlan).build();
+        Commission commission = Commission.builder().id(9L).courseCode("101").academicPeriod(annualPeriod)
+                .sysacadHash(Hashes.sha256Hex("101", 9L, 1, 2024, 55)).sysacadEnabled(true).build();
+        SubjectCommission existingLink = SubjectCommission.builder()
+                .id(new SubjectCommissionId(3L, 9L))
+                .subject(subject).commission(commission).enrolledCount(20).build();
+
+        when(commissionRepository.findAll()).thenReturn(List.of(commission));
+        when(subjectRepository.findAll()).thenReturn(List.of(subject));
+        when(subjectCommissionRepository.findAll()).thenReturn(List.of(existingLink));
+        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any(), any())).thenReturn(Optional.of(studyPlan));
+        when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
+                .thenReturn(Optional.of(annualPeriod));
+
+        service.syncCommissions(List.of(command));
+
+        assertThat(existingLink.getEnrolledCount()).isEqualTo(20);
+        verify(subjectCommissionRepository, never()).save(existingLink);
+    }
 }

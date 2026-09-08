@@ -206,15 +206,15 @@ public class CommissionServiceImpl implements CommissionService {
                     command.subjectCode(), command.courseCode());
             return 0;
         }
-        Integer enrolledCount = command.enrolledCount() != null ? command.enrolledCount() : 0;
-        if (command.enrolledCount() == null) {
-            log.info("Inscriptos no informados para curso={}, materia={}: se crea el link con 0 provisional",
-                    command.courseCode(), command.subjectCode());
-        }
         SubjectCommissionId id = new SubjectCommissionId(subject.getId(), commission.getId());
         SubjectCommission link = existingLinks.get(id);
 
         if (link == null) {
+            Integer enrolledCount = command.enrolledCount() != null ? command.enrolledCount() : 0;
+            if (command.enrolledCount() == null) {
+                log.info("Inscriptos no informados para curso={}, materia={}: se crea el link con 0 provisional",
+                        command.courseCode(), command.subjectCode());
+            }
             SubjectCommission created = SubjectCommission.builder()
                     .id(new SubjectCommissionId())
                     .subject(subject)
@@ -227,10 +227,15 @@ public class CommissionServiceImpl implements CommissionService {
             existingLinks.put(id, created);
             return 1;
         }
-        if (enrolledCount.equals(link.getEnrolledCount())) {
+        if (command.enrolledCount() == null) {
+            log.info("Inscriptos no informados para curso={}, materia={}: se conserva el valor existente ({})",
+                    command.courseCode(), command.subjectCode(), link.getEnrolledCount());
             return 0;
         }
-        link.setEnrolledCount(enrolledCount);
+        if (command.enrolledCount().equals(link.getEnrolledCount())) {
+            return 0;
+        }
+        link.setEnrolledCount(command.enrolledCount());
         subjectCommissionRepository.save(link);
         return 1;
     }
