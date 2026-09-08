@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.allocation.service.impl;
 
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomSubjectPermissionDto;
@@ -28,6 +29,7 @@ class AllocationImpactServiceImplTest {
     @Mock private AllocationRepository allocationRepository;
     @Mock private ClassroomService classroomService;
     @Mock private AcademicEventService academicEventService;
+    @Mock private BuildingScopeResolver buildingScopeResolver;
 
     private AllocationImpactServiceImpl service;
 
@@ -46,7 +48,7 @@ class AllocationImpactServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new AllocationImpactServiceImpl(targetResolver, validator, occupancyReader,
-                allocationRepository, classroomService, academicEventService);
+                allocationRepository, classroomService, academicEventService, buildingScopeResolver);
     }
 
     @Test

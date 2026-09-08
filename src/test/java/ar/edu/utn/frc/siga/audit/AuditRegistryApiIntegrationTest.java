@@ -1,8 +1,7 @@
 package ar.edu.utn.frc.siga.audit;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
-import ar.edu.utn.frc.siga.auth.model.Role;
-import ar.edu.utn.frc.siga.auth.security.JwtService;
+import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
@@ -14,15 +13,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.TestingAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.web.context.WebApplicationContext;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.blankOrNullString;
@@ -31,12 +26,10 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 /**
  * Integración del registro unificado de auditoría contra Postgres real: genera revisiones
@@ -55,22 +48,12 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
     private AcademicEventService academicEventService;
     @Autowired
     private ObjectMapper objectMapper;
-    @Autowired
-    private WebApplicationContext webApplicationContext;
-    @Autowired
-    private JwtService jwtService;
 
     private void seedRecurringEvent(LocalDate date) {
         var sc = testData.materiaYComision();
         var dto = new CreateRecurringEventRequestDto(
                 30, LocalTime.of(8, 0), 90, date.getDayOfWeek(), date, date, sc.subjectId(), sc.commissionId());
-        SecurityContextHolder.getContext().setAuthentication(
-                new TestingAuthenticationToken(USER, "", "ROLE_SUBSECRETARIA"));
-        try {
-            academicEventService.createRecurringEvent(dto);
-        } finally {
-            SecurityContextHolder.clearContext();
-        }
+        asFixtureUser(() -> academicEventService.createRecurringEvent(dto));
     }
 
     private void bumpSetting(String value) throws Exception {
@@ -185,11 +168,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("un AUXILIAR_AULICO no puede consultar el registro (403)")
     void forbiddenWithoutSubsecretariaRole() throws Exception {
-        String auxToken = jwtService.generateAccessToken("auxiliar@frc.utn.edu.ar", Set.of(Role.AUXILIAR_AULICO));
-        MockMvc auxMockMvc = webAppContextSetup(webApplicationContext)
-                .apply(springSecurity())
-                .defaultRequest(get("/").header("Authorization", "Bearer " + auxToken))
-                .build();
+        MockMvc auxMockMvc = mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
 
         auxMockMvc.perform(get("/v1/audit"))
                 .andExpect(status().isForbidden());
