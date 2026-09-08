@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("${siga.api.base-path}/commissions")
 @RequiredArgsConstructor
 @Tag(name = "Comisiones", description = "Consulta de comisiones")
-@PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+@PreAuthorize("hasAuthority('PERM_ACADEMIC_READ')")
 public class CommissionController {
 
     private final CommissionService commissionService;
@@ -55,7 +55,7 @@ public class CommissionController {
     }
 
     @PutMapping("/{id}/activation")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ACADEMIC_ACTIVATE')")
     @Operation(summary = "Activar comisión",
                description = "Reactiva una comisión previamente desactivada (idempotente). "
                        + "204 si queda activa; 404 si la comisión no existe.")
@@ -67,7 +67,7 @@ public class CommissionController {
     }
 
     @DeleteMapping("/{id}/activation")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ACADEMIC_ACTIVATE')")
     @Operation(summary = "Desactivar comisión",
                description = "Soft-delete idempotente. 204 si queda inactiva; 404 si la comisión no existe.")
     public ResponseEntity<Void> deactivate(@PathVariable Long id) {

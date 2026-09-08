@@ -25,13 +25,13 @@ import java.util.Map;
 @RestController
 @RequestMapping("${siga.api.base-path}/settings")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('SUBSECRETARIA')")
 @Tag(name = "Configuración", description = "Administración de parámetros de negocio del sistema")
 public class SettingsController {
 
     private final SettingsService settingsService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('PERM_SETTINGS_READ')")
     @Operation(summary = "Listar configuración agrupada por categoría",
                description = "Devuelve los settings parametrizables agrupados por categoría, con su metadata "
                        + "(tipo, riesgo, cotas, warning) y el valor actual.")
@@ -41,6 +41,7 @@ public class SettingsController {
     }
 
     @GetMapping("/{key}")
+    @PreAuthorize("hasAuthority('PERM_SETTINGS_READ')")
     @Operation(summary = "Obtener un setting por clave",
                description = "Devuelve la metadata y el valor actual de un setting.")
     public ResponseEntity<SettingResponseDto> findByKey(@PathVariable String key) {
@@ -49,6 +50,7 @@ public class SettingsController {
     }
 
     @PutMapping("/{key}")
+    @PreAuthorize("hasAuthority('PERM_SETTINGS_WRITE')")
     @Operation(summary = "Actualizar un setting",
                description = "Valida el tipo y las cotas del valor, lo persiste (auditado con Envers) y refresca "
                        + "el cache. El valor tiene efecto inmediato, sin reiniciar el backend.")
@@ -61,6 +63,7 @@ public class SettingsController {
     }
 
     @PutMapping
+    @PreAuthorize("hasAuthority('PERM_SETTINGS_WRITE')")
     @Operation(summary = "Actualizar varios settings de forma transaccional",
                description = "Valida y persiste todos los settings en una única transacción: si alguno falla, "
                        + "ninguno se aplica.")

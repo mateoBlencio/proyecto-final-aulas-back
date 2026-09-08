@@ -35,7 +35,8 @@ public class IngestServiceImpl implements IngestService {
         IngestRowBatchProcessor.BatchResult result = batchProcessor.process(parsed.rows(), parsed.year());
 
         if (!result.pendingAllocations().isEmpty()) {
-            allocationService.reallocate(AllocationCommand.imported(result.pendingAllocations(), "Importado de Excel"));
+            ar.edu.utn.frc.siga.common.security.SystemScope.run(() ->
+                allocationService.reallocate(AllocationCommand.imported(result.pendingAllocations(), "Importado de Excel")));
         }
 
         log.info("Importación completada: {} filas, {} períodos creados, {} eventos creados, {} filas salteadas, {} advertencias",

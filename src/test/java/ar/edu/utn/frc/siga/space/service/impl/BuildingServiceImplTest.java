@@ -1,6 +1,9 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.security.BuildingScope;
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
+import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.SpaceTestData;
 import ar.edu.utn.frc.siga.space.dto.BuildingFilter;
@@ -23,10 +26,12 @@ import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,12 +44,15 @@ class BuildingServiceImplTest {
     private BuildingRepository buildingRepository;
     @Mock
     private BuildingMapper buildingMapper;
+    @Mock
+    private BuildingScopeResolver buildingScopeResolver;
 
     private BuildingServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new BuildingServiceImpl(buildingRepository, buildingMapper);
+        service = new BuildingServiceImpl(buildingRepository, buildingMapper, buildingScopeResolver);
+        lenient().when(buildingScopeResolver.scopeFor(Permission.BUILDING_READ)).thenReturn(BuildingScope.unrestricted());
     }
 
     @Test
@@ -74,6 +82,18 @@ class BuildingServiceImplTest {
 
         assertThat(service.findAll(new BuildingFilter(null), Pageable.unpaged(), true).getContent())
                 .containsExactly(activeDto, inactiveDto);
+    }
+
+    @Test
+    @DisplayName("findAll: resuelve el alcance de BUILDING_READ para acotar el listado")
+    void findAllConsultsBuildingReadScope() {
+        when(buildingScopeResolver.scopeFor(Permission.BUILDING_READ)).thenReturn(BuildingScope.of(Set.of(5L)));
+        when(buildingRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        service.findAll(new BuildingFilter(null), Pageable.unpaged(), false);
+
+        verify(buildingScopeResolver).scopeFor(Permission.BUILDING_READ);
     }
 
     @Test

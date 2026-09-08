@@ -1,0 +1,25 @@
+meta {
+  name: Listar usuarios por rol y edificio
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/v1/users/with-role?role=AUXILIAR_AULICO&buildingId=1
+  body: none
+  auth: inherit
+}
+
+params:query {
+  role: AUXILIAR_AULICO
+  buildingId: 1
+}
+
+docs {
+  GET /v1/users/with-role. Permiso: PERM_USER_READ.
+  Devuelve los usuarios habilitados cuyo rol alcanza el edificio indicado: los
+  acotados a ese edificio (scopeType BUILDING, scopeId = buildingId) y también
+  los de alcance GLOBAL, que cubren cualquier edificio. Cada usuario viene con
+  su lista completa de roleAssignments. "role" es uno de SUBSECRETARIA /
+  AUXILIAR_AULICO / CONSULTA. Un edificio inexistente devuelve una lista vacía.
+}

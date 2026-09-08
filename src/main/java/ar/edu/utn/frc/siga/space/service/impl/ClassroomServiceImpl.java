@@ -7,10 +7,11 @@ import ar.edu.utn.frc.siga.space.dto.response.ClassroomListItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
+import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.space.exception.SpaceDomainException;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomListComposer;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomMapper;
-import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
@@ -61,6 +62,8 @@ public class ClassroomServiceImpl implements ClassroomService {
     private final ClassroomMapper classroomMapper;
     private final ClassroomListComposer classroomListComposer;
     private final ClassroomFeatureWriter classroomFeatureWriter;
+    private final BuildingScopeResolver buildingScopeResolver;
+    private final ScopedClassroomFinder scopedClassroom;
     private final ClassroomPermissionRepository classroomPermissionRepository;
 
     @Override
@@ -70,6 +73,7 @@ public class ClassroomServiceImpl implements ClassroomService {
                 dto.roomNumber(), dto.buildingId(), dto.classroomTypeId());
 
         Building building = findActiveBuilding(dto.buildingId());
+        buildingScopeResolver.requireAccess(Permission.CLASSROOM_CREATE, building.getId());
         ClassroomType classroomType = classroomTypeService.findById(dto.classroomTypeId());
 
         if (classroomRepository.findByRoomNumberAndDeletedAtIsNull(dto.roomNumber()).isPresent()) {
@@ -91,13 +95,13 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Override
     public ClassroomResponseDto findById(Long id) {
         log.debug("Buscando aula por id={}", id);
-        return classroomMapper.toDto(this.findExistingClassroomById(id));
+        return classroomMapper.toDto(scopedClassroom.requireActiveInScope(id, Permission.CLASSROOM_READ));
     }
 
     @Override
     public List<ClassroomResponseDto> findAllAvailable() {
         log.debug("Listando todas las aulas disponibles");
-        return classroomRepository.findAllActive().stream()
+        return scopedClassroom.findAllActiveInScope(Permission.CLASSROOM_READ).stream()
                 .map(classroomMapper::toDto)
                 .toList();
     }
@@ -140,7 +144,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         Specification<Classroom> spec = ClassroomSpecification.withFilter(filter)
                 .and(SoftDeleteSpecifications.activeUnless(includeDeactivated));
         return classroomListComposer.compose(
-                classroomRepository.findAll(spec, ClassroomListSort.apply(pageable)));
+                scopedClassroom.findAll(spec, Permission.CLASSROOM_READ, ClassroomListSort.apply(pageable)));
     }
 
     @Override
@@ -148,8 +152,11 @@ public class ClassroomServiceImpl implements ClassroomService {
     public ClassroomResponseDto update(Long id, ClassroomRequestDto dto) {
         log.debug("Actualizando aula: id={}, roomNumber={}", id, dto.roomNumber());
 
-        Classroom entity = this.findExistingClassroomById(id);
+        Classroom entity = scopedClassroom.requireActiveInScope(id, Permission.CLASSROOM_UPDATE);
         Building building = findActiveBuilding(dto.buildingId());
+        if (!entity.getBuilding().getId().equals(dto.buildingId())) {
+            buildingScopeResolver.requireAccess(Permission.CLASSROOM_UPDATE, dto.buildingId());
+        }
         ClassroomType classroomType = classroomTypeService.findById(dto.classroomTypeId());
 
         validateCapacity(dto);
@@ -170,7 +177,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
         PermissionMode mode = normalizePermissionMode(dto.permissionMode(), dto.permissionTargets());
 
-        Classroom classroom = this.findExistingClassroomById(id);
+        Classroom classroom = scopedClassroom.requireActiveInScope(id, Permission.CLASSROOM_UPDATE);
         classroom.setClassroomType(classroomTypeService.findById(dto.classroomTypeId()));
         classroom.setObservations(dto.observations());
         classroom.setPermissionMode(mode);
@@ -187,7 +194,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Transactional
     public void delete(Long id) {
         log.debug("Eliminando (soft-delete) aula: id={}", id);
-        Classroom classroom = this.findExistingClassroomById(id);
+        Classroom classroom = scopedClassroom.requireActiveInScope(id, Permission.CLASSROOM_DELETE);
         classroomRepository.softDelete(classroom);
         log.info("Aula eliminada: id={}", id);
     }
@@ -195,13 +202,15 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Override
     @Transactional
     public void activate(Long id) {
-        classroomRepository.restore(Finder.orThrow(classroomRepository::findById, id, "Classroom"));
+        Classroom classroom = scopedClassroom.requireAnyInScope(id, Permission.CLASSROOM_ACTIVATE);
+        classroomRepository.restore(classroom);
     }
 
     @Override
     @Transactional
     public void deactivate(Long id) {
-        classroomRepository.softDelete(Finder.orThrow(classroomRepository::findById, id, "Classroom"));
+        Classroom classroom = scopedClassroom.requireAnyInScope(id, Permission.CLASSROOM_ACTIVATE);
+        classroomRepository.softDelete(classroom);
     }
 
     @Override
@@ -228,14 +237,6 @@ public class ClassroomServiceImpl implements ClassroomService {
         log.warn("Aula '{}' no está en el edificio informado (buildingId={}); se usa la única "
                 + "coincidencia por número, en buildingId={}", roomNumber, buildingId, found.getBuilding().getId());
         return Optional.of(found);
-    }
-
-    private Classroom findExistingClassroomById(Long id) {
-        return classroomRepository.findActiveById(id)
-                .orElseThrow(() -> {
-                    log.warn("Aula no encontrada: id={}", id);
-                    return ResourceNotFoundException.of("Classroom", id);
-                });
     }
 
     private Building findBuildingById(Long id) {

@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("${siga.api.base-path}/subjects")
 @RequiredArgsConstructor
 @Tag(name = "Materias", description = "Consulta del catálogo de materias")
-@PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+@PreAuthorize("hasAuthority('PERM_ACADEMIC_READ')")
 public class SubjectController {
 
     private final SubjectService subjectService;
@@ -58,7 +58,7 @@ public class SubjectController {
     }
 
     @PutMapping("/{id}/activation")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ACADEMIC_ACTIVATE')")
     @Operation(summary = "Activar materia",
                description = "Reactiva una materia previamente desactivada (idempotente). "
                        + "204 si queda activa; 404 si la materia no existe.")
@@ -70,7 +70,7 @@ public class SubjectController {
     }
 
     @DeleteMapping("/{id}/activation")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ACADEMIC_ACTIVATE')")
     @Operation(summary = "Desactivar materia",
                description = "Soft-delete idempotente. 204 si queda inactiva; 404 si la materia no existe.")
     public ResponseEntity<Void> deactivate(@PathVariable Long id) {
