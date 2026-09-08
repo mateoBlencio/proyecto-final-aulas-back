@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.events.service.impl;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.events.EventTestData;
+import ar.edu.utn.frc.siga.events.dto.AcademicEventFilter;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.UpdateUniqueEventRequestDto;
@@ -42,6 +43,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.stubbing.Answer;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.DayOfWeek;
@@ -139,39 +143,65 @@ class AcademicEventServiceImplTest {
         CreateRecurringEventRequestDto dto = recurringDto(DayOfWeek.MONDAY,
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19));
         RecurringEvent existing = EventTestData.recurringEvent(7L, dto.dayOfWeek(), dto.startDate(), dto.endDate());
-        when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
-                dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startTime(), dto.startDate(), dto.endDate()))
-                .thenReturn(Optional.of(existing));
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any()))
+                .thenReturn(List.of(existing));
 
         FindOrCreateResult<Long> result = service.findOrCreateRecurringEvent(dto);
 
         assertThat(result.created()).isFalse();
         assertThat(result.value()).isEqualTo(7L);
-        verify(eventRepository, never()).save(any());
+        verify(eventRepository, never()).saveAll(any());
         verify(subjectService, never()).findById(any());
         verify(commissionService, never()).findById(any());
         verify(composer, never()).compose(any(AcademicEvent.class));
     }
 
     @Test
-    @DisplayName("findOrCreateRecurringEvent: no existe ninguno con esa sextupla → lo crea")
+    @DisplayName("findOrCreateRecurringEvent: no existe ninguno con esa sextupla → lo crea vía el bulk, validando el set de refs con findByIds")
     void findOrCreateCreaNuevo() {
         CreateRecurringEventRequestDto dto = recurringDto(DayOfWeek.MONDAY,
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19));
-        when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
-                dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startTime(), dto.startDate(), dto.endDate()))
-                .thenReturn(Optional.empty());
-        when(subjectService.findById(1L)).thenReturn(EventTestData.subjectResponseDto(1L));
-        when(commissionService.findById(1L)).thenReturn(EventTestData.commissionResponseDto(1L));
-        RecurringEvent saved = EventTestData.recurringEvent(9L, dto.dayOfWeek(), dto.startDate(), dto.endDate());
-        when(eventRepository.save(any())).thenReturn(saved);
-        when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyRecurringResponseDto(9L));
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of());
+        when(subjectService.findByIds(any())).thenReturn(List.of(EventTestData.subjectResponseDto(1L)));
+        when(commissionService.findByIds(any())).thenReturn(List.of(EventTestData.commissionResponseDto(1L)));
+        when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(9L));
 
         FindOrCreateResult<Long> result = service.findOrCreateRecurringEvent(dto);
 
         assertThat(result.created()).isTrue();
         assertThat(result.value()).isEqualTo(9L);
-        verify(eventRepository).save(any());
+        verify(subjectService, never()).findById(any());
+        verify(commissionService, never()).findById(any());
+        verify(subjectService).findByIds(any());
+        verify(commissionService).findByIds(any());
+        verify(occurrenceRepository).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("findOrCreateRecurringEvents: prefetch único, dos requests con la misma clave → un solo insert, resultados en orden")
+    void findOrCreateRecurringEventsBulk() {
+        CreateRecurringEventRequestDto monday = recurringDto(DayOfWeek.MONDAY,
+                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19));
+        CreateRecurringEventRequestDto tuesday = recurringDto(DayOfWeek.TUESDAY,
+                LocalDate.of(2026, 1, 6), LocalDate.of(2026, 1, 20));
+        RecurringEvent existingTuesday = EventTestData.recurringEvent(4L, DayOfWeek.TUESDAY,
+                tuesday.startDate(), tuesday.endDate());
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any()))
+                .thenReturn(List.of(existingTuesday));
+        when(subjectService.findByIds(any())).thenReturn(List.of(EventTestData.subjectResponseDto(1L)));
+        when(commissionService.findByIds(any())).thenReturn(List.of(EventTestData.commissionResponseDto(1L)));
+        when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(10L));
+
+        List<FindOrCreateResult<Long>> results = service.findOrCreateRecurringEvents(
+                List.of(monday, tuesday, monday));
+
+        verify(recurringEventRepository, times(1)).findBySubjectIdInAndCommissionIdIn(any(), any());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<RecurringEvent>> captor = ArgumentCaptor.forClass(List.class);
+        verify(eventRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).hasSize(1);
+        assertThat(results).extracting(FindOrCreateResult::value).containsExactly(10L, 4L, 10L);
+        assertThat(results).extracting(FindOrCreateResult::created).containsExactly(true, false, false);
     }
 
 
@@ -313,10 +343,8 @@ class AcademicEventServiceImplTest {
         assertThat(existing.getSysacadEnabled()).isTrue();
         assertThat(savedRecurringEvents()).containsExactly(existing);
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<Occurrence>> occCaptor = ArgumentCaptor.forClass(List.class);
-        verify(occurrenceRepository).saveAll(occCaptor.capture());
-        assertThat(occCaptor.getValue()).isEmpty();
+        // sin eventos nuevos no se toca occurrenceRepository (guarda !created.isEmpty())
+        verify(occurrenceRepository, never()).saveAll(any());
     }
 
     @Test
@@ -698,14 +726,16 @@ class AcademicEventServiceImplTest {
 
 
     @Test
-    @DisplayName("findAll: delega en el composer sobre todos los eventos")
+    @DisplayName("findAll: delega en el composer sobre la página del repositorio")
     void findAllDelegaEnComposer() {
-        when(eventRepository.findAll()).thenReturn(List.of());
+        when(eventRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
         when(composer.compose(anyCollection())).thenReturn(List.of());
 
-        List<AcademicEventResponseDto> result = service.findAll();
+        var result = service.findAll(new AcademicEventFilter(null, null, null),
+                Pageable.unpaged());
 
-        assertThat(result).isEmpty();
+        assertThat(result.getContent()).isEmpty();
         verify(composer).compose(anyCollection());
     }
 

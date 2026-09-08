@@ -41,4 +41,10 @@ public class AcademicPeriod extends SoftDeletableEntity {
 
     @Column(name = "fecha_fin")
     private LocalDate endDate;
+
+    @Column(name = "fecha_inicio_receso")
+    private LocalDate recessStart;
+
+    @Column(name = "fecha_fin_receso")
+    private LocalDate recessEnd;
 }

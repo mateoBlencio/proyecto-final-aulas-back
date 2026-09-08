@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationConflictDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.NotPermittedConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OverlapConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OvercrowdedConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.UnallocatedConflictDto;
@@ -26,6 +27,7 @@ import ar.edu.utn.frc.siga.common.util.Overcrowding;
 import ar.edu.utn.frc.siga.common.util.Paging;
 import ar.edu.utn.frc.siga.common.util.RoomDate;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomSubjectPermissionDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -79,12 +81,16 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         if (effectiveTypes.contains(ConflictType.OVERLAP)) {
             merged.addAll(buildOverlapConflicts(range, includePast));
         }
+        if (effectiveTypes.contains(ConflictType.NOT_PERMITTED)) {
+            merged.addAll(buildNotPermittedConflicts(range, includePast));
+        }
 
         BuildingScope scope = buildingScopeResolver.scopeFor(Permission.CONFLICT_READ);
         merged.removeIf(dto -> !switch (dto) {
             case UnallocatedConflictDto ignored -> true;
             case OvercrowdedConflictDto o -> scope.allows(o.classroom().buildingId());
             case OverlapConflictDto o -> scope.allows(o.classroom().buildingId());
+            case NotPermittedConflictDto o -> scope.allows(o.classroom().buildingId());
         });
 
         log.info("Conflictos de asignación listados: types={}, count={}", effectiveTypes, merged.size());
@@ -112,16 +118,16 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
     private List<OvercrowdedConflictDto> buildOvercrowdedConflicts(Range range, boolean includePast) {
         List<OccupiedSlot> occupancy = readOccupancy(range, includePast);
 
-        Map<OvercrowdKey, OvercrowdAcc> overcrowdAccs = new LinkedHashMap<>();
+        Map<EventRoomKey, EventRoomAcc> overcrowdAccs = new LinkedHashMap<>();
         for (OccupiedSlot slot : occupancy) {
-            overcrowdAccs.computeIfAbsent(new OvercrowdKey(slot.eventId(), slot.classroomId()),
-                            k -> new OvercrowdAcc(slot.eventId(), slot.classroomId()))
+            overcrowdAccs.computeIfAbsent(new EventRoomKey(slot.eventId(), slot.classroomId()),
+                            k -> new EventRoomAcc(slot.eventId(), slot.classroomId()))
                     .dates.add(slot.date());
         }
 
         Set<Long> eventIds = new LinkedHashSet<>();
         Set<Long> classroomIds = new LinkedHashSet<>();
-        for (OvercrowdAcc acc : overcrowdAccs.values()) {
+        for (EventRoomAcc acc : overcrowdAccs.values()) {
             eventIds.add(acc.eventId);
             classroomIds.add(acc.classroomId);
         }
@@ -142,6 +148,46 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         }
 
         return buildOverlaps(overlapAccs, fetchEventsById(eventIds), fetchClassroomsById(classroomIds));
+    }
+
+    private List<NotPermittedConflictDto> buildNotPermittedConflicts(Range range, boolean includePast) {
+        List<OccupiedSlot> occupancy = readOccupancy(range, includePast);
+
+        Map<EventRoomKey, EventRoomAcc> accs = new LinkedHashMap<>();
+        for (OccupiedSlot slot : occupancy) {
+            accs.computeIfAbsent(new EventRoomKey(slot.eventId(), slot.classroomId()),
+                            k -> new EventRoomAcc(slot.eventId(), slot.classroomId()))
+                    .dates.add(slot.date());
+        }
+        if (accs.isEmpty()) {
+            return List.of();
+        }
+
+        Set<Long> eventIds = new LinkedHashSet<>();
+        Set<Long> classroomIds = new LinkedHashSet<>();
+        for (EventRoomAcc acc : accs.values()) {
+            eventIds.add(acc.eventId);
+            classroomIds.add(acc.classroomId);
+        }
+
+        Map<Long, AcademicEventResponseDto> eventById = fetchEventsById(eventIds);
+        Map<Long, ClassroomResponseDto> classroomById = fetchClassroomsById(classroomIds);
+        Map<Long, ClassroomSubjectPermissionDto> permissionByClassroom =
+                classroomService.findSubjectPermissions(classroomIds);
+
+        List<NotPermittedConflictDto> conflicts = new ArrayList<>();
+        for (EventRoomAcc acc : accs.values()) {
+            AcademicEventResponseDto event = eventById.get(acc.eventId);
+            ClassroomResponseDto classroom = classroomById.get(acc.classroomId);
+            if (event == null || classroom == null || event.subject() == null) continue;
+
+            ClassroomSubjectPermissionDto permission = permissionByClassroom.get(acc.classroomId);
+            Long subjectId = event.subject().id();
+            if (permission != null && !permission.permits(subjectId)) {
+                conflicts.add(new NotPermittedConflictDto(event, classroom, subjectId, List.copyOf(acc.dates)));
+            }
+        }
+        return conflicts;
     }
 
     private Set<Long> unallocatedEventIds(Range range, boolean includePast) {
@@ -216,10 +262,10 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         return overlapAccs;
     }
 
-    private List<OvercrowdedConflictDto> buildOvercrowded(Map<OvercrowdKey, OvercrowdAcc> overcrowdAccs,
+    private List<OvercrowdedConflictDto> buildOvercrowded(Map<EventRoomKey, EventRoomAcc> overcrowdAccs,
             Map<Long, AcademicEventResponseDto> eventDtoById, Map<Long, ClassroomResponseDto> classroomDtoById) {
         List<OvercrowdedConflictDto> overcrowded = new ArrayList<>();
-        for (OvercrowdAcc acc : overcrowdAccs.values()) {
+        for (EventRoomAcc acc : overcrowdAccs.values()) {
             ClassroomResponseDto classroom = classroomDtoById.get(acc.classroomId);
             if (classroom == null || classroom.capacity() == null) continue;
 
@@ -251,15 +297,15 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
     private record Range(LocalDate from, LocalDate to) {
     }
 
-    private record OvercrowdKey(Long eventId, Long classroomId) {
+    private record EventRoomKey(Long eventId, Long classroomId) {
     }
 
-    private static final class OvercrowdAcc {
+    private static final class EventRoomAcc {
         final Long eventId;
         final Long classroomId;
         final Set<LocalDate> dates = new TreeSet<>();
 
-        OvercrowdAcc(Long eventId, Long classroomId) {
+        EventRoomAcc(Long eventId, Long classroomId) {
             this.eventId = eventId;
             this.classroomId = classroomId;
         }

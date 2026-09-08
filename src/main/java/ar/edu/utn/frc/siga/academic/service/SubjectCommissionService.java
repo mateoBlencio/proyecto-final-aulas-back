@@ -1,11 +1,12 @@
 package ar.edu.utn.frc.siga.academic.service;
 
+import ar.edu.utn.frc.siga.academic.dto.SubjectCommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.common.service.ActivationService;
 
-import java.util.List;
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.modulith.NamedInterface;
 
 @NamedInterface("api")
@@ -22,7 +23,6 @@ public interface SubjectCommissionService extends ActivationService<SubjectCommi
      */
     SubjectCommissionResponseDto findByCommissionAndSubjectCode(Long commissionId, Integer subjectCode);
 
-    List<SubjectCommissionResponseDto> findAll(boolean includeDeactivated);
-
-    List<SubjectCommissionResponseDto> findBySubjectId(Long subjectId, boolean includeDeactivated);
+    Page<SubjectCommissionResponseDto> findAll(SubjectCommissionFilter filter, Pageable pageable,
+            boolean includeDeactivated);
 }

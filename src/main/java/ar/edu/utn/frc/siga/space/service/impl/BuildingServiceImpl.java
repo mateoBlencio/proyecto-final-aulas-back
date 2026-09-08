@@ -8,6 +8,7 @@ import ar.edu.utn.frc.siga.common.security.BuildingScopedSpecifications;
 import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
+import ar.edu.utn.frc.siga.space.dto.BuildingFilter;
 import ar.edu.utn.frc.siga.space.dto.request.BuildingActiveBatchItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.mapper.BuildingMapper;
@@ -15,6 +16,7 @@ import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
 import ar.edu.utn.frc.siga.space.service.BuildingService;
 import ar.edu.utn.frc.siga.space.service.command.BuildingSyncCommand;
+import ar.edu.utn.frc.siga.space.specification.BuildingSpecification;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Map;
@@ -23,7 +25,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,15 +44,16 @@ public class BuildingServiceImpl implements BuildingService {
     private final BuildingScopeResolver buildingScopeResolver;
 
     @Override
-    public List<BuildingResponseDto> findAll(boolean includeDeactivated) {
-        log.debug("Listando edificios: includeDeactivated={}", includeDeactivated);
+    public Page<BuildingResponseDto> findAll(BuildingFilter filter, Pageable pageable, boolean includeDeactivated) {
+        log.debug("Listando edificios: filter={}, pageable={}, includeDeactivated={}",
+                filter, pageable, includeDeactivated);
         BuildingScope scope = buildingScopeResolver.scopeFor(Permission.BUILDING_READ);
-        Specification<Building> spec = includeDeactivated
-                ? BuildingScopedSpecifications.withinScope(scope, "id")
-                : SoftDeleteSpecifications.<Building>active().and(BuildingScopedSpecifications.withinScope(scope, "id"));
-        return buildingRepository.findAll(spec).stream()
-                .map(buildingMapper::toDto)
-                .toList();
+        return buildingRepository.findAll(
+                        BuildingSpecification.withFilter(filter)
+                                .and(SoftDeleteSpecifications.activeUnless(includeDeactivated))
+                                .and(BuildingScopedSpecifications.withinScope(scope, "id")),
+                        pageable)
+                .map(buildingMapper::toDto);
     }
 
     @Override

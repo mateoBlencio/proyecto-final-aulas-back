@@ -17,8 +17,12 @@ import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
 import ar.edu.utn.frc.siga.space.model.PermissionMode;
+import ar.edu.utn.frc.siga.space.model.ClassroomPermission;
+import ar.edu.utn.frc.siga.space.model.PermissionTargetKind;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomPermissionTargetRequestDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomSubjectPermissionDto;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
+import ar.edu.utn.frc.siga.space.repository.ClassroomPermissionRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
@@ -60,6 +64,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     private final ClassroomFeatureWriter classroomFeatureWriter;
     private final BuildingScopeResolver buildingScopeResolver;
     private final ScopedClassroomFinder scopedClassroom;
+    private final ClassroomPermissionRepository classroomPermissionRepository;
 
     @Override
     @Transactional
@@ -111,12 +116,33 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     @Override
+    public Map<Long, ClassroomSubjectPermissionDto> findSubjectPermissions(Collection<Long> classroomIds) {
+        if (classroomIds == null || classroomIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, List<ClassroomPermission>> subjectsByClassroom =
+                classroomPermissionRepository.findByClassroomIdInAndDeletedAtIsNull(classroomIds).stream()
+                        .filter(p -> p.getTargetKind() == PermissionTargetKind.SUBJECT)
+                        .collect(Collectors.groupingBy(p -> p.getClassroom().getId()));
+
+        return classroomRepository.findAllById(classroomIds).stream()
+                .collect(Collectors.toMap(Classroom::getId, classroom -> {
+                    PermissionMode mode = classroom.getPermissionMode();
+                    Set<Long> allowed = mode == PermissionMode.SUBSET
+                            ? subjectsByClassroom.getOrDefault(classroom.getId(), List.of()).stream()
+                                    .map(ClassroomPermission::getTargetId)
+                                    .collect(Collectors.toUnmodifiableSet())
+                            : Set.of();
+                    return new ClassroomSubjectPermissionDto(classroom.getId(), mode == PermissionMode.ALL, allowed);
+                }));
+    }
+
+    @Override
     public Page<ClassroomListItemDto> findAll(ClassroomFilter filter, Pageable pageable, boolean includeDeactivated) {
         log.debug("Listando aulas: filter={}, page={}, size={}, includeDeactivated={}",
                 filter, pageable.getPageNumber(), pageable.getPageSize(), includeDeactivated);
-        Specification<Classroom> spec = includeDeactivated
-                ? ClassroomSpecification.withFilter(filter)
-                : ClassroomSpecification.withFilter(filter).and(SoftDeleteSpecifications.active());
+        Specification<Classroom> spec = ClassroomSpecification.withFilter(filter)
+                .and(SoftDeleteSpecifications.activeUnless(includeDeactivated));
         return classroomListComposer.compose(
                 scopedClassroom.findAll(spec, Permission.CLASSROOM_READ, ClassroomListSort.apply(pageable)));
     }

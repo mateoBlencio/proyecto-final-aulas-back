@@ -13,10 +13,15 @@ import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.exception.SpaceDomainException;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomListComposer;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomMapper;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomSubjectPermissionDto;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
+import ar.edu.utn.frc.siga.space.model.ClassroomPermission;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
+import ar.edu.utn.frc.siga.space.model.PermissionMode;
+import ar.edu.utn.frc.siga.space.model.PermissionTargetKind;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
+import ar.edu.utn.frc.siga.space.repository.ClassroomPermissionRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
 import ar.edu.utn.frc.siga.space.service.ClassroomTypeService;
@@ -37,6 +42,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -72,6 +78,8 @@ class ClassroomServiceImplTest {
     private ClassroomFeatureWriter classroomFeatureWriter;
     @Mock
     private BuildingScopeResolver buildingScopeResolver;
+    @Mock
+    private ClassroomPermissionRepository classroomPermissionRepository;
 
     private ClassroomServiceImpl service;
 
@@ -82,7 +90,7 @@ class ClassroomServiceImplTest {
         service = new ClassroomServiceImpl(
                 classroomRepository, buildingRepository, classroomTypeService, classroomTypeRepository,
                 classroomMapper, classroomListComposer, classroomFeatureWriter, buildingScopeResolver,
-                scopedClassroom);
+                scopedClassroom, classroomPermissionRepository);
         lenient().when(buildingScopeResolver.scopeFor(any())).thenReturn(BuildingScope.unrestricted());
     }
 
@@ -596,6 +604,37 @@ class ClassroomServiceImplTest {
 
         verify(classroomRepository, never()).save(any());
         assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("findSubjectPermissions: ALL abre a todas, SUBSET expone las materias, NONE queda vacío")
+    void findSubjectPermissionsResuelveModo() {
+        Classroom all = SpaceTestData.classroom().id(1L).permissionMode(PermissionMode.ALL).build();
+        Classroom subset = SpaceTestData.classroom().id(2L).permissionMode(PermissionMode.SUBSET).build();
+        Classroom none = SpaceTestData.classroom().id(3L).permissionMode(PermissionMode.NONE).build();
+        ClassroomPermission subsetPermission = ClassroomPermission.builder()
+                .classroom(subset).targetKind(PermissionTargetKind.SUBJECT).targetId(77L).build();
+        when(classroomPermissionRepository.findByClassroomIdInAndDeletedAtIsNull(any()))
+                .thenReturn(List.of(subsetPermission));
+        when(classroomRepository.findAllById(any())).thenReturn(List.of(all, subset, none));
+
+        Map<Long, ClassroomSubjectPermissionDto> result =
+                service.findSubjectPermissions(List.of(1L, 2L, 3L));
+
+        assertThat(result.get(1L).openToAll()).isTrue();
+        assertThat(result.get(2L).openToAll()).isFalse();
+        assertThat(result.get(2L).allowedSubjectIds()).containsExactly(77L);
+        assertThat(result.get(2L).permits(77L)).isTrue();
+        assertThat(result.get(3L).openToAll()).isFalse();
+        assertThat(result.get(3L).allowedSubjectIds()).isEmpty();
+        assertThat(result.get(3L).permits(77L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("findSubjectPermissions: lista vacía no consulta la base")
+    void findSubjectPermissionsVacio() {
+        assertThat(service.findSubjectPermissions(List.of())).isEmpty();
+        verify(classroomRepository, never()).findAllById(any());
     }
 
     private static Classroom syncClassroom(Integer roomNumber, Integer capacity, Boolean sysacadEnabled, String hash) {

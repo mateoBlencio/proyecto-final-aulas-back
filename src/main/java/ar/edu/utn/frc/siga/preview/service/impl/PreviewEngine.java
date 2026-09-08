@@ -18,6 +18,7 @@ import ar.edu.utn.frc.siga.optimizer.model.OptimizationResult;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizerRoom;
 import ar.edu.utn.frc.siga.optimizer.service.OptimizerService;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomSubjectPermissionDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,9 +56,13 @@ class PreviewEngine {
         List<RecurringEventResponseDto> events = loadRecurringEvents(eventIds);
         Map<Long, List<LocalDate>> datesByEvent = datesByEvent(eventIds);
         BuildingScope scope = buildingScopeResolver.scopeFor(Permission.PREVIEW_RUN);
-        List<OptimizerRoom> rooms = classroomService.findAllAvailable().stream()
+        List<ClassroomResponseDto> availableRooms = classroomService.findAllAvailable().stream()
                 .filter(c -> scope.allows(c.buildingId()))
-                .map(this::toSolverRoom)
+                .toList();
+        Map<Long, ClassroomSubjectPermissionDto> permissionsByRoom = classroomService.findSubjectPermissions(
+                availableRooms.stream().map(ClassroomResponseDto::id).toList());
+        List<OptimizerRoom> rooms = availableRooms.stream()
+                .map(c -> toSolverRoom(c, permissionsByRoom.get(c.id())))
                 .toList();
 
         List<OccupiedSlot> occupancyInRange = loadOccupancyInRange(events);
@@ -96,8 +101,9 @@ class PreviewEngine {
 
     private OptimizerEvent toSolverEvent(RecurringEventResponseDto e, List<LocalDate> dates) {
         String commissionKey = e.commission() != null ? String.valueOf(e.commission().id()) : null;
+        Set<Long> subjectIds = e.subject() != null ? Set.of(e.subject().id()) : Set.of();
         return new OptimizerEvent(String.valueOf(e.id()), commissionKey, e.enrolled(),
-                e.startTime(), e.endTime(), Set.copyOf(dates));
+                e.startTime(), e.endTime(), Set.copyOf(dates), subjectIds);
     }
 
     private List<RecurringEventResponseDto> loadRecurringEvents(Set<Long> eventIds) {
@@ -124,8 +130,10 @@ class PreviewEngine {
                                         List::copyOf))));
     }
 
-    private OptimizerRoom toSolverRoom(ClassroomResponseDto c) {
-        return new OptimizerRoom(c.id(), c.capacity(), c.buildingId());
+    private OptimizerRoom toSolverRoom(ClassroomResponseDto c, ClassroomSubjectPermissionDto permission) {
+        boolean openToAll = permission == null || permission.openToAll();
+        Set<Long> allowedSubjectIds = permission == null ? Set.of() : permission.allowedSubjectIds();
+        return new OptimizerRoom(c.id(), c.capacity(), c.buildingId(), openToAll, allowedSubjectIds);
     }
 
     private List<OccupiedSlot> loadOccupancyInRange(List<RecurringEventResponseDto> events) {

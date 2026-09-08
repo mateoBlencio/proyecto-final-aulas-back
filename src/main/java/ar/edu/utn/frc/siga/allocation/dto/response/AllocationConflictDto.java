@@ -7,8 +7,9 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 @JsonSubTypes({
         @JsonSubTypes.Type(value = UnallocatedConflictDto.class, name = "UNALLOCATED"),
         @JsonSubTypes.Type(value = OvercrowdedConflictDto.class, name = "OVERCROWDED"),
-        @JsonSubTypes.Type(value = OverlapConflictDto.class, name = "OVERLAP")
+        @JsonSubTypes.Type(value = OverlapConflictDto.class, name = "OVERLAP"),
+        @JsonSubTypes.Type(value = NotPermittedConflictDto.class, name = "NOT_PERMITTED")
 })
 public sealed interface AllocationConflictDto
-        permits UnallocatedConflictDto, OvercrowdedConflictDto, OverlapConflictDto {
+        permits UnallocatedConflictDto, OvercrowdedConflictDto, OverlapConflictDto, NotPermittedConflictDto {
 }

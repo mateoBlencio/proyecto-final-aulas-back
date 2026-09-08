@@ -5,18 +5,23 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/subjects?specialtyCode=5&includeDeactivated=false
+  url: {{baseUrl}}/v1/subjects?page=0&size=20&specialtyCode=5&includeDeactivated=false
   body: none
   auth: inherit
 }
 
 params:query {
+  page: 0
+  size: 20
+  ~code: 101
+  ~name: algoritmos
   specialtyCode: 5
+  ~studyPlanId: 1
   includeDeactivated: false
 }
 
 docs {
-  Sin specialtyCode devuelve el catálogo completo de materias. Con specialtyCode,
-  filtra las materias de todos los planes de esa especialidad (no valida que la
-  especialidad exista: código inexistente devuelve lista vacía).
+  Listado paginado. Filtros opcionales: code, name (contiene, case-insensitive),
+  specialtyCode, studyPlanId. La respuesta es
+  { content: [...], page: { size, number, totalElements, totalPages } }.
 }

@@ -10,7 +10,7 @@ import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.UniqueEventAllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationCommandMapper;
 import ar.edu.utn.frc.siga.allocation.mapper.EventAllocationComposer;
-import ar.edu.utn.frc.siga.common.dto.response.RevisionDto;
+import ar.edu.utn.frc.siga.audit.dto.response.RevisionDto;
 import ar.edu.utn.frc.siga.allocation.service.AllocationAuditHistoryService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationConflictService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationImpactService;
@@ -111,10 +111,11 @@ public class AllocationController {
     @GetMapping("/conflicts")
     @PreAuthorize("hasAuthority('PERM_CONFLICT_READ')")
     @Operation(summary = "Listar conflictos de asignación",
-               description = "Devuelve, mezclados y paginados, los conflictos pedidos en 'types' (los tres si se omite): "
-                       + "eventos sin aula, aulas con sobrecupo, superposiciones de horario-aula. Mismos defaults de "
-                       + "rango que antes: 'from' hoy, 'to' fin del período académico activo (o +6 meses). Excluye "
-                       + "ocurrencias ya pasadas salvo 'includePast=true'.")
+               description = "Devuelve, mezclados y paginados, los conflictos pedidos en 'types' (todos si se omite): "
+                       + "eventos sin aula (UNALLOCATED), aulas con sobrecupo (OVERCROWDED), superposiciones de "
+                       + "horario-aula (OVERLAP) y asignaciones en aulas que no habilitan la materia (NOT_PERMITTED). "
+                       + "Mismos defaults de rango que antes: 'from' hoy, 'to' fin del período académico activo "
+                       + "(o +6 meses). Excluye ocurrencias ya pasadas salvo 'includePast=true'.")
     public ResponseEntity<Page<AllocationConflictDto>> findConflicts(
             @RequestParam(required = false) Set<ConflictType> types,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -165,7 +166,8 @@ public class AllocationController {
                description = "Recibe el mismo body que POST/PUT y responde qué pasaría si se aplicara, sin "
                        + "escribir nada. Devuelve cuántas clases toca el pedido y los choques como DATO y no como error, "
                        + "cada uno con el evento que ocupa el aula y las aulas libres en esa fecha y franja para "
-                       + "poder destrabarlo. Siempre 200, incluso con conflictos. Sigue devolviendo 400 si el "
+                       + "poder destrabarlo (las aulas sugeridas se filtran por permiso: no se propone un aula que "
+                       + "no habilita la materia del evento). Siempre 200, incluso con conflictos. Sigue devolviendo 400 si el "
                        + "pedido está mal formado y 409 si pide un aula inexistente o una ocurrencia ya pasada: "
                        + "eso no es un resultado a mostrar, es un pedido que no se puede ni evaluar.")
     public ResponseEntity<AllocationImpactResponseDto> impact(@Valid @RequestBody AllocationBatchRequestDto dto) {

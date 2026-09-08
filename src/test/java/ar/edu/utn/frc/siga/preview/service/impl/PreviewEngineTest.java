@@ -14,9 +14,13 @@ import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizationResult;
+import ar.edu.utn.frc.siga.optimizer.model.OptimizerEvent;
+import ar.edu.utn.frc.siga.optimizer.model.OptimizerRoom;
 import ar.edu.utn.frc.siga.optimizer.service.OptimizerService;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomSubjectPermissionDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +35,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -64,6 +69,7 @@ class PreviewEngineTest {
         engine = new PreviewEngine(academicEventService, occurrenceService, classroomService, occupancyService,
                 optimizerService, buildingScopeResolver);
         lenient().when(classroomService.findAllAvailable()).thenReturn(List.of());
+        lenient().when(classroomService.findSubjectPermissions(any())).thenReturn(Map.of());
         lenient().when(occupancyService.findOccupancy(any(), any())).thenReturn(List.of());
         lenient().when(buildingScopeResolver.scopeFor(Permission.PREVIEW_RUN)).thenReturn(BuildingScope.unrestricted());
     }
@@ -148,6 +154,42 @@ class PreviewEngineTest {
         ArgumentCaptor<LocalDate> toCaptor = ArgumentCaptor.forClass(LocalDate.class);
         org.mockito.Mockito.verify(occupancyService).findOccupancy(any(), toCaptor.capture());
         assertThat(toCaptor.getValue()).isEqualTo(LocalDate.of(2027, 3, 1));
+    }
+
+    @Test
+    @DisplayName("generate: la materia del evento y el permiso del aula viajan al optimizador")
+    void generatePropagaPermisosYMateria() {
+        SubjectResponseDto subject = new SubjectResponseDto(7L, 700, "Análisis", "1C", null);
+        RecurringEventResponseDto event = new RecurringEventResponseDto(1L, EventType.RECURRING, 30,
+                LocalTime.of(8, 0), 90, DayOfWeek.MONDAY, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 6, 30),
+                subject, null);
+        LocalDate date = LocalDate.now().plusDays(2);
+        when(academicEventService.findByIds(any())).thenReturn(List.of(event));
+        when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(
+                List.of(new OccurrenceSlotDto(10L, 1L, date, LocalTime.of(8, 0), LocalTime.of(9, 30),
+                        OccurrenceStatus.NEEDS_ROOM, 30)));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5L, 100), classroom(6L, 100)));
+        when(classroomService.findSubjectPermissions(any())).thenReturn(Map.of(
+                5L, new ClassroomSubjectPermissionDto(5L, false, Set.of(7L)),
+                6L, new ClassroomSubjectPermissionDto(6L, false, Set.of())));
+        when(optimizerService.optimize(any(), any(), any(), anyInt()))
+                .thenReturn(new OptimizationResult("prev_x", List.of()));
+
+        engine.generate(Set.of(1L), 30);
+
+        ArgumentCaptor<List<OptimizerEvent>> eventsCaptor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<OptimizerRoom>> roomsCaptor = ArgumentCaptor.forClass(List.class);
+        org.mockito.Mockito.verify(optimizerService)
+                .optimize(eventsCaptor.capture(), roomsCaptor.capture(), any(), anyInt());
+
+        assertThat(eventsCaptor.getValue()).singleElement()
+                .extracting(OptimizerEvent::subjectIds).isEqualTo(Set.of(7L));
+        assertThat(roomsCaptor.getValue())
+                .filteredOn(r -> r.id().equals(5L)).singleElement()
+                .satisfies(r -> assertThat(r.permits(Set.of(7L))).isTrue());
+        assertThat(roomsCaptor.getValue())
+                .filteredOn(r -> r.id().equals(6L)).singleElement()
+                .satisfies(r -> assertThat(r.permits(Set.of(7L))).isFalse());
     }
 
     private RecurringEventResponseDto recurringEvent(long id) {
