@@ -1,6 +1,8 @@
-package ar.edu.utn.frc.siga.audit;
+package ar.edu.utn.frc.siga.audit.dto;
 
 import java.time.LocalDateTime;
+
+import ar.edu.utn.frc.siga.audit.model.RevisionKind;
 
 public record RevisionMetadata(
         String recordId,

@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.audit;
+package ar.edu.utn.frc.siga.audit.model;
 
 import org.springframework.modulith.NamedInterface;
 

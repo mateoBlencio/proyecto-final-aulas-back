@@ -1,13 +1,13 @@
 package ar.edu.utn.frc.siga.audit.service.impl;
 
-import ar.edu.utn.frc.siga.audit.RevisionMetadata;
-import ar.edu.utn.frc.siga.audit.RevisionReader;
+import ar.edu.utn.frc.siga.audit.dto.RevisionMetadata;
+import ar.edu.utn.frc.siga.audit.service.RevisionReader;
 import ar.edu.utn.frc.siga.audit.dto.AuditLogFilter;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditLogEntryDto;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditLogEntryType;
 import ar.edu.utn.frc.siga.audit.mapper.AuditLogEntryMapper;
-import ar.edu.utn.frc.siga.audit.registry.AuditedEntity;
-import ar.edu.utn.frc.siga.audit.registry.AuditedEntityRegistry;
+import ar.edu.utn.frc.siga.audit.service.AuditedEntity;
+import ar.edu.utn.frc.siga.audit.service.AuditedEntityRegistry;
 import ar.edu.utn.frc.siga.audit.service.AuditRegistryService;
 import ar.edu.utn.frc.siga.common.exception.InvalidSelectionException;
 import ar.edu.utn.frc.siga.common.util.DateRanges;

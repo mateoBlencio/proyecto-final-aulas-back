@@ -1,5 +1,10 @@
-package ar.edu.utn.frc.siga.audit;
+package ar.edu.utn.frc.siga.audit.service.impl;
 
+import ar.edu.utn.frc.siga.audit.dto.RevisionMetadata;
+import ar.edu.utn.frc.siga.audit.dto.response.RevisionDto;
+import ar.edu.utn.frc.siga.audit.model.RevisionKind;
+import ar.edu.utn.frc.siga.audit.model.SigaRevision;
+import ar.edu.utn.frc.siga.audit.service.RevisionReader;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceUnitUtil;
 import lombok.RequiredArgsConstructor;
@@ -7,7 +12,6 @@ import org.hibernate.envers.AuditReaderFactory;
 import org.hibernate.envers.RevisionType;
 import org.hibernate.envers.query.AuditEntity;
 import org.hibernate.envers.query.AuditQuery;
-import org.springframework.modulith.NamedInterface;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -16,12 +20,12 @@ import java.util.List;
 import java.util.function.Function;
 
 @Component
-@NamedInterface("api")
 @RequiredArgsConstructor
-public class RevisionReader {
+public class RevisionReaderImpl implements RevisionReader {
 
     private final EntityManager entityManager;
 
+    @Override
     public <E, S> List<RevisionDto<S>> read(Class<E> entityClass, String property, Object value, Function<E, S> toSnapshot) {
         List<?> results = AuditReaderFactory.get(entityManager)
                 .createQuery()
@@ -33,6 +37,7 @@ public class RevisionReader {
         return toRevisionDtos(results, toSnapshot);
     }
 
+    @Override
     public <E, S> List<RevisionDto<S>> readById(Class<E> entityClass, Object id, Function<E, S> toSnapshot) {
         List<?> results = AuditReaderFactory.get(entityManager)
                 .createQuery()
@@ -44,6 +49,7 @@ public class RevisionReader {
         return toRevisionDtos(results, toSnapshot);
     }
 
+    @Override
     public <E, S> List<RevisionDto<S>> read(Class<E> entityClass, String property, Collection<?> values, Function<E, S> toSnapshot) {
         if (values.isEmpty()) {
             return List.of();
@@ -59,6 +65,7 @@ public class RevisionReader {
         return toRevisionDtos(results, toSnapshot);
     }
 
+    @Override
     public List<RevisionMetadata> readMetadata(Class<?> entityClass, LocalDateTime from, LocalDateTime to,
                                                String user, RevisionKind kind, String operationId) {
         AuditQuery query = AuditReaderFactory.get(entityManager)

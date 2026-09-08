@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.audit;
+package ar.edu.utn.frc.siga.audit.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -9,6 +9,7 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
+import ar.edu.utn.frc.siga.audit.internal.SigaRevisionListener;
 import org.hibernate.envers.RevisionEntity;
 import org.hibernate.envers.RevisionNumber;
 import org.hibernate.envers.RevisionTimestamp;

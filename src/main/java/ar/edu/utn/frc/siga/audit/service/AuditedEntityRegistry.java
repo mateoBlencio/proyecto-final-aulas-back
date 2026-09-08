@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.audit.registry;
+package ar.edu.utn.frc.siga.audit.service;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.persistence.EntityManager;

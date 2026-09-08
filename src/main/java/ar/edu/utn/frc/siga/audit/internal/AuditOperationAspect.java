@@ -1,5 +1,6 @@
-package ar.edu.utn.frc.siga.audit;
+package ar.edu.utn.frc.siga.audit.internal;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;

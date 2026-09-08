@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.siga.audit.dto;
 
-import ar.edu.utn.frc.siga.audit.RevisionKind;
+import ar.edu.utn.frc.siga.audit.model.RevisionKind;
 
 import java.time.LocalDate;
 

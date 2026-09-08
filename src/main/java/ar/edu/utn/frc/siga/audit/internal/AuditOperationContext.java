@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.audit;
+package ar.edu.utn.frc.siga.audit.internal;
 
 import java.util.UUID;
 

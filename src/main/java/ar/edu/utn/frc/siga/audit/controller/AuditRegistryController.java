@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.siga.audit.controller;
 
-import ar.edu.utn.frc.siga.audit.RevisionKind;
+import ar.edu.utn.frc.siga.audit.model.RevisionKind;
 import ar.edu.utn.frc.siga.audit.dto.AuditLogFilter;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditLogEntryDto;
 import ar.edu.utn.frc.siga.audit.service.AuditRegistryService;

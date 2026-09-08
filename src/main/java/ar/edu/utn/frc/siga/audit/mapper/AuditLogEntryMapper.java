@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.siga.audit.mapper;
 
-import ar.edu.utn.frc.siga.audit.RevisionMetadata;
+import ar.edu.utn.frc.siga.audit.dto.RevisionMetadata;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditLogEntryDto;
 import ar.edu.utn.frc.siga.common.mapper.CentralMapperConfig;
 import org.mapstruct.Mapper;

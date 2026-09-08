@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.audit.registry;
+package ar.edu.utn.frc.siga.audit.service;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
 import org.junit.jupiter.api.DisplayName;

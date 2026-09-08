@@ -1,14 +1,14 @@
 package ar.edu.utn.frc.siga.audit.service.impl;
 
-import ar.edu.utn.frc.siga.audit.RevisionKind;
-import ar.edu.utn.frc.siga.audit.RevisionMetadata;
-import ar.edu.utn.frc.siga.audit.RevisionReader;
+import ar.edu.utn.frc.siga.audit.model.RevisionKind;
+import ar.edu.utn.frc.siga.audit.dto.RevisionMetadata;
+import ar.edu.utn.frc.siga.audit.service.RevisionReader;
 import ar.edu.utn.frc.siga.audit.dto.AuditLogFilter;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditLogEntryDto;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditLogEntryType;
 import ar.edu.utn.frc.siga.audit.mapper.AuditLogEntryMapperImpl;
-import ar.edu.utn.frc.siga.audit.registry.AuditedEntity;
-import ar.edu.utn.frc.siga.audit.registry.AuditedEntityRegistry;
+import ar.edu.utn.frc.siga.audit.service.AuditedEntity;
+import ar.edu.utn.frc.siga.audit.service.AuditedEntityRegistry;
 import ar.edu.utn.frc.siga.common.exception.InvalidDateRangeException;
 import ar.edu.utn.frc.siga.common.exception.InvalidSelectionException;
 import org.junit.jupiter.api.BeforeEach;

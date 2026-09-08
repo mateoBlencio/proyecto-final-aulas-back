@@ -1,5 +1,6 @@
-package ar.edu.utn.frc.siga.audit;
+package ar.edu.utn.frc.siga.audit.internal;
 
+import ar.edu.utn.frc.siga.audit.model.SigaRevision;
 import org.hibernate.envers.RevisionListener;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
