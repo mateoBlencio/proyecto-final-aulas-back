@@ -26,7 +26,7 @@ import java.time.LocalDate;
 @RestController
 @RequestMapping("${siga.api.base-path}/audit")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('SUBSECRETARIA')")
+@PreAuthorize("hasAuthority('PERM_AUDIT_READ')")
 @Tag(name = "Auditoría", description = "Registro unificado de revisiones de todas las entidades auditadas")
 public class AuditRegistryController {
 

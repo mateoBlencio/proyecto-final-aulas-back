@@ -58,7 +58,7 @@ public class AcademicPeriodController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ACADEMIC_PERIOD_UPDATE')")
     @Operation(summary = "Modificar un período académico",
                description = "Ajusta fecha de fin y, sólo para el período ANUAL, el receso invernal "
                        + "(inicio/fin). Al definir el receso en el ANUAL sincroniza el fin del 1.º "

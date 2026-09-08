@@ -16,6 +16,7 @@ public enum Permission {
 
     ACADEMIC_READ(ScopeType.GLOBAL),
     ACADEMIC_ACTIVATE(ScopeType.GLOBAL),
+    ACADEMIC_PERIOD_UPDATE(ScopeType.GLOBAL),
 
     EVENT_READ(ScopeType.GLOBAL),
     EVENT_MANAGE(ScopeType.GLOBAL),
@@ -36,6 +37,7 @@ public enum Permission {
     INGEST_RUN(ScopeType.GLOBAL),
     SYSACAD_READ(ScopeType.GLOBAL),
     SYSACAD_SYNC(ScopeType.GLOBAL),
+    AUDIT_READ(ScopeType.GLOBAL),
     USER_READ(ScopeType.GLOBAL),
     USER_MANAGE(ScopeType.GLOBAL),
     ROLE_ASSIGN(ScopeType.GLOBAL);
