@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.events.service;
 
+import ar.edu.utn.frc.siga.events.dto.AcademicEventFilter;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.UpdateUniqueEventRequestDto;
@@ -18,11 +19,13 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.modulith.NamedInterface;
 
 @NamedInterface("api")
 public interface AcademicEventService {
-    List<AcademicEventResponseDto> findAll();
+    Page<AcademicEventResponseDto> findAll(AcademicEventFilter filter, Pageable pageable);
     AcademicEventResponseDto findById(Long eventId);
 
     List<AcademicEventResponseDto> findByIds(Collection<Long> eventIds);

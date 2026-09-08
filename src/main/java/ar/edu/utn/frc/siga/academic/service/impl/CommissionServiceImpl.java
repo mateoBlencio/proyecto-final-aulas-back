@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.academic.dto.CommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.CommissionMapper;
 import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
@@ -16,8 +17,10 @@ import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.command.CommissionSyncCommand;
+import ar.edu.utn.frc.siga.academic.specification.CommissionSpecification;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.common.util.Maps;
@@ -33,6 +36,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -75,13 +80,12 @@ public class CommissionServiceImpl implements CommissionService {
     }
 
     @Override
-    public List<CommissionResponseDto> findAll(boolean includeDeactivated) {
-        List<Commission> commissions = includeDeactivated
-                ? commissionRepository.findAll()
-                : commissionRepository.findAllActive();
-        return commissions.stream()
-                .map(commissionMapper::toDto)
-                .toList();
+    public Page<CommissionResponseDto> findAll(CommissionFilter filter, Pageable pageable, boolean includeDeactivated) {
+        return commissionRepository.findAll(
+                        CommissionSpecification.withFilter(filter)
+                                .and(SoftDeleteSpecifications.activeUnless(includeDeactivated)),
+                        pageable)
+                .map(commissionMapper::toDto);
     }
 
     @Override

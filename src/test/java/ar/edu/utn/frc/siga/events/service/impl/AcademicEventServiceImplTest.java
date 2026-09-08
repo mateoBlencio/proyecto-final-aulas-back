@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.events.service.impl;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.events.EventTestData;
+import ar.edu.utn.frc.siga.events.dto.AcademicEventFilter;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.UpdateUniqueEventRequestDto;
@@ -42,6 +43,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.stubbing.Answer;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.DayOfWeek;
@@ -698,14 +702,16 @@ class AcademicEventServiceImplTest {
 
 
     @Test
-    @DisplayName("findAll: delega en el composer sobre todos los eventos")
+    @DisplayName("findAll: delega en el composer sobre la página del repositorio")
     void findAllDelegaEnComposer() {
-        when(eventRepository.findAll()).thenReturn(List.of());
+        when(eventRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
         when(composer.compose(anyCollection())).thenReturn(List.of());
 
-        List<AcademicEventResponseDto> result = service.findAll();
+        var result = service.findAll(new AcademicEventFilter(null, null, null),
+                Pageable.unpaged());
 
-        assertThat(result).isEmpty();
+        assertThat(result.getContent()).isEmpty();
         verify(composer).compose(anyCollection());
     }
 

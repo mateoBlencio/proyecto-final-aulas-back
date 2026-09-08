@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.academic.dto.CommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.CommissionMapper;
 import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
@@ -24,6 +25,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
 import java.util.Optional;
@@ -139,31 +143,33 @@ class CommissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("findAll: mapea todas las comisiones del repositorio")
+    @DisplayName("findAll: devuelve la página de comisiones mapeadas según el Specification")
     void findAllMapsAllCommissions() {
         Commission commission = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build();
         CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null);
-        when(commissionRepository.findAllActive()).thenReturn(List.of(commission));
+        when(commissionRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(commission)));
         when(commissionMapper.toDto(commission)).thenReturn(dto);
 
-        List<CommissionResponseDto> result = service.findAll(false);
-
-        assertThat(result).containsExactly(dto);
+        assertThat(service.findAll(new CommissionFilter(null, null), Pageable.unpaged(), false).getContent())
+                .containsExactly(dto);
     }
 
     @Test
-    @DisplayName("findAll: con includeDeactivated=true, trae también las comisiones desactivadas")
+    @DisplayName("findAll: con includeDeactivated=true, no restringe por deletedAt")
     void findAllWithIncludeDeactivatedReturnsEveryStatus() {
         Commission active = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build();
         Commission inactive = Commission.builder().id(4L).courseCode("K1002").academicPeriod(period).build();
         inactive.deactivate();
         CommissionResponseDto activeDto = new CommissionResponseDto(3L, "K1001", null);
         CommissionResponseDto inactiveDto = new CommissionResponseDto(4L, "K1002", null);
-        when(commissionRepository.findAll()).thenReturn(List.of(active, inactive));
+        when(commissionRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(active, inactive)));
         when(commissionMapper.toDto(active)).thenReturn(activeDto);
         when(commissionMapper.toDto(inactive)).thenReturn(inactiveDto);
 
-        assertThat(service.findAll(true)).containsExactly(activeDto, inactiveDto);
+        assertThat(service.findAll(new CommissionFilter(null, null), Pageable.unpaged(), true).getContent())
+                .containsExactly(activeDto, inactiveDto);
     }
 
     @Test

@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.academic.dto.SpecialtyFilter;
+import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SpecialtyMapper;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
@@ -12,6 +14,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
 
@@ -35,6 +40,21 @@ class SpecialtyServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new SpecialtyServiceImpl(specialtyRepository, specialtyMapper);
+    }
+
+    @Test
+    @DisplayName("findAll: aplica la Specification del filtro y mapea la página")
+    void findAllAppliesSpecificationAndMapsPage() {
+        Specialty specialty = Specialty.builder().id(1L).specialtyCode(17).name("Sistemas").build();
+        SpecialtyResponseDto dto = new SpecialtyResponseDto(17, "Sistemas", null);
+        when(specialtyRepository.findAll(any(Specification.class), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(specialty)));
+        when(specialtyMapper.toDto(specialty)).thenReturn(dto);
+
+        var result = service.findAll(new SpecialtyFilter(17, null), PageRequest.of(0, 20));
+
+        assertThat(result.getContent()).containsExactly(dto);
+        assertThat(result.getTotalElements()).isEqualTo(1);
     }
 
     @Test

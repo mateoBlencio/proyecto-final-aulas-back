@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
+import ar.edu.utn.frc.siga.academic.dto.SubjectFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Pageable;
 
 @Import(IntegrationTestData.class)
 @DisplayName("Academic soft-delete (integración)")
@@ -46,14 +48,14 @@ class AcademicSoftDeleteIntegrationTest extends AbstractIntegrationTest {
         Integer code = subject.getCode();
 
         assertThat(subjectRepository.findByCodeAndStudyPlanAndDeletedAtIsNull(code, plan)).isPresent();
-        assertThat(subjectService.findAll(false)).anyMatch(dto -> dto.id().equals(id));
+        assertThat(subjectService.findAll(new SubjectFilter(null, null, null, null), Pageable.unpaged(), false).getContent()).anyMatch(dto -> dto.id().equals(id));
 
         subject.deactivate();
         subjectRepository.save(subject);
 
         assertThat(subjectRepository.findByCodeAndStudyPlanAndDeletedAtIsNull(code, plan)).isEmpty();
-        assertThat(subjectService.findAll(false)).noneMatch(dto -> dto.id().equals(id));
-        assertThat(subjectService.findAll(true)).anyMatch(dto -> dto.id().equals(id));
+        assertThat(subjectService.findAll(new SubjectFilter(null, null, null, null), Pageable.unpaged(), false).getContent()).noneMatch(dto -> dto.id().equals(id));
+        assertThat(subjectService.findAll(new SubjectFilter(null, null, null, null), Pageable.unpaged(), true).getContent()).anyMatch(dto -> dto.id().equals(id));
         assertThatThrownBy(() -> subjectService.findById(id))
                 .isInstanceOf(ResourceNotFoundException.class);
 
@@ -63,7 +65,7 @@ class AcademicSoftDeleteIntegrationTest extends AbstractIntegrationTest {
         subjectRepository.restore(deleted);
 
         assertThat(subjectRepository.findByCodeAndStudyPlanAndDeletedAtIsNull(code, plan)).isPresent();
-        assertThat(subjectService.findAll(false)).anyMatch(dto -> dto.id().equals(id));
+        assertThat(subjectService.findAll(new SubjectFilter(null, null, null, null), Pageable.unpaged(), false).getContent()).anyMatch(dto -> dto.id().equals(id));
         SubjectResponseDto restored = subjectService.findById(id);
         assertThat(restored.id()).isEqualTo(id);
     }

@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.academic.dto.SubjectFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SubjectMapper;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
@@ -10,7 +11,9 @@ import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.academic.service.command.SubjectSyncCommand;
+import ar.edu.utn.frc.siga.academic.specification.SubjectSpecification;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.common.util.Maps;
@@ -22,6 +25,8 @@ import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,13 +43,12 @@ public class SubjectServiceImpl implements SubjectService {
     private final StudyPlanResolver studyPlanResolver;
 
     @Override
-    public List<SubjectResponseDto> findAll(boolean includeDeactivated) {
-        List<Subject> subjects = includeDeactivated
-                ? subjectRepository.findAll()
-                : subjectRepository.findAllActive();
-        return subjects.stream()
-                .map(subjectMapper::toDto)
-                .toList();
+    public Page<SubjectResponseDto> findAll(SubjectFilter filter, Pageable pageable, boolean includeDeactivated) {
+        return subjectRepository.findAll(
+                        SubjectSpecification.withFilter(filter)
+                                .and(SoftDeleteSpecifications.activeUnless(includeDeactivated)),
+                        pageable)
+                .map(subjectMapper::toDto);
     }
 
     @Override
@@ -77,14 +81,6 @@ public class SubjectServiceImpl implements SubjectService {
         StudyPlan studyPlan = requireStudyPlan(studyPlanCode, specialtyCode);
         return subjectMapper.toDto(subjectRepository.findByCodeAndStudyPlanAndDeletedAtIsNull(code, studyPlan)
                 .orElseThrow(() -> ResourceNotFoundException.of("Subject", code)));
-    }
-
-    @Override
-    public List<SubjectResponseDto> findBySpecialtyCode(Integer specialtyCode, boolean includeDeactivated) {
-        return subjectRepository.findByStudyPlan_Specialty_SpecialtyCode(specialtyCode).stream()
-                .filter(subject -> includeDeactivated || subject.isActive())
-                .map(subjectMapper::toDto)
-                .toList();
     }
 
     private StudyPlan requireStudyPlan(Integer studyPlanCode, Integer specialtyCode) {

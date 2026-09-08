@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.academic.dto.SubjectFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SubjectMapper;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
@@ -18,6 +19,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
 import java.util.Optional;
@@ -93,64 +97,33 @@ class SubjectServiceImplTest {
     }
 
     @Test
-    @DisplayName("findAll: mapea todas las materias del repositorio")
+    @DisplayName("findAll: devuelve la página de materias mapeadas según el Specification")
     void findAllMapsAllSubjects() {
         Subject subject = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
         SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null);
-        when(subjectRepository.findAllActive()).thenReturn(List.of(subject));
+        when(subjectRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(subject)));
         when(subjectMapper.toDto(subject)).thenReturn(dto);
 
-        assertThat(service.findAll(false)).containsExactly(dto);
+        assertThat(service.findAll(new SubjectFilter(null, null, null, null), Pageable.unpaged(), false).getContent())
+                .containsExactly(dto);
     }
 
     @Test
-    @DisplayName("findAll: con includeDeactivated=true, mapea todas las materias (activas e inactivas)")
+    @DisplayName("findAll: con includeDeactivated=true, no restringe por deletedAt")
     void findAllWithIncludeDeactivatedMapsEveryStatus() {
         Subject active = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
         Subject inactive = Subject.builder().id(6L).code(102).name("Química").studyPlan(studyPlan).build();
         inactive.deactivate();
         SubjectResponseDto activeDto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null);
         SubjectResponseDto inactiveDto = new SubjectResponseDto(6L, 102, "Química", null, null);
-        when(subjectRepository.findAll()).thenReturn(List.of(active, inactive));
+        when(subjectRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(active, inactive)));
         when(subjectMapper.toDto(active)).thenReturn(activeDto);
         when(subjectMapper.toDto(inactive)).thenReturn(inactiveDto);
 
-        assertThat(service.findAll(true)).containsExactly(activeDto, inactiveDto);
-    }
-
-    @Test
-    @DisplayName("findBySpecialtyCode: mapea las materias de todos los planes de esa especialidad")
-    void findBySpecialtyCodeMapsAllSubjects() {
-        Subject subject = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
-        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null);
-        when(subjectRepository.findByStudyPlan_Specialty_SpecialtyCode(10)).thenReturn(List.of(subject));
-        when(subjectMapper.toDto(subject)).thenReturn(dto);
-
-        assertThat(service.findBySpecialtyCode(10, false)).containsExactly(dto);
-    }
-
-    @Test
-    @DisplayName("findBySpecialtyCode: sin includeDeactivated, descarta las materias desactivadas")
-    void findBySpecialtyCodeFiltersOutDeactivated() {
-        Subject active = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
-        Subject inactive = Subject.builder().id(6L).code(102).name("Química").studyPlan(studyPlan).build();
-        inactive.deactivate();
-        SubjectResponseDto activeDto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null);
-        SubjectResponseDto inactiveDto = new SubjectResponseDto(6L, 102, "Química", null, null);
-        when(subjectRepository.findByStudyPlan_Specialty_SpecialtyCode(10)).thenReturn(List.of(active, inactive));
-        when(subjectMapper.toDto(active)).thenReturn(activeDto);
-        when(subjectMapper.toDto(inactive)).thenReturn(inactiveDto);
-
-        assertThat(service.findBySpecialtyCode(10, true)).containsExactly(activeDto, inactiveDto);
-        assertThat(service.findBySpecialtyCode(10, false)).containsExactly(activeDto);
-    }
-
-    @Test
-    @DisplayName("findBySpecialtyCode: sin materias vinculadas, devuelve lista vacía (no lanza)")
-    void findBySpecialtyCodeWithoutMatchesReturnsEmptyList() {
-        when(subjectRepository.findByStudyPlan_Specialty_SpecialtyCode(999)).thenReturn(List.of());
-
-        assertThat(service.findBySpecialtyCode(999, false)).isEmpty();
+        assertThat(service.findAll(new SubjectFilter(null, null, null, null), Pageable.unpaged(), true).getContent())
+                .containsExactly(activeDto, inactiveDto);
     }
 
     @Test

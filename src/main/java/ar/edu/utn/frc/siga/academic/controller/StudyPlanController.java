@@ -1,11 +1,16 @@
 package ar.edu.utn.frc.siga.academic.controller;
 
+import ar.edu.utn.frc.siga.academic.dto.StudyPlanFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.StudyPlanResponseDto;
 import ar.edu.utn.frc.siga.academic.service.StudyPlanService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -15,8 +20,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 @Slf4j
 @RestController
@@ -30,12 +33,18 @@ public class StudyPlanController {
 
     @GetMapping
     @Operation(summary = "Listar planes de estudio",
-               description = "Por defecto solo devuelve los activos; con includeDeactivated=true incluye "
+               description = "Listado paginado con filtros opcionales por código de plan y de especialidad. "
+                       + "Por defecto solo devuelve los activos; con includeDeactivated=true incluye "
                        + "también los desactivados.")
-    public ResponseEntity<List<StudyPlanResponseDto>> findAll(
+    public ResponseEntity<Page<StudyPlanResponseDto>> findAll(
+            @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
+            @RequestParam(required = false) Integer planCode,
+            @RequestParam(required = false) Integer specialtyCode,
             @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
-        log.debug("GET /v1/study-plans?includeDeactivated={}", includeDeactivated);
-        return ResponseEntity.ok(studyPlanService.findAll(includeDeactivated));
+        log.debug("GET /v1/study-plans?planCode={}&specialtyCode={}&includeDeactivated={}",
+                planCode, specialtyCode, includeDeactivated);
+        StudyPlanFilter filter = new StudyPlanFilter(planCode, specialtyCode);
+        return ResponseEntity.ok(studyPlanService.findAll(filter, pageable, includeDeactivated));
     }
 
     @GetMapping("/{id}")
