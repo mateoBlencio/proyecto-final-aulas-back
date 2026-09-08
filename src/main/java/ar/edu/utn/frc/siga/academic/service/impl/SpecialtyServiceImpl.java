@@ -1,11 +1,13 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.academic.dto.SpecialtyFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SpecialtyMapper;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
 import ar.edu.utn.frc.siga.academic.service.SpecialtyService;
 import ar.edu.utn.frc.siga.academic.service.command.SpecialtySyncCommand;
+import ar.edu.utn.frc.siga.academic.specification.SpecialtySpecification;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import java.time.Instant;
@@ -15,6 +17,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,10 +32,9 @@ public class SpecialtyServiceImpl implements SpecialtyService {
     private final SpecialtyMapper specialtyMapper;
 
     @Override
-    public List<SpecialtyResponseDto> findAll() {
-        return specialtyRepository.findAll().stream()
-                .map(specialtyMapper::toDto)
-                .toList();
+    public Page<SpecialtyResponseDto> findAll(SpecialtyFilter filter, Pageable pageable) {
+        return specialtyRepository.findAll(SpecialtySpecification.withFilter(filter), pageable)
+                .map(specialtyMapper::toDto);
     }
 
     @Override

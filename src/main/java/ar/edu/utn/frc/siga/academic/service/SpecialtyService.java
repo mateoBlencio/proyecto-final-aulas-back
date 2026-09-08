@@ -1,16 +1,19 @@
 package ar.edu.utn.frc.siga.academic.service;
 
+import ar.edu.utn.frc.siga.academic.dto.SpecialtyFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
 import ar.edu.utn.frc.siga.academic.service.command.SpecialtySyncCommand;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.modulith.NamedInterface;
 
 @NamedInterface("api")
 public interface SpecialtyService {
 
-    List<SpecialtyResponseDto> findAll();
+    Page<SpecialtyResponseDto> findAll(SpecialtyFilter filter, Pageable pageable);
 
     SpecialtyResponseDto findById(Long id);
 

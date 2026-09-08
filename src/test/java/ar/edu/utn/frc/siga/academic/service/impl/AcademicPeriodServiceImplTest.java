@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.academic.dto.AcademicPeriodFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.AcademicPeriodMapperImpl;
 import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
@@ -14,6 +15,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -122,32 +126,36 @@ class AcademicPeriodServiceImplTest {
     }
 
     @Test
-    @DisplayName("findAll: sin includeDeactivated, mapea solo los períodos activos")
+    @DisplayName("findAll: devuelve la página de períodos mapeados según el Specification")
     void findAllMapsActivePeriods() {
         AcademicPeriod period = AcademicPeriod.builder()
                 .id(1L).year(2026).semester(1)
                 .startDate(LocalDate.of(2026, 3, 1))
                 .endDate(LocalDate.of(2026, 7, 31))
                 .build();
-        when(academicPeriodRepository.findAllActive()).thenReturn(List.of(period));
+        when(academicPeriodRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(period)));
 
-        List<AcademicPeriodResponseDto> result = service.findAll(false);
+        List<AcademicPeriodResponseDto> result = service.findAll(
+                new AcademicPeriodFilter(null, null), Pageable.unpaged(), false).getContent();
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().year()).isEqualTo(2026);
     }
 
     @Test
-    @DisplayName("findAll: con includeDeactivated=true, mapea todos los períodos del repositorio")
+    @DisplayName("findAll: con includeDeactivated=true, no restringe por deletedAt")
     void findAllWithIncludeDeactivatedMapsAllPeriods() {
         AcademicPeriod period = AcademicPeriod.builder()
                 .id(1L).year(2026).semester(1)
                 .startDate(LocalDate.of(2026, 3, 1))
                 .endDate(LocalDate.of(2026, 7, 31))
                 .build();
-        when(academicPeriodRepository.findAll()).thenReturn(List.of(period));
+        when(academicPeriodRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(period)));
 
-        List<AcademicPeriodResponseDto> result = service.findAll(true);
+        List<AcademicPeriodResponseDto> result = service.findAll(
+                new AcademicPeriodFilter(null, null), Pageable.unpaged(), true).getContent();
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().year()).isEqualTo(2026);

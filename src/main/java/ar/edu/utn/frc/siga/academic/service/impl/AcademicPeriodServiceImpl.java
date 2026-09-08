@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.academic.dto.AcademicPeriodFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.AcademicPeriodMapper;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
@@ -7,10 +8,14 @@ import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
+import ar.edu.utn.frc.siga.academic.specification.AcademicPeriodSpecification;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,13 +57,13 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
     }
 
     @Override
-    public List<AcademicPeriodResponseDto> findAll(boolean includeDeactivated) {
-        List<AcademicPeriod> periods = includeDeactivated
-                ? academicPeriodRepository.findAll()
-                : academicPeriodRepository.findAllActive();
-        return periods.stream()
-                .map(academicPeriodMapper::toDto)
-                .toList();
+    public Page<AcademicPeriodResponseDto> findAll(AcademicPeriodFilter filter, Pageable pageable,
+            boolean includeDeactivated) {
+        return academicPeriodRepository.findAll(
+                        AcademicPeriodSpecification.withFilter(filter)
+                                .and(SoftDeleteSpecifications.activeUnless(includeDeactivated)),
+                        pageable)
+                .map(academicPeriodMapper::toDto);
     }
 
     @Override
