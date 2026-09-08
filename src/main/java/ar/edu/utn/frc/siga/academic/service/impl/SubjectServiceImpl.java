@@ -99,6 +99,7 @@ public class SubjectServiceImpl implements SubjectService {
         Instant syncedAt = Instant.now();
         Map<SubjectKey, Subject> existing = Maps.byId(subjectRepository.findAll(), SubjectKey::of);
         Map<StudyPlanKey, Optional<StudyPlan>> studyPlansByKey = new HashMap<>();
+        Map<Integer, Specialty> specialtyCache = new HashMap<>();
         int affected = 0;
 
         for (SubjectSyncCommand command : commands) {
@@ -109,23 +110,21 @@ public class SubjectServiceImpl implements SubjectService {
                 continue;
             }
             StudyPlanKey key = new StudyPlanKey(command.specialtyCode(), command.studyPlanCode());
-            Optional<StudyPlan> studyPlan = studyPlansByKey.computeIfAbsent(key,
-                    k -> studyPlanResolver.findOrCreate(command.specialtyCode(), command.studyPlanCode(), syncedAt));
-            if (studyPlan.isEmpty()) {
-                log.warn("No se pudo resolver la especialidad {} para la materia {}",
-                        command.specialtyCode(), command.subjectCode());
-                continue;
-            }
+            StudyPlan studyPlan = studyPlansByKey.computeIfAbsent(key,
+                            k -> studyPlanResolver.findOrCreate(command.specialtyCode(), command.studyPlanCode(),
+                                    syncedAt, specialtyCache))
+                    .orElseThrow(() -> new IllegalStateException(
+                            "StudyPlanResolver devolvió vacío con especialidad y plan no nulos"));
 
             String hash = Hashes.sha256Hex(command.name(), command.term());
-            Subject subject = existing.get(new SubjectKey(command.subjectCode(), studyPlan.get().getId()));
+            Subject subject = existing.get(new SubjectKey(command.subjectCode(), studyPlan.getId()));
 
             if (subject == null) {
                 subjectRepository.save(Subject.builder()
                         .code(command.subjectCode())
                         .name(command.name())
                         .term(command.term())
-                        .studyPlan(studyPlan.get())
+                        .studyPlan(studyPlan)
                         .syncedAt(syncedAt)
                         .sysacadHash(hash)
                         .build());

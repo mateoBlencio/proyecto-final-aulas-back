@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.CommissionMapper;
 import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
 import ar.edu.utn.frc.siga.academic.model.Commission;
+import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
@@ -119,6 +120,7 @@ public class CommissionServiceImpl implements CommissionService {
                 .collect(Collectors.toMap(CommissionKey::of, Function.identity()));
         Map<Integer, AcademicPeriod> periodsByYear = new HashMap<>();
         Map<StudyPlanKey, Optional<StudyPlan>> studyPlansByKey = new HashMap<>();
+        Map<Integer, Specialty> specialtyCache = new HashMap<>();
         Map<SubjectKey, Subject> existingSubjects = Maps.byId(subjectRepository.findAll(), SubjectKey::of);
         Map<SubjectCommissionId, SubjectCommission> existingLinks =
                 Maps.byId(subjectCommissionRepository.findAll(), SubjectCommission::getId);
@@ -131,8 +133,8 @@ public class CommissionServiceImpl implements CommissionService {
                         command.courseCode(), command.academicYear());
                 continue;
             }
-            Optional<StudyPlan> studyPlan =
-                    findOrCreateStudyPlan(studyPlansByKey, command.specialtyCode(), command.studyPlanCode(), syncedAt);
+            Optional<StudyPlan> studyPlan = findOrCreateStudyPlan(studyPlansByKey, specialtyCache,
+                    command.specialtyCode(), command.studyPlanCode(), command.courseCode(), syncedAt);
             AcademicPeriod period = findOrCreatePeriod(periodsByYear, command.academicYear());
             CommissionKey rowKey = new CommissionKey(command.courseCode(), period.getId());
             incoming.add(rowKey);
@@ -166,17 +168,16 @@ public class CommissionServiceImpl implements CommissionService {
     }
 
     private Optional<StudyPlan> findOrCreateStudyPlan(Map<StudyPlanKey, Optional<StudyPlan>> cache,
-            Integer specialtyCode, Integer planCode, Instant syncedAt) {
+            Map<Integer, Specialty> specialtyCache, Integer specialtyCode, Integer planCode, String courseCode,
+            Instant syncedAt) {
         if (specialtyCode == null || planCode == null) {
+            log.warn("Comisión {} sin especialidad o plan de estudio en el comando: no se resuelve el plan y no se "
+                    + "vincula la materia", courseCode);
             return Optional.empty();
         }
         StudyPlanKey key = new StudyPlanKey(specialtyCode, planCode);
-        Optional<StudyPlan> studyPlan = cache.computeIfAbsent(key,
-                k -> studyPlanResolver.findOrCreate(specialtyCode, planCode, syncedAt));
-        if (studyPlan.isEmpty()) {
-            log.warn("No se pudo resolver el plan de estudio: especialidad {} no sincronizada todavía", specialtyCode);
-        }
-        return studyPlan;
+        return cache.computeIfAbsent(key,
+                k -> studyPlanResolver.findOrCreate(specialtyCode, planCode, syncedAt, specialtyCache));
     }
 
     private AcademicPeriod findOrCreatePeriod(Map<Integer, AcademicPeriod> cache, Integer year) {
@@ -205,26 +206,31 @@ public class CommissionServiceImpl implements CommissionService {
                     command.subjectCode(), command.courseCode());
             return 0;
         }
-        if (command.enrolledCount() == null) {
-            log.warn("No se pudo resolver la cantidad de inscriptos: curso={}, materia={}",
-                    command.courseCode(), command.subjectCode());
-            return 0;
-        }
         SubjectCommissionId id = new SubjectCommissionId(subject.getId(), commission.getId());
         SubjectCommission link = existingLinks.get(id);
 
         if (link == null) {
+            Integer enrolledCount = command.enrolledCount() != null ? command.enrolledCount() : 0;
+            if (command.enrolledCount() == null) {
+                log.info("Inscriptos no informados para curso={}, materia={}: se crea el link con 0 provisional",
+                        command.courseCode(), command.subjectCode());
+            }
             SubjectCommission created = SubjectCommission.builder()
                     .id(new SubjectCommissionId())
                     .subject(subject)
                     .commission(commission)
-                    .enrolledCount(command.enrolledCount())
+                    .enrolledCount(enrolledCount)
                     .build();
             subjectCommissionRepository.save(created);
             // Registrar el link recién creado para que un duplicado (mismo subject+commission) en el
             // mismo batch entre por la rama de actualización y no vuelva a insertar el mismo id.
             existingLinks.put(id, created);
             return 1;
+        }
+        if (command.enrolledCount() == null) {
+            log.info("Inscriptos no informados para curso={}, materia={}: se conserva el valor existente ({})",
+                    command.courseCode(), command.subjectCode(), link.getEnrolledCount());
+            return 0;
         }
         if (command.enrolledCount().equals(link.getEnrolledCount())) {
             return 0;
