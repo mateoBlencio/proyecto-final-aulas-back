@@ -12,6 +12,7 @@ import ar.edu.utn.frc.siga.events.mapper.AcademicEventComposer;
 import ar.edu.utn.frc.siga.events.mapper.OccurrenceMapper;
 import ar.edu.utn.frc.siga.events.model.AcademicEvent;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
+import ar.edu.utn.frc.siga.events.model.OccurrenceWindow;
 import ar.edu.utn.frc.siga.events.model.RecurringEvent;
 import ar.edu.utn.frc.siga.events.model.UniqueEvent;
 import ar.edu.utn.frc.siga.events.repository.AcademicEventRepository;
@@ -23,6 +24,7 @@ import ar.edu.utn.frc.siga.events.service.command.SyncRecurringEventCommand;
 import ar.edu.utn.frc.siga.events.service.command.UpsertRecurringEventResult;
 import ar.edu.utn.frc.siga.events.specification.AcademicEventSpecification;
 import ar.edu.utn.frc.siga.events.validator.EventScheduleValidator;
+import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
@@ -139,7 +141,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startDate());
 
         subjectService.findById(dto.subjectId());
-        commissionService.findById(dto.commissionId());
+        CommissionResponseDto commission = commissionService.findById(dto.commissionId());
 
         RecurringEvent event = RecurringEvent.builder()
                 .enrolled(dto.enrolled())
@@ -152,12 +154,12 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 .commissionId(dto.commissionId())
                 .build();
 
-        AcademicEvent saved = eventRepository.save(event);
-        List<Occurrence> occurrences = saved.toOccurrences();
+        eventRepository.save(event);
+        List<Occurrence> occurrences = event.toOccurrences(windowFor(commission.academicPeriod()));
         occurrenceRepository.saveAll(occurrences);
 
-        log.info("Evento recurrente creado: id={}, occurrences={}", saved.getId(), occurrences.size());
-        return composer.compose(saved);
+        log.info("Evento recurrente creado: id={}, occurrences={}", event.getId(), occurrences.size());
+        return composer.compose(event);
     }
 
     @Override
@@ -172,8 +174,8 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         Partition partition = partitionByKey(requests, AcademicEventServiceImpl::keyOf,
                 AcademicEventServiceImpl::buildRecurringEvent, null);
 
-        requireExistingReferences(partition.created());
-        persistCreated(partition.created());
+        Map<Long, OccurrenceWindow> windowByCommission = requireExistingReferences(partition.created());
+        persistCreated(partition.created(), windowByCommission);
 
         List<FindOrCreateResult<Long>> results = new ArrayList<>(requests.size());
         for (int i = 0; i < requests.size(); i++) {
@@ -200,11 +202,12 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     /**
      * El bulk construye el evento inline (no pasa por createRecurringEvent), así que valida acá el set
      * distinto de referencias que va a crear -- una consulta batch por servicio -- para no insertar
-     * eventos con subjectId/commissionId inexistentes.
+     * eventos con subjectId/commissionId inexistentes. Devuelve la ventana de ocurrencias por comisión
+     * derivada del período académico, reutilizando el batch de comisiones que ya trajo.
      */
-    private void requireExistingReferences(List<RecurringEvent> toCreate) {
+    private Map<Long, OccurrenceWindow> requireExistingReferences(List<RecurringEvent> toCreate) {
         if (toCreate.isEmpty()) {
-            return;
+            return Map.of();
         }
         Set<Long> subjectIds = toCreate.stream().map(RecurringEvent::getSubjectId).collect(Collectors.toSet());
         Set<Long> commissionIds = toCreate.stream().map(RecurringEvent::getCommissionId).collect(Collectors.toSet());
@@ -212,19 +215,20 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 .map(SubjectResponseDto::id).collect(Collectors.toSet());
         subjectIds.stream().filter(id -> !knownSubjects.contains(id)).findFirst()
                 .ifPresent(id -> { throw ResourceNotFoundException.of("Subject", id); });
-        Set<Long> knownCommissions = commissionService.findByIds(commissionIds).stream()
-                .map(CommissionResponseDto::id).collect(Collectors.toSet());
-        commissionIds.stream().filter(id -> !knownCommissions.contains(id)).findFirst()
+        Map<Long, OccurrenceWindow> windowByCommission = windowsByCommission(commissionIds);
+        commissionIds.stream().filter(id -> !windowByCommission.containsKey(id)).findFirst()
                 .ifPresent(id -> { throw ResourceNotFoundException.of("Commission", id); });
+        return windowByCommission;
     }
 
-    private void persistCreated(List<RecurringEvent> created) {
+    private void persistCreated(List<RecurringEvent> created, Map<Long, OccurrenceWindow> windowByCommission) {
         if (created.isEmpty()) {
             return;
         }
         eventRepository.saveAll(created);
         occurrenceRepository.saveAll(created.stream()
-                .flatMap(event -> event.toOccurrences().stream())
+                .flatMap(event -> event.toOccurrences(windowByCommission.getOrDefault(
+                        event.getCommissionId(), windowFor(null))).stream())
                 .toList());
     }
 
@@ -247,7 +251,8 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 });
 
         recurringEventRepository.saveAll(updated);
-        persistCreated(partition.created());
+        persistCreated(partition.created(), windowsByCommission(partition.created().stream()
+                .map(RecurringEvent::getCommissionId).collect(Collectors.toSet())));
 
         List<UpsertRecurringEventResult> results = new ArrayList<>(commands.size());
         for (int i = 0; i < commands.size(); i++) {
@@ -337,6 +342,23 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     private static RecurringEventKey keyOf(CreateRecurringEventRequestDto dto) {
         return new RecurringEventKey(dto.subjectId(), dto.commissionId(), dto.dayOfWeek(),
                 dto.startTime(), dto.startDate(), dto.endDate());
+    }
+
+    private Map<Long, OccurrenceWindow> windowsByCommission(Set<Long> commissionIds) {
+        if (commissionIds.isEmpty()) {
+            return Map.of();
+        }
+        return commissionService.findByIds(commissionIds).stream()
+                .collect(Collectors.toMap(CommissionResponseDto::id,
+                        commission -> windowFor(commission.academicPeriod())));
+    }
+
+    private static OccurrenceWindow windowFor(AcademicPeriodResponseDto period) {
+        if (period == null) {
+            return OccurrenceWindow.unbounded(null, null);
+        }
+        return new OccurrenceWindow(period.startDate(), period.endDate(),
+                period.recessStart(), period.recessEnd());
     }
 
     /**

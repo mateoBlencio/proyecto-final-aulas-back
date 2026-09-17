@@ -2,6 +2,10 @@ package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
+import ar.edu.utn.frc.siga.common.security.BuildingScope;
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
+import ar.edu.utn.frc.siga.common.security.BuildingScopedSpecifications;
+import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.dto.BuildingFilter;
@@ -37,14 +41,17 @@ public class BuildingServiceImpl implements BuildingService {
 
     private final BuildingRepository buildingRepository;
     private final BuildingMapper buildingMapper;
+    private final BuildingScopeResolver buildingScopeResolver;
 
     @Override
     public Page<BuildingResponseDto> findAll(BuildingFilter filter, Pageable pageable, boolean includeDeactivated) {
         log.debug("Listando edificios: filter={}, pageable={}, includeDeactivated={}",
                 filter, pageable, includeDeactivated);
+        BuildingScope scope = buildingScopeResolver.scopeFor(Permission.BUILDING_READ);
         return buildingRepository.findAll(
                         BuildingSpecification.withFilter(filter)
-                                .and(SoftDeleteSpecifications.activeUnless(includeDeactivated)),
+                                .and(SoftDeleteSpecifications.activeUnless(includeDeactivated))
+                                .and(BuildingScopedSpecifications.withinScope(scope, "id")),
                         pageable)
                 .map(buildingMapper::toDto);
     }

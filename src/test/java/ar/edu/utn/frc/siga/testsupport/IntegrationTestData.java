@@ -174,6 +174,10 @@ public class IntegrationTestData {
 
         int year = 2100 + (int) (nextSeq() % 500);
         AcademicPeriod period = periodoAcademico(year, TermType.ANUAL);
+        LocalDate today = LocalDate.now();
+        period.setStartDate(today.minusYears(5));
+        period.setEndDate(today.plusYears(15));
+        period = academicPeriodRepository.save(period);
         Commission commission = comision("CUR-" + nextSeq(), period);
         materiaComision(subject, commission, 30);
 

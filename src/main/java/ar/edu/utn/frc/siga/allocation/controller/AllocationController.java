@@ -10,12 +10,15 @@ import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.UniqueEventAllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationCommandMapper;
 import ar.edu.utn.frc.siga.allocation.mapper.EventAllocationComposer;
-import ar.edu.utn.frc.siga.common.dto.response.RevisionDto;
+import ar.edu.utn.frc.siga.audit.dto.response.RevisionDto;
 import ar.edu.utn.frc.siga.allocation.service.AllocationAuditHistoryService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationConflictService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationImpactService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.model.ConflictType;
+import ar.edu.utn.frc.siga.common.security.BuildingScope;
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
+import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -48,7 +51,7 @@ import java.util.Set;
 @RequestMapping("${siga.api.base-path}/allocations")
 @RequiredArgsConstructor
 @Tag(name = "Asignaciones", description = "Asignación manual de aulas para ocurrencias específicas")
-@PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+@PreAuthorize("hasAuthority('PERM_ALLOCATION_READ')")
 public class AllocationController {
 
     private final AllocationService allocationService;
@@ -58,6 +61,7 @@ public class AllocationController {
     private final AllocationCommandMapper commandMapper;
     private final EventAllocationComposer eventAllocationComposer;
     private final AcademicEventService academicEventService;
+    private final BuildingScopeResolver buildingScopeResolver;
 
     @GetMapping
     @Operation(summary = "Listar asignaciones por fecha",
@@ -84,12 +88,17 @@ public class AllocationController {
                        + "Para la vista sin aula ver GET /v1/events/unique.")
     public ResponseEntity<List<UniqueEventAllocationResponseDto>> findUniqueEvents() {
         log.debug("GET /v1/allocations/events/unique");
-        List<UniqueEventAllocationResponseDto> events = eventAllocationComposer.composeAll(academicEventService.findUniqueEvents());
+        BuildingScope scope = buildingScopeResolver.scopeFor(Permission.ALLOCATION_READ);
+        List<UniqueEventAllocationResponseDto> events = eventAllocationComposer.composeAll(academicEventService.findUniqueEvents())
+                .stream()
+                .filter(e -> e.classroom() == null || scope.allows(e.classroom().buildingId()))
+                .toList();
         log.info("Eventos únicos con aula listados: count={}", events.size());
         return ResponseEntity.ok(events);
     }
 
     @GetMapping("/history")
+    @PreAuthorize("hasAuthority('PERM_ALLOCATION_HISTORY_READ')")
     @Operation(summary = "Historial de asignaciones de un evento",
                description = "Devuelve las revisiones de auditoría de la(s) asignación(es) de todas las ocurrencias"
                        + " del evento. Devuelve 404 si el evento no existe y una lista vacía si existe pero nunca fue asignada.")
@@ -100,11 +109,13 @@ public class AllocationController {
     }
 
     @GetMapping("/conflicts")
+    @PreAuthorize("hasAuthority('PERM_CONFLICT_READ')")
     @Operation(summary = "Listar conflictos de asignación",
-               description = "Devuelve, mezclados y paginados, los conflictos pedidos en 'types' (los tres si se omite): "
-                       + "eventos sin aula, aulas con sobrecupo, superposiciones de horario-aula. Mismos defaults de "
-                       + "rango que antes: 'from' hoy, 'to' fin del período académico activo (o +6 meses). Excluye "
-                       + "ocurrencias ya pasadas salvo 'includePast=true'.")
+               description = "Devuelve, mezclados y paginados, los conflictos pedidos en 'types' (todos si se omite): "
+                       + "eventos sin aula (UNALLOCATED), aulas con sobrecupo (OVERCROWDED), superposiciones de "
+                       + "horario-aula (OVERLAP) y asignaciones en aulas que no habilitan la materia (NOT_PERMITTED). "
+                       + "Mismos defaults de rango que antes: 'from' hoy, 'to' fin del período académico activo "
+                       + "(o +6 meses). Excluye ocurrencias ya pasadas salvo 'includePast=true'.")
     public ResponseEntity<Page<AllocationConflictDto>> findConflicts(
             @RequestParam(required = false) Set<ConflictType> types,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -116,7 +127,7 @@ public class AllocationController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ALLOCATION_WRITE')")
     @Operation(summary = "Asignar aulas en lote",
                description = "Asigna aula a cada item del lote. Cada item apunta de una de tres formas: "
                        + "'occurrenceIds' (fechas puntuales), 'eventId' solo (todas las ocurrencias futuras "
@@ -131,7 +142,7 @@ public class AllocationController {
     }
 
     @PutMapping
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ALLOCATION_WRITE')")
     @Operation(summary = "Reasignar aulas en lote",
                description = "Cambia el aula de cada item del lote (upsert: crea la asignación si no existía). "
                        + "Además de las formas puntual ('occurrenceIds') y evento completo ('eventId'), acepta "
@@ -150,12 +161,13 @@ public class AllocationController {
     }
 
     @PostMapping("/impact")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ALLOCATION_WRITE')")
     @Operation(summary = "Ver el impacto de un pedido sin aplicarlo",
                description = "Recibe el mismo body que POST/PUT y responde qué pasaría si se aplicara, sin "
                        + "escribir nada. Devuelve cuántas clases toca el pedido y los choques como DATO y no como error, "
                        + "cada uno con el evento que ocupa el aula y las aulas libres en esa fecha y franja para "
-                       + "poder destrabarlo. Siempre 200, incluso con conflictos. Sigue devolviendo 400 si el "
+                       + "poder destrabarlo (las aulas sugeridas se filtran por permiso: no se propone un aula que "
+                       + "no habilita la materia del evento). Siempre 200, incluso con conflictos. Sigue devolviendo 400 si el "
                        + "pedido está mal formado y 409 si pide un aula inexistente o una ocurrencia ya pasada: "
                        + "eso no es un resultado a mostrar, es un pedido que no se puede ni evaluar.")
     public ResponseEntity<AllocationImpactResponseDto> impact(@Valid @RequestBody AllocationBatchRequestDto dto) {
@@ -167,7 +179,7 @@ public class AllocationController {
     }
 
     @DeleteMapping
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ALLOCATION_WRITE')")
     @Operation(summary = "Desasignar aulas en lote",
                description = "Libera el aula de cada item del lote (borra la asignación). "
                        + "409 si alguna ocurrencia del lote ya pasó. Atómico.")

@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.allocation;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
+import ar.edu.utn.frc.siga.common.security.SystemScope;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
@@ -71,8 +72,8 @@ class AllocationSyncFromSysacadIntegrationTest extends AbstractIntegrationTest {
         Long secondOccurrenceId = occurrences.get(1).getId();
 
         // 1) Primer sync: ninguna ocurrencia tenía asignación -> crea las dos, source=SYSACAD.
-        int affectedFirstSync = allocationService.syncFromSysacad(
-                List.of(new AllocationItem(new AllocationTarget.Event(eventId), sysacadClassroom.getId())));
+        int affectedFirstSync = SystemScope.call(() -> allocationService.syncFromSysacad(
+                List.of(new AllocationItem(new AllocationTarget.Event(eventId), sysacadClassroom.getId()))));
 
         assertThat(affectedFirstSync).isEqualTo(2);
         assertThat(allocationByOccurrence(firstOccurrenceId)).satisfies(a -> {
@@ -83,15 +84,15 @@ class AllocationSyncFromSysacadIntegrationTest extends AbstractIntegrationTest {
         assertThat(allocationByOccurrence(secondOccurrenceId).getSource()).isEqualTo(AllocationSource.SYSACAD);
 
         // 2) Un humano reasigna a mano la primera ocurrencia: pasa a source=MANUAL.
-        allocationService.reallocate(AllocationCommand.manual(
+        asFixtureUser(() -> allocationService.reallocate(AllocationCommand.manual(
                 List.of(new AllocationItem(new AllocationTarget.Occurrences(List.of(firstOccurrenceId)), manualClassroom.getId())),
-                "Reasignado a mano"));
+                "Reasignado a mano")));
         assertThat(allocationByOccurrence(firstOccurrenceId).getSource()).isEqualTo(AllocationSource.MANUAL);
 
         // 3) Segundo sync de SysAcad, con un aula distinta para todo el evento: la ocurrencia MANUAL
         //    no se toca; la que seguía siendo SYSACAD se actualiza.
-        int affectedSecondSync = allocationService.syncFromSysacad(
-                List.of(new AllocationItem(new AllocationTarget.Event(eventId), sysacadClassroomV2.getId())));
+        int affectedSecondSync = SystemScope.call(() -> allocationService.syncFromSysacad(
+                List.of(new AllocationItem(new AllocationTarget.Event(eventId), sysacadClassroomV2.getId()))));
 
         assertThat(affectedSecondSync).isEqualTo(1);
 

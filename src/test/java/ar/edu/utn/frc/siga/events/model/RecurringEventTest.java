@@ -117,6 +117,36 @@ class RecurringEventTest {
         assertThat(occurrences).isEmpty();
     }
 
+    @Test
+    @DisplayName("toOccurrences(window): recorta al rango del período (clamp) por ambos bordes")
+    void windowClamp() {
+        LocalDate startDate = LocalDate.of(2026, 3, 2);
+        RecurringEvent event = event(DayOfWeek.MONDAY, startDate, LocalDate.of(2026, 12, 21));
+        OccurrenceWindow window = new OccurrenceWindow(
+                LocalDate.of(2026, 3, 16), LocalDate.of(2026, 11, 30), null, null);
+
+        List<Occurrence> occurrences = event.toOccurrences(window);
+
+        assertThat(occurrences.getFirst().getDate()).isEqualTo(LocalDate.of(2026, 3, 16));
+        assertThat(occurrences.getLast().getDate()).isBeforeOrEqualTo(LocalDate.of(2026, 11, 30));
+    }
+
+    @Test
+    @DisplayName("toOccurrences(window): salta las fechas dentro del receso, bordes inclusive")
+    void windowSkipsRecess() {
+        LocalDate startDate = LocalDate.of(2026, 6, 1);
+        RecurringEvent event = event(DayOfWeek.MONDAY, startDate, LocalDate.of(2026, 8, 31));
+        OccurrenceWindow window = new OccurrenceWindow(startDate, LocalDate.of(2026, 8, 31),
+                LocalDate.of(2026, 7, 6), LocalDate.of(2026, 7, 27));
+
+        List<LocalDate> dates = event.toOccurrences(window).stream().map(Occurrence::getDate).toList();
+
+        assertThat(dates).contains(LocalDate.of(2026, 7, 6).minusWeeks(1))
+                .doesNotContain(LocalDate.of(2026, 7, 6), LocalDate.of(2026, 7, 13),
+                        LocalDate.of(2026, 7, 20), LocalDate.of(2026, 7, 27))
+                .contains(LocalDate.of(2026, 8, 3));
+    }
+
     private RecurringEvent event(DayOfWeek dayOfWeek, LocalDate startDate, LocalDate endDate) {
         return RecurringEvent.builder()
                 .id(1L)

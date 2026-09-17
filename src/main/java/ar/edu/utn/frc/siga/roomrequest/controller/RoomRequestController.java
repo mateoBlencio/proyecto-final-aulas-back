@@ -59,7 +59,7 @@ public class RoomRequestController {
     }
 
     @GetMapping("/items")
-    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_READ')")
     @Operation(summary = "Listar pedidos de aula",
                description = "Listado paginado de pedidos. Filtra por tipo, "
                        + "estado, ámbito y materia; por defecto oculta los pedidos con fecha pasada "
@@ -84,7 +84,7 @@ public class RoomRequestController {
     }
 
     @GetMapping("/items/status-counts")
-    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_READ')")
     @Operation(summary = "Contar pedidos de aula por estado",
                description = "Total de pedidos en cada estado.")
     public ResponseEntity<List<RoomRequestItemStatusCountDto>> countItemsByStatus(
@@ -97,7 +97,7 @@ public class RoomRequestController {
     }
 
     @GetMapping("/items/{id}")
-    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_READ')")
     @Operation(summary = "Buscar un pedido por id",
                description = "Detalle completo de un pedido, con la cabecera de su solicitud "
                        + "(incluido el contacto del docente). 404 si no existe.")

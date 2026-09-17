@@ -44,15 +44,25 @@ public class RecurringEvent extends AcademicEvent {
 
     @Override
     public List<Occurrence> toOccurrences() {
+        LocalDate rawEnd = endDate != null ? endDate : startDate.plusYears(1);
+        return toOccurrences(OccurrenceWindow.unbounded(startDate, rawEnd));
+    }
+
+    public List<Occurrence> toOccurrences(OccurrenceWindow window) {
+        LocalDate rawEnd = endDate != null ? endDate : startDate.plusYears(1);
+        LocalDate effectiveStart = window.clampStart(startDate);
+        LocalDate effectiveEnd = window.clampEnd(rawEnd);
+
         List<Occurrence> result = new ArrayList<>();
-        LocalDate end = endDate != null ? endDate : startDate.plusYears(1);
-        LocalDate current = startDate.with(TemporalAdjusters.nextOrSame(dayOfWeek));
-        while (!current.isAfter(end)) {
-            result.add(Occurrence.builder()
-                    .event(this)
-                    .date(current)
-                    .status(OccurrenceStatus.NEEDS_ROOM)
-                    .build());
+        LocalDate current = effectiveStart.with(TemporalAdjusters.nextOrSame(dayOfWeek));
+        while (!current.isAfter(effectiveEnd)) {
+            if (!window.isInRecess(current)) {
+                result.add(Occurrence.builder()
+                        .event(this)
+                        .date(current)
+                        .status(OccurrenceStatus.NEEDS_ROOM)
+                        .build());
+            }
             current = current.plusWeeks(1);
         }
         return result;

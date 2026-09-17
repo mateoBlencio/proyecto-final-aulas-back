@@ -30,13 +30,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("${siga.api.base-path}/resource-types")
 @RequiredArgsConstructor
 @Tag(name = "Tipos de recurso", description = "ABM de tipos de recurso de aula")
-@PreAuthorize("hasRole('SUBSECRETARIA')")
+@PreAuthorize("hasAuthority('PERM_RESOURCE_TYPE_MANAGE')")
 public class ResourceTypeController {
 
     private final ResourceTypeService resourceTypeService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @PreAuthorize("hasAuthority('PERM_RESOURCE_TYPE_READ')")
     @Operation(summary = "Listar tipos de recurso",
                description = "Listado paginado. Por defecto devuelve solo los tipos activos; con "
                        + "includeDeactivated=true incluye también los desactivados. Pensado para poblar el "
@@ -50,7 +50,7 @@ public class ResourceTypeController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @PreAuthorize("hasAuthority('PERM_RESOURCE_TYPE_READ')")
     @Operation(summary = "Buscar tipo de recurso por id", description = "404 si el tipo de recurso no existe.")
     public ResponseEntity<ResourceTypeResponseDto> findById(@PathVariable Long id) {
         log.debug("GET /v1/resource-types/{}", id);

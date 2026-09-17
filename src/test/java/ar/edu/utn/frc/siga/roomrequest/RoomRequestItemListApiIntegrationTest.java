@@ -1,8 +1,7 @@
 package ar.edu.utn.frc.siga.roomrequest;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
-import ar.edu.utn.frc.siga.auth.model.Role;
-import ar.edu.utn.frc.siga.auth.security.JwtService;
+import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
@@ -22,7 +21,6 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.Set;
 
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -44,8 +42,6 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
     private IntegrationTestData testData;
     @Autowired
     private RoomRequestRepository roomRequestRepository;
-    @Autowired
-    private JwtService jwtService;
 
     @Test
     @DisplayName("filtra por types y, combinado, por statuses")
@@ -174,9 +170,8 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
         anonymousMockMvc.perform(get("/v1/room-requests/items"))
                 .andExpect(status().isUnauthorized());
 
-        String auxToken = jwtService.generateAccessToken("auxiliar@frc.utn.edu.ar", Set.of(Role.AUXILIAR_AULICO));
-        anonymousMockMvc.perform(get("/v1/room-requests/items")
-                        .header("Authorization", "Bearer " + auxToken))
+        mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO)
+                .perform(get("/v1/room-requests/items"))
                 .andExpect(status().isOk());
     }
 

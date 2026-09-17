@@ -6,7 +6,6 @@ import ar.edu.utn.frc.siga.auth.dto.request.RefreshTokenRequest;
 import ar.edu.utn.frc.siga.auth.dto.response.TokenResponse;
 import ar.edu.utn.frc.siga.auth.exception.InvalidCredentialsException;
 import ar.edu.utn.frc.siga.auth.exception.LoginRateLimitExceededException;
-import ar.edu.utn.frc.siga.auth.model.Role;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import ar.edu.utn.frc.siga.auth.security.JwtService;
@@ -27,8 +26,8 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 
+import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -71,7 +70,7 @@ class AuthServiceImplTest {
     }
 
     private User user(String email) {
-        return User.builder().id(1L).email(email).roles(Set.of(Role.SUBSECRETARIA)).build();
+        return User.builder().id(1L).email(email).roleAssignments(List.of()).build();
     }
 
     @Test
@@ -86,7 +85,7 @@ class AuthServiceImplTest {
         User user = user("user@frc.utn.edu.ar");
         when(userRepository.findByEmailAndEnabledTrue("user@frc.utn.edu.ar")).thenReturn(Optional.of(user));
         when(refreshTokenService.issue(user)).thenReturn(new IssuedRefreshToken("raw-token", 3600));
-        when(jwtService.generateAccessToken(any(), any())).thenReturn("access-token");
+        when(jwtService.generateAccessToken(any())).thenReturn("access-token");
         when(jwtService.getAccessExpirationSeconds()).thenReturn(1200L);
 
         TokenResponse result = service.login(request, httpRequest);
@@ -156,7 +155,7 @@ class AuthServiceImplTest {
         User user = user("user@frc.utn.edu.ar");
         IssuedRefreshToken issued = new IssuedRefreshToken("nuevo-raw", 3600);
         when(refreshTokenService.refresh("viejo-raw")).thenReturn(new RefreshResult(user, issued));
-        when(jwtService.generateAccessToken(any(), any())).thenReturn("access-token");
+        when(jwtService.generateAccessToken(any())).thenReturn("access-token");
         when(jwtService.getAccessExpirationSeconds()).thenReturn(1200L);
 
         TokenResponse result = service.refresh(new RefreshTokenRequest("viejo-raw"));

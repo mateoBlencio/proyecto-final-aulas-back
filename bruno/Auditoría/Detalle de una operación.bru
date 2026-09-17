@@ -1,0 +1,27 @@
+meta {
+  name: Detalle de una operación
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/audit/operations/:operationId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  operationId: 00000000-0000-0000-0000-000000000000
+}
+
+params:query {
+  ~page: 0
+  ~size: 20
+}
+
+docs {
+  Cambios individuales (type=CHANGE) que componen una operación en lote,
+  paginados y ordenados por revisión descendente. Requiere rol SUBSECRETARIA.
+  El operationId sale del campo operationId de las entradas type=OPERATION de
+  GET /v1/audit. Página vacía si el operationId no existe.
+}

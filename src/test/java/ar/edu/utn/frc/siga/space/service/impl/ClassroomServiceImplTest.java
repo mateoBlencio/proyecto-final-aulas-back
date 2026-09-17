@@ -1,6 +1,9 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.security.BuildingScope;
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
+import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.SpaceTestData;
 import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
@@ -10,10 +13,15 @@ import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.exception.SpaceDomainException;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomListComposer;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomMapper;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomSubjectPermissionDto;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
+import ar.edu.utn.frc.siga.space.model.ClassroomPermission;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
+import ar.edu.utn.frc.siga.space.model.PermissionMode;
+import ar.edu.utn.frc.siga.space.model.PermissionTargetKind;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
+import ar.edu.utn.frc.siga.space.repository.ClassroomPermissionRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
 import ar.edu.utn.frc.siga.space.service.ClassroomTypeService;
@@ -31,14 +39,19 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static ar.edu.utn.frc.siga.space.service.ClassroomService.DEFAULT_CLASSROOM_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -63,14 +76,22 @@ class ClassroomServiceImplTest {
     private ClassroomListComposer classroomListComposer;
     @Mock
     private ClassroomFeatureWriter classroomFeatureWriter;
+    @Mock
+    private BuildingScopeResolver buildingScopeResolver;
+    @Mock
+    private ClassroomPermissionRepository classroomPermissionRepository;
 
     private ClassroomServiceImpl service;
 
     @BeforeEach
     void setUp() {
+        ScopedClassroomFinder scopedClassroom =
+                new ScopedClassroomFinder(classroomRepository, buildingScopeResolver);
         service = new ClassroomServiceImpl(
                 classroomRepository, buildingRepository, classroomTypeService, classroomTypeRepository,
-                classroomMapper, classroomListComposer, classroomFeatureWriter);
+                classroomMapper, classroomListComposer, classroomFeatureWriter, buildingScopeResolver,
+                scopedClassroom, classroomPermissionRepository);
+        lenient().when(buildingScopeResolver.scopeFor(any())).thenReturn(BuildingScope.unrestricted());
     }
 
 
@@ -155,6 +176,20 @@ class ClassroomServiceImplTest {
         assertThat(toSave.getClassroomType()).isEqualTo(type);
     }
 
+    @Test
+    @DisplayName("create: sin alcance sobre el edificio → AccessDeniedException, no guarda")
+    void createWithoutBuildingScopeThrowsAccessDenied() {
+        Building building = SpaceTestData.building().build();
+        ClassroomRequestDto dto = SpaceTestData.classroomRequestDto();
+        when(buildingRepository.findActiveById(1L)).thenReturn(Optional.of(building));
+        doThrow(new AccessDeniedException("sin acceso"))
+                .when(buildingScopeResolver).requireAccess(Permission.CLASSROOM_CREATE, 1L);
+
+        assertThatThrownBy(() -> service.create(dto)).isInstanceOf(AccessDeniedException.class);
+
+        verify(classroomRepository, never()).save(any());
+    }
+
 
     @Test
     @DisplayName("findById: devuelve el DTO mapeado cuando el aula existe")
@@ -183,7 +218,8 @@ class ClassroomServiceImplTest {
     void findAllAvailableMapsRepositoryResult() {
         Classroom classroom = SpaceTestData.classroom().build();
         ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
-        when(classroomRepository.findAllActive()).thenReturn(List.of(classroom));
+        when(classroomRepository.findAll(ArgumentMatchers.<Specification<Classroom>>any()))
+                .thenReturn(List.of(classroom));
         when(classroomMapper.toDto(classroom)).thenReturn(dto);
 
         assertThat(service.findAllAvailable()).containsExactly(dto);
@@ -281,6 +317,20 @@ class ClassroomServiceImplTest {
                 .hasMessage("Building not found with id: 1");
     }
 
+    @Test
+    @DisplayName("update: sin alcance sobre el edificio del aula → 404 (el fetch acotado no la ve), no guarda")
+    void updateWithoutBuildingScopeThrowsNotFound() {
+        Classroom existing = SpaceTestData.classroom().build();
+        ClassroomRequestDto dto = SpaceTestData.classroomRequestDto();
+        when(classroomRepository.findActiveById(1L)).thenReturn(Optional.of(existing));
+        when(buildingScopeResolver.scopeFor(Permission.CLASSROOM_UPDATE))
+                .thenReturn(BuildingScope.of(Set.of(2L)));
+
+        assertThatThrownBy(() -> service.update(1L, dto)).isInstanceOf(ResourceNotFoundException.class);
+
+        verify(classroomRepository, never()).save(any());
+    }
+
 
     @Test
     @DisplayName("delete: marca el aula como eliminada (soft-delete) sin borrado físico")
@@ -301,6 +351,32 @@ class ClassroomServiceImplTest {
         assertThatThrownBy(() -> service.delete(1L))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Classroom not found with id: 1");
+    }
+
+    @Test
+    @DisplayName("delete: sin alcance sobre el edificio del aula → 404 (el fetch acotado no la ve), no borra")
+    void deleteWithoutBuildingScopeThrowsNotFound() {
+        Classroom existing = SpaceTestData.classroom().build();
+        when(classroomRepository.findActiveById(1L)).thenReturn(Optional.of(existing));
+        when(buildingScopeResolver.scopeFor(Permission.CLASSROOM_DELETE))
+                .thenReturn(BuildingScope.of(Set.of(2L)));
+
+        assertThatThrownBy(() -> service.delete(1L)).isInstanceOf(ResourceNotFoundException.class);
+
+        verify(classroomRepository, never()).softDelete(any());
+    }
+
+    @Test
+    @DisplayName("activate: sin alcance sobre el edificio del aula → 404 (el fetch acotado no la ve), no reactiva")
+    void activateWithoutBuildingScopeThrowsNotFound() {
+        Classroom existing = SpaceTestData.classroom().build();
+        when(classroomRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(buildingScopeResolver.scopeFor(Permission.CLASSROOM_ACTIVATE))
+                .thenReturn(BuildingScope.of(Set.of(2L)));
+
+        assertThatThrownBy(() -> service.activate(1L)).isInstanceOf(ResourceNotFoundException.class);
+
+        verify(classroomRepository, never()).restore(any());
     }
 
 
@@ -528,6 +604,37 @@ class ClassroomServiceImplTest {
 
         verify(classroomRepository, never()).save(any());
         assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("findSubjectPermissions: ALL abre a todas, SUBSET expone las materias, NONE queda vacío")
+    void findSubjectPermissionsResuelveModo() {
+        Classroom all = SpaceTestData.classroom().id(1L).permissionMode(PermissionMode.ALL).build();
+        Classroom subset = SpaceTestData.classroom().id(2L).permissionMode(PermissionMode.SUBSET).build();
+        Classroom none = SpaceTestData.classroom().id(3L).permissionMode(PermissionMode.NONE).build();
+        ClassroomPermission subsetPermission = ClassroomPermission.builder()
+                .classroom(subset).targetKind(PermissionTargetKind.SUBJECT).targetId(77L).build();
+        when(classroomPermissionRepository.findByClassroomIdInAndDeletedAtIsNull(any()))
+                .thenReturn(List.of(subsetPermission));
+        when(classroomRepository.findAllById(any())).thenReturn(List.of(all, subset, none));
+
+        Map<Long, ClassroomSubjectPermissionDto> result =
+                service.findSubjectPermissions(List.of(1L, 2L, 3L));
+
+        assertThat(result.get(1L).openToAll()).isTrue();
+        assertThat(result.get(2L).openToAll()).isFalse();
+        assertThat(result.get(2L).allowedSubjectIds()).containsExactly(77L);
+        assertThat(result.get(2L).permits(77L)).isTrue();
+        assertThat(result.get(3L).openToAll()).isFalse();
+        assertThat(result.get(3L).allowedSubjectIds()).isEmpty();
+        assertThat(result.get(3L).permits(77L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("findSubjectPermissions: lista vacía no consulta la base")
+    void findSubjectPermissionsVacio() {
+        assertThat(service.findSubjectPermissions(List.of())).isEmpty();
+        verify(classroomRepository, never()).findAllById(any());
     }
 
     private static Classroom syncClassroom(Integer roomNumber, Integer capacity, Boolean sysacadEnabled, String hash) {

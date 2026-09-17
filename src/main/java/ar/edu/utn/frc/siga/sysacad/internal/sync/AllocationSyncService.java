@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.sysacad.internal.sync;
 
+import ar.edu.utn.frc.siga.common.security.SystemScope;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.model.TermType;
@@ -109,7 +110,7 @@ public class AllocationSyncService implements SysacadViewSyncer {
 
         warnOverlaps(overlapsBySlot);
 
-        return allocationService.syncFromSysacad(List.copyOf(items));
+        return SystemScope.call(() -> allocationService.syncFromSysacad(List.copyOf(items)));
     }
 
     private static boolean isSentinel(SysacadAllocationDto row) {

@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("${siga.api.base-path}/specialties")
 @RequiredArgsConstructor
 @Tag(name = "Especialidades", description = "Consulta del catálogo de especialidades")
-@PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+@PreAuthorize("hasAuthority('PERM_ACADEMIC_READ')")
 public class SpecialtyController {
 
     private final SpecialtyService specialtyService;

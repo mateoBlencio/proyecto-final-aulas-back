@@ -1,0 +1,42 @@
+meta {
+  name: Modificar período académico
+  type: http
+  seq: 9
+}
+
+put {
+  url: {{baseUrl}}/v1/academic-periods/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: 1
+}
+
+body:json {
+  {
+    "endDate": "2026-11-30",
+    "recessStart": "2026-07-06",
+    "recessEnd": "2026-07-27"
+  }
+}
+
+docs {
+  Modifica un período académico. Requiere rol SUBSECRETARIA.
+
+  Body: { startDate?, endDate, recessStart?, recessEnd? }
+  - startDate solo se puede cambiar si la fecha de inicio actual todavía no ocurrió.
+  - recessStart/recessEnd solo se aceptan en el período ANUAL (cuatrimestre = 0);
+    al setearlos, el fin del 1.º cuatrimestre pasa a recessStart - 1 día y el inicio
+    del 2.º a recessEnd + 1 día, en la misma operación.
+
+  Efecto: publica AcademicPeriodChanged. El módulo events recalcula las ocurrencias
+  FUTURAS y NO asignadas de los eventos recurrentes de ese período: agrega las que
+  faltan, borra las sobrantes; el receso queda como hueco para los eventos anuales.
+
+  Errores: 404 si el período no existe; 422 si la fecha de inicio ya ocurrió, si el
+  orden de fechas es inconsistente, o si se pide receso en un período no ANUAL.
+
+  Respuesta 200: AcademicPeriodResponseDto con las fechas actualizadas y el receso.
+}

@@ -19,7 +19,8 @@ class OptimizerConstraintsTest {
             "Minimizar sobreocupacion",
             "Minimizar subocupacion",
             "Preferir misma aula por comision",
-            "Preferir mismo edificio por comision");
+            "Preferir mismo edificio por comision",
+            "Permiso no satisfecho");
 
     private static final Set<SettingKey> EXPECTED_WEIGHT_KEYS = Set.of(
             SettingKey.OPTIMIZER_WEIGHT_OVERCROWDING,
@@ -28,11 +29,11 @@ class OptimizerConstraintsTest {
             SettingKey.OPTIMIZER_WEIGHT_SAME_COMMISSION_DIFF_BUILDING);
 
     @Test
-    @DisplayName("discovers exactly the six constraints via ServiceLoader")
+    @DisplayName("discovers exactly the seven constraints via ServiceLoader")
     void discoversAllConstraints() {
         List<OptimizerConstraint> constraints = OptimizerConstraints.all();
 
-        assertThat(constraints).hasSize(6);
+        assertThat(constraints).hasSize(7);
     }
 
     @Test
@@ -65,6 +66,7 @@ class OptimizerConstraintsTest {
         Set<String> namesWithoutWeight = withoutWeight.stream()
                 .map(OptimizerConstraint::name)
                 .collect(Collectors.toSet());
-        assertThat(namesWithoutWeight).isEqualTo(Set.of("Sin solapamiento", "Asignar todo lo posible"));
+        assertThat(namesWithoutWeight).isEqualTo(
+                Set.of("Sin solapamiento", "Asignar todo lo posible", "Permiso no satisfecho"));
     }
 }

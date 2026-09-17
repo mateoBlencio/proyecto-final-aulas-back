@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.space;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -44,7 +45,7 @@ class ClassroomSoftDeleteIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[*].id", hasItem(id.intValue())));
 
-        classroomService.delete(id);
+        mockMvc.perform(delete("/v1/classrooms/" + id)).andExpect(status().isNoContent());
 
         assertThat(classroomRepository.findByRoomNumberAndDeletedAtIsNull(roomNumber)).isEmpty();
         assertThat(classroomRepository.findAllByRoomNumberAndDeletedAtIsNull(roomNumber)).isEmpty();
@@ -61,7 +62,7 @@ class ClassroomSoftDeleteIntegrationTest extends AbstractIntegrationTest {
         Long id = classroom.getId();
         Integer roomNumber = classroom.getRoomNumber();
 
-        classroomService.delete(id);
+        asFixtureUser(() -> classroomService.delete(id));
 
         Classroom deleted = classroomRepository.findById(id).orElseThrow();
         assertThat(deleted.isDeleted()).isTrue();

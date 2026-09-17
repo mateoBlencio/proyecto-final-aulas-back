@@ -93,7 +93,7 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
     }
 
     private void blockAllAvailableRooms(LocalDate date) {
-        for (ClassroomResponseDto room : classroomService.findAllAvailable()) {
+        for (ClassroomResponseDto room : asFixtureUser(classroomService::findAllAvailable)) {
             UniqueEvent blocker = eventRepository.save(UniqueEvent.builder()
                     .enrolled(1).startTime(START).duration(Duration.ofMinutes(DURATION))
                     .date(date).description("blocker").kind(UniqueEventKind.OTRO).build());

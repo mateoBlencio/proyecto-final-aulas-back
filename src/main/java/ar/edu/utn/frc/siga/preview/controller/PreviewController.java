@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("${siga.api.base-path}/previews")
 @RequiredArgsConstructor
 @Tag(name = "Asignación automática", description = "Preview de asignación óptima de aulas vía solver")
+@PreAuthorize("hasAuthority('PERM_PREVIEW_RUN')")
 public class PreviewController {
 
     private final PreviewService previewService;
