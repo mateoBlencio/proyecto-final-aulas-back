@@ -133,7 +133,7 @@ class RoomRequestScheduleValidationIntegrationTest extends AbstractIntegrationTe
             assertThat(item.startTime()).isEqualTo(java.time.LocalTime.of(18, 0));
             assertThat(item.durationMinutes()).isEqualTo(120);
             assertThat(item.estimated()).isEqualTo(40);
-            assertThat(item.commission()).isNotNull();
+            assertThat(item.commissions()).hasSize(1);
         });
     }
 

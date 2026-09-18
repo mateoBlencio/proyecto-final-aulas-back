@@ -145,7 +145,7 @@ class RoomRequestIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(created.subject()).isNull();
         assertThat(created.items()).singleElement()
-                .satisfies(item -> assertThat(item.commission()).isNull());
+                .satisfies(item -> assertThat(item.commissions()).isEmpty());
     }
 
     @Test
@@ -228,7 +228,7 @@ class RoomRequestIntegrationTest extends AbstractIntegrationTest {
         assertThat(created.subject()).isNotNull();
         assertThat(created.items()).singleElement().satisfies(item -> {
             assertThat(item.status()).isEqualTo(RoomRequestStatus.PENDING);
-            assertThat(item.commission()).isNull();
+            assertThat(item.commissions()).isEmpty();
             assertThat(item.dayOfWeek()).isNull();
             assertThat(item.date()).isEqualTo(LocalDate.now().plusDays(30));
             assertThat(item.startTime()).isEqualTo(LocalTime.of(10, 0));

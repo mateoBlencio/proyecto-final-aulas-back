@@ -15,11 +15,14 @@ import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestRowHeaderDto;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomPreference;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
+import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -38,11 +41,16 @@ public class RoomRequestComposer {
     private final SubjectService subjectService;
     private final CommissionService commissionService;
     private final ClassroomService classroomService;
+    private final ClassScheduleService classScheduleService;
+
+    private record ActiveCommissionsKey(Long subjectId, LocalDate date) {
+    }
 
     private record Catalogs(
             Map<Long, SubjectResponseDto> subjectsById,
             Map<Long, CommissionResponseDto> commissionsById,
-            Map<Long, ClassroomOptionDto> classroomsById) {
+            Map<Long, ClassroomOptionDto> classroomsById,
+            Map<ActiveCommissionsKey, List<Long>> activeCommissionIdsByKey) {
     }
 
     public RoomRequestResponseDto compose(RoomRequest request) {
@@ -53,14 +61,16 @@ public class RoomRequestComposer {
         Set<Long> subjectIds = new LinkedHashSet<>();
         Set<Long> commissionIds = new LinkedHashSet<>();
         Set<Long> classroomIds = new LinkedHashSet<>();
+        Set<ActiveCommissionsKey> activeCommissionsKeys = new LinkedHashSet<>();
 
         for (RoomRequest request : requests) {
             collectSubjectId(request, subjectIds);
             collectCommissionIds(request.getItems(), commissionIds);
             collectClassroomIds(request.getItems(), classroomIds);
+            collectActiveCommissionsKeys(request.getItems(), activeCommissionsKeys);
         }
 
-        Catalogs catalogs = resolveCatalogs(subjectIds, commissionIds, classroomIds);
+        Catalogs catalogs = resolveCatalogs(subjectIds, commissionIds, classroomIds, activeCommissionsKeys);
 
         List<RoomRequestResponseDto> result = new ArrayList<>(requests.size());
         for (RoomRequest request : requests) {
@@ -78,8 +88,10 @@ public class RoomRequestComposer {
             collectSubjectId(item.getRequest(), subjectIds);
         }
         collectCommissionIds(items, commissionIds);
+        Set<ActiveCommissionsKey> activeCommissionsKeys = new LinkedHashSet<>();
+        collectActiveCommissionsKeys(items, activeCommissionsKeys);
 
-        Catalogs catalogs = resolveCatalogs(subjectIds, commissionIds, Set.of());
+        Catalogs catalogs = resolveCatalogs(subjectIds, commissionIds, Set.of(), activeCommissionsKeys);
 
         Map<Long, RoomRequestRowHeaderDto> headersByRequestId = new LinkedHashMap<>();
         List<RoomRequestItemRowDto> result = new ArrayList<>(items.size());
@@ -88,7 +100,7 @@ public class RoomRequestComposer {
             RoomRequestRowHeaderDto header = headersByRequestId.computeIfAbsent(request.getId(),
                     id -> mapper.toRowHeaderDto(request, resolveSubject(request, catalogs)));
 
-            result.add(mapper.toRowDto(item, header, resolveCommission(item, catalogs)));
+            result.add(mapper.toRowDto(item, header, resolveCommissions(item, catalogs)));
         }
         return result;
     }
@@ -97,13 +109,15 @@ public class RoomRequestComposer {
         Set<Long> subjectIds = new LinkedHashSet<>();
         Set<Long> commissionIds = new LinkedHashSet<>();
         Set<Long> classroomIds = new LinkedHashSet<>();
+        Set<ActiveCommissionsKey> activeCommissionsKeys = new LinkedHashSet<>();
 
         RoomRequest request = item.getRequest();
         collectSubjectId(request, subjectIds);
         collectCommissionIds(List.of(item), commissionIds);
         collectClassroomIds(List.of(item), classroomIds);
+        collectActiveCommissionsKeys(List.of(item), activeCommissionsKeys);
 
-        Catalogs catalogs = resolveCatalogs(subjectIds, commissionIds, classroomIds);
+        Catalogs catalogs = resolveCatalogs(subjectIds, commissionIds, classroomIds, activeCommissionsKeys);
 
         RoomRequestItemDetailHeaderDto header = mapper.toDetailHeaderDto(request, resolveSubject(request, catalogs));
         RoomRequestItemResponseDto itemDto = composeItems(List.of(item), catalogs).getFirst();
@@ -111,15 +125,25 @@ public class RoomRequestComposer {
         return new RoomRequestItemDetailDto(header, itemDto);
     }
 
-    private Catalogs resolveCatalogs(Set<Long> subjectIds, Set<Long> commissionIds, Set<Long> classroomIds) {
+    private Catalogs resolveCatalogs(Set<Long> subjectIds, Set<Long> commissionIds, Set<Long> classroomIds,
+                                     Set<ActiveCommissionsKey> activeCommissionsKeys) {
         Map<Long, SubjectResponseDto> subjectsById =
                 Maps.byId(subjectService.findByIds(subjectIds), SubjectResponseDto::id);
-        Map<Long, CommissionResponseDto> commissionsById =
-                Maps.byId(commissionService.findByIds(commissionIds), CommissionResponseDto::id);
         Map<Long, ClassroomOptionDto> classroomsById =
                 Maps.byId(catalogMapper.toClassroomOptions(classroomService.findByIds(classroomIds)),
                         ClassroomOptionDto::id);
-        return new Catalogs(subjectsById, commissionsById, classroomsById);
+
+        Map<ActiveCommissionsKey, List<Long>> activeCommissionIdsByKey = new LinkedHashMap<>();
+        Set<Long> allCommissionIds = new LinkedHashSet<>(commissionIds);
+        for (ActiveCommissionsKey key : activeCommissionsKeys) {
+            List<Long> activeIds = classScheduleService.activeCommissionIds(key.subjectId(), key.date());
+            activeCommissionIdsByKey.put(key, activeIds);
+            allCommissionIds.addAll(activeIds);
+        }
+        Map<Long, CommissionResponseDto> commissionsById =
+                Maps.byId(commissionService.findByIds(allCommissionIds), CommissionResponseDto::id);
+
+        return new Catalogs(subjectsById, commissionsById, classroomsById, activeCommissionIdsByKey);
     }
 
     private void collectSubjectId(RoomRequest request, Set<Long> subjectIds) {
@@ -136,6 +160,16 @@ public class RoomRequestComposer {
         }
     }
 
+    private void collectActiveCommissionsKeys(Collection<RoomRequestItem> items, Set<ActiveCommissionsKey> keys) {
+        for (RoomRequestItem item : items) {
+            if (item.getCommissionId() == null
+                    && item.getRequest().getType() == RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE
+                    && item.getDate() != null) {
+                keys.add(new ActiveCommissionsKey(item.getRequest().getSubjectId(), item.getDate()));
+            }
+        }
+    }
+
     private void collectClassroomIds(Collection<RoomRequestItem> items, Set<Long> classroomIds) {
         for (RoomRequestItem item : items) {
             item.getPreferences().stream().map(RoomPreference::getClassroomId).forEach(classroomIds::add);
@@ -145,7 +179,7 @@ public class RoomRequestComposer {
     private List<RoomRequestItemResponseDto> composeItems(Collection<RoomRequestItem> items, Catalogs catalogs) {
         List<RoomRequestItemResponseDto> result = new ArrayList<>(items.size());
         for (RoomRequestItem item : items) {
-            result.add(mapper.toDto(item, resolveCommission(item, catalogs),
+            result.add(mapper.toDto(item, resolveCommissions(item, catalogs),
                     resolvePreferredClassrooms(item, catalogs)));
         }
         return result;
@@ -155,8 +189,19 @@ public class RoomRequestComposer {
         return request.getSubjectId() != null ? catalogs.subjectsById().get(request.getSubjectId()) : null;
     }
 
-    private CommissionResponseDto resolveCommission(RoomRequestItem item, Catalogs catalogs) {
-        return item.getCommissionId() != null ? catalogs.commissionsById().get(item.getCommissionId()) : null;
+    private List<CommissionResponseDto> resolveCommissions(RoomRequestItem item, Catalogs catalogs) {
+        if (item.getCommissionId() != null) {
+            CommissionResponseDto commission = catalogs.commissionsById().get(item.getCommissionId());
+            return commission != null ? List.of(commission) : List.of();
+        }
+        if (item.getRequest().getType() != RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE || item.getDate() == null) {
+            return List.of();
+        }
+        ActiveCommissionsKey key = new ActiveCommissionsKey(item.getRequest().getSubjectId(), item.getDate());
+        return catalogs.activeCommissionIdsByKey().getOrDefault(key, List.of()).stream()
+                .map(catalogs.commissionsById()::get)
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     private List<ClassroomOptionDto> resolvePreferredClassrooms(RoomRequestItem item, Catalogs catalogs) {

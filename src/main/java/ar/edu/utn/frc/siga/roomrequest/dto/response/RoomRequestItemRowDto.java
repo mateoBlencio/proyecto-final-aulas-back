@@ -7,13 +7,14 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 
 public record RoomRequestItemRowDto(
         Long itemId,
         RoomRequestStatus status,
         LocalDateTime decidedAt,
         RoomRequestRowHeaderDto request,
-        CommissionResponseDto commission,
+        List<CommissionResponseDto> commissions,
         LocalDate date,
         DayOfWeek dayOfWeek,
         LocalTime startTime,

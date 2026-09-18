@@ -83,9 +83,9 @@ class RoomRequestMapperTest {
         CommissionResponseDto commission = new CommissionResponseDto(7L, "3K1", null);
         List<ClassroomOptionDto> preferred = List.of(new ClassroomOptionDto(11L, 11, "Pabellón"));
 
-        RoomRequestItemResponseDto dto = mapper.toDto(itemEntity(), commission, preferred);
+        RoomRequestItemResponseDto dto = mapper.toDto(itemEntity(), List.of(commission), preferred);
 
-        assertThat(dto.commission()).isSameAs(commission);
+        assertThat(dto.commissions()).containsExactly(commission);
         assertThat(dto.preferredClassrooms()).isEqualTo(preferred);
     }
 

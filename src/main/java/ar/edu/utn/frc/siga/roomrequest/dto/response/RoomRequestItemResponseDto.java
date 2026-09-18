@@ -16,7 +16,7 @@ public record RoomRequestItemResponseDto(
         String decidedBy,
         LocalDateTime decidedAt,
         String decisionReason,
-        CommissionResponseDto commission,
+        List<CommissionResponseDto> commissions,
         LocalDate date,
         DayOfWeek dayOfWeek,
         LocalTime startTime,

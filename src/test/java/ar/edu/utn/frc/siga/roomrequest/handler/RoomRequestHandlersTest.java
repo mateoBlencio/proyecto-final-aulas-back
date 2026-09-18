@@ -39,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -293,10 +294,23 @@ class RoomRequestHandlersTest {
         }
 
         @Test
-        @DisplayName("ítem sin comisión / comisiones repetidas: rechazado")
+        @DisplayName("sin comisión: válido, significa 'todas las vigentes' y no valida ninguna comisión puntual")
+        void nullCommissionMeansAllActive() {
+            assertThatCode(() -> handler.validate(dto(freeFormItem(null)))).doesNotThrowAnyException();
+            verify(academicReference).requireSubject(SUBJECT);
+            verify(academicReference, never()).requireCommissionOfSubject(any(), any());
+        }
+
+        @Test
+        @DisplayName("dos ítems sin comisión en la misma solicitud: no chocan entre sí")
+        void twoNullCommissionsDoNotCollide() {
+            assertThatCode(() -> handler.validate(dto(freeFormItem(null), freeFormItem(null))))
+                    .doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("comisiones repetidas (no nulas) entre ítems: rechazado")
         void commissionRules() {
-            assertThatThrownBy(() -> handler.validate(dto(freeFormItem(null))))
-                    .isInstanceOf(InvalidRoomRequestException.class);
             assertThatThrownBy(() -> handler.validate(dto(freeFormItem(7L), freeFormItem(7L))))
                     .isInstanceOf(InvalidRoomRequestException.class);
         }

@@ -36,6 +36,13 @@ public class ClassScheduleService {
         return collapseByDayAndHours(slots(subjectId, commissionId));
     }
 
+    public List<Long> activeCommissionIds(Long subjectId, LocalDate date) {
+        return academicEventService.findRecurringEventsBySubject(subjectId, date).stream()
+                .map(r -> r.commission().id())
+                .distinct()
+                .toList();
+    }
+
     private static List<ClassSlot> collapseByDayAndHours(List<ClassSlot> slots) {
         Map<List<Object>, ClassSlot> byDayAndHours = new LinkedHashMap<>();
         for (ClassSlot slot : slots) {
