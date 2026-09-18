@@ -504,7 +504,7 @@ class AllocationServiceImplTest {
 
         AllocationResponseDto result = service.findById(1L);
 
-        assertThat(result).isNotNull();
+        assertThat(result.id()).isEqualTo(1L);
     }
 
     @Test
