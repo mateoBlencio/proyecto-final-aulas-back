@@ -46,6 +46,16 @@ public interface RecurringEventRepository extends JpaRepository<RecurringEvent, 
                                                           @Param("commissionId") Long commissionId,
                                                           @Param("onOrAfter") LocalDate onOrAfter);
 
+    @Query("""
+            select r from RecurringEvent r
+            where r.subjectId = :subjectId
+              and (r.sysacadEnabled = true or r.sysacadHash is null)
+              and (r.endDate is null or r.endDate >= :onDate)
+            order by r.commissionId, r.dayOfWeek, r.startTime
+            """)
+    List<RecurringEvent> findActiveBySubject(@Param("subjectId") Long subjectId,
+                                             @Param("onDate") LocalDate onDate);
+
     /**
      * "Sync-owned": sólo {@link ar.edu.utn.frc.siga.events.service.AcademicEventService#syncRecurringEvent}
      * setea {@code sysacadHash} — un evento cargado a mano o por Excel nunca lo tiene, así que este

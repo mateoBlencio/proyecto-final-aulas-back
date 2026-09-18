@@ -119,6 +119,15 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<RecurringEventResponseDto> findRecurringEventsBySubject(Long subjectId, LocalDate onDate) {
+        List<RecurringEvent> events = recurringEventRepository.findActiveBySubject(subjectId, onDate);
+        return composer.compose(events).stream()
+                .map(RecurringEventResponseDto.class::cast)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<OccurrenceResponseDto> findClassOccurrences(Long subjectId, Long commissionId, LocalDate from) {
         List<Long> eventIds = recurringEventRepository
                 .findActiveBySubjectAndCommission(subjectId, commissionId, LocalDate.now())

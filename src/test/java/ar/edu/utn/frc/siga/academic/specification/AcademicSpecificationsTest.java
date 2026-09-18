@@ -80,6 +80,12 @@ class AcademicSpecificationsTest {
         analisisId = analisis.getId();
         fisicaId = fisica.getId();
 
+        StudyPlan civilDesactivado = studyPlanRepository.save(
+                StudyPlan.builder().planCode(99099).specialty(civil).build());
+        subjectRepository.save(Subject.builder()
+                .code(99098).name("ZZ Estática").term("C").studyPlan(civilDesactivado).build());
+        studyPlanRepository.softDelete(civilDesactivado);
+
         AcademicPeriod period1 = academicPeriodRepository.save(
                 AcademicPeriod.builder().year(2099).semester(1).build());
         AcademicPeriod period2 = academicPeriodRepository.save(
@@ -248,15 +254,25 @@ class AcademicSpecificationsTest {
         @Test
         void filtraPorSpecialtyCode() {
             var result = specialtyRepository.findAll(
-                    SpecialtySpecification.withFilter(new SpecialtyFilter(99005, null)), Pageable.unpaged());
+                    SpecialtySpecification.withFilter(new SpecialtyFilter(99005, null, null)), Pageable.unpaged());
             assertThat(result).extracting(Specialty::getId).containsExactly(civil.getId());
         }
 
         @Test
         void filtraPorNameParcial() {
             var result = specialtyRepository.findAll(
-                    SpecialtySpecification.withFilter(new SpecialtyFilter(null, "zz sistemas")), Pageable.unpaged());
+                    SpecialtySpecification.withFilter(new SpecialtyFilter(null, "zz sistemas", null)),
+                    Pageable.unpaged());
             assertThat(result).extracting(Specialty::getId).containsExactly(sistemas.getId());
+        }
+
+        @Test
+        void hasSubjectsExcluyeEspecialidadesSinMaterias() {
+            var result = specialtyRepository.findAll(
+                    SpecialtySpecification.withFilter(new SpecialtyFilter(null, null, true)), Pageable.unpaged());
+            assertThat(result).extracting(Specialty::getId)
+                    .contains(sistemas.getId())
+                    .doesNotContain(civil.getId());
         }
     }
 }

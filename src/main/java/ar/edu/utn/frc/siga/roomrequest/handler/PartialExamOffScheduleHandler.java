@@ -4,7 +4,6 @@ import ar.edu.utn.frc.siga.roomrequest.dto.request.CreatePartialExamOffScheduleD
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.FreeFormItemDto;
-import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.validator.AcademicReferenceValidator;
@@ -14,6 +13,7 @@ import ar.edu.utn.frc.siga.roomrequest.validator.ItemConsistency;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Objects;
 
 @Component
 public class PartialExamOffScheduleHandler extends AbstractRoomRequestHandler {
@@ -33,9 +33,6 @@ public class PartialExamOffScheduleHandler extends AbstractRoomRequestHandler {
     protected void validateItems(CreateRoomRequestDto dto) {
         List<FreeFormItemDto> items = ((CreatePartialExamOffScheduleDto) dto).items();
         for (FreeFormItemDto item : items) {
-            if (item.commissionId() == null) {
-                throw new InvalidRoomRequestException("Cada pedido de parcial fuera de horario requiere una comisión.");
-            }
             ItemConsistency.requireExamUsersConsistent(true, item);
         }
         ItemConsistency.requireDistinct(items.stream().map(FreeFormItemDto::commissionId).toList(), "una comisión");
@@ -46,6 +43,7 @@ public class PartialExamOffScheduleHandler extends AbstractRoomRequestHandler {
         academicReference.requireSubject(dto.subjectId());
         ((CreatePartialExamOffScheduleDto) dto).items().stream()
                 .map(FreeFormItemDto::commissionId)
+                .filter(Objects::nonNull)
                 .distinct()
                 .forEach(commissionId ->
                         academicReference.requireCommissionOfSubject(dto.subjectId(), commissionId));

@@ -33,6 +33,8 @@ public interface AcademicEventService {
 
     List<RecurringEventResponseDto> findRecurringEventsBySubjectAndCommission(Long subjectId, Long commissionId);
 
+    List<RecurringEventResponseDto> findRecurringEventsBySubject(Long subjectId, LocalDate onDate);
+
     List<OccurrenceResponseDto> findClassOccurrences(Long subjectId, Long commissionId, LocalDate from);
 
     AcademicEventResponseDto createRecurringEvent(CreateRecurringEventRequestDto dto);

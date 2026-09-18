@@ -39,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -215,32 +216,52 @@ class RoomRequestHandlersTest {
         }
 
         @Test
-        @DisplayName("happy: día + estimado; horario del cursado")
+        @DisplayName("happy: fecha + estimado; horario derivado del cursado de esa fecha")
         void happy() {
-            when(classSchedule.requireClassDay(eq(SUBJECT), eq(COMMISSION), any())).thenReturn(TUESDAY_SLOT);
-            assertThatCode(() -> handler.validate(dto(scheduledItem(null, DayOfWeek.TUESDAY, 35))))
+            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), any())).thenReturn(TUESDAY_SLOT);
+            assertThatCode(() -> handler.validate(dto(scheduledItem(LocalDate.now().plusDays(7), null, 35))))
                     .doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("sin fecha / con día: rechazado antes de tocar otros módulos")
+        void badShape() {
+            assertThatThrownBy(() -> handler.validate(dto(scheduledItem(null, null, 35))))
+                    .isInstanceOf(InvalidRoomRequestException.class);
+            assertThatThrownBy(() -> handler.validate(dto(scheduledItem(LocalDate.now().plusDays(7), DayOfWeek.TUESDAY, 35))))
+                    .isInstanceOf(InvalidRoomRequestException.class);
+            verifyNoInteractions(academicReference, classSchedule);
         }
 
         @Test
         @DisplayName("sin estimado: rechazado (el parcial sí lo pide)")
         void estimatedRequired() {
-            assertThatThrownBy(() -> handler.validate(dto(scheduledItem(null, DayOfWeek.TUESDAY, null))))
+            assertThatThrownBy(() -> handler.validate(dto(scheduledItem(LocalDate.now().plusDays(7), null, null))))
                     .isInstanceOf(InvalidRoomRequestException.class);
         }
 
         @Test
-        @DisplayName("assemble: date null, estimado copiado, horario del cursado")
-        void assemble() {
-            when(classSchedule.requireClassDay(eq(SUBJECT), eq(COMMISSION), eq(DayOfWeek.TUESDAY)))
-                    .thenReturn(TUESDAY_SLOT);
+        @DisplayName("dos ítems con la misma fecha: rechazado")
+        void duplicateDates() {
+            LocalDate date = LocalDate.now().plusDays(7);
+            assertThatThrownBy(() -> handler.validate(dto(scheduledItem(date, null, 35), scheduledItem(date, null, 40))))
+                    .isInstanceOf(InvalidRoomRequestException.class);
+        }
 
-            RoomRequest request = handler.assemble(dto(scheduledItem(null, DayOfWeek.TUESDAY, 35)));
+        @Test
+        @DisplayName("assemble: dayOfWeek null, fecha y estimado copiados, horario del cursado")
+        void assemble() {
+            LocalDate date = LocalDate.now().plusDays(7);
+            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), eq(date))).thenReturn(TUESDAY_SLOT);
+
+            RoomRequest request = handler.assemble(dto(scheduledItem(date, null, 35)));
 
             assertThat(request.getItems()).singleElement().satisfies(item -> {
-                assertThat(item.getDate()).isNull();
+                assertThat(item.getDate()).isEqualTo(date);
+                assertThat(item.getDayOfWeek()).isNull();
                 assertThat(item.getEstimated()).isEqualTo(35);
                 assertThat(item.getStartTime()).isEqualTo(LocalTime.of(18, 0));
+                assertThat(item.getSourceRecurringEventId()).isEqualTo(100L);
             });
         }
     }
@@ -273,10 +294,23 @@ class RoomRequestHandlersTest {
         }
 
         @Test
-        @DisplayName("ítem sin comisión / comisiones repetidas: rechazado")
+        @DisplayName("sin comisión: válido, significa 'todas las vigentes' y no valida ninguna comisión puntual")
+        void nullCommissionMeansAllActive() {
+            assertThatCode(() -> handler.validate(dto(freeFormItem(null)))).doesNotThrowAnyException();
+            verify(academicReference).requireSubject(SUBJECT);
+            verify(academicReference, never()).requireCommissionOfSubject(any(), any());
+        }
+
+        @Test
+        @DisplayName("dos ítems sin comisión en la misma solicitud: no chocan entre sí")
+        void twoNullCommissionsDoNotCollide() {
+            assertThatCode(() -> handler.validate(dto(freeFormItem(null), freeFormItem(null))))
+                    .doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("comisiones repetidas (no nulas) entre ítems: rechazado")
         void commissionRules() {
-            assertThatThrownBy(() -> handler.validate(dto(freeFormItem(null))))
-                    .isInstanceOf(InvalidRoomRequestException.class);
             assertThatThrownBy(() -> handler.validate(dto(freeFormItem(7L), freeFormItem(7L))))
                     .isInstanceOf(InvalidRoomRequestException.class);
         }

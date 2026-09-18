@@ -27,13 +27,13 @@ public interface RoomRequestMapper {
                                  List<RoomRequestItemResponseDto> itemDtos);
 
     @Mapping(target = "id", source = "item.id")
-    @Mapping(target = "commission", source = "commission")
+    @Mapping(target = "commissions", source = "commissions")
     @Mapping(target = "preferredClassrooms", source = "preferredClassrooms")
     @Mapping(target = "endTime", expression = "java(item.endTime())")
     @Mapping(target = "durationMinutes",
              expression = "java(item.getDuration() == null ? null : item.getDuration().toMinutes())")
     RoomRequestItemResponseDto toDto(RoomRequestItem item,
-                                     CommissionResponseDto commission,
+                                     List<CommissionResponseDto> commissions,
                                      List<ClassroomOptionDto> preferredClassrooms);
 
     @Mapping(target = "id", source = "request.id")
@@ -42,11 +42,11 @@ public interface RoomRequestMapper {
 
     @Mapping(target = "itemId", source = "item.id")
     @Mapping(target = "request", source = "requestHeader")
-    @Mapping(target = "commission", source = "commission")
+    @Mapping(target = "commissions", source = "commissions")
     @Mapping(target = "endTime", expression = "java(item.endTime())")
     RoomRequestItemRowDto toRowDto(RoomRequestItem item,
                                    RoomRequestRowHeaderDto requestHeader,
-                                   CommissionResponseDto commission);
+                                   List<CommissionResponseDto> commissions);
 
     @Mapping(target = "id", source = "request.id")
     @Mapping(target = "subject", source = "subject")

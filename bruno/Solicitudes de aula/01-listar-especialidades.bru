@@ -5,9 +5,13 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/room-requests/catalog/specialties
+  url: {{baseUrl}}/v1/room-requests/catalog/specialties?onlyWithSubjects=true
   body: none
   auth: none
+}
+
+params:query {
+  onlyWithSubjects: true
 }
 
 docs {
@@ -18,4 +22,7 @@ docs {
   Existe en vez de usar GET /v1/specialties porque ese está cerrado con
   @PreAuthorize para personal interno; acá se expone una lectura acotada y
   el permitAll se decide en un solo lugar (SecurityConfig).
+
+  onlyWithSubjects (opcional, default false): si es true, excluye especialidades
+  sin materias cargadas (en desuso).
 }

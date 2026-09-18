@@ -40,9 +40,10 @@ public class RoomRequestCatalogServiceImpl implements RoomRequestCatalogService 
 
     @Override
     @Transactional(readOnly = true)
-    public List<SpecialtyOptionDto> findSpecialties() {
+    public List<SpecialtyOptionDto> findSpecialties(boolean onlyWithSubjects) {
         return mapper.toSpecialtyOptions(
-                specialtyService.findAll(new SpecialtyFilter(null, null), Pageable.unpaged()).getContent());
+                specialtyService.findAll(new SpecialtyFilter(null, null, onlyWithSubjects ? true : null),
+                        Pageable.unpaged()).getContent());
     }
 
     @Override
