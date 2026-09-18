@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.roomrequest.handler;
 
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
+import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.validator.AcademicReferenceValidator;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassroomReferenceValidator;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
@@ -26,13 +27,15 @@ class RoomRequestHandlersRegistryTest {
     private ClassroomReferenceValidator classroomReference;
     @Mock
     private ClassScheduleService classSchedule;
+    @Mock
+    private RoomRequestItemRepository itemRepository;
 
     private List<RoomRequestTypeHandler> allHandlers() {
         return List.of(
                 new OneTimeRoomChangeHandler(academicReference, classroomReference, classSchedule),
                 new RegularRoomChangeHandler(academicReference, classroomReference, classSchedule),
                 new PartialExamInClassHandler(academicReference, classroomReference, classSchedule),
-                new PartialExamOffScheduleHandler(academicReference, classroomReference, classSchedule),
+                new PartialExamOffScheduleHandler(academicReference, classroomReference, classSchedule, itemRepository),
                 new FinalExamHandler(academicReference, classroomReference, classSchedule),
                 new ConferenceHandler(academicReference, classroomReference, classSchedule),
                 new OtherHandler(academicReference, classroomReference, classSchedule));

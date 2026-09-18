@@ -13,7 +13,9 @@ import ar.edu.utn.frc.siga.roomrequest.dto.request.ScheduledItemDto;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
+import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.validator.AcademicReferenceValidator;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassroomReferenceValidator;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
@@ -60,6 +62,8 @@ class RoomRequestHandlersTest {
     private ClassroomReferenceValidator classroomReference;
     @Mock
     private ClassScheduleService classSchedule;
+    @Mock
+    private RoomRequestItemRepository itemRepository;
 
     private static RequesterInfo requester() {
         return new RequesterInfo(AcademicScope.GRADO, "Ada Lovelace", "ada@frc.utn.edu.ar", "351-1234567");
@@ -274,12 +278,17 @@ class RoomRequestHandlersTest {
 
         @BeforeEach
         void setUp() {
-            handler = new PartialExamOffScheduleHandler(academicReference, classroomReference, classSchedule);
+            handler = new PartialExamOffScheduleHandler(academicReference, classroomReference, classSchedule, itemRepository);
+            when(itemRepository.findActiveOffScheduleItemsByDate(any())).thenReturn(List.of());
         }
 
         private CreatePartialExamOffScheduleDto dto(FreeFormItemDto... items) {
             return new CreatePartialExamOffScheduleDto(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, requester(),
                     SUBJECT, List.of(items));
+        }
+
+        private FreeFormItemDto freeFormItemAt(Long commissionId, LocalDate date, LocalTime startTime, LocalTime endTime) {
+            return new FreeFormItemDto(commissionId, date, startTime, endTime, 35, 1, false, false, null, null, null, null, List.of());
         }
 
         @Test
@@ -309,9 +318,58 @@ class RoomRequestHandlersTest {
         }
 
         @Test
-        @DisplayName("comisiones repetidas (no nulas) entre ítems: rechazado")
+        @DisplayName("misma comisión, misma fecha, mismo horario: rechazado")
         void commissionRules() {
             assertThatThrownBy(() -> handler.validate(dto(freeFormItem(7L), freeFormItem(7L))))
+                    .isInstanceOf(InvalidRoomRequestException.class);
+        }
+
+        @Test
+        @DisplayName("misma comisión, distinta fecha: permitido")
+        void sameCommissionDifferentDate() {
+            LocalDate day1 = LocalDate.now().plusDays(7);
+            LocalDate day2 = LocalDate.now().plusDays(21);
+            assertThatCode(() -> handler.validate(dto(
+                    freeFormItemAt(7L, day1, LocalTime.of(10, 0), LocalTime.of(12, 0)),
+                    freeFormItemAt(7L, day2, LocalTime.of(10, 0), LocalTime.of(12, 0)))))
+                    .doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("misma comisión, misma fecha, horarios que no se pisan: permitido")
+        void sameCommissionSameDateNonOverlappingTime() {
+            LocalDate date = LocalDate.now().plusDays(7);
+            assertThatCode(() -> handler.validate(dto(
+                    freeFormItemAt(7L, date, LocalTime.of(10, 0), LocalTime.of(12, 0)),
+                    freeFormItemAt(7L, date, LocalTime.of(14, 0), LocalTime.of(16, 0)))))
+                    .doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("misma comisión, misma fecha, horarios que se pisan: rechazado")
+        void sameCommissionSameDateOverlappingTime() {
+            LocalDate date = LocalDate.now().plusDays(7);
+            assertThatThrownBy(() -> handler.validate(dto(
+                    freeFormItemAt(7L, date, LocalTime.of(10, 0), LocalTime.of(12, 0)),
+                    freeFormItemAt(7L, date, LocalTime.of(11, 0), LocalTime.of(13, 0)))))
+                    .isInstanceOf(InvalidRoomRequestException.class)
+                    .hasMessageContaining("Esa comisión ya tiene otro pedido en la misma fecha y horario");
+        }
+
+        @Test
+        @DisplayName("choca contra un pedido de otra solicitud ya persistida: rechazado")
+        void overlapsWithPersistedRequest() {
+            LocalDate date = LocalDate.now().plusDays(7);
+            RoomRequestItem existing = RoomRequestItem.builder()
+                    .commissionId(7L)
+                    .date(date)
+                    .startTime(LocalTime.of(11, 0))
+                    .duration(Duration.ofHours(2))
+                    .build();
+            when(itemRepository.findActiveOffScheduleItemsByDate(date)).thenReturn(List.of(existing));
+
+            assertThatThrownBy(() -> handler.validate(dto(
+                    freeFormItemAt(7L, date, LocalTime.of(10, 0), LocalTime.of(12, 0)))))
                     .isInstanceOf(InvalidRoomRequestException.class);
         }
 

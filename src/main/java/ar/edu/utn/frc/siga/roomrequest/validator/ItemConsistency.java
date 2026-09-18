@@ -1,12 +1,18 @@
 package ar.edu.utn.frc.siga.roomrequest.validator;
 
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestItemDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.FreeFormItemDto;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Objects;
 
 public final class ItemConsistency {
+
+    public static final String COMMISSION_OVERLAP_MESSAGE =
+            "Esa comisión ya tiene otro pedido en la misma fecha y horario.";
 
     private ItemConsistency() {
     }
@@ -15,6 +21,28 @@ public final class ItemConsistency {
         if (values.stream().filter(Objects::nonNull).distinct().count()
                 != values.stream().filter(Objects::nonNull).count()) {
             throw new InvalidRoomRequestException("No se puede repetir " + what + " entre los pedidos de la solicitud.");
+        }
+    }
+
+    public static boolean commissionScheduleOverlap(Long commissionA, LocalDate dateA, LocalTime startA, LocalTime endA,
+                                                      Long commissionB, LocalDate dateB, LocalTime startB, LocalTime endB) {
+        boolean sameCommission = !(commissionA == null && commissionB == null)
+                && (commissionA == null || commissionB == null || commissionA.equals(commissionB));
+        boolean sameDate = Objects.equals(dateA, dateB);
+        boolean timeOverlap = startA.isBefore(endB) && startB.isBefore(endA);
+        return sameCommission && sameDate && timeOverlap;
+    }
+
+    public static void requireNoCommissionOverlap(List<FreeFormItemDto> items) {
+        for (int i = 0; i < items.size(); i++) {
+            for (int j = i + 1; j < items.size(); j++) {
+                FreeFormItemDto a = items.get(i);
+                FreeFormItemDto b = items.get(j);
+                if (commissionScheduleOverlap(a.commissionId(), a.date(), a.startTime(), a.endTime(),
+                        b.commissionId(), b.date(), b.startTime(), b.endTime())) {
+                    throw new InvalidRoomRequestException(COMMISSION_OVERLAP_MESSAGE);
+                }
+            }
         }
     }
 
