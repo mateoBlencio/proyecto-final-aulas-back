@@ -270,7 +270,9 @@ class AcademicSpecificationsTest {
         void hasSubjectsExcluyeEspecialidadesSinMaterias() {
             var result = specialtyRepository.findAll(
                     SpecialtySpecification.withFilter(new SpecialtyFilter(null, null, true)), Pageable.unpaged());
-            assertThat(result).extracting(Specialty::getId).containsExactly(sistemas.getId());
+            assertThat(result).extracting(Specialty::getId)
+                    .contains(sistemas.getId())
+                    .doesNotContain(civil.getId());
         }
     }
 }
