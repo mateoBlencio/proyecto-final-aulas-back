@@ -16,6 +16,7 @@ import ar.edu.utn.frc.siga.roomrequest.dto.response.SubjectOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestCatalogMapper;
 import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestCatalogService;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
+import ar.edu.utn.frc.siga.common.security.SystemScope;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -68,7 +69,7 @@ public class RoomRequestCatalogServiceImpl implements RoomRequestCatalogService 
     @Override
     @Transactional(readOnly = true)
     public List<ClassroomOptionDto> findClassrooms() {
-        return mapper.toClassroomOptions(classroomService.findAllAvailable());
+        return mapper.toClassroomOptions(SystemScope.call(classroomService::findAllAvailable));
     }
 
     @Override
