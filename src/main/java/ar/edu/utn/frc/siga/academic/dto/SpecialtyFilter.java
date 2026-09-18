@@ -5,6 +5,7 @@ import org.springframework.modulith.NamedInterface;
 @NamedInterface("api")
 public record SpecialtyFilter(
         Integer specialtyCode,
-        String name
+        String name,
+        Boolean hasSubjects
 ) {
 }

@@ -51,7 +51,7 @@ class SpecialtyServiceImplTest {
                 .thenReturn(new PageImpl<>(List.of(specialty)));
         when(specialtyMapper.toDto(specialty)).thenReturn(dto);
 
-        var result = service.findAll(new SpecialtyFilter(17, null), PageRequest.of(0, 20));
+        var result = service.findAll(new SpecialtyFilter(17, null, null), PageRequest.of(0, 20));
 
         assertThat(result.getContent()).containsExactly(dto);
         assertThat(result.getTotalElements()).isEqualTo(1);

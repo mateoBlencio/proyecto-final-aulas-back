@@ -38,7 +38,8 @@ public class SpecialtyController {
             @RequestParam(required = false) Integer specialtyCode,
             @RequestParam(required = false) String name) {
         log.debug("GET /v1/specialties?specialtyCode={}&name={}", specialtyCode, name);
-        return ResponseEntity.ok(specialtyService.findAll(new SpecialtyFilter(specialtyCode, name), pageable));
+        return ResponseEntity.ok(
+                specialtyService.findAll(new SpecialtyFilter(specialtyCode, name, null), pageable));
     }
 
     @GetMapping("/{id}")

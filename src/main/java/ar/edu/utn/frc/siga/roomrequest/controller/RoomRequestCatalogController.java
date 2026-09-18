@@ -31,10 +31,12 @@ public class RoomRequestCatalogController {
 
     @GetMapping("/specialties")
     @Operation(summary = "Listar especialidades",
-               description = "Primer combo del formulario. Devuelve código y nombre.")
-    public ResponseEntity<List<SpecialtyOptionDto>> findSpecialties() {
-        log.debug("GET /v1/room-requests/catalog/specialties");
-        return ResponseEntity.ok(catalogService.findSpecialties());
+               description = "Primer combo del formulario. Devuelve código y nombre. Con "
+                       + "onlyWithSubjects=true excluye las especialidades sin materias cargadas (en desuso).")
+    public ResponseEntity<List<SpecialtyOptionDto>> findSpecialties(
+            @RequestParam(defaultValue = "false") boolean onlyWithSubjects) {
+        log.debug("GET /v1/room-requests/catalog/specialties: onlyWithSubjects={}", onlyWithSubjects);
+        return ResponseEntity.ok(catalogService.findSpecialties(onlyWithSubjects));
     }
 
     @GetMapping("/subjects")
