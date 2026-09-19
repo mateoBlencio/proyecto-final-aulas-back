@@ -229,7 +229,7 @@ class AcademicPeriodServiceImplTest {
     void updateRecessOnNonAnnualRejected() {
         AcademicPeriod firstTerm = AcademicPeriod.builder()
                 .id(2L).year(2026).semester(1)
-                .startDate(LocalDate.now().plusDays(30)).endDate(LocalDate.of(2026, 7, 31))
+                .startDate(LocalDate.of(2026, 6, 1)).endDate(LocalDate.of(2026, 7, 31))
                 .build();
         when(academicPeriodRepository.findActiveById(2L)).thenReturn(Optional.of(firstTerm));
 
