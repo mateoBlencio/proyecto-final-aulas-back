@@ -4,7 +4,9 @@ import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.FreeFormItemDto;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Objects;
@@ -13,6 +15,8 @@ public final class ItemConsistency {
 
     public static final String COMMISSION_OVERLAP_MESSAGE =
             "Esa comisión ya tiene otro pedido en la misma fecha y horario.";
+
+    private static final Duration EXAM_MIN_ADVANCE_NOTICE = Duration.ofHours(2);
 
     private ItemConsistency() {
     }
@@ -74,6 +78,19 @@ public final class ItemConsistency {
         if (item.observations() == null || item.observations().isBlank()) {
             throw new InvalidRoomRequestException(
                     "observations es obligatorio en cada pedido para solicitudes de tipo OTHER.");
+        }
+    }
+
+    public static void requireNotPast(LocalDate date, LocalTime startTime) {
+        if (date.equals(LocalDate.now()) && startTime.isBefore(LocalTime.now())) {
+            throw new InvalidRoomRequestException("No se puede solicitar un horario que ya pasó.");
+        }
+    }
+
+    public static void requireExamAdvanceNotice(LocalDate date, LocalTime startTime) {
+        if (LocalDateTime.of(date, startTime).isBefore(LocalDateTime.now().plus(EXAM_MIN_ADVANCE_NOTICE))) {
+            throw new InvalidRoomRequestException(
+                    "Los exámenes deben solicitarse con al menos 2 horas de anticipación.");
         }
     }
 }

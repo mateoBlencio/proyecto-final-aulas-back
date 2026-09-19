@@ -43,6 +43,7 @@ public class PartialExamOffScheduleHandler extends AbstractRoomRequestHandler {
         List<FreeFormItemDto> items = ((CreatePartialExamOffScheduleDto) dto).items();
         for (FreeFormItemDto item : items) {
             ItemConsistency.requireExamUsersConsistent(true, item);
+            ItemConsistency.requireExamAdvanceNotice(item.date(), item.startTime());
         }
         ItemConsistency.requireNoCommissionOverlap(items);
     }

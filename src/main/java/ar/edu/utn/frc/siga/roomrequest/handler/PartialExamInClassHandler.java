@@ -57,6 +57,7 @@ public class PartialExamInClassHandler extends AbstractRoomRequestHandler {
     @Override
     protected RoomRequestItem buildItem(CreateRoomRequestItemDto item, CreateRoomRequestDto dto) {
         ClassSlot slot = classSchedule.requireClassDate(dto.subjectId(), dto.commissionId(), item.date());
+        ItemConsistency.requireExamAdvanceNotice(item.date(), slot.startTime());
         return baseItem(item)
                 .commissionId(dto.commissionId())
                 .date(item.date())
