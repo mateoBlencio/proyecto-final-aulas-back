@@ -31,7 +31,12 @@ public enum SettingKey {
             "allocation.maxOverlapMinutes", SettingType.INT, RiskLevel.ADVANCED, "allocation",
             "Dos eventos distintos pueden compartir un aula durante este margen, solo en asignación "
                     + "manual y dejando un comentario. Subirlo esconde choques reales de horario; "
-                    + "0 vuelve al rechazo estricto.");
+                    + "0 vuelve al rechazo estricto."),
+    NOTIFICATIONS_ENABLED(
+            "notifications.enabled", SettingType.BOOLEAN, RiskLevel.SAFE, "notifications",
+            "Apagarlo corta todo aviso automático: los pedidos resueltos quedan sin comunicar al docente."),
+    NOTIFICATIONS_CHANNEL_EMAIL_ENABLED(
+            "notifications.channel.email.enabled", SettingType.BOOLEAN, RiskLevel.SAFE, "notifications", null);
 
     private final String key;
     private final SettingType type;

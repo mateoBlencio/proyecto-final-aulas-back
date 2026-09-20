@@ -128,6 +128,10 @@ siga:
       - key: allocation.maxOverlapMinutes
         default-value: "40"
         min: "0"
+      - key: notifications.enabled
+        default-value: "true"
+      - key: notifications.channel.email.enabled
+        default-value: "true"
   optimizer:
     parallel-solver-count: AUTO
     environment-mode: PHASE_ASSERT
