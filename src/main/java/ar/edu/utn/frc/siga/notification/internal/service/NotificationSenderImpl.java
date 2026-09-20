@@ -18,6 +18,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -92,6 +93,7 @@ class NotificationSenderImpl implements NotificationSender {
                 .subject(rendered.subject())
                 .body(rendered.body())
                 .idempotencyKey(request.idempotencyKey())
+                .nextAttemptAt(Instant.now())
                 .build();
     }
 }

@@ -4,6 +4,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 import org.thymeleaf.templatemode.TemplateMode;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
@@ -12,6 +14,8 @@ import org.thymeleaf.templateresolver.ITemplateResolver;
 import java.util.Set;
 
 @Configuration
+@EnableAsync
+@EnableScheduling
 @EnableConfigurationProperties(NotificationProperties.class)
 public class NotificationConfiguration {
 
