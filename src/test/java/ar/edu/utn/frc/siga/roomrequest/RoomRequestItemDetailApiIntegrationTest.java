@@ -44,7 +44,7 @@ class RoomRequestItemDetailApiIntegrationTest extends AbstractIntegrationTest {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
         RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
         RoomRequestItem item = seedItem(request, academic.commissionId(), LocalDate.now().plusDays(10),
-                RoomRequestStatus.PRE_APPROVED);
+                RoomRequestStatus.IN_EVALUATION);
         roomRequestRepository.save(request);
 
         mockMvc.perform(get("/v1/room-requests/items/" + item.getId()))
@@ -53,7 +53,7 @@ class RoomRequestItemDetailApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.request.teacherEmail").value("ada@frc.utn.edu.ar"))
                 .andExpect(jsonPath("$.request.teacherPhone").value("351-1234567"))
                 .andExpect(jsonPath("$.item.id").value(item.getId()))
-                .andExpect(jsonPath("$.item.status").value("PRE_APPROVED"))
+                .andExpect(jsonPath("$.item.status").value("IN_EVALUATION"))
                 .andExpect(jsonPath("$.item.decidedBy").value("subsecretaria@frc.utn.edu.ar"))
                 .andExpect(jsonPath("$.item.observations").doesNotExist());
     }
@@ -73,7 +73,7 @@ class RoomRequestItemDetailApiIntegrationTest extends AbstractIntegrationTest {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
         RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
         RoomRequestItem item = seedItem(request, academic.commissionId(), LocalDate.now().plusDays(10),
-                RoomRequestStatus.PENDING);
+                RoomRequestStatus.NEW);
         roomRequestRepository.save(request);
 
         MockMvc anonymousMockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
@@ -108,7 +108,7 @@ class RoomRequestItemDetailApiIntegrationTest extends AbstractIntegrationTest {
                 .classroomCount(1)
                 .build();
         request.addItem(item);
-        if (status != RoomRequestStatus.PENDING) {
+        if (status != RoomRequestStatus.NEW) {
             item.decide(status, "subsecretaria@frc.utn.edu.ar", "motivo de prueba", LocalDateTime.now());
         }
         return item;

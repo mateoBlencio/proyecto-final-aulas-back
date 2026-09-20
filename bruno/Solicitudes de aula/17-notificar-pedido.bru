@@ -22,7 +22,7 @@ docs {
   red, no hace falta que el front controle si ya se llamó antes.
 
   Si todavía no se notificó:
-  - 409 si el estado no es `PRE_APPROVED`;
+  - 409 si el estado no es `IN_EVALUATION`;
   - 400 si el pedido no tiene ninguna aula asignada (no se puede avisar un aula que
     no existe);
   - sella `notifiedAt`, pasa a `RESOLVED` y publica el evento de dominio

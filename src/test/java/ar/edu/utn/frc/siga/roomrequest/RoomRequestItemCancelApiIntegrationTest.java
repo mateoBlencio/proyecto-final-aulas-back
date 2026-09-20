@@ -40,9 +40,9 @@ class RoomRequestItemCancelApiIntegrationTest extends AbstractIntegrationTest {
     private RoomRequestRepository roomRequestRepository;
 
     @Test
-    @DisplayName("PENDING con motivo: pasa a CANCELLED")
+    @DisplayName("NEW con motivo: pasa a CANCELLED")
     void cancel_pending_returnsCancelled() throws Exception {
-        RoomRequestItem item = seedItem(RoomRequestStatus.PENDING);
+        RoomRequestItem item = seedItem(RoomRequestStatus.NEW);
 
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/cancel")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -67,7 +67,7 @@ class RoomRequestItemCancelApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("sin reason: 400 Invalid room request")
     void cancel_sinReason_returnsBadRequest() throws Exception {
-        RoomRequestItem item = seedItem(RoomRequestStatus.PENDING);
+        RoomRequestItem item = seedItem(RoomRequestStatus.NEW);
 
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/cancel")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -102,8 +102,8 @@ class RoomRequestItemCancelApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("sin token: 401; con AUXILIAR_AULICO: 200 (escritura habilitada para ambos roles)")
     void authenticationAndAuthorization() throws Exception {
-        RoomRequestItem pendingParaAnonimo = seedItem(RoomRequestStatus.PENDING);
-        RoomRequestItem pendingParaAuxiliar = seedItem(RoomRequestStatus.PENDING);
+        RoomRequestItem pendingParaAnonimo = seedItem(RoomRequestStatus.NEW);
+        RoomRequestItem pendingParaAuxiliar = seedItem(RoomRequestStatus.NEW);
 
         MockMvc anonymousMockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
                 .apply(springSecurity())
@@ -139,7 +139,7 @@ class RoomRequestItemCancelApiIntegrationTest extends AbstractIntegrationTest {
                 .classroomCount(1)
                 .build();
         request.addItem(item);
-        if (status != RoomRequestStatus.PENDING) {
+        if (status != RoomRequestStatus.NEW) {
             item.decide(status, "subsecretaria@frc.utn.edu.ar", "motivo de prueba", LocalDateTime.now());
         }
         roomRequestRepository.save(request);

@@ -21,10 +21,10 @@ docs {
 
   Saca un pedido de la cola de un edificio cuando ahí no se puede resolver (el
   laboratorio se bloqueó, el aula quedó chica, el software no está) y lo vuelve a
-  `PENDING`, a la bandeja general.
+  `NEW`, a la bandeja general.
 
   Solo transiciona desde `DERIVED_TO_BUILDING`; desde cualquier otro estado (por
-  ejemplo `PENDING`) devuelve 409. `reason` es obligatorio (400 sin él): sin el
+  ejemplo `NEW`) devuelve 409. `reason` es obligatorio (400 sin él): sin el
   motivo, subsecretaría lo derivaría de nuevo al mismo lugar.
 
   Copia el edificio derivado a `returnedFromBuildingId` y guarda `returnedReason`
@@ -32,5 +32,5 @@ docs {
   sobre el mismo ítem pisa `returnedFromBuildingId`/`returnedReason` con los datos
   nuevos, no los acumula.
 
-  Respuesta: 200 con el pedido actualizado (`status: "PENDING"`).
+  Respuesta: 200 con el pedido actualizado (`status: "NEW"`).
 }

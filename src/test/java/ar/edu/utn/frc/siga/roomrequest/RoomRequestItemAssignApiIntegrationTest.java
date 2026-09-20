@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Duration;
 import java.time.LocalDate;
@@ -29,6 +30,7 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -49,9 +51,11 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
     private OccurrenceRepository occurrenceRepository;
     @Autowired
     private ObjectMapper objectMapper;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
-    @DisplayName("FINAL_EXAM sin evento previo: crea el UniqueEvent y queda PRE_APPROVED")
+    @DisplayName("FINAL_EXAM sin evento previo: crea el UniqueEvent y queda IN_EVALUATION")
     void assign_finalExam_creaEventoYAsigna() throws Exception {
         Classroom aula = testData.aula(testData.edificio());
         RoomRequestItem item = seedCreatedEventItem(RoomRequestType.FINAL_EXAM, LocalDate.now().plusDays(20));
@@ -60,7 +64,7 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(assignBody(List.of(aula.getId()), null)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("PRE_APPROVED"));
+                .andExpect(jsonPath("$.status").value("IN_EVALUATION"));
     }
 
     @Test
@@ -77,7 +81,7 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(assignBody(List.of(aula.getId()), null)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("PRE_APPROVED"));
+                .andExpect(jsonPath("$.status").value("IN_EVALUATION"));
     }
 
     @Test
@@ -106,7 +110,7 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("menos aulas que classroomCount sin motivo: 400; con motivo: 200 PRE_APPROVED")
+    @DisplayName("menos aulas que classroomCount sin motivo: 400; con motivo: 200 IN_EVALUATION")
     void assign_resolucionParcial_exigeMotivo() throws Exception {
         Classroom aula = testData.aula(testData.edificio());
         RoomRequestItem item = seedCreatedEventItem(RoomRequestType.FINAL_EXAM, LocalDate.now().plusDays(24), 2);
@@ -120,7 +124,7 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(assignBody(List.of(aula.getId()), "solo hay una disponible")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("PRE_APPROVED"))
+                .andExpect(jsonPath("$.status").value("IN_EVALUATION"))
                 .andExpect(jsonPath("$.decisionReason").value("solo hay una disponible"));
     }
 
@@ -152,6 +156,94 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(assignBody(List.of(aula.getId()), null)))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("3 aulas: crea 1 evento con 3 ocurrencias enlazadas y 3 filas de asignación")
+    void assign_tresAulas_creaOcurrenciasSimultaneas() throws Exception {
+        Classroom aula1 = testData.aula(testData.edificio());
+        Classroom aula2 = testData.aula(testData.edificio());
+        Classroom aula3 = testData.aula(testData.edificio());
+        RoomRequestItem item = seedCreatedEventItem(RoomRequestType.FINAL_EXAM, LocalDate.now().plusDays(40), 3);
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/assign")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(List.of(aula1.getId(), aula2.getId(), aula3.getId()), null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_EVALUATION"));
+
+        List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "select id_ocurrencia, id_aula, orden from solicitud_item_asignacion where id_item = ?",
+                item.getId());
+        assertThat(rows).hasSize(3);
+        assertThat(rows).extracting(r -> r.get("orden")).containsExactlyInAnyOrder(1, 2, 3);
+
+        List<Long> occurrenceIds = rows.stream().map(r -> ((Number) r.get("id_ocurrencia")).longValue()).toList();
+        List<Occurrence> occurrences = occurrenceRepository.findAllById(occurrenceIds);
+        assertThat(occurrences).extracting(Occurrence::getRoomSlot).containsExactlyInAnyOrder(1, 2, 3);
+        Long principalId = occurrences.stream().filter(o -> o.getRoomSlot() == 1).findFirst().orElseThrow().getId();
+        assertThat(occurrences.stream().filter(o -> o.getRoomSlot() != 1).map(Occurrence::getMirrorOfOccurrenceId))
+                .containsExactly(principalId, principalId);
+    }
+
+    @Test
+    @DisplayName("conflicto en una de tres aulas: no queda ninguna asignada")
+    void assign_conflictoConTresAulas_noAplicaNada() throws Exception {
+        IntegrationTestData.SubjectAndCommission sc = testData.materiaYComision();
+        LocalDate date = LocalDate.now().plusDays(41);
+        Classroom aula1 = testData.aula(testData.edificio());
+        Classroom aula2 = testData.aula(testData.edificio());
+        Classroom aulaOcupada = testData.aula(testData.edificio());
+        Occurrence occupied = seedOccurrence(sc, date);
+        allocateDirectly(occupied.getId(), aulaOcupada.getId());
+
+        RoomRequestItem item = seedCreatedEventItem(RoomRequestType.FINAL_EXAM, date, 3);
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/assign")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(List.of(aula1.getId(), aula2.getId(), aulaOcupada.getId()), null)))
+                .andExpect(status().isConflict());
+
+        List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "select id_ocurrencia from solicitud_item_asignacion where id_item = ?", item.getId());
+        assertThat(rows).isEmpty();
+    }
+
+    @Test
+    @DisplayName("reasignar 3 aulas por otras 3: libera las ocurrencias mirror viejas")
+    void assign_reasignarTresAulas_liberaMirrorsViejos() throws Exception {
+        Classroom aula1 = testData.aula(testData.edificio());
+        Classroom aula2 = testData.aula(testData.edificio());
+        Classroom aula3 = testData.aula(testData.edificio());
+        Classroom nuevaAula2 = testData.aula(testData.edificio());
+        Classroom nuevaAula3 = testData.aula(testData.edificio());
+        RoomRequestItem item = seedCreatedEventItem(RoomRequestType.FINAL_EXAM, LocalDate.now().plusDays(42), 3);
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/assign")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(List.of(aula1.getId(), aula2.getId(), aula3.getId()), null)))
+                .andExpect(status().isOk());
+
+        List<Long> oldMirrorOccurrenceIds = jdbcTemplate.queryForList(
+                        "select id_ocurrencia from solicitud_item_asignacion where id_item = ? and orden > 1",
+                        Long.class, item.getId());
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/assign")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(List.of(aula1.getId(), nuevaAula2.getId(), nuevaAula3.getId()), null)))
+                .andExpect(status().isOk());
+
+        List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "select id_ocurrencia, id_aula from solicitud_item_asignacion where id_item = ?", item.getId());
+        assertThat(rows).hasSize(3);
+        assertThat(rows).extracting(r -> r.get("id_aula"))
+                .containsExactlyInAnyOrder(aula1.getId(), nuevaAula2.getId(), nuevaAula3.getId());
+
+        String idsCsv = oldMirrorOccurrenceIds.stream().map(String::valueOf)
+                .collect(java.util.stream.Collectors.joining(","));
+        var releasedAllocations = jdbcTemplate.queryForList(
+                "select id_asignacion from asignacion_aula where id_ocurrencia in (" + idsCsv + ")");
+        assertThat(releasedAllocations).isEmpty();
     }
 
     @Test
@@ -247,7 +339,7 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
                 .duration(Duration.ofMinutes(90))
                 .estimated(30)
                 .classroomCount(1)
-                .status(RoomRequestStatus.PRE_APPROVED)
+                .status(RoomRequestStatus.IN_EVALUATION)
                 .decidedBy("subsecretaria@frc.utn.edu.ar")
                 .decidedAt(LocalDateTime.now())
                 .notifiedAt(LocalDateTime.now())

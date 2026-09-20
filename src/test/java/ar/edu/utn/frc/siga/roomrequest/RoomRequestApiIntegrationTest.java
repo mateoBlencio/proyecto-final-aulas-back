@@ -67,7 +67,7 @@ class RoomRequestApiIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").exists())
-                .andExpect(jsonPath("$.items[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.items[0].status").value("NEW"))
                 .andExpect(jsonPath("$.items[0].durationMinutes").value(120));
     }
 

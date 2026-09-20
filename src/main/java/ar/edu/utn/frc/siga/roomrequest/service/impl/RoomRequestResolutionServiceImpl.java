@@ -77,7 +77,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
         RoomRequestItem item = itemRepository.findWithRequestById(itemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
-        transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.PRE_APPROVED);
+        transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.IN_EVALUATION);
 
         if (item.getNotifiedAt() != null) {
             throw new InvalidRoomRequestException(
@@ -97,25 +97,62 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
                     "El motivo es obligatorio al asignar menos aulas de las pedidas.");
         }
 
-        Long classroomId = ids.getFirst();
         boolean reassigning = !item.getAllocations().isEmpty();
-        List<Long> occurrenceIds = resolveTargetOccurrences(item, reassigning);
-
-        AllocationCommand command = AllocationCommand.manual(
-                List.of(new AllocationItem(new AllocationTarget.Occurrences(occurrenceIds), classroomId)),
-                "Pedido de aula #" + item.getId());
-        if (createsEvent(item.getRequest().getType()) && !reassigning) {
-            allocationService.allocate(command);
-        } else {
-            allocationService.reallocate(command);
+        if (reassigning) {
+            releaseOldMirrors(item);
         }
 
-        item.assignClassroom(classroomId, occurrenceIds);
-        item.decide(RoomRequestStatus.PRE_APPROVED, actor, reason, LocalDateTime.now());
+        List<List<Long>> occurrencesBySlot = resolveOccurrencesBySlot(item, ids.size(), reassigning);
 
-        log.info("Pedido de aula asignado: itemId={}, classroomId={}, ocurrencias={}",
-                itemId, classroomId, occurrenceIds.size());
+        List<AllocationItem> allocationItems = new ArrayList<>();
+        for (int i = 0; i < ids.size(); i++) {
+            allocationItems.add(new AllocationItem(
+                    new AllocationTarget.Occurrences(occurrencesBySlot.get(i)), ids.get(i)));
+        }
+        allocationService.reallocate(AllocationCommand.manual(allocationItems, "Pedido de aula #" + item.getId()));
+
+        item.assignClassrooms(ids, occurrencesBySlot);
+        item.decide(RoomRequestStatus.IN_EVALUATION, actor, reason, LocalDateTime.now());
+
+        log.info("Pedido de aula asignado: itemId={}, aulas={}, ocurrencias={}",
+                itemId, ids.size(), occurrencesBySlot.stream().mapToInt(List::size).sum());
         return composer.composeItem(item);
+    }
+
+    /** Los "mirror" (orden > 1) son ocurrencias efímeras que solo existen para esta resolución: se liberan y se crean de nuevo en cada assign, nunca se reutilizan entre llamadas. */
+    private void releaseOldMirrors(RoomRequestItem item) {
+        List<Long> oldMirrorOccurrenceIds = item.getAllocations().stream()
+                .filter(allocation -> allocation.getPosition() > 1)
+                .map(RoomRequestItemAllocation::getOccurrenceId)
+                .distinct()
+                .toList();
+        if (oldMirrorOccurrenceIds.isEmpty()) {
+            return;
+        }
+        allocationService.deallocate(new DeallocationCommand(
+                List.of(new AllocationTarget.Occurrences(oldMirrorOccurrenceIds)),
+                "Reasignación de pedido de aula #" + item.getId()));
+        oldMirrorOccurrenceIds.forEach(occurrenceService::release);
+    }
+
+    private List<List<Long>> resolveOccurrencesBySlot(RoomRequestItem item, int classroomCount, boolean reassigning) {
+        List<Long> principalOccurrences = resolveTargetOccurrences(item, reassigning);
+        List<List<Long>> occurrencesBySlot = new ArrayList<>();
+        occurrencesBySlot.add(principalOccurrences);
+
+        if (classroomCount > 1) {
+            Map<Long, List<Long>> mirrorsByPrincipal = new LinkedHashMap<>();
+            for (Long principalId : principalOccurrences) {
+                mirrorsByPrincipal.put(principalId, occurrenceService.createSimultaneous(principalId, classroomCount - 1));
+            }
+            for (int slot = 1; slot < classroomCount; slot++) {
+                int mirrorIndex = slot - 1;
+                occurrencesBySlot.add(principalOccurrences.stream()
+                        .map(principalId -> mirrorsByPrincipal.get(principalId).get(mirrorIndex))
+                        .toList());
+            }
+        }
+        return occurrencesBySlot;
     }
 
     @Override
@@ -229,7 +266,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
         RoomRequestItem item = itemRepository.findWithRequestById(itemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
-        transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.PENDING);
+        transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.NEW);
 
         item.returnFromBuilding(reason);
 
@@ -277,16 +314,17 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
             case ONE_TIME_ROOM_CHANGE, PARTIAL_EXAM_IN_CLASS -> List.of(findOccurrenceOnDate(item));
             case REGULAR_ROOM_CHANGE -> findFutureOccurrencesOnDayOfWeek(item);
             case PARTIAL_EXAM_OFF_SCHEDULE, FINAL_EXAM, CONFERENCE, OTHER -> reassigning
-                    ? List.of(item.getAllocations().getFirst().getOccurrenceId())
+                    ? List.of(principalAllocation(item).getOccurrenceId())
                     : List.of(createEventOccurrence(item, type));
         };
     }
 
-    private static boolean createsEvent(RoomRequestType type) {
-        return switch (type) {
-            case PARTIAL_EXAM_OFF_SCHEDULE, FINAL_EXAM, CONFERENCE, OTHER -> true;
-            case ONE_TIME_ROOM_CHANGE, REGULAR_ROOM_CHANGE, PARTIAL_EXAM_IN_CLASS -> false;
-        };
+    private RoomRequestItemAllocation principalAllocation(RoomRequestItem item) {
+        return item.getAllocations().stream()
+                .filter(allocation -> allocation.getPosition() == 1)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "El pedido no tiene una asignación principal previa a reasignar: itemId=" + item.getId()));
     }
 
     private Long findOccurrenceOnDate(RoomRequestItem item) {

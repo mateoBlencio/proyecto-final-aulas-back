@@ -148,7 +148,7 @@ class RoomRequestResolutionServiceImplTest {
                 .occurrenceId(10L).classroomId(100L).position(1).build();
         RoomRequestItemAllocation allocation2 = RoomRequestItemAllocation.builder()
                 .occurrenceId(11L).classroomId(101L).position(2).build();
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PRE_APPROVED)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.IN_EVALUATION)
                 .allocations(List.of(allocation1, allocation2)).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         when(composer.composeItem(item)).thenReturn(mockResponse());
@@ -162,9 +162,9 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     @Test
-    @DisplayName("ítem sin nada asignado (PENDING): no llama a deallocate")
+    @DisplayName("ítem sin nada asignado (NEW): no llama a deallocate")
     void sinAsignacionesNoLiberaNada() {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         when(composer.composeItem(item)).thenReturn(mockResponse());
 
@@ -315,7 +315,7 @@ class RoomRequestResolutionServiceImplTest {
     @DisplayName("derive: edificio activo, con auxiliar y aula libre → pasa a DERIVED_TO_BUILDING")
     void derive_ok() {
         LocalDate date = LocalDate.of(2026, 3, 10);
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
                 .date(date).startTime(LocalTime.of(10, 0)).duration(java.time.Duration.ofMinutes(60))
                 .build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
@@ -336,7 +336,7 @@ class RoomRequestResolutionServiceImplTest {
     @DisplayName("derive: edificio con solo 1 de 2 aulas libres también se acepta (resolución parcial)")
     void derive_resolucionParcial() {
         LocalDate date = LocalDate.of(2026, 3, 10);
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
                 .date(date).startTime(LocalTime.of(10, 0)).duration(java.time.Duration.ofMinutes(60))
                 .classroomCount(2).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
@@ -357,7 +357,7 @@ class RoomRequestResolutionServiceImplTest {
     @DisplayName("derive: sin ninguna aula libre en el edificio se rechaza")
     void derive_sinAulasLibres() {
         LocalDate date = LocalDate.of(2026, 3, 10);
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
                 .date(date).startTime(LocalTime.of(10, 0)).duration(java.time.Duration.ofMinutes(60))
                 .build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
@@ -375,7 +375,7 @@ class RoomRequestResolutionServiceImplTest {
     @Test
     @DisplayName("derive: edificio sin auxiliar áulico asignado se rechaza (agujero #2)")
     void derive_sinAuxiliarAsignado() {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true));
         when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of());
@@ -388,7 +388,7 @@ class RoomRequestResolutionServiceImplTest {
     @Test
     @DisplayName("derive: edificio inactivo se rechaza")
     void derive_edificioInactivo() {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", false));
 
@@ -400,7 +400,7 @@ class RoomRequestResolutionServiceImplTest {
     @Test
     @DisplayName("derive: edificio inexistente → 404")
     void derive_edificioInexistente() {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         when(buildingService.findById(99L)).thenThrow(ResourceNotFoundException.of("Building", 99L));
 
@@ -409,11 +409,11 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     @Test
-    @DisplayName("derive: desde PRE_APPROVED se rechaza (solo sale desde PENDING)")
-    void derive_desdePreAprobadoSeRechaza() {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PRE_APPROVED).build();
+    @DisplayName("derive: desde IN_EVALUATION se rechaza (solo sale desde NEW)")
+    void derive_desdeEnEvaluacionSeRechaza() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.IN_EVALUATION).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
-        doThrowOnTransitionTo(RoomRequestStatus.PRE_APPROVED, RoomRequestStatus.DERIVED_TO_BUILDING);
+        doThrowOnTransitionTo(RoomRequestStatus.IN_EVALUATION, RoomRequestStatus.DERIVED_TO_BUILDING);
 
         assertThatThrownBy(() -> service.derive(1L, 1L, "subsecretaria@frc.utn.edu.ar"))
                 .isInstanceOf(InvalidRoomRequestTransitionException.class);
@@ -441,7 +441,7 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     @Test
-    @DisplayName("return: DERIVED_TO_BUILDING → PENDING, copia el edificio a returnedFromBuildingId y limpia derivedBuildingId/derivedAt")
+    @DisplayName("return: DERIVED_TO_BUILDING → NEW, copia el edificio a returnedFromBuildingId y limpia derivedBuildingId/derivedAt")
     void return_ok() {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.DERIVED_TO_BUILDING)
                 .derivedBuildingId(5L).derivedAt(java.time.LocalDateTime.now()).build();
@@ -450,7 +450,7 @@ class RoomRequestResolutionServiceImplTest {
 
         service.returnItem(1L, "el laboratorio se bloqueó", "auxiliar@frc.utn.edu.ar");
 
-        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.PENDING);
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.NEW);
         assertThat(item.getReturnedFromBuildingId()).isEqualTo(5L);
         assertThat(item.getReturnedReason()).isEqualTo("el laboratorio se bloqueó");
         assertThat(item.getDerivedBuildingId()).isNull();
@@ -473,11 +473,11 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     @Test
-    @DisplayName("return: solo sale desde DERIVED_TO_BUILDING, PENDING se rechaza")
+    @DisplayName("return: solo sale desde DERIVED_TO_BUILDING, NEW se rechaza")
     void return_soloDesdeDerivado() {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
-        doThrowOnTransitionTo(RoomRequestStatus.PENDING, RoomRequestStatus.PENDING);
+        doThrowOnTransitionTo(RoomRequestStatus.NEW, RoomRequestStatus.NEW);
 
         assertThatThrownBy(() -> service.returnItem(1L, "motivo", "auxiliar@frc.utn.edu.ar"))
                 .isInstanceOf(InvalidRoomRequestTransitionException.class);
@@ -494,11 +494,11 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     @Test
-    @DisplayName("notify: PRE_APPROVED con aula asignada pasa a RESOLVED, sella notifiedAt y publica RoomRequestResolved")
+    @DisplayName("notify: IN_EVALUATION con aula asignada pasa a RESOLVED, sella notifiedAt y publica RoomRequestResolved")
     void notify_ok() {
         RoomRequestItemAllocation allocation = RoomRequestItemAllocation.builder()
                 .occurrenceId(500L).classroomId(101L).position(1).build();
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PRE_APPROVED)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.IN_EVALUATION)
                 .request(requestOfType(RoomRequestType.FINAL_EXAM))
                 .allocations(new java.util.ArrayList<>(List.of(allocation))).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
@@ -516,7 +516,7 @@ class RoomRequestResolutionServiceImplTest {
     void notify_idempotente() {
         RoomRequestItemAllocation allocation = RoomRequestItemAllocation.builder()
                 .occurrenceId(500L).classroomId(101L).position(1).build();
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PRE_APPROVED)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.IN_EVALUATION)
                 .request(requestOfType(RoomRequestType.FINAL_EXAM))
                 .allocations(new java.util.ArrayList<>(List.of(allocation))).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
@@ -536,7 +536,7 @@ class RoomRequestResolutionServiceImplTest {
     void notify_resolucionParcial() {
         RoomRequestItemAllocation allocation = RoomRequestItemAllocation.builder()
                 .occurrenceId(500L).classroomId(101L).position(1).build();
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PRE_APPROVED)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.IN_EVALUATION)
                 .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(2)
                 .allocations(new java.util.ArrayList<>(List.of(allocation))).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
@@ -548,12 +548,12 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     @Test
-    @DisplayName("notify: estado distinto de PRE_APPROVED se rechaza con conflicto")
+    @DisplayName("notify: estado distinto de IN_EVALUATION se rechaza con conflicto")
     void notify_estadoInvalido() {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
                 .request(requestOfType(RoomRequestType.FINAL_EXAM)).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
-        doThrowOnTransitionTo(RoomRequestStatus.PENDING, RoomRequestStatus.RESOLVED);
+        doThrowOnTransitionTo(RoomRequestStatus.NEW, RoomRequestStatus.RESOLVED);
 
         assertThatThrownBy(() -> service.notify(1L, "subsecretaria@frc.utn.edu.ar"))
                 .isInstanceOf(InvalidRoomRequestTransitionException.class);
@@ -563,7 +563,7 @@ class RoomRequestResolutionServiceImplTest {
     @Test
     @DisplayName("notify: sin ninguna aula asignada se rechaza")
     void notify_sinAulas() {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PRE_APPROVED)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.IN_EVALUATION)
                 .request(requestOfType(RoomRequestType.FINAL_EXAM)).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
 
@@ -582,10 +582,10 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     @Test
-    @DisplayName("assign: ONE_TIME_ROOM_CHANGE reasigna la ocurrencia de la fecha del ítem y queda PRE_APPROVED")
+    @DisplayName("assign: ONE_TIME_ROOM_CHANGE reasigna la ocurrencia de la fecha del ítem y queda IN_EVALUATION")
     void assign_oneTimeRoomChange() {
         LocalDate date = LocalDate.of(2026, 3, 12);
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
                 .request(requestOfType(RoomRequestType.ONE_TIME_ROOM_CHANGE))
                 .sourceRecurringEventId(50L).date(date).classroomCount(1).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
@@ -595,7 +595,7 @@ class RoomRequestResolutionServiceImplTest {
 
         service.assign(1L, List.of(101L), null, "subsecretaria@frc.utn.edu.ar");
 
-        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.PRE_APPROVED);
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.IN_EVALUATION);
         assertThat(item.getAllocations()).extracting(RoomRequestItemAllocation::getOccurrenceId).containsExactly(500L);
         assertThat(item.getAllocations()).extracting(RoomRequestItemAllocation::getClassroomId).containsExactly(101L);
         ArgumentCaptor<AllocationCommand> captor = ArgumentCaptor.forClass(AllocationCommand.class);
@@ -608,7 +608,7 @@ class RoomRequestResolutionServiceImplTest {
     @DisplayName("assign: PARTIAL_EXAM_IN_CLASS resuelve la ocurrencia por la fecha del ítem (BUG-01), sin pedir fecha extra")
     void assign_partialExamInClass() {
         LocalDate date = LocalDate.of(2026, 4, 1);
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
                 .request(requestOfType(RoomRequestType.PARTIAL_EXAM_IN_CLASS))
                 .sourceRecurringEventId(60L).date(date).classroomCount(1).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
@@ -617,14 +617,14 @@ class RoomRequestResolutionServiceImplTest {
 
         service.assign(1L, List.of(102L), null, "subsecretaria@frc.utn.edu.ar");
 
-        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.PRE_APPROVED);
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.IN_EVALUATION);
         verify(allocationService).reallocate(any());
     }
 
     @Test
     @DisplayName("assign: REGULAR_ROOM_CHANGE asigna todas las ocurrencias futuras del dayOfWeek del ítem")
     void assign_regularRoomChange() {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
                 .request(requestOfType(RoomRequestType.REGULAR_ROOM_CHANGE))
                 .sourceRecurringEventId(70L).dayOfWeek(java.time.DayOfWeek.THURSDAY).classroomCount(1).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
@@ -636,7 +636,7 @@ class RoomRequestResolutionServiceImplTest {
 
         service.assign(1L, List.of(103L), null, "subsecretaria@frc.utn.edu.ar");
 
-        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.PRE_APPROVED);
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.IN_EVALUATION);
         assertThat(item.getAllocations()).extracting(RoomRequestItemAllocation::getOccurrenceId)
                 .containsExactlyInAnyOrder(701L, 702L);
     }
@@ -644,7 +644,7 @@ class RoomRequestResolutionServiceImplTest {
     @Test
     @DisplayName("assign: REGULAR_ROOM_CHANGE sin ocurrencias futuras se rechaza")
     void assign_regularRoomChange_sinFuturas() {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
                 .request(requestOfType(RoomRequestType.REGULAR_ROOM_CHANGE))
                 .sourceRecurringEventId(70L).dayOfWeek(java.time.DayOfWeek.THURSDAY).classroomCount(1).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
@@ -659,7 +659,7 @@ class RoomRequestResolutionServiceImplTest {
     @DisplayName("assign: FINAL_EXAM crea el UniqueEvent y asigna su ocurrencia (primera vez → allocate)")
     void assign_finalExam_creaEvento() {
         LocalDate date = LocalDate.of(2026, 7, 1);
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
                 .request(requestOfType(RoomRequestType.FINAL_EXAM))
                 .date(date).startTime(LocalTime.of(9, 0)).duration(Duration.ofMinutes(90))
                 .estimated(30).classroomCount(1).build();
@@ -671,17 +671,17 @@ class RoomRequestResolutionServiceImplTest {
 
         service.assign(1L, List.of(104L), null, "subsecretaria@frc.utn.edu.ar");
 
-        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.PRE_APPROVED);
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.IN_EVALUATION);
         assertThat(item.getAllocations()).extracting(RoomRequestItemAllocation::getOccurrenceId).containsExactly(9000L);
-        verify(allocationService).allocate(any());
-        verify(allocationService, never()).reallocate(any());
+        verify(allocationService).reallocate(any());
+        verify(allocationService, never()).allocate(any());
     }
 
     @Test
     @DisplayName("assign: CONFERENCE crea el UniqueEvent kind OTRO")
     void assign_conference_creaEventoOtro() {
         LocalDate date = LocalDate.of(2026, 8, 1);
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
                 .request(requestOfType(RoomRequestType.CONFERENCE))
                 .date(date).startTime(LocalTime.of(18, 0)).duration(Duration.ofMinutes(60))
                 .estimated(80).classroomCount(1).build();
@@ -704,7 +704,7 @@ class RoomRequestResolutionServiceImplTest {
         LocalDate date = LocalDate.of(2026, 7, 1);
         RoomRequestItemAllocation previous = RoomRequestItemAllocation.builder()
                 .occurrenceId(9000L).classroomId(104L).position(1).build();
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PRE_APPROVED)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.IN_EVALUATION)
                 .request(requestOfType(RoomRequestType.FINAL_EXAM))
                 .date(date).startTime(LocalTime.of(9, 0)).duration(Duration.ofMinutes(90))
                 .estimated(30).classroomCount(1).allocations(new java.util.ArrayList<>(List.of(previous))).build();
@@ -723,7 +723,7 @@ class RoomRequestResolutionServiceImplTest {
     @Test
     @DisplayName("assign: 0 aulas se rechaza (eso es cancel, no assign)")
     void assign_ceroAulas() {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
                 .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(2).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
 
@@ -735,7 +735,7 @@ class RoomRequestResolutionServiceImplTest {
     @Test
     @DisplayName("assign: más aulas que classroomCount se rechaza")
     void assign_masAulasQueClassroomCount() {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
                 .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
 
@@ -747,7 +747,7 @@ class RoomRequestResolutionServiceImplTest {
     @Test
     @DisplayName("assign: ids repetidos se rechaza")
     void assign_idsRepetidos() {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
                 .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(2).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
 
@@ -759,7 +759,7 @@ class RoomRequestResolutionServiceImplTest {
     @Test
     @DisplayName("assign: menos aulas que classroomCount sin reason se rechaza")
     void assign_menosAulasSinReason() {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
                 .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(2).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
 
@@ -769,10 +769,10 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     @Test
-    @DisplayName("assign: menos aulas que classroomCount con reason se acepta y queda PRE_APPROVED")
+    @DisplayName("assign: menos aulas que classroomCount con reason se acepta y queda IN_EVALUATION")
     void assign_menosAulasConReason() {
         LocalDate date = LocalDate.of(2026, 7, 1);
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
                 .request(requestOfType(RoomRequestType.FINAL_EXAM))
                 .date(date).startTime(LocalTime.of(9, 0)).duration(Duration.ofMinutes(90))
                 .estimated(30).classroomCount(2).build();
@@ -784,14 +784,14 @@ class RoomRequestResolutionServiceImplTest {
 
         service.assign(1L, List.of(104L), "solo hay una disponible", "subsecretaria@frc.utn.edu.ar");
 
-        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.PRE_APPROVED);
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.IN_EVALUATION);
         assertThat(item.getDecisionReason()).isEqualTo("solo hay una disponible");
     }
 
     @Test
     @DisplayName("assign: pedido ya notificado se rechaza aunque el estado lo permitiera")
     void assign_yaNotificadoSeRechaza() {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PRE_APPROVED)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.IN_EVALUATION)
                 .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1)
                 .notifiedAt(java.time.LocalDateTime.now()).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
@@ -805,7 +805,7 @@ class RoomRequestResolutionServiceImplTest {
     @DisplayName("assign: conflicto de aula propaga la excepción sin dejar nada a medio escribir")
     void assign_conflicto() {
         LocalDate date = LocalDate.of(2026, 3, 12);
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
                 .request(requestOfType(RoomRequestType.ONE_TIME_ROOM_CHANGE))
                 .sourceRecurringEventId(50L).date(date).classroomCount(1).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
@@ -815,18 +815,18 @@ class RoomRequestResolutionServiceImplTest {
 
         assertThatThrownBy(() -> service.assign(1L, List.of(101L), null, "subsecretaria@frc.utn.edu.ar"))
                 .isInstanceOf(ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException.class);
-        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.PENDING);
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.NEW);
         assertThat(item.getAllocations()).isEmpty();
         verifyNoInteractions(composer);
     }
 
     @Test
-    @DisplayName("assign: desde PRE_APPROVED distinto set (0 aulas anteriores) no exige reason si llega completo")
+    @DisplayName("assign: desde IN_EVALUATION distinto set (0 aulas anteriores) no exige reason si llega completo")
     void assign_reasignarSinReasonSiCompleto() {
         RoomRequestItemAllocation previous = RoomRequestItemAllocation.builder()
                 .occurrenceId(500L).classroomId(101L).position(1).build();
         LocalDate date = LocalDate.of(2026, 3, 12);
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PRE_APPROVED)
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.IN_EVALUATION)
                 .request(requestOfType(RoomRequestType.ONE_TIME_ROOM_CHANGE))
                 .sourceRecurringEventId(50L).date(date).classroomCount(1)
                 .allocations(new java.util.ArrayList<>(List.of(previous))).build();
@@ -837,6 +837,95 @@ class RoomRequestResolutionServiceImplTest {
         service.assign(1L, List.of(102L), null, "subsecretaria@frc.utn.edu.ar");
 
         assertThat(item.getAllocations()).extracting(RoomRequestItemAllocation::getClassroomId).containsExactly(102L);
+    }
+
+    @Test
+    @DisplayName("assign: 3 aulas crea 1 evento con 3 ocurrencias enlazadas (roomSlot 1/2/3) y 3 filas de asignación")
+    void assign_tresAulas_creaOcurrenciasSimultaneas() {
+        LocalDate date = LocalDate.of(2026, 7, 1);
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM))
+                .date(date).startTime(LocalTime.of(9, 0)).duration(Duration.ofMinutes(90))
+                .estimated(90).classroomCount(3).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(academicEventService.createUniqueEvent(any())).thenReturn(uniqueEvent(900L));
+        when(academicEventService.findOccurrencesByEventId(900L)).thenReturn(List.of(
+                new OccurrenceResponseDto(9000L, 900L, date, OccurrenceStatus.NEEDS_ROOM, LocalTime.of(9, 0), LocalTime.of(10, 30))));
+        when(occurrenceService.createSimultaneous(9000L, 2)).thenReturn(List.of(9001L, 9002L));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(104L, 105L, 106L), null, "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.IN_EVALUATION);
+        assertThat(item.getAllocations()).hasSize(3);
+        assertThat(item.getAllocations()).extracting(RoomRequestItemAllocation::getOccurrenceId)
+                .containsExactlyInAnyOrder(9000L, 9001L, 9002L);
+        assertThat(item.getAllocations()).extracting(RoomRequestItemAllocation::getPosition)
+                .containsExactlyInAnyOrder(1, 2, 3);
+
+        ArgumentCaptor<AllocationCommand> captor = ArgumentCaptor.forClass(AllocationCommand.class);
+        verify(allocationService).reallocate(captor.capture());
+        assertThat(captor.getValue().items()).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("assign: conflicto con alguna de varias aulas no deja nada a medio escribir")
+    void assign_conflictoConVariasAulas_noAplicaNada() {
+        LocalDate date = LocalDate.of(2026, 7, 1);
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM))
+                .date(date).startTime(LocalTime.of(9, 0)).duration(Duration.ofMinutes(90))
+                .estimated(90).classroomCount(2).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(academicEventService.createUniqueEvent(any())).thenReturn(uniqueEvent(900L));
+        when(academicEventService.findOccurrencesByEventId(900L)).thenReturn(List.of(
+                new OccurrenceResponseDto(9000L, 900L, date, OccurrenceStatus.NEEDS_ROOM, LocalTime.of(9, 0), LocalTime.of(10, 30))));
+        when(occurrenceService.createSimultaneous(9000L, 1)).thenReturn(List.of(9001L));
+        when(allocationService.reallocate(any()))
+                .thenThrow(new ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException("ocupada"));
+
+        assertThatThrownBy(() -> service.assign(1L, List.of(104L, 105L), null, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException.class);
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.NEW);
+        assertThat(item.getAllocations()).isEmpty();
+        verifyNoInteractions(composer);
+    }
+
+    @Test
+    @DisplayName("assign: reasignar de 3 aulas a otras 3 libera los mirrors viejos y no deja huérfanos")
+    void assign_reasignarVariasAulas_liberaMirrorsViejos() {
+        LocalDate date = LocalDate.of(2026, 7, 1);
+        RoomRequestItemAllocation previous1 = RoomRequestItemAllocation.builder()
+                .occurrenceId(9000L).classroomId(104L).position(1).build();
+        RoomRequestItemAllocation previous2 = RoomRequestItemAllocation.builder()
+                .occurrenceId(9001L).classroomId(105L).position(2).build();
+        RoomRequestItemAllocation previous3 = RoomRequestItemAllocation.builder()
+                .occurrenceId(9002L).classroomId(106L).position(3).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.IN_EVALUATION)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM))
+                .date(date).startTime(LocalTime.of(9, 0)).duration(Duration.ofMinutes(90))
+                .estimated(90).classroomCount(3)
+                .allocations(new java.util.ArrayList<>(List.of(previous1, previous2, previous3))).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(occurrenceService.createSimultaneous(9000L, 2)).thenReturn(List.of(9010L, 9011L));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(200L, 201L, 202L), null, "subsecretaria@frc.utn.edu.ar");
+
+        ArgumentCaptor<DeallocationCommand> deallocCaptor = ArgumentCaptor.forClass(DeallocationCommand.class);
+        verify(allocationService).deallocate(deallocCaptor.capture());
+        AllocationTarget.Occurrences deallocated =
+                (AllocationTarget.Occurrences) deallocCaptor.getValue().targets().getFirst();
+        assertThat(deallocated.occurrenceIds()).containsExactlyInAnyOrder(9001L, 9002L);
+        verify(occurrenceService).release(9001L);
+        verify(occurrenceService).release(9002L);
+        verify(academicEventService, never()).createUniqueEvent(any());
+
+        assertThat(item.getAllocations()).extracting(RoomRequestItemAllocation::getOccurrenceId)
+                .containsExactlyInAnyOrder(9000L, 9010L, 9011L);
+        assertThat(item.getAllocations()).extracting(RoomRequestItemAllocation::getClassroomId)
+                .containsExactlyInAnyOrder(200L, 201L, 202L);
     }
 
     private static RoomRequest requestOfType(RoomRequestType type) {

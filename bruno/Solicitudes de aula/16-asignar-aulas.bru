@@ -12,7 +12,7 @@ post {
 
 body:json {
   {
-    "classroomIds": [12],
+    "classroomIds": [12, 15, 18],
     "reason": null
   }
 }
@@ -20,9 +20,8 @@ body:json {
 docs {
   POST /v1/room-requests/items/{id}/assign. Rol: SUBSECRETARIA, AUXILIAR_AULICO.
 
-  Asigna aula(s) a un pedido y lo deja en `PRE_APPROVED` (todavía no se avisó al
-  docente, eso es `notify`). Esta versión admite **una aula por llamada**; varias
-  aulas simultáneas para el mismo pedido llegan en un bloque futuro.
+  Asigna una o más aulas a un pedido y lo deja en `IN_EVALUATION` (todavía no se
+  avisó al docente, eso es `notify`).
 
   Según `RoomRequestType` la ocurrencia objetivo se resuelve distinto:
   - `ONE_TIME_ROOM_CHANGE` / `PARTIAL_EXAM_IN_CLASS`: reasigna la ocurrencia que ya
@@ -32,6 +31,13 @@ docs {
   - `PARTIAL_EXAM_OFF_SCHEDULE`, `FINAL_EXAM`, `CONFERENCE`, `OTHER`: la primera vez
     crean un evento nuevo (`UniqueEvent`) con su ocurrencia; una reasignación
     posterior reutiliza esa misma ocurrencia, no crea otra.
+
+  **Más de un aula**: la primera aula usa la ocurrencia "principal" (la de arriba);
+  cada aula extra crea, sobre el mismo evento y misma fecha, una ocurrencia
+  simultánea nueva (mismo horario, aula distinta). Todo se asigna en una sola
+  transacción: si una sola aula está ocupada, no queda ninguna asignada. Reasignar
+  (segundo `assign`) libera las ocurrencias simultáneas del intento anterior y crea
+  otras nuevas — nunca se reutilizan entre llamadas.
 
   Validaciones (400 Invalid room request salvo que se indique lo contrario):
   - 0 aulas: para cancelar el pedido está `cancel`, no esto;
@@ -43,10 +49,10 @@ docs {
   - 409 si el aula ya está ocupada en esa fecha/horario (conflicto de asignación,
     con el detalle en el `ProblemDetail`).
 
-  Reasignar (un segundo `assign` sobre un pedido ya `PRE_APPROVED`) reemplaza el
-  conjunto de aulas anterior entero. Solo transiciona desde `PENDING`,
-  `DERIVED_TO_BUILDING` o `PRE_APPROVED` (409 desde `RESOLVED` o `CANCELLED`). 404
+  Reasignar (un segundo `assign` sobre un pedido ya `IN_EVALUATION`) reemplaza el
+  conjunto de aulas anterior entero. Solo transiciona desde `NEW`,
+  `DERIVED_TO_BUILDING` o `IN_EVALUATION` (409 desde `RESOLVED` o `CANCELLED`). 404
   si el ítem no existe.
 
-  Respuesta: 200 con el pedido actualizado (`status: "PRE_APPROVED"`).
+  Respuesta: 200 con el pedido actualizado (`status: "IN_EVALUATION"`).
 }

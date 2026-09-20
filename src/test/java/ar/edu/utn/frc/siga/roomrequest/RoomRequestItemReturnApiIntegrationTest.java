@@ -33,7 +33,7 @@ class RoomRequestItemReturnApiIntegrationTest extends AbstractIntegrationTest {
     private RoomRequestRepository roomRequestRepository;
 
     @Test
-    @DisplayName("DERIVED_TO_BUILDING con motivo: vuelve a PENDING y deja returnedFromBuildingId + returnedReason")
+    @DisplayName("DERIVED_TO_BUILDING con motivo: vuelve a NEW y deja returnedFromBuildingId + returnedReason")
     void return_derivado_returnsPending() throws Exception {
         RoomRequestItem item = seedDerivedItem(9L);
 
@@ -41,7 +41,7 @@ class RoomRequestItemReturnApiIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"el laboratorio se bloqueó\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("PENDING"));
+                .andExpect(jsonPath("$.status").value("NEW"));
     }
 
     @Test
@@ -57,9 +57,9 @@ class RoomRequestItemReturnApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("desde PENDING: 409 Invalid room request transition")
+    @DisplayName("desde NEW: 409 Invalid room request transition")
     void return_desdePending_returnsConflict() throws Exception {
-        RoomRequestItem item = seedItem(RoomRequestStatus.PENDING);
+        RoomRequestItem item = seedItem(RoomRequestStatus.NEW);
 
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/return")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -126,7 +126,7 @@ class RoomRequestItemReturnApiIntegrationTest extends AbstractIntegrationTest {
                 .classroomCount(1)
                 .build();
         request.addItem(item);
-        if (status != RoomRequestStatus.PENDING) {
+        if (status != RoomRequestStatus.NEW) {
             item.decide(status, "subsecretaria@frc.utn.edu.ar", "motivo de prueba", LocalDateTime.now());
         }
         roomRequestRepository.save(request);

@@ -33,7 +33,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Entity
 @Audited
@@ -63,7 +66,7 @@ public class RoomRequestItem extends TimestampedEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "estado", nullable = false, length = 30)
     @Builder.Default
-    private RoomRequestStatus status = RoomRequestStatus.PENDING;
+    private RoomRequestStatus status = RoomRequestStatus.NEW;
 
     @Column(name = "decidido_por", length = 150)
     private String decidedBy;
@@ -168,7 +171,7 @@ public class RoomRequestItem extends TimestampedEntity {
         this.decidedAt = decidedAt;
     }
 
-    /** decidedBy/decidedAt trackean la última decisión sea cual sea; el CHECK chk_solicitud_item_decision exige ambos no nulos fuera de PENDING. */
+    /** decidedBy/decidedAt trackean la última decisión sea cual sea; el CHECK chk_solicitud_item_decision exige ambos no nulos fuera de NEW. */
     public void deriveTo(Long buildingId, String decidedBy, LocalDateTime derivedAt) {
         this.status = RoomRequestStatus.DERIVED_TO_BUILDING;
         this.derivedBuildingId = buildingId;
@@ -186,22 +189,39 @@ public class RoomRequestItem extends TimestampedEntity {
     }
 
     public void returnFromBuilding(String reason) {
-        this.status = RoomRequestStatus.PENDING;
+        this.status = RoomRequestStatus.NEW;
         this.returnedFromBuildingId = this.derivedBuildingId;
         this.returnedReason = reason;
         this.derivedBuildingId = null;
         this.derivedAt = null;
     }
 
-    /** Bloque 10: una sola aula, así que todas las ocurrencias resueltas comparten orden=1; Bloque 12 suma más aulas. */
-    public void assignClassroom(Long classroomId, List<Long> occurrenceIds) {
-        allocations.clear();
-        occurrenceIds.forEach(occurrenceId -> allocations.add(RoomRequestItemAllocation.builder()
-                .item(this)
-                .occurrenceId(occurrenceId)
-                .classroomId(classroomId)
-                .position(1)
-                .build()));
+    /** classroomIds[i] cubre occurrencesBySlot.get(i): una fila por ocurrencia real, orden = i+1. */
+    /** Actualiza en el lugar la fila cuya ocurrencia se reutiliza (p. ej. la principal en una reasignación): borrar y recrear con la misma id_ocurrencia viola el UNIQUE(id_item, id_ocurrencia) por el orden de flush de Hibernate. */
+    public void assignClassrooms(List<Long> classroomIds, List<List<Long>> occurrencesBySlot) {
+        Map<Long, RoomRequestItemAllocation> existingByOccurrence = allocations.stream()
+                .collect(java.util.stream.Collectors.toMap(RoomRequestItemAllocation::getOccurrenceId, a -> a));
+        Set<Long> keptOccurrenceIds = new HashSet<>();
+
+        for (int i = 0; i < classroomIds.size(); i++) {
+            Long classroomId = classroomIds.get(i);
+            int position = i + 1;
+            for (Long occurrenceId : occurrencesBySlot.get(i)) {
+                keptOccurrenceIds.add(occurrenceId);
+                RoomRequestItemAllocation existing = existingByOccurrence.get(occurrenceId);
+                if (existing != null) {
+                    existing.update(classroomId, position);
+                } else {
+                    allocations.add(RoomRequestItemAllocation.builder()
+                            .item(this)
+                            .occurrenceId(occurrenceId)
+                            .classroomId(classroomId)
+                            .position(position)
+                            .build());
+                }
+            }
+        }
+        allocations.removeIf(a -> !keptOccurrenceIds.contains(a.getOccurrenceId()));
     }
 
     public void addPreferences(List<Long> classroomIds) {

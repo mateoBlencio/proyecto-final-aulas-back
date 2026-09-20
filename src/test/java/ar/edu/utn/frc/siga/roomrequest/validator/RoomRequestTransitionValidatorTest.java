@@ -18,26 +18,26 @@ class RoomRequestTransitionValidatorTest {
     private final RoomRequestTransitionValidator validator = new RoomRequestTransitionValidator();
 
     @Test
-    @DisplayName("desde PENDING se puede derivar, pre-aprobar o cancelar")
-    void fromPending() {
+    @DisplayName("desde NEW se puede derivar, pasar a evaluación o cancelar")
+    void fromNew() {
         assertThatCode(() -> validator.validateTransition(
-                RoomRequestStatus.PENDING, RoomRequestStatus.DERIVED_TO_BUILDING)).doesNotThrowAnyException();
+                RoomRequestStatus.NEW, RoomRequestStatus.DERIVED_TO_BUILDING)).doesNotThrowAnyException();
         assertThatCode(() -> validator.validateTransition(
-                RoomRequestStatus.PENDING, RoomRequestStatus.PRE_APPROVED)).doesNotThrowAnyException();
+                RoomRequestStatus.NEW, RoomRequestStatus.IN_EVALUATION)).doesNotThrowAnyException();
         assertThatCode(() -> validator.validateTransition(
-                RoomRequestStatus.PENDING, RoomRequestStatus.CANCELLED)).doesNotThrowAnyException();
+                RoomRequestStatus.NEW, RoomRequestStatus.CANCELLED)).doesNotThrowAnyException();
         assertThatThrownBy(() -> validator.validateTransition(
-                RoomRequestStatus.PENDING, RoomRequestStatus.RESOLVED))
+                RoomRequestStatus.NEW, RoomRequestStatus.RESOLVED))
                 .isInstanceOf(InvalidRoomRequestTransitionException.class);
     }
 
     @Test
-    @DisplayName("desde DERIVED_TO_BUILDING se puede asignar, devolver a PENDING o cancelar")
+    @DisplayName("desde DERIVED_TO_BUILDING se puede asignar, devolver a NEW o cancelar")
     void fromDerivedToBuilding() {
         assertThatCode(() -> validator.validateTransition(
-                RoomRequestStatus.DERIVED_TO_BUILDING, RoomRequestStatus.PRE_APPROVED)).doesNotThrowAnyException();
+                RoomRequestStatus.DERIVED_TO_BUILDING, RoomRequestStatus.IN_EVALUATION)).doesNotThrowAnyException();
         assertThatCode(() -> validator.validateTransition(
-                RoomRequestStatus.DERIVED_TO_BUILDING, RoomRequestStatus.PENDING)).doesNotThrowAnyException();
+                RoomRequestStatus.DERIVED_TO_BUILDING, RoomRequestStatus.NEW)).doesNotThrowAnyException();
         assertThatCode(() -> validator.validateTransition(
                 RoomRequestStatus.DERIVED_TO_BUILDING, RoomRequestStatus.CANCELLED)).doesNotThrowAnyException();
         assertThatThrownBy(() -> validator.validateTransition(
@@ -46,26 +46,26 @@ class RoomRequestTransitionValidatorTest {
     }
 
     @Test
-    @DisplayName("PENDING es la única transición hacia atrás, y solo sale de DERIVED_TO_BUILDING (devolución)")
+    @DisplayName("NEW es la única transición hacia atrás, y solo sale de DERIVED_TO_BUILDING (devolución)")
     void onlyDerivedToBuildingReturnsToPending() {
         for (RoomRequestStatus status : EnumSet.complementOf(EnumSet.of(RoomRequestStatus.DERIVED_TO_BUILDING))) {
-            assertThatThrownBy(() -> validator.validateTransition(status, RoomRequestStatus.PENDING))
-                    .as("%s -> PENDING", status)
+            assertThatThrownBy(() -> validator.validateTransition(status, RoomRequestStatus.NEW))
+                    .as("%s -> NEW", status)
                     .isInstanceOf(InvalidRoomRequestTransitionException.class);
         }
     }
 
     @Test
-    @DisplayName("un pedido pre-aprobado se puede reasignar (PRE_APPROVED -> PRE_APPROVED), notificar o cancelar")
-    void fromPreApproved() {
+    @DisplayName("un pedido en evaluación se puede reasignar (IN_EVALUATION -> IN_EVALUATION), notificar o cancelar")
+    void fromInEvaluation() {
         assertThatCode(() -> validator.validateTransition(
-                RoomRequestStatus.PRE_APPROVED, RoomRequestStatus.PRE_APPROVED)).doesNotThrowAnyException();
+                RoomRequestStatus.IN_EVALUATION, RoomRequestStatus.IN_EVALUATION)).doesNotThrowAnyException();
         assertThatCode(() -> validator.validateTransition(
-                RoomRequestStatus.PRE_APPROVED, RoomRequestStatus.RESOLVED)).doesNotThrowAnyException();
+                RoomRequestStatus.IN_EVALUATION, RoomRequestStatus.RESOLVED)).doesNotThrowAnyException();
         assertThatCode(() -> validator.validateTransition(
-                RoomRequestStatus.PRE_APPROVED, RoomRequestStatus.CANCELLED)).doesNotThrowAnyException();
+                RoomRequestStatus.IN_EVALUATION, RoomRequestStatus.CANCELLED)).doesNotThrowAnyException();
         assertThatThrownBy(() -> validator.validateTransition(
-                RoomRequestStatus.PRE_APPROVED, RoomRequestStatus.DERIVED_TO_BUILDING))
+                RoomRequestStatus.IN_EVALUATION, RoomRequestStatus.DERIVED_TO_BUILDING))
                 .isInstanceOf(InvalidRoomRequestTransitionException.class);
     }
 
@@ -102,10 +102,10 @@ class RoomRequestTransitionValidatorTest {
     }
 
     @Test
-    @DisplayName("ningún estado permite quedarse donde está, salvo PRE_APPROVED (reasignar)")
+    @DisplayName("ningún estado permite quedarse donde está, salvo IN_EVALUATION (reasignar)")
     void selfTransitionsAreRejectedExceptPreApproved() {
         for (RoomRequestStatus status : RoomRequestStatus.values()) {
-            if (status == RoomRequestStatus.PRE_APPROVED) {
+            if (status == RoomRequestStatus.IN_EVALUATION) {
                 assertThatCode(() -> validator.validateTransition(status, status))
                         .as("%s -> %s", status, status)
                         .doesNotThrowAnyException();

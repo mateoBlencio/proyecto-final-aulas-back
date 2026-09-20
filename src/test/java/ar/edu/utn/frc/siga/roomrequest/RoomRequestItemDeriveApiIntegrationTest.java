@@ -42,7 +42,7 @@ class RoomRequestItemDeriveApiIntegrationTest extends AbstractIntegrationTest {
         testData.aula(building);
         mockMvcAsScoped("auxiliar-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar",
                 SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, building.getId());
-        RoomRequestItem item = seedItem(RoomRequestStatus.PENDING);
+        RoomRequestItem item = seedItem(RoomRequestStatus.NEW);
 
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/derive")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -57,7 +57,7 @@ class RoomRequestItemDeriveApiIntegrationTest extends AbstractIntegrationTest {
         Building building = testData.edificio();
         mockMvcAsScoped("auxiliar-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar",
                 SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, building.getId());
-        RoomRequestItem item = seedItem(RoomRequestStatus.PENDING);
+        RoomRequestItem item = seedItem(RoomRequestStatus.NEW);
 
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/derive")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -70,7 +70,7 @@ class RoomRequestItemDeriveApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("edificio inactivo: 400 Invalid room request")
     void derive_edificioInactivo_returnsBadRequest() throws Exception {
         Building building = testData.edificio("Edificio-Inactivo", false);
-        RoomRequestItem item = seedItem(RoomRequestStatus.PENDING);
+        RoomRequestItem item = seedItem(RoomRequestStatus.NEW);
 
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/derive")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -83,7 +83,7 @@ class RoomRequestItemDeriveApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("edificio inexistente: 404")
     void derive_edificioInexistente_returnsNotFound() throws Exception {
         long unknownBuildingId = 999_999_000L + IntegrationTestData.nextSeq();
-        RoomRequestItem item = seedItem(RoomRequestStatus.PENDING);
+        RoomRequestItem item = seedItem(RoomRequestStatus.NEW);
 
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/derive")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -92,13 +92,13 @@ class RoomRequestItemDeriveApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("desde PRE_APPROVED: 409 Invalid room request transition")
-    void derive_desdePreAprobado_returnsConflict() throws Exception {
+    @DisplayName("desde IN_EVALUATION: 409 Invalid room request transition")
+    void derive_desdeEnEvaluacion_returnsConflict() throws Exception {
         Building building = testData.edificio();
         testData.aula(building);
         mockMvcAsScoped("auxiliar-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar",
                 SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, building.getId());
-        RoomRequestItem item = seedItem(RoomRequestStatus.PRE_APPROVED);
+        RoomRequestItem item = seedItem(RoomRequestStatus.IN_EVALUATION);
 
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/derive")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -110,7 +110,7 @@ class RoomRequestItemDeriveApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("sin buildingId: 400 Validación fallida")
     void derive_sinBuildingId_returnsBadRequest() throws Exception {
-        RoomRequestItem item = seedItem(RoomRequestStatus.PENDING);
+        RoomRequestItem item = seedItem(RoomRequestStatus.NEW);
 
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/derive")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -149,7 +149,7 @@ class RoomRequestItemDeriveApiIntegrationTest extends AbstractIntegrationTest {
                 .classroomCount(1)
                 .build();
         request.addItem(item);
-        if (status != RoomRequestStatus.PENDING) {
+        if (status != RoomRequestStatus.NEW) {
             item.decide(status, "subsecretaria@frc.utn.edu.ar", "motivo de prueba", LocalDateTime.now());
         }
         roomRequestRepository.save(request);

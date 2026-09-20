@@ -93,7 +93,7 @@ class RoomRequestMapperTest {
     @DisplayName("el estado del pedido viaja al DTO")
     void itemCarriesStatus() {
         assertThat(mapper.toDto(itemEntity(), null, List.of()).status())
-                .isEqualTo(RoomRequestStatus.PENDING);
+                .isEqualTo(RoomRequestStatus.NEW);
     }
 
     private static RoomRequest requestEntity() {

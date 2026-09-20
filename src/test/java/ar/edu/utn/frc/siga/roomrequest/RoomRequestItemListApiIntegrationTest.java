@@ -49,12 +49,12 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
 
         RoomRequest partial = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
-        seedItem(partial, academic.commissionId(), LocalDate.now().plusDays(10), RoomRequestStatus.PENDING);
-        seedItem(partial, academic.commissionId(), LocalDate.now().plusDays(20), RoomRequestStatus.PRE_APPROVED);
+        seedItem(partial, academic.commissionId(), LocalDate.now().plusDays(10), RoomRequestStatus.NEW);
+        seedItem(partial, academic.commissionId(), LocalDate.now().plusDays(20), RoomRequestStatus.IN_EVALUATION);
         roomRequestRepository.save(partial);
 
         RoomRequest conference = seedRequest(RoomRequestType.CONFERENCE, academic.subjectId());
-        seedItem(conference, null, LocalDate.now().plusDays(15), RoomRequestStatus.PENDING);
+        seedItem(conference, null, LocalDate.now().plusDays(15), RoomRequestStatus.NEW);
         roomRequestRepository.save(conference);
 
         mockMvc.perform(get("/v1/room-requests/items")
@@ -66,10 +66,10 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/v1/room-requests/items")
                         .param("subjectId", String.valueOf(academic.subjectId()))
                         .param("types", "PARTIAL_EXAM_OFF_SCHEDULE")
-                        .param("statuses", "PRE_APPROVED"))
+                        .param("statuses", "IN_EVALUATION"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page.totalElements").value(1))
-                .andExpect(jsonPath("$.content[0].status").value("PRE_APPROVED"))
+                .andExpect(jsonPath("$.content[0].status").value("IN_EVALUATION"))
                 .andExpect(jsonPath("$.content[0].request.id").value(partial.getId()));
     }
 
@@ -78,8 +78,8 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
     void combinesTypeAndDateRangeFilters() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
         RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
-        seedItem(request, academic.commissionId(), LocalDate.now().plusDays(5), RoomRequestStatus.PENDING);
-        seedItem(request, academic.commissionId(), LocalDate.now().plusDays(50), RoomRequestStatus.PENDING);
+        seedItem(request, academic.commissionId(), LocalDate.now().plusDays(5), RoomRequestStatus.NEW);
+        seedItem(request, academic.commissionId(), LocalDate.now().plusDays(50), RoomRequestStatus.NEW);
         roomRequestRepository.save(request);
 
         mockMvc.perform(get("/v1/room-requests/items")
@@ -97,7 +97,7 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
         RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
         seedItem(request, academic.commissionId(), LocalDate.now().minusDays(5), RoomRequestStatus.CANCELLED);
-        seedItem(request, academic.commissionId(), LocalDate.now().plusDays(5), RoomRequestStatus.PENDING);
+        seedItem(request, academic.commissionId(), LocalDate.now().plusDays(5), RoomRequestStatus.NEW);
         roomRequestRepository.save(request);
 
         mockMvc.perform(get("/v1/room-requests/items")
@@ -117,9 +117,9 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
     void pagesResultsWithSizeParam() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
         RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
-        seedItem(request, academic.commissionId(), LocalDate.now().plusDays(1), RoomRequestStatus.PENDING);
-        seedItem(request, academic.commissionId(), LocalDate.now().plusDays(2), RoomRequestStatus.PENDING);
-        seedItem(request, academic.commissionId(), LocalDate.now().plusDays(3), RoomRequestStatus.PENDING);
+        seedItem(request, academic.commissionId(), LocalDate.now().plusDays(1), RoomRequestStatus.NEW);
+        seedItem(request, academic.commissionId(), LocalDate.now().plusDays(2), RoomRequestStatus.NEW);
+        seedItem(request, academic.commissionId(), LocalDate.now().plusDays(3), RoomRequestStatus.NEW);
         roomRequestRepository.save(request);
 
         mockMvc.perform(get("/v1/room-requests/items")
@@ -146,11 +146,11 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
 
         // createdAt lo sella @CreationTimestamp al persistir: el orden de alta define el orden esperado.
         RoomRequest olderRequest = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
-        seedItem(olderRequest, academic.commissionId(), LocalDate.now().plusDays(30), RoomRequestStatus.PENDING);
+        seedItem(olderRequest, academic.commissionId(), LocalDate.now().plusDays(30), RoomRequestStatus.NEW);
         roomRequestRepository.saveAndFlush(olderRequest);
 
         RoomRequest newerRequest = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
-        seedItem(newerRequest, academic.commissionId(), LocalDate.now().plusDays(31), RoomRequestStatus.PENDING);
+        seedItem(newerRequest, academic.commissionId(), LocalDate.now().plusDays(31), RoomRequestStatus.NEW);
         roomRequestRepository.saveAndFlush(newerRequest);
 
         mockMvc.perform(get("/v1/room-requests/items")
@@ -186,7 +186,7 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
                 .build();
     }
 
-    /** Statuses distintos de PENDING pasan por {@code decide(...)}: el check constraint de la tabla exige decidedBy/decidedAt en ese caso. */
+    /** Statuses distintos de NEW pasan por {@code decide(...)}: el check constraint de la tabla exige decidedBy/decidedAt en ese caso. */
     private RoomRequestItem seedItem(RoomRequest request, Long commissionId, LocalDate date, RoomRequestStatus status) {
         RoomRequestItem item = RoomRequestItem.builder()
                 .commissionId(commissionId)
@@ -197,7 +197,7 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
                 .classroomCount(1)
                 .build();
         request.addItem(item);
-        if (status != RoomRequestStatus.PENDING) {
+        if (status != RoomRequestStatus.NEW) {
             item.decide(status, "subsecretaria@frc.utn.edu.ar", "motivo de prueba", LocalDateTime.now());
         }
         return item;

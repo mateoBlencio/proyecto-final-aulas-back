@@ -50,4 +50,9 @@ public class RoomRequestItemAllocation extends TimestampedEntity {
     /** Número de aula del pedido (1..classroomCount), no de ocurrencia: un REGULAR_ROOM_CHANGE repite el mismo valor en varias filas, una por clase futura. */
     @Column(name = "orden", nullable = false)
     private Integer position;
+
+    void update(Long classroomId, Integer position) {
+        this.classroomId = classroomId;
+        this.position = position;
+    }
 }

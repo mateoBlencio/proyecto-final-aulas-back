@@ -58,7 +58,7 @@ public class RoomRequestController {
 
     @PostMapping
     @Operation(summary = "Crear una solicitud de aula",
-               description = "Registra una solicitud con sus pedidos y queda en estado PENDING "
+               description = "Registra una solicitud con sus pedidos y queda en estado NEW "
                        + "para que subsecretaría la analice. Endpoint público")
     public ResponseEntity<RoomRequestResponseDto> create(@Valid @RequestBody CreateRoomRequestDto dto) {
         log.debug("POST /v1/room-requests: teacherName={}, type={}, items={}",
@@ -119,7 +119,7 @@ public class RoomRequestController {
     @PostMapping("/items/{id}/assign")
     @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
     @Operation(summary = "Asignar aula(s) a un pedido",
-               description = "Asigna una o más aulas y deja el pedido en PRE_APPROVED. Admite "
+               description = "Asigna una o más aulas y deja el pedido en IN_EVALUATION. Admite "
                        + "resolución parcial (menos aulas que classroomCount, con motivo obligatorio) "
                        + "y reasignación mientras el pedido no fue notificado.")
     public ResponseEntity<RoomRequestItemResponseDto> assignItem(@PathVariable Long id,
@@ -164,7 +164,7 @@ public class RoomRequestController {
     @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
     @Operation(summary = "Derivar un pedido de aula a un edificio",
                description = "Deja el pedido en la cola de un edificio para que su auxiliar áulico "
-                       + "lo resuelva. Solo desde PENDING, y solo a edificios activos, con auxiliar "
+                       + "lo resuelva. Solo desde NEW, y solo a edificios activos, con auxiliar "
                        + "áulico asignado y con al menos un aula libre que cumpla los requisitos.")
     public ResponseEntity<RoomRequestItemResponseDto> deriveItem(@PathVariable Long id,
                                                                   @Valid @RequestBody DeriveRoomRequestItemDto dto,
@@ -179,7 +179,7 @@ public class RoomRequestController {
     @PostMapping("/items/{id}/return")
     @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
     @Operation(summary = "Devolver un pedido derivado",
-               description = "Saca el pedido de la cola de un edificio y lo vuelve a PENDING. Solo "
+               description = "Saca el pedido de la cola de un edificio y lo vuelve a NEW. Solo "
                        + "desde DERIVED_TO_BUILDING, con motivo obligatorio.")
     public ResponseEntity<RoomRequestItemResponseDto> returnItem(@PathVariable Long id,
                                                                   @Valid @RequestBody ReturnRoomRequestItemDto dto,
@@ -196,7 +196,7 @@ public class RoomRequestController {
     @Operation(summary = "Avisar al docente que su pedido quedó resuelto",
                description = "Sella la resolución y deja el pedido en RESOLVED. Idempotente: llamarlo "
                        + "de nuevo sobre un pedido ya notificado devuelve 200 sin resellar ni volver a "
-                       + "avisar. Requiere PRE_APPROVED con al menos un aula asignada.")
+                       + "avisar. Requiere IN_EVALUATION con al menos un aula asignada.")
     public ResponseEntity<RoomRequestItemResponseDto> notifyItem(@PathVariable Long id, Principal principal) {
         log.debug("POST /v1/room-requests/items/{}/notify", id);
         RoomRequestItemResponseDto response = roomRequestResolutionService.notify(id, principal.getName());

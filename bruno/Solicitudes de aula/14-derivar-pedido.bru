@@ -20,8 +20,8 @@ docs {
   POST /v1/room-requests/items/{id}/derive. Rol: SUBSECRETARIA, AUXILIAR_AULICO.
 
   Deja el pedido en la cola de un edificio (estado `DERIVED_TO_BUILDING`) para que su
-  auxiliar áulico lo resuelva. Solo transiciona desde `PENDING`; desde cualquier otro
-  estado (por ejemplo `PRE_APPROVED`) devuelve 409.
+  auxiliar áulico lo resuelva. Solo transiciona desde `NEW`; desde cualquier otro
+  estado (por ejemplo `IN_EVALUATION`) devuelve 409.
 
   Valida el edificio elegido:
   - 404 si `buildingId` no existe;

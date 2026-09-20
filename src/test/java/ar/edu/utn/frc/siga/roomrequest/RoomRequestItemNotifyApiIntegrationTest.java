@@ -42,7 +42,7 @@ class RoomRequestItemNotifyApiIntegrationTest extends AbstractIntegrationTest {
     private OccurrenceRepository occurrenceRepository;
 
     @Test
-    @DisplayName("PRE_APPROVED con aula asignada: pasa a RESOLVED y sella notifiedAt")
+    @DisplayName("IN_EVALUATION con aula asignada: pasa a RESOLVED y sella notifiedAt")
     void notify_ok() throws Exception {
         RoomRequestItem item = seedPreApprovedItem(1);
 
@@ -67,9 +67,9 @@ class RoomRequestItemNotifyApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("estado distinto de PRE_APPROVED: 409")
+    @DisplayName("estado distinto de IN_EVALUATION: 409")
     void notify_estadoInvalido_returnsConflict() throws Exception {
-        RoomRequestItem item = seedItem(RoomRequestStatus.PENDING);
+        RoomRequestItem item = seedItem(RoomRequestStatus.NEW);
 
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/notify"))
                 .andExpect(status().isConflict())
@@ -79,7 +79,7 @@ class RoomRequestItemNotifyApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("sin ninguna aula asignada: 400")
     void notify_sinAulas_returnsBadRequest() throws Exception {
-        RoomRequestItem item = seedItem(RoomRequestStatus.PRE_APPROVED);
+        RoomRequestItem item = seedItem(RoomRequestStatus.IN_EVALUATION);
 
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/notify"))
                 .andExpect(status().isBadRequest())
@@ -118,11 +118,11 @@ class RoomRequestItemNotifyApiIntegrationTest extends AbstractIntegrationTest {
                 .duration(Duration.ofMinutes(90))
                 .estimated(30)
                 .classroomCount(classroomCount)
-                .status(RoomRequestStatus.PRE_APPROVED)
+                .status(RoomRequestStatus.IN_EVALUATION)
                 .decidedBy("subsecretaria@frc.utn.edu.ar")
                 .decidedAt(LocalDateTime.now())
                 .build();
-        item.assignClassroom(classroomId, List.of(occurrenceId));
+        item.assignClassrooms(List.of(classroomId), List.of(List.of(occurrenceId)));
         request.addItem(item);
         roomRequestRepository.save(request);
         return item;
@@ -146,7 +146,7 @@ class RoomRequestItemNotifyApiIntegrationTest extends AbstractIntegrationTest {
                 .classroomCount(1)
                 .build();
         request.addItem(item);
-        if (status != RoomRequestStatus.PENDING) {
+        if (status != RoomRequestStatus.NEW) {
             item.decide(status, "subsecretaria@frc.utn.edu.ar", null, LocalDateTime.now());
         }
         roomRequestRepository.save(request);
