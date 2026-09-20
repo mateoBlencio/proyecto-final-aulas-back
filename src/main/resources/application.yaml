@@ -57,6 +57,19 @@ spring:
     compose:
       enabled: false
 
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${MAIL_SMTP_AUTH:true}
+      mail.smtp.starttls.enable: ${MAIL_SMTP_STARTTLS_ENABLE:true}
+      mail.smtp.starttls.required: ${MAIL_SMTP_STARTTLS_REQUIRED:true}
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
+
 server:
   servlet:
     context-path: /api
@@ -166,6 +179,12 @@ siga:
       allocations: "0 0 3 * * SUN"
       subjects: "0 0 3 * * SUN"
       commissions: "0 0 3 * * SUN"
+  notifications:
+    max-attempts: 5
+    retry-interval: PT1M
+    email:
+      enabled: ${MAIL_ENABLED:false}
+      from: ${MAIL_FROM:no-reply@frc.utn.edu.ar}
 
 logging:
   level:
