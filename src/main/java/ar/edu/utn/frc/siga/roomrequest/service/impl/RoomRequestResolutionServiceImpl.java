@@ -5,9 +5,12 @@ import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
+import ar.edu.utn.frc.siga.auth.model.SystemRole;
+import ar.edu.utn.frc.siga.auth.service.UserService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.TimeRanges;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestComposer;
@@ -25,7 +28,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -42,6 +48,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
     private final AllocationService allocationService;
     private final AllocationOccupancyService allocationOccupancyService;
     private final ClassroomService classroomService;
+    private final UserService userService;
     private final RoomRequestComposer composer;
 
     @Override
@@ -86,6 +93,31 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
                         classroom.buildingId(), classroom.buildingName(), classroom.capacity(),
                         !occupiedClassroomIds.contains(classroom.id())))
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CandidateBuildingDto> findCandidateBuildings(Long itemId) {
+        log.debug("Buscando edificios candidatos para itemId={}", itemId);
+
+        RoomRequestItem item = itemRepository.findById(itemId)
+                .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
+
+        Set<Long> occupiedClassroomIds = occupiedClassroomIds(item);
+        Map<Long, List<ClassroomResponseDto>> freeByBuilding = candidateClassrooms(item).stream()
+                .filter(c -> !occupiedClassroomIds.contains(c.id()))
+                .collect(Collectors.groupingBy(ClassroomResponseDto::buildingId, LinkedHashMap::new, Collectors.toList()));
+
+        List<CandidateBuildingDto> result = new ArrayList<>();
+        for (Map.Entry<Long, List<ClassroomResponseDto>> entry : freeByBuilding.entrySet()) {
+            Long buildingId = entry.getKey();
+            if (userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, buildingId).isEmpty()) {
+                continue;
+            }
+            result.add(new CandidateBuildingDto(buildingId, entry.getValue().getFirst().buildingName(),
+                    entry.getValue().size()));
+        }
+        return result;
     }
 
     private List<ClassroomResponseDto> candidateClassrooms(RoomRequestItem item) {

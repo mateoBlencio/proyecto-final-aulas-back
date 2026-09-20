@@ -5,8 +5,12 @@ import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
+import ar.edu.utn.frc.siga.auth.dto.response.UserResponseDto;
+import ar.edu.utn.frc.siga.auth.model.SystemRole;
+import ar.edu.utn.frc.siga.auth.service.UserService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestTransitionException;
@@ -56,6 +60,8 @@ class RoomRequestResolutionServiceImplTest {
     private AllocationOccupancyService allocationOccupancyService;
     @Mock
     private ClassroomService classroomService;
+    @Mock
+    private UserService userService;
     @Mock
     private RoomRequestComposer composer;
 
@@ -214,6 +220,72 @@ class RoomRequestResolutionServiceImplTest {
         assertThat(service.findAllowedClassrooms(1L)).isEmpty();
     }
 
+    @Test
+    @DisplayName("findCandidateBuildings: edificio con las classroomCount aulas pedidas aparece")
+    void findCandidateBuildings_edificioCompleto() {
+        LocalDate date = LocalDate.of(2026, 3, 10);
+        RoomRequestItem item = RoomRequestItem.builder()
+                .date(date).startTime(LocalTime.of(10, 0)).duration(java.time.Duration.ofMinutes(60))
+                .classroomCount(2).build();
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findAllAvailable()).thenReturn(
+                List.of(classroom(101L, 1L, "Edificio Central"), classroom(102L, 1L, "Edificio Central")));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of());
+        when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L))
+                .thenReturn(List.of(auxiliar()));
+
+        List<CandidateBuildingDto> result = service.findCandidateBuildings(1L);
+
+        assertThat(result).containsExactly(new CandidateBuildingDto(1L, "Edificio Central", 2));
+    }
+
+    @Test
+    @DisplayName("findCandidateBuildings: edificio con solo 1 de 2 aulas libres también aparece")
+    void findCandidateBuildings_resolucionParcial() {
+        LocalDate date = LocalDate.of(2026, 3, 10);
+        RoomRequestItem item = RoomRequestItem.builder()
+                .date(date).startTime(LocalTime.of(10, 0)).duration(java.time.Duration.ofMinutes(60))
+                .classroomCount(2).build();
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findAllAvailable()).thenReturn(
+                List.of(classroom(101L, 1L, "Edificio Central"), classroom(102L, 1L, "Edificio Central")));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of(
+                new OccupiedSlot(102L, date, LocalTime.of(10, 0), LocalTime.of(11, 0), 5L, 7L)));
+        when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L))
+                .thenReturn(List.of(auxiliar()));
+
+        List<CandidateBuildingDto> result = service.findCandidateBuildings(1L);
+
+        assertThat(result).containsExactly(new CandidateBuildingDto(1L, "Edificio Central", 1));
+    }
+
+    @Test
+    @DisplayName("findCandidateBuildings: edificio sin ninguna aula libre no aparece")
+    void findCandidateBuildings_sinAulasLibres() {
+        LocalDate date = LocalDate.of(2026, 3, 10);
+        RoomRequestItem item = itemFor(date, LocalTime.of(10, 0), 60);
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(101L, 1L, "Edificio Central")));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of(
+                new OccupiedSlot(101L, date, LocalTime.of(10, 0), LocalTime.of(11, 0), 5L, 7L)));
+
+        assertThat(service.findCandidateBuildings(1L)).isEmpty();
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("findCandidateBuildings: edificio con aulas libres pero sin ningún auxiliar áulico asignado no aparece")
+    void findCandidateBuildings_sinAuxiliarAsignado() {
+        LocalDate date = LocalDate.of(2026, 3, 10);
+        RoomRequestItem item = itemFor(date, LocalTime.of(10, 0), 60);
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(101L, 1L, "Edificio Central")));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of());
+        when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of());
+
+        assertThat(service.findCandidateBuildings(1L)).isEmpty();
+    }
+
     private static RoomRequestItem itemFor(LocalDate date, LocalTime startTime, int durationMinutes) {
         return RoomRequestItem.builder()
                 .date(date).startTime(startTime).duration(java.time.Duration.ofMinutes(durationMinutes))
@@ -221,7 +293,15 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     private static ClassroomResponseDto classroom(Long id) {
-        return new ClassroomResponseDto(id, id.intValue(), 40, 1L, "Edificio Central", 1L, "Aula común");
+        return classroom(id, 1L, "Edificio Central");
+    }
+
+    private static ClassroomResponseDto classroom(Long id, Long buildingId, String buildingName) {
+        return new ClassroomResponseDto(id, id.intValue(), 40, buildingId, buildingName, 1L, "Aula común");
+    }
+
+    private static UserResponseDto auxiliar() {
+        return new UserResponseDto(1L, "auxiliar@frc.utn.edu.ar", "Auxiliar", "Aulico", List.of());
     }
 
     private void doThrowOnTransitionTo(RoomRequestStatus current, RoomRequestStatus target) {

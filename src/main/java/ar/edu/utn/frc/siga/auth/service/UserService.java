@@ -6,7 +6,9 @@ import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.modulith.NamedInterface;
 
+@NamedInterface("api")
 public interface UserService {
 
     UserResponseDto create(CreateUserRequestDto dto, String currentUserEmail);

@@ -3,7 +3,9 @@ package ar.edu.utn.frc.siga.auth.model;
 import ar.edu.utn.frc.siga.common.security.Permission;
 import java.util.EnumSet;
 import java.util.Set;
+import org.springframework.modulith.NamedInterface;
 
+@NamedInterface("api")
 public enum SystemRole {
 
     SUBSECRETARIA(EnumSet.allOf(Permission.class)),

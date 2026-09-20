@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.roomrequest.dto.RoomRequestItemFilter;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CancelRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemRowDto;
@@ -137,6 +138,19 @@ public class RoomRequestController {
         log.debug("GET /v1/room-requests/items/{}/allowed-classrooms", id);
         List<AllowedClassroomDto> response = roomRequestResolutionService.findAllowedClassrooms(id);
         log.info("Aulas candidatas listadas vía controller: itemId={}, total={}", id, response.size());
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/items/{id}/candidate-buildings")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_READ')")
+    @Operation(summary = "Edificios candidatos para derivar un pedido",
+               description = "Edificios con al menos un aula libre que cumple los requisitos del "
+                       + "pedido y que tienen algún auxiliar áulico asignado. Lista vacía es una "
+                       + "respuesta válida.")
+    public ResponseEntity<List<CandidateBuildingDto>> findCandidateBuildings(@PathVariable Long id) {
+        log.debug("GET /v1/room-requests/items/{}/candidate-buildings", id);
+        List<CandidateBuildingDto> response = roomRequestResolutionService.findCandidateBuildings(id);
+        log.info("Edificios candidatos listados vía controller: itemId={}, total={}", id, response.size());
         return ResponseEntity.ok(response);
     }
 }
