@@ -1,14 +1,17 @@
 package ar.edu.utn.frc.siga.roomrequest.controller;
 
 import ar.edu.utn.frc.siga.roomrequest.dto.RoomRequestItemFilter;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.CancelRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemRowDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemStatusCountDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
+import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestResolutionService;
 import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,6 +34,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.security.Principal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -45,6 +49,7 @@ import java.util.Set;
 public class RoomRequestController {
 
     private final RoomRequestService roomRequestService;
+    private final RoomRequestResolutionService roomRequestResolutionService;
 
     @PostMapping
     @Operation(summary = "Crear una solicitud de aula",
@@ -104,5 +109,20 @@ public class RoomRequestController {
     public ResponseEntity<RoomRequestItemDetailDto> findItemById(@PathVariable Long id) {
         log.debug("GET /v1/room-requests/items/{}", id);
         return ResponseEntity.ok(roomRequestService.findItemById(id));
+    }
+
+    @PostMapping("/items/{id}/cancel")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
+    @Operation(summary = "Cancelar un pedido de aula",
+               description = "Cancela el pedido desde cualquier estado no final, incluido RESOLVED. "
+                       + "Libera las aulas que tuviera asignadas.")
+    public ResponseEntity<RoomRequestItemResponseDto> cancelItem(@PathVariable Long id,
+                                                                  @Valid @RequestBody CancelRoomRequestItemDto dto,
+                                                                  Principal principal) {
+        log.debug("POST /v1/room-requests/items/{}/cancel", id);
+        RoomRequestItemResponseDto response =
+                roomRequestResolutionService.cancel(id, dto.reason(), principal.getName());
+        log.info("Pedido de aula cancelado vía controller: id={}", id);
+        return ResponseEntity.ok(response);
     }
 }

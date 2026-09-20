@@ -1,0 +1,148 @@
+package ar.edu.utn.frc.siga.roomrequest;
+
+import ar.edu.utn.frc.siga.AbstractIntegrationTest;
+import ar.edu.utn.frc.siga.auth.model.SystemRole;
+import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
+import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestRepository;
+import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@Import(IntegrationTestData.class)
+@DisplayName("POST /v1/room-requests/items/{id}/cancel (integración)")
+class RoomRequestItemCancelApiIntegrationTest extends AbstractIntegrationTest {
+
+    @Autowired
+    private WebApplicationContext webApplicationContext;
+    @Autowired
+    private IntegrationTestData testData;
+    @Autowired
+    private RoomRequestRepository roomRequestRepository;
+
+    @Test
+    @DisplayName("PENDING con motivo: pasa a CANCELLED")
+    void cancel_pending_returnsCancelled() throws Exception {
+        RoomRequestItem item = seedItem(RoomRequestStatus.PENDING);
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/cancel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"el docente se arrepintió\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.decisionReason").value("el docente se arrepintió"));
+    }
+
+    @Test
+    @DisplayName("RESOLVED con motivo: también se puede cancelar")
+    void cancel_resolved_returnsCancelled() throws Exception {
+        RoomRequestItem item = seedItem(RoomRequestStatus.RESOLVED);
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/cancel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"se cayó el laboratorio\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    @Test
+    @DisplayName("sin reason: 400 Invalid room request")
+    void cancel_sinReason_returnsBadRequest() throws Exception {
+        RoomRequestItem item = seedItem(RoomRequestStatus.PENDING);
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/cancel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Invalid room request"));
+    }
+
+    @Test
+    @DisplayName("ya CANCELLED: 409 Invalid room request transition")
+    void cancel_yaCancelado_returnsConflict() throws Exception {
+        RoomRequestItem item = seedItem(RoomRequestStatus.CANCELLED);
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/cancel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"otra vez\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Invalid room request transition"));
+    }
+
+    @Test
+    @DisplayName("id inexistente: 404")
+    void cancel_idInexistente_returnsNotFound() throws Exception {
+        long unknownId = 999_999_000L + IntegrationTestData.nextSeq();
+
+        mockMvc.perform(post("/v1/room-requests/items/" + unknownId + "/cancel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"motivo\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("sin token: 401; con AUXILIAR_AULICO: 200 (escritura habilitada para ambos roles)")
+    void authenticationAndAuthorization() throws Exception {
+        RoomRequestItem pendingParaAnonimo = seedItem(RoomRequestStatus.PENDING);
+        RoomRequestItem pendingParaAuxiliar = seedItem(RoomRequestStatus.PENDING);
+
+        MockMvc anonymousMockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
+                .apply(springSecurity())
+                .build();
+        anonymousMockMvc.perform(post("/v1/room-requests/items/" + pendingParaAnonimo.getId() + "/cancel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"motivo\"}"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO)
+                .perform(post("/v1/room-requests/items/" + pendingParaAuxiliar.getId() + "/cancel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"motivo\"}"))
+                .andExpect(status().isOk());
+    }
+
+    private RoomRequestItem seedItem(RoomRequestStatus status) {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+        RoomRequest request = RoomRequest.builder()
+                .type(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE)
+                .scope(AcademicScope.GRADO)
+                .teacherName("Ada Lovelace")
+                .teacherEmail("ada@frc.utn.edu.ar")
+                .teacherPhone("351-1234567")
+                .subjectId(academic.subjectId())
+                .build();
+        RoomRequestItem item = RoomRequestItem.builder()
+                .commissionId(academic.commissionId())
+                .date(LocalDate.now().plusDays(10))
+                .startTime(LocalTime.of(10, 0))
+                .duration(Duration.ofMinutes(120))
+                .estimated(35)
+                .classroomCount(1)
+                .build();
+        request.addItem(item);
+        if (status != RoomRequestStatus.PENDING) {
+            item.decide(status, "subsecretaria@frc.utn.edu.ar", "motivo de prueba", LocalDateTime.now());
+        }
+        roomRequestRepository.save(request);
+        return item;
+    }
+}

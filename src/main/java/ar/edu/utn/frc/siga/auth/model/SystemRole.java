@@ -24,6 +24,7 @@ public enum SystemRole {
             Permission.CONFLICT_READ,
             Permission.PREVIEW_RUN,
             Permission.ROOM_REQUEST_READ,
+            Permission.ROOM_REQUEST_WRITE,
             Permission.USER_READ)),
 
     CONSULTA(EnumSet.of(

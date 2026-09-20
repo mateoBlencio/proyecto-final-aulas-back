@@ -105,6 +105,19 @@ public class RoomRequestComposer {
         return result;
     }
 
+    public RoomRequestItemResponseDto composeItem(RoomRequestItem item) {
+        Set<Long> commissionIds = new LinkedHashSet<>();
+        Set<Long> classroomIds = new LinkedHashSet<>();
+        Set<ActiveCommissionsKey> activeCommissionsKeys = new LinkedHashSet<>();
+
+        collectCommissionIds(List.of(item), commissionIds);
+        collectClassroomIds(List.of(item), classroomIds);
+        collectActiveCommissionsKeys(List.of(item), activeCommissionsKeys);
+
+        Catalogs catalogs = resolveCatalogs(Set.of(), commissionIds, classroomIds, activeCommissionsKeys);
+        return composeItems(List.of(item), catalogs).getFirst();
+    }
+
     public RoomRequestItemDetailDto composeDetail(RoomRequestItem item) {
         Set<Long> subjectIds = new LinkedHashSet<>();
         Set<Long> commissionIds = new LinkedHashSet<>();
