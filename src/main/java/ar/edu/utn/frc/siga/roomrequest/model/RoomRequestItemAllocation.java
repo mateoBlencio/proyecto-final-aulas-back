@@ -22,12 +22,8 @@ import org.hibernate.envers.Audited;
 @Entity
 @Audited
 @Table(name = "solicitud_item_asignacion",
-       uniqueConstraints = {
-           @UniqueConstraint(name = "uq_solicitud_item_asignacion_item_aula",
-                             columnNames = {"id_item", "id_aula"}),
-           @UniqueConstraint(name = "uq_solicitud_item_asignacion_item_orden",
-                             columnNames = {"id_item", "orden"})
-       })
+       uniqueConstraints = @UniqueConstraint(name = "uq_solicitud_item_asignacion_item_ocurrencia",
+                                             columnNames = {"id_item", "id_ocurrencia"}))
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -51,6 +47,7 @@ public class RoomRequestItemAllocation extends TimestampedEntity {
     @Column(name = "id_aula", nullable = false)
     private Long classroomId;
 
+    /** Número de aula del pedido (1..classroomCount), no de ocurrencia: un REGULAR_ROOM_CHANGE repite el mismo valor en varias filas, una por clase futura. */
     @Column(name = "orden", nullable = false)
     private Integer position;
 }

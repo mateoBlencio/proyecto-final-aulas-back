@@ -31,8 +31,7 @@ CREATE TABLE IF NOT EXISTS solicitud_item_asignacion (
     actualizado_en timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT pk_solicitud_item_asignacion PRIMARY KEY (id_item_asignacion),
     CONSTRAINT chk_solicitud_item_asignacion_orden CHECK (orden >= 1),
-    CONSTRAINT uq_solicitud_item_asignacion_item_aula UNIQUE (id_item, id_aula),
-    CONSTRAINT uq_solicitud_item_asignacion_item_orden UNIQUE (id_item, orden),
+    CONSTRAINT uq_solicitud_item_asignacion_item_ocurrencia UNIQUE (id_item, id_ocurrencia),
     CONSTRAINT fk_solicitud_item_asignacion_item FOREIGN KEY (id_item) REFERENCES solicitud_aula_item(id_item),
     CONSTRAINT fk_solicitud_item_asignacion_ocurrencia FOREIGN KEY (id_ocurrencia) REFERENCES ocurrencia(id_ocurrencia),
     CONSTRAINT fk_solicitud_item_asignacion_aula FOREIGN KEY (id_aula) REFERENCES aula(id_aula)
