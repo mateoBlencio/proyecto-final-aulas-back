@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.roomrequest.controller;
 import ar.edu.utn.frc.siga.roomrequest.dto.RoomRequestItemFilter;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CancelRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.DeriveRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
@@ -138,6 +139,22 @@ public class RoomRequestController {
         log.debug("GET /v1/room-requests/items/{}/allowed-classrooms", id);
         List<AllowedClassroomDto> response = roomRequestResolutionService.findAllowedClassrooms(id);
         log.info("Aulas candidatas listadas vía controller: itemId={}, total={}", id, response.size());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/items/{id}/derive")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
+    @Operation(summary = "Derivar un pedido de aula a un edificio",
+               description = "Deja el pedido en la cola de un edificio para que su auxiliar áulico "
+                       + "lo resuelva. Solo desde PENDING, y solo a edificios activos, con auxiliar "
+                       + "áulico asignado y con al menos un aula libre que cumpla los requisitos.")
+    public ResponseEntity<RoomRequestItemResponseDto> deriveItem(@PathVariable Long id,
+                                                                  @Valid @RequestBody DeriveRoomRequestItemDto dto,
+                                                                  Principal principal) {
+        log.debug("POST /v1/room-requests/items/{}/derive", id);
+        RoomRequestItemResponseDto response =
+                roomRequestResolutionService.derive(id, dto.buildingId(), principal.getName());
+        log.info("Pedido de aula derivado vía controller: id={}, buildingId={}", id, dto.buildingId());
         return ResponseEntity.ok(response);
     }
 

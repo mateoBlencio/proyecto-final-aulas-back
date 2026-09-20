@@ -13,4 +13,6 @@ public interface RoomRequestResolutionService {
     List<AllowedClassroomDto> findAllowedClassrooms(Long itemId);
 
     List<CandidateBuildingDto> findCandidateBuildings(Long itemId);
+
+    RoomRequestItemResponseDto derive(Long itemId, Long buildingId, String actor);
 }

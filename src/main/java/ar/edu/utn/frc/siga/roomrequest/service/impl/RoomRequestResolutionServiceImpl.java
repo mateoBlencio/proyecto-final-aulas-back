@@ -20,7 +20,9 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestResolutionService;
 import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestTransitionValidator;
+import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
+import ar.edu.utn.frc.siga.space.service.BuildingService;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,6 +50,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
     private final AllocationService allocationService;
     private final AllocationOccupancyService allocationOccupancyService;
     private final ClassroomService classroomService;
+    private final BuildingService buildingService;
     private final UserService userService;
     private final RoomRequestComposer composer;
 
@@ -118,6 +121,37 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
                     entry.getValue().size()));
         }
         return result;
+    }
+
+    @Override
+    @Transactional
+    public RoomRequestItemResponseDto derive(Long itemId, Long buildingId, String actor) {
+        log.debug("Derivando pedido de aula: itemId={}, buildingId={}", itemId, buildingId);
+
+        RoomRequestItem item = itemRepository.findWithRequestById(itemId)
+                .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
+        transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.DERIVED_TO_BUILDING);
+
+        BuildingResponseDto building = buildingService.findById(buildingId);
+        if (!Boolean.TRUE.equals(building.active())) {
+            throw new InvalidRoomRequestException("El edificio no está activo.");
+        }
+        if (userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, buildingId).isEmpty()) {
+            throw new InvalidRoomRequestException("El edificio no tiene un auxiliar áulico asignado.");
+        }
+
+        Set<Long> occupiedClassroomIds = occupiedClassroomIds(item);
+        boolean hasFreeClassroom = candidateClassrooms(item).stream()
+                .anyMatch(c -> c.buildingId().equals(buildingId) && !occupiedClassroomIds.contains(c.id()));
+        if (!hasFreeClassroom) {
+            throw new InvalidRoomRequestException(
+                    "El edificio no tiene ninguna aula libre que cumpla los requisitos del pedido.");
+        }
+
+        item.deriveTo(buildingId, actor, LocalDateTime.now());
+
+        log.info("Pedido de aula derivado: itemId={}, buildingId={}", itemId, buildingId);
+        return composer.composeItem(item);
     }
 
     private List<ClassroomResponseDto> candidateClassrooms(RoomRequestItem item) {

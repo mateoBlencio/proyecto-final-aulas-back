@@ -1,0 +1,36 @@
+meta {
+  name: Derivar un pedido de aula a un edificio
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/v1/room-requests/items/1/derive
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "buildingId": 1
+  }
+}
+
+docs {
+  POST /v1/room-requests/items/{id}/derive. Rol: SUBSECRETARIA, AUXILIAR_AULICO.
+
+  Deja el pedido en la cola de un edificio (estado `DERIVED_TO_BUILDING`) para que su
+  auxiliar áulico lo resuelva. Solo transiciona desde `PENDING`; desde cualquier otro
+  estado (por ejemplo `PRE_APPROVED`) devuelve 409.
+
+  Valida el edificio elegido:
+  - 404 si `buildingId` no existe;
+  - 400 si el edificio no está activo;
+  - 400 si el edificio no tiene ningún auxiliar áulico asignado (sin nadie que lo
+    resuelva ahí, no es un destino válido);
+  - 400 si el edificio no tiene ninguna aula libre que cumpla los requisitos del
+    pedido (computadoras, proyector) en su fecha y horario. No exige llegar a
+    `classroomCount`: alcanza con una aula libre, aunque el pedido pida más.
+
+  Respuesta: 200 con el pedido actualizado (`status: "DERIVED_TO_BUILDING"`).
+}

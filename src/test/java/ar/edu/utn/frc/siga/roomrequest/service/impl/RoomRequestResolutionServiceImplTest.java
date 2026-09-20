@@ -20,7 +20,9 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItemAllocation;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestTransitionValidator;
+import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
+import ar.edu.utn.frc.siga.space.service.BuildingService;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -60,6 +62,8 @@ class RoomRequestResolutionServiceImplTest {
     private AllocationOccupancyService allocationOccupancyService;
     @Mock
     private ClassroomService classroomService;
+    @Mock
+    private BuildingService buildingService;
     @Mock
     private UserService userService;
     @Mock
@@ -284,6 +288,124 @@ class RoomRequestResolutionServiceImplTest {
         when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of());
 
         assertThat(service.findCandidateBuildings(1L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("derive: edificio activo, con auxiliar y aula libre → pasa a DERIVED_TO_BUILDING")
+    void derive_ok() {
+        LocalDate date = LocalDate.of(2026, 3, 10);
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+                .date(date).startTime(LocalTime.of(10, 0)).duration(java.time.Duration.ofMinutes(60))
+                .build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true));
+        when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of(auxiliar()));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(101L, 1L, "Edificio Central")));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of());
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.derive(1L, 1L, "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.DERIVED_TO_BUILDING);
+        assertThat(item.getDerivedBuildingId()).isEqualTo(1L);
+        assertThat(item.getDerivedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("derive: edificio con solo 1 de 2 aulas libres también se acepta (resolución parcial)")
+    void derive_resolucionParcial() {
+        LocalDate date = LocalDate.of(2026, 3, 10);
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+                .date(date).startTime(LocalTime.of(10, 0)).duration(java.time.Duration.ofMinutes(60))
+                .classroomCount(2).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true));
+        when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of(auxiliar()));
+        when(classroomService.findAllAvailable()).thenReturn(
+                List.of(classroom(101L, 1L, "Edificio Central"), classroom(102L, 1L, "Edificio Central")));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of(
+                new OccupiedSlot(102L, date, LocalTime.of(10, 0), LocalTime.of(11, 0), 5L, 7L)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.derive(1L, 1L, "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.DERIVED_TO_BUILDING);
+    }
+
+    @Test
+    @DisplayName("derive: sin ninguna aula libre en el edificio se rechaza")
+    void derive_sinAulasLibres() {
+        LocalDate date = LocalDate.of(2026, 3, 10);
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+                .date(date).startTime(LocalTime.of(10, 0)).duration(java.time.Duration.ofMinutes(60))
+                .build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true));
+        when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of(auxiliar()));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(101L, 1L, "Edificio Central")));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of(
+                new OccupiedSlot(101L, date, LocalTime.of(10, 0), LocalTime.of(11, 0), 5L, 7L)));
+
+        assertThatThrownBy(() -> service.derive(1L, 1L, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestException.class);
+        verifyNoInteractions(composer);
+    }
+
+    @Test
+    @DisplayName("derive: edificio sin auxiliar áulico asignado se rechaza (agujero #2)")
+    void derive_sinAuxiliarAsignado() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true));
+        when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.derive(1L, 1L, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestException.class);
+        verifyNoInteractions(classroomService, composer);
+    }
+
+    @Test
+    @DisplayName("derive: edificio inactivo se rechaza")
+    void derive_edificioInactivo() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", false));
+
+        assertThatThrownBy(() -> service.derive(1L, 1L, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestException.class);
+        verifyNoInteractions(userService, classroomService, composer);
+    }
+
+    @Test
+    @DisplayName("derive: edificio inexistente → 404")
+    void derive_edificioInexistente() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(buildingService.findById(99L)).thenThrow(ResourceNotFoundException.of("Building", 99L));
+
+        assertThatThrownBy(() -> service.derive(1L, 99L, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("derive: desde PRE_APPROVED se rechaza (solo sale desde PENDING)")
+    void derive_desdePreAprobadoSeRechaza() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PRE_APPROVED).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        doThrowOnTransitionTo(RoomRequestStatus.PRE_APPROVED, RoomRequestStatus.DERIVED_TO_BUILDING);
+
+        assertThatThrownBy(() -> service.derive(1L, 1L, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestTransitionException.class);
+        verifyNoInteractions(buildingService, composer);
+    }
+
+    @Test
+    @DisplayName("derive: ítem inexistente → 404")
+    void derive_itemInexistente() {
+        when(itemRepository.findWithRequestById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.derive(99L, 1L, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     private static RoomRequestItem itemFor(LocalDate date, LocalTime startTime, int durationMinutes) {

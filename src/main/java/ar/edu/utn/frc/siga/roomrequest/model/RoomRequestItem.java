@@ -168,6 +168,15 @@ public class RoomRequestItem extends TimestampedEntity {
         this.decidedAt = decidedAt;
     }
 
+    /** decidedBy/decidedAt trackean la última decisión sea cual sea; el CHECK chk_solicitud_item_decision exige ambos no nulos fuera de PENDING. */
+    public void deriveTo(Long buildingId, String decidedBy, LocalDateTime derivedAt) {
+        this.status = RoomRequestStatus.DERIVED_TO_BUILDING;
+        this.derivedBuildingId = buildingId;
+        this.derivedAt = derivedAt;
+        this.decidedBy = decidedBy;
+        this.decidedAt = derivedAt;
+    }
+
     public void addPreferences(List<Long> classroomIds) {
         classroomIds.forEach(this::addPreference);
     }
