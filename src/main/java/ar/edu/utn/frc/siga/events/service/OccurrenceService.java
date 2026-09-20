@@ -18,6 +18,13 @@ public interface OccurrenceService {
 
     List<OccurrenceSlotDto> findSlotsByEvent(Long eventId, LocalDate from);
 
+    /**
+     * Crea {@code count} ocurrencias simultáneas a la de {@code occurrenceId}: mismo evento, misma
+     * fecha, {@code roomSlot} correlativo a partir del máximo existente y {@code mirrorOfOccurrenceId}
+     * apuntando a la principal. Es el único punto donde se crean ocurrencias simultáneas.
+     */
+    List<Long> createSimultaneous(Long occurrenceId, int count);
+
     List<OccurrenceSlotDto> findSlotsByEvents(Collection<Long> eventIds, LocalDate from);
 
     List<OccurrenceSlotDto> findSlotsByEvents(Collection<Long> eventIds);
