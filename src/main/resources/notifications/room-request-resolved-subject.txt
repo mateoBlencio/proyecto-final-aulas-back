@@ -1,1 +1,1 @@
-Aula confirmada — [(${tipoTexto})][# th:if="${materia}"] — [(${materia})][/][# th:if="${comision}"] — [(${comision})][/]
+[(${asuntoTitulo})][# th:each="parte : ${asuntoPartes}"] — [(${parte})][/]

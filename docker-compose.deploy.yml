@@ -28,6 +28,7 @@ services:
     restart: always
     ports:
       - "8025:8025"
+      - "1025:1025"
     networks:
       - app-network
 
@@ -60,6 +61,7 @@ services:
     restart: always
     ports:
       - "8026:8025"
+      - "1026:1025"
     networks:
       - app-network
 

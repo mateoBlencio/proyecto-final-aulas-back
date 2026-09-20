@@ -1,50 +1,164 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html lang="es" xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
 <head>
-    <meta charset="UTF-8"/>
-    <title>Aula confirmada</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<title th:text="${tituloBanner}">Aula confirmada</title>
+<style>
+  body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+  table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+  img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+  body { margin: 0; padding: 0; width: 100% !important; background-color: #eef2f7; }
+  @media screen and (max-width: 600px) {
+    .email-container { width: 100% !important; }
+    .px-32 { padding-left: 20px !important; padding-right: 20px !important; }
+  }
+</style>
 </head>
-<body>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<body style="margin:0;padding:0;background-color:#eef2f7;">
+
+  <!-- Preheader: texto que se ve en la bandeja de entrada, oculto en el cuerpo -->
+  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#eef2f7;" th:text="${parrafoConfirmacion}">
+    Preheader
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#eef2f7;">
     <tr>
-        <td>
-            <p>Hola, <span th:text="${docente}">Docente</span>:</p>
+      <td align="center" style="padding:24px 12px;">
 
-            <p>Confirmamos el aula para tu pedido <span th:text="${pedidoId}">#0</span>
-                (<span th:text="${tipoTexto}">Tipo de pedido</span>).</p>
+        <!-- Card principal -->
+        <table role="presentation" class="email-container" width="600" cellpadding="0" cellspacing="0" border="0"
+               style="max-width:600px;width:100%;background-color:#ffffff;border:1px solid #e5e5e5;border-radius:12px;overflow:hidden;">
 
-            <table role="presentation">
-                <tr th:if="${materia}">
-                    <td>Materia</td>
-                    <td th:text="${materia}">Materia</td>
-                </tr>
-                <tr th:if="${comision}">
-                    <td>Comisión</td>
-                    <td th:text="${comision}">Comisión</td>
-                </tr>
-                <tr th:if="${fecha}">
-                    <td>Fecha</td>
-                    <td th:text="${fecha}">Fecha</td>
-                </tr>
-                <tr th:if="${horario}">
-                    <td>Horario</td>
-                    <td th:text="${horario}">Horario</td>
-                </tr>
-                <tr th:each="aula : ${aulas}">
-                    <td>Aula</td>
-                    <td th:text="${aula}">Aula</td>
-                </tr>
-            </table>
+          <!-- Header: logo institucional -->
+          <tr>
+            <td class="px-32" align="left" style="padding:20px 32px;border-bottom:1px solid #e5e5e5;">
+              <img src="cid:logoSiga" alt="Sistema Inteligente de Gestión Áulica" width="140" style="display:block;border:0;max-width:140px;height:auto;" />
+            </td>
+            <td class="px-32" align="right" style="padding:20px 32px;border-bottom:1px solid #e5e5e5;">
+              <img src="cid:logoUtnFrc" alt="UTN Facultad Regional Córdoba" width="140" style="display:block;border:0;max-width:140px;height:auto;" />
+            </td>
+          </tr>
 
-            <p th:if="${menosAulasMensaje}" th:text="${menosAulasMensaje}">Mensaje de menos aulas</p>
+          <!-- Banner azul: título del tipo de pedido -->
+          <tr>
+            <td class="px-32" align="left" style="padding:28px 32px;background-color:#1538b8;">
+              <h1 style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:20px;line-height:26px;font-weight:700;color:#ffffff;" th:text="${tituloBanner}">
+                Título del banner
+              </h1>
+            </td>
+          </tr>
 
-            <p th:if="${observaciones}">
-                Observaciones: <span th:text="${observaciones}">Observaciones</span>
-            </p>
+          <!-- Saludo + párrafo de confirmación -->
+          <tr>
+            <td class="px-32" style="padding:28px 32px 4px 32px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:22px;color:#191919;">
+              Hola, <span th:text="${docente}">Docente</span>:
+            </td>
+          </tr>
+          <tr>
+            <td class="px-32" style="padding:8px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;" th:text="${parrafoConfirmacion}">
+              Párrafo de confirmación
+            </td>
+          </tr>
 
-            <p>Ante cualquier inconveniente, respondé este mail.</p>
-        </td>
+          <!-- Bloque de datos del pedido -->
+          <tr>
+            <td class="px-32" style="padding:20px 32px 0 32px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #e5e5e5;">
+
+                <th:block th:if="${not #strings.isEmpty(materia)}">
+                <tr><td style="padding:16px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6b7280;">Materia</td></tr>
+                <tr><td style="padding:2px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;color:#191919;" th:text="${materia}">Materia</td></tr>
+                </th:block>
+
+                <th:block th:if="${not #strings.isEmpty(comisiones)}">
+                <tr><td style="padding:16px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6b7280;" th:text="${comisionesLabel}">Comisión</td></tr>
+                <tr><td style="padding:2px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;color:#191919;" th:text="${comisiones}">Comisiones</td></tr>
+                </th:block>
+
+                <th:block th:if="${not #strings.isEmpty(diaSemana)}">
+                <tr><td style="padding:16px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6b7280;">Día</td></tr>
+                <tr><td style="padding:2px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;color:#191919;" th:text="${diaSemana}">Día</td></tr>
+                </th:block>
+
+                <th:block th:if="${not #strings.isEmpty(fecha)}">
+                <tr><td style="padding:16px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6b7280;">Fecha</td></tr>
+                <tr><td style="padding:2px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;color:#191919;" th:text="${fecha}">Fecha</td></tr>
+                </th:block>
+
+                <th:block th:if="${not #strings.isEmpty(horario)}">
+                <tr><td style="padding:16px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6b7280;">Horario</td></tr>
+                <tr><td style="padding:2px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;color:#191919;" th:text="${horario}">Horario</td></tr>
+                </th:block>
+
+                <th:block th:if="${not #strings.isEmpty(aulaAnterior)}">
+                <tr><td style="padding:16px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6b7280;">Aula anterior</td></tr>
+                <tr><td style="padding:2px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;color:#191919;" th:text="${aulaAnterior}">Aula anterior</td></tr>
+                </th:block>
+
+                <th:block th:if="${not #lists.isEmpty(aulas)}">
+                <tr><td style="padding:16px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6b7280;" th:text="${aulasLabel}">Aula</td></tr>
+                <tr th:each="aula : ${aulas}"><td style="padding:2px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;color:#191919;" th:text="${aula}">Aula 305 (Edificio Central)</td></tr>
+                </th:block>
+
+                <tr><td style="padding:0 0 16px 0;"></td></tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr th:if="${not #strings.isEmpty(notaAdicional)}">
+            <td class="px-32" style="padding:0 32px 4px 32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#374151;" th:text="${notaAdicional}">
+              Nota adicional
+            </td>
+          </tr>
+
+          <!-- Párrafo condicional: se resolvió con menos aulas de las pedidas -->
+          <tr th:if="${not #strings.isEmpty(motivoMenosAulas)}">
+            <td class="px-32" style="padding:0 32px 4px 32px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0f4ff;border-radius:8px;">
+                <tr>
+                  <td style="padding:14px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#191919;" th:text="${motivoMenosAulas}">
+                    Motivo de menos aulas
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Observaciones del docente -->
+          <tr th:if="${not #strings.isEmpty(observaciones)}">
+            <td class="px-32" style="padding:20px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#374151;">
+              <strong style="color:#191919;">Observaciones:</strong> <span th:text="${observaciones}">Observaciones</span>
+            </td>
+          </tr>
+
+          <!-- Cierre -->
+          <tr>
+            <td class="px-32" style="padding:28px 32px 0 32px;">
+              <hr style="border:none;border-top:1px solid #e5e5e5;margin:0;" />
+            </td>
+          </tr>
+          <tr>
+            <td class="px-32" style="padding:16px 32px 32px 32px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#6b7280;">
+              No respondas este mail. Si hay algún problema con tu pedido, comunicate con Soporte de Subsecretaría.
+            </td>
+          </tr>
+
+        </table>
+
+        <!-- Footer, fuera de la card -->
+        <table role="presentation" class="email-container" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
+          <tr>
+            <td align="center" style="padding:16px 12px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:16px;color:#9ca3af;">
+              UTN Facultad Regional Córdoba — Sistema de Gestión de Aulas (SIGA)
+            </td>
+          </tr>
+        </table>
+
+      </td>
     </tr>
-</table>
+  </table>
+
 </body>
 </html>
