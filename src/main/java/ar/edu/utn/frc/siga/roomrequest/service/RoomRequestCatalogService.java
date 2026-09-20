@@ -8,7 +8,6 @@ import ar.edu.utn.frc.siga.roomrequest.dto.response.SubjectOptionDto;
 
 import java.util.List;
 
-/** Lectura pública y acotada de los catálogos que necesita el formulario (no expone los controllers internos). */
 public interface RoomRequestCatalogService {
 
     /** {@code onlyWithSubjects}: si es true, excluye especialidades sin materias cargadas (en desuso). */
