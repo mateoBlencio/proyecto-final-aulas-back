@@ -12,6 +12,14 @@ spring:
     user: ${DB_MIGRATION_USERNAME}
     password: ${DB_MIGRATION_PASSWORD}
 
+  mail:
+    host: ${MAIL_HOST:mailhog-test}
+    port: ${MAIL_PORT:1025}
+    properties:
+      mail.smtp.auth: ${MAIL_SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${MAIL_SMTP_STARTTLS_ENABLE:false}
+      mail.smtp.starttls.required: ${MAIL_SMTP_STARTTLS_REQUIRED:false}
+
 springdoc:
   swagger-ui:
     enabled: true
@@ -25,6 +33,12 @@ management:
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS}
+
+siga:
+  notifications:
+    email:
+      enabled: ${MAIL_ENABLED:true}
+      from: ${MAIL_FROM:no-reply@siga.local}
 
 logging:
   level:

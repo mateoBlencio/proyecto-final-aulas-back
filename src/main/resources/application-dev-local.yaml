@@ -8,6 +8,14 @@ spring:
       enabled: true
       stop:
         command: down
+
+  mail:
+    host: localhost
+    port: 1025
+    properties:
+      mail.smtp.auth: false
+      mail.smtp.starttls.enable: false
+      mail.smtp.starttls.required: false
   # Aca manda Hibernate: es el ambiente donde se disenan los cambios de entidades antes de
   # escribir la migracion. Prender Flyway aca chocaria con ddl-auto: update.
   flyway:
@@ -46,6 +54,10 @@ siga:
   sysacad:
     enabled: false
     api-key: dev-local-unused
+  notifications:
+    email:
+      enabled: true
+      from: no-reply@siga.local
 
 logging:
   level:

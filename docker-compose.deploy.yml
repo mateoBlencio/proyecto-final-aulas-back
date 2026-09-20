@@ -22,6 +22,15 @@ services:
     networks:
       - app-network
 
+  mailhog-dev:
+    image: mailhog/mailhog:v1.0.1
+    profiles: ["dev"]
+    restart: always
+    ports:
+      - "8025:8025"
+    networks:
+      - app-network
+
   backend-test:
     build: .
     profiles: ["test"]
@@ -42,6 +51,15 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS_TEST}
       SYSACAD_ENABLED: ${SYSACAD_ENABLED}
       SYSACAD_API_KEY: ${SYSACAD_API_KEY}
+    networks:
+      - app-network
+
+  mailhog-test:
+    image: mailhog/mailhog:v1.0.1
+    profiles: ["test"]
+    restart: always
+    ports:
+      - "8026:8025"
     networks:
       - app-network
 
