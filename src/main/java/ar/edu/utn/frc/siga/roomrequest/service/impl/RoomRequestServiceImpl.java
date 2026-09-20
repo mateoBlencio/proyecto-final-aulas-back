@@ -76,10 +76,13 @@ public class RoomRequestServiceImpl implements RoomRequestService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<RoomRequestItemStatusCountDto> countItemsByStatus(boolean includePast) {
-        log.debug("Contando pedidos de aula por estado: includePast={}", includePast);
+    public List<RoomRequestItemStatusCountDto> countItemsByStatus(boolean includePast,
+            Boolean requiresSpecialAssignment, Boolean partiallyResolved) {
+        log.debug("Contando pedidos de aula por estado: includePast={}, requiresSpecialAssignment={}, "
+                        + "partiallyResolved={}", includePast, requiresSpecialAssignment, partiallyResolved);
 
-        RoomRequestItemFilter base = RoomRequestItemFilter.of(null, null, null, null, null, null, includePast);
+        RoomRequestItemFilter base = RoomRequestItemFilter.of(null, null, null, null, null, null, includePast,
+                requiresSpecialAssignment, null, partiallyResolved, null);
         List<RoomRequestItemStatusCountDto> counts = Arrays.stream(RoomRequestStatus.values())
                 .map(status -> new RoomRequestItemStatusCountDto(status, itemRepository.count(
                         RoomRequestItemSpecification.withFilter(onlyStatus(base, status)))))
@@ -90,7 +93,8 @@ public class RoomRequestServiceImpl implements RoomRequestService {
 
     private static RoomRequestItemFilter onlyStatus(RoomRequestItemFilter base, RoomRequestStatus status) {
         return new RoomRequestItemFilter(null, Set.of(status), null, null,
-                base.dateFrom(), base.dateTo(), base.includePast());
+                base.dateFrom(), base.dateTo(), base.includePast(),
+                base.requiresSpecialAssignment(), null, base.partiallyResolved(), null);
     }
 
     @Override

@@ -110,12 +110,14 @@ class RoomRequestServiceImplTest {
     @Test
     @DisplayName("traduce el sort antes de consultar el repositorio y compone la página por batch")
     void translatesSortAndComposesPage() {
-        RoomRequestItemFilter filter = RoomRequestItemFilter.of(null, null, null, null, null, null, true);
+        RoomRequestItemFilter filter =
+                RoomRequestItemFilter.of(null, null, null, null, null, null, true, null, null, null, null);
         Pageable requested = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "startTime"));
 
         RoomRequestItem item = RoomRequestItem.builder().id(5L).build();
         RoomRequestItemRowDto row = new RoomRequestItemRowDto(
-                5L, null, null, null, null, null, null, null, null, null, null);
+                5L, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         when(itemRepository.findAll(ArgumentMatchers.<Specification<RoomRequestItem>>any(), pageableCaptor.capture()))
@@ -134,7 +136,8 @@ class RoomRequestServiceImplTest {
     @Test
     @DisplayName("sort fuera de la whitelist: 400 antes de tocar el repositorio")
     void invalidSortNeverReachesRepository() {
-        RoomRequestItemFilter filter = RoomRequestItemFilter.of(null, null, null, null, null, null, true);
+        RoomRequestItemFilter filter =
+                RoomRequestItemFilter.of(null, null, null, null, null, null, true, null, null, null, null);
         Pageable requested = PageRequest.of(0, 20, Sort.by("teacherEmail"));
 
         assertThatThrownBy(() -> service.findItems(filter, requested))
@@ -149,7 +152,7 @@ class RoomRequestServiceImplTest {
         when(itemRepository.count(ArgumentMatchers.<Specification<RoomRequestItem>>any()))
                 .thenReturn(30L, 5L, 10L, 2L, 0L);
 
-        List<RoomRequestItemStatusCountDto> result = service.countItemsByStatus(true);
+        List<RoomRequestItemStatusCountDto> result = service.countItemsByStatus(true, null, null);
 
         assertThat(result).containsExactly(
                 new RoomRequestItemStatusCountDto(RoomRequestStatus.NEW, 30L),

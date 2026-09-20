@@ -96,6 +96,45 @@ class RoomRequestItemStatusCountsApiIntegrationTest extends AbstractIntegrationT
     }
 
     @Test
+    @DisplayName("requiresSpecialAssignment=true solo cuenta pedidos con computadoras/software/examen con usuarios")
+    void requiresSpecialAssignmentFiltersCounts() throws Exception {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+
+        long newWithSpecialBefore = countWithParams(RoomRequestStatus.NEW, true, null);
+
+        RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
+        RoomRequestItem withComputers = RoomRequestItem.builder()
+                .commissionId(academic.commissionId())
+                .date(LocalDate.now().plusDays(10))
+                .startTime(LocalTime.of(10, 0))
+                .duration(Duration.ofMinutes(120))
+                .estimated(35)
+                .classroomCount(1)
+                .requiresComputers(true)
+                .build();
+        request.addItem(withComputers);
+        seedItem(request, academic.commissionId(), LocalDate.now().plusDays(11), RoomRequestStatus.NEW);
+        roomRequestRepository.save(request);
+
+        assertThat(countWithParams(RoomRequestStatus.NEW, true, null)).isEqualTo(newWithSpecialBefore + 1);
+    }
+
+    private long countWithParams(RoomRequestStatus status, Boolean requiresSpecialAssignment,
+            Boolean partiallyResolved) throws Exception {
+        var request = get("/v1/room-requests/items/status-counts");
+        if (requiresSpecialAssignment != null) {
+            request = request.param("requiresSpecialAssignment", String.valueOf(requiresSpecialAssignment));
+        }
+        if (partiallyResolved != null) {
+            request = request.param("partiallyResolved", String.valueOf(partiallyResolved));
+        }
+        String body = mockMvc.perform(request)
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return ((Number) JsonPath.read(body, "$[" + status.ordinal() + "].count")).longValue();
+    }
+
+    @Test
     @DisplayName("sin token: 401; con AUXILIAR_AULICO: 200 (lectura habilitada para ambos roles)")
     void authenticationAndAuthorization() throws Exception {
         MockMvc anonymousMockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)

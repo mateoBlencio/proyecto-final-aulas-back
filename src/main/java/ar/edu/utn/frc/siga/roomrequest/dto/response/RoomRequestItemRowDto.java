@@ -20,5 +20,12 @@ public record RoomRequestItemRowDto(
         LocalTime startTime,
         LocalTime endTime,
         Integer classroomCount,
-        Boolean requiresComputers
+        Boolean requiresComputers,
+        Boolean requiresSpecialAssignment,
+        Long derivedBuildingId,
+        String derivedBuildingName,
+        LocalDateTime derivedAt,
+        Boolean wasReturned,
+        Integer assignedClassroomCount,
+        Boolean partiallyResolved
 ) {}

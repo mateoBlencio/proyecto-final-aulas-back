@@ -8,6 +8,7 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestRepository;
+import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,6 +57,27 @@ class RoomRequestItemDetailApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.item.status").value("IN_EVALUATION"))
                 .andExpect(jsonPath("$.item.decidedBy").value("subsecretaria@frc.utn.edu.ar"))
                 .andExpect(jsonPath("$.item.observations").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("pedido devuelto por un edificio: viaja derivedBuilding (limpio) y returnedFromBuilding")
+    void findById_returnedItem_showsReturnedFromBuilding() throws Exception {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+        Building building = testData.edificio();
+        RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
+        RoomRequestItem item = seedItem(request, academic.commissionId(), LocalDate.now().plusDays(11),
+                RoomRequestStatus.NEW);
+        item.deriveTo(building.getId(), "subsecretaria@frc.utn.edu.ar", LocalDateTime.now());
+        item.returnFromBuilding("no había proyector");
+        roomRequestRepository.save(request);
+
+        mockMvc.perform(get("/v1/room-requests/items/" + item.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.item.status").value("NEW"))
+                .andExpect(jsonPath("$.item.derivedBuilding").doesNotExist())
+                .andExpect(jsonPath("$.item.returnedFromBuilding.id").value(building.getId()))
+                .andExpect(jsonPath("$.item.returnedFromBuilding.name").value(building.getName()))
+                .andExpect(jsonPath("$.item.returnedReason").value("no había proyector"));
     }
 
     @Test
