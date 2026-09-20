@@ -511,7 +511,6 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         event.setKind(dto.eventType());
         event.setSubjectId(dto.subjectId());
         event.setCommissionId(dto.commissionId());
-        // Todas las ocurrencias simultáneas (misma fecha, distinta aula) se mueven juntas.
         occurrences.forEach(o -> o.setDate(dto.date()));
 
         log.info("Evento único actualizado: id={}", id);

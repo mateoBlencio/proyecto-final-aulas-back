@@ -19,10 +19,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.envers.Audited;
 
-/**
- * Rastro de qué ocurrencia y aula produjo la resolución de un ítem (§1 de gestion-solicitud.md).
- * Reasignar reemplaza el conjunto entero vía {@code orphanRemoval}, nunca lo acumula.
- */
 @Entity
 @Audited
 @Table(name = "solicitud_item_asignacion",

@@ -70,7 +70,6 @@ class RecurringEventReconcilerTest {
             + "no se duplica si sigue deseada, y se borra completa si deja de estarlo")
     void toleratesSimultaneousOccurrencesOnSameDate() {
         LocalDate nextMonday = LocalDate.now().with(java.time.temporal.TemporalAdjusters.next(DayOfWeek.MONDAY));
-        // Ventana de una sola semana: el único desired date es nextMonday, ya cubierto por keptPrincipal.
         RecurringEvent event = event(nextMonday, nextMonday);
 
         LocalDate droppedDate = nextMonday.plusWeeks(5);
