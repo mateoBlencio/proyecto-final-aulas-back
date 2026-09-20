@@ -19,4 +19,6 @@ public interface RoomRequestResolutionService {
     RoomRequestItemResponseDto derive(Long itemId, Long buildingId, String actor);
 
     RoomRequestItemResponseDto returnItem(Long itemId, String reason, String actor);
+
+    RoomRequestItemResponseDto notify(Long itemId, String actor);
 }

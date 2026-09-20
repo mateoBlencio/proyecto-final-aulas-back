@@ -177,6 +177,14 @@ public class RoomRequestItem extends TimestampedEntity {
         this.decidedAt = derivedAt;
     }
 
+    /** No toca decisionReason: preserva el motivo de resolución parcial que haya dejado el último assign. */
+    public void resolve(String decidedBy, LocalDateTime notifiedAt) {
+        this.status = RoomRequestStatus.RESOLVED;
+        this.decidedBy = decidedBy;
+        this.decidedAt = notifiedAt;
+        this.notifiedAt = notifiedAt;
+    }
+
     public void returnFromBuilding(String reason) {
         this.status = RoomRequestStatus.PENDING;
         this.returnedFromBuildingId = this.derivedBuildingId;

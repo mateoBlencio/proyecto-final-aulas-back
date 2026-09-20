@@ -191,6 +191,19 @@ public class RoomRequestController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/items/{id}/notify")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
+    @Operation(summary = "Avisar al docente que su pedido quedó resuelto",
+               description = "Sella la resolución y deja el pedido en RESOLVED. Idempotente: llamarlo "
+                       + "de nuevo sobre un pedido ya notificado devuelve 200 sin resellar ni volver a "
+                       + "avisar. Requiere PRE_APPROVED con al menos un aula asignada.")
+    public ResponseEntity<RoomRequestItemResponseDto> notifyItem(@PathVariable Long id, Principal principal) {
+        log.debug("POST /v1/room-requests/items/{}/notify", id);
+        RoomRequestItemResponseDto response = roomRequestResolutionService.notify(id, principal.getName());
+        log.info("Pedido de aula notificado vía controller: id={}", id);
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/items/{id}/candidate-buildings")
     @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_READ')")
     @Operation(summary = "Edificios candidatos para derivar un pedido",

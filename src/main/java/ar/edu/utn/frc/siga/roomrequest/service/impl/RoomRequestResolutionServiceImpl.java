@@ -24,6 +24,7 @@ import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestComposer;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItemAllocation;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestResolved;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
@@ -36,6 +37,7 @@ import ar.edu.utn.frc.siga.space.service.BuildingService;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,6 +67,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
     private final UserService userService;
     private final AcademicEventService academicEventService;
     private final OccurrenceService occurrenceService;
+    private final ApplicationEventPublisher eventPublisher;
     private final RoomRequestComposer composer;
 
     @Override
@@ -231,6 +234,40 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         item.returnFromBuilding(reason);
 
         log.info("Pedido de aula devuelto: itemId={}", itemId);
+        return composer.composeItem(item);
+    }
+
+    @Override
+    @Transactional
+    public RoomRequestItemResponseDto notify(Long itemId, String actor) {
+        log.debug("Notificando pedido de aula: itemId={}", itemId);
+
+        RoomRequestItem item = itemRepository.findWithRequestById(itemId)
+                .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
+
+        if (item.getNotifiedAt() != null) {
+            log.debug("Pedido ya notificado, devuelve el estado actual sin resellar: itemId={}", itemId);
+            return composer.composeItem(item);
+        }
+
+        transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.RESOLVED);
+        if (item.getAllocations().isEmpty()) {
+            throw new InvalidRoomRequestException("El pedido no tiene ninguna aula asignada.");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        item.resolve(actor, now);
+
+        List<Long> classroomIds = item.getAllocations().stream()
+                .map(RoomRequestItemAllocation::getClassroomId)
+                .distinct()
+                .toList();
+        eventPublisher.publishEvent(new RoomRequestResolved(item.getId(), item.getRequest().getId(),
+                item.getRequest().getTeacherName(), item.getRequest().getTeacherEmail(),
+                item.getRequest().getSubjectId(), item.getDate(), item.getDayOfWeek(), item.getStartTime(),
+                classroomIds));
+
+        log.info("Pedido de aula notificado: itemId={}", itemId);
         return composer.composeItem(item);
     }
 

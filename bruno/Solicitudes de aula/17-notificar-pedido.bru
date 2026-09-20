@@ -1,0 +1,34 @@
+meta {
+  name: Avisar al docente que su pedido quedó resuelto
+  type: http
+  seq: 17
+}
+
+post {
+  url: {{baseUrl}}/v1/room-requests/items/1/notify
+  body: none
+  auth: inherit
+}
+
+docs {
+  POST /v1/room-requests/items/{id}/notify. Rol: SUBSECRETARIA, AUXILIAR_AULICO.
+
+  Sella la resolución del pedido y lo deja en `RESOLVED`: a partir de acá el docente
+  ya sabe qué aula(s) tiene y el pedido queda congelado (un `assign` posterior se
+  rechaza; la única salida es `cancel`).
+
+  **Idempotente**: si `notifiedAt` ya estaba seteado, devuelve 200 con el estado
+  actual sin resellar ni volver a publicar el aviso — pensado para reintentos de
+  red, no hace falta que el front controle si ya se llamó antes.
+
+  Si todavía no se notificó:
+  - 409 si el estado no es `PRE_APPROVED`;
+  - 400 si el pedido no tiene ninguna aula asignada (no se puede avisar un aula que
+    no existe);
+  - sella `notifiedAt`, pasa a `RESOLVED` y publica el evento de dominio
+    `RoomRequestResolved`. Hoy nadie lo consume todavía (el módulo de
+    notificaciones que arma el envío real llega en un bloque futuro) — publicarlo
+    ya no requiere que exista un listener.
+
+  Respuesta: 200 con el pedido actualizado (`status: "RESOLVED"`).
+}

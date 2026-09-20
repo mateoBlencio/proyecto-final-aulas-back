@@ -86,6 +86,8 @@ class RoomRequestResolutionServiceImplTest {
     @Mock
     private OccurrenceService occurrenceService;
     @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+    @Mock
     private RoomRequestComposer composer;
 
     @InjectMocks
@@ -488,6 +490,94 @@ class RoomRequestResolutionServiceImplTest {
         when(itemRepository.findWithRequestById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.returnItem(99L, "motivo", "auxiliar@frc.utn.edu.ar"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("notify: PRE_APPROVED con aula asignada pasa a RESOLVED, sella notifiedAt y publica RoomRequestResolved")
+    void notify_ok() {
+        RoomRequestItemAllocation allocation = RoomRequestItemAllocation.builder()
+                .occurrenceId(500L).classroomId(101L).position(1).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PRE_APPROVED)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM))
+                .allocations(new java.util.ArrayList<>(List.of(allocation))).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.notify(1L, "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.RESOLVED);
+        assertThat(item.getNotifiedAt()).isNotNull();
+        verify(eventPublisher).publishEvent(any(ar.edu.utn.frc.siga.roomrequest.model.RoomRequestResolved.class));
+    }
+
+    @Test
+    @DisplayName("notify: llamado dos veces devuelve 200 las dos veces con el mismo notifiedAt, sin republicar")
+    void notify_idempotente() {
+        RoomRequestItemAllocation allocation = RoomRequestItemAllocation.builder()
+                .occurrenceId(500L).classroomId(101L).position(1).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PRE_APPROVED)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM))
+                .allocations(new java.util.ArrayList<>(List.of(allocation))).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.notify(1L, "subsecretaria@frc.utn.edu.ar");
+        java.time.LocalDateTime firstNotifiedAt = item.getNotifiedAt();
+        service.notify(1L, "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(item.getNotifiedAt()).isEqualTo(firstNotifiedAt);
+        verify(eventPublisher, org.mockito.Mockito.times(1))
+                .publishEvent(any(ar.edu.utn.frc.siga.roomrequest.model.RoomRequestResolved.class));
+    }
+
+    @Test
+    @DisplayName("notify: pedido resuelto de menos (1 de 2 aulas) funciona igual")
+    void notify_resolucionParcial() {
+        RoomRequestItemAllocation allocation = RoomRequestItemAllocation.builder()
+                .occurrenceId(500L).classroomId(101L).position(1).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PRE_APPROVED)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(2)
+                .allocations(new java.util.ArrayList<>(List.of(allocation))).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.notify(1L, "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.RESOLVED);
+    }
+
+    @Test
+    @DisplayName("notify: estado distinto de PRE_APPROVED se rechaza con conflicto")
+    void notify_estadoInvalido() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        doThrowOnTransitionTo(RoomRequestStatus.PENDING, RoomRequestStatus.RESOLVED);
+
+        assertThatThrownBy(() -> service.notify(1L, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestTransitionException.class);
+        verifyNoInteractions(eventPublisher, composer);
+    }
+
+    @Test
+    @DisplayName("notify: sin ninguna aula asignada se rechaza")
+    void notify_sinAulas() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PRE_APPROVED)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> service.notify(1L, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestException.class);
+        verifyNoInteractions(eventPublisher, composer);
+    }
+
+    @Test
+    @DisplayName("notify: ítem inexistente → 404")
+    void notify_itemInexistente() {
+        when(itemRepository.findWithRequestById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.notify(99L, "subsecretaria@frc.utn.edu.ar"))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
