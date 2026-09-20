@@ -2,7 +2,6 @@ package ar.edu.utn.frc.siga.roomrequest;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
-import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
@@ -18,10 +17,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -43,8 +40,8 @@ class RoomRequestItemDetailApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("id existente: devuelve la cabecera completa (con contacto del docente) y el ítem completo")
     void findById_returnsFullHeaderAndItem() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
-        RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
-        RoomRequestItem item = seedItem(request, academic.commissionId(), LocalDate.now().plusDays(10),
+        RoomRequest request = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
+        RoomRequestItem item = testData.itemDePedido(request, academic.commissionId(), LocalDate.now().plusDays(10),
                 RoomRequestStatus.IN_EVALUATION);
         roomRequestRepository.save(request);
 
@@ -64,8 +61,8 @@ class RoomRequestItemDetailApiIntegrationTest extends AbstractIntegrationTest {
     void findById_returnedItem_showsReturnedFromBuilding() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
         Building building = testData.edificio();
-        RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
-        RoomRequestItem item = seedItem(request, academic.commissionId(), LocalDate.now().plusDays(11),
+        RoomRequest request = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
+        RoomRequestItem item = testData.itemDePedido(request, academic.commissionId(), LocalDate.now().plusDays(11),
                 RoomRequestStatus.NEW);
         item.deriveTo(building.getId(), "subsecretaria@frc.utn.edu.ar", LocalDateTime.now());
         item.returnFromBuilding("no había proyector");
@@ -93,8 +90,8 @@ class RoomRequestItemDetailApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("sin token: 401; con AUXILIAR_AULICO: 200 (lectura habilitada para ambos roles)")
     void authenticationAndAuthorization() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
-        RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
-        RoomRequestItem item = seedItem(request, academic.commissionId(), LocalDate.now().plusDays(10),
+        RoomRequest request = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
+        RoomRequestItem item = testData.itemDePedido(request, academic.commissionId(), LocalDate.now().plusDays(10),
                 RoomRequestStatus.NEW);
         roomRequestRepository.save(request);
 
@@ -107,32 +104,5 @@ class RoomRequestItemDetailApiIntegrationTest extends AbstractIntegrationTest {
         mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO)
                 .perform(get("/v1/room-requests/items/" + item.getId()))
                 .andExpect(status().isOk());
-    }
-
-    private RoomRequest seedRequest(RoomRequestType type, Long subjectId) {
-        return RoomRequest.builder()
-                .type(type)
-                .scope(AcademicScope.GRADO)
-                .teacherName("Ada Lovelace")
-                .teacherEmail("ada@frc.utn.edu.ar")
-                .teacherPhone("351-1234567")
-                .subjectId(subjectId)
-                .build();
-    }
-
-    private RoomRequestItem seedItem(RoomRequest request, Long commissionId, LocalDate date, RoomRequestStatus status) {
-        RoomRequestItem item = RoomRequestItem.builder()
-                .commissionId(commissionId)
-                .date(date)
-                .startTime(LocalTime.of(10, 0))
-                .duration(Duration.ofMinutes(120))
-                .estimated(35)
-                .classroomCount(1)
-                .build();
-        request.addItem(item);
-        if (status != RoomRequestStatus.NEW) {
-            item.decide(status, "subsecretaria@frc.utn.edu.ar", "motivo de prueba", LocalDateTime.now());
-        }
-        return item;
     }
 }

@@ -256,8 +256,8 @@ class RoomRequestResolutionServiceImplTest {
         when(classroomService.findAllAvailable()).thenReturn(
                 List.of(classroom(101L, 1L, "Edificio Central"), classroom(102L, 1L, "Edificio Central")));
         when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of());
-        when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L))
-                .thenReturn(List.of(auxiliar()));
+        when(userService.findBuildingIdsCoveredByRole(eq(SystemRole.AUXILIAR_AULICO), any()))
+                .thenReturn(Set.of(1L));
 
         List<CandidateBuildingDto> result = service.findCandidateBuildings(1L);
 
@@ -276,8 +276,8 @@ class RoomRequestResolutionServiceImplTest {
                 List.of(classroom(101L, 1L, "Edificio Central"), classroom(102L, 1L, "Edificio Central")));
         when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of(
                 new OccupiedSlot(102L, date, LocalTime.of(10, 0), LocalTime.of(11, 0), 5L, 7L)));
-        when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L))
-                .thenReturn(List.of(auxiliar()));
+        when(userService.findBuildingIdsCoveredByRole(eq(SystemRole.AUXILIAR_AULICO), any()))
+                .thenReturn(Set.of(1L));
 
         List<CandidateBuildingDto> result = service.findCandidateBuildings(1L);
 
@@ -306,7 +306,7 @@ class RoomRequestResolutionServiceImplTest {
         when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
         when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(101L, 1L, "Edificio Central")));
         when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of());
-        when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of());
+        when(userService.findBuildingIdsCoveredByRole(eq(SystemRole.AUXILIAR_AULICO), any())).thenReturn(Set.of());
 
         assertThat(service.findCandidateBuildings(1L)).isEmpty();
     }

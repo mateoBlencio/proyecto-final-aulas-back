@@ -13,7 +13,9 @@ import ar.edu.utn.frc.siga.auth.service.RefreshTokenService;
 import ar.edu.utn.frc.siga.auth.service.RoleAssignmentService;
 import ar.edu.utn.frc.siga.auth.service.UserService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -107,6 +109,17 @@ public class UserServiceImpl implements UserService {
                 .toList();
         log.info("Usuarios con rol {} sobre el edificio {}: count={}", role, buildingId, users.size());
         return users;
+    }
+
+    @Override
+    public Set<Long> findBuildingIdsCoveredByRole(SystemRole role, Collection<Long> buildingIds) {
+        if (buildingIds.isEmpty()) {
+            return Set.of();
+        }
+        if (userRepository.existsEnabledGlobalRole(role)) {
+            return Set.copyOf(buildingIds);
+        }
+        return userRepository.findBuildingIdsWithScopedRole(role, buildingIds);
     }
 
     private User findExisting(Long id) {

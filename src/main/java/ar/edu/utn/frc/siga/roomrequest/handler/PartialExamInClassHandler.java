@@ -34,12 +34,7 @@ public class PartialExamInClassHandler extends AbstractRoomRequestHandler {
     protected void validateItems(CreateRoomRequestDto dto) {
         List<ScheduledItemDto> items = ((CreatePartialExamInClassDto) dto).items();
         for (ScheduledItemDto item : items) {
-            if (item.date() == null) {
-                throw new InvalidRoomRequestException("Cada pedido de parcial en horario de clases requiere una fecha.");
-            }
-            if (item.dayOfWeek() != null) {
-                throw new InvalidRoomRequestException("El parcial en horario de clases se ata a una fecha, no a un día de dictado.");
-            }
+            ItemConsistency.requireDateOnly(item, "parcial en horario de clases");
             if (item.estimated() == null) {
                 throw new InvalidRoomRequestException("Cada pedido de parcial requiere la cantidad estimada de asistentes.");
             }

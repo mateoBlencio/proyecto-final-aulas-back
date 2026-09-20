@@ -93,4 +93,30 @@ public final class ItemConsistency {
                     "Los exámenes deben solicitarse con al menos 2 horas de anticipación.");
         }
     }
+
+    /** typeLabel entra en jerga de negocio, p. ej. "cambio de aula por única vez". */
+    public static void requireDateOnly(CreateRoomRequestItemDto item, String typeLabel) {
+        if (item.date() == null) {
+            throw new InvalidRoomRequestException("Cada pedido de " + typeLabel + " requiere una fecha.");
+        }
+        if (item.dayOfWeek() != null) {
+            throw new InvalidRoomRequestException(
+                    "El " + typeLabel + " se ata a una fecha, no a un día de dictado.");
+        }
+    }
+
+    public static void requireDayOfWeekOnly(CreateRoomRequestItemDto item, String typeLabel) {
+        if (item.dayOfWeek() == null) {
+            throw new InvalidRoomRequestException("Cada pedido de " + typeLabel + " requiere un día de dictado.");
+        }
+        if (item.date() != null) {
+            throw new InvalidRoomRequestException("El " + typeLabel + " no se ata a una fecha.");
+        }
+    }
+
+    public static void requireNoEstimated(CreateRoomRequestItemDto item) {
+        if (item.estimated() != null) {
+            throw new InvalidRoomRequestException("El cambio de aula no lleva cantidad estimada de asistentes.");
+        }
+    }
 }

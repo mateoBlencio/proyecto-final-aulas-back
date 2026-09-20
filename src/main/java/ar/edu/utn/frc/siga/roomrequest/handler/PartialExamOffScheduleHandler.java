@@ -61,13 +61,13 @@ public class PartialExamOffScheduleHandler extends AbstractRoomRequestHandler {
     }
 
     private void requireNoOverlapWithExistingRequests(List<FreeFormItemDto> items) {
-        Map<LocalDate, List<RoomRequestItem>> existingByDate = items.stream()
-                .map(FreeFormItemDto::date)
-                .distinct()
-                .collect(Collectors.toMap(date -> date, itemRepository::findActiveOffScheduleItemsByDate));
+        List<LocalDate> dates = items.stream().map(FreeFormItemDto::date).distinct().toList();
+        Map<LocalDate, List<RoomRequestItem>> existingByDate = itemRepository
+                .findActiveOffScheduleItemsByDateIn(dates).stream()
+                .collect(Collectors.groupingBy(RoomRequestItem::getDate));
 
         for (FreeFormItemDto item : items) {
-            boolean overlaps = existingByDate.get(item.date()).stream()
+            boolean overlaps = existingByDate.getOrDefault(item.date(), List.of()).stream()
                     .anyMatch(existing -> ItemConsistency.commissionScheduleOverlap(
                             item.commissionId(), item.date(), item.startTime(), item.endTime(),
                             existing.getCommissionId(), existing.getDate(), existing.getStartTime(), existing.endTime()));

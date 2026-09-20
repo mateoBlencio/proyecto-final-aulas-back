@@ -315,7 +315,7 @@ class RoomRequestHandlersTest {
         @BeforeEach
         void setUp() {
             handler = new PartialExamOffScheduleHandler(academicReference, classroomReference, classSchedule, itemRepository);
-            when(itemRepository.findActiveOffScheduleItemsByDate(any())).thenReturn(List.of());
+            when(itemRepository.findActiveOffScheduleItemsByDateIn(any())).thenReturn(List.of());
         }
 
         private CreatePartialExamOffScheduleDto dto(FreeFormItemDto... items) {
@@ -402,7 +402,7 @@ class RoomRequestHandlersTest {
                     .startTime(LocalTime.of(11, 0))
                     .duration(Duration.ofHours(2))
                     .build();
-            when(itemRepository.findActiveOffScheduleItemsByDate(date)).thenReturn(List.of(existing));
+            when(itemRepository.findActiveOffScheduleItemsByDateIn(any())).thenReturn(List.of(existing));
 
             assertThatThrownBy(() -> handler.validate(dto(
                     freeFormItemAt(7L, date, LocalTime.of(10, 0), LocalTime.of(12, 0)))))

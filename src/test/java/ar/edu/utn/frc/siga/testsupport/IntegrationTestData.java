@@ -17,6 +17,11 @@ import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import static ar.edu.utn.frc.siga.space.service.ClassroomService.DEFAULT_CLASSROOM_TYPE;
 
 import ar.edu.utn.frc.siga.space.model.Building;
@@ -35,7 +40,9 @@ import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
 import ar.edu.utn.frc.siga.space.repository.ResourceTypeRepository;
 
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -203,6 +210,34 @@ public class IntegrationTestData {
                 .commission(commission)
                 .enrolledCount(enrolledCount)
                 .build());
+    }
+
+    public RoomRequest solicitudDeAula(RoomRequestType type, Long subjectId) {
+        return RoomRequest.builder()
+                .type(type)
+                .scope(AcademicScope.GRADO)
+                .teacherName("Ada Lovelace")
+                .teacherEmail("ada@frc.utn.edu.ar")
+                .teacherPhone("351-1234567")
+                .subjectId(subjectId)
+                .build();
+    }
+
+    /** Statuses distintos de NEW pasan por {@code decide(...)}: el check constraint de la tabla exige decidedBy/decidedAt. */
+    public RoomRequestItem itemDePedido(RoomRequest request, Long commissionId, LocalDate date, RoomRequestStatus status) {
+        RoomRequestItem item = RoomRequestItem.builder()
+                .commissionId(commissionId)
+                .date(date)
+                .startTime(LocalTime.of(10, 0))
+                .duration(Duration.ofMinutes(120))
+                .estimated(35)
+                .classroomCount(1)
+                .build();
+        request.addItem(item);
+        if (status != RoomRequestStatus.NEW) {
+            item.decide(status, "subsecretaria@frc.utn.edu.ar", "motivo de prueba", LocalDateTime.now());
+        }
+        return item;
     }
 
     public Long eventoRecurrente(Long subjectId, Long commissionId, DayOfWeek dayOfWeek, LocalTime startTime,

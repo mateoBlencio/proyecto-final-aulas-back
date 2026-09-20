@@ -109,26 +109,8 @@ class RoomRequestItemReturnApiIntegrationTest extends AbstractIntegrationTest {
 
     private RoomRequestItem seedItem(RoomRequestStatus status) {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
-        RoomRequest request = RoomRequest.builder()
-                .type(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE)
-                .scope(AcademicScope.GRADO)
-                .teacherName("Ada Lovelace")
-                .teacherEmail("ada@frc.utn.edu.ar")
-                .teacherPhone("351-1234567")
-                .subjectId(academic.subjectId())
-                .build();
-        RoomRequestItem item = RoomRequestItem.builder()
-                .commissionId(academic.commissionId())
-                .date(LocalDate.now().plusDays(10))
-                .startTime(LocalTime.of(10, 0))
-                .duration(Duration.ofMinutes(120))
-                .estimated(35)
-                .classroomCount(1)
-                .build();
-        request.addItem(item);
-        if (status != RoomRequestStatus.NEW) {
-            item.decide(status, "subsecretaria@frc.utn.edu.ar", "motivo de prueba", LocalDateTime.now());
-        }
+        RoomRequest request = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
+        RoomRequestItem item = testData.itemDePedido(request, academic.commissionId(), LocalDate.now().plusDays(10), status);
         roomRequestRepository.save(request);
         return item;
     }

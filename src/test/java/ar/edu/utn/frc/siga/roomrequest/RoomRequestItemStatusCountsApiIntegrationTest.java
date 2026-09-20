@@ -2,7 +2,6 @@ package ar.edu.utn.frc.siga.roomrequest;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
-import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
@@ -20,7 +19,6 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -68,10 +66,10 @@ class RoomRequestItemStatusCountsApiIntegrationTest extends AbstractIntegrationT
         long preApprovedBefore = count(RoomRequestStatus.IN_EVALUATION, false);
         long cancelledBefore = count(RoomRequestStatus.CANCELLED, false);
 
-        RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
-        seedItem(request, academic.commissionId(), LocalDate.now().plusDays(10), RoomRequestStatus.NEW);
-        seedItem(request, academic.commissionId(), LocalDate.now().plusDays(11), RoomRequestStatus.NEW);
-        seedItem(request, academic.commissionId(), LocalDate.now().plusDays(12), RoomRequestStatus.IN_EVALUATION);
+        RoomRequest request = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
+        testData.itemDePedido(request, academic.commissionId(), LocalDate.now().plusDays(10), RoomRequestStatus.NEW);
+        testData.itemDePedido(request, academic.commissionId(), LocalDate.now().plusDays(11), RoomRequestStatus.NEW);
+        testData.itemDePedido(request, academic.commissionId(), LocalDate.now().plusDays(12), RoomRequestStatus.IN_EVALUATION);
         roomRequestRepository.save(request);
 
         assertThat(count(RoomRequestStatus.NEW, false)).isEqualTo(pendingBefore + 2);
@@ -87,8 +85,8 @@ class RoomRequestItemStatusCountsApiIntegrationTest extends AbstractIntegrationT
         long cancelledVigentesBefore = count(RoomRequestStatus.CANCELLED, false);
         long cancelledTodosBefore = count(RoomRequestStatus.CANCELLED, true);
 
-        RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
-        seedItem(request, academic.commissionId(), LocalDate.now().minusDays(5), RoomRequestStatus.CANCELLED);
+        RoomRequest request = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
+        testData.itemDePedido(request, academic.commissionId(), LocalDate.now().minusDays(5), RoomRequestStatus.CANCELLED);
         roomRequestRepository.save(request);
 
         assertThat(count(RoomRequestStatus.CANCELLED, false)).isEqualTo(cancelledVigentesBefore);
@@ -102,7 +100,7 @@ class RoomRequestItemStatusCountsApiIntegrationTest extends AbstractIntegrationT
 
         long newWithSpecialBefore = countWithParams(RoomRequestStatus.NEW, true, null);
 
-        RoomRequest request = seedRequest(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
+        RoomRequest request = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
         RoomRequestItem withComputers = RoomRequestItem.builder()
                 .commissionId(academic.commissionId())
                 .date(LocalDate.now().plusDays(10))
@@ -113,7 +111,7 @@ class RoomRequestItemStatusCountsApiIntegrationTest extends AbstractIntegrationT
                 .requiresComputers(true)
                 .build();
         request.addItem(withComputers);
-        seedItem(request, academic.commissionId(), LocalDate.now().plusDays(11), RoomRequestStatus.NEW);
+        testData.itemDePedido(request, academic.commissionId(), LocalDate.now().plusDays(11), RoomRequestStatus.NEW);
         roomRequestRepository.save(request);
 
         assertThat(countWithParams(RoomRequestStatus.NEW, true, null)).isEqualTo(newWithSpecialBefore + 1);
@@ -155,33 +153,5 @@ class RoomRequestItemStatusCountsApiIntegrationTest extends AbstractIntegrationT
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         return ((Number) JsonPath.read(body, "$[" + status.ordinal() + "].count")).longValue();
-    }
-
-    private RoomRequest seedRequest(RoomRequestType type, Long subjectId) {
-        return RoomRequest.builder()
-                .type(type)
-                .scope(AcademicScope.GRADO)
-                .teacherName("Ada Lovelace")
-                .teacherEmail("ada@frc.utn.edu.ar")
-                .teacherPhone("351-1234567")
-                .subjectId(subjectId)
-                .build();
-    }
-
-    /** Statuses distintos de NEW pasan por {@code decide(...)}: el check constraint exige decidedBy/decidedAt. */
-    private RoomRequestItem seedItem(RoomRequest request, Long commissionId, LocalDate date, RoomRequestStatus status) {
-        RoomRequestItem item = RoomRequestItem.builder()
-                .commissionId(commissionId)
-                .date(date)
-                .startTime(LocalTime.of(10, 0))
-                .duration(Duration.ofMinutes(120))
-                .estimated(35)
-                .classroomCount(1)
-                .build();
-        request.addItem(item);
-        if (status != RoomRequestStatus.NEW) {
-            item.decide(status, "subsecretaria@frc.utn.edu.ar", "motivo de prueba", LocalDateTime.now());
-        }
-        return item;
     }
 }

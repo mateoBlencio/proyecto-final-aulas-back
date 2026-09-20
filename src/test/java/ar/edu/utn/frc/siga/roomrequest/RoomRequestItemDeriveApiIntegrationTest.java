@@ -3,7 +3,6 @@ package ar.edu.utn.frc.siga.roomrequest;
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.common.security.ScopeType;
-import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
@@ -17,10 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 
-import java.time.Duration;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -132,26 +128,8 @@ class RoomRequestItemDeriveApiIntegrationTest extends AbstractIntegrationTest {
 
     private RoomRequestItem seedItem(RoomRequestStatus status) {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
-        RoomRequest request = RoomRequest.builder()
-                .type(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE)
-                .scope(AcademicScope.GRADO)
-                .teacherName("Ada Lovelace")
-                .teacherEmail("ada@frc.utn.edu.ar")
-                .teacherPhone("351-1234567")
-                .subjectId(academic.subjectId())
-                .build();
-        RoomRequestItem item = RoomRequestItem.builder()
-                .commissionId(academic.commissionId())
-                .date(LocalDate.now().plusDays(10))
-                .startTime(LocalTime.of(10, 0))
-                .duration(Duration.ofMinutes(120))
-                .estimated(35)
-                .classroomCount(1)
-                .build();
-        request.addItem(item);
-        if (status != RoomRequestStatus.NEW) {
-            item.decide(status, "subsecretaria@frc.utn.edu.ar", "motivo de prueba", LocalDateTime.now());
-        }
+        RoomRequest request = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
+        RoomRequestItem item = testData.itemDePedido(request, academic.commissionId(), LocalDate.now().plusDays(10), status);
         roomRequestRepository.save(request);
         return item;
     }

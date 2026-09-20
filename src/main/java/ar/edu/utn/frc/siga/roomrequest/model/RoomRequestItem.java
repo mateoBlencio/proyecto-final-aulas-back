@@ -18,6 +18,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -149,6 +150,11 @@ public class RoomRequestItem extends TimestampedEntity {
 
     @Column(name = "fecha_notificacion")
     private LocalDateTime notifiedAt;
+
+    /** Lock optimista: dos resoluciones concurrentes sobre el mismo ítem (assign/notify/cancel a la vez) chocan en el commit en vez de pisarse. */
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 
     @OneToMany(mappedBy = "item", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("position ASC")

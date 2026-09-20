@@ -211,11 +211,17 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         Map<Long, List<ClassroomResponseDto>> freeByBuilding = candidateClassrooms(item).stream()
                 .filter(c -> !occupiedClassroomIds.contains(c.id()))
                 .collect(Collectors.groupingBy(ClassroomResponseDto::buildingId, LinkedHashMap::new, Collectors.toList()));
+        if (freeByBuilding.isEmpty()) {
+            return List.of();
+        }
+
+        Set<Long> buildingIdsWithAuxiliar = userService.findBuildingIdsCoveredByRole(
+                SystemRole.AUXILIAR_AULICO, freeByBuilding.keySet());
 
         List<CandidateBuildingDto> result = new ArrayList<>();
         for (Map.Entry<Long, List<ClassroomResponseDto>> entry : freeByBuilding.entrySet()) {
             Long buildingId = entry.getKey();
-            if (userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, buildingId).isEmpty()) {
+            if (!buildingIdsWithAuxiliar.contains(buildingId)) {
                 continue;
             }
             result.add(new CandidateBuildingDto(buildingId, entry.getValue().getFirst().buildingName(),
