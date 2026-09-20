@@ -2,6 +2,8 @@ package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
 import ar.edu.utn.frc.siga.allocation.service.AllocationOccupancyService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
+import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
+import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
@@ -9,6 +11,12 @@ import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.service.UserService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.TimeRanges;
+import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
+import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
+import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
@@ -17,8 +25,10 @@ import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestComposer;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItemAllocation;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestResolutionService;
+import ar.edu.utn.frc.siga.roomrequest.validator.ItemConsistency;
 import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestTransitionValidator;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
@@ -29,6 +39,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -52,7 +63,57 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
     private final ClassroomService classroomService;
     private final BuildingService buildingService;
     private final UserService userService;
+    private final AcademicEventService academicEventService;
+    private final OccurrenceService occurrenceService;
     private final RoomRequestComposer composer;
+
+    @Override
+    @Transactional
+    public RoomRequestItemResponseDto assign(Long itemId, List<Long> classroomIds, String reason, String actor) {
+        log.debug("Asignando aula(s) a pedido: itemId={}, classroomIds={}", itemId, classroomIds);
+
+        RoomRequestItem item = itemRepository.findWithRequestById(itemId)
+                .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
+        transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.PRE_APPROVED);
+
+        if (item.getNotifiedAt() != null) {
+            throw new InvalidRoomRequestException(
+                    "El pedido ya fue notificado al docente; no se puede volver a asignar.");
+        }
+
+        List<Long> ids = classroomIds == null ? List.of() : classroomIds;
+        if (ids.isEmpty()) {
+            throw new InvalidRoomRequestException("Hay que asignar al menos un aula.");
+        }
+        if (ids.size() > item.getClassroomCount()) {
+            throw new InvalidRoomRequestException("No se pueden asignar más aulas de las pedidas.");
+        }
+        ItemConsistency.requireDistinct(ids, "un aula");
+        if (ids.size() < item.getClassroomCount() && (reason == null || reason.isBlank())) {
+            throw new InvalidRoomRequestException(
+                    "El motivo es obligatorio al asignar menos aulas de las pedidas.");
+        }
+
+        Long classroomId = ids.getFirst();
+        boolean reassigning = !item.getAllocations().isEmpty();
+        List<Long> occurrenceIds = resolveTargetOccurrences(item, reassigning);
+
+        AllocationCommand command = AllocationCommand.manual(
+                List.of(new AllocationItem(new AllocationTarget.Occurrences(occurrenceIds), classroomId)),
+                "Pedido de aula #" + item.getId());
+        if (createsEvent(item.getRequest().getType()) && !reassigning) {
+            allocationService.allocate(command);
+        } else {
+            allocationService.reallocate(command);
+        }
+
+        item.assignClassroom(classroomId, occurrenceIds);
+        item.decide(RoomRequestStatus.PRE_APPROVED, actor, reason, LocalDateTime.now());
+
+        log.info("Pedido de aula asignado: itemId={}, classroomId={}, ocurrencias={}",
+                itemId, classroomId, occurrenceIds.size());
+        return composer.composeItem(item);
+    }
 
     @Override
     @Transactional
@@ -171,6 +232,58 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
         log.info("Pedido de aula devuelto: itemId={}", itemId);
         return composer.composeItem(item);
+    }
+
+    private List<Long> resolveTargetOccurrences(RoomRequestItem item, boolean reassigning) {
+        RoomRequestType type = item.getRequest().getType();
+        return switch (type) {
+            case ONE_TIME_ROOM_CHANGE, PARTIAL_EXAM_IN_CLASS -> List.of(findOccurrenceOnDate(item));
+            case REGULAR_ROOM_CHANGE -> findFutureOccurrencesOnDayOfWeek(item);
+            case PARTIAL_EXAM_OFF_SCHEDULE, FINAL_EXAM, CONFERENCE, OTHER -> reassigning
+                    ? List.of(item.getAllocations().getFirst().getOccurrenceId())
+                    : List.of(createEventOccurrence(item, type));
+        };
+    }
+
+    private static boolean createsEvent(RoomRequestType type) {
+        return switch (type) {
+            case PARTIAL_EXAM_OFF_SCHEDULE, FINAL_EXAM, CONFERENCE, OTHER -> true;
+            case ONE_TIME_ROOM_CHANGE, REGULAR_ROOM_CHANGE, PARTIAL_EXAM_IN_CLASS -> false;
+        };
+    }
+
+    private Long findOccurrenceOnDate(RoomRequestItem item) {
+        return occurrenceService.findSlotsByEvent(item.getSourceRecurringEventId(), null).stream()
+                .filter(slot -> slot.date().equals(item.getDate()))
+                .findFirst()
+                .map(OccurrenceSlotDto::occurrenceId)
+                .orElseThrow(() -> new InvalidRoomRequestException(
+                        "No se encontró la clase de este pedido en el calendario."));
+    }
+
+    private List<Long> findFutureOccurrencesOnDayOfWeek(RoomRequestItem item) {
+        List<Long> occurrenceIds = occurrenceService.findSlotsByEvent(item.getSourceRecurringEventId(), LocalDate.now())
+                .stream()
+                .filter(slot -> slot.date().getDayOfWeek() == item.getDayOfWeek())
+                .map(OccurrenceSlotDto::occurrenceId)
+                .toList();
+        if (occurrenceIds.isEmpty()) {
+            throw new InvalidRoomRequestException("No quedan clases futuras para este cambio regular de aula.");
+        }
+        return occurrenceIds;
+    }
+
+    private Long createEventOccurrence(RoomRequestItem item, RoomRequestType type) {
+        UniqueEventKind kind = switch (type) {
+            case PARTIAL_EXAM_OFF_SCHEDULE -> UniqueEventKind.PARCIAL;
+            case FINAL_EXAM -> UniqueEventKind.EXAMEN_FINAL;
+            default -> UniqueEventKind.OTRO;
+        };
+        CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(kind, item.getRequest().getSubjectId(),
+                item.getCommissionId(), item.getDate(), item.getStartTime(),
+                (int) item.getDuration().toMinutes(), item.getEstimated(), item.getObservations());
+        AcademicEventResponseDto event = academicEventService.createUniqueEvent(dto);
+        return academicEventService.findOccurrencesByEventId(event.id()).getFirst().id();
     }
 
     private List<ClassroomResponseDto> candidateClassrooms(RoomRequestItem item) {

@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
 import ar.edu.utn.frc.siga.allocation.service.AllocationOccupancyService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
+import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
@@ -9,15 +10,27 @@ import ar.edu.utn.frc.siga.auth.dto.response.UserResponseDto;
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.service.UserService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
+import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.dto.response.UniqueEventResponseDto;
+import ar.edu.utn.frc.siga.events.model.EventType;
+import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
+import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestTransitionException;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestComposer;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItemAllocation;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestTransitionValidator;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
@@ -34,6 +47,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -43,6 +57,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -66,6 +81,10 @@ class RoomRequestResolutionServiceImplTest {
     private BuildingService buildingService;
     @Mock
     private UserService userService;
+    @Mock
+    private AcademicEventService academicEventService;
+    @Mock
+    private OccurrenceService occurrenceService;
     @Mock
     private RoomRequestComposer composer;
 
@@ -470,6 +489,285 @@ class RoomRequestResolutionServiceImplTest {
 
         assertThatThrownBy(() -> service.returnItem(99L, "motivo", "auxiliar@frc.utn.edu.ar"))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("assign: ONE_TIME_ROOM_CHANGE reasigna la ocurrencia de la fecha del ítem y queda PRE_APPROVED")
+    void assign_oneTimeRoomChange() {
+        LocalDate date = LocalDate.of(2026, 3, 12);
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+                .request(requestOfType(RoomRequestType.ONE_TIME_ROOM_CHANGE))
+                .sourceRecurringEventId(50L).date(date).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(occurrenceService.findSlotsByEvent(50L, null)).thenReturn(List.of(
+                occurrenceSlot(500L, 50L, date)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(101L), null, "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.PRE_APPROVED);
+        assertThat(item.getAllocations()).extracting(RoomRequestItemAllocation::getOccurrenceId).containsExactly(500L);
+        assertThat(item.getAllocations()).extracting(RoomRequestItemAllocation::getClassroomId).containsExactly(101L);
+        ArgumentCaptor<AllocationCommand> captor = ArgumentCaptor.forClass(AllocationCommand.class);
+        verify(allocationService).reallocate(captor.capture());
+        assertThat(((AllocationTarget.Occurrences) captor.getValue().items().getFirst().target()).occurrenceIds())
+                .containsExactly(500L);
+    }
+
+    @Test
+    @DisplayName("assign: PARTIAL_EXAM_IN_CLASS resuelve la ocurrencia por la fecha del ítem (BUG-01), sin pedir fecha extra")
+    void assign_partialExamInClass() {
+        LocalDate date = LocalDate.of(2026, 4, 1);
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+                .request(requestOfType(RoomRequestType.PARTIAL_EXAM_IN_CLASS))
+                .sourceRecurringEventId(60L).date(date).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(occurrenceService.findSlotsByEvent(60L, null)).thenReturn(List.of(occurrenceSlot(600L, 60L, date)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(102L), null, "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.PRE_APPROVED);
+        verify(allocationService).reallocate(any());
+    }
+
+    @Test
+    @DisplayName("assign: REGULAR_ROOM_CHANGE asigna todas las ocurrencias futuras del dayOfWeek del ítem")
+    void assign_regularRoomChange() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+                .request(requestOfType(RoomRequestType.REGULAR_ROOM_CHANGE))
+                .sourceRecurringEventId(70L).dayOfWeek(java.time.DayOfWeek.THURSDAY).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(occurrenceService.findSlotsByEvent(eq(70L), any(LocalDate.class))).thenReturn(List.of(
+                occurrenceSlot(701L, 70L, LocalDate.of(2026, 5, 7)),
+                occurrenceSlot(702L, 70L, LocalDate.of(2026, 5, 14)),
+                occurrenceSlot(703L, 70L, LocalDate.of(2026, 5, 8))));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(103L), null, "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.PRE_APPROVED);
+        assertThat(item.getAllocations()).extracting(RoomRequestItemAllocation::getOccurrenceId)
+                .containsExactlyInAnyOrder(701L, 702L);
+    }
+
+    @Test
+    @DisplayName("assign: REGULAR_ROOM_CHANGE sin ocurrencias futuras se rechaza")
+    void assign_regularRoomChange_sinFuturas() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+                .request(requestOfType(RoomRequestType.REGULAR_ROOM_CHANGE))
+                .sourceRecurringEventId(70L).dayOfWeek(java.time.DayOfWeek.THURSDAY).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(occurrenceService.findSlotsByEvent(eq(70L), any(LocalDate.class))).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.assign(1L, List.of(103L), null, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestException.class);
+        verifyNoInteractions(allocationService, composer);
+    }
+
+    @Test
+    @DisplayName("assign: FINAL_EXAM crea el UniqueEvent y asigna su ocurrencia (primera vez → allocate)")
+    void assign_finalExam_creaEvento() {
+        LocalDate date = LocalDate.of(2026, 7, 1);
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM))
+                .date(date).startTime(LocalTime.of(9, 0)).duration(Duration.ofMinutes(90))
+                .estimated(30).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(academicEventService.createUniqueEvent(any())).thenReturn(uniqueEvent(900L));
+        when(academicEventService.findOccurrencesByEventId(900L)).thenReturn(List.of(
+                new OccurrenceResponseDto(9000L, 900L, date, OccurrenceStatus.NEEDS_ROOM, LocalTime.of(9, 0), LocalTime.of(10, 30))));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(104L), null, "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.PRE_APPROVED);
+        assertThat(item.getAllocations()).extracting(RoomRequestItemAllocation::getOccurrenceId).containsExactly(9000L);
+        verify(allocationService).allocate(any());
+        verify(allocationService, never()).reallocate(any());
+    }
+
+    @Test
+    @DisplayName("assign: CONFERENCE crea el UniqueEvent kind OTRO")
+    void assign_conference_creaEventoOtro() {
+        LocalDate date = LocalDate.of(2026, 8, 1);
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+                .request(requestOfType(RoomRequestType.CONFERENCE))
+                .date(date).startTime(LocalTime.of(18, 0)).duration(Duration.ofMinutes(60))
+                .estimated(80).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(academicEventService.createUniqueEvent(any())).thenReturn(uniqueEvent(901L));
+        when(academicEventService.findOccurrencesByEventId(901L)).thenReturn(List.of(
+                new OccurrenceResponseDto(9001L, 901L, date, OccurrenceStatus.NEEDS_ROOM, LocalTime.of(18, 0), LocalTime.of(19, 0))));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(105L), null, "subsecretaria@frc.utn.edu.ar");
+
+        ArgumentCaptor<CreateUniqueEventRequestDto> captor = ArgumentCaptor.forClass(CreateUniqueEventRequestDto.class);
+        verify(academicEventService).createUniqueEvent(captor.capture());
+        assertThat(captor.getValue().eventType()).isEqualTo(UniqueEventKind.OTRO);
+    }
+
+    @Test
+    @DisplayName("assign: reasignar sobre un tipo con evento creado reutiliza la ocurrencia existente (reallocate, no allocate)")
+    void assign_reasignarTipoConEventoCreado() {
+        LocalDate date = LocalDate.of(2026, 7, 1);
+        RoomRequestItemAllocation previous = RoomRequestItemAllocation.builder()
+                .occurrenceId(9000L).classroomId(104L).position(1).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PRE_APPROVED)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM))
+                .date(date).startTime(LocalTime.of(9, 0)).duration(Duration.ofMinutes(90))
+                .estimated(30).classroomCount(1).allocations(new java.util.ArrayList<>(List.of(previous))).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(200L), null, "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(item.getAllocations()).extracting(RoomRequestItemAllocation::getOccurrenceId).containsExactly(9000L);
+        assertThat(item.getAllocations()).extracting(RoomRequestItemAllocation::getClassroomId).containsExactly(200L);
+        verify(academicEventService, never()).createUniqueEvent(any());
+        verify(allocationService).reallocate(any());
+        verify(allocationService, never()).allocate(any());
+    }
+
+    @Test
+    @DisplayName("assign: 0 aulas se rechaza (eso es cancel, no assign)")
+    void assign_ceroAulas() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(2).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> service.assign(1L, List.of(), null, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestException.class);
+        verifyNoInteractions(allocationService, composer);
+    }
+
+    @Test
+    @DisplayName("assign: más aulas que classroomCount se rechaza")
+    void assign_masAulasQueClassroomCount() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> service.assign(1L, List.of(104L, 105L), null, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestException.class);
+        verifyNoInteractions(allocationService, composer);
+    }
+
+    @Test
+    @DisplayName("assign: ids repetidos se rechaza")
+    void assign_idsRepetidos() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(2).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> service.assign(1L, List.of(104L, 104L), null, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestException.class);
+        verifyNoInteractions(allocationService, composer);
+    }
+
+    @Test
+    @DisplayName("assign: menos aulas que classroomCount sin reason se rechaza")
+    void assign_menosAulasSinReason() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(2).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> service.assign(1L, List.of(104L), null, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestException.class);
+        verifyNoInteractions(allocationService, composer);
+    }
+
+    @Test
+    @DisplayName("assign: menos aulas que classroomCount con reason se acepta y queda PRE_APPROVED")
+    void assign_menosAulasConReason() {
+        LocalDate date = LocalDate.of(2026, 7, 1);
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM))
+                .date(date).startTime(LocalTime.of(9, 0)).duration(Duration.ofMinutes(90))
+                .estimated(30).classroomCount(2).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(academicEventService.createUniqueEvent(any())).thenReturn(uniqueEvent(900L));
+        when(academicEventService.findOccurrencesByEventId(900L)).thenReturn(List.of(
+                new OccurrenceResponseDto(9000L, 900L, date, OccurrenceStatus.NEEDS_ROOM, LocalTime.of(9, 0), LocalTime.of(10, 30))));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(104L), "solo hay una disponible", "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.PRE_APPROVED);
+        assertThat(item.getDecisionReason()).isEqualTo("solo hay una disponible");
+    }
+
+    @Test
+    @DisplayName("assign: pedido ya notificado se rechaza aunque el estado lo permitiera")
+    void assign_yaNotificadoSeRechaza() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PRE_APPROVED)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1)
+                .notifiedAt(java.time.LocalDateTime.now()).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> service.assign(1L, List.of(104L), null, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestException.class);
+        verifyNoInteractions(allocationService, composer);
+    }
+
+    @Test
+    @DisplayName("assign: conflicto de aula propaga la excepción sin dejar nada a medio escribir")
+    void assign_conflicto() {
+        LocalDate date = LocalDate.of(2026, 3, 12);
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING)
+                .request(requestOfType(RoomRequestType.ONE_TIME_ROOM_CHANGE))
+                .sourceRecurringEventId(50L).date(date).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(occurrenceService.findSlotsByEvent(50L, null)).thenReturn(List.of(occurrenceSlot(500L, 50L, date)));
+        when(allocationService.reallocate(any()))
+                .thenThrow(new ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException("ocupada"));
+
+        assertThatThrownBy(() -> service.assign(1L, List.of(101L), null, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException.class);
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.PENDING);
+        assertThat(item.getAllocations()).isEmpty();
+        verifyNoInteractions(composer);
+    }
+
+    @Test
+    @DisplayName("assign: desde PRE_APPROVED distinto set (0 aulas anteriores) no exige reason si llega completo")
+    void assign_reasignarSinReasonSiCompleto() {
+        RoomRequestItemAllocation previous = RoomRequestItemAllocation.builder()
+                .occurrenceId(500L).classroomId(101L).position(1).build();
+        LocalDate date = LocalDate.of(2026, 3, 12);
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PRE_APPROVED)
+                .request(requestOfType(RoomRequestType.ONE_TIME_ROOM_CHANGE))
+                .sourceRecurringEventId(50L).date(date).classroomCount(1)
+                .allocations(new java.util.ArrayList<>(List.of(previous))).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(occurrenceService.findSlotsByEvent(50L, null)).thenReturn(List.of(occurrenceSlot(500L, 50L, date)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(102L), null, "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(item.getAllocations()).extracting(RoomRequestItemAllocation::getClassroomId).containsExactly(102L);
+    }
+
+    private static RoomRequest requestOfType(RoomRequestType type) {
+        return RoomRequest.builder()
+                .type(type)
+                .scope(ar.edu.utn.frc.siga.roomrequest.model.AcademicScope.GRADO)
+                .teacherName("Ada Lovelace")
+                .teacherEmail("ada@frc.utn.edu.ar")
+                .teacherPhone("351-1234567")
+                .subjectId(1L)
+                .build();
+    }
+
+    private static OccurrenceSlotDto occurrenceSlot(Long occurrenceId, Long eventId, LocalDate date) {
+        return new OccurrenceSlotDto(occurrenceId, eventId, date, LocalTime.of(10, 0), LocalTime.of(11, 0),
+                OccurrenceStatus.NEEDS_ROOM, 30);
+    }
+
+    private static AcademicEventResponseDto uniqueEvent(Long eventId) {
+        return new UniqueEventResponseDto(eventId, EventType.UNIQUE_EVENT, UniqueEventKind.EXAMEN_FINAL, 30,
+                LocalTime.of(9, 0), 90L, LocalDate.of(2026, 7, 1), null, null, null);
     }
 
     private static RoomRequestItem itemFor(LocalDate date, LocalTime startTime, int durationMinutes) {

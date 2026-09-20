@@ -185,6 +185,17 @@ public class RoomRequestItem extends TimestampedEntity {
         this.derivedAt = null;
     }
 
+    /** Bloque 10: una sola aula, así que todas las ocurrencias resueltas comparten orden=1; Bloque 12 suma más aulas. */
+    public void assignClassroom(Long classroomId, List<Long> occurrenceIds) {
+        allocations.clear();
+        occurrenceIds.forEach(occurrenceId -> allocations.add(RoomRequestItemAllocation.builder()
+                .item(this)
+                .occurrenceId(occurrenceId)
+                .classroomId(classroomId)
+                .position(1)
+                .build()));
+    }
+
     public void addPreferences(List<Long> classroomIds) {
         classroomIds.forEach(this::addPreference);
     }

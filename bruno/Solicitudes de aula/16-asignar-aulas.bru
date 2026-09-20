@@ -1,0 +1,52 @@
+meta {
+  name: Asignar aula(s) a un pedido
+  type: http
+  seq: 16
+}
+
+post {
+  url: {{baseUrl}}/v1/room-requests/items/1/assign
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "classroomIds": [12],
+    "reason": null
+  }
+}
+
+docs {
+  POST /v1/room-requests/items/{id}/assign. Rol: SUBSECRETARIA, AUXILIAR_AULICO.
+
+  Asigna aula(s) a un pedido y lo deja en `PRE_APPROVED` (todavía no se avisó al
+  docente, eso es `notify`). Esta versión admite **una aula por llamada**; varias
+  aulas simultáneas para el mismo pedido llegan en un bloque futuro.
+
+  Según `RoomRequestType` la ocurrencia objetivo se resuelve distinto:
+  - `ONE_TIME_ROOM_CHANGE` / `PARTIAL_EXAM_IN_CLASS`: reasigna la ocurrencia que ya
+    existe en la fecha del pedido.
+  - `REGULAR_ROOM_CHANGE`: reasigna **todas** las ocurrencias futuras del día de la
+    semana del pedido (400 si no queda ninguna futura — la cursada ya terminó).
+  - `PARTIAL_EXAM_OFF_SCHEDULE`, `FINAL_EXAM`, `CONFERENCE`, `OTHER`: la primera vez
+    crean un evento nuevo (`UniqueEvent`) con su ocurrencia; una reasignación
+    posterior reutiliza esa misma ocurrencia, no crea otra.
+
+  Validaciones (400 Invalid room request salvo que se indique lo contrario):
+  - 0 aulas: para cancelar el pedido está `cancel`, no esto;
+  - más aulas que `classroomCount`, o ids repetidos;
+  - menos aulas que `classroomCount` sin `reason` (resolución parcial: `reason` pasa
+    a ser obligatorio; opcional si se asigna la cantidad completa);
+  - pedido ya notificado (`notifiedAt` no nulo): queda congelado aunque el estado
+    técnicamente permitiera la transición;
+  - 409 si el aula ya está ocupada en esa fecha/horario (conflicto de asignación,
+    con el detalle en el `ProblemDetail`).
+
+  Reasignar (un segundo `assign` sobre un pedido ya `PRE_APPROVED`) reemplaza el
+  conjunto de aulas anterior entero. Solo transiciona desde `PENDING`,
+  `DERIVED_TO_BUILDING` o `PRE_APPROVED` (409 desde `RESOLVED` o `CANCELLED`). 404
+  si el ítem no existe.
+
+  Respuesta: 200 con el pedido actualizado (`status: "PRE_APPROVED"`).
+}

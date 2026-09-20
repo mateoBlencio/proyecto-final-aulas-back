@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.roomrequest.controller;
 
 import ar.edu.utn.frc.siga.roomrequest.dto.RoomRequestItemFilter;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.AssignRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CancelRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.DeriveRoomRequestItemDto;
@@ -113,6 +114,22 @@ public class RoomRequestController {
     public ResponseEntity<RoomRequestItemDetailDto> findItemById(@PathVariable Long id) {
         log.debug("GET /v1/room-requests/items/{}", id);
         return ResponseEntity.ok(roomRequestService.findItemById(id));
+    }
+
+    @PostMapping("/items/{id}/assign")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
+    @Operation(summary = "Asignar aula(s) a un pedido",
+               description = "Asigna una o más aulas y deja el pedido en PRE_APPROVED. Admite "
+                       + "resolución parcial (menos aulas que classroomCount, con motivo obligatorio) "
+                       + "y reasignación mientras el pedido no fue notificado.")
+    public ResponseEntity<RoomRequestItemResponseDto> assignItem(@PathVariable Long id,
+                                                                  @Valid @RequestBody AssignRoomRequestItemDto dto,
+                                                                  Principal principal) {
+        log.debug("POST /v1/room-requests/items/{}/assign", id);
+        RoomRequestItemResponseDto response =
+                roomRequestResolutionService.assign(id, dto.classroomIds(), dto.reason(), principal.getName());
+        log.info("Pedido de aula asignado vía controller: id={}", id);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/items/{id}/cancel")
