@@ -712,6 +712,27 @@ class AcademicEventServiceImplTest {
     }
 
     @Test
+    @DisplayName("updateUniqueEvent: evento con ocurrencias simultáneas mueve la fecha de todas, valida contra la principal")
+    void updateUniqueEventConOcurrenciasSimultaneas() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence principal = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.NEEDS_ROOM);
+        Occurrence mirror = Occurrence.builder()
+                .id(11L).event(event).date(event.getDate()).status(OccurrenceStatus.NEEDS_ROOM)
+                .roomSlot(2).mirrorOfOccurrenceId(10L).build();
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(mirror, principal));
+        when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyUniqueResponseDto(3L));
+
+        UpdateUniqueEventRequestDto dto = updateDto();
+        service.updateUniqueEvent(3L, dto);
+
+        verify(eventScheduleValidator).validateNotPast(principal);
+        verify(eventScheduleValidator, never()).validateNotPast(mirror);
+        assertThat(principal.getDate()).isEqualTo(dto.date());
+        assertThat(mirror.getDate()).isEqualTo(dto.date());
+    }
+
+    @Test
     @DisplayName("updateUniqueEvent: occurrence ya pasada → propaga la excepción del validator, sin escribir")
     void updateUniqueEventOccurrencePasada() {
         UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2020, 1, 1), LocalTime.of(10, 0), Duration.ofMinutes(60));

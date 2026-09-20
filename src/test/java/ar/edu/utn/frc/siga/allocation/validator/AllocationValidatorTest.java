@@ -119,6 +119,19 @@ class AllocationValidatorTest {
     }
 
     @Test
+    @DisplayName("regresión: trío de ocurrencias simultáneas del mismo evento (misma fecha, 3 aulas distintas) "
+            + "no se marca como conflicto entre sí")
+    void internalConflictsNoMarcaTrioSimultaneo() {
+        RecurringEvent event = EventTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90));
+        LocalDate date = futureDate(1);
+        AllocationCandidate roomSlot1 = new AllocationCandidate(EventTestData.occurrenceSlot(10L, event, date, OccurrenceStatus.NEEDS_ROOM), 5L);
+        AllocationCandidate roomSlot2 = new AllocationCandidate(EventTestData.occurrenceSlot(11L, event, date, OccurrenceStatus.NEEDS_ROOM), 6L);
+        AllocationCandidate roomSlot3 = new AllocationCandidate(EventTestData.occurrenceSlot(12L, event, date, OccurrenceStatus.NEEDS_ROOM), 7L);
+
+        assertThat(validator.internalConflicts(List.of(roomSlot1, roomSlot2, roomSlot3))).isEmpty();
+    }
+
+    @Test
     @DisplayName("validateNoOverlap: sin conflictos no lanza")
     void validateNoOverlapSinConflictosNoLanza() {
         RecurringEvent event = EventTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90));

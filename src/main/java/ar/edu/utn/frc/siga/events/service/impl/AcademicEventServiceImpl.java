@@ -484,9 +484,13 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         log.debug("Actualizando evento único: id={}", id);
 
         UniqueEvent event = Finder.orThrow(uniqueEventRepository::findById, id, "UniqueEvent");
-        Occurrence occurrence = occurrenceRepository.findByEvent_Id(id).getFirst();
+        List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(id);
+        Occurrence principal = occurrences.stream()
+                .filter(o -> o.getMirrorOfOccurrenceId() == null)
+                .findFirst()
+                .orElseThrow(() -> ResourceNotFoundException.of("Occurrence", id));
 
-        eventScheduleValidator.validateNotPast(occurrence);
+        eventScheduleValidator.validateNotPast(principal);
 
         Duration duration = Duration.ofMinutes(dto.durationMinutes());
         eventScheduleValidator.validateBusinessHours(dto.startTime(), dto.startTime().plus(duration));
@@ -507,7 +511,8 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         event.setKind(dto.eventType());
         event.setSubjectId(dto.subjectId());
         event.setCommissionId(dto.commissionId());
-        occurrence.setDate(dto.date());
+        // Todas las ocurrencias simultáneas (misma fecha, distinta aula) se mueven juntas.
+        occurrences.forEach(o -> o.setDate(dto.date()));
 
         log.info("Evento único actualizado: id={}", id);
         return composer.compose(event);

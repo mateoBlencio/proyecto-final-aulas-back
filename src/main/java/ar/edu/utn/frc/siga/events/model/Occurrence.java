@@ -56,6 +56,18 @@ public class Occurrence extends TimestampedEntity {
     @Column(name = "estado", nullable = false)
     private OccurrenceStatus status;
 
+    /**
+     * Distingue las ocurrencias simultáneas de un mismo evento y fecha (N aulas = N ocurrencias,
+     * ver gestion-solicitud.md §2). {@code 1} en toda ocurrencia normal.
+     */
+    @Column(name = "orden_aula", nullable = false)
+    @Builder.Default
+    private Integer roomSlot = 1;
+
+    /** Nulo en la ocurrencia principal (roomSlot 1); en las demás, apunta a ella. */
+    @Column(name = "id_ocurrencia_principal")
+    private Long mirrorOfOccurrenceId;
+
     public LocalTime startTime() {
         return event.getStartTime();
     }

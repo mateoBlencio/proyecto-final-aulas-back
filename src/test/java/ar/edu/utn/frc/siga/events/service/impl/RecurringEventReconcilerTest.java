@@ -65,6 +65,38 @@ class RecurringEventReconcilerTest {
                 .containsExactlyInAnyOrder(nextMonday.plusWeeks(1), nextMonday.plusWeeks(2), nextMonday.plusWeeks(3));
     }
 
+    @Test
+    @DisplayName("regresión: fecha con ocurrencias simultáneas (mismo evento y fecha, distinto roomSlot) "
+            + "no se duplica si sigue deseada, y se borra completa si deja de estarlo")
+    void toleratesSimultaneousOccurrencesOnSameDate() {
+        LocalDate nextMonday = LocalDate.now().with(java.time.temporal.TemporalAdjusters.next(DayOfWeek.MONDAY));
+        // Ventana de una sola semana: el único desired date es nextMonday, ya cubierto por keptPrincipal.
+        RecurringEvent event = event(nextMonday, nextMonday);
+
+        LocalDate droppedDate = nextMonday.plusWeeks(5);
+        Occurrence keptPrincipal = occurrence(1L, event, nextMonday);
+        Occurrence keptMirror = Occurrence.builder()
+                .id(2L).event(event).date(nextMonday).status(OccurrenceStatus.NEEDS_ROOM)
+                .roomSlot(2).mirrorOfOccurrenceId(1L).build();
+        Occurrence droppedPrincipal = occurrence(3L, event, droppedDate);
+        Occurrence droppedMirror = Occurrence.builder()
+                .id(4L).event(event).date(droppedDate).status(OccurrenceStatus.NEEDS_ROOM)
+                .roomSlot(2).mirrorOfOccurrenceId(3L).build();
+        when(occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eq(event.getId()), any()))
+                .thenReturn(List.of(keptPrincipal, keptMirror, droppedPrincipal, droppedMirror));
+        when(occurrenceAllocationQuery.allocatedAmong(any())).thenReturn(Set.of());
+
+        reconciler.reconcileFuture(event, new OccurrenceWindow(nextMonday, nextMonday, null, null));
+
+        ArgumentCaptor<List<Occurrence>> deleted = ArgumentCaptor.forClass(List.class);
+        verify(occurrenceRepository).deleteAll(deleted.capture());
+        assertThat(deleted.getValue()).extracting(Occurrence::getId).containsExactlyInAnyOrder(3L, 4L);
+
+        ArgumentCaptor<List<Occurrence>> created = ArgumentCaptor.forClass(List.class);
+        verify(occurrenceRepository).saveAll(created.capture());
+        assertThat(created.getValue()).isEmpty();
+    }
+
     private RecurringEvent event(LocalDate startDate, LocalDate endDate) {
         return RecurringEvent.builder()
                 .id(7L).enrolled(30).startTime(LocalTime.of(8, 0)).duration(Duration.ofMinutes(90))
