@@ -147,15 +147,17 @@ class RoomRequestServiceImplTest {
     @DisplayName("countItemsByStatus: un conteo por cada estado del enum, en orden, sin tocar el composer")
     void countItemsByStatusReturnsOneEntryPerStatus() {
         when(itemRepository.count(ArgumentMatchers.<Specification<RoomRequestItem>>any()))
-                .thenReturn(30L, 10L, 0L);
+                .thenReturn(30L, 5L, 10L, 2L, 0L);
 
         List<RoomRequestItemStatusCountDto> result = service.countItemsByStatus(true);
 
         assertThat(result).containsExactly(
                 new RoomRequestItemStatusCountDto(RoomRequestStatus.PENDING, 30L),
+                new RoomRequestItemStatusCountDto(RoomRequestStatus.DERIVED_TO_BUILDING, 5L),
                 new RoomRequestItemStatusCountDto(RoomRequestStatus.PRE_APPROVED, 10L),
+                new RoomRequestItemStatusCountDto(RoomRequestStatus.RESOLVED, 2L),
                 new RoomRequestItemStatusCountDto(RoomRequestStatus.CANCELLED, 0L));
-        verify(itemRepository, times(3)).count(ArgumentMatchers.<Specification<RoomRequestItem>>any());
+        verify(itemRepository, times(5)).count(ArgumentMatchers.<Specification<RoomRequestItem>>any());
         verifyNoInteractions(composer);
     }
 

@@ -30,6 +30,7 @@ public class AuditedEntityRegistry {
             "RoomRequest", "Solicitud de aula",
             "RoomRequestItem", "Ítem de solicitud de aula",
             "RoomPreference", "Preferencia de aula",
+            "RoomRequestItemAllocation", "Asignación de solicitud de aula",
             "Setting", "Configuración");
 
     private final EntityManager entityManager;

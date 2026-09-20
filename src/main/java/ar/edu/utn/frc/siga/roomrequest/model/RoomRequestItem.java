@@ -131,6 +131,30 @@ public class RoomRequestItem extends TimestampedEntity {
     @Builder.Default
     private List<RoomPreference> preferences = new ArrayList<>();
 
+    /** Edificio esperando resolver el pedido. Se limpia al devolver ({@link #returnedFromBuildingId}). */
+    @Column(name = "id_edificio_derivado")
+    private Long derivedBuildingId;
+
+    @Column(name = "fecha_derivacion")
+    private LocalDateTime derivedAt;
+
+    /** Historial de devolución: nunca se limpia, a diferencia de {@link #derivedBuildingId}. */
+    @Column(name = "id_edificio_devuelto")
+    private Long returnedFromBuildingId;
+
+    @Column(name = "motivo_devolucion")
+    private String returnedReason;
+
+    /** Sella la primera vez que se avisó al docente. Hace idempotente a {@code notify}. */
+    @Column(name = "fecha_notificacion")
+    private LocalDateTime notifiedAt;
+
+    @OneToMany(mappedBy = "item", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("position ASC")
+    @BatchSize(size = 50)
+    @Builder.Default
+    private List<RoomRequestItemAllocation> allocations = new ArrayList<>();
+
     public LocalTime endTime() {
         return (startTime == null || duration == null) ? null : startTime.plus(duration);
     }
