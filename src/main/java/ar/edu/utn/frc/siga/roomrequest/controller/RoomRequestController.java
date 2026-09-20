@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.roomrequest.dto.RoomRequestItemFilter;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CancelRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.DeriveRoomRequestItemDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.ReturnRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
@@ -155,6 +156,21 @@ public class RoomRequestController {
         RoomRequestItemResponseDto response =
                 roomRequestResolutionService.derive(id, dto.buildingId(), principal.getName());
         log.info("Pedido de aula derivado vía controller: id={}, buildingId={}", id, dto.buildingId());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/items/{id}/return")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
+    @Operation(summary = "Devolver un pedido derivado",
+               description = "Saca el pedido de la cola de un edificio y lo vuelve a PENDING. Solo "
+                       + "desde DERIVED_TO_BUILDING, con motivo obligatorio.")
+    public ResponseEntity<RoomRequestItemResponseDto> returnItem(@PathVariable Long id,
+                                                                  @Valid @RequestBody ReturnRoomRequestItemDto dto,
+                                                                  Principal principal) {
+        log.debug("POST /v1/room-requests/items/{}/return", id);
+        RoomRequestItemResponseDto response =
+                roomRequestResolutionService.returnItem(id, dto.reason(), principal.getName());
+        log.info("Pedido de aula devuelto vía controller: id={}", id);
         return ResponseEntity.ok(response);
     }
 

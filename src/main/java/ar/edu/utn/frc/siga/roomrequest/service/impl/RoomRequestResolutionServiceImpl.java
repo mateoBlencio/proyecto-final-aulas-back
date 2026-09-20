@@ -154,6 +154,25 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         return composer.composeItem(item);
     }
 
+    @Override
+    @Transactional
+    public RoomRequestItemResponseDto returnItem(Long itemId, String reason, String actor) {
+        log.debug("Devolviendo pedido de aula desde su edificio: itemId={}", itemId);
+
+        if (reason == null || reason.isBlank()) {
+            throw new InvalidRoomRequestException("El motivo de devolución es obligatorio.");
+        }
+
+        RoomRequestItem item = itemRepository.findWithRequestById(itemId)
+                .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
+        transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.PENDING);
+
+        item.returnFromBuilding(reason);
+
+        log.info("Pedido de aula devuelto: itemId={}", itemId);
+        return composer.composeItem(item);
+    }
+
     private List<ClassroomResponseDto> candidateClassrooms(RoomRequestItem item) {
         List<ClassroomResponseDto> candidates = classroomService.findAllAvailable();
         if (item.getRequiresComputers()) {

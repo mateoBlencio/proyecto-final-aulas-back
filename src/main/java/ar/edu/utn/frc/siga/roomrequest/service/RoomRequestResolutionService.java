@@ -15,4 +15,6 @@ public interface RoomRequestResolutionService {
     List<CandidateBuildingDto> findCandidateBuildings(Long itemId);
 
     RoomRequestItemResponseDto derive(Long itemId, Long buildingId, String actor);
+
+    RoomRequestItemResponseDto returnItem(Long itemId, String reason, String actor);
 }

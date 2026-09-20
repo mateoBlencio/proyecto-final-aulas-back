@@ -408,6 +408,70 @@ class RoomRequestResolutionServiceImplTest {
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
+    @Test
+    @DisplayName("return: reason vacío o nulo → 400, sin tocar el repositorio")
+    void return_reasonObligatorio() {
+        assertThatThrownBy(() -> service.returnItem(1L, "", "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestException.class);
+        assertThatThrownBy(() -> service.returnItem(1L, null, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestException.class);
+
+        verifyNoInteractions(itemRepository, transitionValidator, composer);
+    }
+
+    @Test
+    @DisplayName("return: DERIVED_TO_BUILDING → PENDING, copia el edificio a returnedFromBuildingId y limpia derivedBuildingId/derivedAt")
+    void return_ok() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.DERIVED_TO_BUILDING)
+                .derivedBuildingId(5L).derivedAt(java.time.LocalDateTime.now()).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.returnItem(1L, "el laboratorio se bloqueó", "auxiliar@frc.utn.edu.ar");
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.PENDING);
+        assertThat(item.getReturnedFromBuildingId()).isEqualTo(5L);
+        assertThat(item.getReturnedReason()).isEqualTo("el laboratorio se bloqueó");
+        assertThat(item.getDerivedBuildingId()).isNull();
+        assertThat(item.getDerivedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("return: un segundo return pisa returnedFromBuildingId/returnedReason con los datos nuevos")
+    void return_segundaVezPisaDatosAnteriores() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.DERIVED_TO_BUILDING)
+                .derivedBuildingId(7L).derivedAt(java.time.LocalDateTime.now())
+                .returnedFromBuildingId(5L).returnedReason("motivo viejo").build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.returnItem(1L, "motivo nuevo", "auxiliar@frc.utn.edu.ar");
+
+        assertThat(item.getReturnedFromBuildingId()).isEqualTo(7L);
+        assertThat(item.getReturnedReason()).isEqualTo("motivo nuevo");
+    }
+
+    @Test
+    @DisplayName("return: solo sale desde DERIVED_TO_BUILDING, PENDING se rechaza")
+    void return_soloDesdeDerivado() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.PENDING).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        doThrowOnTransitionTo(RoomRequestStatus.PENDING, RoomRequestStatus.PENDING);
+
+        assertThatThrownBy(() -> service.returnItem(1L, "motivo", "auxiliar@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestTransitionException.class);
+        verifyNoInteractions(composer);
+    }
+
+    @Test
+    @DisplayName("return: ítem inexistente → 404")
+    void return_itemInexistente() {
+        when(itemRepository.findWithRequestById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.returnItem(99L, "motivo", "auxiliar@frc.utn.edu.ar"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
     private static RoomRequestItem itemFor(LocalDate date, LocalTime startTime, int durationMinutes) {
         return RoomRequestItem.builder()
                 .date(date).startTime(startTime).duration(java.time.Duration.ofMinutes(durationMinutes))

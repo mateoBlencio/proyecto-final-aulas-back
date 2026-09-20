@@ -177,6 +177,14 @@ public class RoomRequestItem extends TimestampedEntity {
         this.decidedAt = derivedAt;
     }
 
+    public void returnFromBuilding(String reason) {
+        this.status = RoomRequestStatus.PENDING;
+        this.returnedFromBuildingId = this.derivedBuildingId;
+        this.returnedReason = reason;
+        this.derivedBuildingId = null;
+        this.derivedAt = null;
+    }
+
     public void addPreferences(List<Long> classroomIds) {
         classroomIds.forEach(this::addPreference);
     }
