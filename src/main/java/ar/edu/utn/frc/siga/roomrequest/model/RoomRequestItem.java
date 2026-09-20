@@ -32,6 +32,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -164,28 +165,35 @@ public class RoomRequestItem extends TimestampedEntity {
         this.position = position;
     }
 
+    /** Trunca a microsegundos: Postgres guarda timestamp con esa precisión, y sin truncar acá la respuesta de la misma llamada (en memoria, con nanosegundos) no coincide byte a byte con una relectura posterior desde la base. */
     public void decide(RoomRequestStatus target, String decidedBy, String reason, LocalDateTime decidedAt) {
         this.status = target;
         this.decidedBy = decidedBy;
         this.decisionReason = reason;
-        this.decidedAt = decidedAt;
+        this.decidedAt = truncateToMicros(decidedAt);
     }
 
     /** decidedBy/decidedAt trackean la última decisión sea cual sea; el CHECK chk_solicitud_item_decision exige ambos no nulos fuera de NEW. */
     public void deriveTo(Long buildingId, String decidedBy, LocalDateTime derivedAt) {
+        LocalDateTime truncated = truncateToMicros(derivedAt);
         this.status = RoomRequestStatus.DERIVED_TO_BUILDING;
         this.derivedBuildingId = buildingId;
-        this.derivedAt = derivedAt;
+        this.derivedAt = truncated;
         this.decidedBy = decidedBy;
-        this.decidedAt = derivedAt;
+        this.decidedAt = truncated;
     }
 
     /** No toca decisionReason: preserva el motivo de resolución parcial que haya dejado el último assign. */
     public void resolve(String decidedBy, LocalDateTime notifiedAt) {
+        LocalDateTime truncated = truncateToMicros(notifiedAt);
         this.status = RoomRequestStatus.RESOLVED;
         this.decidedBy = decidedBy;
-        this.decidedAt = notifiedAt;
-        this.notifiedAt = notifiedAt;
+        this.decidedAt = truncated;
+        this.notifiedAt = truncated;
+    }
+
+    private static LocalDateTime truncateToMicros(LocalDateTime value) {
+        return value.truncatedTo(ChronoUnit.MICROS);
     }
 
     public void returnFromBuilding(String reason) {
