@@ -20,10 +20,6 @@ import lombok.NoArgsConstructor;
 import java.time.Duration;
 import java.time.Instant;
 
-/**
- * Outbox: cada fila es un envío pendiente o ya resuelto. No lleva {@code @Audited}: la tabla
- * ya es el propio historial de envíos (ver notificaciones-modulo-email.md).
- */
 @Entity
 @Table(name = "notificacion")
 @Getter
@@ -78,8 +74,6 @@ public class Notification extends TimestampedEntity {
     @Column(name = "clave_idempotencia", nullable = false, length = 120)
     private String idempotencyKey;
 
-    /** Quién confirmó el envío (por ejemplo el email de Subsecretaría). Ningún llamador lo completa
-     * todavía: la integración que lo va a poblar está en notificaciones-roomrequest-integracion.md. */
     @Column(name = "solicitado_por", length = 150)
     private String requestedBy;
 
