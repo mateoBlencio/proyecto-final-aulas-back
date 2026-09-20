@@ -48,7 +48,8 @@ public class EmailChannelSender implements ChannelSender {
 
         MimeMessage mimeMessage = mailSender.createMimeMessage();
         try {
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+            MimeMessageHelper helper =
+                    new MimeMessageHelper(mimeMessage, MimeMessageHelper.MULTIPART_MODE_RELATED, "UTF-8");
             helper.setFrom(properties.getEmail().getFrom());
             helper.setTo(address);
             helper.setSubject(stripHeaderInjection(message.subject()));
