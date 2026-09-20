@@ -262,6 +262,7 @@ class RoomRequestResolutionServiceImplTest {
         List<CandidateBuildingDto> result = service.findCandidateBuildings(1L);
 
         assertThat(result).containsExactly(new CandidateBuildingDto(1L, "Edificio Central", 2));
+        verify(userService).findBuildingIdsCoveredByRole(SystemRole.AUXILIAR_AULICO, Set.of(1L));
     }
 
     @Test
@@ -282,6 +283,7 @@ class RoomRequestResolutionServiceImplTest {
         List<CandidateBuildingDto> result = service.findCandidateBuildings(1L);
 
         assertThat(result).containsExactly(new CandidateBuildingDto(1L, "Edificio Central", 1));
+        verify(userService).findBuildingIdsCoveredByRole(SystemRole.AUXILIAR_AULICO, Set.of(1L));
     }
 
     @Test
