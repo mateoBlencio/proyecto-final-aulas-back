@@ -147,7 +147,7 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
         IntegrationTestData.SubjectAndCommission sc = testData.materiaYComision();
         LocalDate date = LocalDate.now().plusDays(26);
         Classroom aula = testData.aula(testData.edificio());
-        Occurrence occupied = seedOccurrence(sc, date);
+        Occurrence occupied = seedOccurrence(sc, date, LocalTime.of(9, 0));
         allocateDirectly(occupied.getId(), aula.getId());
 
         RoomRequestItem item = seedCreatedEventItem(RoomRequestType.FINAL_EXAM, date);
@@ -194,7 +194,7 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
         Classroom aula1 = testData.aula(testData.edificio());
         Classroom aula2 = testData.aula(testData.edificio());
         Classroom aulaOcupada = testData.aula(testData.edificio());
-        Occurrence occupied = seedOccurrence(sc, date);
+        Occurrence occupied = seedOccurrence(sc, date, LocalTime.of(9, 0));
         allocateDirectly(occupied.getId(), aulaOcupada.getId());
 
         RoomRequestItem item = seedCreatedEventItem(RoomRequestType.FINAL_EXAM, date, 3);
@@ -268,7 +268,13 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     private Occurrence seedOccurrence(IntegrationTestData.SubjectAndCommission sc, LocalDate date) {
-        var dto = new CreateRecurringEventRequestDto(30, START, 90, date.getDayOfWeek(), date, date,
+        return seedOccurrence(sc, date, START);
+    }
+
+    /** startTime igual al del item creado por seedCreatedEventItem (09:00-10:30): solape total, supera
+     *  cualquier margen tolerado de allocation.maxOverlapMinutes, no solo uno parcial que hoy se tolera. */
+    private Occurrence seedOccurrence(IntegrationTestData.SubjectAndCommission sc, LocalDate date, LocalTime startTime) {
+        var dto = new CreateRecurringEventRequestDto(30, startTime, 90, date.getDayOfWeek(), date, date,
                 sc.subjectId(), sc.commissionId());
         Long eventId = academicEventService.createRecurringEvent(dto).id();
         return occurrenceRepository.findByEvent_Id(eventId).getFirst();
