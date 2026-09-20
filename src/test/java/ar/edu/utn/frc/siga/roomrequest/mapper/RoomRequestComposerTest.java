@@ -1,18 +1,13 @@
 package ar.edu.utn.frc.siga.roomrequest.mapper;
 
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
-import ar.edu.utn.frc.siga.academic.service.CommissionService;
-import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AssignedClassroomDto;
+import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestCatalogsResolver.ActiveCommissionsKey;
+import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestCatalogsResolver.Catalogs;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItemAllocation;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
-import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemAllocationRepository;
-import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
-import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
-import ar.edu.utn.frc.siga.space.service.BuildingService;
-import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,8 +17,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
-import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -39,62 +35,50 @@ class RoomRequestComposerTest {
     @Mock
     private RoomRequestMapper mapper;
     @Mock
-    private RoomRequestCatalogMapper catalogMapper;
-    @Mock
-    private SubjectService subjectService;
-    @Mock
-    private CommissionService commissionService;
-    @Mock
-    private ClassroomService classroomService;
-    @Mock
-    private BuildingService buildingService;
-    @Mock
-    private ClassScheduleService classScheduleService;
-    @Mock
-    private RoomRequestItemAllocationRepository allocationRepository;
+    private RoomRequestCatalogsResolver catalogsResolver;
 
     @InjectMocks
     private RoomRequestComposer composer;
 
     @Test
-    @DisplayName("compose de varias solicitudes: los ids de materia y comisión de todos los ítems se piden en un solo findByIds por catálogo, no uno por solicitud")
-    void compose_batchesCrossModuleLookupsAcrossRequests() {
+    @DisplayName("compose de varias solicitudes: los ids de materia y comisión de todos los ítems se piden en un solo resolve, no uno por solicitud")
+    void compose_collectsIdsAcrossRequestsAndCallsResolverOnce() {
         RoomRequest r1 = RoomRequest.builder().id(1L).subjectId(10L).type(RoomRequestType.CONFERENCE).build();
         r1.addItem(RoomRequestItem.builder().id(100L).commissionId(5L).build());
 
         RoomRequest r2 = RoomRequest.builder().id(2L).subjectId(20L).type(RoomRequestType.CONFERENCE).build();
         r2.addItem(RoomRequestItem.builder().id(200L).commissionId(6L).build());
 
+        when(catalogsResolver.resolve(any(), any(), any(), any(), any())).thenReturn(emptyCatalogs());
+
         composer.compose(List.of(r1, r2));
 
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<Collection<Long>> subjectIds = ArgumentCaptor.forClass(Collection.class);
-        verify(subjectService, times(1)).findByIds(subjectIds.capture());
-        assertThat(subjectIds.getValue()).containsExactlyInAnyOrder(10L, 20L);
-
+        ArgumentCaptor<Set<Long>> subjectIds = ArgumentCaptor.forClass(Set.class);
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<Collection<Long>> commissionIds = ArgumentCaptor.forClass(Collection.class);
-        verify(commissionService, times(1)).findByIds(commissionIds.capture());
+        ArgumentCaptor<Set<Long>> commissionIds = ArgumentCaptor.forClass(Set.class);
+        verify(catalogsResolver, times(1)).resolve(subjectIds.capture(), commissionIds.capture(), any(), any(), any());
+        assertThat(subjectIds.getValue()).containsExactlyInAnyOrder(10L, 20L);
         assertThat(commissionIds.getValue()).containsExactlyInAnyOrder(5L, 6L);
     }
 
     @Test
-    @DisplayName("PARTIAL_EXAM_OFF_SCHEDULE sin comisión puntual: resuelve las comisiones vigentes por fecha con una sola consulta")
-    void resolveCommissions_offScheduleWithoutCommission_usesActiveCommissionsByDate() {
+    @DisplayName("PARTIAL_EXAM_OFF_SCHEDULE sin comisión puntual: usa las comisiones vigentes que el resolver dejó en activeCommissionIdsByKey")
+    void composeItem_offScheduleWithoutCommission_usesActiveCommissionsFromCatalogs() {
         LocalDate date = LocalDate.of(2026, 5, 4);
         RoomRequest request = RoomRequest.builder().id(1L).subjectId(10L)
                 .type(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE).build();
         RoomRequestItem item = RoomRequestItem.builder().id(100L).date(date).build();
         request.addItem(item);
 
-        when(classScheduleService.activeCommissionIds(10L, date)).thenReturn(List.of(7L, 8L));
-        when(commissionService.findByIds(any())).thenReturn(List.of(
-                new CommissionResponseDto(7L, "CUR-7", null),
-                new CommissionResponseDto(8L, "CUR-8", null)));
+        ActiveCommissionsKey key = new ActiveCommissionsKey(10L, date);
+        Catalogs catalogs = new Catalogs(Map.of(), Map.of(
+                7L, new CommissionResponseDto(7L, "CUR-7", null),
+                8L, new CommissionResponseDto(8L, "CUR-8", null)),
+                Map.of(), Map.of(), Map.of(), Map.of(key, List.of(7L, 8L)));
+        when(catalogsResolver.resolve(any(), any(), any(), any(), any())).thenReturn(catalogs);
 
         composer.composeItem(item);
-
-        verify(classScheduleService, times(1)).activeCommissionIds(10L, date);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<CommissionResponseDto>> commissions = ArgumentCaptor.forClass(List.class);
@@ -110,10 +94,9 @@ class RoomRequestComposerTest {
         RoomRequestItem item = RoomRequestItem.builder().id(100L).allocations(List.of(main, mirror)).build();
         RoomRequest.builder().id(1L).type(RoomRequestType.CONFERENCE).build().addItem(item);
 
-        ClassroomResponseDto classroom1 = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio A", 1L, "Aula");
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom1));
-        when(catalogMapper.toAssignedClassroomOptions(List.of(classroom1)))
-                .thenReturn(List.of(new AssignedClassroomDto(1L, 101, "Edificio A", 40)));
+        Catalogs catalogs = new Catalogs(Map.of(), Map.of(), Map.of(),
+                Map.of(1L, new AssignedClassroomDto(1L, 101, "Edificio A", 40)), Map.of(), Map.of());
+        when(catalogsResolver.resolve(any(), any(), any(), any(), any())).thenReturn(catalogs);
 
         composer.composeItem(item);
 
@@ -121,5 +104,9 @@ class RoomRequestComposerTest {
         ArgumentCaptor<List<AssignedClassroomDto>> assignedClassrooms = ArgumentCaptor.forClass(List.class);
         verify(mapper).toDto(eq(item), any(), any(), assignedClassrooms.capture(), any(), any());
         assertThat(assignedClassrooms.getValue()).extracting(AssignedClassroomDto::id).containsExactly(1L);
+    }
+
+    private static Catalogs emptyCatalogs() {
+        return new Catalogs(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
     }
 }

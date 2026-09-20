@@ -1,22 +1,13 @@
 package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
-import ar.edu.utn.frc.siga.allocation.service.AllocationOccupancyService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
-import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.service.UserService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
-import ar.edu.utn.frc.siga.common.util.TimeRanges;
-import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
-import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
-import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
-import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
-import ar.edu.utn.frc.siga.events.service.AcademicEventService;
-import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
@@ -26,49 +17,39 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItemAllocation;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestResolved;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
-import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestResolutionService;
 import ar.edu.utn.frc.siga.roomrequest.validator.ItemConsistency;
 import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestTransitionValidator;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
-import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.BuildingService;
-import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
+/** Transiciones de estado de un ítem (assign/cancel/derive/return/notify). La resolución de qué ocurrencias u
+ *  aulas/edificios son candidatos vive en {@link RoomRequestOccurrenceResolver} y {@link RoomRequestCandidateResolver}. */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionService {
 
-    private static final String COMPUTERS_RESOURCE_NAME = "Cantidad de PC";
-    private static final String PROJECTOR_RESOURCE_NAME = "Proyector";
-
     private final RoomRequestItemRepository itemRepository;
     private final RoomRequestTransitionValidator transitionValidator;
     private final AllocationService allocationService;
-    private final AllocationOccupancyService allocationOccupancyService;
-    private final ClassroomService classroomService;
     private final BuildingService buildingService;
     private final UserService userService;
-    private final AcademicEventService academicEventService;
-    private final OccurrenceService occurrenceService;
     private final ApplicationEventPublisher eventPublisher;
     private final RoomRequestComposer composer;
+    private final RoomRequestOccurrenceResolver occurrenceResolver;
+    private final RoomRequestCandidateResolver candidateResolver;
 
     @Override
     @Transactional
@@ -99,10 +80,10 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
         boolean reassigning = !item.getAllocations().isEmpty();
         if (reassigning) {
-            releaseOldMirrors(item);
+            occurrenceResolver.releaseOldMirrors(item);
         }
 
-        List<List<Long>> occurrencesBySlot = resolveOccurrencesBySlot(item, ids.size(), reassigning);
+        List<List<Long>> occurrencesBySlot = occurrenceResolver.resolveOccurrencesBySlot(item, ids.size(), reassigning);
 
         List<AllocationItem> allocationItems = new ArrayList<>();
         for (int i = 0; i < ids.size(); i++) {
@@ -117,42 +98,6 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         log.info("Pedido de aula asignado: itemId={}, aulas={}, ocurrencias={}",
                 itemId, ids.size(), occurrencesBySlot.stream().mapToInt(List::size).sum());
         return composer.composeItem(item);
-    }
-
-    /** Los "mirror" (orden > 1) son ocurrencias efímeras que solo existen para esta resolución: se liberan y se crean de nuevo en cada assign, nunca se reutilizan entre llamadas. */
-    private void releaseOldMirrors(RoomRequestItem item) {
-        List<Long> oldMirrorOccurrenceIds = item.getAllocations().stream()
-                .filter(allocation -> allocation.getPosition() > 1)
-                .map(RoomRequestItemAllocation::getOccurrenceId)
-                .distinct()
-                .toList();
-        if (oldMirrorOccurrenceIds.isEmpty()) {
-            return;
-        }
-        allocationService.deallocate(new DeallocationCommand(
-                List.of(new AllocationTarget.Occurrences(oldMirrorOccurrenceIds)),
-                "Reasignación de pedido de aula #" + item.getId()));
-        oldMirrorOccurrenceIds.forEach(occurrenceService::release);
-    }
-
-    private List<List<Long>> resolveOccurrencesBySlot(RoomRequestItem item, int classroomCount, boolean reassigning) {
-        List<Long> principalOccurrences = resolveTargetOccurrences(item, reassigning);
-        List<List<Long>> occurrencesBySlot = new ArrayList<>();
-        occurrencesBySlot.add(principalOccurrences);
-
-        if (classroomCount > 1) {
-            Map<Long, List<Long>> mirrorsByPrincipal = new LinkedHashMap<>();
-            for (Long principalId : principalOccurrences) {
-                mirrorsByPrincipal.put(principalId, occurrenceService.createSimultaneous(principalId, classroomCount - 1));
-            }
-            for (int slot = 1; slot < classroomCount; slot++) {
-                int mirrorIndex = slot - 1;
-                occurrencesBySlot.add(principalOccurrences.stream()
-                        .map(principalId -> mirrorsByPrincipal.get(principalId).get(mirrorIndex))
-                        .toList());
-            }
-        }
-        return occurrencesBySlot;
     }
 
     @Override
@@ -184,50 +129,13 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<AllowedClassroomDto> findAllowedClassrooms(Long itemId) {
-        log.debug("Buscando aulas candidatas para itemId={}", itemId);
-
-        RoomRequestItem item = itemRepository.findById(itemId)
-                .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
-
-        Set<Long> occupiedClassroomIds = occupiedClassroomIds(item);
-        return candidateClassrooms(item).stream()
-                .map(classroom -> new AllowedClassroomDto(classroom.id(), classroom.roomNumber(),
-                        classroom.buildingId(), classroom.buildingName(), classroom.capacity(),
-                        !occupiedClassroomIds.contains(classroom.id())))
-                .toList();
+        return candidateResolver.findAllowedClassrooms(itemId);
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<CandidateBuildingDto> findCandidateBuildings(Long itemId) {
-        log.debug("Buscando edificios candidatos para itemId={}", itemId);
-
-        RoomRequestItem item = itemRepository.findById(itemId)
-                .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
-
-        Set<Long> occupiedClassroomIds = occupiedClassroomIds(item);
-        Map<Long, List<ClassroomResponseDto>> freeByBuilding = candidateClassrooms(item).stream()
-                .filter(c -> !occupiedClassroomIds.contains(c.id()))
-                .collect(Collectors.groupingBy(ClassroomResponseDto::buildingId, LinkedHashMap::new, Collectors.toList()));
-        if (freeByBuilding.isEmpty()) {
-            return List.of();
-        }
-
-        Set<Long> buildingIdsWithAuxiliar = userService.findBuildingIdsCoveredByRole(
-                SystemRole.AUXILIAR_AULICO, freeByBuilding.keySet());
-
-        List<CandidateBuildingDto> result = new ArrayList<>();
-        for (Map.Entry<Long, List<ClassroomResponseDto>> entry : freeByBuilding.entrySet()) {
-            Long buildingId = entry.getKey();
-            if (!buildingIdsWithAuxiliar.contains(buildingId)) {
-                continue;
-            }
-            result.add(new CandidateBuildingDto(buildingId, entry.getValue().getFirst().buildingName(),
-                    entry.getValue().size()));
-        }
-        return result;
+        return candidateResolver.findCandidateBuildings(itemId);
     }
 
     @Override
@@ -247,8 +155,8 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
             throw new InvalidRoomRequestException("El edificio no tiene un auxiliar áulico asignado.");
         }
 
-        Set<Long> occupiedClassroomIds = occupiedClassroomIds(item);
-        boolean hasFreeClassroom = candidateClassrooms(item).stream()
+        Set<Long> occupiedClassroomIds = candidateResolver.occupiedClassroomIds(item);
+        boolean hasFreeClassroom = candidateResolver.candidateClassrooms(item).stream()
                 .anyMatch(c -> c.buildingId().equals(buildingId) && !occupiedClassroomIds.contains(c.id()));
         if (!hasFreeClassroom) {
             throw new InvalidRoomRequestException(
@@ -280,7 +188,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         return composer.composeItem(item);
     }
 
-    // Este metodo va a tener modificaciones despues deu que mati termine el modulo "notification"
+    // TODO: este método va a cambiar cuando se agregue el módulo "notification" que consuma RoomRequestResolved.
     @Override
     @Transactional
     public RoomRequestItemResponseDto notify(Long itemId, String actor) {
@@ -313,83 +221,5 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
         log.info("Pedido de aula notificado: itemId={}", itemId);
         return composer.composeItem(item);
-    }
-
-    private List<Long> resolveTargetOccurrences(RoomRequestItem item, boolean reassigning) {
-        RoomRequestType type = item.getRequest().getType();
-        return switch (type) {
-            case ONE_TIME_ROOM_CHANGE, PARTIAL_EXAM_IN_CLASS -> List.of(findOccurrenceOnDate(item));
-            case REGULAR_ROOM_CHANGE -> findFutureOccurrencesOnDayOfWeek(item);
-            case PARTIAL_EXAM_OFF_SCHEDULE, FINAL_EXAM, CONFERENCE, OTHER -> reassigning
-                    ? List.of(principalAllocation(item).getOccurrenceId())
-                    : List.of(createEventOccurrence(item, type));
-        };
-    }
-
-    private RoomRequestItemAllocation principalAllocation(RoomRequestItem item) {
-        return item.getAllocations().stream()
-                .filter(allocation -> allocation.getPosition() == 1)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "El pedido no tiene una asignación principal previa a reasignar: itemId=" + item.getId()));
-    }
-
-    private Long findOccurrenceOnDate(RoomRequestItem item) {
-        return occurrenceService.findSlotsByEvent(item.getSourceRecurringEventId(), null).stream()
-                .filter(slot -> slot.date().equals(item.getDate()))
-                .findFirst()
-                .map(OccurrenceSlotDto::occurrenceId)
-                .orElseThrow(() -> new InvalidRoomRequestException(
-                        "No se encontró la clase de este pedido en el calendario."));
-    }
-
-    private List<Long> findFutureOccurrencesOnDayOfWeek(RoomRequestItem item) {
-        List<Long> occurrenceIds = occurrenceService.findSlotsByEvent(item.getSourceRecurringEventId(), LocalDate.now())
-                .stream()
-                .filter(slot -> slot.date().getDayOfWeek() == item.getDayOfWeek())
-                .map(OccurrenceSlotDto::occurrenceId)
-                .toList();
-        if (occurrenceIds.isEmpty()) {
-            throw new InvalidRoomRequestException("No quedan clases futuras para este cambio regular de aula.");
-        }
-        return occurrenceIds;
-    }
-
-    private Long createEventOccurrence(RoomRequestItem item, RoomRequestType type) {
-        UniqueEventKind kind = switch (type) {
-            case PARTIAL_EXAM_OFF_SCHEDULE -> UniqueEventKind.PARCIAL;
-            case FINAL_EXAM -> UniqueEventKind.EXAMEN_FINAL;
-            default -> UniqueEventKind.OTRO;
-        };
-        CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(kind, item.getRequest().getSubjectId(),
-                item.getCommissionId(), item.getDate(), item.getStartTime(),
-                (int) item.getDuration().toMinutes(), item.getEstimated(), item.getObservations());
-        AcademicEventResponseDto event = academicEventService.createUniqueEvent(dto);
-        return academicEventService.findOccurrencesByEventId(event.id()).getFirst().id();
-    }
-
-    private List<ClassroomResponseDto> candidateClassrooms(RoomRequestItem item) {
-        List<ClassroomResponseDto> candidates = classroomService.findAllAvailable();
-        if (item.getRequiresComputers()) {
-            Set<Long> withComputers = classroomService.findIdsWithResourceAtLeast(
-                    COMPUTERS_RESOURCE_NAME, item.getComputerCount());
-            candidates = candidates.stream().filter(c -> withComputers.contains(c.id())).toList();
-        }
-        if (item.getRequiresProjector()) {
-            Set<Long> withProjector = classroomService.findIdsWithResourceAtLeast(PROJECTOR_RESOURCE_NAME, 1);
-            candidates = candidates.stream().filter(c -> withProjector.contains(c.id())).toList();
-        }
-        return candidates;
-    }
-
-    private Set<Long> occupiedClassroomIds(RoomRequestItem item) {
-        if (item.getDate() == null) {
-            return Set.of();
-        }
-        return allocationOccupancyService.findOccupancy(item.getDate(), item.getDate()).stream()
-                .filter(slot -> TimeRanges.overlaps(item.getStartTime(), item.endTime(),
-                        slot.startTime(), slot.endTime()))
-                .map(OccupiedSlot::classroomId)
-                .collect(Collectors.toSet());
     }
 }

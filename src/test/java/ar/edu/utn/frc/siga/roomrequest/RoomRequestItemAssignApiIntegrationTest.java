@@ -158,6 +158,28 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isConflict());
     }
 
+    /** allocation.maxOverlapMinutes (default 40) tolera un solape parcial en asignaciones MANUAL con
+     *  observación no vacía; RoomRequestResolutionServiceImpl.assign() siempre manda una, así que hoy
+     *  ningún solape parcial de un pedido de aula puede rechazarse por esta vía (ver assign_conflicto_returnsConflict,
+     *  que sí queda blocking porque ahí el solape es total). */
+    @Test
+    @DisplayName("aula ocupada con solape parcial dentro del margen tolerado: 200, el aula queda asignada igual")
+    void assign_solapeParcialTolerado_returnsOk() throws Exception {
+        IntegrationTestData.SubjectAndCommission sc = testData.materiaYComision();
+        LocalDate date = LocalDate.now().plusDays(27);
+        Classroom aula = testData.aula(testData.edificio());
+        Occurrence occupied = seedOccurrence(sc, date);
+        allocateDirectly(occupied.getId(), aula.getId());
+
+        RoomRequestItem item = seedCreatedEventItem(RoomRequestType.FINAL_EXAM, date);
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/assign")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(List.of(aula.getId()), null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_EVALUATION"));
+    }
+
     @Test
     @DisplayName("3 aulas: crea 1 evento con 3 ocurrencias enlazadas y 3 filas de asignación")
     void assign_tresAulas_creaOcurrenciasSimultaneas() throws Exception {
