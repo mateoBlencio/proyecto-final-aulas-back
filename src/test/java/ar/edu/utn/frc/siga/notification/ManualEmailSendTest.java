@@ -28,6 +28,8 @@ class ManualEmailSendTest {
                 NotificationTemplate.ROOM_REQUEST_RESOLVED,
                 List.of(new NotificationRecipient("Vos", "TU_EMAIL_REAL@gmail.com")),
                 Map.of(
+                        "asuntoTitulo", "Aula confirmada",
+                        "asuntoPartes", List.of("Prueba manual"),
                         "tituloBanner", "Aula confirmada",
                         "docente", "Vos",
                         "parrafoConfirmacion", "Confirmamos el aula para tu pedido de prueba #999.",
