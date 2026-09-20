@@ -15,6 +15,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     boolean existsByIdempotencyKeyAndChannelAndRecipient(
             String idempotencyKey, NotificationChannel channel, String recipient);
 
+    long countByIdempotencyKey(String idempotencyKey);
+
     @Query(
             value = "SELECT id_notificacion FROM notificacion "
                     + "WHERE estado = 'PENDING' AND proximo_intento <= now() "
