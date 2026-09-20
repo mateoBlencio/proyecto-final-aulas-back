@@ -1,8 +1,7 @@
-# para ejecutar: SPRING_PROFILES_ACTIVE=dev-snapshot ./mvnw spring-boot:run
-# postgres local persistente (volumen nombrado): sobrevive a `docker compose down` y a reinicios,
-# pensado para restaurar ahi un dump de dev y probar migraciones antes de aplicarlas en dev de verdad
+# SPRING_PROFILES_ACTIVE=dev-snapshot ./mvnw spring-boot:run
 services:
-  postgres:
+  dev-snapshot-db-service:
+    container_name: dev-snapshot-db-container
     image: 'postgres:16-alpine'
     environment:
       - 'POSTGRES_DB=mydatabase'
@@ -11,7 +10,4 @@ services:
     ports:
       - '5432:5432'
     volumes:
-      - pgdata_dump:/var/lib/postgresql/data
-
-volumes:
-  pgdata_dump:
+      - ${DEV_SNAPSHOT_DB_PATH:-../db-dev-snapshot}:/var/lib/postgresql/data
