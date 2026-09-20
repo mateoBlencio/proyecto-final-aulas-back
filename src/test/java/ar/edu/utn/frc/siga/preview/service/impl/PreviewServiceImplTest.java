@@ -35,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -188,5 +189,8 @@ class PreviewServiceImplTest {
         service.confirm("prev_x", request);
 
         verify(previewStore, times(1)).remove("prev_x");
+        // Confirm sigue en la sobrecarga estricta (margen 0): no puede heredar la tolerancia
+        // de la asignación manual y filtrarla al optimizador.
+        verify(validator).validateNoOverlap(anyList(), anyList());
     }
 }

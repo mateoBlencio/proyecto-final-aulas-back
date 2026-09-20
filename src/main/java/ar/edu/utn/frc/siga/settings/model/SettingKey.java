@@ -26,7 +26,12 @@ public enum SettingKey {
     EVENTS_HOURS_START(
             "events.hours.start", SettingType.TIME, RiskLevel.SAFE, "events", null),
     EVENTS_HOURS_END(
-            "events.hours.end", SettingType.TIME, RiskLevel.SAFE, "events", null);
+            "events.hours.end", SettingType.TIME, RiskLevel.SAFE, "events", null),
+    ALLOCATION_MAX_OVERLAP_MINUTES(
+            "allocation.maxOverlapMinutes", SettingType.INT, RiskLevel.ADVANCED, "allocation",
+            "Dos eventos distintos pueden compartir un aula durante este margen, solo en asignación "
+                    + "manual y dejando un comentario. Subirlo esconde choques reales de horario; "
+                    + "0 vuelve al rechazo estricto.");
 
     private final String key;
     private final SettingType type;

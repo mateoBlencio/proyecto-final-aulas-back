@@ -59,8 +59,20 @@ docs {
                        "eventType": "UNIQUE_EVENT", "occurrenceId": 950,
                        "allocationId": 3001 },
         "alternativeClassrooms": [ { "id": 31, "roomNumber": "31", "...": "..." } ] }
+    ],
+    "toleratedOverlaps": [
+      { "occurrenceId": 705, "date": "2026-03-31",
+        "startTime": "18:00:00", "endTime": "20:00:00", "classroomId": 12,
+        "conflictingEventId": 90, "conflictingAllocationId": 3050,
+        "conflictingOccurrenceId": 960, "overlapMinutes": 30 }
     ]
   }
+
+  toleratedOverlaps lista los solapamientos que entran dentro del margen de
+  allocation.maxOverlapMinutes: no cuentan como bloqueo (van en movableClasses,
+  no en blockedClasses) pero el PUT/POST equivalente va a exigir "observation"
+  para escribirlos. Mostrar este aviso antes de confirmar es el motivo de
+  llamar a /impact en vez de mandar el PUT a ciegas.
 
   CÓMO DESTRABAR UN CONFLICTO (ver PARA-FRONT: no hace falta endpoint nuevo, se
   resuelve armando bien el lote del PUT):

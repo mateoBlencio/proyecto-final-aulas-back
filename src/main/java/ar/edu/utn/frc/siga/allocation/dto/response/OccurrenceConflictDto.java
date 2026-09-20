@@ -14,5 +14,6 @@ public record OccurrenceConflictDto(
         Long classroomId,
         Long conflictingEventId,
         Long conflictingAllocationId,
-        Long conflictingOccurrenceId) {
+        Long conflictingOccurrenceId,
+        int overlapMinutes) {
 }

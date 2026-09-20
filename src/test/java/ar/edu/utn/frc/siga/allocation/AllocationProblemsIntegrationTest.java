@@ -80,6 +80,14 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated());
     }
 
+    /** Igual que {@link #seedOccurrence}, pero con la hora de arranque corrida (para armar solapes parciales). */
+    private Occurrence seedOccurrenceAt(IntegrationTestData.SubjectAndCommission sc, LocalDate date, LocalTime start, Integer enrolled) {
+        var dto = new CreateRecurringEventRequestDto(
+                enrolled, start, DURATION, date.getDayOfWeek(), date, date, sc.subjectId(), sc.commissionId());
+        Long eventId = academicEventService.createRecurringEvent(dto).id();
+        return occurrenceRepository.findByEvent_Id(eventId).getFirst();
+    }
+
     /** Segunda allocation en la misma franja/aula por repositorio directo: la API bloquea el solape (validateNoOverlap). */
     private void allocateDirect(Occurrence occurrence, Long classroomId) {
         allocationRepository.save(Allocation.builder()
@@ -170,6 +178,41 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
             assertThat(node.get("classroom").get("id").asLong()).isEqualTo(aulaOverlap.getId());
             assertThat(List.of(node.get("eventA").get("id").asLong(), node.get("eventB").get("id").asLong()))
                     .containsExactlyInAnyOrder(overlapEventAId, overlapEventBId);
+        });
+    }
+
+    @Test
+    @DisplayName("Un solape de 30 minutos autorizado por API (dentro del margen) igual aparece en el tablero de OVERLAP")
+    void overlapConflicts_toleratedOverlapCreatedByApiStillListed() throws Exception {
+        // Decisión explícita del plan: el tablero de conflictos no filtra por tolerancia.
+        LocalDate from = LocalDate.now().plusDays(60);
+        LocalDate to = LocalDate.now().plusDays(70);
+        var scA = testData.materiaYComision();
+        var scB = testData.materiaYComision();
+        Classroom aula = testData.aula(testData.edificio(), testData.tipoAulaPorDefecto(), 100);
+        LocalDate date = from.plusDays(4);
+        Occurrence occA = seedOccurrence(scA, date, 20); // 09:00-10:00
+        Occurrence occB = seedOccurrenceAt(scB, date, LocalTime.of(9, 30), 20); // 09:30-10:30, solape 30 con occA
+
+        allocateOk(occA.getId(), aula.getId());
+
+        var dto = new AllocationBatchRequestDto(
+                List.of(new AllocationItemRequestDto(List.of(occB.getId()), null, null, null, aula.getId())),
+                "solape tolerado, autorizado para este caso");
+        mockMvc.perform(post("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isCreated());
+
+        Long eventAId = occA.getEvent().getId();
+        Long eventBId = occB.getEvent().getId();
+
+        JsonNode content = conflictsContent("OVERLAP", from, to);
+
+        assertThat(content).anySatisfy(node -> {
+            assertThat(node.get("classroom").get("id").asLong()).isEqualTo(aula.getId());
+            assertThat(List.of(node.get("eventA").get("id").asLong(), node.get("eventB").get("id").asLong()))
+                    .containsExactlyInAnyOrder(eventAId, eventBId);
         });
     }
 

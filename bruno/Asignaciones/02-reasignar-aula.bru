@@ -35,13 +35,19 @@ docs {
   Valida que el aula nueva no esté ocupada por OTRA asignación en la misma
   fecha/franja de la ocurrencia (la ocupación actual de esta misma asignación
   no cuenta como conflicto: reasignar al mismo aula que ya tenía es válido).
-  Todo el lote se valida ANTES de escribir nada. Si hay solapamiento → 409 con:
+  Todo el lote se valida ANTES de escribir nada. Si hay solapamiento que
+  supera el margen de allocation.maxOverlapMinutes (ver /v1/settings, default
+  40 minutos) → 409 con:
   {
     "conflicts": [
       { "occurrenceId", "date", "startTime", "endTime", "classroomId",
-        "conflictingEventId", "conflictingAllocationId" }
+        "conflictingEventId", "conflictingAllocationId", "overlapMinutes" }
     ]
   }
+
+  Si el solapamiento entra dentro del margen y falta "observation" (o viene
+  vacía) → 400 "Observation required" con:
+  { "overlaps": [ { "occurrenceId", ..., "overlapMinutes" } ] }
 
   Respuesta 200: List<AllocationResponseDto> con el/los item(s) resultantes.
 }

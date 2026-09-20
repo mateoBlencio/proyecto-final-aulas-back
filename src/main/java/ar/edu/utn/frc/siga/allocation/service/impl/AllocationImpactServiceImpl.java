@@ -14,6 +14,7 @@ import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationCandidate;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
+import ar.edu.utn.frc.siga.allocation.validator.OverlapReview;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.common.util.TimeRanges;
@@ -45,7 +46,7 @@ import java.util.stream.Collectors;
 class AllocationImpactServiceImpl implements AllocationImpactService {
 
     private static final AllocationImpactResponseDto EMPTY =
-            new AllocationImpactResponseDto(0, 0, 0, List.of(), List.of());
+            new AllocationImpactResponseDto(0, 0, 0, List.of(), List.of(), List.of());
 
     private final AllocationTargetResolver targetResolver;
     private final AllocationValidator validator;
@@ -77,13 +78,13 @@ class AllocationImpactServiceImpl implements AllocationImpactService {
                 .map(e -> new AllocationCandidate(e.getKey(), e.getValue()))
                 .toList();
 
-        List<OccurrenceConflictDto> conflicts = validator.findConflicts(candidates);
-        Set<Long> blockedOccurrenceIds = conflicts.stream()
+        OverlapReview overlaps = validator.reviewManualOverlaps(candidates);
+        Set<Long> blockedOccurrenceIds = overlaps.blocking().stream()
                 .map(OccurrenceConflictDto::occurrenceId)
                 .collect(Collectors.toSet());
 
         List<ImpactOccurrenceDto> occurrences = describeOccurrences(candidates, blockedOccurrenceIds);
-        List<ImpactConflictDto> detailed = describeConflicts(conflicts, candidates);
+        List<ImpactConflictDto> detailed = describeConflicts(overlaps.blocking(), candidates);
 
         log.debug("Impacto analizado: total={}, bloqueadas={}", occurrences.size(), blockedOccurrenceIds.size());
         return new AllocationImpactResponseDto(
@@ -91,7 +92,8 @@ class AllocationImpactServiceImpl implements AllocationImpactService {
                 occurrences.size() - blockedOccurrenceIds.size(),
                 blockedOccurrenceIds.size(),
                 occurrences,
-                detailed);
+                detailed,
+                overlaps.tolerated());
     }
 
     private List<ImpactOccurrenceDto> describeOccurrences(List<AllocationCandidate> candidates,

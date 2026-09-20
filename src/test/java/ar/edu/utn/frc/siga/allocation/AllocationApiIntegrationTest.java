@@ -59,8 +59,13 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     private Occurrence seedOccurrence(IntegrationTestData.SubjectAndCommission sc, LocalDate date) {
+        return seedOccurrenceAt(sc, date, START);
+    }
+
+    /** Igual que {@link #seedOccurrence}, pero con la hora de arranque corrida (para armar solapes parciales). */
+    private Occurrence seedOccurrenceAt(IntegrationTestData.SubjectAndCommission sc, LocalDate date, LocalTime start) {
         var dto = new CreateRecurringEventRequestDto(
-                30, START, DURATION, date.getDayOfWeek(), date, date, sc.subjectId(), sc.commissionId());
+                30, start, DURATION, date.getDayOfWeek(), date, date, sc.subjectId(), sc.commissionId());
         Long eventId = academicEventService.createRecurringEvent(dto).id();
         List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId);
         assertThat(occurrences).hasSize(1);
@@ -175,6 +180,85 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.title").value("Reallocation conflict"))
                 .andExpect(jsonPath("$.conflicts").isArray());
+    }
+
+    @Test
+    @DisplayName("Asignar sobre una franja con 30 minutos de solape (dentro del margen) y observation responde 201 y persiste la observación")
+    void allocateManually_toleratedOverlapWithObservation_returns201AndPersistsObservation() throws Exception {
+        var sc = testData.materiaYComision();
+        Classroom aula = testData.aula(testData.edificio());
+        LocalDate date = LocalDate.now().plusDays(16);
+        Occurrence first = seedOccurrence(sc, date); // 08:00-09:30
+        Occurrence second = seedOccurrenceAt(sc, date, LocalTime.of(9, 0)); // 09:00-10:30, solape 30 con first
+
+        allocateOk(first.getId(), aula.getId());
+
+        var dto = new AllocationBatchRequestDto(
+                List.of(new AllocationItemRequestDto(List.of(second.getId()), null, null, null, aula.getId())),
+                "actividad de posgrado simultánea, autorizado");
+
+        mockMvc.perform(post("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isCreated());
+
+        assertThat(allocationRepository.findByOccurrenceIdIn(List.of(first.getId(), second.getId())))
+                .hasSize(2)
+                .filteredOn(a -> a.getOccurrenceId().equals(second.getId()))
+                .first()
+                .extracting(Allocation::getObservation)
+                .isEqualTo("actividad de posgrado simultánea, autorizado");
+    }
+
+    @Test
+    @DisplayName("El mismo solape de 30 minutos sin observation responde 400 (Observation required) y no escribe nada")
+    void allocateManually_toleratedOverlapWithoutObservation_returns400AndWritesNothing() throws Exception {
+        var sc = testData.materiaYComision();
+        Classroom aula = testData.aula(testData.edificio());
+        LocalDate date = LocalDate.now().plusDays(17);
+        Occurrence first = seedOccurrence(sc, date); // 08:00-09:30
+        Occurrence second = seedOccurrenceAt(sc, date, LocalTime.of(9, 0)); // 09:00-10:30, solape 30 con first
+
+        allocateOk(first.getId(), aula.getId());
+
+        mockMvc.perform(post("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(byOccurrence(second.getId(), aula.getId()))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Observation required"))
+                .andExpect(jsonPath("$.overlaps.length()").value(1))
+                .andExpect(jsonPath("$.overlaps[0].overlapMinutes").value(30));
+
+        assertThat(allocationRepository.findByOccurrenceIdIn(List.of(first.getId(), second.getId()))).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Con allocation.maxOverlapMinutes en 0, el mismo par de 30 minutos vuelve a dar 409")
+    void allocateManually_toleratedOverlapAfterLoweringMaxOverlapSettingToZero_returns409() throws Exception {
+        var sc = testData.materiaYComision();
+        Classroom aula = testData.aula(testData.edificio());
+        LocalDate date = LocalDate.now().plusDays(18);
+        Occurrence first = seedOccurrence(sc, date); // 08:00-09:30
+        Occurrence second = seedOccurrenceAt(sc, date, LocalTime.of(9, 0)); // 09:00-10:30, solape 30 con first
+
+        allocateOk(first.getId(), aula.getId());
+
+        mockMvc.perform(put("/v1/settings/{key}", "allocation.maxOverlapMinutes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"value\":\"0\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(byOccurrence(second.getId(), aula.getId()))))
+                .andExpect(status().isConflict());
+
+        assertThat(allocationRepository.findByOccurrenceIdIn(List.of(first.getId(), second.getId()))).hasSize(1);
+
+        mockMvc.perform(put("/v1/settings/{key}", "allocation.maxOverlapMinutes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"value\":\"40\"}"))
+                .andExpect(status().isOk());
     }
 
     @Test
