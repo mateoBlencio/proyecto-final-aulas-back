@@ -65,7 +65,15 @@ class SettingsApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.events[?(@.key=='events.hours.start')].value").value("08:00"))
                 .andExpect(jsonPath("$.events[?(@.key=='events.hours.start')].type").value("TIME"))
                 .andExpect(jsonPath("$.optimizer[?(@.key=='optimizer.weights.overcrowding')].min").value("0"))
-                .andExpect(jsonPath("$.optimizer[?(@.key=='optimizer.weights.overcrowding')].max").value("1000000"));
+                .andExpect(jsonPath("$.optimizer[?(@.key=='optimizer.weights.overcrowding')].max").value("1000000"))
+                .andExpect(jsonPath("$.allocation").isArray())
+                .andExpect(jsonPath("$.allocation[?(@.key=='allocation.maxOverlapMinutes')].value").value("40"))
+                .andExpect(jsonPath("$.allocation[?(@.key=='allocation.maxOverlapMinutes')].defaultValue").value("40"))
+                .andExpect(jsonPath("$.allocation[?(@.key=='allocation.maxOverlapMinutes')].type").value("INT"))
+                .andExpect(jsonPath("$.allocation[?(@.key=='allocation.maxOverlapMinutes')].riskLevel").value("ADVANCED"))
+                .andExpect(jsonPath("$.allocation[?(@.key=='allocation.maxOverlapMinutes')].warning").exists())
+                .andExpect(jsonPath("$.allocation[?(@.key=='allocation.maxOverlapMinutes')].max")
+                        .value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.nullValue())));
     }
 
     @Test
@@ -144,6 +152,46 @@ class SettingsApiIntegrationTest extends AbstractIntegrationTest {
         auxiliarMockMvc.perform(put("/v1/settings/{key}", "optimizer.weights.overcrowding")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"value\":\"123\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("PUT allocation.maxOverlapMinutes sin cota superior: acepta 5000 y lo persiste")
+    void put_allocationMaxOverlapMinutes_sinTecho_persiste5000() throws Exception {
+        putValue("allocation.maxOverlapMinutes", "5000")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.value").value("5000"));
+
+        assertThat(settingRepository.findById("allocation.maxOverlapMinutes"))
+                .get()
+                .extracting(Setting::getValue)
+                .isEqualTo("5000");
+
+        putValue("allocation.maxOverlapMinutes", "40").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("PUT allocation.maxOverlapMinutes con -1 responde 400 por el min: 0")
+    void put_allocationMaxOverlapMinutes_negativo_returns400() throws Exception {
+        putValue("allocation.maxOverlapMinutes", "-1")
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PUT allocation.maxOverlapMinutes con un valor que desborda Integer responde 400")
+    void put_allocationMaxOverlapMinutes_desbordeDeInteger_returns400() throws Exception {
+        putValue("allocation.maxOverlapMinutes", "99999999999")
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Un AUXILIAR_AULICO no puede mover el margen de solape (403): solo Subsecretaría")
+    void put_allocationMaxOverlapMinutes_asAuxiliar_isForbidden() throws Exception {
+        MockMvc auxiliarMockMvc = mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
+
+        auxiliarMockMvc.perform(put("/v1/settings/{key}", "allocation.maxOverlapMinutes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"value\":\"50\"}"))
                 .andExpect(status().isForbidden());
     }
 

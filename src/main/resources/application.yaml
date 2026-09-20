@@ -128,6 +128,9 @@ siga:
         default-value: "08:00"
       - key: events.hours.end
         default-value: "23:00"
+      - key: allocation.maxOverlapMinutes
+        default-value: "40"
+        min: "0"
   optimizer:
     parallel-solver-count: AUTO
     environment-mode: PHASE_ASSERT

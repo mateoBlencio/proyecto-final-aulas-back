@@ -111,9 +111,25 @@ class AllocationServiceImplTest {
         assertThat(result).hasSize(1);
         verify(validator).validateClassroomsAvailable(Set.of(5L));
         ArgumentCaptor<List<AllocationCandidate>> captor = ArgumentCaptor.forClass(List.class);
-        verify(validator).validateNoOverlap(captor.capture());
+        verify(validator).validateManualOverlap(captor.capture(), any());
         assertThat(captor.getValue()).containsExactly(new AllocationCandidate(occ, 5L));
         verify(writer).create(resolved, "obs", AllocationSource.MANUAL);
+    }
+
+    @Test
+    @DisplayName("allocate: la observación del comando llega intacta al validador (la exige validateManualOverlap si hay solape tolerado)")
+    void allocatePasaLaObservacionAlValidator() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "mudanza de aula por obra");
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
+        when(writer.create(resolved, "mudanza de aula por obra", AllocationSource.MANUAL))
+                .thenReturn(List.of(allocation(100L, 10L, 5, AllocationSource.MANUAL)));
+
+        service.allocate(command);
+
+        verify(validator).validateManualOverlap(anyList(), eq("mudanza de aula por obra"));
     }
 
     @Test
@@ -171,7 +187,7 @@ class AllocationServiceImplTest {
 
         assertThat(result).isEmpty();
         verify(validator, never()).validateClassroomsAvailable(any());
-        verify(validator, never()).validateNoOverlap(anyList());
+        verify(validator, never()).validateManualOverlap(anyList(), any());
         verify(writer).create(Map.of(), "obs", AllocationSource.MANUAL);
     }
 
@@ -188,7 +204,7 @@ class AllocationServiceImplTest {
         assertThatThrownBy(() -> service.allocate(command)).isInstanceOf(AllocationConflictException.class);
 
         verify(writer, never()).create(any(), any(), any());
-        verify(validator, never()).validateNoOverlap(anyList());
+        verify(validator, never()).validateManualOverlap(anyList(), any());
     }
 
     @Test
@@ -218,7 +234,7 @@ class AllocationServiceImplTest {
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
         Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
         when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
-        doThrow(new ReallocationConflictException(List.of())).when(validator).validateNoOverlap(anyList());
+        doThrow(new ReallocationConflictException(List.of())).when(validator).validateManualOverlap(anyList(), any());
 
         assertThatThrownBy(() -> service.allocate(command)).isInstanceOf(ReallocationConflictException.class);
 
@@ -238,7 +254,8 @@ class AllocationServiceImplTest {
         service.allocate(command);
 
         verify(validator).validateClassroomsAvailable(Set.of(5L));
-        verify(validator, never()).validateNoOverlap(anyList());
+        // Requisito A: AUTOMATIC nunca ve el margen tolerado, ni siquiera indirectamente.
+        verify(validator, never()).validateManualOverlap(anyList(), any());
     }
 
     @Test
@@ -255,7 +272,8 @@ class AllocationServiceImplTest {
         service.allocate(command);
 
         verify(targetResolver).resolveClassroomByOccurrence(command.items(), null);
-        verify(validator, never()).validateNoOverlap(anyList());
+        // Requisito A: IMPORTED nunca ve el margen tolerado, ni siquiera indirectamente.
+        verify(validator, never()).validateManualOverlap(anyList(), any());
     }
 
     @Test
@@ -322,7 +340,7 @@ class AllocationServiceImplTest {
 
         assertThat(result).isEmpty();
         verify(validator, never()).validateClassroomsAvailable(any());
-        verify(validator, never()).validateNoOverlap(anyList());
+        verify(validator, never()).validateManualOverlap(anyList(), any());
     }
 
     @Test
@@ -333,7 +351,7 @@ class AllocationServiceImplTest {
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
         Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
         when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
-        doThrow(new ReallocationConflictException(List.of())).when(validator).validateNoOverlap(anyList());
+        doThrow(new ReallocationConflictException(List.of())).when(validator).validateManualOverlap(anyList(), any());
 
         assertThatThrownBy(() -> service.reallocate(command)).isInstanceOf(ReallocationConflictException.class);
 
@@ -352,7 +370,8 @@ class AllocationServiceImplTest {
 
         service.reallocate(command);
 
-        verify(validator, never()).validateNoOverlap(anyList());
+        // Requisito A: AUTOMATIC nunca ve el margen tolerado, ni siquiera indirectamente.
+        verify(validator, never()).validateManualOverlap(anyList(), any());
     }
 
     // ---------- deallocate ----------
@@ -477,7 +496,7 @@ class AllocationServiceImplTest {
 
         service.syncFromSysacad(List.of(item));
 
-        verify(validator, never()).validateNoOverlap(anyList());
+        verify(validator, never()).validateManualOverlap(anyList(), any());
     }
 
     @Test
@@ -504,7 +523,7 @@ class AllocationServiceImplTest {
 
         AllocationResponseDto result = service.findById(1L);
 
-        assertThat(result).isNotNull();
+        assertThat(result.id()).isEqualTo(1L);
     }
 
     @Test

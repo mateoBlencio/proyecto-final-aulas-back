@@ -608,7 +608,7 @@ class AcademicEventServiceImplTest {
 
         AcademicEventResponseDto result = service.createUniqueEvent(dto);
 
-        assertThat(result).isNotNull();
+        assertThat(result.id()).isEqualTo(3L);
         verify(subjectService, never()).findById(any());
         verify(commissionService, never()).findById(any());
     }

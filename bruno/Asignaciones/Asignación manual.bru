@@ -34,14 +34,21 @@ docs {
 
   Valida que el aula no esté ya ocupada (asignación ALLOCATED existente de OTRO
   evento) en la misma fecha/franja horaria de la ocurrencia. Todo el lote se
-  valida ANTES de escribir nada. Si hay solapamiento o si algún item ya tiene
-  asignación → 409 con:
+  valida ANTES de escribir nada. Si hay solapamiento que supera el margen de
+  allocation.maxOverlapMinutes (ver /v1/settings, default 40 minutos) o si
+  algún item ya tiene asignación → 409 con:
   {
     "conflicts": [
       { "occurrenceId", "date", "startTime", "endTime", "classroomId",
-        "conflictingEventId", "conflictingAllocationId" }
+        "conflictingEventId", "conflictingAllocationId", "overlapMinutes" }
     ]
   }
+
+  Si el solapamiento entra dentro del margen y falta "observation" (o viene
+  vacía) → 400 "Observation required" con:
+  { "overlaps": [ { "occurrenceId", ..., "overlapMinutes" } ] }
+  Con "observation" presente, la asignación se crea igual y el comentario
+  queda guardado en cada fila y en el historial de auditoría.
 
   Respuesta 201: List<AllocationResponseDto> con el/los item(s) creados.
 }

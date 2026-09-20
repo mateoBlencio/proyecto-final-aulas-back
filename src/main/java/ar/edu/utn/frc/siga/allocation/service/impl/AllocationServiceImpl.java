@@ -135,7 +135,7 @@ public class AllocationServiceImpl implements AllocationService {
             List<AllocationCandidate> candidates = classroomByOccurrence.entrySet().stream()
                     .map(e -> new AllocationCandidate(e.getKey(), e.getValue()))
                     .toList();
-            validator.validateNoOverlap(candidates);
+            validator.validateManualOverlap(candidates, command.observation());
         }
 
         return classroomByOccurrence;

@@ -7,6 +7,7 @@ public record SettingResponseDto(
         String key,
         SettingType type,
         String value,
+        String defaultValue,
         RiskLevel riskLevel,
         String min,
         String max,
