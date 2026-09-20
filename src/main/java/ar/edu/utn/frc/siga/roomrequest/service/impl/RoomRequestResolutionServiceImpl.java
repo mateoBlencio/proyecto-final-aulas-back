@@ -274,6 +274,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         return composer.composeItem(item);
     }
 
+    // Este metodo va a tener modificaciones despues deu que mati termine el modulo "notification"
     @Override
     @Transactional
     public RoomRequestItemResponseDto notify(Long itemId, String actor) {
