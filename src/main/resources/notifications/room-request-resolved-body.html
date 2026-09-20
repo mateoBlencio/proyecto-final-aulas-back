@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Aula confirmada</title>
+</head>
+<body>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+        <td>
+            <p>Hola, <span th:text="${docente}">Docente</span>:</p>
+
+            <p>Confirmamos el aula para tu pedido <span th:text="${pedidoId}">#0</span>
+                (<span th:text="${tipoTexto}">Tipo de pedido</span>).</p>
+
+            <table role="presentation">
+                <tr th:if="${materia}">
+                    <td>Materia</td>
+                    <td th:text="${materia}">Materia</td>
+                </tr>
+                <tr th:if="${comision}">
+                    <td>Comisión</td>
+                    <td th:text="${comision}">Comisión</td>
+                </tr>
+                <tr th:if="${fecha}">
+                    <td>Fecha</td>
+                    <td th:text="${fecha}">Fecha</td>
+                </tr>
+                <tr th:if="${horario}">
+                    <td>Horario</td>
+                    <td th:text="${horario}">Horario</td>
+                </tr>
+                <tr th:each="aula : ${aulas}">
+                    <td>Aula</td>
+                    <td th:text="${aula}">Aula</td>
+                </tr>
+            </table>
+
+            <p th:if="${menosAulasMensaje}" th:text="${menosAulasMensaje}">Mensaje de menos aulas</p>
+
+            <p th:if="${observaciones}">
+                Observaciones: <span th:text="${observaciones}">Observaciones</span>
+            </p>
+
+            <p>Ante cualquier inconveniente, respondé este mail.</p>
+        </td>
+    </tr>
+</table>
+</body>
+</html>
