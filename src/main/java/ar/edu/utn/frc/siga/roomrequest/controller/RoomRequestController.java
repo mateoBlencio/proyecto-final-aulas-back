@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.roomrequest.controller;
 import ar.edu.utn.frc.siga.roomrequest.dto.RoomRequestItemFilter;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CancelRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemRowDto;
@@ -123,6 +124,19 @@ public class RoomRequestController {
         RoomRequestItemResponseDto response =
                 roomRequestResolutionService.cancel(id, dto.reason(), principal.getName());
         log.info("Pedido de aula cancelado vía controller: id={}", id);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/items/{id}/allowed-classrooms")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_READ')")
+    @Operation(summary = "Aulas candidatas para resolver un pedido",
+               description = "Aulas activas que cumplen los requisitos del pedido (computadoras, "
+                       + "proyector), con disponibilidad ya calculada contra su fecha y horario. "
+                       + "Lista vacía es una respuesta válida.")
+    public ResponseEntity<List<AllowedClassroomDto>> findAllowedClassrooms(@PathVariable Long id) {
+        log.debug("GET /v1/room-requests/items/{}/allowed-classrooms", id);
+        List<AllowedClassroomDto> response = roomRequestResolutionService.findAllowedClassrooms(id);
+        log.info("Aulas candidatas listadas vía controller: itemId={}, total={}", id, response.size());
         return ResponseEntity.ok(response);
     }
 }
