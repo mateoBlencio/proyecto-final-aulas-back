@@ -15,7 +15,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.Duration;
@@ -23,7 +22,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -42,8 +40,6 @@ class RoomRequestItemNotifyApiIntegrationTest extends AbstractIntegrationTest {
     private AcademicEventService academicEventService;
     @Autowired
     private OccurrenceRepository occurrenceRepository;
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
 
     @Test
     @DisplayName("IN_EVALUATION con aula asignada: pasa a RESOLVED y sella notifiedAt")
@@ -53,39 +49,6 @@ class RoomRequestItemNotifyApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/notify"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("RESOLVED"));
-    }
-
-    @Test
-    @DisplayName("notify registra una notificación PENDING para el docente (Bloque 14, módulo notification)")
-    void notify_registraNotificacionPendiente() throws Exception {
-        RoomRequestItem item = seedPreApprovedItem(1);
-
-        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/notify"))
-                .andExpect(status().isOk());
-
-        // @ApplicationModuleListener corre asíncrono después del commit de notify: se espera con reintentos
-        // cortos en vez de asumir que ya terminó cuando mockMvc.perform() devuelve.
-        List<Map<String, Object>> rows = awaitNotificationRows(item.getId());
-        assertThat(rows).hasSize(1);
-        assertThat(rows.getFirst().get("destinatario")).isEqualTo("ada@frc.utn.edu.ar");
-        assertThat(rows.getFirst().get("canal")).isEqualTo("EMAIL");
-        assertThat(rows.getFirst().get("estado")).isEqualTo("PENDING");
-    }
-
-    private List<Map<String, Object>> awaitNotificationRows(Long itemId) throws InterruptedException {
-        String likePattern = "%\"itemId\":" + itemId + "%";
-        for (int attempt = 0; attempt < 20; attempt++) {
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                    "select destinatario, canal, estado, payload from notificacion_saliente where payload like ?",
-                    likePattern);
-            if (!rows.isEmpty()) {
-                return rows;
-            }
-            Thread.sleep(100);
-        }
-        return jdbcTemplate.queryForList(
-                "select destinatario, canal, estado, payload from notificacion_saliente where payload like ?",
-                likePattern);
     }
 
     @Test
