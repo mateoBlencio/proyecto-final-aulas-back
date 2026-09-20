@@ -115,7 +115,7 @@ class RoomRequestServiceImplTest {
 
         RoomRequestItem item = RoomRequestItem.builder().id(5L).build();
         RoomRequestItemRowDto row = new RoomRequestItemRowDto(
-                5L, null, null, null, null, null, null, null, null, null);
+                5L, null, null, null, null, null, null, null, null, null, null);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         when(itemRepository.findAll(ArgumentMatchers.<Specification<RoomRequestItem>>any(), pageableCaptor.capture()))
@@ -152,9 +152,9 @@ class RoomRequestServiceImplTest {
         List<RoomRequestItemStatusCountDto> result = service.countItemsByStatus(true);
 
         assertThat(result).containsExactly(
-                new RoomRequestItemStatusCountDto(RoomRequestStatus.PENDING, 30L),
+                new RoomRequestItemStatusCountDto(RoomRequestStatus.NEW, 30L),
                 new RoomRequestItemStatusCountDto(RoomRequestStatus.DERIVED_TO_BUILDING, 5L),
-                new RoomRequestItemStatusCountDto(RoomRequestStatus.PRE_APPROVED, 10L),
+                new RoomRequestItemStatusCountDto(RoomRequestStatus.IN_EVALUATION, 10L),
                 new RoomRequestItemStatusCountDto(RoomRequestStatus.RESOLVED, 2L),
                 new RoomRequestItemStatusCountDto(RoomRequestStatus.CANCELLED, 0L));
         verify(itemRepository, times(5)).count(ArgumentMatchers.<Specification<RoomRequestItem>>any());

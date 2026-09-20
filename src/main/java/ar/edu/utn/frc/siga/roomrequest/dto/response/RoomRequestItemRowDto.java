@@ -19,5 +19,6 @@ public record RoomRequestItemRowDto(
         DayOfWeek dayOfWeek,
         LocalTime startTime,
         LocalTime endTime,
-        Integer classroomCount
+        Integer classroomCount,
+        Boolean requiresComputers
 ) {}
