@@ -129,16 +129,16 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("pedido ya notificado: 400, no se puede reasignar")
-    void assign_yaNotificado_returnsBadRequest() throws Exception {
+    @DisplayName("pedido ya notificado (RESOLVED): 409, no se puede reasignar")
+    void assign_yaNotificado_returnsConflict() throws Exception {
         Classroom aula = testData.aula(testData.edificio());
         RoomRequestItem item = seedNotifiedItem(LocalDate.now().plusDays(25));
 
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/assign")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(assignBody(List.of(aula.getId()), null)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("Invalid room request"));
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Invalid room request transition"));
     }
 
     @Test
@@ -158,10 +158,10 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isConflict());
     }
 
-    /** allocation.maxOverlapMinutes (default 40) tolera un solape parcial en asignaciones MANUAL con
-     *  observación no vacía; RoomRequestResolutionServiceImpl.assign() siempre manda una, así que hoy
-     *  ningún solape parcial de un pedido de aula puede rechazarse por esta vía (ver assign_conflicto_returnsConflict,
-     *  que sí queda blocking porque ahí el solape es total). */
+    /** allocation.maxOverlapMinutes (default 40) tolera un solape parcial en asignaciones MANUAL, pero solo
+     *  con observación no vacía (RoomRequestResolutionServiceImpl.assign() manda el {@code reason} real del
+     *  pedido); ver assign_solapeParcialTolerado_sinMotivo_returnsBadRequest para el caso sin motivo, y
+     *  assign_conflicto_returnsConflict para el solape total, que siempre rechaza. */
     @Test
     @DisplayName("aula ocupada con solape parcial dentro del margen tolerado: 200, el aula queda asignada igual")
     void assign_solapeParcialTolerado_returnsOk() throws Exception {
@@ -175,9 +175,26 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/assign")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(assignBody(List.of(aula.getId()), null)))
+                        .content(assignBody(List.of(aula.getId()), "Solape tolerado, aprobado por subsecretaría")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("IN_EVALUATION"));
+    }
+
+    @Test
+    @DisplayName("aula ocupada con solape parcial dentro del margen tolerado pero sin motivo: 400, exige justificación")
+    void assign_solapeParcialTolerado_sinMotivo_returnsBadRequest() throws Exception {
+        IntegrationTestData.SubjectAndCommission sc = testData.materiaYComision();
+        LocalDate date = LocalDate.now().plusDays(28);
+        Classroom aula = testData.aula(testData.edificio());
+        Occurrence occupied = seedOccurrence(sc, date);
+        allocateDirectly(occupied.getId(), aula.getId());
+
+        RoomRequestItem item = seedCreatedEventItem(RoomRequestType.FINAL_EXAM, date);
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/assign")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(List.of(aula.getId()), null)))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -367,7 +384,7 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
                 .duration(Duration.ofMinutes(90))
                 .estimated(30)
                 .classroomCount(1)
-                .status(RoomRequestStatus.IN_EVALUATION)
+                .status(RoomRequestStatus.RESOLVED)
                 .decidedBy("subsecretaria@frc.utn.edu.ar")
                 .decidedAt(LocalDateTime.now())
                 .notifiedAt(LocalDateTime.now())

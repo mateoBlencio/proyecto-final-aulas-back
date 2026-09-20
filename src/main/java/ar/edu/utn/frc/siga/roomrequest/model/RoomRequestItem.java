@@ -166,6 +166,13 @@ public class RoomRequestItem extends TimestampedEntity {
         return (startTime == null || duration == null) ? null : startTime.plus(duration);
     }
 
+    /** Fuente de verdad de la regla; {@link ar.edu.utn.frc.siga.roomrequest.specification.RoomRequestItemSpecification}
+     *  la repite en SQL para poder filtrar sin traer las filas, así que un cambio acá hay que replicarlo ahí. */
+    public boolean requiresSpecialAssignment() {
+        return Boolean.TRUE.equals(requiresComputers) || requiredSoftware != null
+                || Boolean.TRUE.equals(requiresExamUsers);
+    }
+
     void attachTo(RoomRequest request, int position) {
         this.request = request;
         this.position = position;

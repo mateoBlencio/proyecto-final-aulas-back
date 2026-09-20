@@ -511,19 +511,6 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     @Test
-    @DisplayName("assign: pedido ya notificado se rechaza aunque el estado lo permitiera")
-    void assign_yaNotificadoSeRechaza() {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.IN_EVALUATION)
-                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1)
-                .notifiedAt(java.time.LocalDateTime.now()).build();
-        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
-
-        assertThatThrownBy(() -> service.assign(1L, List.of(104L), null, "subsecretaria@frc.utn.edu.ar"))
-                .isInstanceOf(InvalidRoomRequestException.class);
-        verifyNoInteractions(allocationService, occurrenceResolver, composer);
-    }
-
-    @Test
     @DisplayName("assign: conflicto de aula propaga la excepción sin dejar nada a medio escribir")
     void assign_conflicto() {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)

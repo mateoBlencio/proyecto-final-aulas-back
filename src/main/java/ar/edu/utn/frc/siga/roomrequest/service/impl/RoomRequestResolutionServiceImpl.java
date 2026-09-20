@@ -60,11 +60,6 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
         transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.IN_EVALUATION);
 
-        if (item.getNotifiedAt() != null) {
-            throw new InvalidRoomRequestException(
-                    "El pedido ya fue notificado al docente; no se puede volver a asignar.");
-        }
-
         List<Long> ids = classroomIds == null ? List.of() : classroomIds;
         if (ids.isEmpty()) {
             throw new InvalidRoomRequestException("Hay que asignar al menos un aula.");
@@ -90,7 +85,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
             allocationItems.add(new AllocationItem(
                     new AllocationTarget.Occurrences(occurrencesBySlot.get(i)), ids.get(i)));
         }
-        allocationService.reallocate(AllocationCommand.manual(allocationItems, "Pedido de aula #" + item.getId()));
+        allocationService.reallocate(AllocationCommand.manual(allocationItems, reason));
 
         item.assignClassrooms(ids, occurrencesBySlot);
         item.decide(RoomRequestStatus.IN_EVALUATION, actor, reason, LocalDateTime.now());

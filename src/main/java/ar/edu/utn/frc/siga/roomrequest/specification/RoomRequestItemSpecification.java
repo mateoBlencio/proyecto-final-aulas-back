@@ -39,6 +39,8 @@ public class RoomRequestItemSpecification {
                         cb.lessThanOrEqualTo(root.get("date"), filter.dateTo())));
             }
             if (filter.requiresSpecialAssignment() != null) {
+                // Espejo en SQL de RoomRequestItem.requiresSpecialAssignment() (no se puede filtrar por un método
+                // Java sin traer las filas): si cambia la regla ahí, hay que replicarla acá también.
                 // requiresExamUsers es nullable: sin coalesce, NULL OR false da NULL y cb.not(NULL) también
                 // es NULL, no true, así que la fila se pierde en ambos sentidos del filtro.
                 Predicate special = cb.or(

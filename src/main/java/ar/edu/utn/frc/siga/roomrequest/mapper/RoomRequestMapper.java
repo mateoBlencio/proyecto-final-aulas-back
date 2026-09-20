@@ -54,9 +54,7 @@ public interface RoomRequestMapper {
     @Mapping(target = "endTime", expression = "java(item.endTime())")
     @Mapping(target = "derivedBuildingName", source = "derivedBuildingName")
     @Mapping(target = "assignedClassroomCount", source = "assignedClassroomCount")
-    @Mapping(target = "requiresSpecialAssignment",
-             expression = "java(Boolean.TRUE.equals(item.getRequiresComputers()) "
-                     + "|| item.getRequiredSoftware() != null || Boolean.TRUE.equals(item.getRequiresExamUsers()))")
+    @Mapping(target = "requiresSpecialAssignment", expression = "java(item.requiresSpecialAssignment())")
     @Mapping(target = "wasReturned", expression = "java(item.getReturnedFromBuildingId() != null)")
     @Mapping(target = "partiallyResolved",
              expression = "java(assignedClassroomCount != null && assignedClassroomCount > 0 "
