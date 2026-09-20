@@ -23,6 +23,7 @@ import ar.edu.utn.frc.siga.space.model.PermissionTargetKind;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomPermissionRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
+import ar.edu.utn.frc.siga.space.repository.ClassroomResourceRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
 import ar.edu.utn.frc.siga.space.service.ClassroomTypeService;
 import ar.edu.utn.frc.siga.space.service.command.ClassroomSyncCommand;
@@ -80,6 +81,8 @@ class ClassroomServiceImplTest {
     private BuildingScopeResolver buildingScopeResolver;
     @Mock
     private ClassroomPermissionRepository classroomPermissionRepository;
+    @Mock
+    private ClassroomResourceRepository classroomResourceRepository;
 
     private ClassroomServiceImpl service;
 
@@ -90,7 +93,7 @@ class ClassroomServiceImplTest {
         service = new ClassroomServiceImpl(
                 classroomRepository, buildingRepository, classroomTypeService, classroomTypeRepository,
                 classroomMapper, classroomListComposer, classroomFeatureWriter, buildingScopeResolver,
-                scopedClassroom, classroomPermissionRepository);
+                scopedClassroom, classroomPermissionRepository, classroomResourceRepository);
         lenient().when(buildingScopeResolver.scopeFor(any())).thenReturn(BuildingScope.unrestricted());
     }
 
