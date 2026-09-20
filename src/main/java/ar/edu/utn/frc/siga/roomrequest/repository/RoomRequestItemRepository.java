@@ -31,4 +31,19 @@ public interface RoomRequestItemRepository
             + "and i.date = :date "
             + "and i.status <> ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.CANCELLED")
     List<RoomRequestItem> findActiveOffScheduleItemsByDate(@Param("date") LocalDate date);
+
+    @Query("select i from RoomRequestItem i "
+            + "where i.status in (ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.NEW, "
+            + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.DERIVED_TO_BUILDING, "
+            + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.IN_EVALUATION) "
+            + "and i.request.type <> ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType.REGULAR_ROOM_CHANGE "
+            + "and i.date < :today")
+    List<RoomRequestItem> findExpiredByDate(@Param("today") LocalDate today);
+
+    @Query("select i from RoomRequestItem i "
+            + "where i.status in (ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.NEW, "
+            + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.DERIVED_TO_BUILDING, "
+            + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.IN_EVALUATION) "
+            + "and i.request.type = ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType.REGULAR_ROOM_CHANGE")
+    List<RoomRequestItem> findActiveRegularRoomChangeItems();
 }
