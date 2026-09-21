@@ -96,7 +96,7 @@ class RoomRequestItemCancelApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("sin token: 401; con AUXILIAR_AULICO: 200 (escritura habilitada para ambos roles)")
+    @DisplayName("sin token: 401; con AUXILIAR_AULICO sobre un NEW (todavía no es de ningún edificio): 403")
     void authenticationAndAuthorization() throws Exception {
         RoomRequestItem pendingParaAnonimo = seedItem(RoomRequestStatus.NEW);
         RoomRequestItem pendingParaAuxiliar = seedItem(RoomRequestStatus.NEW);
@@ -113,7 +113,7 @@ class RoomRequestItemCancelApiIntegrationTest extends AbstractIntegrationTest {
                 .perform(post("/v1/room-requests/items/" + pendingParaAuxiliar.getId() + "/cancel")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"motivo\"}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isForbidden());
     }
 
     private RoomRequestItem seedItem(RoomRequestStatus status) {

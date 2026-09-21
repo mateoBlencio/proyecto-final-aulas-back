@@ -86,14 +86,15 @@ public class RoomRequestController {
             @RequestParam(required = false) Boolean requiresSpecialAssignment,
             @RequestParam(required = false) Long derivedBuildingId,
             @RequestParam(required = false) Boolean partiallyResolved,
-            @RequestParam(required = false) Boolean wasReturned) {
+            @RequestParam(required = false) Boolean wasReturned,
+            Principal principal) {
 
         log.debug("GET /v1/room-requests/items: types={}, statuses={}, scope={}, subjectId={}, page={}",
                 types, statuses, scope, subjectId, pageable.getPageNumber());
         RoomRequestItemFilter filter =
                 RoomRequestItemFilter.of(types, statuses, scope, subjectId, dateFrom, dateTo, includePast,
                         requiresSpecialAssignment, derivedBuildingId, partiallyResolved, wasReturned);
-        Page<RoomRequestItemRowDto> page = roomRequestService.findItems(filter, pageable);
+        Page<RoomRequestItemRowDto> page = roomRequestService.findItems(filter, pageable, principal.getName());
         log.info("Pedidos de aula listados vía controller: total={}", page.getTotalElements());
         return ResponseEntity.ok(page);
     }
@@ -106,12 +107,13 @@ public class RoomRequestController {
     public ResponseEntity<List<RoomRequestItemStatusCountDto>> countItemsByStatus(
             @RequestParam(required = false, defaultValue = "true") boolean includePast,
             @RequestParam(required = false) Boolean requiresSpecialAssignment,
-            @RequestParam(required = false) Boolean partiallyResolved) {
+            @RequestParam(required = false) Boolean partiallyResolved,
+            Principal principal) {
 
         log.debug("GET /v1/room-requests/items/status-counts: includePast={}, requiresSpecialAssignment={}, "
                         + "partiallyResolved={}", includePast, requiresSpecialAssignment, partiallyResolved);
-        List<RoomRequestItemStatusCountDto> counts =
-                roomRequestService.countItemsByStatus(includePast, requiresSpecialAssignment, partiallyResolved);
+        List<RoomRequestItemStatusCountDto> counts = roomRequestService.countItemsByStatus(includePast,
+                requiresSpecialAssignment, partiallyResolved, principal.getName());
         log.info("Pedidos de aula contados por estado vía controller: {}", counts);
         return ResponseEntity.ok(counts);
     }

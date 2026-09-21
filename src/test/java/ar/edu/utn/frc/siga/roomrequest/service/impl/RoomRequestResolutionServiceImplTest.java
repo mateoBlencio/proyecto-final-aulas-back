@@ -23,6 +23,8 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItemAllocation;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
+import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl;
+import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestDeriveEligibilityValidator;
 import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestTransitionValidator;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
@@ -57,6 +59,10 @@ class RoomRequestResolutionServiceImplTest {
     private RoomRequestItemRepository itemRepository;
     @Mock
     private RoomRequestTransitionValidator transitionValidator;
+    @Mock
+    private RoomRequestAccessControl accessControl;
+    @Mock
+    private RoomRequestDeriveEligibilityValidator deriveEligibilityValidator;
     @Mock
     private AllocationService allocationService;
     @Mock
@@ -294,6 +300,22 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     @Test
+    @DisplayName("derive: delega la elegibilidad en RoomRequestDeriveEligibilityValidator, tras el rol/edificio")
+    void derive_delegaElegibilidad() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        org.mockito.Mockito.doThrow(new InvalidRoomRequestException("no requiere asignación especial"))
+                .when(deriveEligibilityValidator).validate(item);
+
+        assertThatThrownBy(() -> service.derive(1L, 1L, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestException.class);
+
+        org.mockito.Mockito.verify(accessControl).authorize(item, "subsecretaria@frc.utn.edu.ar",
+                ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl.Action.DERIVE);
+        verifyNoInteractions(buildingService, composer);
+    }
+
+    @Test
     @DisplayName("derive: ítem inexistente → 404")
     void derive_itemInexistente() {
         when(itemRepository.findWithRequestById(99L)).thenReturn(Optional.empty());
@@ -464,7 +486,7 @@ class RoomRequestResolutionServiceImplTest {
     // manejo de reason, y cómo se arma el AllocationCommand a partir de lo que el resolver devuelve.
 
     @Test
-    @DisplayName("assign: RESOLVED (ya notificado) se rechaza antes de validar la forma")
+    @DisplayName("assign: RESOLVED (ya notificado) se rechaza antes de validar la forma o el rol")
     void assign_yaNotificadoSeRechaza() {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.RESOLVED)
                 .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(2).build();
@@ -472,7 +494,7 @@ class RoomRequestResolutionServiceImplTest {
 
         assertThatThrownBy(() -> service.assign(1L, List.of(104L), null, "subsecretaria@frc.utn.edu.ar"))
                 .isInstanceOf(RoomRequestAlreadyNotifiedException.class);
-        verifyNoInteractions(transitionValidator, allocationService, occurrenceResolver, composer);
+        verifyNoInteractions(transitionValidator, accessControl, allocationService, occurrenceResolver, composer);
     }
 
     @Test

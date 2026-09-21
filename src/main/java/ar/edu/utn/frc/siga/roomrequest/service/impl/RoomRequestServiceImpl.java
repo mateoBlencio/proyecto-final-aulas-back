@@ -19,6 +19,7 @@ import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestRepository;
 import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestService;
 import ar.edu.utn.frc.siga.roomrequest.specification.RoomRequestItemSort;
 import ar.edu.utn.frc.siga.roomrequest.specification.RoomRequestItemSpecification;
+import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -40,6 +41,7 @@ public class RoomRequestServiceImpl implements RoomRequestService {
     private final RoomRequestItemRepository itemRepository;
     private final RoomRequestComposer composer;
     private final RoomRequestHandlers handlers;
+    private final RoomRequestAccessControl accessControl;
 
     @Override
     @Transactional
@@ -60,14 +62,16 @@ public class RoomRequestServiceImpl implements RoomRequestService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<RoomRequestItemRowDto> findItems(RoomRequestItemFilter filter, Pageable pageable) {
+    public Page<RoomRequestItemRowDto> findItems(RoomRequestItemFilter filter, Pageable pageable,
+            String actorEmail) {
         log.debug("Listando pedidos de aula: types={}, statuses={}, scope={}, subjectId={}, "
                         + "dateFrom={}, dateTo={}, includePast={}",
                 filter.types(), filter.statuses(), filter.scope(), filter.subjectId(),
                 filter.dateFrom(), filter.dateTo(), filter.includePast());
 
+        RoomRequestItemFilter scoped = scoped(filter, actorEmail);
         Page<RoomRequestItem> page = itemRepository.findAll(
-                RoomRequestItemSpecification.withFilter(filter), RoomRequestItemSort.apply(pageable));
+                RoomRequestItemSpecification.withFilter(scoped), RoomRequestItemSort.apply(pageable));
         Page<RoomRequestItemRowDto> result =
                 new PageImpl<>(composer.composeRows(page.getContent()), page.getPageable(), page.getTotalElements());
         log.info("Pedidos de aula listados: total={}", result.getTotalElements());
@@ -77,12 +81,12 @@ public class RoomRequestServiceImpl implements RoomRequestService {
     @Override
     @Transactional(readOnly = true)
     public List<RoomRequestItemStatusCountDto> countItemsByStatus(boolean includePast,
-            Boolean requiresSpecialAssignment, Boolean partiallyResolved) {
+            Boolean requiresSpecialAssignment, Boolean partiallyResolved, String actorEmail) {
         log.debug("Contando pedidos de aula por estado: includePast={}, requiresSpecialAssignment={}, "
                         + "partiallyResolved={}", includePast, requiresSpecialAssignment, partiallyResolved);
 
-        RoomRequestItemFilter base = RoomRequestItemFilter.of(null, null, null, null, null, null, includePast,
-                requiresSpecialAssignment, null, partiallyResolved, null);
+        RoomRequestItemFilter base = scoped(RoomRequestItemFilter.of(null, null, null, null, null, null, includePast,
+                requiresSpecialAssignment, null, partiallyResolved, null), actorEmail);
         List<RoomRequestItemStatusCountDto> counts = Arrays.stream(RoomRequestStatus.values())
                 .map(status -> new RoomRequestItemStatusCountDto(status, itemRepository.count(
                         RoomRequestItemSpecification.withFilter(onlyStatus(base, status)))))
@@ -91,10 +95,15 @@ public class RoomRequestServiceImpl implements RoomRequestService {
         return counts;
     }
 
+    private RoomRequestItemFilter scoped(RoomRequestItemFilter filter, String actorEmail) {
+        return accessControl.readScope(actorEmail).map(filter::restrictedToBuildings).orElse(filter);
+    }
+
     private static RoomRequestItemFilter onlyStatus(RoomRequestItemFilter base, RoomRequestStatus status) {
         return new RoomRequestItemFilter(null, Set.of(status), null, null,
                 base.dateFrom(), base.dateTo(), base.includePast(),
-                base.requiresSpecialAssignment(), null, base.partiallyResolved(), null);
+                base.requiresSpecialAssignment(), null, base.partiallyResolved(), null,
+                base.restrictToBuildingIds());
     }
 
     @Override

@@ -52,6 +52,11 @@ public class RoomRequestItemSpecification {
             if (filter.derivedBuildingId() != null) {
                 predicates.add(cb.equal(root.get("derivedBuildingId"), filter.derivedBuildingId()));
             }
+            if (filter.restrictToBuildingIds() != null) {
+                predicates.add(filter.restrictToBuildingIds().isEmpty()
+                        ? cb.disjunction()
+                        : root.get("derivedBuildingId").in(filter.restrictToBuildingIds()));
+            }
             if (filter.wasReturned() != null) {
                 Predicate returned = cb.isNotNull(root.get("returnedFromBuildingId"));
                 predicates.add(filter.wasReturned() ? returned : cb.not(returned));

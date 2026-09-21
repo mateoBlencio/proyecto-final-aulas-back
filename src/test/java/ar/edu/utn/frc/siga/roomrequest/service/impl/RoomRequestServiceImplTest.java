@@ -22,6 +22,7 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestRepository;
+import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -61,12 +62,14 @@ class RoomRequestServiceImplTest {
     private RoomRequestComposer composer;
     @Mock
     private RoomRequestHandlers handlers;
+    @Mock
+    private RoomRequestAccessControl accessControl;
 
     private RoomRequestServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new RoomRequestServiceImpl(repository, itemRepository, composer, handlers);
+        service = new RoomRequestServiceImpl(repository, itemRepository, composer, handlers, accessControl);
     }
 
     @Test
@@ -124,7 +127,7 @@ class RoomRequestServiceImplTest {
                 .thenAnswer(invocation -> new PageImpl<>(List.of(item), pageableCaptor.getValue(), 1));
         when(composer.composeRows(List.of(item))).thenReturn(List.of(row));
 
-        Page<RoomRequestItemRowDto> result = service.findItems(filter, requested);
+        Page<RoomRequestItemRowDto> result = service.findItems(filter, requested, "subsecretaria@frc.utn.edu.ar");
 
         assertThat(pageableCaptor.getValue().getSort().toList())
                 .extracting(Sort.Order::getProperty)
@@ -140,7 +143,7 @@ class RoomRequestServiceImplTest {
                 RoomRequestItemFilter.of(null, null, null, null, null, null, true, null, null, null, null);
         Pageable requested = PageRequest.of(0, 20, Sort.by("teacherEmail"));
 
-        assertThatThrownBy(() -> service.findItems(filter, requested))
+        assertThatThrownBy(() -> service.findItems(filter, requested, "subsecretaria@frc.utn.edu.ar"))
                 .isInstanceOf(InvalidRoomRequestException.class);
 
         verifyNoInteractions(itemRepository, composer);
@@ -152,7 +155,8 @@ class RoomRequestServiceImplTest {
         when(itemRepository.count(ArgumentMatchers.<Specification<RoomRequestItem>>any()))
                 .thenReturn(30L, 5L, 10L, 2L, 0L);
 
-        List<RoomRequestItemStatusCountDto> result = service.countItemsByStatus(true, null, null);
+        List<RoomRequestItemStatusCountDto> result =
+                service.countItemsByStatus(true, null, null, "subsecretaria@frc.utn.edu.ar");
 
         assertThat(result).containsExactly(
                 new RoomRequestItemStatusCountDto(RoomRequestStatus.NEW, 30L),

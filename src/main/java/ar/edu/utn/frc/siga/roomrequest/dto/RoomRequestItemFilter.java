@@ -20,7 +20,8 @@ public record RoomRequestItemFilter(
         Boolean requiresSpecialAssignment,
         Long derivedBuildingId,
         Boolean partiallyResolved,
-        Boolean wasReturned) {
+        Boolean wasReturned,
+        Set<Long> restrictToBuildingIds) {
 
     public static RoomRequestItemFilter of(Set<RoomRequestType> types, Set<RoomRequestStatus> statuses,
             AcademicScope scope, Long subjectId, LocalDate dateFrom, LocalDate dateTo, boolean includePast,
@@ -31,7 +32,13 @@ public record RoomRequestItemFilter(
             DateRanges.requireNotBefore(dateTo, effectiveFrom);
         }
         return new RoomRequestItemFilter(types, statuses, scope, subjectId, effectiveFrom, dateTo, includePast,
-                requiresSpecialAssignment, derivedBuildingId, partiallyResolved, wasReturned);
+                requiresSpecialAssignment, derivedBuildingId, partiallyResolved, wasReturned, null);
+    }
+
+    /** Recorta el resultado a los edificios a cargo del auxiliar áulico que consulta; null = sin recorte. */
+    public RoomRequestItemFilter restrictedToBuildings(Set<Long> buildingIds) {
+        return new RoomRequestItemFilter(types, statuses, scope, subjectId, dateFrom, dateTo, includePast,
+                requiresSpecialAssignment, derivedBuildingId, partiallyResolved, wasReturned, buildingIds);
     }
 
     private static LocalDate laterOf(LocalDate dateFrom, LocalDate today) {

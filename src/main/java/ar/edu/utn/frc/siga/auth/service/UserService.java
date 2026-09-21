@@ -25,4 +25,10 @@ public interface UserService {
 
     /** Subconjunto de buildingIds cubierto por algún usuario habilitado con ese rol (alcance GLOBAL o al edificio puntual). */
     Set<Long> findBuildingIdsCoveredByRole(SystemRole role, Collection<Long> buildingIds);
+
+    /** Si el usuario habilitado tiene ese rol asignado, con cualquier alcance. */
+    boolean hasRole(String email, SystemRole role);
+
+    /** Edificios a cargo del usuario para ese rol (alcance por edificio; ignora un eventual alcance GLOBAL de ese rol). */
+    Set<Long> findBuildingIdsForRole(String email, SystemRole role);
 }
