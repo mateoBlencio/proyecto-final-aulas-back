@@ -36,6 +36,7 @@ public class FinalExamHandler extends AbstractRoomRequestHandler {
             ItemConsistency.requireNoCommission(item,
                     "El final se solicita por materia: los pedidos no llevan comisión.");
             ItemConsistency.requireExamUsersConsistent(true, item);
+            ItemConsistency.requireExamAdvanceNotice(item.date(), item.startTime());
         }
     }
 

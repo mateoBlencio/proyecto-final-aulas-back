@@ -5,33 +5,41 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/room-requests/items/status-counts?includePast=false
+  url: {{baseUrl}}/v1/room-requests/items/status-counts?includePast=false&requiresSpecialAssignment=&partiallyResolved=
   body: none
   auth: inherit
 }
 
 params:query {
   includePast: false
+  requiresSpecialAssignment:
+  partiallyResolved:
 }
 
 docs {
   Total de pedidos por estado, para los badges de las solapas de la bandeja.
   Requiere autenticación (hasAnyRole SUBSECRETARIA, AUXILIAR_AULICO).
 
-  A diferencia de 06-listar-pedidos, NO toma los filtros del listado (types,
-  scope, subjectId, dateFrom, dateTo, statuses): cada badge es el total de ese
-  estado. Único parámetro:
+  A diferencia de 08-listar-pedidos, NO toma la mayoría de los filtros del
+  listado (types, scope, subjectId, dateFrom, dateTo, statuses,
+  derivedBuildingId, wasReturned): cada badge es el total de ese estado.
+  Parámetros:
 
   - includePast: default false, oculta los pedidos con fecha ya pasada (mismo
     criterio que la bandeja). includePast=true suma el histórico completo.
+  - requiresSpecialAssignment / partiallyResolved: opcionales, mismos cálculos
+    que en el listado (ver 08-listar-pedidos), por si el front quiere un badge
+    de "requieren atención especial" o "resueltos parcialmente".
 
-  Respuesta 200: siempre los 3 estados, en este orden, con 0 cuando no hay
+  Respuesta 200: siempre los 5 estados, en este orden, con 0 cuando no hay
   pedidos. Sin envoltorio de paginación.
 
   [
-    { "status": "PENDING",      "count": 12 },
-    { "status": "PRE_APPROVED", "count": 3  },
-    { "status": "CANCELLED",    "count": 47 }
+    { "status": "NEW",                 "count": 12 },
+    { "status": "DERIVED_TO_BUILDING", "count": 4  },
+    { "status": "IN_EVALUATION",       "count": 3  },
+    { "status": "RESOLVED",            "count": 8  },
+    { "status": "CANCELLED",           "count": 47 }
   ]
 
   Uso en el front: se pide una sola vez al entrar a la bandeja (y al togglear

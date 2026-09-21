@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
@@ -44,6 +45,29 @@ public class OccurrenceServiceImpl implements OccurrenceService {
                 ? occurrenceRepository.findByEvent_Id(eventId)
                 : occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eventId, from);
         return occurrences.stream().map(OccurrenceServiceImpl::toSlot).toList();
+    }
+
+    @Override
+    @Transactional
+    public List<Long> createSimultaneous(Long occurrenceId, int count) {
+        Occurrence principal = Finder.orThrow(occurrenceRepository::findById, occurrenceId, "Occurrence");
+        int nextSlot = occurrenceRepository.findByEvent_IdAndDate(principal.getEvent().getId(), principal.getDate())
+                .stream()
+                .mapToInt(Occurrence::getRoomSlot)
+                .max()
+                .orElse(1) + 1;
+
+        List<Occurrence> created = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            created.add(Occurrence.builder()
+                    .event(principal.getEvent())
+                    .date(principal.getDate())
+                    .status(OccurrenceStatus.NEEDS_ROOM)
+                    .roomSlot(nextSlot + i)
+                    .mirrorOfOccurrenceId(principal.getId())
+                    .build());
+        }
+        return occurrenceRepository.saveAll(created).stream().map(Occurrence::getId).toList();
     }
 
     @Override

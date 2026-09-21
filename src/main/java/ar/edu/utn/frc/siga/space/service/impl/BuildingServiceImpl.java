@@ -18,6 +18,7 @@ import ar.edu.utn.frc.siga.space.service.BuildingService;
 import ar.edu.utn.frc.siga.space.service.command.BuildingSyncCommand;
 import ar.edu.utn.frc.siga.space.specification.BuildingSpecification;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -66,6 +67,11 @@ public class BuildingServiceImpl implements BuildingService {
     public BuildingResponseDto findByName(String name) {
         return buildingMapper.toDto(buildingRepository.findByName(name)
                 .orElseThrow(() -> ResourceNotFoundException.of("Building", name)));
+    }
+
+    @Override
+    public List<BuildingResponseDto> findByIds(Collection<Long> ids) {
+        return buildingRepository.findAllById(ids).stream().map(buildingMapper::toDto).toList();
     }
 
     @Override

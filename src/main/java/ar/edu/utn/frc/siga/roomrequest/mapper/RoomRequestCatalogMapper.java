@@ -4,10 +4,13 @@ import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.common.mapper.CentralMapperConfig;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.AssignedClassroomDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.BuildingOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CommissionOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.SpecialtyOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.SubjectOptionDto;
+import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -31,4 +34,12 @@ public interface RoomRequestCatalogMapper {
     ClassroomOptionDto toOption(ClassroomResponseDto classroom);
 
     List<ClassroomOptionDto> toClassroomOptions(List<ClassroomResponseDto> classrooms);
+
+    AssignedClassroomDto toAssignedClassroomOption(ClassroomResponseDto classroom);
+
+    List<AssignedClassroomDto> toAssignedClassroomOptions(List<ClassroomResponseDto> classrooms);
+
+    BuildingOptionDto toOption(BuildingResponseDto building);
+
+    List<BuildingOptionDto> toBuildingOptions(List<BuildingResponseDto> buildings);
 }

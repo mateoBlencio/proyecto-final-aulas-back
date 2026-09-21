@@ -96,6 +96,9 @@ cors:
 siga:
   api:
     base-path: /v1
+  room-requests:
+    expiry:
+      cron: "0 0 4 * * *"
   settings:
     definitions:
       - key: optimizer.unimprovedSecondsLimit

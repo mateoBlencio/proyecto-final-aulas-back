@@ -28,6 +28,8 @@ class UniqueEventTest {
         assertThat(occurrence.getDate()).isEqualTo(date);
         assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM);
         assertThat(occurrence.getEvent()).isSameAs(event);
+        assertThat(occurrence.getRoomSlot()).isEqualTo(1);
+        assertThat(occurrence.getMirrorOfOccurrenceId()).isNull();
     }
 
     @Test

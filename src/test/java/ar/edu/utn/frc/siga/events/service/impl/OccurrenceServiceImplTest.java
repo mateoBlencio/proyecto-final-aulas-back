@@ -13,16 +13,19 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -109,6 +112,74 @@ class OccurrenceServiceImplTest {
 
         assertThatThrownBy(() -> service.requestRoom(10L)).isInstanceOf(OccurrenceAlreadyPastException.class);
         assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.ROOM_RELEASED);
+    }
+
+    @Test
+    @DisplayName("createSimultaneous: crea count ocurrencias con roomSlot correlativo y mirrorOfOccurrenceId a la principal")
+    void createSimultaneousCreaOcurrenciasEnlazadas() {
+        Occurrence principal = occurrence(10L, OccurrenceStatus.NEEDS_ROOM);
+        when(occurrenceRepository.findById(10L)).thenReturn(Optional.of(principal));
+        when(occurrenceRepository.findByEvent_IdAndDate(1L, LocalDate.of(2026, 3, 2)))
+                .thenReturn(List.of(principal));
+        when(occurrenceRepository.saveAll(org.mockito.ArgumentMatchers.<List<Occurrence>>any()))
+                .thenAnswer(invocation -> {
+                    List<Occurrence> toSave = invocation.getArgument(0);
+                    List<Occurrence> saved = new java.util.ArrayList<>();
+                    long nextId = 100L;
+                    for (Occurrence o : toSave) {
+                        saved.add(Occurrence.builder()
+                                .id(nextId++)
+                                .event(o.getEvent())
+                                .date(o.getDate())
+                                .status(o.getStatus())
+                                .roomSlot(o.getRoomSlot())
+                                .mirrorOfOccurrenceId(o.getMirrorOfOccurrenceId())
+                                .build());
+                    }
+                    return saved;
+                });
+
+        List<Long> created = service.createSimultaneous(10L, 2);
+
+        assertThat(created).containsExactly(100L, 101L);
+        ArgumentCaptor<List<Occurrence>> captor = ArgumentCaptor.forClass(List.class);
+        verify(occurrenceRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).extracting(Occurrence::getRoomSlot).containsExactly(2, 3);
+        assertThat(captor.getValue()).extracting(Occurrence::getMirrorOfOccurrenceId).containsExactly(10L, 10L);
+        assertThat(captor.getValue()).extracting(Occurrence::getDate).containsExactly(
+                LocalDate.of(2026, 3, 2), LocalDate.of(2026, 3, 2));
+        assertThat(captor.getValue()).extracting(Occurrence::getStatus).containsExactly(
+                OccurrenceStatus.NEEDS_ROOM, OccurrenceStatus.NEEDS_ROOM);
+    }
+
+    @Test
+    @DisplayName("createSimultaneous: si ya hay ocurrencias simultáneas, sigue la numeración de roomSlot")
+    void createSimultaneousContinuaLaNumeracion() {
+        Occurrence principal = occurrence(10L, OccurrenceStatus.NEEDS_ROOM);
+        Occurrence existingMirror = Occurrence.builder()
+                .id(11L).event(principal.getEvent()).date(principal.getDate())
+                .status(OccurrenceStatus.NEEDS_ROOM).roomSlot(2).mirrorOfOccurrenceId(10L).build();
+        when(occurrenceRepository.findById(10L)).thenReturn(Optional.of(principal));
+        when(occurrenceRepository.findByEvent_IdAndDate(1L, LocalDate.of(2026, 3, 2)))
+                .thenReturn(List.of(principal, existingMirror));
+        when(occurrenceRepository.saveAll(org.mockito.ArgumentMatchers.<List<Occurrence>>any()))
+                .thenAnswer(invocation -> {
+                    List<Occurrence> toSave = invocation.getArgument(0);
+                    List<Occurrence> saved = new java.util.ArrayList<>();
+                    long nextId = 200L;
+                    for (Occurrence o : toSave) {
+                        saved.add(Occurrence.builder().id(nextId++).event(o.getEvent()).date(o.getDate())
+                                .status(o.getStatus()).roomSlot(o.getRoomSlot())
+                                .mirrorOfOccurrenceId(o.getMirrorOfOccurrenceId()).build());
+                    }
+                    return saved;
+                });
+
+        service.createSimultaneous(10L, 1);
+
+        ArgumentCaptor<List<Occurrence>> captor = ArgumentCaptor.forClass(List.class);
+        verify(occurrenceRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).extracting(Occurrence::getRoomSlot).containsExactly(3);
     }
 
     @Test

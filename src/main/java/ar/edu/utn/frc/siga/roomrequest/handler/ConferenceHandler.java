@@ -32,6 +32,7 @@ public class ConferenceHandler extends AbstractRoomRequestHandler {
             ItemConsistency.requireNoCommission(item,
                     "Una charla o conferencia no pertenece al cursado de una comisión: los pedidos no llevan comisión.");
             ItemConsistency.requireExamUsersConsistent(false, item);
+            ItemConsistency.requireNotPast(item.date(), item.startTime());
         }
     }
 

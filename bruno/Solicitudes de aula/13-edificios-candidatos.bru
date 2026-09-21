@@ -1,0 +1,29 @@
+meta {
+  name: Edificios candidatos para derivar un pedido
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/v1/room-requests/items/1/candidate-buildings
+  body: none
+  auth: inherit
+}
+
+docs {
+  Edificios a los que subsecretaría puede derivar el pedido. Requiere autenticación
+  (hasAnyRole SUBSECRETARIA, AUXILIAR_AULICO). Sin query params: todo sale de los
+  datos del ítem.
+
+  Solo devuelve edificios que tienen **al menos un aula libre** que cumple los
+  requisitos del pedido (computadoras, proyector) Y que tienen **al menos un
+  auxiliar áulico asignado** — si nadie puede resolverlo ahí, no se ofrece como
+  destino de derivación.
+
+  No exige llegar a `classroomCount`: un edificio con 1 de 2 aulas libres igual
+  aparece, con `availableClassroomCount: 1` (la resolución puede ser parcial).
+
+  Respuesta: array de { id, name, availableClassroomCount }. Lista vacía es una
+  respuesta válida (200, no 404) cuando ningún edificio tiene nada libre. 404
+  solo si el id del ítem no existe.
+}

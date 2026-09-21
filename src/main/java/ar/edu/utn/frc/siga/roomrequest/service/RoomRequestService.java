@@ -17,7 +17,8 @@ public interface RoomRequestService {
 
     Page<RoomRequestItemRowDto> findItems(RoomRequestItemFilter filter, Pageable pageable);
 
-    List<RoomRequestItemStatusCountDto> countItemsByStatus(boolean includePast);
+    List<RoomRequestItemStatusCountDto> countItemsByStatus(boolean includePast, Boolean requiresSpecialAssignment,
+            Boolean partiallyResolved);
 
     RoomRequestItemDetailDto findItemById(Long itemId);
 }
