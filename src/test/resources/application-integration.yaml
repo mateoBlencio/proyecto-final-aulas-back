@@ -36,3 +36,6 @@ siga:
   sysacad:
     enabled: false
     api-key: integration-test-unused
+  notifications:
+    email:
+      enabled: true
