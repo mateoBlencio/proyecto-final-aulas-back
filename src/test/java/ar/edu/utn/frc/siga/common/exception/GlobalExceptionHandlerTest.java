@@ -163,6 +163,17 @@ class GlobalExceptionHandlerTest {
         assertThat(problem.getStatus()).isEqualTo(413);
     }
 
+    @Test
+    @DisplayName("OptimisticLockingFailureException se traduce a 409 sin filtrar el mensaje interno al cliente")
+    void optimisticLockingFailureExceptionMapsTo409() {
+        ProblemDetail problem = handler.handleOptimisticLock(
+                new org.springframework.dao.OptimisticLockingFailureException("Row was updated or deleted by another transaction"));
+
+        assertThat(problem.getStatus()).isEqualTo(409);
+        assertThat(problem.getTitle()).isEqualTo("Concurrent modification");
+        assertThat(problem.getDetail()).doesNotContain("Row was updated or deleted");
+    }
+
     // ---------- catch-all ----------
 
     @Test

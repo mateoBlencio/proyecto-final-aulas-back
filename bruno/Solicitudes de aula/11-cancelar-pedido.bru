@@ -1,0 +1,27 @@
+meta {
+  name: Cancelar pedido
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/v1/room-requests/items/1/cancel
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "reason": "Se cayó el laboratorio y no hay otra aula disponible"
+  }
+}
+
+docs {
+  Cancela el pedido (item) desde cualquier estado no final, incluido RESOLVED.
+  Requiere autenticación (hasAnyRole SUBSECRETARIA, AUXILIAR_AULICO).
+
+  Si el pedido tenía aulas asignadas, las libera. `reason` es obligatorio.
+
+  Errores: 400 si falta `reason`; 409 si ya estaba CANCELLED; 404 si el id
+  no existe.
+}

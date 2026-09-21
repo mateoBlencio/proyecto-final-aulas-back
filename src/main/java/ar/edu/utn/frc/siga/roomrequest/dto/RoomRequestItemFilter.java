@@ -16,15 +16,22 @@ public record RoomRequestItemFilter(
         Long subjectId,
         LocalDate dateFrom,
         LocalDate dateTo,
-        boolean includePast) {
+        boolean includePast,
+        Boolean requiresSpecialAssignment,
+        Long derivedBuildingId,
+        Boolean partiallyResolved,
+        Boolean wasReturned) {
 
     public static RoomRequestItemFilter of(Set<RoomRequestType> types, Set<RoomRequestStatus> statuses,
-            AcademicScope scope, Long subjectId, LocalDate dateFrom, LocalDate dateTo, boolean includePast) {
+            AcademicScope scope, Long subjectId, LocalDate dateFrom, LocalDate dateTo, boolean includePast,
+            Boolean requiresSpecialAssignment, Long derivedBuildingId, Boolean partiallyResolved,
+            Boolean wasReturned) {
         LocalDate effectiveFrom = includePast ? dateFrom : laterOf(dateFrom, LocalDate.now());
         if (effectiveFrom != null) {
             DateRanges.requireNotBefore(dateTo, effectiveFrom);
         }
-        return new RoomRequestItemFilter(types, statuses, scope, subjectId, effectiveFrom, dateTo, includePast);
+        return new RoomRequestItemFilter(types, statuses, scope, subjectId, effectiveFrom, dateTo, includePast,
+                requiresSpecialAssignment, derivedBuildingId, partiallyResolved, wasReturned);
     }
 
     private static LocalDate laterOf(LocalDate dateFrom, LocalDate today) {

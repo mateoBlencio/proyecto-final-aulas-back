@@ -7,9 +7,11 @@ spring:
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
+
   flyway:
     user: ${DB_MIGRATION_USERNAME}
     password: ${DB_MIGRATION_PASSWORD}
+    ignore-migration-patterns: "*:missing"
 
 springdoc:
   swagger-ui:

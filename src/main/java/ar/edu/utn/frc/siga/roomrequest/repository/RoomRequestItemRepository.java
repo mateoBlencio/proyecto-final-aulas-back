@@ -12,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,7 +29,22 @@ public interface RoomRequestItemRepository
 
     @Query("select i from RoomRequestItem i "
             + "where i.request.type = ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE "
-            + "and i.date = :date "
+            + "and i.date in :dates "
             + "and i.status <> ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.CANCELLED")
-    List<RoomRequestItem> findActiveOffScheduleItemsByDate(@Param("date") LocalDate date);
+    List<RoomRequestItem> findActiveOffScheduleItemsByDateIn(@Param("dates") Collection<LocalDate> dates);
+
+    @Query("select i from RoomRequestItem i "
+            + "where i.status in (ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.NEW, "
+            + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.DERIVED_TO_BUILDING, "
+            + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.IN_EVALUATION) "
+            + "and i.request.type <> ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType.REGULAR_ROOM_CHANGE "
+            + "and i.date < :today")
+    List<RoomRequestItem> findExpiredByDate(@Param("today") LocalDate today);
+
+    @Query("select i from RoomRequestItem i "
+            + "where i.status in (ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.NEW, "
+            + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.DERIVED_TO_BUILDING, "
+            + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.IN_EVALUATION) "
+            + "and i.request.type = ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType.REGULAR_ROOM_CHANGE")
+    List<RoomRequestItem> findActiveRegularRoomChangeItems();
 }

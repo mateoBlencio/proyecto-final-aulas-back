@@ -53,7 +53,7 @@ class RoomRequestIntegrationTest extends AbstractIntegrationTest {
         assertThat(created.id()).isNotNull();
         assertThat(created.createdAt()).isNotNull();
         assertThat(created.items()).allSatisfy(
-                item -> assertThat(item.status()).isEqualTo(RoomRequestStatus.PENDING));
+                item -> assertThat(item.status()).isEqualTo(RoomRequestStatus.NEW));
         assertThat(created.items()).hasSize(2);
 
         var first = created.items().getFirst();
@@ -199,7 +199,7 @@ class RoomRequestIntegrationTest extends AbstractIntegrationTest {
         assertThat(created.type()).isEqualTo(RoomRequestType.OTHER);
         assertThat(created.subject()).isNull();
         assertThat(created.items()).singleElement().satisfies(item -> {
-            assertThat(item.status()).isEqualTo(RoomRequestStatus.PENDING);
+            assertThat(item.status()).isEqualTo(RoomRequestStatus.NEW);
             assertThat(item.observations()).isEqualTo("Necesito el aula para un evento no contemplado");
         });
     }
@@ -227,7 +227,7 @@ class RoomRequestIntegrationTest extends AbstractIntegrationTest {
         assertThat(created.type()).isEqualTo(RoomRequestType.FINAL_EXAM);
         assertThat(created.subject()).isNotNull();
         assertThat(created.items()).singleElement().satisfies(item -> {
-            assertThat(item.status()).isEqualTo(RoomRequestStatus.PENDING);
+            assertThat(item.status()).isEqualTo(RoomRequestStatus.NEW);
             assertThat(item.commissions()).isEmpty();
             assertThat(item.dayOfWeek()).isNull();
             assertThat(item.date()).isEqualTo(LocalDate.now().plusDays(30));

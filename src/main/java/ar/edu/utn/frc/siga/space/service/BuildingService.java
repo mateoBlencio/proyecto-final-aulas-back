@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.common.service.ActivationService;
 import ar.edu.utn.frc.siga.space.service.command.BuildingSyncCommand;
 
+import java.util.Collection;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
@@ -20,6 +21,9 @@ public interface BuildingService extends ActivationService<Long> {
     BuildingResponseDto findById(Long id);
 
     BuildingResponseDto findByName(String name);
+
+    /** No filtra por activo: un pedido derivado a un edificio que luego se desactivó sigue mostrando su nombre. */
+    List<BuildingResponseDto> findByIds(Collection<Long> ids);
 
     BuildingResponseDto setActive(Long id, Boolean active);
 

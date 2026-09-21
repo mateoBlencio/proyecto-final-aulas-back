@@ -16,6 +16,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @NamedInterface("api")
 public interface ClassroomService extends ActivationService<Long> {
@@ -29,6 +30,13 @@ public interface ClassroomService extends ActivationService<Long> {
     List<ClassroomResponseDto> findAllAvailable();
 
     List<ClassroomResponseDto> findByIds(Collection<Long> ids);
+
+    /**
+     * Ids de aulas con un recurso ({@code resourceTypeName}, insensible a mayúsculas) cuya
+     * {@code cantidad} llega a {@code minQuantity}. Para un recurso {@code BOOLEAN} (p. ej.
+     * "Proyector") alcanza con pedir {@code minQuantity = 1}.
+     */
+    Set<Long> findIdsWithResourceAtLeast(String resourceTypeName, int minQuantity);
 
     /**
      * Resuelve, para cada aula pedida, si habilita el uso por materia: {@code openToAll} cuando el

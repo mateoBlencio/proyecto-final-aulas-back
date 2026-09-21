@@ -31,6 +31,7 @@ public enum Permission {
     PREVIEW_RUN(ScopeType.BUILDING),
 
     ROOM_REQUEST_READ(ScopeType.GLOBAL),
+    ROOM_REQUEST_WRITE(ScopeType.GLOBAL),
 
     SETTINGS_READ(ScopeType.GLOBAL),
     SETTINGS_WRITE(ScopeType.GLOBAL),

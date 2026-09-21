@@ -24,6 +24,7 @@ import ar.edu.utn.frc.siga.space.dto.response.ClassroomSubjectPermissionDto;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomPermissionRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
+import ar.edu.utn.frc.siga.space.repository.ClassroomResourceRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import ar.edu.utn.frc.siga.space.service.ClassroomTypeService;
@@ -65,6 +66,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     private final BuildingScopeResolver buildingScopeResolver;
     private final ScopedClassroomFinder scopedClassroom;
     private final ClassroomPermissionRepository classroomPermissionRepository;
+    private final ClassroomResourceRepository classroomResourceRepository;
 
     @Override
     @Transactional
@@ -113,6 +115,12 @@ public class ClassroomServiceImpl implements ClassroomService {
                 .filter(Classroom::isActive)
                 .map(classroomMapper::toDto)
                 .toList();
+    }
+
+    @Override
+    public Set<Long> findIdsWithResourceAtLeast(String resourceTypeName, int minQuantity) {
+        log.debug("Buscando aulas con recurso: resourceTypeName={}, minQuantity={}", resourceTypeName, minQuantity);
+        return classroomResourceRepository.findClassroomIdsWithResourceAtLeast(resourceTypeName, minQuantity);
     }
 
     @Override

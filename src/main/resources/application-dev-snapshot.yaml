@@ -1,0 +1,42 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/mydatabase
+    username: myuser
+    password: secret
+  docker:
+    compose:
+      enabled: true
+      file: compose-snapshot.yaml
+  flyway:
+    enabled: true
+    # dev real tiene una fila huerfana en flyway_schema_history (una migracion de "notification"
+    # que se corrio sin commitear y se reviertio en el codigo, ver CLAUDE.md). El dump la trae
+    # pegada; sin esto Flyway rechaza el arranque con "applied migration not resolved locally".
+    ignore-migration-patterns: "*:missing"
+
+springdoc:
+  swagger-ui:
+    enabled: true
+  api-docs:
+    enabled: true
+
+management:
+  endpoint:
+    health:
+      show-details: always
+
+cors:
+  allowed-origins: http://localhost:5173,http://127.0.0.1:5173
+
+siga:
+  jwt:
+    secret: dev-local-fixed-secret-not-for-prod-0123456789abcdef
+  sysacad:
+    enabled: false
+    api-key: dev-local-unused
+
+logging:
+  level:
+    ar.edu.utn.frc.siga: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: WARN

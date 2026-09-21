@@ -1,0 +1,13 @@
+# SPRING_PROFILES_ACTIVE=dev-snapshot ./mvnw spring-boot:run
+services:
+  dev-snapshot-db-service:
+    container_name: dev-snapshot-db-container
+    image: 'postgres:16-alpine'
+    environment:
+      - 'POSTGRES_DB=mydatabase'
+      - 'POSTGRES_PASSWORD=secret'
+      - 'POSTGRES_USER=myuser'
+    ports:
+      - '5432:5432'
+    volumes:
+      - ${DEV_SNAPSHOT_DB_PATH:-../db-dev-snapshot}:/var/lib/postgresql/data
