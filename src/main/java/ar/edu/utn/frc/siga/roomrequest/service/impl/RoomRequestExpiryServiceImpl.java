@@ -46,7 +46,6 @@ public class RoomRequestExpiryServiceImpl implements RoomRequestExpiryService {
         return expired.size();
     }
 
-    /** endDate nulo (cursada sin fecha de fin) no vence: no hay plazo que inventar. */
     private List<RoomRequestItem> expiredRegularRoomChangeItems(LocalDate today) {
         List<RoomRequestItem> candidates = itemRepository.findActiveRegularRoomChangeItems();
         if (candidates.isEmpty()) {

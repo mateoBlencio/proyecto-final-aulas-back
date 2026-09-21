@@ -22,7 +22,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Resuelve qué ocurrencia(s) del calendario le corresponden a un ítem al asignarlo, y libera las ocurrencias "mirror" viejas al reasignar. */
 @Component
 @RequiredArgsConstructor
 class RoomRequestOccurrenceResolver {
@@ -51,7 +50,6 @@ class RoomRequestOccurrenceResolver {
         return occurrencesBySlot;
     }
 
-    /** Los "mirror" (orden > 1) son ocurrencias efímeras que solo existen para esta resolución: se liberan y se crean de nuevo en cada assign, nunca se reutilizan entre llamadas. */
     void releaseOldMirrors(RoomRequestItem item) {
         List<Long> oldMirrorOccurrenceIds = item.getAllocations().stream()
                 .filter(allocation -> allocation.getPosition() > 1)

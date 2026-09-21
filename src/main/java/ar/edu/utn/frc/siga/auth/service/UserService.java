@@ -29,6 +29,9 @@ public interface UserService {
     /** Si el usuario habilitado tiene ese rol asignado, con cualquier alcance. */
     boolean hasRole(String email, SystemRole role);
 
-    /** Edificios a cargo del usuario para ese rol (alcance por edificio; ignora un eventual alcance GLOBAL de ese rol). */
+    /** Si el usuario habilitado tiene ese rol con alcance GLOBAL (cubre cualquier edificio). */
+    boolean hasGlobalRole(String email, SystemRole role);
+
+    /** Edificios a cargo del usuario para ese rol por alcance puntual; no incluye un eventual alcance GLOBAL, ver {@link #hasGlobalRole}. */
     Set<Long> findBuildingIdsForRole(String email, SystemRole role);
 }

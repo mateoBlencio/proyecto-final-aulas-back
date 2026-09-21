@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Resuelve qué aulas y edificios son candidatos para un ítem: disponibilidad por requisitos (proyector, PC) y por ocupación de horario. */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -97,10 +96,6 @@ class RoomRequestCandidateResolver {
         return candidates;
     }
 
-    /** Estricta a propósito: marca ocupada un aula ante cualquier solape, aunque
-     *  {@link RoomRequestResolutionServiceImpl#assign} después tolere hasta {@code allocation.maxOverlapMinutes}
-     *  con motivo. Mejor sugerir como libres solo aulas sin solape y dejar el margen tolerado como excepción
-     *  manual, no como sugerencia por defecto. */
     Set<Long> occupiedClassroomIds(RoomRequestItem item) {
         if (item.getDate() == null) {
             return Set.of();

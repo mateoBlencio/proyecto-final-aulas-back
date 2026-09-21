@@ -128,6 +128,11 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public boolean hasGlobalRole(String email, SystemRole role) {
+        return userRepository.existsEnabledGlobalRoleForUser(email, role);
+    }
+
+    @Override
     public Set<Long> findBuildingIdsForRole(String email, SystemRole role) {
         return userRepository.findBuildingIdsForUserAndRole(email, role);
     }

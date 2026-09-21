@@ -123,9 +123,9 @@ public class RoomRequestController {
     @Operation(summary = "Buscar un pedido por id",
                description = "Detalle completo de un pedido, con la cabecera de su solicitud "
                        + "(incluido el contacto del docente). 404 si no existe.")
-    public ResponseEntity<RoomRequestItemDetailDto> findItemById(@PathVariable Long id) {
+    public ResponseEntity<RoomRequestItemDetailDto> findItemById(@PathVariable Long id, Principal principal) {
         log.debug("GET /v1/room-requests/items/{}", id);
-        return ResponseEntity.ok(roomRequestService.findItemById(id));
+        return ResponseEntity.ok(roomRequestService.findItemById(id, principal.getName()));
     }
 
     @PostMapping("/items/{id}/assign")

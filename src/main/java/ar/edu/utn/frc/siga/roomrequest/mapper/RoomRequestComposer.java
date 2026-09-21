@@ -32,7 +32,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Arma los DTOs de respuesta de roomrequest a partir del catálogo cross-módulo que resuelve {@link RoomRequestCatalogsResolver}. */
 @Component
 @RequiredArgsConstructor
 public class RoomRequestComposer {

@@ -12,7 +12,7 @@ public class RoomRequestAlreadyNotifiedException extends SigaAppException {
 
     public RoomRequestAlreadyNotifiedException(Long itemId) {
         super(HttpStatus.CONFLICT, "Room request already notified",
-                "El pedido ya fue notificado al docente, no se puede reasignar.");
+                "El pedido ya fue notificado al docente, es un estado terminal.");
         withProperty("itemId", itemId);
     }
 }

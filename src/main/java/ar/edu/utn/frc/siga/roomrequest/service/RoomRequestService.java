@@ -20,5 +20,5 @@ public interface RoomRequestService {
     List<RoomRequestItemStatusCountDto> countItemsByStatus(boolean includePast, Boolean requiresSpecialAssignment,
             Boolean partiallyResolved, String actorEmail);
 
-    RoomRequestItemDetailDto findItemById(Long itemId);
+    RoomRequestItemDetailDto findItemById(Long itemId, String actorEmail);
 }

@@ -174,7 +174,7 @@ class RoomRequestCatalogsResolverTest {
         LocalDate date = LocalDate.of(2026, 9, 15);
         RoomRequestItem item = RoomRequestItem.builder().id(1L).sourceRecurringEventId(50L).date(date).build();
 
-        when(academicEventService.findOccurrencesByEventId(50L)).thenReturn(List.of(
+        when(academicEventService.findOccurrencesByEventIds(Set.of(50L))).thenReturn(List.of(
                 occurrence(900L, 50L, date.minusDays(7)),
                 occurrence(901L, 50L, date),
                 occurrence(902L, 50L, date.plusDays(7))));
@@ -194,7 +194,7 @@ class RoomRequestCatalogsResolverTest {
         LocalDate date = LocalDate.of(2026, 9, 15);
         RoomRequestItem item = RoomRequestItem.builder().id(1L).sourceRecurringEventId(50L).date(date).build();
 
-        when(academicEventService.findOccurrencesByEventId(50L)).thenReturn(List.of(
+        when(academicEventService.findOccurrencesByEventIds(Set.of(50L))).thenReturn(List.of(
                 occurrence(901L, 50L, date),
                 occurrence(902L, 50L, date)));
         ClassroomResponseDto classroomA = classroom(101L, "Edificio A");
@@ -215,7 +215,7 @@ class RoomRequestCatalogsResolverTest {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).sourceRecurringEventId(50L).build();
         LocalDate today = LocalDate.now();
 
-        when(academicEventService.findOccurrencesByEventId(50L)).thenReturn(List.of(
+        when(academicEventService.findOccurrencesByEventIds(Set.of(50L))).thenReturn(List.of(
                 occurrence(900L, 50L, today.minusDays(7)),
                 occurrence(901L, 50L, today.plusDays(7)),
                 occurrence(902L, 50L, today.plusDays(14))));
@@ -235,7 +235,7 @@ class RoomRequestCatalogsResolverTest {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).sourceRecurringEventId(50L).build();
         LocalDate today = LocalDate.now();
 
-        when(academicEventService.findOccurrencesByEventId(50L)).thenReturn(List.of(
+        when(academicEventService.findOccurrencesByEventIds(Set.of(50L))).thenReturn(List.of(
                 occurrence(900L, 50L, today.minusDays(14)),
                 occurrence(901L, 50L, today.minusDays(7))));
         ClassroomResponseDto classroom = classroom(101L, "Edificio A");

@@ -108,10 +108,11 @@ public class RoomRequestServiceImpl implements RoomRequestService {
 
     @Override
     @Transactional(readOnly = true)
-    public RoomRequestItemDetailDto findItemById(Long itemId) {
+    public RoomRequestItemDetailDto findItemById(Long itemId, String actorEmail) {
         log.debug("Buscando pedido de aula por id={}", itemId);
         RoomRequestItem item = itemRepository.findWithRequestById(itemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
+        accessControl.authorizeRead(item, actorEmail);
         return composer.composeDetail(item);
     }
 }

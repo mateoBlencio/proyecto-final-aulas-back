@@ -109,6 +109,17 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<OccurrenceResponseDto> findOccurrencesByEventIds(Collection<Long> eventIds) {
+        if (eventIds.isEmpty()) {
+            return List.of();
+        }
+        return occurrenceRepository.findByEvent_IdIn(eventIds).stream()
+                .map(occurrenceMapper::toDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<RecurringEventResponseDto> findRecurringEventsBySubjectAndCommission(Long subjectId, Long commissionId) {
         List<RecurringEvent> events =
                 recurringEventRepository.findActiveBySubjectAndCommission(subjectId, commissionId, LocalDate.now());

@@ -91,7 +91,6 @@ public class RoomRequestItem extends TimestampedEntity {
     @Column(name = "dia_semana", length = 20)
     private DayOfWeek dayOfWeek;
 
-    /** Evento recurrente del que se derivó día y horario, cuando el tipo usa el cursado. Trazabilidad. */
     @Column(name = "id_evento_recurrente")
     private Long sourceRecurringEventId;
 

@@ -176,7 +176,7 @@ class RoomRequestServiceImplTest {
         when(itemRepository.findWithRequestById(5L)).thenReturn(Optional.of(item));
         when(composer.composeDetail(item)).thenReturn(detail);
 
-        RoomRequestItemDetailDto result = service.findItemById(5L);
+        RoomRequestItemDetailDto result = service.findItemById(5L, "subsecretaria@frc.utn.edu.ar");
 
         assertThat(result).isSameAs(detail);
     }
@@ -186,7 +186,7 @@ class RoomRequestServiceImplTest {
     void findItemByIdNotFoundThrows() {
         when(itemRepository.findWithRequestById(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.findItemById(999L))
+        assertThatThrownBy(() -> service.findItemById(999L, "subsecretaria@frc.utn.edu.ar"))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verifyNoInteractions(composer);

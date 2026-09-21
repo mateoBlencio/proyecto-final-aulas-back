@@ -132,14 +132,13 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     @Test
-    @DisplayName("RESOLVED → cancel: la transición se rechaza, es terminal")
+    @DisplayName("RESOLVED → cancel: se rechaza con título propio de 'ya notificado', es terminal")
     void resueltoSeRechaza() {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.RESOLVED).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
-        doThrowOnTransitionTo(RoomRequestStatus.RESOLVED, RoomRequestStatus.CANCELLED);
 
         assertThatThrownBy(() -> service.cancel(1L, "motivo", "subsecretaria@frc.utn.edu.ar"))
-                .isInstanceOf(InvalidRoomRequestTransitionException.class);
+                .isInstanceOf(RoomRequestAlreadyNotifiedException.class);
 
         verifyNoInteractions(allocationService, composer);
     }

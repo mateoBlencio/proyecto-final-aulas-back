@@ -11,10 +11,6 @@ import org.springframework.stereotype.Component;
 import java.util.Optional;
 import java.util.Set;
 
-/**
- * Quién puede hacer qué sobre un pedido de aula: refleja la matriz rol × estado que hoy sólo
- * aplica el front ({@code getAllowedActions}), más el recorte por edificio del auxiliar áulico.
- */
 @Component
 @RequiredArgsConstructor
 public class RoomRequestAccessControl {
@@ -31,17 +27,26 @@ public class RoomRequestAccessControl {
             return;
         }
 
-        Set<Long> buildingIds = userService.findBuildingIdsForRole(actorEmail, SystemRole.AUXILIAR_AULICO);
-        boolean ownsBuilding = item.getDerivedBuildingId() != null
-                && buildingIds.contains(item.getDerivedBuildingId());
+        boolean ownsBuilding = userService.hasGlobalRole(actorEmail, SystemRole.AUXILIAR_AULICO)
+                || (item.getDerivedBuildingId() != null
+                        && userService.findBuildingIdsForRole(actorEmail, SystemRole.AUXILIAR_AULICO)
+                                .contains(item.getDerivedBuildingId()));
         if (!auxiliarAllows(item, action, ownsBuilding)) {
             throw new RoomRequestForbiddenException(action.name());
         }
     }
 
-    /** Edificios a los que hay que acotar una consulta para este actor; vacío = sin recorte (subsecretaría). */
+    public void authorizeRead(RoomRequestItem item, String actorEmail) {
+        Optional<Set<Long>> scope = readScope(actorEmail);
+        if (scope.isPresent()
+                && (item.getDerivedBuildingId() == null || !scope.get().contains(item.getDerivedBuildingId()))) {
+            throw new RoomRequestForbiddenException("READ");
+        }
+    }
+
     public Optional<Set<Long>> readScope(String actorEmail) {
-        if (userService.hasRole(actorEmail, SystemRole.SUBSECRETARIA)) {
+        if (!userService.hasRole(actorEmail, SystemRole.AUXILIAR_AULICO)
+                || userService.hasGlobalRole(actorEmail, SystemRole.AUXILIAR_AULICO)) {
             return Optional.empty();
         }
         return Optional.of(userService.findBuildingIdsForRole(actorEmail, SystemRole.AUXILIAR_AULICO));
@@ -51,9 +56,8 @@ public class RoomRequestAccessControl {
         return switch (item.getStatus()) {
             case NEW -> action == Action.ASSIGN || action == Action.DERIVE || action == Action.CANCEL;
             case DERIVED_TO_BUILDING -> action == Action.RETURN || action == Action.CANCEL;
-            // Una vez que un auxiliar toma el pedido (pasó por un edificio), subsecretaría deja de operarlo.
-            case IN_EVALUATION -> item.getDerivedBuildingId() == null
-                    && (action == Action.ASSIGN || action == Action.NOTIFY);
+            case IN_EVALUATION -> action == Action.CANCEL
+                    || (item.getDerivedBuildingId() == null && (action == Action.ASSIGN || action == Action.NOTIFY));
             case RESOLVED, CANCELLED -> false;
         };
     }
@@ -64,7 +68,8 @@ public class RoomRequestAccessControl {
             case NEW -> false;
             case DERIVED_TO_BUILDING -> ownsBuilding
                     && (action == Action.ASSIGN || action == Action.RETURN || action == Action.CANCEL);
-            case IN_EVALUATION -> ownsBuilding && (action == Action.ASSIGN || action == Action.NOTIFY);
+            case IN_EVALUATION -> ownsBuilding
+                    && (action == Action.ASSIGN || action == Action.NOTIFY || action == Action.CANCEL);
             case RESOLVED, CANCELLED -> false;
         };
     }

@@ -117,6 +117,9 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
         RoomRequestItem item = itemRepository.findWithRequestById(itemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
+        if (item.getStatus() == RoomRequestStatus.RESOLVED) {
+            throw new RoomRequestAlreadyNotifiedException(itemId);
+        }
         transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.CANCELLED);
         accessControl.authorize(item, actor, Action.CANCEL);
 
@@ -205,6 +208,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
         RoomRequestItem item = itemRepository.findWithRequestById(itemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
+        accessControl.authorizeRead(item, actor);
         if (item.getNotifiedAt() != null) {
             log.debug("Pedido ya notificado, devuelve el estado actual sin resellar: itemId={}", itemId);
             return composer.composeItem(item);

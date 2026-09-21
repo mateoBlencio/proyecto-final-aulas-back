@@ -34,7 +34,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Batchea por ID todo el catálogo cross-módulo (materia, comisión, aula, edificio) que necesita el Composer para armar sus DTOs. */
 @Component
 @RequiredArgsConstructor
 class RoomRequestCatalogsResolver {
@@ -121,15 +120,15 @@ class RoomRequestCatalogsResolver {
 
         Set<Long> eventIds = linkedItems.stream().map(RoomRequestItem::getSourceRecurringEventId)
                 .collect(Collectors.toSet());
-        Map<Long, List<OccurrenceResponseDto>> occurrencesByEventId = new LinkedHashMap<>();
-        for (Long eventId : eventIds) {
-            occurrencesByEventId.put(eventId, academicEventService.findOccurrencesByEventId(eventId));
-        }
+        Map<Long, List<OccurrenceResponseDto>> occurrencesByEventId = academicEventService
+                .findOccurrencesByEventIds(eventIds).stream()
+                .collect(Collectors.groupingBy(OccurrenceResponseDto::eventId));
 
         Map<Long, List<Long>> occurrenceIdsByItemId = new LinkedHashMap<>();
         Set<Long> allOccurrenceIds = new LinkedHashSet<>();
         for (RoomRequestItem item : linkedItems) {
-            List<OccurrenceResponseDto> occurrences = occurrencesByEventId.get(item.getSourceRecurringEventId());
+            List<OccurrenceResponseDto> occurrences =
+                    occurrencesByEventId.getOrDefault(item.getSourceRecurringEventId(), List.of());
             LocalDate targetDate = item.getDate() != null ? item.getDate() : nearestOccurrenceDate(occurrences);
             List<Long> occurrenceIds = occurrences.stream()
                     .filter(occurrence -> occurrence.date().equals(targetDate))
