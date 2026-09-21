@@ -43,15 +43,19 @@ jobs:
 
       - name: Upload reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: Wandalen/wretry.action@v3
         with:
-          name: reports-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            target/surefire-reports/
-            target/site/jacoco/
-            target/spring-modulith-docs/
-          if-no-files-found: ignore
-          retention-days: 7
+          action: actions/upload-artifact@v7
+          attempt_limit: 3
+          attempt_delay: 10000
+          with: |
+            name: reports-${{ github.run_id }}-${{ github.run_attempt }}
+            path: |
+              target/surefire-reports/
+              target/site/jacoco/
+              target/spring-modulith-docs/
+            if-no-files-found: ignore
+            retention-days: 7
 
       - name: Publish test results
         if: always()
