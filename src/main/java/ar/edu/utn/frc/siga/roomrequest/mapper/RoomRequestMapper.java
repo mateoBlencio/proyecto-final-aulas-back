@@ -16,6 +16,9 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 @Mapper(config = CentralMapperConfig.class)
@@ -72,4 +75,9 @@ public interface RoomRequestMapper {
     @Mapping(target = "id", source = "request.id")
     @Mapping(target = "subject", source = "subject")
     RoomRequestItemDetailHeaderDto toDetailHeaderDto(RoomRequest request, SubjectResponseDto subject);
+
+    // El front pide createdAt en LocalDateTime, igual que decidedAt/derivedAt/notifiedAt; la entidad sigue en Instant (patrón de auditoría UTC).
+    default LocalDateTime map(Instant createdAt) {
+        return createdAt == null ? null : LocalDateTime.ofInstant(createdAt, ZoneOffset.UTC);
+    }
 }
