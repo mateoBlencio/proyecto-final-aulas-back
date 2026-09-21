@@ -34,6 +34,7 @@ class ManualEmailSendTest {
     static void mailProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.mail.host", mailhog::getHost);
         registry.add("spring.mail.port", () -> mailhog.getMappedPort(1025));
+        registry.add("siga.notifications.email.enabled", () -> "true");
     }
 
     @Autowired
