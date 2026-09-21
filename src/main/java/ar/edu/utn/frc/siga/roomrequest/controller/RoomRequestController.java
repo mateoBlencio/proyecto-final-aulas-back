@@ -144,8 +144,8 @@ public class RoomRequestController {
     @PostMapping("/items/{id}/cancel")
     @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
     @Operation(summary = "Cancelar un pedido de aula",
-               description = "Cancela el pedido desde cualquier estado no final, incluido RESOLVED. "
-                       + "Libera las aulas que tuviera asignadas.")
+               description = "Cancela el pedido desde cualquier estado no final. RESOLVED es terminal: "
+                       + "una vez notificado el docente, no se puede cancelar. Libera las aulas que tuviera asignadas.")
     public ResponseEntity<RoomRequestItemResponseDto> cancelItem(@PathVariable Long id,
                                                                   @Valid @RequestBody CancelRoomRequestItemDto dto,
                                                                   Principal principal) {

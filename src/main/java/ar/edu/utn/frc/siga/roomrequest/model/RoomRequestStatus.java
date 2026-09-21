@@ -19,7 +19,7 @@ public enum RoomRequestStatus {
             case NEW -> FROM_NEW.contains(target);
             case DERIVED_TO_BUILDING -> FROM_DERIVED_TO_BUILDING.contains(target);
             case IN_EVALUATION -> FROM_IN_EVALUATION.contains(target);
-            case RESOLVED -> target == CANCELLED;
+            case RESOLVED -> false;
             case CANCELLED -> false;
         };
     }

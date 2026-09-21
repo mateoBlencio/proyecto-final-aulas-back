@@ -95,8 +95,8 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = RoomRequestStatus.class, names = "CANCELLED", mode = EnumSource.Mode.EXCLUDE)
-    @DisplayName("se puede cancelar desde cualquier estado no final, incluido RESOLVED")
+    @EnumSource(value = RoomRequestStatus.class, names = {"CANCELLED", "RESOLVED"}, mode = EnumSource.Mode.EXCLUDE)
+    @DisplayName("se puede cancelar desde cualquier estado no final salvo RESOLVED")
     void cancelaDesdeCualquierEstadoNoFinal(RoomRequestStatus status) {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(status).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
@@ -115,6 +115,19 @@ class RoomRequestResolutionServiceImplTest {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.CANCELLED).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         doThrowOnTransitionTo(RoomRequestStatus.CANCELLED, RoomRequestStatus.CANCELLED);
+
+        assertThatThrownBy(() -> service.cancel(1L, "motivo", "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestTransitionException.class);
+
+        verifyNoInteractions(allocationService, composer);
+    }
+
+    @Test
+    @DisplayName("RESOLVED → cancel: la transición se rechaza, es terminal")
+    void resueltoSeRechaza() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.RESOLVED).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        doThrowOnTransitionTo(RoomRequestStatus.RESOLVED, RoomRequestStatus.CANCELLED);
 
         assertThatThrownBy(() -> service.cancel(1L, "motivo", "subsecretaria@frc.utn.edu.ar"))
                 .isInstanceOf(InvalidRoomRequestTransitionException.class);

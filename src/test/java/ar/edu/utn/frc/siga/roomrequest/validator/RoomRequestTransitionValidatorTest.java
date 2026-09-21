@@ -70,11 +70,9 @@ class RoomRequestTransitionValidatorTest {
     }
 
     @Test
-    @DisplayName("un pedido resuelto queda congelado: solo puede cancelarse")
-    void fromResolved() {
-        assertThatCode(() -> validator.validateTransition(
-                RoomRequestStatus.RESOLVED, RoomRequestStatus.CANCELLED)).doesNotThrowAnyException();
-        for (RoomRequestStatus target : EnumSet.complementOf(EnumSet.of(RoomRequestStatus.CANCELLED))) {
+    @DisplayName("RESOLVED es terminal: no sale hacia ningún estado, ni siquiera CANCELLED")
+    void resolvedIsTerminal() {
+        for (RoomRequestStatus target : RoomRequestStatus.values()) {
             assertThatThrownBy(() -> validator.validateTransition(RoomRequestStatus.RESOLVED, target))
                     .as("RESOLVED -> %s", target)
                     .isInstanceOf(InvalidRoomRequestTransitionException.class);

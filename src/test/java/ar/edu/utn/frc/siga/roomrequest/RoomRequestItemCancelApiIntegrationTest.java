@@ -49,15 +49,15 @@ class RoomRequestItemCancelApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("RESOLVED con motivo: también se puede cancelar")
-    void cancel_resolved_returnsCancelled() throws Exception {
+    @DisplayName("RESOLVED: 409, es terminal (el docente ya fue notificado)")
+    void cancel_resolved_returnsConflict() throws Exception {
         RoomRequestItem item = seedItem(RoomRequestStatus.RESOLVED);
 
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/cancel")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"se cayó el laboratorio\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("CANCELLED"));
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Invalid room request transition"));
     }
 
     @Test
