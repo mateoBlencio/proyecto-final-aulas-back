@@ -143,7 +143,7 @@ public class AllocationValidator {
         for (Long classroomId : classroomIds) {
             ClassroomResponseDto classroom = classroomsById.get(classroomId);
             if (classroom == null) {
-                throw new AllocationConflictException("El aula " + classroomId + " no existe o no está disponible.");
+                throw new AllocationConflictException("El aula " + classroomId + " no existe o no está disponible.", classroomId);
             }
         }
     }
