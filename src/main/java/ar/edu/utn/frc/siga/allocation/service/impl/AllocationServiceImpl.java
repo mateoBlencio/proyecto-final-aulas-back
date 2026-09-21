@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -67,6 +68,15 @@ public class AllocationServiceImpl implements AllocationService {
         return composer.composeAll(allocationRepository.findByOccurrenceIdIn(occurrenceIds)).stream()
                 .filter(dto -> dto.classroom() == null || scope.allows(dto.classroom().buildingId()))
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AllocationResponseDto> findByOccurrenceIds(Collection<Long> occurrenceIds) {
+        if (occurrenceIds.isEmpty()) {
+            return List.of();
+        }
+        return composer.composeAll(allocationRepository.findByOccurrenceIdIn(occurrenceIds));
     }
 
     @Override

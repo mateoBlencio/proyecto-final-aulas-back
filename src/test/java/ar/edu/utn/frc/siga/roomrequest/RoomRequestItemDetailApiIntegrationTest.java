@@ -53,7 +53,9 @@ class RoomRequestItemDetailApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.item.id").value(item.getId()))
                 .andExpect(jsonPath("$.item.status").value("IN_EVALUATION"))
                 .andExpect(jsonPath("$.item.decidedBy").value("subsecretaria@frc.utn.edu.ar"))
-                .andExpect(jsonPath("$.item.observations").doesNotExist());
+                .andExpect(jsonPath("$.item.observations").doesNotExist())
+                .andExpect(jsonPath("$.item.enrolled").doesNotExist())
+                .andExpect(jsonPath("$.item.currentClassrooms").doesNotExist());
     }
 
     @Test

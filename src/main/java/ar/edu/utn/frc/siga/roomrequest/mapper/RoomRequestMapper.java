@@ -31,18 +31,22 @@ public interface RoomRequestMapper {
     @Mapping(target = "id", source = "item.id")
     @Mapping(target = "commissions", source = "commissions")
     @Mapping(target = "preferredClassrooms", source = "preferredClassrooms")
+    @Mapping(target = "currentClassrooms", source = "currentClassrooms")
     @Mapping(target = "assignedClassrooms", source = "assignedClassrooms")
     @Mapping(target = "derivedBuilding", source = "derivedBuilding")
     @Mapping(target = "returnedFromBuilding", source = "returnedFromBuilding")
+    @Mapping(target = "enrolled", source = "enrolled")
     @Mapping(target = "endTime", expression = "java(item.endTime())")
     @Mapping(target = "durationMinutes",
              expression = "java(item.getDuration() == null ? null : item.getDuration().toMinutes())")
     RoomRequestItemResponseDto toDto(RoomRequestItem item,
                                      List<CommissionResponseDto> commissions,
                                      List<ClassroomOptionDto> preferredClassrooms,
+                                     List<ClassroomOptionDto> currentClassrooms,
                                      List<AssignedClassroomDto> assignedClassrooms,
                                      BuildingOptionDto derivedBuilding,
-                                     BuildingOptionDto returnedFromBuilding);
+                                     BuildingOptionDto returnedFromBuilding,
+                                     Integer enrolled);
 
     @Mapping(target = "id", source = "request.id")
     @Mapping(target = "subject", source = "subject")

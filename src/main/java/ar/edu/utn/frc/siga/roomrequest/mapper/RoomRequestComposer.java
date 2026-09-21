@@ -50,6 +50,7 @@ public class RoomRequestComposer {
         Set<Long> classroomIds = new LinkedHashSet<>();
         Set<Long> buildingIds = new LinkedHashSet<>();
         Set<ActiveCommissionsKey> activeCommissionsKeys = new LinkedHashSet<>();
+        List<RoomRequestItem> items = new ArrayList<>();
 
         for (RoomRequest request : requests) {
             collectSubjectId(request, subjectIds);
@@ -58,13 +59,17 @@ public class RoomRequestComposer {
             collectAssignedClassroomIds(request.getItems(), classroomIds);
             collectBuildingIds(request.getItems(), buildingIds);
             collectActiveCommissionsKeys(request.getItems(), activeCommissionsKeys);
+            items.addAll(request.getItems());
         }
 
         Catalogs catalogs = catalogsResolver.resolve(subjectIds, commissionIds, classroomIds, buildingIds, activeCommissionsKeys);
+        Map<Long, Integer> enrolledByEventId = catalogsResolver.resolveEnrolledByEventId(collectSourceRecurringEventIds(items));
+        Map<Long, List<ClassroomOptionDto>> currentClassroomsByItemId = catalogsResolver.resolveCurrentClassroomsByItemId(items);
 
         List<RoomRequestResponseDto> result = new ArrayList<>(requests.size());
         for (RoomRequest request : requests) {
-            result.add(mapper.toDto(request, resolveSubject(request, catalogs), composeItems(request.getItems(), catalogs)));
+            result.add(mapper.toDto(request, resolveSubject(request, catalogs),
+                    composeItems(request.getItems(), catalogs, enrolledByEventId, currentClassroomsByItemId)));
         }
         return result;
     }
@@ -114,7 +119,9 @@ public class RoomRequestComposer {
         collectActiveCommissionsKeys(List.of(item), activeCommissionsKeys);
 
         Catalogs catalogs = catalogsResolver.resolve(Set.of(), commissionIds, classroomIds, buildingIds, activeCommissionsKeys);
-        return composeItems(List.of(item), catalogs).getFirst();
+        Map<Long, Integer> enrolledByEventId = catalogsResolver.resolveEnrolledByEventId(collectSourceRecurringEventIds(List.of(item)));
+        Map<Long, List<ClassroomOptionDto>> currentClassroomsByItemId = catalogsResolver.resolveCurrentClassroomsByItemId(List.of(item));
+        return composeItems(List.of(item), catalogs, enrolledByEventId, currentClassroomsByItemId).getFirst();
     }
 
     public RoomRequestItemDetailDto composeDetail(RoomRequestItem item) {
@@ -133,9 +140,12 @@ public class RoomRequestComposer {
         collectActiveCommissionsKeys(List.of(item), activeCommissionsKeys);
 
         Catalogs catalogs = catalogsResolver.resolve(subjectIds, commissionIds, classroomIds, buildingIds, activeCommissionsKeys);
+        Map<Long, Integer> enrolledByEventId = catalogsResolver.resolveEnrolledByEventId(collectSourceRecurringEventIds(List.of(item)));
+        Map<Long, List<ClassroomOptionDto>> currentClassroomsByItemId = catalogsResolver.resolveCurrentClassroomsByItemId(List.of(item));
 
         RoomRequestItemDetailHeaderDto header = mapper.toDetailHeaderDto(request, resolveSubject(request, catalogs));
-        RoomRequestItemResponseDto itemDto = composeItems(List.of(item), catalogs).getFirst();
+        RoomRequestItemResponseDto itemDto =
+                composeItems(List.of(item), catalogs, enrolledByEventId, currentClassroomsByItemId).getFirst();
 
         return new RoomRequestItemDetailDto(header, itemDto);
     }
@@ -187,13 +197,29 @@ public class RoomRequestComposer {
         }
     }
 
-    private List<RoomRequestItemResponseDto> composeItems(Collection<RoomRequestItem> items, Catalogs catalogs) {
+    private Set<Long> collectSourceRecurringEventIds(Collection<RoomRequestItem> items) {
+        Set<Long> eventIds = new LinkedHashSet<>();
+        for (RoomRequestItem item : items) {
+            if (item.getSourceRecurringEventId() != null) {
+                eventIds.add(item.getSourceRecurringEventId());
+            }
+        }
+        return eventIds;
+    }
+
+    private List<RoomRequestItemResponseDto> composeItems(Collection<RoomRequestItem> items, Catalogs catalogs,
+            Map<Long, Integer> enrolledByEventId, Map<Long, List<ClassroomOptionDto>> currentClassroomsByItemId) {
         List<RoomRequestItemResponseDto> result = new ArrayList<>(items.size());
         for (RoomRequestItem item : items) {
+            Integer enrolled = item.getSourceRecurringEventId() != null
+                    ? enrolledByEventId.get(item.getSourceRecurringEventId()) : null;
             result.add(mapper.toDto(item, resolveCommissions(item, catalogs),
-                    resolvePreferredClassrooms(item, catalogs), resolveAssignedClassrooms(item, catalogs),
+                    resolvePreferredClassrooms(item, catalogs),
+                    currentClassroomsByItemId.get(item.getId()),
+                    resolveAssignedClassrooms(item, catalogs),
                     resolveBuilding(item.getDerivedBuildingId(), catalogs),
-                    resolveBuilding(item.getReturnedFromBuildingId(), catalogs)));
+                    resolveBuilding(item.getReturnedFromBuildingId(), catalogs),
+                    enrolled));
         }
         return result;
     }

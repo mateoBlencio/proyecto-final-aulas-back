@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 
 import org.springframework.modulith.NamedInterface;
@@ -17,6 +18,8 @@ public interface AllocationService {
     AllocationResponseDto findById(Long allocationId);
 
     List<AllocationResponseDto> findByDate(LocalDate date);
+
+    List<AllocationResponseDto> findByOccurrenceIds(Collection<Long> occurrenceIds);
 
     List<AllocationResponseDto> allocate(AllocationCommand command);
 
