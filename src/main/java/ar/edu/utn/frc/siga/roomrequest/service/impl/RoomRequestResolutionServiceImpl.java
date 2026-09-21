@@ -17,6 +17,7 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItemAllocation;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestResolved;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestResolutionService;
 import ar.edu.utn.frc.siga.roomrequest.validator.ItemConsistency;
@@ -79,6 +80,13 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         }
 
         List<List<Long>> occurrencesBySlot = occurrenceResolver.resolveOccurrencesBySlot(item, ids.size(), reassigning);
+
+        RoomRequestType type = item.getRequest().getType();
+        if (type == RoomRequestType.ONE_TIME_ROOM_CHANGE || type == RoomRequestType.REGULAR_ROOM_CHANGE) {
+            Long principalOccurrenceId = occurrencesBySlot.get(0).getFirst();
+            allocationService.findClassroomIdByOccurrence(principalOccurrenceId)
+                    .ifPresent(item::rememberPreviousClassroom);
+        }
 
         List<AllocationItem> allocationItems = new ArrayList<>();
         for (int i = 0; i < ids.size(); i++) {

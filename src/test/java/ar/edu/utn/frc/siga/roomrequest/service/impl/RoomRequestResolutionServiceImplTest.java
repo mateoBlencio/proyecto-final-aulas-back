@@ -644,6 +644,6 @@ class RoomRequestResolutionServiceImplTest {
     private static RoomRequestItemResponseDto mockResponse() {
         return new RoomRequestItemResponseDto(1L, 1, RoomRequestStatus.CANCELLED, "subsecretaria@frc.utn.edu.ar",
                 null, "motivo", List.of(), null, null, null, null, null, null, 1, false, false, null,
-                false, null, null, List.of(), List.of(), null, null, null, null, null);
+                false, null, null, List.of(), List.of(), null, null, null, null, null, null);
     }
 }

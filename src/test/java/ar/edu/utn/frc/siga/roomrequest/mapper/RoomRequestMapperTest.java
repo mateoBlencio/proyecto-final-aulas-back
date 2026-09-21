@@ -34,7 +34,7 @@ class RoomRequestMapperTest {
     @DisplayName("la cabecera se arma con la materia y los items que le pasa el composer")
     void headerUsesComposedPieces() {
         SubjectResponseDto subject = new SubjectResponseDto(42L, 101, "Análisis Matemático I", "ANUAL", null);
-        RoomRequestItemResponseDto itemDto = mapper.toDto(itemEntity(), null, List.of(), List.of(), null, null);
+        RoomRequestItemResponseDto itemDto = mapper.toDto(itemEntity(), null, List.of(), List.of(), null, null, null);
 
         RoomRequestResponseDto dto = mapper.toDto(requestEntity(), subject, List.of(itemDto));
 
@@ -57,7 +57,7 @@ class RoomRequestMapperTest {
     @Test
     @DisplayName("el pedido deriva endTime y durationMinutes de la duración guardada")
     void itemDerivesEndTimeAndDuration() {
-        RoomRequestItemResponseDto dto = mapper.toDto(itemEntity(), null, List.of(), List.of(), null, null);
+        RoomRequestItemResponseDto dto = mapper.toDto(itemEntity(), null, List.of(), List.of(), null, null, null);
 
         assertThat(dto.startTime()).isEqualTo(LocalTime.of(10, 0));
         assertThat(dto.endTime()).isEqualTo(LocalTime.of(12, 0));
@@ -74,7 +74,7 @@ class RoomRequestMapperTest {
                 .estimated(35).classroomCount(1)
                 .build();
 
-        RoomRequestItemResponseDto dto = mapper.toDto(entity, null, List.of(), List.of(), null, null);
+        RoomRequestItemResponseDto dto = mapper.toDto(entity, null, List.of(), List.of(), null, null, null);
 
         assertThat(dto.dayOfWeek()).isEqualTo(DayOfWeek.TUESDAY);
         assertThat(dto.date()).isNull();
@@ -87,7 +87,7 @@ class RoomRequestMapperTest {
         CommissionResponseDto commission = new CommissionResponseDto(7L, "3K1", null);
         List<ClassroomOptionDto> preferred = List.of(new ClassroomOptionDto(11L, 11, "Pabellón"));
 
-        RoomRequestItemResponseDto dto = mapper.toDto(itemEntity(), List.of(commission), preferred, List.of(), null, null);
+        RoomRequestItemResponseDto dto = mapper.toDto(itemEntity(), List.of(commission), preferred, List.of(), null, null, null);
 
         assertThat(dto.commissions()).containsExactly(commission);
         assertThat(dto.preferredClassrooms()).isEqualTo(preferred);
@@ -96,7 +96,7 @@ class RoomRequestMapperTest {
     @Test
     @DisplayName("el estado del pedido viaja al DTO")
     void itemCarriesStatus() {
-        assertThat(mapper.toDto(itemEntity(), null, List.of(), List.of(), null, null).status())
+        assertThat(mapper.toDto(itemEntity(), null, List.of(), List.of(), null, null, null).status())
                 .isEqualTo(RoomRequestStatus.NEW);
     }
 
@@ -108,7 +108,7 @@ class RoomRequestMapperTest {
         BuildingOptionDto returnedFrom = new BuildingOptionDto(4L, "Edificio Anexo");
 
         RoomRequestItemResponseDto dto =
-                mapper.toDto(itemEntity(), null, List.of(), assigned, derived, returnedFrom);
+                mapper.toDto(itemEntity(), null, List.of(), assigned, null, derived, returnedFrom);
 
         assertThat(dto.assignedClassrooms()).isEqualTo(assigned);
         assertThat(dto.derivedBuilding()).isEqualTo(derived);
@@ -124,7 +124,7 @@ class RoomRequestMapperTest {
                 .notifiedAt(now).derivedAt(now).returnedReason("no había proyector")
                 .build();
 
-        RoomRequestItemResponseDto dto = mapper.toDto(entity, null, List.of(), List.of(), null, null);
+        RoomRequestItemResponseDto dto = mapper.toDto(entity, null, List.of(), List.of(), null, null, null);
 
         assertThat(dto.notifiedAt()).isEqualTo(now);
         assertThat(dto.derivedAt()).isEqualTo(now);

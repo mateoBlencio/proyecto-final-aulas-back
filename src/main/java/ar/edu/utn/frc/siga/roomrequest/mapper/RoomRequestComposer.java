@@ -173,6 +173,9 @@ public class RoomRequestComposer {
     private void collectAssignedClassroomIds(Collection<RoomRequestItem> items, Set<Long> classroomIds) {
         for (RoomRequestItem item : items) {
             item.getAllocations().stream().map(RoomRequestItemAllocation::getClassroomId).forEach(classroomIds::add);
+            if (item.getPreviousClassroomId() != null) {
+                classroomIds.add(item.getPreviousClassroomId());
+            }
         }
     }
 
@@ -192,6 +195,7 @@ public class RoomRequestComposer {
         for (RoomRequestItem item : items) {
             result.add(mapper.toDto(item, resolveCommissions(item, catalogs),
                     resolvePreferredClassrooms(item, catalogs), resolveAssignedClassrooms(item, catalogs),
+                    resolvePreviousClassroom(item, catalogs),
                     resolveBuilding(item.getDerivedBuildingId(), catalogs),
                     resolveBuilding(item.getReturnedFromBuildingId(), catalogs)));
         }
@@ -212,6 +216,12 @@ public class RoomRequestComposer {
                 .map(entry -> catalogs.assignedClassroomsById().get(entry.getValue()))
                 .filter(Objects::nonNull)
                 .toList();
+    }
+
+    private AssignedClassroomDto resolvePreviousClassroom(RoomRequestItem item, Catalogs catalogs) {
+        return item.getPreviousClassroomId() != null
+                ? catalogs.assignedClassroomsById().get(item.getPreviousClassroomId())
+                : null;
     }
 
     private SubjectResponseDto resolveSubject(RoomRequest request, Catalogs catalogs) {
