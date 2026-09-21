@@ -33,6 +33,7 @@ public class OtherHandler extends AbstractRoomRequestHandler {
             ItemConsistency.requireNoCommission(item,
                     "Una solicitud de tipo OTHER no pertenece al cursado de una comisión: los pedidos no llevan comisión.");
             ItemConsistency.requireExamUsersConsistent(false, item);
+            ItemConsistency.requireNotPast(item.date(), item.startTime());
         }
     }
 

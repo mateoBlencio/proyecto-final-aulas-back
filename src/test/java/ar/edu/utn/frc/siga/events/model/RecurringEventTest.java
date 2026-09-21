@@ -24,6 +24,8 @@ class RecurringEventTest {
         List<Occurrence> occurrences = event.toOccurrences();
 
         assertThat(occurrences.getFirst().getDate()).isEqualTo(startDate);
+        assertThat(occurrences.getFirst().getRoomSlot()).isEqualTo(1);
+        assertThat(occurrences.getFirst().getMirrorOfOccurrenceId()).isNull();
     }
 
     @Test

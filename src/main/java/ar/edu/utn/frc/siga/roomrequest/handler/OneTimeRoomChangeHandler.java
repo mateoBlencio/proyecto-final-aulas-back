@@ -4,7 +4,6 @@ import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateOneTimeRoomChangeDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.ScheduledItemDto;
-import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.validator.AcademicReferenceValidator;
@@ -34,16 +33,8 @@ public class OneTimeRoomChangeHandler extends AbstractRoomRequestHandler {
     protected void validateItems(CreateRoomRequestDto dto) {
         List<ScheduledItemDto> items = ((CreateOneTimeRoomChangeDto) dto).items();
         for (ScheduledItemDto item : items) {
-            if (item.date() == null) {
-                throw new InvalidRoomRequestException("Cada pedido de cambio de aula por única vez requiere una fecha.");
-            }
-            if (item.dayOfWeek() != null) {
-                throw new InvalidRoomRequestException(
-                        "El cambio de aula por única vez se ata a una fecha, no a un día de dictado.");
-            }
-            if (item.estimated() != null) {
-                throw new InvalidRoomRequestException("El cambio de aula no lleva cantidad estimada de asistentes.");
-            }
+            ItemConsistency.requireDateOnly(item, "cambio de aula por única vez");
+            ItemConsistency.requireNoEstimated(item);
             ItemConsistency.requireExamUsersConsistent(false, item);
         }
         ItemConsistency.requireDistinct(items.stream().map(ScheduledItemDto::date).toList(), "una fecha");
@@ -58,6 +49,7 @@ public class OneTimeRoomChangeHandler extends AbstractRoomRequestHandler {
     @Override
     protected RoomRequestItem buildItem(CreateRoomRequestItemDto item, CreateRoomRequestDto dto) {
         ClassSlot slot = classSchedule.requireClassDate(dto.subjectId(), dto.commissionId(), item.date());
+        ItemConsistency.requireNotPast(item.date(), slot.startTime());
         return baseItem(item)
                 .commissionId(dto.commissionId())
                 .date(item.date())

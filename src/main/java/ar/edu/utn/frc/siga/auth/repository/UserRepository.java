@@ -2,8 +2,10 @@ package ar.edu.utn.frc.siga.auth.repository;
 
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.model.User;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -35,4 +37,20 @@ public interface UserRepository extends JpaRepository<User, Long> {
             """)
     List<User> findEnabledByRoleCoveringBuilding(@Param("role") SystemRole role,
                                                  @Param("buildingId") Long buildingId);
+
+    @Query("""
+            select (count(ra) > 0) from RoleAssignment ra
+            where ra.user.enabled = true and ra.role = :role
+              and ra.scopeType = ar.edu.utn.frc.siga.common.security.ScopeType.GLOBAL
+            """)
+    boolean existsEnabledGlobalRole(@Param("role") SystemRole role);
+
+    @Query("""
+            select distinct ra.scopeId from RoleAssignment ra
+            where ra.user.enabled = true and ra.role = :role
+              and ra.scopeType = ar.edu.utn.frc.siga.common.security.ScopeType.BUILDING
+              and ra.scopeId in :buildingIds
+            """)
+    Set<Long> findBuildingIdsWithScopedRole(@Param("role") SystemRole role,
+                                            @Param("buildingIds") Collection<Long> buildingIds);
 }

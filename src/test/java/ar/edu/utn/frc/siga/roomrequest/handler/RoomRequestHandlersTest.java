@@ -126,6 +126,28 @@ class RoomRequestHandlersTest {
         }
 
         @Test
+        @DisplayName("hoy con horario ya pasado: rechazado")
+        void todayButAlreadyPast() {
+            LocalDate today = LocalDate.now();
+            ClassSlot pastSlot = new ClassSlot(100L, today.getDayOfWeek(), LocalTime.MIDNIGHT, LocalTime.MAX);
+            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), eq(today))).thenReturn(pastSlot);
+
+            assertThatThrownBy(() -> handler.assemble(dto(scheduledItem(today, null, null))))
+                    .isInstanceOf(InvalidRoomRequestException.class);
+        }
+
+        @Test
+        @DisplayName("hoy con horario que todavía no llegó: permitido")
+        void todayButNotYetPast() {
+            LocalDate today = LocalDate.now();
+            ClassSlot futureSlot = new ClassSlot(100L, today.getDayOfWeek(), LocalTime.MAX, LocalTime.MAX);
+            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), eq(today))).thenReturn(futureSlot);
+
+            assertThatCode(() -> handler.assemble(dto(scheduledItem(today, null, null))))
+                    .doesNotThrowAnyException();
+        }
+
+        @Test
         @DisplayName("assemble: deriva horario y evento del cursado, deja date y comisión, estimado null")
         void assemble() {
             LocalDate date = LocalDate.now().plusDays(7);
@@ -268,6 +290,18 @@ class RoomRequestHandlersTest {
                 assertThat(item.getSourceRecurringEventId()).isEqualTo(100L);
             });
         }
+
+        @Test
+        @DisplayName("menos de 2hs de anticipación según el horario resuelto del cursado: rechazado")
+        void requiresAdvanceNotice() {
+            LocalDate today = LocalDate.now();
+            ClassSlot soonSlot = new ClassSlot(100L, today.getDayOfWeek(),
+                    LocalTime.now().plusMinutes(30), LocalTime.now().plusMinutes(90));
+            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), eq(today))).thenReturn(soonSlot);
+
+            assertThatThrownBy(() -> handler.assemble(dto(scheduledItem(today, null, 35))))
+                    .isInstanceOf(InvalidRoomRequestException.class);
+        }
     }
 
     @Nested
@@ -279,7 +313,7 @@ class RoomRequestHandlersTest {
         @BeforeEach
         void setUp() {
             handler = new PartialExamOffScheduleHandler(academicReference, classroomReference, classSchedule, itemRepository);
-            when(itemRepository.findActiveOffScheduleItemsByDate(any())).thenReturn(List.of());
+            when(itemRepository.findActiveOffScheduleItemsByDateIn(any())).thenReturn(List.of());
         }
 
         private CreatePartialExamOffScheduleDto dto(FreeFormItemDto... items) {
@@ -366,7 +400,7 @@ class RoomRequestHandlersTest {
                     .startTime(LocalTime.of(11, 0))
                     .duration(Duration.ofHours(2))
                     .build();
-            when(itemRepository.findActiveOffScheduleItemsByDate(date)).thenReturn(List.of(existing));
+            when(itemRepository.findActiveOffScheduleItemsByDateIn(any())).thenReturn(List.of(existing));
 
             assertThatThrownBy(() -> handler.validate(dto(
                     freeFormItemAt(7L, date, LocalTime.of(10, 0), LocalTime.of(12, 0)))))
@@ -384,6 +418,14 @@ class RoomRequestHandlersTest {
                 assertThat(item.getDuration()).isEqualTo(Duration.ofHours(2));
                 assertThat(item.getEstimated()).isEqualTo(35);
             });
+        }
+
+        @Test
+        @DisplayName("menos de 2hs de anticipación: rechazado")
+        void requiresAdvanceNotice() {
+            assertThatThrownBy(() -> handler.validate(dto(
+                    freeFormItemAt(null, LocalDate.now(), LocalTime.now().plusMinutes(30), LocalTime.now().plusMinutes(90)))))
+                    .isInstanceOf(InvalidRoomRequestException.class);
         }
     }
 
@@ -416,6 +458,16 @@ class RoomRequestHandlersTest {
             assertThatThrownBy(() -> handler.validate(dto(freeFormItem(null), freeFormItem(null))))
                     .isInstanceOf(InvalidRoomRequestException.class);
             assertThatThrownBy(() -> handler.validate(dto(freeFormItem(7L))))
+                    .isInstanceOf(InvalidRoomRequestException.class);
+        }
+
+        @Test
+        @DisplayName("menos de 2hs de anticipación: rechazado")
+        void requiresAdvanceNotice() {
+            FreeFormItemDto tooSoon = new FreeFormItemDto(null, LocalDate.now(),
+                    LocalTime.now().plusMinutes(30), LocalTime.now().plusMinutes(90),
+                    35, 1, false, false, null, null, null, null, List.of());
+            assertThatThrownBy(() -> handler.validate(dto(tooSoon)))
                     .isInstanceOf(InvalidRoomRequestException.class);
         }
 
@@ -483,6 +535,35 @@ class RoomRequestHandlersTest {
             assertThatThrownBy(() -> other.validate(otherWithCommission))
                     .isInstanceOf(InvalidRoomRequestException.class)
                     .hasMessageContaining("no llevan comisión");
+        }
+
+        @Test
+        @DisplayName("hoy con horario ya pasado: rechazado en conferencia y en otro")
+        void todayButAlreadyPast() {
+            FreeFormItemDto pastToday = new FreeFormItemDto(null, LocalDate.now(),
+                    LocalTime.MIDNIGHT, LocalTime.MAX,
+                    35, 1, false, false, null, null, null, null, List.of());
+            CreateConferenceDto conferenceDto = new CreateConferenceDto(RoomRequestType.CONFERENCE, requester(),
+                    null, List.of(pastToday));
+            assertThatThrownBy(() -> conference.validate(conferenceDto)).isInstanceOf(InvalidRoomRequestException.class);
+
+            FreeFormItemDto pastTodayWithObservations = new FreeFormItemDto(null, LocalDate.now(),
+                    LocalTime.MIDNIGHT, LocalTime.MAX,
+                    35, 1, false, false, null, null, null, "Grabación de video", List.of());
+            CreateOtherDto otherDto = new CreateOtherDto(RoomRequestType.OTHER, requester(), null,
+                    List.of(pastTodayWithObservations));
+            assertThatThrownBy(() -> other.validate(otherDto)).isInstanceOf(InvalidRoomRequestException.class);
+        }
+
+        @Test
+        @DisplayName("hoy con horario que todavía no llegó: permitido")
+        void todayButNotYetPast() {
+            FreeFormItemDto futureToday = new FreeFormItemDto(null, LocalDate.now(),
+                    LocalTime.MAX, LocalTime.MAX,
+                    35, 1, false, false, null, null, null, null, List.of());
+            CreateConferenceDto conferenceDto = new CreateConferenceDto(RoomRequestType.CONFERENCE, requester(),
+                    null, List.of(futureToday));
+            assertThatCode(() -> conference.validate(conferenceDto)).doesNotThrowAnyException();
         }
 
         private FreeFormItemDto withObservations(Long commissionId) {

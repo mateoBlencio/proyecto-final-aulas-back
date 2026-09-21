@@ -56,6 +56,13 @@ public class Occurrence extends TimestampedEntity {
     @Column(name = "estado", nullable = false)
     private OccurrenceStatus status;
 
+    @Column(name = "orden_aula", nullable = false)
+    @Builder.Default
+    private Integer roomSlot = 1;
+
+    @Column(name = "id_ocurrencia_principal")
+    private Long mirrorOfOccurrenceId;
+
     public LocalTime startTime() {
         return event.getStartTime();
     }

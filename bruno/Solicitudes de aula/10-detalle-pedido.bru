@@ -19,6 +19,19 @@ docs {
   al docente) e "item" trae todos los campos del pedido: decidedBy,
   decisionReason, requiresProjector, requiresComputers, computerCount,
   requiresExamUsers, requiredSoftware, observations, preferredClassrooms.
-  
+
+  También suma el resultado de la resolución, cuando aplica:
+  - assignedClassrooms: AssignedClassroomDto[] (id, roomNumber, buildingName,
+    capacity). [] si todavía no se asignó ninguna aula. Una entrada por aula
+    del pedido (posición 1..classroomCount), no una por ocurrencia real: un
+    REGULAR_ROOM_CHANGE que cubre N clases futuras con la misma aula aparece
+    una sola vez acá.
+  - notifiedAt: fecha en que se avisó al docente (notify), null si no se avisó.
+  - derivedBuilding / derivedAt: edificio y fecha de la derivación vigente
+    (DERIVED_TO_BUILDING), null si nunca se derivó o ya se devolvió.
+  - returnedFromBuilding / returnedReason: edificio y motivo de la última
+    devolución (return), null si nunca se devolvió. Un return posterior pisa
+    estos dos con los datos nuevos.
+
   404 si el id no existe.
 }

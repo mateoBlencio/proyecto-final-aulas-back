@@ -69,6 +69,18 @@ class RoomRequestItemSortTest {
     }
 
     @Test
+    @DisplayName("derivedAt y decidedAt son campos permitidos, se traducen tal cual")
+    void derivedAtAndDecidedAtAreAllowed() {
+        Pageable result = RoomRequestItemSort.apply(
+                PageRequest.of(0, 20, Sort.by(Sort.Order.desc("derivedAt"), Sort.Order.asc("decidedAt"))));
+
+        assertThat(orders(result)).containsExactly(
+                Sort.Order.desc("derivedAt"),
+                Sort.Order.asc("decidedAt"),
+                Sort.Order.asc("id"));
+    }
+
+    @Test
     @DisplayName("sort compuesto: cada campo se traduce en orden y el desempate va al final")
     void compositeSortTranslatesEachFieldInOrder() {
         Pageable requested = PageRequest.of(0, 20, Sort.by(Sort.Order.asc("date"), Sort.Order.desc("createdAt")));

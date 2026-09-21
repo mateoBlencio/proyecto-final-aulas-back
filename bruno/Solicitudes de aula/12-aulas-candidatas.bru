@@ -1,0 +1,26 @@
+meta {
+  name: Aulas candidatas para un pedido
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/v1/room-requests/items/1/allowed-classrooms
+  body: none
+  auth: inherit
+}
+
+docs {
+  Aulas activas que cumplen los requisitos del pedido (computadoras, proyector),
+  con disponibilidad ya calculada contra su fecha y horario. Requiere
+  autenticación (hasAnyRole SUBSECRETARIA, AUXILIAR_AULICO). Sin query params:
+  todo sale de los datos del ítem.
+
+  Respuesta: array de { id, roomNumber, buildingId, buildingName, capacity,
+  available }. `available: false` = ocupada en esa fecha/horario, pero igual
+  aparece en la lista (no se filtra). `requiredSoftware` no filtra, ya viaja en
+  el detalle del ítem.
+
+  Lista vacía es una respuesta válida (200, no 404). 404 solo si el id del
+  ítem no existe.
+}

@@ -30,5 +30,11 @@ public record RoomRequestItemResponseDto(
         Boolean requiresExamUsers,
         String requiredSoftware,
         String observations,
-        List<ClassroomOptionDto> preferredClassrooms
+        List<ClassroomOptionDto> preferredClassrooms,
+        List<AssignedClassroomDto> assignedClassrooms,
+        LocalDateTime notifiedAt,
+        BuildingOptionDto derivedBuilding,
+        LocalDateTime derivedAt,
+        BuildingOptionDto returnedFromBuilding,
+        String returnedReason
 ) {}

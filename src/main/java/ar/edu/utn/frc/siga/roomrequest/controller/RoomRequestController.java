@@ -1,14 +1,22 @@
 package ar.edu.utn.frc.siga.roomrequest.controller;
 
 import ar.edu.utn.frc.siga.roomrequest.dto.RoomRequestItemFilter;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.AssignRoomRequestItemDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.CancelRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.DeriveRoomRequestItemDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.ReturnRoomRequestItemDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemRowDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemStatusCountDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
+import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestResolutionService;
 import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,6 +39,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.security.Principal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -45,10 +54,11 @@ import java.util.Set;
 public class RoomRequestController {
 
     private final RoomRequestService roomRequestService;
+    private final RoomRequestResolutionService roomRequestResolutionService;
 
     @PostMapping
     @Operation(summary = "Crear una solicitud de aula",
-               description = "Registra una solicitud con sus pedidos y queda en estado PENDING "
+               description = "Registra una solicitud con sus pedidos y queda en estado NEW "
                        + "para que subsecretaría la analice. Endpoint público")
     public ResponseEntity<RoomRequestResponseDto> create(@Valid @RequestBody CreateRoomRequestDto dto) {
         log.debug("POST /v1/room-requests: teacherName={}, type={}, items={}",
@@ -72,12 +82,17 @@ public class RoomRequestController {
             @RequestParam(required = false) Long subjectId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
-            @RequestParam(required = false, defaultValue = "false") boolean includePast) {
+            @RequestParam(required = false, defaultValue = "false") boolean includePast,
+            @RequestParam(required = false) Boolean requiresSpecialAssignment,
+            @RequestParam(required = false) Long derivedBuildingId,
+            @RequestParam(required = false) Boolean partiallyResolved,
+            @RequestParam(required = false) Boolean wasReturned) {
 
         log.debug("GET /v1/room-requests/items: types={}, statuses={}, scope={}, subjectId={}, page={}",
                 types, statuses, scope, subjectId, pageable.getPageNumber());
         RoomRequestItemFilter filter =
-                RoomRequestItemFilter.of(types, statuses, scope, subjectId, dateFrom, dateTo, includePast);
+                RoomRequestItemFilter.of(types, statuses, scope, subjectId, dateFrom, dateTo, includePast,
+                        requiresSpecialAssignment, derivedBuildingId, partiallyResolved, wasReturned);
         Page<RoomRequestItemRowDto> page = roomRequestService.findItems(filter, pageable);
         log.info("Pedidos de aula listados vía controller: total={}", page.getTotalElements());
         return ResponseEntity.ok(page);
@@ -88,10 +103,14 @@ public class RoomRequestController {
     @Operation(summary = "Contar pedidos de aula por estado",
                description = "Total de pedidos en cada estado.")
     public ResponseEntity<List<RoomRequestItemStatusCountDto>> countItemsByStatus(
-            @RequestParam(required = false, defaultValue = "false") boolean includePast) {
+            @RequestParam(required = false, defaultValue = "false") boolean includePast,
+            @RequestParam(required = false) Boolean requiresSpecialAssignment,
+            @RequestParam(required = false) Boolean partiallyResolved) {
 
-        log.debug("GET /v1/room-requests/items/status-counts: includePast={}", includePast);
-        List<RoomRequestItemStatusCountDto> counts = roomRequestService.countItemsByStatus(includePast);
+        log.debug("GET /v1/room-requests/items/status-counts: includePast={}, requiresSpecialAssignment={}, "
+                        + "partiallyResolved={}", includePast, requiresSpecialAssignment, partiallyResolved);
+        List<RoomRequestItemStatusCountDto> counts =
+                roomRequestService.countItemsByStatus(includePast, requiresSpecialAssignment, partiallyResolved);
         log.info("Pedidos de aula contados por estado vía controller: {}", counts);
         return ResponseEntity.ok(counts);
     }
@@ -104,5 +123,106 @@ public class RoomRequestController {
     public ResponseEntity<RoomRequestItemDetailDto> findItemById(@PathVariable Long id) {
         log.debug("GET /v1/room-requests/items/{}", id);
         return ResponseEntity.ok(roomRequestService.findItemById(id));
+    }
+
+    @PostMapping("/items/{id}/assign")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
+    @Operation(summary = "Asignar aula(s) a un pedido",
+               description = "Asigna una o más aulas y deja el pedido en IN_EVALUATION. Admite "
+                       + "resolución parcial (menos aulas que classroomCount, con motivo obligatorio) "
+                       + "y reasignación mientras el pedido no fue notificado.")
+    public ResponseEntity<RoomRequestItemResponseDto> assignItem(@PathVariable Long id,
+                                                                  @Valid @RequestBody AssignRoomRequestItemDto dto,
+                                                                  Principal principal) {
+        log.debug("POST /v1/room-requests/items/{}/assign", id);
+        RoomRequestItemResponseDto response =
+                roomRequestResolutionService.assign(id, dto.classroomIds(), dto.reason(), principal.getName());
+        log.info("Pedido de aula asignado vía controller: id={}", id);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/items/{id}/cancel")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
+    @Operation(summary = "Cancelar un pedido de aula",
+               description = "Cancela el pedido desde cualquier estado no final, incluido RESOLVED. "
+                       + "Libera las aulas que tuviera asignadas.")
+    public ResponseEntity<RoomRequestItemResponseDto> cancelItem(@PathVariable Long id,
+                                                                  @Valid @RequestBody CancelRoomRequestItemDto dto,
+                                                                  Principal principal) {
+        log.debug("POST /v1/room-requests/items/{}/cancel", id);
+        RoomRequestItemResponseDto response =
+                roomRequestResolutionService.cancel(id, dto.reason(), principal.getName());
+        log.info("Pedido de aula cancelado vía controller: id={}", id);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/items/{id}/allowed-classrooms")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_READ')")
+    @Operation(summary = "Aulas candidatas para resolver un pedido",
+               description = "Aulas activas que cumplen los requisitos del pedido (computadoras, "
+                       + "proyector), con disponibilidad ya calculada contra su fecha y horario. "
+                       + "Lista vacía es una respuesta válida.")
+    public ResponseEntity<List<AllowedClassroomDto>> findAllowedClassrooms(@PathVariable Long id) {
+        log.debug("GET /v1/room-requests/items/{}/allowed-classrooms", id);
+        List<AllowedClassroomDto> response = roomRequestResolutionService.findAllowedClassrooms(id);
+        log.info("Aulas candidatas listadas vía controller: itemId={}, total={}", id, response.size());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/items/{id}/derive")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
+    @Operation(summary = "Derivar un pedido de aula a un edificio",
+               description = "Deja el pedido en la cola de un edificio para que su auxiliar áulico "
+                       + "lo resuelva. Solo desde NEW, y solo a edificios activos, con auxiliar "
+                       + "áulico asignado y con al menos un aula libre que cumpla los requisitos.")
+    public ResponseEntity<RoomRequestItemResponseDto> deriveItem(@PathVariable Long id,
+                                                                  @Valid @RequestBody DeriveRoomRequestItemDto dto,
+                                                                  Principal principal) {
+        log.debug("POST /v1/room-requests/items/{}/derive", id);
+        RoomRequestItemResponseDto response =
+                roomRequestResolutionService.derive(id, dto.buildingId(), principal.getName());
+        log.info("Pedido de aula derivado vía controller: id={}, buildingId={}", id, dto.buildingId());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/items/{id}/return")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
+    @Operation(summary = "Devolver un pedido derivado",
+               description = "Saca el pedido de la cola de un edificio y lo vuelve a NEW. Solo "
+                       + "desde DERIVED_TO_BUILDING, con motivo obligatorio.")
+    public ResponseEntity<RoomRequestItemResponseDto> returnItem(@PathVariable Long id,
+                                                                  @Valid @RequestBody ReturnRoomRequestItemDto dto,
+                                                                  Principal principal) {
+        log.debug("POST /v1/room-requests/items/{}/return", id);
+        RoomRequestItemResponseDto response =
+                roomRequestResolutionService.returnItem(id, dto.reason(), principal.getName());
+        log.info("Pedido de aula devuelto vía controller: id={}", id);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/items/{id}/notify")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
+    @Operation(summary = "Avisar al docente que su pedido quedó resuelto",
+               description = "Sella la resolución y deja el pedido en RESOLVED. Idempotente: llamarlo "
+                       + "de nuevo sobre un pedido ya notificado devuelve 200 sin resellar ni volver a "
+                       + "avisar. Requiere IN_EVALUATION con al menos un aula asignada.")
+    public ResponseEntity<RoomRequestItemResponseDto> notifyItem(@PathVariable Long id, Principal principal) {
+        log.debug("POST /v1/room-requests/items/{}/notify", id);
+        RoomRequestItemResponseDto response = roomRequestResolutionService.notify(id, principal.getName());
+        log.info("Pedido de aula notificado vía controller: id={}", id);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/items/{id}/candidate-buildings")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_READ')")
+    @Operation(summary = "Edificios candidatos para derivar un pedido",
+               description = "Edificios con al menos un aula libre que cumple los requisitos del "
+                       + "pedido y que tienen algún auxiliar áulico asignado. Lista vacía es una "
+                       + "respuesta válida.")
+    public ResponseEntity<List<CandidateBuildingDto>> findCandidateBuildings(@PathVariable Long id) {
+        log.debug("GET /v1/room-requests/items/{}/candidate-buildings", id);
+        List<CandidateBuildingDto> response = roomRequestResolutionService.findCandidateBuildings(id);
+        log.info("Edificios candidatos listados vía controller: itemId={}, total={}", id, response.size());
+        return ResponseEntity.ok(response);
     }
 }

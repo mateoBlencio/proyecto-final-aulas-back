@@ -15,6 +15,8 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
 
     List<Occurrence> findByEvent_Id(Long eventId);
 
+    List<Occurrence> findByEvent_IdAndDate(Long eventId, LocalDate date);
+
     @EntityGraph(attributePaths = "event")
     List<Occurrence> findByEvent_IdIn(Collection<Long> eventIds);
 
