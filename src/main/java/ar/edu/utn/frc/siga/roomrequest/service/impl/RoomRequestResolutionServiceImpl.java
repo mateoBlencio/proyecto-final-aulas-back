@@ -11,7 +11,10 @@ import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
+import ar.edu.utn.frc.siga.roomrequest.exception.BuildingNotAvailableException;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
+import ar.edu.utn.frc.siga.roomrequest.exception.PartialAssignmentReasonRequiredException;
+import ar.edu.utn.frc.siga.roomrequest.exception.RoomRequestAlreadyNotifiedException;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestComposer;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItemAllocation;
@@ -58,6 +61,9 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
         RoomRequestItem item = itemRepository.findWithRequestById(itemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
+        if (item.getStatus() == RoomRequestStatus.RESOLVED) {
+            throw new RoomRequestAlreadyNotifiedException(itemId);
+        }
         transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.IN_EVALUATION);
 
         List<Long> ids = classroomIds == null ? List.of() : classroomIds;
@@ -69,8 +75,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         }
         ItemConsistency.requireDistinct(ids, "un aula");
         if (ids.size() < item.getClassroomCount() && (reason == null || reason.isBlank())) {
-            throw new InvalidRoomRequestException(
-                    "El motivo es obligatorio al asignar menos aulas de las pedidas.");
+            throw new PartialAssignmentReasonRequiredException();
         }
 
         boolean reassigning = !item.getAllocations().isEmpty();
@@ -154,8 +159,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         boolean hasFreeClassroom = candidateResolver.candidateClassrooms(item).stream()
                 .anyMatch(c -> c.buildingId().equals(buildingId) && !occupiedClassroomIds.contains(c.id()));
         if (!hasFreeClassroom) {
-            throw new InvalidRoomRequestException(
-                    "El edificio no tiene ninguna aula libre que cumpla los requisitos del pedido.");
+            throw new BuildingNotAvailableException(buildingId);
         }
 
         item.deriveTo(buildingId, actor, LocalDateTime.now());

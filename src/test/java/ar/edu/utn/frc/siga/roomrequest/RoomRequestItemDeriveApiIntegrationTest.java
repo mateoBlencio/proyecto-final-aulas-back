@@ -48,7 +48,7 @@ class RoomRequestItemDeriveApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("edificio sin ninguna aula libre: 400 Invalid room request")
+    @DisplayName("edificio sin ninguna aula libre: 400 Building not available")
     void derive_sinAulasLibres_returnsBadRequest() throws Exception {
         Building building = testData.edificio();
         mockMvcAsScoped("auxiliar-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar",
@@ -59,7 +59,7 @@ class RoomRequestItemDeriveApiIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"buildingId\":" + building.getId() + "}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("Invalid room request"));
+                .andExpect(jsonPath("$.title").value("Building not available"));
     }
 
     @Test

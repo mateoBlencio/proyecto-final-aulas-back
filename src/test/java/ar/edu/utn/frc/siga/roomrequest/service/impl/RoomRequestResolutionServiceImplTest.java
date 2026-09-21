@@ -11,8 +11,11 @@ import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
+import ar.edu.utn.frc.siga.roomrequest.exception.BuildingNotAvailableException;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestTransitionException;
+import ar.edu.utn.frc.siga.roomrequest.exception.PartialAssignmentReasonRequiredException;
+import ar.edu.utn.frc.siga.roomrequest.exception.RoomRequestAlreadyNotifiedException;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestComposer;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
@@ -238,7 +241,7 @@ class RoomRequestResolutionServiceImplTest {
         when(candidateResolver.candidateClassrooms(item)).thenReturn(List.of(classroom(101L, 1L, "Edificio Central")));
 
         assertThatThrownBy(() -> service.derive(1L, 1L, "subsecretaria@frc.utn.edu.ar"))
-                .isInstanceOf(InvalidRoomRequestException.class);
+                .isInstanceOf(BuildingNotAvailableException.class);
         verifyNoInteractions(composer);
     }
 
@@ -461,6 +464,18 @@ class RoomRequestResolutionServiceImplTest {
     // manejo de reason, y cómo se arma el AllocationCommand a partir de lo que el resolver devuelve.
 
     @Test
+    @DisplayName("assign: RESOLVED (ya notificado) se rechaza antes de validar la forma")
+    void assign_yaNotificadoSeRechaza() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.RESOLVED)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(2).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> service.assign(1L, List.of(104L), null, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(RoomRequestAlreadyNotifiedException.class);
+        verifyNoInteractions(transitionValidator, allocationService, occurrenceResolver, composer);
+    }
+
+    @Test
     @DisplayName("assign: 0 aulas se rechaza (eso es cancel, no assign)")
     void assign_ceroAulas() {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
@@ -504,7 +519,7 @@ class RoomRequestResolutionServiceImplTest {
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
 
         assertThatThrownBy(() -> service.assign(1L, List.of(104L), null, "subsecretaria@frc.utn.edu.ar"))
-                .isInstanceOf(InvalidRoomRequestException.class);
+                .isInstanceOf(PartialAssignmentReasonRequiredException.class);
         verifyNoInteractions(allocationService, occurrenceResolver, composer);
     }
 
