@@ -23,7 +23,9 @@ public final class SettingsCatalogFixture {
                 definition("preview.ttlMinutes", "30", "1", "1440"),
                 definition("events.hours.start", "08:00", null, null),
                 definition("events.hours.end", "23:00", null, null),
-                definition("allocation.maxOverlapMinutes", "40", "0", null)));
+                definition("allocation.maxOverlapMinutes", "40", "0", null),
+                definition("notifications.enabled", "true", null, null),
+                definition("notifications.channel.email.enabled", "true", null, null)));
         return properties;
     }
 
