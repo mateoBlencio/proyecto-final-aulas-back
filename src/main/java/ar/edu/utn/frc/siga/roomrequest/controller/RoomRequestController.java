@@ -72,8 +72,8 @@ public class RoomRequestController {
     @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_READ')")
     @Operation(summary = "Listar pedidos de aula",
                description = "Listado paginado de pedidos. Filtra por tipo, "
-                       + "estado, ámbito y materia; por defecto oculta los pedidos con fecha pasada "
-                       + "salvo que se pida includePast=true.")
+                       + "estado, ámbito y materia; trae también los pedidos con fecha pasada "
+                       + "salvo que se pida includePast=false.")
     public ResponseEntity<Page<RoomRequestItemRowDto>> findItems(
             @PageableDefault(size = 20, sort = {"date", "startTime"}, direction = Sort.Direction.ASC)  Pageable pageable,
             @RequestParam(required = false) Set<RoomRequestType> types,
@@ -82,7 +82,7 @@ public class RoomRequestController {
             @RequestParam(required = false) Long subjectId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
-            @RequestParam(required = false, defaultValue = "false") boolean includePast,
+            @RequestParam(required = false, defaultValue = "true") boolean includePast,
             @RequestParam(required = false) Boolean requiresSpecialAssignment,
             @RequestParam(required = false) Long derivedBuildingId,
             @RequestParam(required = false) Boolean partiallyResolved,
@@ -101,9 +101,10 @@ public class RoomRequestController {
     @GetMapping("/items/status-counts")
     @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_READ')")
     @Operation(summary = "Contar pedidos de aula por estado",
-               description = "Total de pedidos en cada estado.")
+               description = "Total de pedidos en cada estado; incluye los de fecha pasada "
+                       + "salvo que se pida includePast=false.")
     public ResponseEntity<List<RoomRequestItemStatusCountDto>> countItemsByStatus(
-            @RequestParam(required = false, defaultValue = "false") boolean includePast,
+            @RequestParam(required = false, defaultValue = "true") boolean includePast,
             @RequestParam(required = false) Boolean requiresSpecialAssignment,
             @RequestParam(required = false) Boolean partiallyResolved) {
 

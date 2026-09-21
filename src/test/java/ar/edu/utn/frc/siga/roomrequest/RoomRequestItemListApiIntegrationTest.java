@@ -101,7 +101,7 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("includePast=false oculta pedidos vencidos; includePast=true los trae")
+    @DisplayName("includePast=false oculta pedidos vencidos; por defecto (sin mandar el parámetro) los trae")
     void includePastTogglesVisibilityOfPastItems() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
         RoomRequest request = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
@@ -110,13 +110,13 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
         roomRequestRepository.save(request);
 
         mockMvc.perform(get("/v1/room-requests/items")
-                        .param("subjectId", String.valueOf(academic.subjectId())))
+                        .param("subjectId", String.valueOf(academic.subjectId()))
+                        .param("includePast", "false"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page.totalElements").value(1));
 
         mockMvc.perform(get("/v1/room-requests/items")
-                        .param("subjectId", String.valueOf(academic.subjectId()))
-                        .param("includePast", "true"))
+                        .param("subjectId", String.valueOf(academic.subjectId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page.totalElements").value(2));
     }
