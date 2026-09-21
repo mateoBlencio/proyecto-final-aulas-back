@@ -16,8 +16,6 @@ spring:
       mail.smtp.auth: false
       mail.smtp.starttls.enable: false
       mail.smtp.starttls.required: false
-  # Aca manda Hibernate: es el ambiente donde se disenan los cambios de entidades antes de
-  # escribir la migracion. Prender Flyway aca chocaria con ddl-auto: update.
   flyway:
     enabled: false
 

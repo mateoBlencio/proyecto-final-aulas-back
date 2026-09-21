@@ -19,16 +19,10 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS_DEV}
       SYSACAD_ENABLED: ${SYSACAD_ENABLED}
       SYSACAD_API_KEY: ${SYSACAD_API_KEY}
-    networks:
-      - app-network
-
-  mailhog-dev:
-    image: mailhog/mailhog:v1.0.1
-    profiles: ["dev"]
-    restart: always
-    ports:
-      - "8025:8025"
-      - "1025:1025"
+      MAIL_HOST: ${MAIL_HOST_DEV}
+      MAIL_USERNAME: ${MAIL_USERNAME_DEV}
+      MAIL_PASSWORD: ${MAIL_PASSWORD_DEV}
+      MAIL_FROM: ${MAIL_FROM_DEV}
     networks:
       - app-network
 

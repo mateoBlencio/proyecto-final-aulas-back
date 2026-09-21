@@ -7,20 +7,9 @@ spring:
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
-
-  # Flyway corre con un usuario aparte: el de la app tiene solo DML y no es dueno de las
-  # tablas, asi que un ALTER TABLE en una migracion le daria "must be owner of table".
   flyway:
     user: ${DB_MIGRATION_USERNAME}
     password: ${DB_MIGRATION_PASSWORD}
-
-  mail:
-    host: ${MAIL_HOST:mailhog-dev}
-    port: ${MAIL_PORT:1025}
-    properties:
-      mail.smtp.auth: ${MAIL_SMTP_AUTH:false}
-      mail.smtp.starttls.enable: ${MAIL_SMTP_STARTTLS_ENABLE:false}
-      mail.smtp.starttls.required: ${MAIL_SMTP_STARTTLS_REQUIRED:false}
 
 springdoc:
   swagger-ui:
