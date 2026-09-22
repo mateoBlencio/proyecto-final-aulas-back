@@ -5,6 +5,8 @@ import ar.edu.utn.frc.siga.audit.dto.response.AuditLogEntryDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.util.List;
+
 public interface AuditRegistryService {
 
     /**
@@ -15,4 +17,7 @@ public interface AuditRegistryService {
 
     /** Cambios individuales que componen una operación en lote (drill-down). */
     Page<AuditLogEntryDto> findOperationItems(String operationId, Pageable pageable);
+
+    /** Etiquetas de dominio de las entidades auditadas, en el mismo orden del registry. */
+    List<String> findEntityTypes();
 }

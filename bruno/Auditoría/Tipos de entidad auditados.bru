@@ -1,0 +1,17 @@
+meta {
+  name: Tipos de entidad auditados
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/v1/audit/entity-types
+  body: none
+  auth: inherit
+}
+
+docs {
+  Etiquetas de dominio aceptadas por el parámetro 'entityType' de GET /v1/audit,
+  descubiertas en runtime a partir de las entidades @Audited. Requiere rol
+  SUBSECRETARIA.
+}

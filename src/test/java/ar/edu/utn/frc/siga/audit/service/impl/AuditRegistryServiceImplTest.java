@@ -159,7 +159,7 @@ class AuditRegistryServiceImplTest {
     }
 
     @Test
-    @DisplayName("'to' en el futuro sin 'from': no revienta (from se defaultea a hoy), antes tiraba NPE")
+    @DisplayName("'to' en el futuro sin 'from': no revienta (rango queda abierto por abajo)")
     void findAll_toWithoutFrom_doesNotThrow() {
         when(revisionReader.readMetadata(any(), any(), any(), any(), any(), isNull())).thenReturn(List.of());
         AuditLogFilter onlyTo = new AuditLogFilter(null, LocalDate.now().plusDays(30), null, null, null);
@@ -170,12 +170,17 @@ class AuditRegistryServiceImplTest {
     }
 
     @Test
-    @DisplayName("'to' en el pasado sin 'from': 400 (from se defaultea a hoy, queda 'to' antes de 'from')")
-    void findAll_pastToWithoutFrom_throws() {
-        AuditLogFilter pastTo = new AuditLogFilter(null, LocalDate.now().minusDays(1), null, null, null);
+    @DisplayName("'to' en el pasado sin 'from': no revienta y 'from' llega null a readMetadata")
+    void findAll_pastToWithoutFrom_doesNotThrow() {
+        when(revisionReader.readMetadata(any(), any(), any(), any(), any(), isNull())).thenReturn(List.of());
+        LocalDate to = LocalDate.now().minusDays(1);
+        AuditLogFilter pastTo = new AuditLogFilter(null, to, null, null, null);
 
-        assertThatThrownBy(() -> service.findAll(pastTo, PageRequest.of(0, 10)))
-                .isInstanceOf(InvalidDateRangeException.class);
+        Page<AuditLogEntryDto> result = service.findAll(pastTo, PageRequest.of(0, 10));
+
+        assertThat(result.getContent()).isEmpty();
+        verify(revisionReader).readMetadata(String.class, null, to.plusDays(1).atStartOfDay(), null, null, null);
+        verify(revisionReader).readMetadata(Integer.class, null, to.plusDays(1).atStartOfDay(), null, null, null);
     }
 
     @Test
@@ -211,5 +216,13 @@ class AuditRegistryServiceImplTest {
         assertThat(page.getContent()).extracting(AuditLogEntryDto::type).containsOnly(AuditLogEntryType.CHANGE);
         assertThat(page.getContent()).extracting(AuditLogEntryDto::revision).containsExactly(21, 20);
         assertThat(page.getContent()).extracting(AuditLogEntryDto::operationId).containsOnly("op-9");
+    }
+
+    @Test
+    @DisplayName("findEntityTypes devuelve las etiquetas del registry en su orden")
+    void findEntityTypes_returnsRegistryLabelsInOrder() {
+        List<String> types = service.findEntityTypes();
+
+        assertThat(types).containsExactly("Asignación", "Configuración");
     }
 }

@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.blankOrNullString;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
@@ -172,5 +173,64 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
 
         auxMockMvc.perform(get("/v1/audit"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("GET /v1/audit/entity-types responde con las diez etiquetas de entidades auditadas")
+    void entityTypesReturnsAllLabels() throws Exception {
+        mockMvc.perform(get("/v1/audit/entity-types"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(10)))
+                .andExpect(jsonPath("$", hasItem("Asignación de rol")))
+                .andExpect(jsonPath("$", hasItem("Asignación de solicitud de aula")));
+    }
+
+    @Test
+    @DisplayName("cada etiqueta de /v1/audit/entity-types es aceptada como entityType por GET /v1/audit")
+    void entityTypesCatalogMatchesFilter() throws Exception {
+        MvcResult catalog = mockMvc.perform(get("/v1/audit/entity-types"))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode labels = objectMapper.readTree(catalog.getResponse().getContentAsString());
+
+        for (JsonNode label : labels) {
+            mockMvc.perform(get("/v1/audit").param("entityType", label.asText()))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    @Test
+    @DisplayName("un AUXILIAR_AULICO no puede consultar el catálogo de tipos de entidad (403)")
+    void entityTypesForbiddenWithoutSubsecretariaRole() throws Exception {
+        MockMvc auxMockMvc = mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
+
+        auxMockMvc.perform(get("/v1/audit/entity-types"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("filtra por fragmento de usuario, sin importar mayúsculas")
+    void filtersByUserPartialCaseInsensitive() throws Exception {
+        seedRecurringEvent(LocalDate.now().plusDays(37));
+
+        mockMvc.perform(get("/v1/audit").param("size", "200").param("user", "INTEGRATION-TEST"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isNotEmpty())
+                .andExpect(jsonPath("$.content[*].user", everyItem(is(USER))));
+    }
+
+    @Test
+    @DisplayName("un fragmento de usuario que no matchea a nadie devuelve página vacía")
+    void filtersByUserNoMatchReturnsEmptyPage() throws Exception {
+        mockMvc.perform(get("/v1/audit").param("user", "nadie-que-exista"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isEmpty());
+    }
+
+    @Test
+    @DisplayName("'to' en el pasado sin 'from' responde 200")
+    void pastToWithoutFromReturns200() throws Exception {
+        mockMvc.perform(get("/v1/audit").param("to", LocalDate.now().minusDays(1).toString()))
+                .andExpect(status().isOk());
     }
 }
