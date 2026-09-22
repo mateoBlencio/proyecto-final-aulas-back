@@ -45,7 +45,7 @@ public class AuditRegistryServiceImpl implements AuditRegistryService {
     @Override
     @Transactional(readOnly = true)
     public Page<AuditLogEntryDto> findAll(AuditLogFilter filter, Pageable pageable) {
-        DateRanges.requireNotBefore(filter.to(), DateRanges.defaultFrom(filter.from()));
+        DateRanges.requireNotBefore(filter.to(), filter.from());
 
         Collection<AuditedEntity> targets = resolveTargets(filter.entityType());
         LocalDateTime from = atStartOfDay(filter.from());
@@ -120,6 +120,11 @@ public class AuditRegistryServiceImpl implements AuditRegistryService {
                 sample.operationId(),
                 group.size(),
                 entityTypes);
+    }
+
+    @Override
+    public List<String> findEntityTypes() {
+        return registry.all().stream().map(AuditedEntity::label).toList();
     }
 
     private Collection<AuditedEntity> resolveTargets(String entityType) {

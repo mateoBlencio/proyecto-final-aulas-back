@@ -12,6 +12,7 @@ import org.hibernate.envers.AuditReaderFactory;
 import org.hibernate.envers.RevisionType;
 import org.hibernate.envers.query.AuditEntity;
 import org.hibernate.envers.query.AuditQuery;
+import org.hibernate.envers.query.criteria.MatchMode;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -79,8 +80,8 @@ public class RevisionReaderImpl implements RevisionReader {
         if (to != null) {
             query.add(AuditEntity.revisionProperty("fechaRevision").lt(to));
         }
-        if (user != null) {
-            query.add(AuditEntity.revisionProperty("usuario").eq(user));
+        if (user != null && !user.isBlank()) {
+            query.add(AuditEntity.revisionProperty("usuario").ilike(user, MatchMode.ANYWHERE));
         }
         if (kind != null) {
             query.add(AuditEntity.revisionType().eq(toType(kind)));
