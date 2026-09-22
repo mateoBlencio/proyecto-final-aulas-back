@@ -32,6 +32,7 @@ public interface RoomRequestMapper {
     @Mapping(target = "commissions", source = "commissions")
     @Mapping(target = "preferredClassrooms", source = "preferredClassrooms")
     @Mapping(target = "assignedClassrooms", source = "assignedClassrooms")
+    @Mapping(target = "previousClassroom", source = "previousClassroom")
     @Mapping(target = "derivedBuilding", source = "derivedBuilding")
     @Mapping(target = "returnedFromBuilding", source = "returnedFromBuilding")
     @Mapping(target = "endTime", expression = "java(item.endTime())")
@@ -41,6 +42,7 @@ public interface RoomRequestMapper {
                                      List<CommissionResponseDto> commissions,
                                      List<ClassroomOptionDto> preferredClassrooms,
                                      List<AssignedClassroomDto> assignedClassrooms,
+                                     AssignedClassroomDto previousClassroom,
                                      BuildingOptionDto derivedBuilding,
                                      BuildingOptionDto returnedFromBuilding);
 

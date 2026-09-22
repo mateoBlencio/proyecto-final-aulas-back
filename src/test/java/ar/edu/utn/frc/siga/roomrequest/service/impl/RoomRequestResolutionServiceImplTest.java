@@ -8,12 +8,17 @@ import ar.edu.utn.frc.siga.auth.dto.response.UserResponseDto;
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.service.UserService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.notification.api.NotificationRequest;
+import ar.edu.utn.frc.siga.notification.api.NotificationSender;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailHeaderDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestTransitionException;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestComposer;
+import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestNotificationModel;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItemAllocation;
@@ -61,7 +66,9 @@ class RoomRequestResolutionServiceImplTest {
     @Mock
     private UserService userService;
     @Mock
-    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+    private NotificationSender notificationSender;
+    @Mock
+    private RoomRequestNotificationModel notificationModel;
     @Mock
     private RoomRequestComposer composer;
     @Mock
@@ -355,7 +362,7 @@ class RoomRequestResolutionServiceImplTest {
     // ---------- notify ----------
 
     @Test
-    @DisplayName("notify: IN_EVALUATION con aula asignada pasa a RESOLVED, sella notifiedAt y publica RoomRequestResolved")
+    @DisplayName("notify: IN_EVALUATION con aula asignada pasa a RESOLVED, sella notifiedAt y notifica al docente")
     void notify_ok() {
         RoomRequestItemAllocation allocation = RoomRequestItemAllocation.builder()
                 .occurrenceId(500L).classroomId(101L).position(1).build();
@@ -363,17 +370,20 @@ class RoomRequestResolutionServiceImplTest {
                 .request(requestOfType(RoomRequestType.FINAL_EXAM))
                 .allocations(new java.util.ArrayList<>(List.of(allocation))).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
-        when(composer.composeItem(item)).thenReturn(mockResponse());
+        when(composer.composeDetail(item)).thenReturn(mockDetail());
 
         service.notify(1L, "subsecretaria@frc.utn.edu.ar");
 
         assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.RESOLVED);
         assertThat(item.getNotifiedAt()).isNotNull();
-        verify(eventPublisher).publishEvent(any(ar.edu.utn.frc.siga.roomrequest.model.RoomRequestResolved.class));
+
+        ArgumentCaptor<NotificationRequest> captor = ArgumentCaptor.forClass(NotificationRequest.class);
+        verify(notificationSender, org.mockito.Mockito.times(1)).send(captor.capture());
+        assertThat(captor.getValue().idempotencyKey()).isEqualTo("room-request-item:1:RESOLVED");
     }
 
     @Test
-    @DisplayName("notify: llamado dos veces devuelve 200 las dos veces con el mismo notifiedAt, sin republicar")
+    @DisplayName("notify: llamado dos veces devuelve 200 las dos veces con el mismo notifiedAt, sin renotificar")
     void notify_idempotente() {
         RoomRequestItemAllocation allocation = RoomRequestItemAllocation.builder()
                 .occurrenceId(500L).classroomId(101L).position(1).build();
@@ -381,6 +391,7 @@ class RoomRequestResolutionServiceImplTest {
                 .request(requestOfType(RoomRequestType.FINAL_EXAM))
                 .allocations(new java.util.ArrayList<>(List.of(allocation))).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(composer.composeDetail(item)).thenReturn(mockDetail());
         when(composer.composeItem(item)).thenReturn(mockResponse());
 
         service.notify(1L, "subsecretaria@frc.utn.edu.ar");
@@ -388,8 +399,25 @@ class RoomRequestResolutionServiceImplTest {
         service.notify(1L, "subsecretaria@frc.utn.edu.ar");
 
         assertThat(item.getNotifiedAt()).isEqualTo(firstNotifiedAt);
-        verify(eventPublisher, org.mockito.Mockito.times(1))
-                .publishEvent(any(ar.edu.utn.frc.siga.roomrequest.model.RoomRequestResolved.class));
+        verify(notificationSender, org.mockito.Mockito.times(1)).send(any());
+    }
+
+    @Test
+    @DisplayName("notify: ítem ya notificado no vuelve a llamar a NotificationSender")
+    void notify_yaNotificado_noReenviaNotificacion() {
+        RoomRequestItemAllocation allocation = RoomRequestItemAllocation.builder()
+                .occurrenceId(500L).classroomId(101L).position(1).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.RESOLVED)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM))
+                .allocations(new java.util.ArrayList<>(List.of(allocation)))
+                .notifiedAt(java.time.LocalDateTime.now())
+                .build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.notify(1L, "subsecretaria@frc.utn.edu.ar");
+
+        verify(notificationSender, never()).send(any());
     }
 
     @Test
@@ -401,7 +429,7 @@ class RoomRequestResolutionServiceImplTest {
                 .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(2)
                 .allocations(new java.util.ArrayList<>(List.of(allocation))).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
-        when(composer.composeItem(item)).thenReturn(mockResponse());
+        when(composer.composeDetail(item)).thenReturn(mockDetail());
 
         service.notify(1L, "subsecretaria@frc.utn.edu.ar");
 
@@ -418,7 +446,7 @@ class RoomRequestResolutionServiceImplTest {
 
         assertThatThrownBy(() -> service.notify(1L, "subsecretaria@frc.utn.edu.ar"))
                 .isInstanceOf(InvalidRoomRequestTransitionException.class);
-        verifyNoInteractions(eventPublisher, composer);
+        verifyNoInteractions(notificationSender, composer);
     }
 
     @Test
@@ -430,7 +458,7 @@ class RoomRequestResolutionServiceImplTest {
 
         assertThatThrownBy(() -> service.notify(1L, "subsecretaria@frc.utn.edu.ar"))
                 .isInstanceOf(InvalidRoomRequestException.class);
-        verifyNoInteractions(eventPublisher, composer);
+        verifyNoInteractions(notificationSender, composer);
     }
 
     @Test
@@ -644,6 +672,13 @@ class RoomRequestResolutionServiceImplTest {
     private static RoomRequestItemResponseDto mockResponse() {
         return new RoomRequestItemResponseDto(1L, 1, RoomRequestStatus.CANCELLED, "subsecretaria@frc.utn.edu.ar",
                 null, "motivo", List.of(), null, null, null, null, null, null, 1, false, false, null,
-                false, null, null, List.of(), List.of(), null, null, null, null, null);
+                false, null, null, List.of(), List.of(), null, null, null, null, null, null);
+    }
+
+    private static RoomRequestItemDetailDto mockDetail() {
+        RoomRequestItemDetailHeaderDto header = new RoomRequestItemDetailHeaderDto(1L, RoomRequestType.FINAL_EXAM,
+                ar.edu.utn.frc.siga.roomrequest.model.AcademicScope.GRADO, "Ada Lovelace", "ada@frc.utn.edu.ar",
+                "351-1234567", null, null);
+        return new RoomRequestItemDetailDto(header, mockResponse());
     }
 }
