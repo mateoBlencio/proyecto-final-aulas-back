@@ -31,6 +31,7 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -57,6 +58,12 @@ public class AllocationServiceImpl implements AllocationService {
             throw ResourceNotFoundException.of("Allocation", allocationId);
         }
         return dto;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Long> findClassroomIdByOccurrence(Long occurrenceId) {
+        return allocationRepository.findByOccurrenceId(occurrenceId).map(Allocation::getClassroomId);
     }
 
     @Override

@@ -8,18 +8,24 @@ import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.service.UserService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.notification.api.NotificationRecipient;
+import ar.edu.utn.frc.siga.notification.api.NotificationRequest;
+import ar.edu.utn.frc.siga.notification.api.NotificationSender;
+import ar.edu.utn.frc.siga.notification.api.NotificationTemplate;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.exception.BuildingNotAvailableException;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.exception.PartialAssignmentReasonRequiredException;
 import ar.edu.utn.frc.siga.roomrequest.exception.RoomRequestAlreadyNotifiedException;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestComposer;
+import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestNotificationModel;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItemAllocation;
-import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestResolved;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestResolutionService;
 import ar.edu.utn.frc.siga.roomrequest.validator.ItemConsistency;
@@ -31,7 +37,6 @@ import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.service.BuildingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,7 +59,8 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
     private final AllocationService allocationService;
     private final BuildingService buildingService;
     private final UserService userService;
-    private final ApplicationEventPublisher eventPublisher;
+    private final NotificationSender notificationSender;
+    private final RoomRequestNotificationModel notificationModel;
     private final RoomRequestComposer composer;
     private final RoomRequestOccurrenceResolver occurrenceResolver;
     private final RoomRequestCandidateResolver candidateResolver;
@@ -90,6 +96,13 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         }
 
         List<List<Long>> occurrencesBySlot = occurrenceResolver.resolveOccurrencesBySlot(item, ids.size(), reassigning);
+
+        RoomRequestType type = item.getRequest().getType();
+        if (type == RoomRequestType.ONE_TIME_ROOM_CHANGE || type == RoomRequestType.REGULAR_ROOM_CHANGE) {
+            Long principalOccurrenceId = occurrencesBySlot.get(0).getFirst();
+            allocationService.findClassroomIdByOccurrence(principalOccurrenceId)
+                    .ifPresent(item::rememberPreviousClassroom);
+        }
 
         List<AllocationItem> allocationItems = new ArrayList<>();
         for (int i = 0; i < ids.size(); i++) {
@@ -200,7 +213,6 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         return composer.composeItem(item);
     }
 
-    // TODO: este método va a cambiar cuando se agregue el módulo "notification" que consuma RoomRequestResolved.
     @Override
     @Transactional
     public RoomRequestItemResponseDto notify(Long itemId, String actor) {
@@ -223,16 +235,14 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         LocalDateTime now = LocalDateTime.now();
         item.resolve(actor, now);
 
-        List<Long> classroomIds = item.getAllocations().stream()
-                .map(RoomRequestItemAllocation::getClassroomId)
-                .distinct()
-                .toList();
-        eventPublisher.publishEvent(new RoomRequestResolved(item.getId(), item.getRequest().getId(),
-                item.getRequest().getTeacherName(), item.getRequest().getTeacherEmail(),
-                item.getRequest().getSubjectId(), item.getDate(), item.getDayOfWeek(), item.getStartTime(),
-                classroomIds));
+        RoomRequestItemDetailDto detail = composer.composeDetail(item);
+        notificationSender.send(new NotificationRequest(
+                NotificationTemplate.ROOM_REQUEST_RESOLVED,
+                List.of(new NotificationRecipient(detail.request().teacherName(), detail.request().teacherEmail())),
+                notificationModel.build(detail),
+                "room-request-item:" + itemId + ":RESOLVED"));
 
         log.info("Pedido de aula notificado: itemId={}", itemId);
-        return composer.composeItem(item);
+        return detail.item();
     }
 }

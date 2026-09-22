@@ -14,7 +14,7 @@ public final class DateRanges {
     }
 
     public static void requireNotBefore(LocalDate to, LocalDate from) {
-        if (to != null && to.isBefore(from)) {
+        if (to != null && from != null && to.isBefore(from)) {
             throw new InvalidDateRangeException(
                     "'to' (" + to + ") no puede ser anterior a 'from' (" + from + ")");
         }

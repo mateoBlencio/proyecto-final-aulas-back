@@ -8,6 +8,14 @@ spring:
       enabled: true
       stop:
         command: down
+
+  mail:
+    host: localhost
+    port: 1025
+    properties:
+      mail.smtp.auth: false
+      mail.smtp.starttls.enable: false
+      mail.smtp.starttls.required: false
   flyway:
     enabled: false
 
@@ -44,6 +52,10 @@ siga:
   sysacad:
     enabled: false
     api-key: dev-local-unused
+  notifications:
+    email:
+      enabled: true
+      from: no-reply@siga.local
 
 logging:
   level:

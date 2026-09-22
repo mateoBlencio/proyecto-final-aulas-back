@@ -85,6 +85,39 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("ONE_TIME_ROOM_CHANGE: assign guarda el aula que tenía la ocurrencia antes, y una reasignación posterior no la pisa")
+    void assign_oneTimeRoomChange_guardaAulaAnteriorYNoLaPisaEnReasignacion() throws Exception {
+        Classroom aulaA = testData.aula(testData.edificio());
+        Classroom aulaB = testData.aula(testData.edificio());
+        Classroom aulaC = testData.aula(testData.edificio());
+        IntegrationTestData.SubjectAndCommission sc = testData.materiaYComision();
+        LocalDate date = LocalDate.now().plusDays(29);
+        Occurrence occurrence = seedOccurrence(sc, date);
+        allocateDirectly(occurrence.getId(), aulaA.getId());
+        RoomRequestItem item = seedExistingEventItem(RoomRequestType.ONE_TIME_ROOM_CHANGE,
+                occurrence.getEvent().getId(), sc, date);
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/assign")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(List.of(aulaB.getId()), null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.previousClassroom.id").value(aulaA.getId()));
+        assertThat(previousClassroomIdOf(item)).isEqualTo(aulaA.getId());
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/assign")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(List.of(aulaC.getId()), null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.previousClassroom.id").value(aulaA.getId()));
+        assertThat(previousClassroomIdOf(item)).isEqualTo(aulaA.getId());
+    }
+
+    private Long previousClassroomIdOf(RoomRequestItem item) {
+        return jdbcTemplate.queryForObject(
+                "select id_aula_anterior from solicitud_aula_item where id_item = ?", Long.class, item.getId());
+    }
+
+    @Test
     @DisplayName("0 aulas: 400 Invalid room request")
     void assign_ceroAulas_returnsBadRequest() throws Exception {
         RoomRequestItem item = seedCreatedEventItem(RoomRequestType.FINAL_EXAM, LocalDate.now().plusDays(22));

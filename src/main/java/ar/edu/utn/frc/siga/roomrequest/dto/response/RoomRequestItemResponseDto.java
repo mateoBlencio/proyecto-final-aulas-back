@@ -34,6 +34,7 @@ public record RoomRequestItemResponseDto(
         List<ClassroomOptionDto> preferredClassrooms,
         List<ClassroomOptionDto> currentClassrooms,
         List<AssignedClassroomDto> assignedClassrooms,
+        AssignedClassroomDto previousClassroom,
         LocalDateTime notifiedAt,
         BuildingOptionDto derivedBuilding,
         LocalDateTime derivedAt,

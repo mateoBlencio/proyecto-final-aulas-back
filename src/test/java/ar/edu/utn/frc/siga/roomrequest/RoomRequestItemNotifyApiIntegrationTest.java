@@ -15,6 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.Duration;
@@ -22,6 +23,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -40,6 +42,8 @@ class RoomRequestItemNotifyApiIntegrationTest extends AbstractIntegrationTest {
     private AcademicEventService academicEventService;
     @Autowired
     private OccurrenceRepository occurrenceRepository;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     @DisplayName("IN_EVALUATION con aula asignada: pasa a RESOLVED y sella notifiedAt")
@@ -49,6 +53,22 @@ class RoomRequestItemNotifyApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/notify"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("RESOLVED"));
+    }
+
+    @Test
+    @DisplayName("notify exitoso: deja una única notificación al docente en la tabla notificacion")
+    void notify_ok_notificaAlDocente() throws Exception {
+        RoomRequestItem item = seedPreApprovedItem(1);
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/notify"))
+                .andExpect(status().isOk());
+
+        List<Map<String, Object>> rows = notificationRows(item.getId());
+        assertThat(rows).hasSize(1);
+        Map<String, Object> notification = rows.getFirst();
+        assertThat(notification.get("destinatario")).isEqualTo("ada@frc.utn.edu.ar");
+        assertThat(notification.get("plantilla")).isEqualTo("ROOM_REQUEST_RESOLVED");
+        assertThat((String) notification.get("asunto")).startsWith("Aula confirmada");
     }
 
     @Test
@@ -64,6 +84,7 @@ class RoomRequestItemNotifyApiIntegrationTest extends AbstractIntegrationTest {
                 .andReturn();
 
         assertThat(first.getResponse().getContentAsString()).isEqualTo(second.getResponse().getContentAsString());
+        assertThat(notificationRows(item.getId())).hasSize(1);
     }
 
     @Test
@@ -93,6 +114,12 @@ class RoomRequestItemNotifyApiIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(post("/v1/room-requests/items/" + unknownId + "/notify"))
                 .andExpect(status().isNotFound());
+    }
+
+    private List<Map<String, Object>> notificationRows(Long itemId) {
+        return jdbcTemplate.queryForList(
+                "SELECT destinatario, plantilla, asunto FROM notificacion WHERE clave_idempotencia = ?",
+                "room-request-item:" + itemId + ":RESOLVED");
     }
 
     private RoomRequestItem seedPreApprovedItem(int classroomCount) {

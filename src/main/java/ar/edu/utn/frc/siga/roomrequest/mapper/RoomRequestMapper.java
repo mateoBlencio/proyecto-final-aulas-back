@@ -36,6 +36,7 @@ public interface RoomRequestMapper {
     @Mapping(target = "preferredClassrooms", source = "preferredClassrooms")
     @Mapping(target = "currentClassrooms", source = "currentClassrooms")
     @Mapping(target = "assignedClassrooms", source = "assignedClassrooms")
+    @Mapping(target = "previousClassroom", source = "previousClassroom")
     @Mapping(target = "derivedBuilding", source = "derivedBuilding")
     @Mapping(target = "returnedFromBuilding", source = "returnedFromBuilding")
     @Mapping(target = "enrolled", source = "enrolled")
@@ -47,6 +48,7 @@ public interface RoomRequestMapper {
                                      List<ClassroomOptionDto> preferredClassrooms,
                                      List<ClassroomOptionDto> currentClassrooms,
                                      List<AssignedClassroomDto> assignedClassrooms,
+                                     AssignedClassroomDto previousClassroom,
                                      BuildingOptionDto derivedBuilding,
                                      BuildingOptionDto returnedFromBuilding,
                                      Integer enrolled);

@@ -601,6 +601,29 @@ class AllocationServiceImplTest {
         verifyNoInteractions(buildingScopeResolver);
     }
 
+    // ---------- findClassroomIdByOccurrence ----------
+
+    @Test
+    @DisplayName("findClassroomIdByOccurrence: occurrence asignada → el classroomId de esa asignación")
+    void findClassroomIdByOccurrenceAsignada() {
+        Allocation alloc = allocation(1L, 10L, 5, AllocationSource.MANUAL);
+        when(allocationRepository.findByOccurrenceId(10L)).thenReturn(Optional.of(alloc));
+
+        Optional<Long> result = service.findClassroomIdByOccurrence(10L);
+
+        assertThat(result).contains(5L);
+    }
+
+    @Test
+    @DisplayName("findClassroomIdByOccurrence: occurrence sin asignación → Optional vacío")
+    void findClassroomIdByOccurrenceSinAsignar() {
+        when(allocationRepository.findByOccurrenceId(10L)).thenReturn(Optional.empty());
+
+        Optional<Long> result = service.findClassroomIdByOccurrence(10L);
+
+        assertThat(result).isEmpty();
+    }
+
     // ---------- helpers ----------
 
     private OccurrenceSlotDto occurrenceSlot(long id, long eventId, LocalDate date) {

@@ -18,6 +18,11 @@ spring:
     compose:
       enabled: false
 
+management:
+  health:
+    mail:
+      enabled: false
+
 cors:
   allowed-origins:
     - http://localhost:5173

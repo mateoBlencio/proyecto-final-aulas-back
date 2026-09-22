@@ -10,8 +10,6 @@ spring:
   data:
     web:
       pageable:
-        # Tope global de tamaño de página para todos los listados paginados
-        # (?size=100000 queda acotado a 200 en vez de traer toda la tabla).
         max-page-size: 200
         default-page-size: 20
 
@@ -54,6 +52,19 @@ spring:
   docker:
     compose:
       enabled: false
+
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${MAIL_SMTP_AUTH:true}
+      mail.smtp.starttls.enable: ${MAIL_SMTP_STARTTLS_ENABLE:true}
+      mail.smtp.starttls.required: ${MAIL_SMTP_STARTTLS_REQUIRED:true}
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
 
 server:
   servlet:
@@ -129,6 +140,10 @@ siga:
       - key: allocation.maxOverlapMinutes
         default-value: "40"
         min: "0"
+      - key: notifications.enabled
+        default-value: "true"
+      - key: notifications.channel.email.enabled
+        default-value: "true"
   optimizer:
     parallel-solver-count: AUTO
     environment-mode: PHASE_ASSERT
@@ -163,6 +178,12 @@ siga:
       allocations: "0 0 3 * * SUN"
       subjects: "0 0 3 * * SUN"
       commissions: "0 0 3 * * SUN"
+  notifications:
+    max-attempts: 5
+    retry-interval: PT1M
+    email:
+      enabled: ${MAIL_ENABLED:false}
+      from: ${MAIL_FROM:no-reply@frc.utn.edu.ar}
 
 logging:
   level:

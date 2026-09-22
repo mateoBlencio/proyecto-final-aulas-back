@@ -150,6 +150,11 @@ public class RoomRequestItem extends TimestampedEntity {
     @Column(name = "fecha_notificacion")
     private LocalDateTime notifiedAt;
 
+    /** Aula que ocupaba la clase antes del primer assign. Solo se completa una vez: si Subsecretaría
+     *  reasigna A -> B -> C, el docente sigue viendo A como aula anterior, porque nunca vio B. */
+    @Column(name = "id_aula_anterior")
+    private Long previousClassroomId;
+
     /** Lock optimista: dos resoluciones concurrentes sobre el mismo ítem (assign/notify/cancel a la vez) chocan en el commit en vez de pisarse. */
     @Version
     @Column(name = "version", nullable = false)
@@ -246,6 +251,12 @@ public class RoomRequestItem extends TimestampedEntity {
 
     public void addPreferences(List<Long> classroomIds) {
         classroomIds.forEach(this::addPreference);
+    }
+
+    public void rememberPreviousClassroom(Long classroomId) {
+        if (this.previousClassroomId == null) {
+            this.previousClassroomId = classroomId;
+        }
     }
 
     public void addPreference(Long classroomId) {

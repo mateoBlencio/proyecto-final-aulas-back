@@ -32,6 +32,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/** Arma los DTOs de respuesta de roomrequest a partir del catálogo cross-módulo que resuelve {@link RoomRequestCatalogsResolver}. */
 @Component
 @RequiredArgsConstructor
 public class RoomRequestComposer {
@@ -182,6 +183,9 @@ public class RoomRequestComposer {
     private void collectAssignedClassroomIds(Collection<RoomRequestItem> items, Set<Long> classroomIds) {
         for (RoomRequestItem item : items) {
             item.getAllocations().stream().map(RoomRequestItemAllocation::getClassroomId).forEach(classroomIds::add);
+            if (item.getPreviousClassroomId() != null) {
+                classroomIds.add(item.getPreviousClassroomId());
+            }
         }
     }
 
@@ -216,6 +220,7 @@ public class RoomRequestComposer {
                     resolvePreferredClassrooms(item, catalogs),
                     currentClassroomsByItemId.get(item.getId()),
                     resolveAssignedClassrooms(item, catalogs),
+                    resolvePreviousClassroom(item, catalogs),
                     resolveBuilding(item.getDerivedBuildingId(), catalogs),
                     resolveBuilding(item.getReturnedFromBuildingId(), catalogs),
                     enrolled));
@@ -237,6 +242,12 @@ public class RoomRequestComposer {
                 .map(entry -> catalogs.assignedClassroomsById().get(entry.getValue()))
                 .filter(Objects::nonNull)
                 .toList();
+    }
+
+    private AssignedClassroomDto resolvePreviousClassroom(RoomRequestItem item, Catalogs catalogs) {
+        return item.getPreviousClassroomId() != null
+                ? catalogs.assignedClassroomsById().get(item.getPreviousClassroomId())
+                : null;
     }
 
     private SubjectResponseDto resolveSubject(RoomRequest request, Catalogs catalogs) {

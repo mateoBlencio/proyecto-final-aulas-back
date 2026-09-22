@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.modulith.NamedInterface;
 
@@ -16,6 +17,8 @@ import org.springframework.modulith.NamedInterface;
 public interface AllocationService {
 
     AllocationResponseDto findById(Long allocationId);
+
+    Optional<Long> findClassroomIdByOccurrence(Long occurrenceId);
 
     List<AllocationResponseDto> findByDate(LocalDate date);
 

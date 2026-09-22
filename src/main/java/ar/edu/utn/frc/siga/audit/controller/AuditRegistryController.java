@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -39,7 +40,8 @@ public class AuditRegistryController {
                        + "en /audit/operations/{operationId}) o un cambio individual suelto (type=CHANGE, con "
                        + "kind, entityType y recordId). Todas traen 'description' de lo que se cambió. Filtros "
                        + "opcionales por rango de fechas, usuario, tipo de entidad y tipo de cambio. 400 si "
-                       + "'entityType' no es un tipo conocido o si 'to' es anterior a 'from'.")
+                       + "'entityType' no es un tipo conocido o si se envían las dos fechas y 'to' es anterior "
+                       + "a 'from'.")
     public ResponseEntity<Page<AuditLogEntryDto>> findAll(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
@@ -63,5 +65,13 @@ public class AuditRegistryController {
             @PageableDefault(size = 20) Pageable pageable) {
         log.debug("GET /v1/audit/operations/{}", operationId);
         return ResponseEntity.ok(auditRegistryService.findOperationItems(operationId, pageable));
+    }
+
+    @GetMapping("/entity-types")
+    @Operation(summary = "Tipos de entidad auditados",
+               description = "Etiquetas de dominio aceptadas por el parámetro 'entityType' de "
+                       + "GET /v1/audit. Se descubren en runtime a partir de las entidades @Audited.")
+    public ResponseEntity<List<String>> findEntityTypes() {
+        return ResponseEntity.ok(auditRegistryService.findEntityTypes());
     }
 }

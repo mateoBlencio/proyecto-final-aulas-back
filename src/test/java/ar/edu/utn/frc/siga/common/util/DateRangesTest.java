@@ -49,4 +49,12 @@ class DateRangesTest {
     void requireNotBeforeToNullNoLanza() {
         assertThatCode(() -> DateRanges.requireNotBefore(null, LocalDate.now())).doesNotThrowAnyException();
     }
+
+    @Test
+    @DisplayName("requireNotBefore: 'from' null con 'to' presente no lanza (rango abierto)")
+    void requireNotBeforeFromNullNoLanza() {
+        LocalDate to = LocalDate.now().minusDays(1);
+
+        assertThatCode(() -> DateRanges.requireNotBefore(to, null)).doesNotThrowAnyException();
+    }
 }
