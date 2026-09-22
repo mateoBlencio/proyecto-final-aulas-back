@@ -236,11 +236,15 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         item.resolve(actor, now);
 
         RoomRequestItemDetailDto detail = composer.composeDetail(item);
-        notificationSender.send(new NotificationRequest(
-                NotificationTemplate.ROOM_REQUEST_RESOLVED,
-                List.of(new NotificationRecipient(detail.request().teacherName(), detail.request().teacherEmail())),
-                notificationModel.build(detail),
-                "room-request-item:" + itemId + ":RESOLVED"));
+        try {
+            notificationSender.send(new NotificationRequest(
+                    NotificationTemplate.ROOM_REQUEST_RESOLVED,
+                    List.of(new NotificationRecipient(detail.request().teacherName(), detail.request().teacherEmail())),
+                    notificationModel.build(detail),
+                    "room-request-item:" + itemId + ":RESOLVED"));
+        } catch (RuntimeException e) {
+            log.error("No se pudo encolar la notificación de pedido resuelto: itemId={}", itemId, e);
+        }
 
         log.info("Pedido de aula notificado: itemId={}", itemId);
         return detail.item();
