@@ -10,11 +10,12 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 class NotificationDispatchListener {
 
+    private final NotificationRetryClaimer claimer;
     private final NotificationDispatcher dispatcher;
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     void onNotificationsQueued(NotificationsQueuedEvent event) {
-        event.notificationIds().forEach(dispatcher::dispatch);
+        claimer.claim(event.notificationIds()).forEach(dispatcher::dispatch);
     }
 }

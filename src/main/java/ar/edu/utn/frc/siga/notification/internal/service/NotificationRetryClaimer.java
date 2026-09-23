@@ -25,4 +25,17 @@ class NotificationRetryClaimer {
         }
         return ids;
     }
+
+    @Transactional
+    List<Long> claim(List<Long> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        Instant now = Instant.now();
+        List<Long> claimed = repository.findDueByIds(ids, now);
+        if (!claimed.isEmpty()) {
+            repository.postponeNextAttempt(claimed, now.plus(CLAIM_LOCK_DURATION));
+        }
+        return claimed;
+    }
 }
