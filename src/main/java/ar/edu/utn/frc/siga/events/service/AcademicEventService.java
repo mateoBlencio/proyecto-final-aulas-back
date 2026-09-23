@@ -30,6 +30,7 @@ public interface AcademicEventService {
 
     List<AcademicEventResponseDto> findByIds(Collection<Long> eventIds);
     List<OccurrenceResponseDto> findOccurrencesByEventId(Long eventId);
+    List<OccurrenceResponseDto> findOccurrencesByEventIds(Collection<Long> eventIds);
 
     List<RecurringEventResponseDto> findRecurringEventsBySubjectAndCommission(Long subjectId, Long commissionId);
 

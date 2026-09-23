@@ -49,9 +49,21 @@ class RoomRequestItemCancelApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("RESOLVED con motivo: también se puede cancelar")
-    void cancel_resolved_returnsCancelled() throws Exception {
+    @DisplayName("RESOLVED: 409 Room request already notified, es terminal")
+    void cancel_resolved_returnsConflict() throws Exception {
         RoomRequestItem item = seedItem(RoomRequestStatus.RESOLVED);
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/cancel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"se cayó el laboratorio\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Room request already notified"));
+    }
+
+    @Test
+    @DisplayName("IN_EVALUATION: pasa a CANCELLED (aula asignada, docente sin avisar todavía)")
+    void cancel_inEvaluation_returnsCancelled() throws Exception {
+        RoomRequestItem item = seedItem(RoomRequestStatus.IN_EVALUATION);
 
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/cancel")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -96,7 +108,7 @@ class RoomRequestItemCancelApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("sin token: 401; con AUXILIAR_AULICO: 200 (escritura habilitada para ambos roles)")
+    @DisplayName("sin token: 401; con AUXILIAR_AULICO sobre un NEW (todavía no es de ningún edificio): 403")
     void authenticationAndAuthorization() throws Exception {
         RoomRequestItem pendingParaAnonimo = seedItem(RoomRequestStatus.NEW);
         RoomRequestItem pendingParaAuxiliar = seedItem(RoomRequestStatus.NEW);
@@ -113,7 +125,7 @@ class RoomRequestItemCancelApiIntegrationTest extends AbstractIntegrationTest {
                 .perform(post("/v1/room-requests/items/" + pendingParaAuxiliar.getId() + "/cancel")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"motivo\"}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isForbidden());
     }
 
     private RoomRequestItem seedItem(RoomRequestStatus status) {

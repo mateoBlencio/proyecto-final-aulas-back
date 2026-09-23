@@ -4,6 +4,14 @@ import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
+import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
+import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
+import ar.edu.utn.frc.siga.allocation.service.AllocationService;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
+import ar.edu.utn.frc.siga.events.model.EventType;
+import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AssignedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestCatalogsResolver.ActiveCommissionsKey;
@@ -54,6 +62,10 @@ class RoomRequestCatalogsResolverTest {
     private ClassScheduleService classScheduleService;
     @Mock
     private RoomRequestItemAllocationRepository allocationRepository;
+    @Mock
+    private AcademicEventService academicEventService;
+    @Mock
+    private AllocationService allocationService;
 
     @InjectMocks
     private RoomRequestCatalogsResolver resolver;
@@ -129,7 +141,131 @@ class RoomRequestCatalogsResolverTest {
         assertThat(result).containsEntry(1L, 2).containsEntry(2L, 0);
     }
 
+    @Test
+    @DisplayName("resolveEnrolledByEventId: sin eventIds, no consulta el servicio de eventos y devuelve vacío")
+    void resolveEnrolledByEventId_sinEventos() {
+        assertThat(resolver.resolveEnrolledByEventId(Set.of())).isEmpty();
+        verifyNoInteractions(academicEventService);
+    }
+
+    @Test
+    @DisplayName("resolveEnrolledByEventId: batchea todos los eventIds en un solo findByIds")
+    void resolveEnrolledByEventId_batchesEventIds() {
+        when(academicEventService.findByIds(Set.of(50L, 51L))).thenReturn(List.of(
+                recurringEvent(50L, 45), recurringEvent(51L, null)));
+
+        Map<Long, Integer> result = resolver.resolveEnrolledByEventId(Set.of(50L, 51L));
+
+        assertThat(result).containsEntry(50L, 45).containsEntry(51L, null);
+    }
+
+    @Test
+    @DisplayName("resolveCurrentClassroomsByItemId: ítems sin sourceRecurringEventId no consultan eventos ni asignaciones")
+    void resolveCurrentClassroomsByItemId_sinItemsConEvento() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).build();
+
+        assertThat(resolver.resolveCurrentClassroomsByItemId(List.of(item))).isEmpty();
+        verifyNoInteractions(academicEventService, allocationService);
+    }
+
+    @Test
+    @DisplayName("resolveCurrentClassroomsByItemId: con fecha puntual, resuelve el aula de la ocurrencia de ese día")
+    void resolveCurrentClassroomsByItemId_withDate_resolvesThatOccurrence() {
+        LocalDate date = LocalDate.of(2026, 9, 15);
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).sourceRecurringEventId(50L).date(date).build();
+
+        when(academicEventService.findOccurrencesByEventIds(Set.of(50L))).thenReturn(List.of(
+                occurrence(900L, 50L, date.minusDays(7)),
+                occurrence(901L, 50L, date),
+                occurrence(902L, 50L, date.plusDays(7))));
+        ClassroomResponseDto classroom = classroom(101L, "Edificio A");
+        when(allocationService.findByOccurrenceIds(Set.of(901L))).thenReturn(List.of(allocation(901L, classroom)));
+        when(catalogMapper.toClassroomOptions(List.of(classroom)))
+                .thenReturn(List.of(new ClassroomOptionDto(101L, 101, "Edificio A")));
+
+        Map<Long, List<ClassroomOptionDto>> result = resolver.resolveCurrentClassroomsByItemId(List.of(item));
+
+        assertThat(result.get(1L)).extracting(ClassroomOptionDto::id).containsExactly(101L);
+    }
+
+    @Test
+    @DisplayName("resolveCurrentClassroomsByItemId: split en 2 aulas para la misma fecha, devuelve las 2")
+    void resolveCurrentClassroomsByItemId_split() {
+        LocalDate date = LocalDate.of(2026, 9, 15);
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).sourceRecurringEventId(50L).date(date).build();
+
+        when(academicEventService.findOccurrencesByEventIds(Set.of(50L))).thenReturn(List.of(
+                occurrence(901L, 50L, date),
+                occurrence(902L, 50L, date)));
+        ClassroomResponseDto classroomA = classroom(101L, "Edificio A");
+        ClassroomResponseDto classroomB = classroom(102L, "Edificio B");
+        when(allocationService.findByOccurrenceIds(Set.of(901L, 902L))).thenReturn(List.of(
+                allocation(901L, classroomA), allocation(902L, classroomB)));
+        when(catalogMapper.toClassroomOptions(List.of(classroomA, classroomB))).thenReturn(List.of(
+                new ClassroomOptionDto(101L, 101, "Edificio A"), new ClassroomOptionDto(102L, 102, "Edificio B")));
+
+        Map<Long, List<ClassroomOptionDto>> result = resolver.resolveCurrentClassroomsByItemId(List.of(item));
+
+        assertThat(result.get(1L)).extracting(ClassroomOptionDto::id).containsExactly(101L, 102L);
+    }
+
+    @Test
+    @DisplayName("resolveCurrentClassroomsByItemId: sin fecha puntual, usa la ocurrencia futura más próxima a hoy")
+    void resolveCurrentClassroomsByItemId_withoutDate_usesNearestFutureOccurrence() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).sourceRecurringEventId(50L).build();
+        LocalDate today = LocalDate.now();
+
+        when(academicEventService.findOccurrencesByEventIds(Set.of(50L))).thenReturn(List.of(
+                occurrence(900L, 50L, today.minusDays(7)),
+                occurrence(901L, 50L, today.plusDays(7)),
+                occurrence(902L, 50L, today.plusDays(14))));
+        ClassroomResponseDto classroom = classroom(101L, "Edificio A");
+        when(allocationService.findByOccurrenceIds(Set.of(901L))).thenReturn(List.of(allocation(901L, classroom)));
+        when(catalogMapper.toClassroomOptions(List.of(classroom)))
+                .thenReturn(List.of(new ClassroomOptionDto(101L, 101, "Edificio A")));
+
+        Map<Long, List<ClassroomOptionDto>> result = resolver.resolveCurrentClassroomsByItemId(List.of(item));
+
+        assertThat(result.get(1L)).extracting(ClassroomOptionDto::id).containsExactly(101L);
+    }
+
+    @Test
+    @DisplayName("resolveCurrentClassroomsByItemId: sin fecha puntual y sin ocurrencias futuras, cae a la última pasada")
+    void resolveCurrentClassroomsByItemId_withoutDate_fallsBackToLastPastOccurrence() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).sourceRecurringEventId(50L).build();
+        LocalDate today = LocalDate.now();
+
+        when(academicEventService.findOccurrencesByEventIds(Set.of(50L))).thenReturn(List.of(
+                occurrence(900L, 50L, today.minusDays(14)),
+                occurrence(901L, 50L, today.minusDays(7))));
+        ClassroomResponseDto classroom = classroom(101L, "Edificio A");
+        when(allocationService.findByOccurrenceIds(Set.of(901L))).thenReturn(List.of(allocation(901L, classroom)));
+        when(catalogMapper.toClassroomOptions(List.of(classroom)))
+                .thenReturn(List.of(new ClassroomOptionDto(101L, 101, "Edificio A")));
+
+        Map<Long, List<ClassroomOptionDto>> result = resolver.resolveCurrentClassroomsByItemId(List.of(item));
+
+        assertThat(result.get(1L)).extracting(ClassroomOptionDto::id).containsExactly(101L);
+    }
+
     private static SubjectResponseDto subject(Long id) {
         return new SubjectResponseDto(id, 1, "Materia", "1", null);
+    }
+
+    private static RecurringEventResponseDto recurringEvent(Long id, Integer enrolled) {
+        return new RecurringEventResponseDto(id, EventType.RECURRING, enrolled, null, 0L, null, null, null, null, null);
+    }
+
+    private static OccurrenceResponseDto occurrence(Long id, Long eventId, LocalDate date) {
+        return new OccurrenceResponseDto(id, eventId, date, OccurrenceStatus.NEEDS_ROOM, null, null);
+    }
+
+    private static ClassroomResponseDto classroom(Long id, String buildingName) {
+        return new ClassroomResponseDto(id, id.intValue(), 40, 1L, buildingName, 1L, "Aula");
+    }
+
+    private static AllocationResponseDto allocation(Long occurrenceId, ClassroomResponseDto classroom) {
+        return new AllocationResponseDto(occurrenceId, AllocationSource.MANUAL, null, null,
+                occurrence(occurrenceId, 50L, LocalDate.now()), null, classroom);
     }
 }

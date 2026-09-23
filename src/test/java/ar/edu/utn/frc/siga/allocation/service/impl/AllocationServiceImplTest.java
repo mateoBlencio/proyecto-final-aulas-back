@@ -578,6 +578,29 @@ class AllocationServiceImplTest {
         assertThat(result).isEmpty();
     }
 
+    @Test
+    @DisplayName("findByOccurrenceIds: sin ids, no consulta el repositorio y devuelve vacío")
+    void findByOccurrenceIdsSinIds() {
+        List<AllocationResponseDto> result = service.findByOccurrenceIds(List.of());
+
+        assertThat(result).isEmpty();
+        verifyNoInteractions(allocationRepository);
+    }
+
+    @Test
+    @DisplayName("findByOccurrenceIds: compone las asignaciones de las ocurrencias dadas, sin filtrar por alcance de edificio")
+    void findByOccurrenceIdsComponeSinFiltrarAlcance() {
+        Allocation alloc = allocation(1L, 10L, 5, AllocationSource.MANUAL);
+        ClassroomResponseDto classroom = new ClassroomResponseDto(5L, 101, 40, 9L, "Edificio Ajeno", 1L, "Normal");
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of(alloc));
+        when(composer.composeAll(List.of(alloc))).thenReturn(List.of(responseDtoWithClassroom(classroom)));
+
+        List<AllocationResponseDto> result = service.findByOccurrenceIds(List.of(10L));
+
+        assertThat(result).hasSize(1);
+        verifyNoInteractions(buildingScopeResolver);
+    }
+
     // ---------- findClassroomIdByOccurrence ----------
 
     @Test

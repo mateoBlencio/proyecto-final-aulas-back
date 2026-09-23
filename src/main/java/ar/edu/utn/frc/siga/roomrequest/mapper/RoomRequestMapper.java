@@ -16,6 +16,9 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 @Mapper(config = CentralMapperConfig.class)
@@ -31,20 +34,24 @@ public interface RoomRequestMapper {
     @Mapping(target = "id", source = "item.id")
     @Mapping(target = "commissions", source = "commissions")
     @Mapping(target = "preferredClassrooms", source = "preferredClassrooms")
+    @Mapping(target = "currentClassrooms", source = "currentClassrooms")
     @Mapping(target = "assignedClassrooms", source = "assignedClassrooms")
     @Mapping(target = "previousClassroom", source = "previousClassroom")
     @Mapping(target = "derivedBuilding", source = "derivedBuilding")
     @Mapping(target = "returnedFromBuilding", source = "returnedFromBuilding")
+    @Mapping(target = "enrolled", source = "enrolled")
     @Mapping(target = "endTime", expression = "java(item.endTime())")
     @Mapping(target = "durationMinutes",
              expression = "java(item.getDuration() == null ? null : item.getDuration().toMinutes())")
     RoomRequestItemResponseDto toDto(RoomRequestItem item,
                                      List<CommissionResponseDto> commissions,
                                      List<ClassroomOptionDto> preferredClassrooms,
+                                     List<ClassroomOptionDto> currentClassrooms,
                                      List<AssignedClassroomDto> assignedClassrooms,
                                      AssignedClassroomDto previousClassroom,
                                      BuildingOptionDto derivedBuilding,
-                                     BuildingOptionDto returnedFromBuilding);
+                                     BuildingOptionDto returnedFromBuilding,
+                                     Integer enrolled);
 
     @Mapping(target = "id", source = "request.id")
     @Mapping(target = "subject", source = "subject")
@@ -70,4 +77,9 @@ public interface RoomRequestMapper {
     @Mapping(target = "id", source = "request.id")
     @Mapping(target = "subject", source = "subject")
     RoomRequestItemDetailHeaderDto toDetailHeaderDto(RoomRequest request, SubjectResponseDto subject);
+
+    // El front pide createdAt en LocalDateTime, igual que decidedAt/derivedAt/notifiedAt; la entidad sigue en Instant (patrón de auditoría UTC).
+    default LocalDateTime map(Instant createdAt) {
+        return createdAt == null ? null : LocalDateTime.ofInstant(createdAt, ZoneOffset.UTC);
+    }
 }

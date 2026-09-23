@@ -82,7 +82,7 @@ class RoomRequestComposerTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<CommissionResponseDto>> commissions = ArgumentCaptor.forClass(List.class);
-        verify(mapper).toDto(eq(item), commissions.capture(), any(), any(), any(), any(), any());
+        verify(mapper).toDto(eq(item), commissions.capture(), any(), any(), any(), any(), any(), any(), any());
         assertThat(commissions.getValue()).extracting(CommissionResponseDto::id).containsExactly(7L, 8L);
     }
 
@@ -102,7 +102,7 @@ class RoomRequestComposerTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<AssignedClassroomDto>> assignedClassrooms = ArgumentCaptor.forClass(List.class);
-        verify(mapper).toDto(eq(item), any(), any(), assignedClassrooms.capture(), any(), any(), any());
+        verify(mapper).toDto(eq(item), any(), any(), any(), assignedClassrooms.capture(), any(), any(), any(), any());
         assertThat(assignedClassrooms.getValue()).extracting(AssignedClassroomDto::id).containsExactly(1L);
     }
 

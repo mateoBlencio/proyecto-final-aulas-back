@@ -171,7 +171,7 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(assignBody(List.of(aula.getId()), null)))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.title").value("Invalid room request transition"));
+                .andExpect(jsonPath("$.title").value("Room request already notified"));
     }
 
     @Test

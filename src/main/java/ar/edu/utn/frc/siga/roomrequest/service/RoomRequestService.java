@@ -15,10 +15,10 @@ public interface RoomRequestService {
 
     RoomRequestResponseDto create(CreateRoomRequestDto dto);
 
-    Page<RoomRequestItemRowDto> findItems(RoomRequestItemFilter filter, Pageable pageable);
+    Page<RoomRequestItemRowDto> findItems(RoomRequestItemFilter filter, Pageable pageable, String actorEmail);
 
     List<RoomRequestItemStatusCountDto> countItemsByStatus(boolean includePast, Boolean requiresSpecialAssignment,
-            Boolean partiallyResolved);
+            Boolean partiallyResolved, String actorEmail);
 
-    RoomRequestItemDetailDto findItemById(Long itemId);
+    RoomRequestItemDetailDto findItemById(Long itemId, String actorEmail);
 }

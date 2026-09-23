@@ -15,4 +15,9 @@ public class AllocationConflictException extends SigaAppException {
     public AllocationConflictException(String detail) {
         super(HttpStatus.CONFLICT, "Allocation error", detail);
     }
+
+    public AllocationConflictException(String detail, Long classroomId) {
+        super(HttpStatus.CONFLICT, "Allocation error", detail);
+        withProperty("classroomId", classroomId);
+    }
 }

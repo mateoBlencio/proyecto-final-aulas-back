@@ -48,7 +48,7 @@ class RoomRequestItemDeriveApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("edificio sin ninguna aula libre: 400 Invalid room request")
+    @DisplayName("edificio sin ninguna aula libre: 400 Building not available")
     void derive_sinAulasLibres_returnsBadRequest() throws Exception {
         Building building = testData.edificio();
         mockMvcAsScoped("auxiliar-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar",
@@ -59,7 +59,7 @@ class RoomRequestItemDeriveApiIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"buildingId\":" + building.getId() + "}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("Invalid room request"));
+                .andExpect(jsonPath("$.title").value("Building not available"));
     }
 
     @Test
@@ -126,10 +126,25 @@ class RoomRequestItemDeriveApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    // Sólo un pedido que requiere asignación especial es derivable: todo item de este archivo pide
+    // uso exclusivo para examen (requiresExamUsers) para pasar RoomRequestDeriveEligibilityValidator
+    // sin necesitar además que la aula seedeada tenga el recurso de computadoras.
     private RoomRequestItem seedItem(RoomRequestStatus status) {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
         RoomRequest request = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
-        RoomRequestItem item = testData.itemDePedido(request, academic.commissionId(), LocalDate.now().plusDays(10), status);
+        RoomRequestItem item = RoomRequestItem.builder()
+                .commissionId(academic.commissionId())
+                .date(LocalDate.now().plusDays(10))
+                .startTime(java.time.LocalTime.of(10, 0))
+                .duration(java.time.Duration.ofMinutes(120))
+                .estimated(35)
+                .classroomCount(1)
+                .requiresExamUsers(true)
+                .build();
+        request.addItem(item);
+        if (status != RoomRequestStatus.NEW) {
+            item.decide(status, "subsecretaria@frc.utn.edu.ar", "motivo de prueba", java.time.LocalDateTime.now());
+        }
         roomRequestRepository.save(request);
         return item;
     }

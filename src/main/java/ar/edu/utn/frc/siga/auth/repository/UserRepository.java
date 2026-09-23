@@ -53,4 +53,24 @@ public interface UserRepository extends JpaRepository<User, Long> {
             """)
     Set<Long> findBuildingIdsWithScopedRole(@Param("role") SystemRole role,
                                             @Param("buildingIds") Collection<Long> buildingIds);
+
+    @Query("""
+            select (count(ra) > 0) from RoleAssignment ra
+            where ra.user.email = :email and ra.user.enabled = true and ra.role = :role
+            """)
+    boolean existsEnabledRoleForUser(@Param("email") String email, @Param("role") SystemRole role);
+
+    @Query("""
+            select (count(ra) > 0) from RoleAssignment ra
+            where ra.user.email = :email and ra.user.enabled = true and ra.role = :role
+              and ra.scopeType = ar.edu.utn.frc.siga.common.security.ScopeType.GLOBAL
+            """)
+    boolean existsEnabledGlobalRoleForUser(@Param("email") String email, @Param("role") SystemRole role);
+
+    @Query("""
+            select ra.scopeId from RoleAssignment ra
+            where ra.user.email = :email and ra.user.enabled = true and ra.role = :role
+              and ra.scopeType = ar.edu.utn.frc.siga.common.security.ScopeType.BUILDING
+            """)
+    Set<Long> findBuildingIdsForUserAndRole(@Param("email") String email, @Param("role") SystemRole role);
 }

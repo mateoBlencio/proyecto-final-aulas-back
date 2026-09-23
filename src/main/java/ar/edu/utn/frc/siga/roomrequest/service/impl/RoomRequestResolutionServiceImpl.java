@@ -16,7 +16,10 @@ import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
+import ar.edu.utn.frc.siga.roomrequest.exception.BuildingNotAvailableException;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
+import ar.edu.utn.frc.siga.roomrequest.exception.PartialAssignmentReasonRequiredException;
+import ar.edu.utn.frc.siga.roomrequest.exception.RoomRequestAlreadyNotifiedException;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestComposer;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestNotificationModel;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
@@ -26,6 +29,9 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestResolutionService;
 import ar.edu.utn.frc.siga.roomrequest.validator.ItemConsistency;
+import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl;
+import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl.Action;
+import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestDeriveEligibilityValidator;
 import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestTransitionValidator;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.service.BuildingService;
@@ -48,6 +54,8 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
     private final RoomRequestItemRepository itemRepository;
     private final RoomRequestTransitionValidator transitionValidator;
+    private final RoomRequestAccessControl accessControl;
+    private final RoomRequestDeriveEligibilityValidator deriveEligibilityValidator;
     private final AllocationService allocationService;
     private final BuildingService buildingService;
     private final UserService userService;
@@ -64,7 +72,11 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
         RoomRequestItem item = itemRepository.findWithRequestById(itemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
+        if (item.getStatus() == RoomRequestStatus.RESOLVED) {
+            throw new RoomRequestAlreadyNotifiedException(itemId);
+        }
         transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.IN_EVALUATION);
+        accessControl.authorize(item, actor, Action.ASSIGN);
 
         List<Long> ids = classroomIds == null ? List.of() : classroomIds;
         if (ids.isEmpty()) {
@@ -75,8 +87,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         }
         ItemConsistency.requireDistinct(ids, "un aula");
         if (ids.size() < item.getClassroomCount() && (reason == null || reason.isBlank())) {
-            throw new InvalidRoomRequestException(
-                    "El motivo es obligatorio al asignar menos aulas de las pedidas.");
+            throw new PartialAssignmentReasonRequiredException();
         }
 
         boolean reassigning = !item.getAllocations().isEmpty();
@@ -119,7 +130,11 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
         RoomRequestItem item = itemRepository.findWithRequestById(itemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
+        if (item.getStatus() == RoomRequestStatus.RESOLVED) {
+            throw new RoomRequestAlreadyNotifiedException(itemId);
+        }
         transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.CANCELLED);
+        accessControl.authorize(item, actor, Action.CANCEL);
 
         List<Long> occurrenceIds = item.getAllocations().stream()
                 .map(RoomRequestItemAllocation::getOccurrenceId)
@@ -154,6 +169,8 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         RoomRequestItem item = itemRepository.findWithRequestById(itemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
         transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.DERIVED_TO_BUILDING);
+        accessControl.authorize(item, actor, Action.DERIVE);
+        deriveEligibilityValidator.validate(item);
 
         BuildingResponseDto building = buildingService.findById(buildingId);
         if (!Boolean.TRUE.equals(building.active())) {
@@ -167,8 +184,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         boolean hasFreeClassroom = candidateResolver.candidateClassrooms(item).stream()
                 .anyMatch(c -> c.buildingId().equals(buildingId) && !occupiedClassroomIds.contains(c.id()));
         if (!hasFreeClassroom) {
-            throw new InvalidRoomRequestException(
-                    "El edificio no tiene ninguna aula libre que cumpla los requisitos del pedido.");
+            throw new BuildingNotAvailableException(buildingId);
         }
 
         item.deriveTo(buildingId, actor, LocalDateTime.now());
@@ -189,6 +205,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         RoomRequestItem item = itemRepository.findWithRequestById(itemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
         transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.NEW);
+        accessControl.authorize(item, actor, Action.RETURN);
 
         item.returnFromBuilding(reason);
 
@@ -203,13 +220,14 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
         RoomRequestItem item = itemRepository.findWithRequestById(itemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
-
+        accessControl.authorizeRead(item, actor);
         if (item.getNotifiedAt() != null) {
             log.debug("Pedido ya notificado, devuelve el estado actual sin resellar: itemId={}", itemId);
             return composer.composeItem(item);
         }
 
         transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.RESOLVED);
+        accessControl.authorize(item, actor, Action.NOTIFY);
         if (item.getAllocations().isEmpty()) {
             throw new InvalidRoomRequestException("El pedido no tiene ninguna aula asignada.");
         }
@@ -218,11 +236,15 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         item.resolve(actor, now);
 
         RoomRequestItemDetailDto detail = composer.composeDetail(item);
-        notificationSender.send(new NotificationRequest(
-                NotificationTemplate.ROOM_REQUEST_RESOLVED,
-                List.of(new NotificationRecipient(detail.request().teacherName(), detail.request().teacherEmail())),
-                notificationModel.build(detail),
-                "room-request-item:" + itemId + ":RESOLVED"));
+        try {
+            notificationSender.send(new NotificationRequest(
+                    NotificationTemplate.ROOM_REQUEST_RESOLVED,
+                    List.of(new NotificationRecipient(detail.request().teacherName(), detail.request().teacherEmail())),
+                    notificationModel.build(detail),
+                    "room-request-item:" + itemId + ":RESOLVED"));
+        } catch (RuntimeException e) {
+            log.error("No se pudo encolar la notificación de pedido resuelto: itemId={}", itemId, e);
+        }
 
         log.info("Pedido de aula notificado: itemId={}", itemId);
         return detail.item();

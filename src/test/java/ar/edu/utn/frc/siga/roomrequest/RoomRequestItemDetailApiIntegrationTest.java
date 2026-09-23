@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.roomrequest;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
+import ar.edu.utn.frc.siga.common.security.ScopeType;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
@@ -53,7 +54,9 @@ class RoomRequestItemDetailApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.item.id").value(item.getId()))
                 .andExpect(jsonPath("$.item.status").value("IN_EVALUATION"))
                 .andExpect(jsonPath("$.item.decidedBy").value("subsecretaria@frc.utn.edu.ar"))
-                .andExpect(jsonPath("$.item.observations").doesNotExist());
+                .andExpect(jsonPath("$.item.observations").doesNotExist())
+                .andExpect(jsonPath("$.item.enrolled").doesNotExist())
+                .andExpect(jsonPath("$.item.currentClassrooms").doesNotExist());
     }
 
     @Test
@@ -87,7 +90,7 @@ class RoomRequestItemDetailApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("sin token: 401; con AUXILIAR_AULICO: 200 (lectura habilitada para ambos roles)")
+    @DisplayName("sin token: 401; con AUXILIAR_AULICO de alcance GLOBAL: 200 (cubre cualquier edificio)")
     void authenticationAndAuthorization() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
         RoomRequest request = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
@@ -104,5 +107,41 @@ class RoomRequestItemDetailApiIntegrationTest extends AbstractIntegrationTest {
         mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO)
                 .perform(get("/v1/room-requests/items/" + item.getId()))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("AUXILIAR_AULICO acotado a un edificio: lee un pedido derivado a SU edificio, "
+            + "403 sobre uno de otro edificio o uno todavía sin derivar")
+    void findById_auxiliarScopedToBuilding_isRestrictedToOwnBuilding() throws Exception {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+        Building suEdificio = testData.edificio();
+        Building otroEdificio = testData.edificio();
+
+        RoomRequest requestPropio = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
+        RoomRequestItem itemPropio = testData.itemDePedido(requestPropio, academic.commissionId(),
+                LocalDate.now().plusDays(10), RoomRequestStatus.NEW);
+        itemPropio.deriveTo(suEdificio.getId(), "subsecretaria@frc.utn.edu.ar", LocalDateTime.now());
+        roomRequestRepository.save(requestPropio);
+
+        RoomRequest requestAjeno = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
+        RoomRequestItem itemAjeno = testData.itemDePedido(requestAjeno, academic.commissionId(),
+                LocalDate.now().plusDays(10), RoomRequestStatus.NEW);
+        itemAjeno.deriveTo(otroEdificio.getId(), "subsecretaria@frc.utn.edu.ar", LocalDateTime.now());
+        roomRequestRepository.save(requestAjeno);
+
+        RoomRequest requestSinDerivar = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
+        RoomRequestItem itemSinDerivar = testData.itemDePedido(requestSinDerivar, academic.commissionId(),
+                LocalDate.now().plusDays(10), RoomRequestStatus.NEW);
+        roomRequestRepository.save(requestSinDerivar);
+
+        MockMvc auxiliarMockMvc = mockMvcAsScoped("auxiliar-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar",
+                SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, suEdificio.getId());
+
+        auxiliarMockMvc.perform(get("/v1/room-requests/items/" + itemPropio.getId()))
+                .andExpect(status().isOk());
+        auxiliarMockMvc.perform(get("/v1/room-requests/items/" + itemAjeno.getId()))
+                .andExpect(status().isForbidden());
+        auxiliarMockMvc.perform(get("/v1/room-requests/items/" + itemSinDerivar.getId()))
+                .andExpect(status().isForbidden());
     }
 }

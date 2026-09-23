@@ -122,6 +122,21 @@ public class UserServiceImpl implements UserService {
         return userRepository.findBuildingIdsWithScopedRole(role, buildingIds);
     }
 
+    @Override
+    public boolean hasRole(String email, SystemRole role) {
+        return userRepository.existsEnabledRoleForUser(email, role);
+    }
+
+    @Override
+    public boolean hasGlobalRole(String email, SystemRole role) {
+        return userRepository.existsEnabledGlobalRoleForUser(email, role);
+    }
+
+    @Override
+    public Set<Long> findBuildingIdsForRole(String email, SystemRole role) {
+        return userRepository.findBuildingIdsForUserAndRole(email, role);
+    }
+
     private User findExisting(Long id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> {

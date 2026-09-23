@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,6 +21,8 @@ public interface AllocationService {
     Optional<Long> findClassroomIdByOccurrence(Long occurrenceId);
 
     List<AllocationResponseDto> findByDate(LocalDate date);
+
+    List<AllocationResponseDto> findByOccurrenceIds(Collection<Long> occurrenceIds);
 
     List<AllocationResponseDto> allocate(AllocationCommand command);
 

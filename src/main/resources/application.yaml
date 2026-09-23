@@ -98,7 +98,7 @@ siga:
     base-path: /v1
   room-requests:
     expiry:
-      cron: "0 0 4 * * *"
+      cron: "0 0 7 * * *"
   settings:
     definitions:
       - key: optimizer.unimprovedSecondsLimit

@@ -72,8 +72,8 @@ public class RoomRequestController {
     @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_READ')")
     @Operation(summary = "Listar pedidos de aula",
                description = "Listado paginado de pedidos. Filtra por tipo, "
-                       + "estado, ámbito y materia; por defecto oculta los pedidos con fecha pasada "
-                       + "salvo que se pida includePast=true.")
+                       + "estado, ámbito y materia; trae también los pedidos con fecha pasada "
+                       + "salvo que se pida includePast=false.")
     public ResponseEntity<Page<RoomRequestItemRowDto>> findItems(
             @PageableDefault(size = 20, sort = {"date", "startTime"}, direction = Sort.Direction.ASC)  Pageable pageable,
             @RequestParam(required = false) Set<RoomRequestType> types,
@@ -82,18 +82,19 @@ public class RoomRequestController {
             @RequestParam(required = false) Long subjectId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
-            @RequestParam(required = false, defaultValue = "false") boolean includePast,
+            @RequestParam(required = false, defaultValue = "true") boolean includePast,
             @RequestParam(required = false) Boolean requiresSpecialAssignment,
             @RequestParam(required = false) Long derivedBuildingId,
             @RequestParam(required = false) Boolean partiallyResolved,
-            @RequestParam(required = false) Boolean wasReturned) {
+            @RequestParam(required = false) Boolean wasReturned,
+            Principal principal) {
 
         log.debug("GET /v1/room-requests/items: types={}, statuses={}, scope={}, subjectId={}, page={}",
                 types, statuses, scope, subjectId, pageable.getPageNumber());
         RoomRequestItemFilter filter =
                 RoomRequestItemFilter.of(types, statuses, scope, subjectId, dateFrom, dateTo, includePast,
                         requiresSpecialAssignment, derivedBuildingId, partiallyResolved, wasReturned);
-        Page<RoomRequestItemRowDto> page = roomRequestService.findItems(filter, pageable);
+        Page<RoomRequestItemRowDto> page = roomRequestService.findItems(filter, pageable, principal.getName());
         log.info("Pedidos de aula listados vía controller: total={}", page.getTotalElements());
         return ResponseEntity.ok(page);
     }
@@ -101,16 +102,18 @@ public class RoomRequestController {
     @GetMapping("/items/status-counts")
     @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_READ')")
     @Operation(summary = "Contar pedidos de aula por estado",
-               description = "Total de pedidos en cada estado.")
+               description = "Total de pedidos en cada estado; incluye los de fecha pasada "
+                       + "salvo que se pida includePast=false.")
     public ResponseEntity<List<RoomRequestItemStatusCountDto>> countItemsByStatus(
-            @RequestParam(required = false, defaultValue = "false") boolean includePast,
+            @RequestParam(required = false, defaultValue = "true") boolean includePast,
             @RequestParam(required = false) Boolean requiresSpecialAssignment,
-            @RequestParam(required = false) Boolean partiallyResolved) {
+            @RequestParam(required = false) Boolean partiallyResolved,
+            Principal principal) {
 
         log.debug("GET /v1/room-requests/items/status-counts: includePast={}, requiresSpecialAssignment={}, "
                         + "partiallyResolved={}", includePast, requiresSpecialAssignment, partiallyResolved);
-        List<RoomRequestItemStatusCountDto> counts =
-                roomRequestService.countItemsByStatus(includePast, requiresSpecialAssignment, partiallyResolved);
+        List<RoomRequestItemStatusCountDto> counts = roomRequestService.countItemsByStatus(includePast,
+                requiresSpecialAssignment, partiallyResolved, principal.getName());
         log.info("Pedidos de aula contados por estado vía controller: {}", counts);
         return ResponseEntity.ok(counts);
     }
@@ -120,9 +123,9 @@ public class RoomRequestController {
     @Operation(summary = "Buscar un pedido por id",
                description = "Detalle completo de un pedido, con la cabecera de su solicitud "
                        + "(incluido el contacto del docente). 404 si no existe.")
-    public ResponseEntity<RoomRequestItemDetailDto> findItemById(@PathVariable Long id) {
+    public ResponseEntity<RoomRequestItemDetailDto> findItemById(@PathVariable Long id, Principal principal) {
         log.debug("GET /v1/room-requests/items/{}", id);
-        return ResponseEntity.ok(roomRequestService.findItemById(id));
+        return ResponseEntity.ok(roomRequestService.findItemById(id, principal.getName()));
     }
 
     @PostMapping("/items/{id}/assign")
@@ -144,8 +147,8 @@ public class RoomRequestController {
     @PostMapping("/items/{id}/cancel")
     @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
     @Operation(summary = "Cancelar un pedido de aula",
-               description = "Cancela el pedido desde cualquier estado no final, incluido RESOLVED. "
-                       + "Libera las aulas que tuviera asignadas.")
+               description = "Cancela el pedido desde cualquier estado no final. RESOLVED es terminal: "
+                       + "una vez notificado el docente, no se puede cancelar. Libera las aulas que tuviera asignadas.")
     public ResponseEntity<RoomRequestItemResponseDto> cancelItem(@PathVariable Long id,
                                                                   @Valid @RequestBody CancelRoomRequestItemDto dto,
                                                                   Principal principal) {

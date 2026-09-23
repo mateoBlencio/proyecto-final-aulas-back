@@ -254,8 +254,8 @@ class RoomRequestNotificationModelTest {
                 1L, type, null, "Ada Lovelace", "ada@frc.utn.edu.ar", null, subject, null);
         RoomRequestItemResponseDto item = new RoomRequestItemResponseDto(
                 itemId, 1, null, null, null, decisionReason, commissions, date, dayOfWeek, startTime, endTime,
-                null, null, classroomCount, null, null, null, null, null, observations,
-                List.of(), assignedClassrooms, previousClassroom, null, null, null, null, null);
+                null, null, null, classroomCount, null, null, null, null, null, observations,
+                List.of(), null, assignedClassrooms, previousClassroom, null, null, null, null, null);
         return new RoomRequestItemDetailDto(header, item);
     }
 }
