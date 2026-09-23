@@ -24,6 +24,13 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             nativeQuery = true)
     List<Long> findDueForRetry(@Param("limit") int limit);
 
+    @Query(
+            value = "SELECT id_notificacion FROM notificacion "
+                    + "WHERE id_notificacion IN (:ids) AND estado = 'PENDING' AND proximo_intento <= :now "
+                    + "FOR UPDATE SKIP LOCKED",
+            nativeQuery = true)
+    List<Long> findDueByIds(@Param("ids") List<Long> ids, @Param("now") Instant now);
+
     @Modifying
     @Query(
             value = "UPDATE notificacion SET proximo_intento = :nextAttemptAt WHERE id_notificacion IN (:ids)",
