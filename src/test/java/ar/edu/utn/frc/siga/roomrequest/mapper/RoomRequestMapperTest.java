@@ -33,7 +33,7 @@ class RoomRequestMapperTest {
     @Test
     @DisplayName("la cabecera se arma con la materia y los items que le pasa el composer")
     void headerUsesComposedPieces() {
-        SubjectResponseDto subject = new SubjectResponseDto(42L, 101, "Análisis Matemático I", "ANUAL", null);
+        SubjectResponseDto subject = new SubjectResponseDto(42L, 101, "Análisis Matemático I", "ANUAL", null, true);
         RoomRequestItemResponseDto itemDto =
                 mapper.toDto(itemEntity(), null, List.of(), List.of(), List.of(), null, null, null, null);
 

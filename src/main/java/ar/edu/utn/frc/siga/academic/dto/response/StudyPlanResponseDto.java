@@ -6,6 +6,7 @@ import org.springframework.modulith.NamedInterface;
 public record StudyPlanResponseDto(
         Long id,
         Integer planCode,
-        SpecialtyResponseDto specialty
+        SpecialtyResponseDto specialty,
+        boolean enabled
 ) {
 }

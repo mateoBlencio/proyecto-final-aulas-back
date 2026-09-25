@@ -76,7 +76,7 @@ public final class EventTestData {
     }
 
     public static SubjectResponseDto subjectResponseDto(Long id) {
-        return new SubjectResponseDto(id, 100, "Materia de prueba", "anual", null);
+        return new SubjectResponseDto(id, 100, "Materia de prueba", "anual", null, true);
     }
 
     public static CommissionResponseDto commissionResponseDto(Long id) {

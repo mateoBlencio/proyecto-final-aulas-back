@@ -2,7 +2,9 @@ package ar.edu.utn.frc.siga.academic;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
@@ -67,7 +69,8 @@ class AcademicActivationApiIntegrationTest extends AbstractIntegrationTest {
         assertActivationLifecycle(
                 "/v1/subjects/" + id + "/activation",
                 "/v1/subjects/999999999/activation",
-                () -> subjectRepository.findActiveById(id).isPresent());
+                () -> subjectRepository.findActiveById(id).isPresent(),
+                "/v1/subjects?code=" + subject.getCode() + "&includeDeactivated=true");
     }
 
     @Test
@@ -75,10 +78,15 @@ class AcademicActivationApiIntegrationTest extends AbstractIntegrationTest {
     void studyPlan_activationLifecycle() throws Exception {
         StudyPlan plan = testData.planDeEstudio((int) IntegrationTestData.nextSeq(), newSpecialty());
         long id = plan.getId();
+
+        mockMvc.perform(get("/v1/study-plans").param("planCode", String.valueOf(plan.getPlanCode())))
+                .andExpect(jsonPath("$.content[0].id").value(id));
+
         assertActivationLifecycle(
                 "/v1/study-plans/" + id + "/activation",
                 "/v1/study-plans/999999999/activation",
-                () -> studyPlanRepository.findActiveById(id).isPresent());
+                () -> studyPlanRepository.findActiveById(id).isPresent(),
+                "/v1/study-plans?planCode=" + plan.getPlanCode() + "&includeDeactivated=true");
     }
 
     @Test
@@ -98,6 +106,12 @@ class AcademicActivationApiIntegrationTest extends AbstractIntegrationTest {
     void academicPeriod_activationLifecycle() throws Exception {
         AcademicPeriod period = testData.periodoAcademico(newYear(), TermType.ANUAL);
         long id = period.getId();
+
+        mockMvc.perform(get("/v1/academic-periods")
+                        .param("year", String.valueOf(period.getYear()))
+                        .param("semester", String.valueOf(period.getSemester())))
+                .andExpect(jsonPath("$.content[0].id").value(id));
+
         assertActivationLifecycle(
                 "/v1/academic-periods/" + id + "/activation",
                 "/v1/academic-periods/999999999/activation",
@@ -112,7 +126,9 @@ class AcademicActivationApiIntegrationTest extends AbstractIntegrationTest {
         assertActivationLifecycle(
                 "/v1/subject-commissions/" + link.subjectId() + "/" + link.commissionId() + "/activation",
                 "/v1/subject-commissions/999999999/999999999/activation",
-                () -> subjectCommissionRepository.findActiveById(key).isPresent());
+                () -> subjectCommissionRepository.findActiveById(key).isPresent(),
+                "/v1/subject-commissions?subjectId=" + link.subjectId() + "&commissionId=" + link.commissionId()
+                        + "&includeDeactivated=true");
     }
 
     private Specialty newSpecialty() {
@@ -125,15 +141,31 @@ class AcademicActivationApiIntegrationTest extends AbstractIntegrationTest {
 
     private void assertActivationLifecycle(String activationPath, String missingPath, BooleanSupplier active)
             throws Exception {
+        assertActivationLifecycle(activationPath, missingPath, active, null);
+    }
+
+    /**
+     * {@code listPath} es opcional: si no es null, verifica además que el listado (con
+     * {@code includeDeactivated=true}) refleje {@code enabled=false} tras el DELETE y
+     * {@code enabled=true} tras el PUT.
+     */
+    private void assertActivationLifecycle(String activationPath, String missingPath, BooleanSupplier active,
+            String listPath) throws Exception {
         assertThat(active.getAsBoolean()).isTrue();
 
         mockMvc.perform(delete(activationPath)).andExpect(status().isNoContent());
         assertThat(active.getAsBoolean()).isFalse();
+        if (listPath != null) {
+            mockMvc.perform(get(listPath)).andExpect(jsonPath("$.content[0].enabled").value(false));
+        }
         mockMvc.perform(delete(activationPath)).andExpect(status().isNoContent());
         assertThat(active.getAsBoolean()).isFalse();
 
         mockMvc.perform(put(activationPath)).andExpect(status().isNoContent());
         assertThat(active.getAsBoolean()).isTrue();
+        if (listPath != null) {
+            mockMvc.perform(get(listPath)).andExpect(jsonPath("$.content[0].enabled").value(true));
+        }
         mockMvc.perform(put(activationPath)).andExpect(status().isNoContent());
         assertThat(active.getAsBoolean()).isTrue();
 
