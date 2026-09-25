@@ -159,7 +159,7 @@ class PreviewEngineTest {
     @Test
     @DisplayName("generate: la materia del evento y el permiso del aula viajan al optimizador")
     void generatePropagaPermisosYMateria() {
-        SubjectResponseDto subject = new SubjectResponseDto(7L, 700, "Análisis", "1C", null);
+        SubjectResponseDto subject = new SubjectResponseDto(7L, 700, "Análisis", "1C", null, true);
         RecurringEventResponseDto event = new RecurringEventResponseDto(1L, EventType.RECURRING, 30,
                 LocalTime.of(8, 0), 90, DayOfWeek.MONDAY, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 6, 30),
                 subject, null);

@@ -51,7 +51,7 @@ class IngestRowBatchProcessorTest {
     }
 
     private IngestRowResolver.ResolvedRefs resolved(Long classroomBuildingId) {
-        SubjectResponseDto subject = new SubjectResponseDto(10L, 100, "Materia", "Anual", null);
+        SubjectResponseDto subject = new SubjectResponseDto(10L, 100, "Materia", "Anual", null, true);
         CommissionResponseDto commission = new CommissionResponseDto(20L, "6301", null);
         BuildingResponseDto building = new BuildingResponseDto(5L, "Edificio Central", true);
         ClassroomResponseDto classroom = new ClassroomResponseDto(

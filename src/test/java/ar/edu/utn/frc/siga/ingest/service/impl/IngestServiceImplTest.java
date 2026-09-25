@@ -203,7 +203,7 @@ class IngestServiceImplTest {
     void materiaInexistenteSalteaFilaYLaReporta() {
         SpecialtyResponseDto specialty = new SpecialtyResponseDto(1, "Ingeniería en Sistemas", "Ing. Sist.");
         when(specialtyService.findBySpecialtyCode(1)).thenReturn(specialty);
-        StudyPlanResponseDto plan = new StudyPlanResponseDto(1, specialty);
+        StudyPlanResponseDto plan = new StudyPlanResponseDto(1L, 1, specialty, true);
         when(studyPlanService.findByPlanCodeAndSpecialtyCode(1, 1)).thenReturn(plan);
         when(subjectService.findByCodeAndStudyPlan(100, 1, 1))
             .thenThrow(ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException.of("Subject", 100));
@@ -276,12 +276,12 @@ class IngestServiceImplTest {
         SpecialtyResponseDto specialty = new SpecialtyResponseDto(row.specialtyCode(), "Ingeniería en Sistemas", "Ing. Sist.");
         when(specialtyService.findBySpecialtyCode(row.specialtyCode())).thenReturn(specialty);
 
-        StudyPlanResponseDto plan = new StudyPlanResponseDto(row.studyPlanCode(), specialty);
+        StudyPlanResponseDto plan = new StudyPlanResponseDto(1L, row.studyPlanCode(), specialty, true);
         when(studyPlanService.findByPlanCodeAndSpecialtyCode(row.studyPlanCode(), row.specialtyCode()))
             .thenReturn(plan);
 
         SubjectResponseDto subject = new SubjectResponseDto(10L, row.subjectCode(), row.subjectName(),
-            row.termType(), plan);
+            row.termType(), plan, true);
         when(subjectService.findByCodeAndStudyPlan(row.subjectCode(), row.studyPlanCode(), row.specialtyCode()))
             .thenReturn(subject);
 
@@ -295,7 +295,7 @@ class IngestServiceImplTest {
             .thenReturn(commission);
 
         SubjectCommissionResponseDto subjectCommission = new SubjectCommissionResponseDto(10L, 20L,
-            commission, row.enrolledCount());
+            commission, row.enrolledCount(), true);
         when(subjectCommissionService.findBySubjectAndCommission(10L, 20L))
             .thenReturn(subjectCommission);
 
@@ -319,10 +319,10 @@ class IngestServiceImplTest {
     private void stubRestOfChain(SpecialtyResponseDto specialty, int subjectCode, String subjectName,
             long subjectId, String courseCode, long commissionId, int roomNumber,
             long buildingId, long eventId) {
-        StudyPlanResponseDto plan = new StudyPlanResponseDto(1, specialty);
+        StudyPlanResponseDto plan = new StudyPlanResponseDto(1L, 1, specialty, true);
         when(studyPlanService.findByPlanCodeAndSpecialtyCode(1, 1)).thenReturn(plan);
 
-        SubjectResponseDto subject = new SubjectResponseDto(subjectId, subjectCode, subjectName, "Anual", plan);
+        SubjectResponseDto subject = new SubjectResponseDto(subjectId, subjectCode, subjectName, "Anual", plan, true);
         when(subjectService.findByCodeAndStudyPlan(subjectCode, 1, 1)).thenReturn(subject);
 
         AcademicPeriodResponseDto period = new AcademicPeriodResponseDto(2026, 0,
@@ -334,7 +334,7 @@ class IngestServiceImplTest {
             .thenReturn(commission);
 
         SubjectCommissionResponseDto subjectCommission =
-            new SubjectCommissionResponseDto(subjectId, commissionId, commission, 30);
+            new SubjectCommissionResponseDto(subjectId, commissionId, commission, 30, true);
         when(subjectCommissionService.findBySubjectAndCommission(subjectId, commissionId))
             .thenReturn(subjectCommission);
 
@@ -355,11 +355,11 @@ class IngestServiceImplTest {
     }
 
     private void stubForSecondSubject(SpecialtyResponseDto specialty) {
-        StudyPlanResponseDto plan = new StudyPlanResponseDto(1, specialty);
-        SubjectResponseDto subject = new SubjectResponseDto(21L, 101, "Álgebra", "Anual", plan);
+        StudyPlanResponseDto plan = new StudyPlanResponseDto(1L, 1, specialty, true);
+        SubjectResponseDto subject = new SubjectResponseDto(21L, 101, "Álgebra", "Anual", plan, true);
         when(subjectService.findByCodeAndStudyPlan(101, 1, 1)).thenReturn(subject);
 
-        SubjectCommissionResponseDto subjectCommission = new SubjectCommissionResponseDto(21L, 30L, null, 30);
+        SubjectCommissionResponseDto subjectCommission = new SubjectCommissionResponseDto(21L, 30L, null, 30, true);
         when(subjectCommissionService.findBySubjectAndCommission(21L, 30L))
             .thenReturn(subjectCommission);
     }
