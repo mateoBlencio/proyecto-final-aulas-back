@@ -21,6 +21,7 @@ public final class SettingsCatalogFixture {
                 definition("optimizer.solverSecondsSpentLimit", "300", "1", "3600"),
                 definition("preview.defaultTimeLimitSeconds", "30", "1", "3600"),
                 definition("preview.ttlMinutes", "30", "1", "1440"),
+                definition("preview.suggestionTimeLimitSeconds", "2", "1", "60"),
                 definition("events.hours.start", "08:00", null, null),
                 definition("events.hours.end", "23:00", null, null),
                 definition("allocation.maxOverlapMinutes", "40", "0", null),
