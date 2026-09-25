@@ -6,6 +6,7 @@ import java.time.LocalDate;
 
 @NamedInterface("api")
 public record AcademicPeriodResponseDto(
+        Long id,
         Integer year,
         Integer semester,
         LocalDate startDate,
@@ -14,6 +15,6 @@ public record AcademicPeriodResponseDto(
         LocalDate recessEnd
 ) {
     public AcademicPeriodResponseDto(Integer year, Integer semester, LocalDate startDate, LocalDate endDate) {
-        this(year, semester, startDate, endDate, null, null);
+        this(null, year, semester, startDate, endDate, null, null);
     }
 }
