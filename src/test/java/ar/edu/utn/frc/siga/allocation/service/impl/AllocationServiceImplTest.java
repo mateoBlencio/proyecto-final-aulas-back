@@ -81,13 +81,15 @@ class AllocationServiceImplTest {
     private ClassroomService classroomService;
     @Mock
     private BuildingScopeResolver buildingScopeResolver;
+    @Mock
+    private ClassroomAllocationLock classroomLock;
 
     private AllocationServiceImpl service;
 
     @BeforeEach
     void setUp() {
         service = new AllocationServiceImpl(allocationRepository, occurrenceService, composer, validator, targetResolver,
-                writer, classroomService, buildingScopeResolver);
+                writer, classroomService, buildingScopeResolver, classroomLock);
         lenient().when(classroomService.findByIds(any())).thenReturn(List.of());
         lenient().when(buildingScopeResolver.scopeFor(any())).thenReturn(BuildingScope.unrestricted());
     }

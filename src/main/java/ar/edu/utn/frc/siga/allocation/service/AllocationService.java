@@ -4,7 +4,9 @@ import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
+import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 
 import java.time.LocalDate;
 import java.util.Collection;
@@ -23,6 +25,8 @@ public interface AllocationService {
     List<AllocationResponseDto> findByDate(LocalDate date);
 
     List<AllocationResponseDto> findByOccurrenceIds(Collection<Long> occurrenceIds);
+
+    List<OccurrenceSlotDto> resolveOccurrences(AllocationTarget target);
 
     List<AllocationResponseDto> allocate(AllocationCommand command);
 

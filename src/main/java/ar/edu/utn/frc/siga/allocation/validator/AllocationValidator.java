@@ -56,6 +56,12 @@ public class AllocationValidator {
         return review(future, loadOccupancy(future), allocationSettings.getMaxOverlapMinutes());
     }
 
+    public void validateStrictOverlap(List<AllocationCandidate> candidates) {
+        List<AllocationCandidate> future = candidates.stream().filter(c -> !c.occurrence().isPast()).toList();
+        if (future.isEmpty()) return;
+        throwIfAny(review(future, loadOccupancy(future), 0).blocking());
+    }
+
     private OverlapReview review(List<AllocationCandidate> candidates, List<OccupiedSlot> occupancy,
                                  int toleranceMinutes) {
         List<OccurrenceConflictDto> all = new ArrayList<>();
