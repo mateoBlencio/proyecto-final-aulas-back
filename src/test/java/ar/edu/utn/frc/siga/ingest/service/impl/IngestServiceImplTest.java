@@ -203,7 +203,7 @@ class IngestServiceImplTest {
     void materiaInexistenteSalteaFilaYLaReporta() {
         SpecialtyResponseDto specialty = new SpecialtyResponseDto(1, "Ingeniería en Sistemas", "Ing. Sist.");
         when(specialtyService.findBySpecialtyCode(1)).thenReturn(specialty);
-        StudyPlanResponseDto plan = new StudyPlanResponseDto(1, specialty);
+        StudyPlanResponseDto plan = new StudyPlanResponseDto(1L, 1, specialty);
         when(studyPlanService.findByPlanCodeAndSpecialtyCode(1, 1)).thenReturn(plan);
         when(subjectService.findByCodeAndStudyPlan(100, 1, 1))
             .thenThrow(ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException.of("Subject", 100));
@@ -276,7 +276,7 @@ class IngestServiceImplTest {
         SpecialtyResponseDto specialty = new SpecialtyResponseDto(row.specialtyCode(), "Ingeniería en Sistemas", "Ing. Sist.");
         when(specialtyService.findBySpecialtyCode(row.specialtyCode())).thenReturn(specialty);
 
-        StudyPlanResponseDto plan = new StudyPlanResponseDto(row.studyPlanCode(), specialty);
+        StudyPlanResponseDto plan = new StudyPlanResponseDto(1L, row.studyPlanCode(), specialty);
         when(studyPlanService.findByPlanCodeAndSpecialtyCode(row.studyPlanCode(), row.specialtyCode()))
             .thenReturn(plan);
 
@@ -319,7 +319,7 @@ class IngestServiceImplTest {
     private void stubRestOfChain(SpecialtyResponseDto specialty, int subjectCode, String subjectName,
             long subjectId, String courseCode, long commissionId, int roomNumber,
             long buildingId, long eventId) {
-        StudyPlanResponseDto plan = new StudyPlanResponseDto(1, specialty);
+        StudyPlanResponseDto plan = new StudyPlanResponseDto(1L, 1, specialty);
         when(studyPlanService.findByPlanCodeAndSpecialtyCode(1, 1)).thenReturn(plan);
 
         SubjectResponseDto subject = new SubjectResponseDto(subjectId, subjectCode, subjectName, "Anual", plan);
@@ -355,7 +355,7 @@ class IngestServiceImplTest {
     }
 
     private void stubForSecondSubject(SpecialtyResponseDto specialty) {
-        StudyPlanResponseDto plan = new StudyPlanResponseDto(1, specialty);
+        StudyPlanResponseDto plan = new StudyPlanResponseDto(1L, 1, specialty);
         SubjectResponseDto subject = new SubjectResponseDto(21L, 101, "Álgebra", "Anual", plan);
         when(subjectService.findByCodeAndStudyPlan(101, 1, 1)).thenReturn(subject);
 
