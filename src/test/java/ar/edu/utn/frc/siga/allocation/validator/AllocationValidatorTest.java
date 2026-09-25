@@ -331,6 +331,50 @@ class AllocationValidatorTest {
                 .isInstanceOf(ReallocationConflictException.class);
     }
 
+    // ---------- validateManualOverlap vs. validateStrictOverlap (tolerancia 0) ----------
+
+    @Test
+    @DisplayName("validateManualOverlap: solape de 5 minutos con margen 10 pasa con observación (tolerado)")
+    void validateManualOverlapSolape5ConMargen10PasaConObservacion() {
+        LocalDate date = futureDate(1);
+        RecurringEvent event = EventTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90)); // 08:00-09:30
+        AllocationCandidate candidate = new AllocationCandidate(
+                EventTestData.occurrenceSlot(10L, event, date, OccurrenceStatus.NEEDS_ROOM), 5L);
+
+        RecurringEvent occupantEvent = EventTestData.recurringEvent(2L, LocalTime.of(9, 25), Duration.ofMinutes(60)); // 09:25-10:25, solape 5
+        OccurrenceSlotDto occupantOcc = EventTestData.occurrenceSlot(20L, occupantEvent, date, OccurrenceStatus.NEEDS_ROOM);
+        Allocation occupied = Allocation.builder().id(500L).occurrenceId(20L).classroomId(5L).build();
+        when(occurrenceService.findSlotsBetween(any(), any())).thenReturn(List.of(occupantOcc));
+        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(occupied));
+
+        maxOverlapMinutes = 10;
+        assertThatCode(() -> validator.validateManualOverlap(List.of(candidate), "aula ajena, autorizado"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateStrictOverlap: el mismo solape de 5 minutos que validateManualOverlap tolera con margen 10 acá lanza (tolerancia 0)")
+    void validateStrictOverlapSolape5MinutosLanza() {
+        LocalDate date = futureDate(1);
+        RecurringEvent event = EventTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90)); // 08:00-09:30
+        AllocationCandidate candidate = new AllocationCandidate(
+                EventTestData.occurrenceSlot(10L, event, date, OccurrenceStatus.NEEDS_ROOM), 5L);
+
+        RecurringEvent occupantEvent = EventTestData.recurringEvent(2L, LocalTime.of(9, 25), Duration.ofMinutes(60)); // 09:25-10:25, solape 5
+        OccurrenceSlotDto occupantOcc = EventTestData.occurrenceSlot(20L, occupantEvent, date, OccurrenceStatus.NEEDS_ROOM);
+        Allocation occupied = Allocation.builder().id(500L).occurrenceId(20L).classroomId(5L).build();
+        when(occurrenceService.findSlotsBetween(any(), any())).thenReturn(List.of(occupantOcc));
+        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(occupied));
+
+        assertThatThrownBy(() -> validator.validateStrictOverlap(List.of(candidate)))
+                .isInstanceOf(ReallocationConflictException.class)
+                .satisfies(ex -> {
+                    List<OccurrenceConflictDto> conflicts = ((ReallocationConflictException) ex).getConflicts();
+                    assertThat(conflicts).hasSize(1);
+                    assertThat(conflicts.getFirst().overlapMinutes()).isEqualTo(5);
+                });
+    }
+
     // ---------- estado de la ocurrencia ----------
 
     @Test

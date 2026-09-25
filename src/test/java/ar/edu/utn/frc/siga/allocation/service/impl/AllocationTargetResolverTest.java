@@ -240,6 +240,39 @@ class AllocationTargetResolverTest {
         verify(occurrenceService, never()).findSlotsByEvents(anyCollection(), any());
     }
 
+    // ---------- resolveAll (usado por AllocationService.resolveOccurrences) ----------
+
+    @Test
+    @DisplayName("resolveAll — EventRange descarta ocurrencias posteriores a 'to'")
+    void resolveAllEventRangeDescartaPosterioresATo() {
+        LocalDate from = LocalDate.now().plusDays(7);
+        LocalDate to = from.plusDays(14);
+        realValidateRange();
+        when(occurrenceService.findSlotsByEvent(EVENT_ID, from)).thenReturn(List.of(
+                slot(1L, from),
+                slot(2L, to),
+                slot(3L, to.plusDays(1))));
+
+        List<OccurrenceSlotDto> resolved = resolver.resolveAll(
+                List.of(new AllocationTarget.EventRange(EVENT_ID, from, to)), LocalDate.now());
+
+        assertThat(resolved).extracting(OccurrenceSlotDto::occurrenceId).containsExactly(1L, 2L);
+    }
+
+    @Test
+    @DisplayName("resolveAll — Occurrences con una ocurrencia pasada lanza AllocationConflictException")
+    void resolveAllOccurrencesConPasadaLanza() {
+        OccurrenceSlotDto pasada = new OccurrenceSlotDto(
+                1L, EVENT_ID, LocalDate.now().minusDays(1), LocalTime.of(8, 0), LocalTime.of(10, 0),
+                OccurrenceStatus.NEEDS_ROOM, 30);
+        when(occurrenceService.findSlots(List.of(1L))).thenReturn(List.of(pasada));
+        doThrowConflict(pasada);
+
+        assertThatThrownBy(() -> resolver.resolveAll(
+                List.of(new AllocationTarget.Occurrences(List.of(1L))), LocalDate.now()))
+                .isInstanceOf(AllocationConflictException.class);
+    }
+
     // ---------- helpers ----------
 
     private static AllocationItem eventItem(long eventId, long classroomId) {

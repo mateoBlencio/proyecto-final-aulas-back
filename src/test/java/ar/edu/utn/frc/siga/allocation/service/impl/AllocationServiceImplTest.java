@@ -29,6 +29,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
@@ -49,6 +50,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -376,6 +378,60 @@ class AllocationServiceImplTest {
         verify(validator, never()).validateManualOverlap(anyList(), any());
     }
 
+    @Test
+    @DisplayName("reallocate: source AUTOMATIC llama validateStrictOverlap con los candidatos del lote")
+    void reallocateAutomaticLlamaValidateStrictOverlapConLosCandidatos() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
+        AllocationCommand command = AllocationCommand.automatic(List.of(item));
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
+        when(writer.upsert(resolved, null, AllocationSource.AUTOMATIC))
+                .thenReturn(List.of(allocation(900L, 10L, 5, AllocationSource.AUTOMATIC)));
+
+        service.reallocate(command);
+
+        ArgumentCaptor<List<AllocationCandidate>> captor = ArgumentCaptor.forClass(List.class);
+        verify(validator).validateStrictOverlap(captor.capture());
+        assertThat(captor.getValue()).containsExactly(new AllocationCandidate(occ, 5L));
+    }
+
+    @Test
+    @DisplayName("reallocate: source MANUAL llama validateManualOverlap y nunca validateStrictOverlap")
+    void reallocateManualNuncaLlamaValidateStrictOverlap() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
+        when(writer.upsert(resolved, "obs", AllocationSource.MANUAL))
+                .thenReturn(List.of(allocation(900L, 10L, 5, AllocationSource.MANUAL)));
+
+        service.reallocate(command);
+
+        verify(validator).validateManualOverlap(anyList(), eq("obs"));
+        verify(validator, never()).validateStrictOverlap(anyList());
+    }
+
+    @Test
+    @DisplayName("reallocate: el lock por aula se toma antes que cualquier validación de solapamiento, con el set de aulas del lote")
+    void reallocateTomaElLockAntesDeValidarSolapamiento() {
+        AllocationItem item1 = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
+        AllocationItem item2 = new AllocationItem(new AllocationTarget.Occurrences(List.of(11L)), 6L);
+        AllocationCommand command = AllocationCommand.manual(List.of(item1, item2), "obs");
+        OccurrenceSlotDto occ1 = occurrenceSlot(10L, 1L, futureDate(1));
+        OccurrenceSlotDto occ2 = occurrenceSlot(11L, 2L, futureDate(2));
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ1, 5, occ2, 6);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
+        when(writer.upsert(resolved, "obs", AllocationSource.MANUAL)).thenReturn(List.of());
+
+        service.reallocate(command);
+
+        InOrder order = inOrder(classroomLock, validator);
+        order.verify(classroomLock).lock(Set.of(5L, 6L));
+        order.verify(validator).validateManualOverlap(anyList(), any());
+    }
+
     // ---------- deallocate ----------
 
     @Test
@@ -502,6 +558,22 @@ class AllocationServiceImplTest {
     }
 
     @Test
+    @DisplayName("syncFromSysacad: toma el lock por aula y no llama a ningún método de overlap del validator")
+    void syncFromSysacadTomaElLockYNoValidaSolapamiento() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5L);
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
+        when(targetResolver.resolveClassroomByOccurrence(List.of(item), null)).thenReturn(resolved);
+        when(writer.syncFromSysacad(resolved)).thenReturn(1);
+
+        service.syncFromSysacad(List.of(item));
+
+        verify(classroomLock).lock(Set.of(5L));
+        verify(validator, never()).validateManualOverlap(anyList(), any());
+        verify(validator, never()).validateStrictOverlap(anyList());
+    }
+
+    @Test
     @DisplayName("syncFromSysacad: lote que no resuelve a ninguna ocurrencia es un no-op (sin validar aulas)")
     void syncFromSysacadTargetVacioEsNoOp() {
         AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5L);
@@ -512,6 +584,21 @@ class AllocationServiceImplTest {
 
         assertThat(affected).isEqualTo(0);
         verify(validator, never()).validateClassroomsAvailable(any());
+    }
+
+    // ---------- resolveOccurrences ----------
+
+    @Test
+    @DisplayName("resolveOccurrences: delega en targetResolver.resolveAll con hoy como clamp y devuelve lo que resuelve")
+    void resolveOccurrencesDelegaEnTargetResolver() {
+        AllocationTarget target = new AllocationTarget.Occurrences(List.of(10L));
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
+        when(targetResolver.resolveAll(List.of(target), LocalDate.now())).thenReturn(List.of(occ));
+
+        List<OccurrenceSlotDto> result = service.resolveOccurrences(target);
+
+        assertThat(result).containsExactly(occ);
+        verify(targetResolver).resolveAll(List.of(target), LocalDate.now());
     }
 
     // ---------- findById / findByDate ----------
