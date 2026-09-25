@@ -1,9 +1,12 @@
 package ar.edu.utn.frc.siga.preview.controller;
 
+import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.preview.dto.request.ConfirmPreviewRequestDto;
 import ar.edu.utn.frc.siga.preview.dto.request.PreviewRequestDto;
+import ar.edu.utn.frc.siga.preview.dto.request.ReallocationSuggestionRequestDto;
 import ar.edu.utn.frc.siga.preview.dto.response.ConfirmPreviewResponseDto;
 import ar.edu.utn.frc.siga.preview.dto.response.PreviewResponseDto;
+import ar.edu.utn.frc.siga.preview.dto.response.ReallocationSuggestionResponseDto;
 import ar.edu.utn.frc.siga.preview.service.PreviewService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,6 +21,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -64,6 +69,36 @@ public class PreviewController {
         ConfirmPreviewResponseDto response = previewService.confirm(previewId, request);
         log.info("Confirm de preview: previewId={}, applied={}, skipped={}",
                 previewId, response.applied().size(), response.skippedEventIds().size());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/reallocation-suggestion")
+    @PreAuthorize("hasAuthority('PERM_PREVIEW_RUN') and hasAuthority('PERM_ALLOCATION_WRITE')")
+    @Operation(summary = "Sugerir aula para una reasignación",
+               description = "Corre el solver para el target indicado (occurrenceIds, o eventId con from y "
+                       + "opcionalmente to) y devuelve un aula sugerida con su suggestionId, sin persistir "
+                       + "asignaciones. status=NO_ROOM_AVAILABLE (sin suggestionId) si ninguna aula del alcance "
+                       + "del usuario cumple las reglas hard en todas las fechas.")
+    public ResponseEntity<ReallocationSuggestionResponseDto> suggestReallocation(
+            @Valid @RequestBody ReallocationSuggestionRequestDto request) {
+        log.debug("POST /v1/previews/reallocation-suggestion: eventId={}, occurrenceIds={}",
+                request.eventId(), request.occurrenceIds());
+        ReallocationSuggestionResponseDto response = previewService.suggestReallocation(request);
+        log.info("Sugerencia de reasignación: suggestionId={}, status={}", response.suggestionId(), response.status());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/reallocation-suggestion/{suggestionId}/confirm")
+    @PreAuthorize("hasAuthority('PERM_PREVIEW_RUN') and hasAuthority('PERM_ALLOCATION_WRITE')")
+    @Operation(summary = "Confirmar la sugerencia de reasignación",
+               description = "Aplica, con source=AUTOMATIC, el aula sugerida a las ocurrencias que resolvió la "
+                       + "sugerencia, revalidando todo contra la base. 410 si la sugerencia expiró, no existe o "
+                       + "ya se usó (se consume al primer intento de confirm, aunque falle).")
+    public ResponseEntity<List<AllocationResponseDto>> confirmReallocationSuggestion(
+            @PathVariable String suggestionId) {
+        log.debug("POST /v1/previews/reallocation-suggestion/{}/confirm", suggestionId);
+        List<AllocationResponseDto> response = previewService.confirmReallocationSuggestion(suggestionId);
+        log.info("Confirm de sugerencia de reasignación: suggestionId={}, applied={}", suggestionId, response.size());
         return ResponseEntity.ok(response);
     }
 }

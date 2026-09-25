@@ -11,4 +11,8 @@ public interface PreviewStore {
     Optional<OptimizationResult> get(String previewId);
 
     void remove(String previewId);
+
+    void saveSuggestion(ReallocationSuggestion suggestion);
+
+    Optional<ReallocationSuggestion> takeSuggestion(String suggestionId);
 }

@@ -23,6 +23,8 @@ public enum SettingKey {
             "preview.defaultTimeLimitSeconds", SettingType.INT, RiskLevel.SAFE, "preview", null),
     PREVIEW_TTL_MINUTES(
             "preview.ttlMinutes", SettingType.LONG, RiskLevel.SAFE, "preview", null),
+    PREVIEW_SUGGESTION_TIME_LIMIT_SECONDS(
+            "preview.suggestionTimeLimitSeconds", SettingType.INT, RiskLevel.SAFE, "preview", null),
     EVENTS_HOURS_START(
             "events.hours.start", SettingType.TIME, RiskLevel.SAFE, "events", null),
     EVENTS_HOURS_END(
