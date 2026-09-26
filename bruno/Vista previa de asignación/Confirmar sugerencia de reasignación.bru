@@ -1,0 +1,39 @@
+meta {
+  name: Confirmar sugerencia de reasignación
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/v1/previews/reallocation-suggestion/:suggestionId/confirm
+  body: none
+  auth: bearer
+}
+
+params:path {
+  suggestionId: sug_961560f8-1234-4abc-9def-abcdef123456
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJhZG1pbkBmcmMudXRuLmVkdS5hciIsInJvbGVzIjpbIlNVQlNFQ1JFVEFSSUEiXSwiaWF0IjoxNzg1MTE0NTc1LCJleHAiOjE3ODUxMTU3NzV9.X-EjQOMqzdQbdcABQ3BubqKjeZHNDvvuohGpXe1eGu3uN9Oifsl_FojTuPEDvWLS
+}
+
+docs {
+  Sin body. Aplica, con source = AUTOMATIC, el aula sugerida a exactamente las
+  occurrenceIds devueltas por POST /v1/previews/reallocation-suggestion, revalidando
+  todo contra la BD actual. Si en el medio se crearon ocurrencias nuevas en el rango,
+  no entran.
+
+  Respuesta 200: List<AllocationResponseDto>, igual forma que PUT /v1/allocations,
+  con source == "AUTOMATIC" en cada fila.
+
+  La sugerencia se consume al primer intento de confirm, aunque ese intento falle con
+  409: para reintentar hay que pedir una sugerencia nueva.
+
+  Errores:
+  - 410 Gone: la sugerencia expiró, no existe o ya se usó (incluye re-confirm).
+  - 403: falta PERM_PREVIEW_RUN o PERM_ALLOCATION_WRITE, o el aula quedó fuera del
+    alcance de edificios del usuario.
+  - 409 Conflict: alguna ocurrencia ya pasó, el aula dejó de estar disponible, o ahora
+    se solapa con otra asignación (mismo cuerpo que el 409 de PUT /v1/allocations).
+}

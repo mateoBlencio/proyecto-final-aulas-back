@@ -12,6 +12,7 @@ import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.optimizer.model.OptimizerAllocation;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizerEvent;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizerOccupancy;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizationResult;
@@ -26,9 +27,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
@@ -51,14 +55,14 @@ class PreviewEngine {
                   Map<Long, List<OccupiedSlot>> priorSlotsByEvent) {
     }
 
+    record Suggestion(AcademicEventResponseDto event, ClassroomResponseDto classroom, int overcrowdedBy) {
+    }
+
     @Transactional(readOnly = true)
     Inputs loadInputs(Set<Long> eventIds) {
         List<RecurringEventResponseDto> events = loadRecurringEvents(eventIds);
         Map<Long, List<LocalDate>> datesByEvent = datesByEvent(eventIds);
-        BuildingScope scope = buildingScopeResolver.scopeFor(Permission.PREVIEW_RUN);
-        List<ClassroomResponseDto> availableRooms = classroomService.findAllAvailable().stream()
-                .filter(c -> scope.allows(c.buildingId()))
-                .toList();
+        List<ClassroomResponseDto> availableRooms = loadAvailableRooms(Permission.PREVIEW_RUN);
         Map<Long, ClassroomSubjectPermissionDto> permissionsByRoom = classroomService.findSubjectPermissions(
                 availableRooms.stream().map(ClassroomResponseDto::id).toList());
         List<OptimizerRoom> rooms = availableRooms.stream()
@@ -97,6 +101,84 @@ class PreviewEngine {
                 optimizerEvents.size(), inputs.rooms().size(), inputs.occupancy().size());
 
         return optimizerService.optimize(optimizerEvents, inputs.rooms(), inputs.occupancy(), timeLimitSeconds);
+    }
+
+    // Sin @Transactional: el solver no debe correr con una conexión tomada.
+    Suggestion suggest(Long eventId, List<OccurrenceSlotDto> slots, Set<Long> excludedClassroomIds,
+            int timeLimitSeconds) {
+        List<AcademicEventResponseDto> found = academicEventService.findByIds(Set.of(eventId));
+        if (found.isEmpty()) {
+            throw ResourceNotFoundException.of("AcademicEvent", eventId);
+        }
+        AcademicEventResponseDto event = found.getFirst();
+
+        List<ClassroomResponseDto> availableRooms = loadAvailableRooms(Permission.PREVIEW_RUN, Permission.ALLOCATION_WRITE)
+                .stream()
+                .filter(c -> !excludedClassroomIds.contains(c.id()))
+                .toList();
+        if (availableRooms.isEmpty()) {
+            return new Suggestion(event, null, 0);
+        }
+
+        Map<Long, ClassroomSubjectPermissionDto> permissionsByRoom = classroomService.findSubjectPermissions(
+                availableRooms.stream().map(ClassroomResponseDto::id).toList());
+        List<OptimizerRoom> rooms = availableRooms.stream()
+                .map(c -> toSolverRoom(c, permissionsByRoom.get(c.id())))
+                .toList();
+
+        OptimizerEvent optimizerEvent = toSuggestionEvent(eventId, event, slots);
+        List<OptimizerOccupancy> occupancy = loadOccupancyForSuggestion(eventId, slots);
+
+        log.info("Sugerencia de reasignación: evento={}, {} aulas candidatas, {} franjas ocupadas",
+                eventId, rooms.size(), occupancy.size());
+
+        OptimizationResult result = optimizerService.optimize(List.of(optimizerEvent), rooms, occupancy, timeLimitSeconds);
+        OptimizerAllocation allocation = result.allocations().getFirst();
+        if (allocation.classroomId() == null) {
+            return new Suggestion(event, null, 0);
+        }
+
+        ClassroomResponseDto classroom = availableRooms.stream()
+                .filter(c -> c.id().equals(allocation.classroomId()))
+                .findFirst()
+                .orElseThrow();
+        OptimizerRoom solverRoom = rooms.stream()
+                .filter(r -> r.id().equals(allocation.classroomId()))
+                .findFirst()
+                .orElseThrow();
+        return new Suggestion(event, classroom, solverRoom.overcrowding(optimizerEvent.enrolled()));
+    }
+
+    private List<ClassroomResponseDto> loadAvailableRooms(Permission... permissions) {
+        List<BuildingScope> scopes = Arrays.stream(permissions).map(buildingScopeResolver::scopeFor).toList();
+        return classroomService.findAllAvailable().stream()
+                .filter(c -> scopes.stream().allMatch(scope -> scope.allows(c.buildingId())))
+                .toList();
+    }
+
+    private OptimizerEvent toSuggestionEvent(Long eventId, AcademicEventResponseDto event, List<OccurrenceSlotDto> slots) {
+        String commissionKey = event instanceof RecurringEventResponseDto recurring && recurring.commission() != null
+                ? String.valueOf(recurring.commission().id()) : null;
+        Set<Long> subjectIds = event.subject() != null ? Set.of(event.subject().id()) : Set.of();
+        Set<LocalDate> occurrenceDates = slots.stream().map(OccurrenceSlotDto::date).collect(Collectors.toSet());
+        LocalTime startTime = slots.stream().map(OccurrenceSlotDto::startTime).min(Comparator.naturalOrder()).orElseThrow();
+        LocalTime endTime = slots.stream().map(OccurrenceSlotDto::endTime).max(Comparator.naturalOrder()).orElseThrow();
+        int enrolled = slots.stream()
+                .map(OccurrenceSlotDto::enrolled)
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(Objects.requireNonNullElse(event.enrolled(), 0));
+        return new OptimizerEvent(String.valueOf(eventId), commissionKey, enrolled, startTime, endTime,
+                occurrenceDates, subjectIds);
+    }
+
+    private List<OptimizerOccupancy> loadOccupancyForSuggestion(Long eventId, List<OccurrenceSlotDto> slots) {
+        LocalDate minDate = slots.stream().map(OccurrenceSlotDto::date).min(Comparator.naturalOrder()).orElseThrow();
+        LocalDate maxDate = slots.stream().map(OccurrenceSlotDto::date).max(Comparator.naturalOrder()).orElseThrow();
+        return occupancyService.findOccupancy(minDate, maxDate).stream()
+                .filter(o -> !eventId.equals(o.eventId()))
+                .map(this::toOccupancy)
+                .toList();
     }
 
     private OptimizerEvent toSolverEvent(RecurringEventResponseDto e, List<LocalDate> dates) {

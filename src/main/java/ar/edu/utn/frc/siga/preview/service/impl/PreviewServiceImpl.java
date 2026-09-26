@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.preview.service.impl;
 
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
+import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.service.AllocationConflictService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
@@ -14,12 +15,16 @@ import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.preview.dto.request.ConfirmPreviewRequestDto;
 import ar.edu.utn.frc.siga.preview.dto.request.PreviewAllocationDto;
 import ar.edu.utn.frc.siga.preview.dto.request.PreviewRequestDto;
+import ar.edu.utn.frc.siga.preview.dto.request.ReallocationSuggestionRequestDto;
 import ar.edu.utn.frc.siga.preview.dto.response.ConfirmPreviewResponseDto;
 import ar.edu.utn.frc.siga.preview.dto.response.PreviewResponseDto;
+import ar.edu.utn.frc.siga.preview.dto.response.ReallocationSuggestionResponseDto;
+import ar.edu.utn.frc.siga.preview.dto.response.ReallocationSuggestionResponseDto.SuggestionStatus;
 import ar.edu.utn.frc.siga.preview.config.PreviewSettings;
 import ar.edu.utn.frc.siga.preview.mapper.PreviewComposer;
 import ar.edu.utn.frc.siga.preview.service.PreviewService;
 import ar.edu.utn.frc.siga.preview.service.PreviewStore;
+import ar.edu.utn.frc.siga.preview.service.ReallocationSuggestion;
 import ar.edu.utn.frc.siga.preview.validator.PreviewValidator;
 import ar.edu.utn.frc.siga.preview.exception.ExpiredPreviewException;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizationResult;
@@ -29,10 +34,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -130,6 +137,58 @@ public class PreviewServiceImpl implements PreviewService {
         log.info("Confirm aplicado: previewId={}, applied={}, skipped={}",
                 previewId, saved.size(), skippedEventIds.size());
         return new ConfirmPreviewResponseDto(saved, skippedEventIds);
+    }
+
+    @Override
+    public ReallocationSuggestionResponseDto suggestReallocation(ReallocationSuggestionRequestDto request) {
+        AllocationTarget target = request.eventId() != null
+                ? new AllocationTarget.EventRange(request.eventId(), request.from(), request.to())
+                : new AllocationTarget.Occurrences(request.occurrenceIds());
+        List<OccurrenceSlotDto> slots = allocationService.resolveOccurrences(target);
+        if (slots.isEmpty()) {
+            throw new AllocationConflictException("el target no tiene ocurrencias pendientes de asignación");
+        }
+        Set<Long> eventIds = slots.stream().map(OccurrenceSlotDto::eventId).collect(Collectors.toSet());
+        if (eventIds.size() > 1) {
+            throw new InvalidSelectionException("Las ocurrencias indicadas pertenecen a más de un evento");
+        }
+        Long eventId = eventIds.iterator().next();
+        List<OccurrenceSlotDto> orderedSlots = slots.stream()
+                .sorted(Comparator.comparing(OccurrenceSlotDto::date))
+                .toList();
+        List<Long> occurrenceIds = orderedSlots.stream().map(OccurrenceSlotDto::occurrenceId).toList();
+        List<LocalDate> dates = orderedSlots.stream().map(OccurrenceSlotDto::date).toList();
+        Set<Long> excludedClassroomIds = request.excludedClassroomIds() != null
+                ? Set.copyOf(request.excludedClassroomIds()) : Set.of();
+
+        PreviewEngine.Suggestion suggestion = previewEngine.suggest(
+                eventId, orderedSlots, excludedClassroomIds, previewSettings.getSuggestionTimeLimitSeconds());
+
+        if (suggestion.classroom() == null) {
+            log.info("Sin aula sugerida: eventId={}, ocurrencias={}", eventId, occurrenceIds.size());
+            return new ReallocationSuggestionResponseDto(
+                    null, eventId, occurrenceIds, dates, SuggestionStatus.NO_ROOM_AVAILABLE, null, 0);
+        }
+
+        String suggestionId = "sug_" + UUID.randomUUID();
+        previewStore.saveSuggestion(
+                new ReallocationSuggestion(suggestionId, eventId, occurrenceIds, suggestion.classroom().id()));
+        log.info("Sugerencia generada: suggestionId={}, eventId={}, classroomId={}",
+                suggestionId, eventId, suggestion.classroom().id());
+        return new ReallocationSuggestionResponseDto(suggestionId, eventId, occurrenceIds, dates,
+                SuggestionStatus.SUGGESTED, suggestion.classroom(), suggestion.overcrowdedBy());
+    }
+
+    @Override
+    @Transactional
+    public List<AllocationResponseDto> confirmReallocationSuggestion(String suggestionId) {
+        ReallocationSuggestion suggestion = previewStore.takeSuggestion(suggestionId)
+                .orElseThrow(() -> new ExpiredPreviewException(suggestionId));
+        AllocationItem item = new AllocationItem(
+                new AllocationTarget.Occurrences(suggestion.occurrenceIds()), suggestion.classroomId());
+        List<AllocationResponseDto> saved = allocationService.reallocate(AllocationCommand.automatic(List.of(item)));
+        log.info("Confirm de sugerencia: suggestionId={}, applied={}", suggestionId, saved.size());
+        return saved;
     }
 
     private Set<Long> resolveEventIds(PreviewRequestDto request) {

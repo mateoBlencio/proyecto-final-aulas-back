@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
+import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
 import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
@@ -48,6 +49,7 @@ public class AllocationServiceImpl implements AllocationService {
     private final AllocationWriter writer;
     private final ClassroomService classroomService;
     private final BuildingScopeResolver buildingScopeResolver;
+    private final ClassroomAllocationLock classroomLock;
 
     @Override
     @Transactional(readOnly = true)
@@ -84,6 +86,12 @@ public class AllocationServiceImpl implements AllocationService {
             return List.of();
         }
         return composer.composeAll(allocationRepository.findByOccurrenceIdIn(occurrenceIds));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OccurrenceSlotDto> resolveOccurrences(AllocationTarget target) {
+        return targetResolver.resolveAll(List.of(target), LocalDate.now());
     }
 
     @Override
@@ -145,14 +153,19 @@ public class AllocationServiceImpl implements AllocationService {
         }
 
         Set<Long> classroomIds = Set.copyOf(classroomByOccurrence.values());
+        classroomLock.lock(classroomIds);
         requireAccessToClassrooms(classroomIds);
         validator.validateClassroomsAvailable(classroomIds);
 
-        if (command.source() == AllocationSource.MANUAL) {
+        if (command.source() == AllocationSource.MANUAL || command.source() == AllocationSource.AUTOMATIC) {
             List<AllocationCandidate> candidates = classroomByOccurrence.entrySet().stream()
                     .map(e -> new AllocationCandidate(e.getKey(), e.getValue()))
                     .toList();
-            validator.validateManualOverlap(candidates, command.observation());
+            if (command.source() == AllocationSource.MANUAL) {
+                validator.validateManualOverlap(candidates, command.observation());
+            } else {
+                validator.validateStrictOverlap(candidates);
+            }
         }
 
         return classroomByOccurrence;

@@ -1,0 +1,62 @@
+meta {
+  name: Sugerir aula para reasignación
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/v1/previews/reallocation-suggestion
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJhZG1pbkBmcmMudXRuLmVkdS5hciIsInJvbGVzIjpbIlNVQlNFQ1JFVEFSSUEiXSwiaWF0IjoxNzg1MTE0NTc1LCJleHAiOjE3ODUxMTU3NzV9.X-EjQOMqzdQbdcABQ3BubqKjeZHNDvvuohGpXe1eGu3uN9Oifsl_FojTuPEDvWLS
+}
+
+body:json {
+  {
+    "eventId": 42,
+    "from": "2026-10-05",
+    "to": "2026-10-19",
+    "excludedClassroomIds": [7]
+  }
+}
+
+docs {
+  Corre el solver de optimizer para UNA sola reasignación (día puntual o rango) y
+  devuelve un aula sugerida con un suggestionId, sin persistir nada. El target usa la
+  misma semántica que PUT /v1/allocations:
+  - { "occurrenceIds": [101] }: día(s) puntual(es).
+  - { "eventId": 42, "from": "2026-10-05" }: desde una fecha en adelante.
+  - { "eventId": 42, "from": "2026-10-05", "to": "2026-10-19" }: rango acotado.
+  occurrenceIds y eventId son excluyentes; con eventId, from es obligatorio.
+
+  excludedClassroomIds es opcional: el solver no ve la ocupación del propio evento en
+  esas fechas, así que el aula actual puede volver a salir sugerida. Mandala para forzar
+  otra aula, o agregá ahí la sugerencia anterior para pedir una distinta.
+
+  Respuesta 200:
+  {
+    "suggestionId": "sug_xxxxxxxx-...",
+    "eventId": 42,
+    "occurrenceIds": [101, 102, 103],
+    "dates": ["2026-10-05", "2026-10-12", "2026-10-19"],
+    "status": "SUGGESTED",
+    "classroom": { "id": 9, "roomNumber": 101, "capacity": 40, ... },
+    "overcrowdedBy": 0
+  }
+
+  status = NO_ROOM_AVAILABLE (suggestionId y classroom null) si ninguna aula del
+  alcance del usuario cumple las reglas hard (sin choque, con permiso) en todas las
+  fechas. En ese caso el front puede caer al flujo manual o a POST /v1/allocations/impact.
+
+  La sugerencia se guarda en memoria con el mismo TTL que las previews
+  (preview.ttlMinutes). Confirmarla: POST /v1/previews/reallocation-suggestion/{suggestionId}/confirm.
+
+  Errores:
+  - 400: target inválido, from anterior a hoy, o to < from.
+  - 403: falta PERM_PREVIEW_RUN o PERM_ALLOCATION_WRITE.
+  - 404: el evento no existe.
+  - 409: ocurrencia inexistente o ya pasada, o el target no tiene ocurrencias futuras.
+}
