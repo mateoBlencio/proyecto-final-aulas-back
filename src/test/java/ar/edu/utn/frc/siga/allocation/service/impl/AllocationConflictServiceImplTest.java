@@ -251,7 +251,7 @@ class AllocationConflictServiceImplTest {
     void detectaAulaNoPermitida() {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
-        SubjectResponseDto subject = new SubjectResponseDto(7L, 700, "Análisis", "1C", null);
+        SubjectResponseDto subject = new SubjectResponseDto(7L, 700, "Análisis", "1C", null, true);
         RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0), subject);
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         mockOccupancy(List.of(slot), List.of(allocation(100L, 10L, 5)), List.of(event));
@@ -275,7 +275,7 @@ class AllocationConflictServiceImplTest {
     void noReportaAulaPermitida() {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
-        SubjectResponseDto subject = new SubjectResponseDto(7L, 700, "Análisis", "1C", null);
+        SubjectResponseDto subject = new SubjectResponseDto(7L, 700, "Análisis", "1C", null, true);
         RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0), subject);
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         mockOccupancy(List.of(slot), List.of(allocation(100L, 10L, 5)), List.of(event));

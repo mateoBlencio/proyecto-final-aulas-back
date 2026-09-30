@@ -7,6 +7,7 @@ public record SubjectCommissionResponseDto(
         Long subjectId,
         Long commissionId,
         CommissionResponseDto commission,
-        Integer enrolledCount
+        Integer enrolledCount,
+        boolean enabled
 ) {
 }

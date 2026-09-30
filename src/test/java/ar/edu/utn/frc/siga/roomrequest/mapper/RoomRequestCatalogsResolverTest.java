@@ -249,7 +249,7 @@ class RoomRequestCatalogsResolverTest {
     }
 
     private static SubjectResponseDto subject(Long id) {
-        return new SubjectResponseDto(id, 1, "Materia", "1", null);
+        return new SubjectResponseDto(id, 1, "Materia", "1", null, true);
     }
 
     private static RecurringEventResponseDto recurringEvent(Long id, Integer enrolled) {

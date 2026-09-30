@@ -8,6 +8,7 @@ public record SubjectResponseDto(
         Integer code,
         String name,
         String term,
-        StudyPlanResponseDto studyPlan
+        StudyPlanResponseDto studyPlan,
+        boolean enabled
 ) {
 }

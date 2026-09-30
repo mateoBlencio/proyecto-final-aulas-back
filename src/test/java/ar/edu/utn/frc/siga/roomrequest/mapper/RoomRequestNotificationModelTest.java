@@ -28,7 +28,7 @@ class RoomRequestNotificationModelTest {
     @Test
     @DisplayName("REGULAR_ROOM_CHANGE: diaSemana y horario van por separado, con aula anterior y sin fecha")
     void regularRoomChangeConAulaAnterior() {
-        SubjectResponseDto subject = new SubjectResponseDto(42L, 101, "Análisis Matemático I", "ANUAL", null);
+        SubjectResponseDto subject = new SubjectResponseDto(42L, 101, "Análisis Matemático I", "ANUAL", null, true);
         AssignedClassroomDto aulaNueva = new AssignedClassroomDto(1L, 5, "Pabellón 1", 40);
         AssignedClassroomDto aulaAnterior = new AssignedClassroomDto(2L, 3, "Pabellón 2", 30);
         RoomRequestItemDetailDto detail = detail(RoomRequestType.REGULAR_ROOM_CHANGE, subject, 10L,
@@ -57,7 +57,7 @@ class RoomRequestNotificationModelTest {
     @Test
     @DisplayName("ONE_TIME_ROOM_CHANGE: trae fecha y horario, no trae diaSemana")
     void oneTimeRoomChangeTraeFechaNoDiaSemana() {
-        SubjectResponseDto subject = new SubjectResponseDto(55L, 205, "Bases de Datos I", "ANUAL", null);
+        SubjectResponseDto subject = new SubjectResponseDto(55L, 205, "Bases de Datos I", "ANUAL", null, true);
         AssignedClassroomDto aulaNueva = new AssignedClassroomDto(3L, 8, "Edificio Anexo", 50);
         AssignedClassroomDto aulaAnterior = new AssignedClassroomDto(4L, 6, "Edificio Anexo", 45);
         RoomRequestItemDetailDto detail = detail(RoomRequestType.ONE_TIME_ROOM_CHANGE, subject, 11L,
@@ -84,7 +84,7 @@ class RoomRequestNotificationModelTest {
     @Test
     @DisplayName("FINAL_EXAM sin comisiones: el mapa no tiene comisiones ni comisionesLabel")
     void finalExamSinComisiones() {
-        SubjectResponseDto subject = new SubjectResponseDto(60L, 310, "Sistemas Operativos", "ANUAL", null);
+        SubjectResponseDto subject = new SubjectResponseDto(60L, 310, "Sistemas Operativos", "ANUAL", null, true);
         AssignedClassroomDto aula = new AssignedClassroomDto(5L, 12, "Pabellón Argentina", 60);
         RoomRequestItemDetailDto detail = detail(RoomRequestType.FINAL_EXAM, subject, 12L,
                 List.of(), LocalDate.of(2026, 11, 20), null,
@@ -109,7 +109,7 @@ class RoomRequestNotificationModelTest {
     @Test
     @DisplayName("PARTIAL_EXAM_IN_CLASS con dos comisiones: horario marca horario de cursado")
     void partialExamInClassConDosComisiones() {
-        SubjectResponseDto subject = new SubjectResponseDto(70L, 220, "Programación II", "ANUAL", null);
+        SubjectResponseDto subject = new SubjectResponseDto(70L, 220, "Programación II", "ANUAL", null, true);
         AssignedClassroomDto aula = new AssignedClassroomDto(6L, 15, "Pabellón Argentina", 35);
         RoomRequestItemDetailDto detail = detail(RoomRequestType.PARTIAL_EXAM_IN_CLASS, subject, 13L,
                 List.of(new CommissionResponseDto(102L, "4K2", null), new CommissionResponseDto(103L, "4K3", null)),
@@ -134,7 +134,7 @@ class RoomRequestNotificationModelTest {
     @Test
     @DisplayName("PARTIAL_EXAM_OFF_SCHEDULE con tres comisiones: se listan con comas y 'y'")
     void partialExamOffScheduleConTresComisiones() {
-        SubjectResponseDto subject = new SubjectResponseDto(80L, 330, "Redes de Datos", "ANUAL", null);
+        SubjectResponseDto subject = new SubjectResponseDto(80L, 330, "Redes de Datos", "ANUAL", null, true);
         AssignedClassroomDto aula = new AssignedClassroomDto(7L, 20, "Pabellón España", 80);
         RoomRequestItemDetailDto detail = detail(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, subject, 14L,
                 List.of(new CommissionResponseDto(104L, "3K1", null), new CommissionResponseDto(105L, "3K2", null),
@@ -224,7 +224,7 @@ class RoomRequestNotificationModelTest {
     @Test
     @DisplayName("aulaAnterior ausente si el pedido no tiene aula anterior registrada (previo a la migración V10)")
     void aulaAnteriorAusenteSiNoHayAulaAnteriorRegistrada() {
-        SubjectResponseDto subject = new SubjectResponseDto(55L, 205, "Bases de Datos I", "ANUAL", null);
+        SubjectResponseDto subject = new SubjectResponseDto(55L, 205, "Bases de Datos I", "ANUAL", null, true);
         AssignedClassroomDto aulaNueva = new AssignedClassroomDto(3L, 8, "Edificio Anexo", 50);
         AssignedClassroomDto aulaAnterior = new AssignedClassroomDto(4L, 6, "Edificio Anexo", 45);
         RoomRequestItemDetailDto conAulaAnterior = detail(RoomRequestType.ONE_TIME_ROOM_CHANGE, subject, 19L,

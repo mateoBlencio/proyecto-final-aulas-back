@@ -56,6 +56,7 @@ class AcademicPeriodUpdateApiIntegrationTest extends AbstractIntegrationTest {
                                 {"endDate":"%d-11-30","recessStart":"%d-07-06","recessEnd":"%d-07-27"}
                                 """.formatted(year, year, year)))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(annualId))
                 .andExpect(jsonPath("$.recessStart").value(year + "-07-06"))
                 .andExpect(jsonPath("$.recessEnd").value(year + "-07-27"));
 

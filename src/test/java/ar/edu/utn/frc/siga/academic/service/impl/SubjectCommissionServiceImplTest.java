@@ -60,7 +60,7 @@ class SubjectCommissionServiceImplTest {
     void findWithExistingRelationReturnsMappedDto() {
         SubjectCommission existing = SubjectCommission.builder().subject(subject).commission(commission)
                 .enrolledCount(30).build();
-        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, 2L, null, 30);
+        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, 2L, null, 30, true);
         when(subjectRepository.findById(1L)).thenReturn(Optional.of(subject));
         when(commissionRepository.findById(2L)).thenReturn(Optional.of(commission));
         when(subjectCommissionRepository.findBySubjectAndCommissionAndDeletedAtIsNull(subject, commission)).thenReturn(Optional.of(existing));
@@ -98,7 +98,7 @@ class SubjectCommissionServiceImplTest {
     void findByCommissionAndSubjectCodeWithExistingRelationReturnsMappedDto() {
         SubjectCommission existing = SubjectCommission.builder().subject(subject).commission(commission)
                 .enrolledCount(30).build();
-        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, 2L, null, 30);
+        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, 2L, null, 30, true);
         when(subjectCommissionRepository.findFirstByCommission_IdAndSubject_CodeAndDeletedAtIsNullOrderBySubject_IdAsc(2L, 101))
                 .thenReturn(Optional.of(existing));
         when(subjectCommissionMapper.toDto(existing)).thenReturn(dto);
@@ -123,7 +123,7 @@ class SubjectCommissionServiceImplTest {
     void findAllMapsAllRelations() {
         SubjectCommission relation = SubjectCommission.builder().subject(subject).commission(commission)
                 .enrolledCount(30).build();
-        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, 2L, null, 30);
+        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, 2L, null, 30, true);
         when(subjectCommissionRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(relation)));
         when(subjectCommissionMapper.toDto(relation)).thenReturn(dto);
@@ -140,8 +140,8 @@ class SubjectCommissionServiceImplTest {
         SubjectCommission inactive = SubjectCommission.builder().id(new SubjectCommissionId(1L, 3L))
                 .subject(subject).commission(commission).enrolledCount(10).build();
         inactive.deactivate();
-        SubjectCommissionResponseDto activeDto = new SubjectCommissionResponseDto(1L, 2L, null, 30);
-        SubjectCommissionResponseDto inactiveDto = new SubjectCommissionResponseDto(1L, 2L, null, 10);
+        SubjectCommissionResponseDto activeDto = new SubjectCommissionResponseDto(1L, 2L, null, 30, true);
+        SubjectCommissionResponseDto inactiveDto = new SubjectCommissionResponseDto(1L, 2L, null, 10, false);
         when(subjectCommissionRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(active, inactive)));
         when(subjectCommissionMapper.toDto(active)).thenReturn(activeDto);

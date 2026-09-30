@@ -64,7 +64,7 @@ class SubjectServiceImplTest {
     @DisplayName("findById: devuelve el DTO mapeado cuando la materia existe")
     void findByIdReturnsMappedDto() {
         Subject subject = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
-        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null);
+        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true);
         when(subjectRepository.findActiveById(5L)).thenReturn(Optional.of(subject));
         when(subjectMapper.toDto(subject)).thenReturn(dto);
 
@@ -87,7 +87,7 @@ class SubjectServiceImplTest {
     @DisplayName("findByIds: mapea cada materia encontrada, sin fallar por ids inexistentes")
     void findByIdsMapsAllFound() {
         Subject subject = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
-        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null);
+        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true);
         when(subjectRepository.findAllById(List.of(5L, 99L))).thenReturn(List.of(subject));
         when(subjectMapper.toDto(subject)).thenReturn(dto);
 
@@ -100,7 +100,7 @@ class SubjectServiceImplTest {
     @DisplayName("findAll: devuelve la página de materias mapeadas según el Specification")
     void findAllMapsAllSubjects() {
         Subject subject = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
-        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null);
+        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true);
         when(subjectRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(subject)));
         when(subjectMapper.toDto(subject)).thenReturn(dto);
@@ -115,8 +115,8 @@ class SubjectServiceImplTest {
         Subject active = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
         Subject inactive = Subject.builder().id(6L).code(102).name("Química").studyPlan(studyPlan).build();
         inactive.deactivate();
-        SubjectResponseDto activeDto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null);
-        SubjectResponseDto inactiveDto = new SubjectResponseDto(6L, 102, "Química", null, null);
+        SubjectResponseDto activeDto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true);
+        SubjectResponseDto inactiveDto = new SubjectResponseDto(6L, 102, "Química", null, null, false);
         when(subjectRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(active, inactive)));
         when(subjectMapper.toDto(active)).thenReturn(activeDto);
@@ -130,7 +130,7 @@ class SubjectServiceImplTest {
     @DisplayName("findByCodeAndStudyPlan: devuelve el DTO mapeado cuando la materia existe para ese plan")
     void findByCodeAndStudyPlanReturnsMappedDto() {
         Subject existing = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
-        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", "Anual", null);
+        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", "Anual", null, true);
         when(specialtyRepository.findBySpecialtyCode(10)).thenReturn(Optional.of(specialty));
         when(studyPlanRepository.findByPlanCodeAndSpecialtyAndDeletedAtIsNull(2020, specialty)).thenReturn(Optional.of(studyPlan));
         when(subjectRepository.findByCodeAndStudyPlanAndDeletedAtIsNull(101, studyPlan)).thenReturn(Optional.of(existing));
