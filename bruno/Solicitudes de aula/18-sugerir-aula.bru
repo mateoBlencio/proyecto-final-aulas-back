@@ -1,0 +1,38 @@
+meta {
+  name: Sugerir aula(s) para un pedido
+  type: http
+  seq: 18
+}
+
+post {
+  url: {{baseUrl}}/v1/room-requests/items/1/suggestion
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "excludedClassroomIds": []
+  }
+}
+
+docs {
+  POST /v1/room-requests/items/{id}/suggestion. Permiso: PERM_ROOM_REQUEST_WRITE.
+
+  Corre el solver (Timefold) con la fecha, el horario, la cantidad estimada y los
+  requisitos del pedido (proyector, computadoras) y devuelve las aulas sugeridas con un
+  `suggestionId`. No persiste ninguna asignación. El body es opcional.
+
+  - Para `REGULAR_ROOM_CHANGE` considera todas las fechas futuras del día de dictado; el
+    aula sugerida tiene que estar libre en todas.
+  - Si el pedido está derivado a un edificio, solo sugiere aulas de ese edificio.
+  - Pide `classroomCount` aulas distintas. `status`: `SUGGESTED` (las cubre),
+    `PARTIAL` (cubre menos) o `NO_ROOM_AVAILABLE` (sin `suggestionId`, ninguna cumple las
+    reglas hard).
+  - `overcrowdedBy`: la mayor cantidad de personas que excede la capacidad entre las
+    aulas sugeridas (0 si entran todos).
+  - `excludedClassroomIds`: aulas a descartar, para pedir otra alternativa.
+
+  La sugerencia vive en memoria el TTL de `preview.ttlMinutes`. Misma autorización y
+  mismos estados que `assign` (409 desde `RESOLVED` o `CANCELLED`). 404 si el ítem no existe.
+}

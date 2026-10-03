@@ -1,0 +1,34 @@
+meta {
+  name: Confirmar la sugerencia de aula de un pedido
+  type: http
+  seq: 19
+}
+
+post {
+  url: {{baseUrl}}/v1/room-requests/items/1/suggestion/{{suggestionId}}/confirm
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "reason": null
+  }
+}
+
+docs {
+  POST /v1/room-requests/items/{id}/suggestion/{suggestionId}/confirm. Permiso:
+  PERM_ROOM_REQUEST_WRITE.
+
+  Asigna las aulas de la sugerencia con la misma lógica que `assign` (ocurrencias,
+  aulas simultáneas, aula anterior, estado `IN_EVALUATION`), pero con
+  `source = AUTOMATIC`: la auditoría distingue la asignación del algoritmo de la manual, y el
+  solapamiento se valida con tolerancia 0 bajo el lock por aula. El body es opcional.
+
+  - `reason` solo es obligatorio si la sugerencia fue `PARTIAL` (400 si falta).
+  - 410 si la sugerencia no existe, expiró, es de otro pedido, ya se usó (se consume al
+    primer intento, aunque falle) o el pedido cambió desde que se generó.
+  - 409 si el aula se ocupó entre la sugerencia y la confirmación.
+
+  Respuesta: 200 con el pedido actualizado (`status: "IN_EVALUATION"`).
+}
