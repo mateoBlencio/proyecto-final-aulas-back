@@ -1,0 +1,19 @@
+meta {
+  name: Listar aulas
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/classrooms?buildingId=3&size=20000
+  body: none
+  auth: inherit
+}
+
+params:query {
+  buildingId: 3
+  size: 20000
+  ~capacityMin: 60
+  ~page: 0
+  ~includeDeactivated: true
+}

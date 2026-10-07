@@ -1,0 +1,15 @@
+meta {
+  name: Eliminar aula
+  type: http
+  seq: 8
+}
+
+delete {
+  url: {{baseUrl}}/v1/classrooms/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: 34
+}

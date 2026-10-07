@@ -1,0 +1,16 @@
+meta {
+  name: Especialidades
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{sysacadUrl}}/api/data/views/Especialidades
+  body: none
+  auth: none
+}
+
+docs {
+  Consulta directa a la vista Especialidades de Sysacad. Los filtros van como query params por
+  nombre de columna; el orden con sort y direction (asc|desc).
+}
