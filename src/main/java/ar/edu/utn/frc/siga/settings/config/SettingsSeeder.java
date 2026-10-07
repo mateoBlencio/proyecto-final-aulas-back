@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.settings.config;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.settings.model.Setting;
 import ar.edu.utn.frc.siga.settings.model.SettingKey;
 import ar.edu.utn.frc.siga.settings.repository.SettingRepository;
@@ -21,6 +22,7 @@ public class SettingsSeeder implements ApplicationRunner {
 
     @Override
     @Transactional
+    @AuditOperation("Alta de configuraciones por defecto")
     public void run(@NonNull ApplicationArguments args) {
         int seeded = 0;
         for (SettingKey key : SettingKey.values()) {

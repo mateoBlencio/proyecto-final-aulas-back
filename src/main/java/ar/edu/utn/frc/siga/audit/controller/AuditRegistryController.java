@@ -35,11 +35,17 @@ public class AuditRegistryController {
 
     @GetMapping
     @Operation(summary = "Listar el registro de auditoría",
-               description = "Log paginado ordenado por revisión descendente. Cada entrada es una operación "
-                       + "de negocio en lote (type=OPERATION, con recordCount y entityTypes; el detalle se pide "
-                       + "en /audit/operations/{operationId}) o un cambio individual suelto (type=CHANGE, con "
-                       + "kind, entityType y recordId). Todas traen 'description' de lo que se cambió. Filtros "
-                       + "opcionales por rango de fechas, usuario, tipo de entidad y tipo de cambio. 400 si "
+               description = "Log paginado ordenado por revisión descendente. Cada entrada es: una operación "
+                       + "de negocio (type=OPERATION, agrupa todas las revisiones con el mismo operationId; "
+                       + "detalle en /audit/operations/{operationId}), una transacción sin operación que tocó "
+                       + "más de un registro (type=TRANSACTION, una revisión de Envers; detalle en "
+                       + "/audit/revisions/{revision}) o un cambio individual suelto (type=CHANGE, con kind, "
+                       + "entityType y recordId). OPERATION y TRANSACTION traen recordCount y entityTypes, y "
+                       + "kind solo si todas sus filas comparten el tipo de cambio. Todas traen 'description'. "
+                       + "Filtros opcionales: 'from', 'to' y 'user' filtran revisiones; 'entityType' y 'kind' "
+                       + "filtran filas antes de agrupar, así que una entrada aparece si le queda al menos una "
+                       + "fila, y recordCount y entityTypes cuentan solo las filas que pasan el filtro (una "
+                       + "revisión con varias filas puede pasar de TRANSACTION a CHANGE al filtrar). 400 si "
                        + "'entityType' no es un tipo conocido o si se envían las dos fechas y 'to' es anterior "
                        + "a 'from'.")
     public ResponseEntity<Page<AuditLogEntryDto>> findAll(
@@ -50,8 +56,8 @@ public class AuditRegistryController {
             @RequestParam(required = false) RevisionKind kind,
             @PageableDefault(size = 20) Pageable pageable) {
         log.debug("GET /v1/audit: from={}, to={}, user={}, entityType={}, kind={}", from, to, user, entityType, kind);
-        AuditLogFilter filter = new AuditLogFilter(from, to, user, entityType, kind);
-        Page<AuditLogEntryDto> page = auditRegistryService.findAll(filter, pageable);
+        Page<AuditLogEntryDto> page = auditRegistryService.findAll(
+                new AuditLogFilter(from, to, user, entityType, kind), pageable);
         log.info("Registro de auditoría consultado: total={}", page.getTotalElements());
         return ResponseEntity.ok(page);
     }
@@ -59,12 +65,40 @@ public class AuditRegistryController {
     @GetMapping("/operations/{operationId}")
     @Operation(summary = "Detalle de una operación en lote",
                description = "Cambios individuales (type=CHANGE) que componen la operación, paginados y "
-                       + "ordenados por revisión descendente. Página vacía si el operationId no existe.")
+                       + "ordenados por revisión descendente. Página vacía si el operationId no existe. "
+                       + "Filtros opcionales iguales a GET /v1/audit; con los mismos filtros, totalElements "
+                       + "coincide con recordCount de la entrada.")
     public ResponseEntity<Page<AuditLogEntryDto>> findOperationItems(
             @PathVariable String operationId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String user,
+            @RequestParam(required = false) String entityType,
+            @RequestParam(required = false) RevisionKind kind,
             @PageableDefault(size = 20) Pageable pageable) {
         log.debug("GET /v1/audit/operations/{}", operationId);
-        return ResponseEntity.ok(auditRegistryService.findOperationItems(operationId, pageable));
+        return ResponseEntity.ok(auditRegistryService.findOperationItems(
+                operationId, new AuditLogFilter(from, to, user, entityType, kind), pageable));
+    }
+
+    @GetMapping("/revisions/{revision}")
+    @Operation(summary = "Detalle de una transacción (revisión de Envers)",
+               description = "Cambios (type=CHANGE) de una revisión de Envers (una transacción), paginados, "
+                       + "ordenados por revisión descendente, tipo de entidad y recordId. Página vacía si la "
+                       + "revisión no existe. Filtros opcionales iguales a GET /v1/audit; con los mismos "
+                       + "filtros, totalElements coincide con recordCount de la entrada. 400 por 'entityType' "
+                       + "desconocido o si 'to' es anterior a 'from'.")
+    public ResponseEntity<Page<AuditLogEntryDto>> findRevisionItems(
+            @PathVariable int revision,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String user,
+            @RequestParam(required = false) String entityType,
+            @RequestParam(required = false) RevisionKind kind,
+            @PageableDefault(size = 20) Pageable pageable) {
+        log.debug("GET /v1/audit/revisions/{}", revision);
+        return ResponseEntity.ok(auditRegistryService.findRevisionItems(
+                revision, new AuditLogFilter(from, to, user, entityType, kind), pageable));
     }
 
     @GetMapping("/entity-types")

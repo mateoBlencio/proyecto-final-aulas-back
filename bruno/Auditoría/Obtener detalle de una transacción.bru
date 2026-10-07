@@ -1,0 +1,32 @@
+meta {
+  name: Obtener detalle de una transacción
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/v1/audit/revisions/:revision
+  body: none
+  auth: inherit
+}
+
+params:path {
+  revision: 1
+}
+
+params:query {
+  ~from: 2026-01-01
+  ~to: 2026-12-31
+  ~user:
+  ~entityType:
+  ~kind:
+  ~page: 0
+  ~size: 20
+}
+
+docs {
+  Cambios individuales (type=CHANGE) de una revisión de Envers (una transacción),
+  paginados y ordenados por revisión descendente, tipo de entidad y recordId. La
+  revision sale del campo revision de las entradas type=TRANSACTION de GET /v1/audit.
+  Página vacía si la revisión no existe. Filtros opcionales iguales a GET /v1/audit.
+}

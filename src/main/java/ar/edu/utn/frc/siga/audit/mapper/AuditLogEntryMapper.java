@@ -2,6 +2,8 @@ package ar.edu.utn.frc.siga.audit.mapper;
 
 import ar.edu.utn.frc.siga.audit.dto.RevisionMetadata;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditLogEntryDto;
+import ar.edu.utn.frc.siga.audit.dto.response.AuditLogEntryType;
+import ar.edu.utn.frc.siga.audit.repository.AuditGroupRow;
 import ar.edu.utn.frc.siga.common.mapper.CentralMapperConfig;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -15,6 +17,22 @@ public interface AuditLogEntryMapper {
     @Mapping(target = "recordCount", ignore = true)
     @Mapping(target = "entityTypes", ignore = true)
     AuditLogEntryDto toChange(RevisionMetadata metadata, String entityType);
+
+    default AuditLogEntryDto toOperation(AuditGroupRow row) {
+        return new AuditLogEntryDto(AuditLogEntryType.OPERATION, row.revision(), row.date(), row.user(),
+                row.description(), row.commonKind(), null, null, row.operationId(),
+                (int) row.recordCount(), row.entityTypes());
+    }
+
+    default AuditLogEntryDto toTransaction(AuditGroupRow row) {
+        return new AuditLogEntryDto(AuditLogEntryType.TRANSACTION, row.revision(), row.date(), row.user(),
+                describeTransaction(row), row.commonKind(), null, null, null,
+                (int) row.recordCount(), row.entityTypes());
+    }
+
+    default String describeTransaction(AuditGroupRow row) {
+        return row.recordCount() + " cambios en " + String.join(", ", row.entityTypes());
+    }
 
     /** Descripción escrita por el código de la operación, o una derivada del tipo de cambio. */
     default String describe(RevisionMetadata metadata, String entityType) {

@@ -10,13 +10,17 @@ import java.util.List;
 public interface AuditRegistryService {
 
     /**
-     * Registro paginado: operaciones de negocio en lote (una entrada por operación) y cambios
-     * individuales sueltos, ordenados por revisión descendente.
+     * Paginated log, ordered by revision descending: business operations (one entry per
+     * operation), transactions without an operation that touched several records (one entry per revision)
+     * and standalone individual changes.
      */
     Page<AuditLogEntryDto> findAll(AuditLogFilter filter, Pageable pageable);
 
-    /** Cambios individuales que componen una operación en lote (drill-down). */
-    Page<AuditLogEntryDto> findOperationItems(String operationId, Pageable pageable);
+    /** Individual changes that make up an operation (drill-down), with optional filters. */
+    Page<AuditLogEntryDto> findOperationItems(String operationId, AuditLogFilter filter, Pageable pageable);
+
+    /** Individual changes of an Envers revision (one transaction), with optional filters. */
+    Page<AuditLogEntryDto> findRevisionItems(int revision, AuditLogFilter filter, Pageable pageable);
 
     /** Etiquetas de dominio de las entidades auditadas, en el mismo orden del registry. */
     List<String> findEntityTypes();

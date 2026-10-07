@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.events.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.event.AcademicPeriodChanged;
@@ -32,6 +33,7 @@ class AcademicPeriodChangedListener {
     private final RecurringEventReconciler reconciler;
 
     @ApplicationModuleListener
+    @AuditOperation("Recálculo de ocurrencias por cambio de período académico")
     void on(AcademicPeriodChanged event) {
         List<RecurringEvent> allEvents = recurringEventRepository.findAll();
         Set<Long> commissionIds = allEvents.stream()

@@ -1,21 +1,16 @@
 package ar.edu.utn.frc.siga.audit.service.impl;
 
-import ar.edu.utn.frc.siga.audit.dto.RevisionMetadata;
 import ar.edu.utn.frc.siga.audit.dto.response.RevisionDto;
 import ar.edu.utn.frc.siga.audit.model.RevisionKind;
 import ar.edu.utn.frc.siga.audit.model.SigaRevision;
 import ar.edu.utn.frc.siga.audit.service.RevisionReader;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceUnitUtil;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.envers.AuditReaderFactory;
 import org.hibernate.envers.RevisionType;
 import org.hibernate.envers.query.AuditEntity;
-import org.hibernate.envers.query.AuditQuery;
-import org.hibernate.envers.query.criteria.MatchMode;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Function;
@@ -66,51 +61,6 @@ public class RevisionReaderImpl implements RevisionReader {
         return toRevisionDtos(results, toSnapshot);
     }
 
-    @Override
-    public List<RevisionMetadata> readMetadata(Class<?> entityClass, LocalDateTime from, LocalDateTime to,
-                                               String user, RevisionKind kind, String operationId) {
-        AuditQuery query = AuditReaderFactory.get(entityManager)
-                .createQuery()
-                .forRevisionsOfEntity(entityClass, false, true)
-                .addOrder(AuditEntity.revisionNumber().asc());
-
-        if (from != null) {
-            query.add(AuditEntity.revisionProperty("fechaRevision").ge(from));
-        }
-        if (to != null) {
-            query.add(AuditEntity.revisionProperty("fechaRevision").lt(to));
-        }
-        if (user != null && !user.isBlank()) {
-            query.add(AuditEntity.revisionProperty("usuario").ilike(user, MatchMode.ANYWHERE));
-        }
-        if (kind != null) {
-            query.add(AuditEntity.revisionType().eq(toType(kind)));
-        }
-        if (operationId != null) {
-            query.add(AuditEntity.revisionProperty("operacionId").eq(operationId));
-        }
-
-        PersistenceUnitUtil idUtil = entityManager.getEntityManagerFactory().getPersistenceUnitUtil();
-        return query.getResultList().stream()
-                .map(row -> {
-                    Object[] tuple = (Object[]) row;
-                    SigaRevision revision = (SigaRevision) tuple[1];
-                    RevisionType revisionType = (RevisionType) tuple[2];
-                    String recordId = tuple[0] == null
-                            ? null
-                            : String.valueOf(idUtil.getIdentifier(tuple[0]));
-                    return new RevisionMetadata(
-                            recordId,
-                            revision.getId(),
-                            revision.getFechaRevision(),
-                            revision.getUsuario(),
-                            toKind(revisionType),
-                            revision.getDescripcion(),
-                            revision.getOperacionId());
-                })
-                .toList();
-    }
-
     private <E, S> List<RevisionDto<S>> toRevisionDtos(List<?> results, Function<E, S> toSnapshot) {
         return results.stream()
                 .map(row -> {
@@ -134,14 +84,6 @@ public class RevisionReaderImpl implements RevisionReader {
             case ADD -> RevisionKind.CREATED;
             case MOD -> RevisionKind.MODIFIED;
             case DEL -> RevisionKind.DELETED;
-        };
-    }
-
-    private RevisionType toType(RevisionKind kind) {
-        return switch (kind) {
-            case CREATED -> RevisionType.ADD;
-            case MODIFIED -> RevisionType.MOD;
-            case DELETED -> RevisionType.DEL;
         };
     }
 }

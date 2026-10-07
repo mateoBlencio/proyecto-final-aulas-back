@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.auth.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.auth.dto.request.AssignRoleRequestDto;
 import ar.edu.utn.frc.siga.auth.dto.response.RoleAssignmentDto;
 import ar.edu.utn.frc.siga.auth.exception.RoleDomainException;
@@ -33,6 +34,7 @@ public class RoleAssignmentServiceImpl implements RoleAssignmentService {
 
     @Override
     @Transactional
+    @AuditOperation("Asignación de rol")
     public RoleAssignmentDto assign(Long userId, AssignRoleRequestDto dto, String currentUserEmail) {
         log.debug("Asignando rol: userId={}, role={}, scopeType={}, scopeId={}",
                 userId, dto.role(), dto.scopeType(), dto.scopeId());
@@ -55,6 +57,7 @@ public class RoleAssignmentServiceImpl implements RoleAssignmentService {
 
     @Override
     @Transactional
+    @AuditOperation("Revocación de rol")
     public void revoke(Long userId, Long assignmentId, String currentUserEmail) {
         log.debug("Revocando asignación: userId={}, assignmentId={}", userId, assignmentId);
 

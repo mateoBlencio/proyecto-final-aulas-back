@@ -7,8 +7,8 @@ import java.util.UUID;
  * Lo escribe {@code AuditOperationAspect} al entrar/salir de un método anotado y lo lee
  * {@link SigaRevisionListener} al sellar cada revisión de Envers.
  *
- * <p>No se propaga a hilos hijos: los cambios auditados dentro de un
- * {@code @ApplicationModuleListener} (otro hilo) quedan sin operación asociada.
+ * <p>The context is not propagated across threads: an async listener needs its own
+ * {@link AuditOperation}.
  */
 public final class AuditOperationContext {
 
