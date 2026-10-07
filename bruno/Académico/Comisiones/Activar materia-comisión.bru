@@ -1,0 +1,22 @@
+meta {
+  name: Activar materia-comisión
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{baseUrl}}/v1/subject-commissions/:subjectId/:commissionId/activation
+  body: none
+  auth: inherit
+}
+
+params:path {
+  subjectId: 1
+  commissionId: 1
+}
+
+docs {
+  PUT /v1/subject-commissions/{subjectId}/{commissionId}/activation. Rol: SUBSECRETARIA.
+  Reactiva un vínculo materia-comisión desactivado (idempotente). 204 si queda activo;
+  404 si el vínculo no existe.
+}

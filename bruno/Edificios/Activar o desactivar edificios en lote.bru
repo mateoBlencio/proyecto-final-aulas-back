@@ -1,0 +1,35 @@
+meta {
+  name: Activar o desactivar edificios en lote
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/v1/buildings/activation
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "buildings": [
+      { "id": 1, "active": false },
+      { "id": 2, "active": false },
+      { "id": 9, "active": false },
+      { "id": 10, "active": false },
+      { "id": 11, "active": false },
+      { "id": 14, "active": false },
+      { "id": 15, "active": false },
+      { "id": 16, "active": false },
+      { "id": 21, "active": false },
+      { "id": 25, "active": false },
+      { "id": 26, "active": false },
+      { "id": 27, "active": false },
+      { "id": 29, "active": false },
+      { "id": 30, "active": false },
+      { "id": 31, "active": false },
+      { "id": 32, "active": false }
+    ]
+  }
+  
+}

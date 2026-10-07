@@ -1,0 +1,15 @@
+meta {
+  name: Enviar mensaje a comisión (metadata)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{sysacadUrl}}/api/data/procedures/EnviarMensajeComision/metadata
+  body: none
+  auth: none
+}
+
+docs {
+  Devuelve la metadata (params y tipos) del procedimiento EnviarMensajeComision. Solo lectura.
+}

@@ -1,0 +1,11 @@
+meta {
+  name: Desactivar edificio
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/v1/buildings/1/activation
+  body: none
+  auth: inherit
+}
