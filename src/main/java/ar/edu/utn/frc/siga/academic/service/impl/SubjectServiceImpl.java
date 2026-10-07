@@ -19,7 +19,9 @@ import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -98,12 +100,20 @@ public class SubjectServiceImpl implements SubjectService {
         Map<Integer, Specialty> specialtyCache = new HashMap<>();
         int affected = 0;
 
-        for (SubjectSyncCommand command : commands) {
-            if (command.specialtyCode() == null || command.studyPlanCode() == null
-                    || command.subjectCode() == null || command.name() == null) {
-                log.warn("Materia de SysAcad ignorada por datos incompletos: especialidad={}, plan={}, materia={}",
-                        command.specialtyCode(), command.studyPlanCode(), command.subjectCode());
+        for (Map.Entry<SourceKey, List<SubjectSyncCommand>> entry : groupBySourceKey(commands).entrySet()) {
+            SourceKey sourceKey = entry.getKey();
+            List<SubjectSyncCommand> group = entry.getValue();
+            SubjectSyncCommand command = group.get(0);
+            if (hasConflictingVariants(group)) {
+                log.warn("Materia de SysAcad ignorada por variantes con datos distintos: especialidad={}, plan={}, materia={}, variantes={}",
+                        sourceKey.specialtyCode(), sourceKey.studyPlanCode(), sourceKey.subjectCode(),
+                        group.stream().map(c -> "[nombre=" + c.name() + ", dictado=" + c.term() + "]")
+                                .distinct().toList());
                 continue;
+            }
+            if (group.size() > 1) {
+                log.warn("Materia repetida en la misma corrida de SysAcad: especialidad={}, plan={}, materia={}, copias={}",
+                        sourceKey.specialtyCode(), sourceKey.studyPlanCode(), sourceKey.subjectCode(), group.size());
             }
             StudyPlanKey key = new StudyPlanKey(command.specialtyCode(), command.studyPlanCode());
             StudyPlan studyPlan = studyPlansByKey.computeIfAbsent(key,
@@ -113,23 +123,25 @@ public class SubjectServiceImpl implements SubjectService {
                             "StudyPlanResolver devolvió vacío con especialidad y plan no nulos"));
 
             String hash = Hashes.sha256Hex(command.name(), command.term());
-            Subject subject = existing.get(new SubjectKey(command.subjectCode(), studyPlan.getId()));
+            SubjectKey subjectKey = new SubjectKey(command.subjectCode(), studyPlan.getId());
+            Subject subject = existing.get(subjectKey);
 
             if (subject == null) {
-                subjectRepository.save(Subject.builder()
+                existing.put(subjectKey, subjectRepository.save(Subject.builder()
                         .code(command.subjectCode())
                         .name(command.name())
                         .term(command.term())
                         .studyPlan(studyPlan)
                         .syncedAt(syncedAt)
                         .sysacadHash(hash)
-                        .build());
+                        .build()));
                 affected++;
                 continue;
             }
-            if (hash.equals(subject.getSysacadHash())) {
+            if (hash.equals(subject.getSysacadHash()) && subject.isActive()) {
                 continue;
             }
+            subject.activate();
             subject.setName(command.name());
             subject.setTerm(command.term());
             subject.setSyncedAt(syncedAt);
@@ -139,6 +151,33 @@ public class SubjectServiceImpl implements SubjectService {
         }
 
         return affected;
+    }
+
+    // Groups valid commands by (specialty, plan, subject); resolve(specialty, plan) is injective on the
+    // study plan, so this key is equivalent to the matching key (subject code, plan id) without
+    // creating plans for groups that end up ignored.
+    private static Map<SourceKey, List<SubjectSyncCommand>> groupBySourceKey(List<SubjectSyncCommand> commands) {
+        Map<SourceKey, List<SubjectSyncCommand>> groups = new LinkedHashMap<>();
+        for (SubjectSyncCommand command : commands) {
+            if (command.specialtyCode() == null || command.studyPlanCode() == null
+                    || command.subjectCode() == null || command.name() == null) {
+                log.warn("Materia de SysAcad ignorada por datos incompletos: especialidad={}, plan={}, materia={}",
+                        command.specialtyCode(), command.studyPlanCode(), command.subjectCode());
+                continue;
+            }
+            groups.computeIfAbsent(
+                            new SourceKey(command.specialtyCode(), command.studyPlanCode(), command.subjectCode()),
+                            k -> new ArrayList<>())
+                    .add(command);
+        }
+        return groups;
+    }
+
+    private static boolean hasConflictingVariants(List<SubjectSyncCommand> group) {
+        return group.stream().map(c -> Hashes.sha256Hex(c.name(), c.term())).distinct().count() > 1;
+    }
+
+    private record SourceKey(Integer specialtyCode, Integer studyPlanCode, Integer subjectCode) {
     }
 
     private record StudyPlanKey(Integer specialtyCode, Integer planCode) {
