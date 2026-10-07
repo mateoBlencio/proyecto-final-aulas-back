@@ -80,12 +80,12 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
 
     @Override
     public List<SysacadSubjectCommissionDto> findSubjectCommissions() {
-        return schedulesRaw.get().stream().map(mapper::toSubjectCommission).toList();
+        return schedulesRaw.get().stream().map(mapper::toSubjectCommission).filter(Objects::nonNull).toList();
     }
 
     @Override
     public List<SysacadCommissionDto> findCommissions() {
-        return commissionsRaw.get().stream().map(mapper::toCommission).toList();
+        return commissionsRaw.get().stream().map(mapper::toCommission).filter(Objects::nonNull).toList();
     }
 
     @Override

@@ -1,7 +1,12 @@
 package ar.edu.utn.frc.siga.sysacad.internal.service.impl;
 
 import ar.edu.utn.frc.siga.common.util.Lazy;
+import ar.edu.utn.frc.siga.sysacad.api.SysacadAcademicEventDto;
+import ar.edu.utn.frc.siga.sysacad.api.SysacadAllocationDto;
+import ar.edu.utn.frc.siga.sysacad.api.SysacadCommissionDto;
+import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectCommissionDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectDto;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawCommission;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSubject;
 import ar.edu.utn.frc.siga.sysacad.internal.mapper.SysacadCatalogMapper;
@@ -147,5 +152,51 @@ class SysacadCatalogSnapshotTest {
         snapshot.findAllocations();
 
         assertThat(scheduleReads).hasValue(1);
+    }
+
+    private static RawSchedule scheduleWithCourse(String course) {
+        return new RawSchedule(course, 90, 805, 15, "Edif. Ing.Possetto",
+                2, 0, "A", "A",
+                "10:30", "12:45", "10:30-12:45", 135,
+                17, "Ingeniería en Sistemas de Información", 94, 519, "Sistemas de Representación", 30);
+    }
+
+    @Test
+    @DisplayName("findCommissions: las filas con código de curso inválido no aparecen y las demás se normalizan")
+    void findCommissionsFiltraCodigosInvalidos() {
+        SysacadCatalogSnapshot snapshot = new SysacadCatalogSnapshot(
+                Lazy.of(List::of), Lazy.of(List::of), Lazy.of(List::of),
+                Lazy.of(() -> List.of(
+                        new RawCommission("...", 17, 94, 519, 2026, 10),
+                        new RawCommission(null, 17, 94, 519, 2026, 10),
+                        new RawCommission("5D1.", 17, 94, 519, 2026, 10))),
+                Lazy.of(List::of), Lazy.of(List::of), mapper);
+
+        assertThat(snapshot.findCommissions())
+                .containsExactly(new SysacadCommissionDto("5D1", 17, 94, 519, 2026, 10));
+    }
+
+    @Test
+    @DisplayName("findSubjectCommissions: las filas con código de curso inválido no aparecen y las demás se normalizan")
+    void findSubjectCommissionsFiltraCodigosInvalidos() {
+        List<SysacadSubjectCommissionDto> result = snapshot(
+                List.of(),
+                List.of(scheduleWithCourse("..."), scheduleWithCourse(null), scheduleWithCourse("5D1."))
+        ).findSubjectCommissions();
+
+        assertThat(result).containsExactly(new SysacadSubjectCommissionDto("5D1", 519, 30));
+    }
+
+    @Test
+    @DisplayName("findAcademicEvents y findAllocations: las filas con código de curso inválido no aparecen")
+    void findEventsYAllocationsFiltranCodigosInvalidos() {
+        SysacadCatalogSnapshot snapshot = snapshot(
+                List.of(),
+                List.of(scheduleWithCourse("..."), scheduleWithCourse(null), scheduleWithCourse("5D1.")));
+
+        assertThat(snapshot.findAcademicEvents()).extracting(SysacadAcademicEventDto::courseCode)
+                .containsExactly("5D1");
+        assertThat(snapshot.findAllocations()).extracting(SysacadAllocationDto::courseCode)
+                .containsExactly("5D1");
     }
 }

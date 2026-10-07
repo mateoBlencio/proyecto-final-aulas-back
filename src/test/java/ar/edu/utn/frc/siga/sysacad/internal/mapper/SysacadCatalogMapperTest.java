@@ -18,6 +18,10 @@ import java.time.DayOfWeek;
 import java.time.LocalTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -184,5 +188,120 @@ class SysacadCatalogMapperTest {
                 5, "Ingeniería en Sistemas de Información", 2008, 115, "Sistemas de Representación", 30));
 
         assertThat(subjectCommission).isEqualTo(new SysacadSubjectCommissionDto("1H90SR", 115, 30));
+    }
+
+    private static RawSchedule scheduleWithCourse(String course) {
+        return new RawSchedule(course, 90, 805, 15, "Edif. X", 2, 0, "A", "A",
+                "10:30", "12:45", "10:30-12:45", 135, 5, "Especialidad", 2008, 115, "Materia", 30);
+    }
+
+    @ParameterizedTest(name = "[{index}] \"{0}\" -> {1}")
+    @DisplayName("normalizeCourseCode: quita caracteres inválidos y pasa a mayúsculas")
+    @CsvSource(delimiter = '|', quoteCharacter = '\'', value = {
+            "5D1.|5D1",
+            "' 3k1 '|3K1",
+            "EIG-VW|EIG-VW",
+            "5d1|5D1",
+            "'5 D 1'|5D1",
+            "5D1/|5D1",
+            "-|-"})
+    void normalizaCodigoDeCurso(String raw, String expected) {
+        assertThat(SysacadCatalogMapper.normalizeCourseCode(raw)).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @DisplayName("normalizeCourseCode: vacío tras normalizar devuelve null")
+    @ValueSource(strings = {"...", "", "   ", "./ ."})
+    @NullSource
+    void codigoDeCursoVacioEsNull(String raw) {
+        assertThat(SysacadCatalogMapper.normalizeCourseCode(raw)).isNull();
+    }
+
+    @Test
+    @DisplayName("toCommission: normaliza '5D1.' a '5D1' y ' 3k1 ' a '3K1'")
+    void toCommissionNormalizaCodigo() {
+        assertThat(mapper.toCommission(new RawCommission("5D1.", 17, 94, 519, 2026, 10)).courseCode())
+                .isEqualTo("5D1");
+        assertThat(mapper.toCommission(new RawCommission(" 3k1 ", 17, 94, 519, 2026, 10)).courseCode())
+                .isEqualTo("3K1");
+        assertThat(mapper.toCommission(new RawCommission("EIG-VW", 17, 94, 519, 2026, 10)).courseCode())
+                .isEqualTo("EIG-VW");
+    }
+
+    @Test
+    @DisplayName("toCommission: curso '...' o null devuelve null (fila salteada)")
+    void toCommissionSaltea() {
+        assertThat(mapper.toCommission(new RawCommission("...", 17, 94, 519, 2026, 10))).isNull();
+        assertThat(mapper.toCommission(new RawCommission(null, 17, 94, 519, 2026, 10))).isNull();
+    }
+
+    @Test
+    @DisplayName("toSubjectCommission: normaliza el curso y saltea '...' o null")
+    void toSubjectCommissionNormalizaYSaltea() {
+        assertThat(mapper.toSubjectCommission(scheduleWithCourse("5D1.")).courseCode()).isEqualTo("5D1");
+        assertThat(mapper.toSubjectCommission(scheduleWithCourse(" 3k1 ")).courseCode()).isEqualTo("3K1");
+        assertThat(mapper.toSubjectCommission(scheduleWithCourse("EIG-VW")).courseCode()).isEqualTo("EIG-VW");
+        assertThat(mapper.toSubjectCommission(scheduleWithCourse("..."))).isNull();
+        assertThat(mapper.toSubjectCommission(scheduleWithCourse(null))).isNull();
+    }
+
+    @Test
+    @DisplayName("toAcademicEvent: normaliza el curso y saltea '...' o null")
+    void toAcademicEventNormalizaYSaltea() {
+        assertThat(mapper.toAcademicEvent(scheduleWithCourse("5D1.")).courseCode()).isEqualTo("5D1");
+        assertThat(mapper.toAcademicEvent(scheduleWithCourse(" 3k1 ")).courseCode()).isEqualTo("3K1");
+        assertThat(mapper.toAcademicEvent(scheduleWithCourse("EIG-VW")).courseCode()).isEqualTo("EIG-VW");
+        assertThat(mapper.toAcademicEvent(scheduleWithCourse("..."))).isNull();
+        assertThat(mapper.toAcademicEvent(scheduleWithCourse(null))).isNull();
+    }
+
+    @Test
+    @DisplayName("toAllocation: normaliza el curso y saltea '...' o null")
+    void toAllocationNormalizaYSaltea() {
+        assertThat(mapper.toAllocation(scheduleWithCourse("5D1.")).courseCode()).isEqualTo("5D1");
+        assertThat(mapper.toAllocation(scheduleWithCourse(" 3k1 ")).courseCode()).isEqualTo("3K1");
+        assertThat(mapper.toAllocation(scheduleWithCourse("EIG-VW")).courseCode()).isEqualTo("EIG-VW");
+        assertThat(mapper.toAllocation(scheduleWithCourse("..."))).isNull();
+        assertThat(mapper.toAllocation(scheduleWithCourse(null))).isNull();
+    }
+
+    @ParameterizedTest(name = "[{index}] \"{0}\" -> \"{1}\"")
+    @DisplayName("cleanText: recorta bordes y colapsa espacios, tabs y saltos internos")
+    @CsvSource(delimiter = '|', quoteCharacter = '\'', value = {
+            "'Edif.  Central'|Edif. Central",
+            "'Edif.\t\tCentral'|Edif. Central",
+            "'Edif. \t Central'|Edif. Central",
+            "'  Edif. Central  '|Edif. Central",
+            "'\tEdif. Central\t'|Edif. Central",
+            "'Edif.\nCentral'|Edif. Central",
+            "Edif. Central|Edif. Central"})
+    void limpiaTexto(String raw, String expected) {
+        assertThat(SysacadCatalogMapper.cleanText(raw)).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("cleanText: null queda null y solo espacios queda vacío")
+    void limpiaTextoNuloYVacio() {
+        assertThat(SysacadCatalogMapper.cleanText(null)).isNull();
+        assertThat(SysacadCatalogMapper.cleanText("  \t ")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("cleanText: no toca la puntuación ('Ing. Sist. Inf.' queda intacto)")
+    void limpiaTextoConservaPuntuacion() {
+        assertThat(SysacadCatalogMapper.cleanText("Ing. Sist. Inf.")).isEqualTo("Ing. Sist. Inf.");
+    }
+
+    @Test
+    @DisplayName("toBuilding, toSpecialty y toSubject: colapsan espacios internos repetidos")
+    void colapsaEspaciosEnTextosMapeados() {
+        assertThat(mapper.toBuilding(new RawBuilding(2, "Edif.   Central  ")).name()).isEqualTo("Edif. Central");
+
+        SysacadSpecialtyDto specialty = mapper.toSpecialty(new RawSpecialty(5, " Ing.  en   Sistemas ", "Ing.  Sist. Inf."));
+        assertThat(specialty.name()).isEqualTo("Ing. en Sistemas");
+        assertThat(specialty.abbreviation()).isEqualTo("Ing. Sist. Inf.");
+
+        assertThat(mapper.toSubject(new RawSubject(17, 94, 519, " Análisis\t Matemático   I "), null).name())
+                .isEqualTo("Análisis Matemático I");
     }
 }
