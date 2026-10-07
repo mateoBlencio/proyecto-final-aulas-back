@@ -1,0 +1,21 @@
+meta {
+  name: Activar período académico
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/v1/academic-periods/:id/activation
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: 1
+}
+
+docs {
+  PUT /v1/academic-periods/{id}/activation. Rol: SUBSECRETARIA.
+  Reactiva un período académico desactivado (idempotente). 204 si queda activo;
+  404 si el período no existe.
+}
