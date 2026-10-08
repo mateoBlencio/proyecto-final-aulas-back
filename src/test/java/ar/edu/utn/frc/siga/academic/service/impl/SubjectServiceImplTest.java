@@ -31,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -226,7 +227,113 @@ class SubjectServiceImplTest {
                 List.of(new SubjectSyncCommand(17, 94, 519, "Análisis Matemático I", "C")));
 
         verify(subjectRepository, never()).save(any());
+        assertThat(existing.getDeletedAt()).isNull();
         assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("syncSubjects: dos comandos idénticos en la misma corrida insertan una sola vez")
+    void syncSubjectsInsertsDuplicatedCommandOnce() {
+        StudyPlan syncStudyPlan = syncStudyPlan();
+        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any(), any())).thenReturn(Optional.of(syncStudyPlan));
+        when(subjectRepository.findAll()).thenReturn(List.of());
+        when(subjectRepository.save(any(Subject.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        SubjectSyncCommand command = new SubjectSyncCommand(17, 94, 519, "Análisis Matemático I", "C");
+
+        int affected = service.syncSubjects(List.of(command, command));
+
+        verify(subjectRepository, times(1)).save(any(Subject.class));
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("syncSubjects: clave repetida con datos distintos se ignora completa, sin resolver el plan ni escribir")
+    void syncSubjectsIgnoresKeyWithConflictingVariants() {
+        when(subjectRepository.findAll()).thenReturn(List.of());
+
+        int affected = service.syncSubjects(List.of(
+                new SubjectSyncCommand(17, 94, 519, "Analisis I", "A"),
+                new SubjectSyncCommand(17, 94, 519, "Análisis Matemático I", "C")));
+
+        verify(subjectRepository, never()).save(any());
+        verify(studyPlanResolver, never()).findOrCreate(any(), any(), any(), any());
+        assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("syncSubjects: variantes distintas sobre una materia existente la dejan sin cambios")
+    void syncSubjectsLeavesExistingSubjectUntouchedOnConflictingVariants() {
+        StudyPlan syncStudyPlan = syncStudyPlan();
+        Subject existing = Subject.builder().id(1L).code(519).name("Original").term("A").studyPlan(syncStudyPlan)
+                .sysacadHash(Hashes.sha256Hex("Original", "A")).build();
+        when(subjectRepository.findAll()).thenReturn(List.of(existing));
+
+        int affected = service.syncSubjects(List.of(
+                new SubjectSyncCommand(17, 94, 519, "Variante 1", "A"),
+                new SubjectSyncCommand(17, 94, 519, "Variante 2", "A")));
+
+        verify(subjectRepository, never()).save(any());
+        assertThat(existing.getName()).isEqualTo("Original");
+        assertThat(existing.getSysacadHash()).isEqualTo(Hashes.sha256Hex("Original", "A"));
+        assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("syncSubjects: variantes distintas sobre una materia dada de baja no la reactivan")
+    void syncSubjectsDoesNotReactivateSoftDeletedSubjectOnConflictingVariants() {
+        StudyPlan syncStudyPlan = syncStudyPlan();
+        Subject existing = Subject.builder().id(1L).code(519).name("Original").term("A").studyPlan(syncStudyPlan)
+                .sysacadHash(Hashes.sha256Hex("Original", "A")).build();
+        existing.deactivate();
+        when(subjectRepository.findAll()).thenReturn(List.of(existing));
+
+        int affected = service.syncSubjects(List.of(
+                new SubjectSyncCommand(17, 94, 519, "Original", "A"),
+                new SubjectSyncCommand(17, 94, 519, "Otro", "A")));
+
+        verify(subjectRepository, never()).save(any());
+        assertThat(existing.getDeletedAt()).isNotNull();
+        assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("syncSubjects: en una corrida mixta procesa la clave con copias idénticas y la normal, e ignora la conflictiva")
+    void syncSubjectsProcessesOnlyNonConflictingKeysInMixedRun() {
+        StudyPlan syncStudyPlan = syncStudyPlan();
+        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any(), any())).thenReturn(Optional.of(syncStudyPlan));
+        when(subjectRepository.findAll()).thenReturn(List.of());
+        when(subjectRepository.save(any(Subject.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        SubjectSyncCommand identical = new SubjectSyncCommand(17, 94, 520, "Física I", "A");
+
+        int affected = service.syncSubjects(List.of(
+                new SubjectSyncCommand(17, 94, 519, "Conflicto 1", "A"),
+                identical,
+                new SubjectSyncCommand(17, 94, 521, "Química", "C"),
+                new SubjectSyncCommand(17, 94, 519, "Conflicto 2", "A"),
+                identical));
+
+        ArgumentCaptor<Subject> saved = ArgumentCaptor.forClass(Subject.class);
+        verify(subjectRepository, times(2)).save(saved.capture());
+        assertThat(saved.getAllValues()).extracting(Subject::getCode).containsExactlyInAnyOrder(520, 521);
+        assertThat(affected).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("syncSubjects: reactiva la materia dada de baja aunque el hash no cambió y la cuenta como afectada")
+    void syncSubjectsReactivatesSoftDeletedSubjectWithSameHash() {
+        StudyPlan syncStudyPlan = syncStudyPlan();
+        Subject existing = Subject.builder().id(1L).code(519).name("Análisis Matemático I").term("C")
+                .studyPlan(syncStudyPlan).sysacadHash(Hashes.sha256Hex("Análisis Matemático I", "C")).build();
+        existing.deactivate();
+        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any(), any())).thenReturn(Optional.of(syncStudyPlan));
+        when(subjectRepository.findAll()).thenReturn(List.of(existing));
+
+        int affected = service.syncSubjects(
+                List.of(new SubjectSyncCommand(17, 94, 519, "Análisis Matemático I", "C")));
+
+        assertThat(existing.getDeletedAt()).isNull();
+        verify(subjectRepository).save(existing);
+        assertThat(affected).isEqualTo(1);
     }
 
     @Test

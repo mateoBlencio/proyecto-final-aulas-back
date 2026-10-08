@@ -1,0 +1,34 @@
+meta {
+  name: Enviar mensaje a comisión
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{sysacadUrl}}/api/data/procedures/EnviarMensajeComision
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "params": {
+      "@LegajoPublica": 89765,
+      "@IdTipoUsuarioPublica": "",
+      "@FechaHasta": "2026-11-01",
+      "@AnioAcademico": 2026,
+      "@Especialidad": "COMPLETAR",
+      "@Plan": "COMPLETAR",
+      "@Materia": "COMPLETAR",
+      "@Comision": 1791393916949,
+      "@Nota": "Prueba funcionamiento API"
+    }
+  }
+}
+
+docs {
+  ADVERTENCIA: ESCRIBE EN SYSACAD PRODUCTIVO. No se ejecuta para probar.
+  Ejecuta el procedimiento EnviarMensajeComision. Tipos: @LegajoPublica INT,
+  @IdTipoUsuarioPublica VARCHAR(10), @FechaHasta DATE, @AnioAcademico INT,
+  @Especialidad INT, @Plan INT, @Materia INT, @Comision INT, @Nota VARCHAR(150).
+}

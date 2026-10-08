@@ -11,8 +11,10 @@ import ar.edu.utn.frc.siga.academic.specification.SpecialtySpecification;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -57,6 +59,7 @@ public class SpecialtyServiceImpl implements SpecialtyService {
         Instant syncedAt = Instant.now();
         Map<Integer, Specialty> existing = specialtyRepository.findAll().stream()
                 .collect(Collectors.toMap(Specialty::getSpecialtyCode, Function.identity()));
+        Set<Integer> seen = new HashSet<>();
         int affected = 0;
 
         for (SpecialtySyncCommand command : commands) {
@@ -64,17 +67,21 @@ public class SpecialtyServiceImpl implements SpecialtyService {
                 log.warn("Especialidad de SysAcad ignorada por clave vacía: nombre={}", command.name());
                 continue;
             }
+            if (!seen.add(command.specialtyCode())) {
+                log.warn("Especialidad repetida en la misma corrida de SysAcad: especialidad={}",
+                        command.specialtyCode());
+            }
             String hash = Hashes.sha256Hex(command.name(), command.abbreviation());
             Specialty specialty = existing.get(command.specialtyCode());
 
             if (specialty == null) {
-                specialtyRepository.save(Specialty.builder()
+                existing.put(command.specialtyCode(), specialtyRepository.save(Specialty.builder()
                         .specialtyCode(command.specialtyCode())
                         .name(command.name())
                         .abbreviation(command.abbreviation())
                         .syncedAt(syncedAt)
                         .sysacadHash(hash)
-                        .build());
+                        .build()));
                 affected++;
                 continue;
             }

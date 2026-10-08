@@ -23,6 +23,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -75,6 +76,19 @@ class SpecialtyServiceImplTest {
         assertThat(inserted.getSyncedAt()).isNotNull();
         assertThat(inserted.getSysacadHash())
                 .isEqualTo(Hashes.sha256Hex("Ingeniería en Sistemas de Información", "Ing. Sist. Inf."));
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("syncSpecialties: código repetido en la misma corrida inserta una sola vez")
+    void syncSpecialtiesInsertsDuplicatedCodeOnce() {
+        when(specialtyRepository.findAll()).thenReturn(List.of());
+        when(specialtyRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        SpecialtySyncCommand command = new SpecialtySyncCommand(5, "Sistemas", "Sist.");
+
+        int affected = service.syncSpecialties(List.of(command, command));
+
+        verify(specialtyRepository, times(1)).save(any(Specialty.class));
         assertThat(affected).isEqualTo(1);
     }
 

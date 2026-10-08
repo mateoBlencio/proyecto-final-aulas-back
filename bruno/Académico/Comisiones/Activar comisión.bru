@@ -1,0 +1,21 @@
+meta {
+  name: Activar comisión
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/v1/commissions/:id/activation
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: 1
+}
+
+docs {
+  PUT /v1/commissions/{id}/activation. Rol: SUBSECRETARIA.
+  Reactiva una comisión desactivada (idempotente). 204 si queda activa;
+  404 si la comisión no existe.
+}
