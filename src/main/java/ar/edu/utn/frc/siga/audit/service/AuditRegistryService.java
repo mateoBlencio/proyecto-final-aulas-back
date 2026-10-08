@@ -24,6 +24,13 @@ public interface AuditRegistryService {
     Page<AuditLogEntryDto> findRevisionItems(int revision, AuditLogFilter filter, Pageable pageable);
 
     /**
+     * Changes of one record across all its revisions, with per-field diff, revision descending.
+     * 400 if the entity type is unknown or {@code recordId} cannot be converted to the entity's id type;
+     * empty page if the record has no revisions.
+     */
+    Page<AuditLogEntryDto> findEntityHistory(String entityType, String recordId, Pageable pageable);
+
+    /**
      * Operations of the causal chain that contains {@code operationId} (ancestors and descendants), cause first.
      * Capped at 200 operations; {@code truncated} flags an incomplete chain. Empty if the id does not exist.
      */

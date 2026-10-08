@@ -69,6 +69,15 @@ public class AuditRegistryServiceImpl implements AuditRegistryService {
 
     @Override
     @Transactional(readOnly = true)
+    public Page<AuditLogEntryDto> findEntityHistory(String entityType, String recordId, Pageable pageable) {
+        AuditedEntity entity = registry.byLabel(entityType)
+                .orElseThrow(() -> new InvalidSelectionException("Tipo de entidad desconocido: '" + entityType + "'"));
+        AuditLogCriteria criteria = new AuditLogCriteria(null, null, null, null, List.of(entity), null, null);
+        return findItems(criteria, ChangeScope.ofRecord(entity, recordId), pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public AuditOperationChainDto findOperationChain(String operationId) {
         AuditChainRows chain = repository.findOperationChain(operationId);
         List<AuditLogEntryDto> entries = chain.rows().stream()

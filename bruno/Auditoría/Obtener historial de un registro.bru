@@ -1,0 +1,34 @@
+meta {
+  name: Obtener historial de un registro
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/v1/audit/entities/:entityType/:recordId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  entityType: Ocurrencia
+  recordId: 1
+}
+
+params:query {
+  ~page: 0
+  ~size: 20
+}
+
+docs {
+  Cambios (type=CHANGE) de un único registro a lo largo de todas sus revisiones,
+  con el diff por campo en 'changes', paginados y ordenados por revisión descendente.
+
+  entityType es una etiqueta de GET /v1/audit/entity-types tal cual, sin slug. Si
+  tiene espacios o acentos, el cliente la codifica en la URL (Bruno lo hace solo;
+  a mano: Asignaci%C3%B3n%20de%20rol). recordId es el id del registro.
+
+  Página vacía si el registro no tiene revisiones. 400 si entityType es desconocido
+  o si recordId no tiene el formato del id de la entidad (texto para un id numérico).
+  Los ids String que contengan '/' no se pueden consultar por esta ruta.
+}
