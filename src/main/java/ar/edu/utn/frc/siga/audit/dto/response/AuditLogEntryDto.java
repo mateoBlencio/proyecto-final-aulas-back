@@ -21,6 +21,8 @@ import java.util.List;
  *       {@code GET /v1/audit/revisions/{revision}}. {@code operationId}, {@code entityType} and
  *       {@code recordId} are null.</li>
  * </ul>
+ * {@code parentOperationId} (only {@code OPERATION}) is the operation that caused this one; the chain is fetched with
+ * {@code GET /v1/audit/operations/{operationId}/chain}.
  * {@code actorType} indicates whether a person ({@code HUMAN}) or a system process ({@code SYSTEM}) made
  * the change; a null {@code user} with {@code HUMAN} is a request from the public form.
  * {@code changes} is the field-level diff of a {@code CHANGE}. It is only filled in the items of
@@ -41,6 +43,9 @@ public record AuditLogEntryDto(
         String entityType,
         String recordId,
         String operationId,
+        @Schema(description = "Id de la operación que causó esta (solo OPERATION). Null si no tiene causa. "
+                + "Puede apuntar a una operación sin filas visibles con los filtros activos.")
+        String parentOperationId,
         Integer recordCount,
         List<String> entityTypes,
         @Schema(description = "Diff por campo de un CHANGE. Null en el listado principal y en OPERATION/TRANSACTION. "

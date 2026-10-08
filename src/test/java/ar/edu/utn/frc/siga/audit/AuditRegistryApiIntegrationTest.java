@@ -5,6 +5,8 @@ import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.audit.service.AuditedEntity;
 import ar.edu.utn.frc.siga.audit.service.AuditedEntityRegistry;
+import ar.edu.utn.frc.siga.allocation.dto.request.AllocationBatchRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.AllocationItemRequestDto;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.model.RecurringEvent;
@@ -44,6 +46,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.blankOrNullString;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.everyItem;
@@ -1010,5 +1013,165 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(changeSummary(created)).anyMatch(c -> c.startsWith("email:null:"));
         JsonNode modified = ofType(revisionItems(modification), "Usuario");
         assertThat(changeSummary(modified)).containsExactly("enabled:true:false");
+    }
+
+    /** Operation ids of the release flow: the parent (release) and the child (listener thread). */
+    private record ReleaseChain(String parentId, String childId) {
+    }
+
+    /** Allocates an occurrence, releases it through the API and waits for the async listener to delete the allocation. */
+    private ReleaseChain releaseAllocatedOccurrence(int daysAhead) throws Exception {
+        var sc = testData.materiaYComision();
+        LocalDate date = LocalDate.now().plusDays(daysAhead);
+        var eventDto = new CreateRecurringEventRequestDto(
+                30, LocalTime.of(8, 0), 90, date.getDayOfWeek(), date, date, sc.subjectId(), sc.commissionId());
+        Long eventId = asFixtureUser(() -> academicEventService.createRecurringEvent(eventDto)).id();
+        Long occurrenceId = occurrenceRepository.findByEvent_Id(eventId).getFirst().getId();
+        Long classroomId = testData.aula(testData.edificio()).getId();
+        var body = new AllocationBatchRequestDto(
+                List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, null, null, classroomId)), null);
+        MvcResult created = mockMvc.perform(post("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long allocationId = objectMapper.readTree(created.getResponse().getContentAsString()).get(0).get("id").asLong();
+
+        mockMvc.perform(post("/v1/events/occurrences/{id}/release", occurrenceId)).andExpect(status().is2xxSuccessful());
+
+        String childSql = "SELECT r.operacion_id FROM revinfo r JOIN asignacion_aula_aud a ON a.rev = r.rev "
+                + "WHERE a.id_asignacion = ? AND a.revtype = 2";
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() ->
+                assertThat(jdbcTemplate.queryForList(childSql, String.class, allocationId)).hasSize(1));
+        String childId = jdbcTemplate.queryForObject(childSql, String.class, allocationId);
+        String parentId = jdbcTemplate.queryForObject(
+                "SELECT r.operacion_id FROM revinfo r JOIN ocurrencia_aud o ON o.rev = r.rev "
+                        + "WHERE o.id_ocurrencia = ? AND o.revtype = 1 AND r.descripcion = 'Liberación de ocurrencia'",
+                String.class, occurrenceId);
+        return new ReleaseChain(parentId, childId);
+    }
+
+    private void assertReleaseChain(JsonNode chain, ReleaseChain ids) {
+        assertThat(chain.get("truncated").asBoolean()).isFalse();
+        JsonNode entries = chain.get("entries");
+        assertThat(entries).hasSize(2);
+        assertThat(entries.get(0).get("operationId").asText()).isEqualTo(ids.parentId());
+        assertThat(entries.get(0).get("type").asText()).isEqualTo("OPERATION");
+        assertThat(isAbsent(entries.get(0).get("parentOperationId"))).isTrue();
+        assertThat(entries.get(0).get("actorType").asText()).isEqualTo("HUMAN");
+        assertThat(entries.get(1).get("operationId").asText()).isEqualTo(ids.childId());
+        assertThat(entries.get(1).get("parentOperationId").asText()).isEqualTo(ids.parentId());
+        assertThat(entries.get(1).get("actorType").asText()).isEqualTo("SYSTEM");
+        assertThat(entries.get(0).get("revision").asInt()).isLessThan(entries.get(1).get("revision").asInt());
+    }
+
+    @Test
+    @DisplayName("la cadena pedida desde el hijo devuelve padre e hijo, padre primero")
+    void chainFromChildReturnsParentThenChild() throws Exception {
+        ReleaseChain ids = releaseAllocatedOccurrence(61);
+
+        assertReleaseChain(json(mockMvc, get("/v1/audit/operations/{id}/chain", ids.childId())), ids);
+    }
+
+    @Test
+    @DisplayName("la cadena pedida desde el padre devuelve las mismas entradas que desde el hijo")
+    void chainFromParentEqualsChainFromChild() throws Exception {
+        ReleaseChain ids = releaseAllocatedOccurrence(62);
+
+        JsonNode fromParent = json(mockMvc, get("/v1/audit/operations/{id}/chain", ids.parentId()));
+        JsonNode fromChild = json(mockMvc, get("/v1/audit/operations/{id}/chain", ids.childId()));
+
+        assertReleaseChain(fromParent, ids);
+        assertThat(fromParent).isEqualTo(fromChild);
+    }
+
+    @Test
+    @DisplayName("la entrada OPERATION del hijo en el listado trae parentOperationId y la del padre no")
+    void listingShowsParentOperationId() throws Exception {
+        ReleaseChain ids = releaseAllocatedOccurrence(63);
+
+        JsonNode page = json(mockMvc, get("/v1/audit").param("size", "200"));
+
+        assertThat(operationEntry(page, ids.childId()).get("parentOperationId").asText()).isEqualTo(ids.parentId());
+        assertThat(isAbsent(operationEntry(page, ids.parentId()).get("parentOperationId"))).isTrue();
+    }
+
+    @Test
+    @DisplayName("la cadena de un id inexistente responde 200 con entries vacío y truncated false")
+    void chainOfUnknownIdIsEmpty() throws Exception {
+        mockMvc.perform(get("/v1/audit/operations/{id}/chain", "no-existe"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries").isEmpty())
+                .andExpect(jsonPath("$.truncated").value(false));
+    }
+
+    @Test
+    @DisplayName("la cadena sin PERM_AUDIT_READ responde 403")
+    void chainForbiddenWithoutAuditPermission() throws Exception {
+        MockMvc auxMockMvc = mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
+
+        auxMockMvc.perform(get("/v1/audit/operations/{id}/chain", "x")).andExpect(status().isForbidden());
+    }
+
+    /** Inserts one revision plus one audit row for {@code operationId}; returns the revision to delete later. */
+    private int insertOperation(String operationId, String parentId) {
+        Integer rev = jdbcTemplate.queryForObject(
+                "INSERT INTO revinfo (fecha_revision, usuario, tipo_actor, descripcion, operacion_id, operacion_padre_id) "
+                        + "VALUES (now(), 'chain-test', 'SYSTEM', 'Cadena de prueba', ?, ?) RETURNING rev",
+                Integer.class, operationId, parentId);
+        jdbcTemplate.update("INSERT INTO configuracion_aud (clave, rev, revtype, valor) VALUES (?, ?, 1, 'x')",
+                "chain-test-" + java.util.UUID.randomUUID(), rev);
+        return rev;
+    }
+
+    private void deleteRevisions(List<Integer> revisions) {
+        revisions.forEach(rev -> {
+            jdbcTemplate.update("DELETE FROM configuracion_aud WHERE rev = ?", rev);
+            jdbcTemplate.update("DELETE FROM revinfo WHERE rev = ?", rev);
+        });
+    }
+
+    @Test
+    @DisplayName("una cadena de más de 10 niveles responde truncated true")
+    void chainDeeperThanTenLevelsIsTruncated() throws Exception {
+        List<Integer> revisions = new ArrayList<>();
+        try {
+            String previous = null;
+            String root = null;
+            for (int i = 0; i < 13; i++) {
+                String id = java.util.UUID.randomUUID().toString();
+                revisions.add(insertOperation(id, previous));
+                root = root == null ? id : root;
+                previous = id;
+            }
+
+            JsonNode chain = json(mockMvc, get("/v1/audit/operations/{id}/chain", root));
+
+            assertThat(chain.get("truncated").asBoolean()).isTrue();
+            assertThat(chain.get("entries")).hasSize(11);
+        } finally {
+            deleteRevisions(revisions);
+        }
+    }
+
+    @Test
+    @DisplayName("una raíz con más de 200 hijos responde 200 entradas y truncated true")
+    void rootWithMoreThanTwoHundredChildrenIsTruncated() throws Exception {
+        List<Integer> revisions = new ArrayList<>();
+        try {
+            String root = java.util.UUID.randomUUID().toString();
+            revisions.add(insertOperation(root, null));
+            for (int i = 0; i < 201; i++) {
+                revisions.add(insertOperation(java.util.UUID.randomUUID().toString(), root));
+            }
+
+            JsonNode chain = json(mockMvc, get("/v1/audit/operations/{id}/chain", root));
+
+            assertThat(chain.get("truncated").asBoolean()).isTrue();
+            assertThat(chain.get("entries")).hasSize(200);
+            assertThat(chain.get("entries").get(0).get("operationId").asText()).isEqualTo(root);
+        } finally {
+            deleteRevisions(revisions);
+        }
     }
 }

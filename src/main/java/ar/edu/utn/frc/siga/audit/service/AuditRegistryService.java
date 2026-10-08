@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.audit.service;
 
 import ar.edu.utn.frc.siga.audit.dto.AuditLogFilter;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditLogEntryDto;
+import ar.edu.utn.frc.siga.audit.dto.response.AuditOperationChainDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -21,6 +22,12 @@ public interface AuditRegistryService {
 
     /** Individual changes of an Envers revision (one transaction), with optional filters. */
     Page<AuditLogEntryDto> findRevisionItems(int revision, AuditLogFilter filter, Pageable pageable);
+
+    /**
+     * Operations of the causal chain that contains {@code operationId} (ancestors and descendants), cause first.
+     * Capped at 200 operations; {@code truncated} flags an incomplete chain. Empty if the id does not exist.
+     */
+    AuditOperationChainDto findOperationChain(String operationId);
 
     /** Etiquetas de dominio de las entidades auditadas, en el mismo orden del registry. */
     List<String> findEntityTypes();

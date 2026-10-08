@@ -13,6 +13,7 @@ import java.util.List;
  */
 public record AuditGroupRow(
         String operationId,
+        String parentOperationId,
         int revision,
         LocalDateTime date,
         String user,

@@ -8,7 +8,9 @@ import java.util.UUID;
  * {@link SigaRevisionListener} al sellar cada revisión de Envers.
  *
  * <p>The context is not propagated across threads: an async listener needs its own
- * {@link AuditOperation}.
+ * {@link AuditOperation}. The cause is propagated explicitly: the event that crosses threads
+ * implements {@code AuditCause} and carries the id of the operation that published it, which
+ * becomes the {@code parentId} of the listener's operation.
  */
 public final class AuditOperationContext {
 
@@ -17,10 +19,10 @@ public final class AuditOperationContext {
     private AuditOperationContext() {
     }
 
-    static void begin(String description) {
+    static void begin(String description, String parentId) {
         Holder holder = CURRENT.get();
         if (holder == null) {
-            CURRENT.set(new Holder(new Operation(UUID.randomUUID().toString(), description)));
+            CURRENT.set(new Holder(new Operation(UUID.randomUUID().toString(), description, parentId)));
         } else {
             holder.depth++;
         }
@@ -41,7 +43,12 @@ public final class AuditOperationContext {
         return holder == null ? null : holder.operation;
     }
 
-    record Operation(String id, String description) {
+    public static String currentOperationId() {
+        Operation operation = current();
+        return operation == null ? null : operation.id();
+    }
+
+    record Operation(String id, String description, String parentId) {
     }
 
     private static final class Holder {

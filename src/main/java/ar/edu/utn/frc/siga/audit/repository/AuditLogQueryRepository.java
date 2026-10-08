@@ -30,6 +30,8 @@ public class AuditLogQueryRepository {
     // Envers columns with the default naming (see V1 and V7).
     private static final String REV = "rev";
     private static final String REVTYPE = "revtype";
+    private static final int MAX_CHAIN_DEPTH = 10;
+    private static final int MAX_CHAIN_OPERATIONS = 200;
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AuditedEntityRegistry registry;
@@ -63,7 +65,64 @@ public class AuditLogQueryRepository {
             return List.of();
         }
 
-        // Phase 2: aggregates for the groups on the page.
+        return aggregateGroups(criteria, operationIds, revisions);
+    }
+
+    /**
+     * Operations that form the causal chain of {@code operationId}: its ancestors up to the root and all
+     * the descendants of that root (siblings and their children included), up to 10 levels in each direction.
+     * Capped at {@value #MAX_CHAIN_OPERATIONS} operations selected by revision ascending (the cause first); the returned rows keep the listing order (revision descending), so callers sort them.
+     * {@code truncated} is true if the cap cut operations or if the 10-level limit stopped the walk before
+     * the real root (the one with a null parent) or before the leaves.
+     * Filters are not applied: the chain shows the whole cause and effect. Empty if no revision belongs to the id.
+     * Each operation is its own group, so the actor of an entry never mixes humans and systems; a child
+     * operation of a human one (listener thread) shows as SYSTEM in its own entry.
+     */
+    public AuditChainRows findOperationChain(String operationId) {
+        String sql = "WITH RECURSIVE ancestors(op, depth) AS ("
+                + "SELECT CAST(:id AS varchar), 0 "
+                + "UNION "
+                + "SELECT r.operacion_padre_id, a.depth + 1 FROM ancestors a "
+                + "JOIN revinfo r ON r.operacion_id = a.op "
+                + "WHERE r.operacion_padre_id IS NOT NULL AND a.depth < " + MAX_CHAIN_DEPTH + "), "
+                + "root(op) AS (SELECT op FROM ancestors ORDER BY depth DESC LIMIT 1), "
+                + "descendants(op, depth) AS ("
+                + "SELECT op, 0 FROM root "
+                + "UNION "
+                + "SELECT r.operacion_id, d.depth + 1 FROM descendants d "
+                + "JOIN revinfo r ON r.operacion_padre_id = d.op "
+                + "WHERE d.depth < " + MAX_CHAIN_DEPTH + "), "
+                + "ordered AS (SELECT r.operacion_id AS op, MAX(r." + REV + ") AS revision FROM revinfo r "
+                + "WHERE r.operacion_id IN (SELECT op FROM descendants) "
+                + "GROUP BY r.operacion_id ORDER BY revision, r.operacion_id LIMIT " + (MAX_CHAIN_OPERATIONS + 1) + ") "
+                + "SELECT o.op, (EXISTS (SELECT 1 FROM revinfo p WHERE p.operacion_id = (SELECT op FROM root) "
+                + "AND p.operacion_padre_id IS NOT NULL) "
+                + "OR EXISTS (SELECT 1 FROM descendants d JOIN revinfo c ON c.operacion_padre_id = d.op "
+                + "WHERE d.depth = " + MAX_CHAIN_DEPTH + ")) AS depth_cut "
+                + "FROM ordered o ORDER BY o.revision, o.op";
+        List<String> operationIds = new ArrayList<>();
+        boolean[] depthCut = {false};
+        jdbc.query(sql, new MapSqlParameterSource("id", operationId), rs -> {
+            operationIds.add(rs.getString("op"));
+            depthCut[0] = rs.getBoolean("depth_cut");
+        });
+        if (operationIds.isEmpty()) {
+            return new AuditChainRows(List.of(), false);
+        }
+        boolean truncated = depthCut[0];
+        if (operationIds.size() > MAX_CHAIN_OPERATIONS) {
+            operationIds.remove(operationIds.size() - 1);
+            truncated = true;
+        }
+        AuditLogCriteria unfiltered = new AuditLogCriteria(null, null, null, null, registry.all(), null, null);
+        return new AuditChainRows(aggregateGroups(unfiltered, operationIds, List.of()), truncated);
+    }
+
+    /**
+     * Aggregates for the groups on the page. {@code MAX(tipo_actor)} per group: an operation lives in one
+     * thread, so its revisions share the actor; a parent and a child are different groups.
+     */
+    private List<AuditGroupRow> aggregateGroups(AuditLogCriteria criteria, List<String> operationIds, List<Integer> revisions) {
         MapSqlParameterSource aggParams = new MapSqlParameterSource();
         List<String> restrictions = new ArrayList<>();
         if (!operationIds.isEmpty()) {
@@ -76,7 +135,7 @@ public class AuditLogQueryRepository {
         }
         String union = unionBranches(criteria, aggParams, "(" + String.join(" OR ", restrictions) + ")");
         String aggSql = "SELECT c.operacion_id, MAX(c.rev) AS revision, MAX(c.fecha_revision) AS fecha, "
-                + "MAX(c.usuario) AS usuario, MAX(c.tipo_actor) AS tipo_actor, MAX(c.descripcion) AS descripcion, COUNT(*) AS record_count, "
+                + "MAX(c.usuario) AS usuario, MAX(c.tipo_actor) AS tipo_actor, MAX(c.descripcion) AS descripcion, MAX(c.operacion_padre_id) AS operacion_padre_id, COUNT(*) AS record_count, "
                 + "MIN(c.revtype) AS min_revtype, MAX(c.revtype) AS max_revtype, "
                 + "MIN(c.entity_idx) AS min_entity_idx, MIN(c.record_id) AS min_record_id, "
                 + "string_agg(DISTINCT CAST(c.entity_idx AS varchar), ',') AS entity_idxs "
@@ -94,6 +153,7 @@ public class AuditLogQueryRepository {
             RevisionKind commonKind = minRevtype == rs.getInt("max_revtype") ? toKind(minRevtype) : null;
             return new AuditGroupRow(
                     rs.getString("operacion_id"),
+                    rs.getString("operacion_padre_id"),
                     rs.getInt("revision"),
                     rs.getObject("fecha", LocalDateTime.class),
                     rs.getString("usuario"),
@@ -154,7 +214,7 @@ public class AuditLogQueryRepository {
     private String unionBranches(AuditLogCriteria criteria, MapSqlParameterSource params, String extraRestriction) {
         String revFilters = revisionFilters(criteria, params);
         return criteria.targets().stream()
-                .map(target -> "SELECT r." + REV + ", r.fecha_revision, r.usuario, r.tipo_actor, r.descripcion, r.operacion_id, "
+                .map(target -> "SELECT r." + REV + ", r.fecha_revision, r.usuario, r.tipo_actor, r.descripcion, r.operacion_id, r.operacion_padre_id, "
                         + "x." + REVTYPE + ", CAST(x." + target.idColumn() + " AS varchar) AS record_id, "
                         + registry.indexOf(target) + " AS entity_idx "
                         + "FROM revinfo r JOIN " + target.auditTable() + " x ON x." + REV + " = r." + REV

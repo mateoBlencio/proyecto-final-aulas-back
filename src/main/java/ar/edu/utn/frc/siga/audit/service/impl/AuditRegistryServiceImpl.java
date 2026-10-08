@@ -3,7 +3,9 @@ package ar.edu.utn.frc.siga.audit.service.impl;
 import ar.edu.utn.frc.siga.audit.dto.AuditLogFilter;
 import ar.edu.utn.frc.siga.audit.dto.RevisionMetadata;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditLogEntryDto;
+import ar.edu.utn.frc.siga.audit.dto.response.AuditOperationChainDto;
 import ar.edu.utn.frc.siga.audit.mapper.AuditLogEntryMapper;
+import ar.edu.utn.frc.siga.audit.repository.AuditChainRows;
 import ar.edu.utn.frc.siga.audit.repository.AuditChangeRow;
 import ar.edu.utn.frc.siga.audit.repository.AuditGroupRow;
 import ar.edu.utn.frc.siga.audit.repository.AuditLogCriteria;
@@ -27,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -62,6 +65,17 @@ public class AuditRegistryServiceImpl implements AuditRegistryService {
     @Transactional(readOnly = true)
     public Page<AuditLogEntryDto> findRevisionItems(int revision, AuditLogFilter filter, Pageable pageable) {
         return findItems(toCriteria(filter), ChangeScope.ofRevision(revision), pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AuditOperationChainDto findOperationChain(String operationId) {
+        AuditChainRows chain = repository.findOperationChain(operationId);
+        List<AuditLogEntryDto> entries = chain.rows().stream()
+                .sorted(Comparator.comparingInt(AuditGroupRow::revision))
+                .map(auditLogEntryMapper::toOperation)
+                .toList();
+        return new AuditOperationChainDto(entries, chain.truncated());
     }
 
     @Override

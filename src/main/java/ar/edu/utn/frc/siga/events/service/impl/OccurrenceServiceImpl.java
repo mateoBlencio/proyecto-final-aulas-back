@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.events.service.impl;
 
 import ar.edu.utn.frc.siga.audit.AuditOperation;
+import ar.edu.utn.frc.siga.audit.AuditOperations;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
@@ -119,7 +120,7 @@ public class OccurrenceServiceImpl implements OccurrenceService {
         Occurrence occurrence = Finder.orThrow(occurrenceRepository::findById, occurrenceId, "Occurrence");
         eventScheduleValidator.validateNotPast(occurrence);
         occurrence.setStatus(OccurrenceStatus.ROOM_RELEASED);
-        eventPublisher.publishEvent(new OccurrenceVacated(occurrenceId));
+        eventPublisher.publishEvent(new OccurrenceVacated(occurrenceId, AuditOperations.currentOperationId()));
     }
 
     @Override
