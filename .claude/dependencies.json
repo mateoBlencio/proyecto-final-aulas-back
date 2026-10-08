@@ -3,58 +3,62 @@
     {
       "name": "graphify",
       "usedBy": "CLAUDE.md (graphify), frontend-docs-writer",
-      "install": "git checkout origin/develop -- .claude/skills/graphify"
+      "install": "git checkout origin/develop -- .claude/skills/graphify",
+      "source": "github.com/Graphify-Labs/graphify (Apache-2.0, ver LICENSE y NOTICE)"
     },
     {
       "name": "ponytail",
       "usedBy": "implementer",
-      "source": "github.com/DietrichGebert/ponytail",
+      "source": "github.com/DietrichGebert/ponytail (MIT, ver LICENSE)",
       "install": "git checkout origin/develop -- .claude/skills/ponytail"
     },
     {
       "name": "ponytail-audit",
       "usedBy": "diff-reviewer",
-      "source": "github.com/DietrichGebert/ponytail",
+      "source": "github.com/DietrichGebert/ponytail (MIT, ver LICENSE)",
       "install": "git checkout origin/develop -- .claude/skills/ponytail-audit"
     },
     {
       "name": "ponytail-debt",
       "usedBy": "diff-reviewer",
-      "source": "github.com/DietrichGebert/ponytail",
+      "source": "github.com/DietrichGebert/ponytail (MIT, ver LICENSE)",
       "install": "git checkout origin/develop -- .claude/skills/ponytail-debt"
     },
     {
       "name": "ponytail-review",
       "usedBy": "diff-reviewer",
-      "source": "github.com/DietrichGebert/ponytail",
+      "source": "github.com/DietrichGebert/ponytail (MIT, ver LICENSE)",
       "install": "git checkout origin/develop -- .claude/skills/ponytail-review"
     },
     {
       "name": "security-audit",
       "usedBy": "security-reviewer",
-      "source": "Cloudflare (MIT, ver LICENSE)",
+      "source": "github.com/cloudflare/security-audit-skill (MIT, ver LICENSE)",
       "install": "git checkout origin/develop -- .claude/skills/security-audit"
     },
     {
       "name": "software-design",
       "usedBy": "implementer, planner",
-      "install": "git checkout origin/develop -- .claude/skills/software-design"
+      "install": "git checkout origin/develop -- .claude/skills/software-design",
+      "source": "propia (armada con Claude para este repo)"
     },
     {
       "name": "spring-boot-modulith",
       "usedBy": "implementer, planner",
-      "source": "github.com/joaquimscosta/arkhe-claude-plugins",
+      "source": "github.com/joaquimscosta/arkhe-claude-plugins (MIT, ver LICENSE)",
       "install": "git checkout origin/develop -- .claude/skills/spring-boot-modulith"
     },
     {
       "name": "stop-slop",
       "usedBy": "CLAUDE.md, todos los agentes",
-      "install": "git checkout origin/develop -- .claude/skills/stop-slop"
+      "install": "git checkout origin/develop -- .claude/skills/stop-slop",
+      "source": "propia (armada con Claude para este repo)"
     },
     {
       "name": "testing-pyramid",
       "usedBy": "test-writer",
-      "install": "git checkout origin/develop -- .claude/skills/testing-pyramid"
+      "install": "git checkout origin/develop -- .claude/skills/testing-pyramid",
+      "source": "propia (armada con Claude para este repo)"
     }
   ],
   "clis": [
