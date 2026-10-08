@@ -192,7 +192,7 @@ buildNumber.properties
 .claude/settings.local.json
 .claude/plans/
 .claude/agent-memory-local/
-.claude/docs/sysacad/*.json
+.claude/docs/
 
 # graphify
 graphify-out/
