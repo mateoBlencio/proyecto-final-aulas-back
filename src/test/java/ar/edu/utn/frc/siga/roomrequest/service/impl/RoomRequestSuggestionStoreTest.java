@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
+import ar.edu.utn.frc.siga.settings.api.SettingChangedEvent;
 import ar.edu.utn.frc.siga.settings.api.SettingsReader;
 import ar.edu.utn.frc.siga.settings.model.SettingKey;
 import org.junit.jupiter.api.Test;
@@ -75,6 +76,45 @@ class RoomRequestSuggestionStoreTest {
         store.save(SUGGESTION);
 
         assertThat(store.take("sug_1")).isEmpty();
+    }
+
+    @Test
+    void alCambiarElTtlEnCalienteSeAplicaSinDescartarLasSugerenciasVigentes() {
+        SettingsReader settingsReader = mock(SettingsReader.class);
+        when(settingsReader.getLong(SettingKey.PREVIEW_TTL_MINUTES)).thenReturn(30L, 60L);
+        RoomRequestSuggestionStore store = new RoomRequestSuggestionStore(settingsReader);
+        store.init();
+        store.save(SUGGESTION);
+
+        store.onSettingChanged(new SettingChangedEvent(SettingKey.PREVIEW_TTL_MINUTES));
+
+        assertThat(store.take("sug_1")).contains(SUGGESTION);
+    }
+
+    @Test
+    void alBajarElTtlEnCalienteLasSugerenciasExpiranConElNuevoValor() {
+        SettingsReader settingsReader = mock(SettingsReader.class);
+        when(settingsReader.getLong(SettingKey.PREVIEW_TTL_MINUTES)).thenReturn(30L, 0L);
+        RoomRequestSuggestionStore store = new RoomRequestSuggestionStore(settingsReader);
+        store.init();
+        store.save(SUGGESTION);
+
+        store.onSettingChanged(new SettingChangedEvent(SettingKey.PREVIEW_TTL_MINUTES));
+
+        assertThat(store.take("sug_1")).isEmpty();
+    }
+
+    @Test
+    void ignoraLosCambiosDeOtrosSettings() {
+        SettingsReader settingsReader = mock(SettingsReader.class);
+        when(settingsReader.getLong(SettingKey.PREVIEW_TTL_MINUTES)).thenReturn(30L, 0L);
+        RoomRequestSuggestionStore store = new RoomRequestSuggestionStore(settingsReader);
+        store.init();
+        store.save(SUGGESTION);
+
+        store.onSettingChanged(new SettingChangedEvent(SettingKey.PREVIEW_SUGGESTION_TIME_LIMIT_SECONDS));
+
+        assertThat(store.take("sug_1")).contains(SUGGESTION);
     }
 
     @Test

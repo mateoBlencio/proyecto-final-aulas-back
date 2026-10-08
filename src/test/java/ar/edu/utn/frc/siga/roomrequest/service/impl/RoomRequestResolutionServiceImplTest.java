@@ -704,11 +704,12 @@ class RoomRequestResolutionServiceImplTest {
         when(occurrenceResolver.resolveOccurrencesBySlot(item, 1, false)).thenReturn(List.of(List.of(9000L)));
         when(composer.composeItem(item)).thenReturn(mockResponse());
 
-        service.assignAutomatic(1L, List.of(104L), null, "subsecretaria@frc.utn.edu.ar");
+        service.assignAutomatic(1L, List.of(104L), "solo hay un aula libre", "subsecretaria@frc.utn.edu.ar");
 
         ArgumentCaptor<AllocationCommand> captor = ArgumentCaptor.forClass(AllocationCommand.class);
         verify(allocationService).reallocate(captor.capture());
         assertThat(captor.getValue().source()).isEqualTo(AllocationSource.AUTOMATIC);
+        assertThat(captor.getValue().observation()).isEqualTo("solo hay un aula libre");
         assertThat(captor.getValue().items()).hasSize(1);
         assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.IN_EVALUATION);
         assertThat(item.getAllocations()).extracting(RoomRequestItemAllocation::getClassroomId).containsExactly(104L);

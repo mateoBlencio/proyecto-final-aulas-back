@@ -76,7 +76,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
     @Transactional
     public RoomRequestItemResponseDto assignAutomatic(Long itemId, List<Long> classroomIds, String reason,
                                                       String actor) {
-        return assign(itemId, classroomIds, reason, actor, AllocationCommand::automatic);
+        return assign(itemId, classroomIds, reason, actor, items -> AllocationCommand.automatic(items, reason));
     }
 
     private RoomRequestItemResponseDto assign(Long itemId, List<Long> classroomIds, String reason, String actor,

@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Component
 @RequiredArgsConstructor
@@ -66,6 +67,7 @@ class RoomRequestSuggestionInputLoader {
             throw new InvalidRoomRequestException("El pedido no tiene horario para sugerir un aula.");
         }
         Set<LocalDate> dates = datesOf(item);
+        int enrolled = enrolledOf(item);
 
         Set<Long> ownOccurrenceIds = item.getAllocations().stream()
                 .map(RoomRequestItemAllocation::getOccurrenceId)
@@ -97,7 +99,7 @@ class RoomRequestSuggestionInputLoader {
 
         Set<Long> subjectIds = item.getRequest().getSubjectId() != null
                 ? Set.of(item.getRequest().getSubjectId()) : Set.of();
-        return new Inputs(itemId, item.getVersion(), item.getClassroomCount(), enrolledOf(item), item.getStartTime(),
+        return new Inputs(itemId, item.getVersion(), item.getClassroomCount(), enrolled, item.getStartTime(),
                 item.endTime(), dates, subjectIds, classrooms, rooms, occupancy);
     }
 
@@ -116,14 +118,14 @@ class RoomRequestSuggestionInputLoader {
         if (item.getEstimated() != null) {
             return item.getEstimated();
         }
-        if (item.getSourceRecurringEventId() == null) {
-            return 0;
-        }
-        return academicEventService.findByIds(Set.of(item.getSourceRecurringEventId())).stream()
+        Long sourceEventId = item.getSourceRecurringEventId();
+        return (sourceEventId == null ? Stream.<AcademicEventResponseDto>empty()
+                : academicEventService.findByIds(Set.of(sourceEventId)).stream())
                 .map(AcademicEventResponseDto::enrolled)
                 .filter(Objects::nonNull)
                 .findFirst()
-                .orElse(0);
+                .orElseThrow(() -> new InvalidRoomRequestException(
+                        "El pedido no tiene cantidad de inscriptos para sugerir un aula."));
     }
 
     private OptimizerRoom toSolverRoom(ClassroomResponseDto c, ClassroomSubjectPermissionDto permission) {

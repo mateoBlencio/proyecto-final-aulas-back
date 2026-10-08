@@ -309,27 +309,26 @@ class RoomRequestSuggestionInputLoaderTest {
     }
 
     @Test
-    void sinEstimadoNiEventoDeOrigenLosInscriptosSonCero() {
+    void sinEstimadoNiEventoDeOrigenRechazaElPedido() {
         RoomRequestItem item = item(RoomRequestType.ONE_TIME_ROOM_CHANGE).estimated(null).build();
         stubItem(item);
-        stubCandidates(item, List.of());
-        when(allocationOccupancyService.findOccupancy(DATE, DATE)).thenReturn(List.of());
 
-        assertThat(loader.load(ITEM_ID, Set.of(), ACTOR).enrolled()).isZero();
-        verifyNoInteractions(academicEventService);
+        assertThatThrownBy(() -> loader.load(ITEM_ID, Set.of(), ACTOR))
+                .isInstanceOf(InvalidRoomRequestException.class)
+                .hasMessageContaining("inscriptos");
+        verifyNoInteractions(academicEventService, candidateResolver, allocationOccupancyService);
     }
 
     @Test
-    void sinEstimadoYConEventoSinInscriptosOSinEventoEncontradoLosInscriptosSonCero() {
+    void sinEstimadoYConEventoSinInscriptosRechazaElPedido() {
         RoomRequestItem item = item(RoomRequestType.ONE_TIME_ROOM_CHANGE).estimated(null)
                 .sourceRecurringEventId(100L).build();
         stubItem(item);
-        stubCandidates(item, List.of());
-        AcademicEventResponseDto event = recurringEvent(null);
-        when(academicEventService.findByIds(Set.of(100L))).thenReturn(List.of(event));
-        when(allocationOccupancyService.findOccupancy(DATE, DATE)).thenReturn(List.of());
+        when(academicEventService.findByIds(Set.of(100L))).thenReturn(List.of(recurringEvent(null)));
 
-        assertThat(loader.load(ITEM_ID, Set.of(), ACTOR).enrolled()).isZero();
+        assertThatThrownBy(() -> loader.load(ITEM_ID, Set.of(), ACTOR))
+                .isInstanceOf(InvalidRoomRequestException.class);
+        verifyNoInteractions(candidateResolver, allocationOccupancyService);
     }
 
     private void stubItem(RoomRequestItem item) {

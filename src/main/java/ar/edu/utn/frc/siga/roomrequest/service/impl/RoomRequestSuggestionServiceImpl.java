@@ -51,8 +51,9 @@ public class RoomRequestSuggestionServiceImpl implements RoomRequestSuggestionSe
             return noRoomAvailable(itemId);
         }
 
+        int enrolledPerRoom = (inputs.enrolled() + inputs.classroomCount() - 1) / inputs.classroomCount();
         List<OptimizerEvent> events = IntStream.range(0, inputs.classroomCount())
-                .mapToObj(i -> new OptimizerEvent("rr-" + itemId + "-" + i, "rr-" + itemId, inputs.enrolled(),
+                .mapToObj(i -> new OptimizerEvent("rr-" + itemId + "-" + i, "rr-" + itemId, enrolledPerRoom,
                         inputs.startTime(), inputs.endTime(), inputs.dates(), inputs.subjectIds()))
                 .toList();
         log.info("Sugerencia de aula para pedido: itemId={}, {} aulas candidatas, {} franjas ocupadas",
@@ -74,7 +75,7 @@ public class RoomRequestSuggestionServiceImpl implements RoomRequestSuggestionSe
                 .collect(Collectors.toMap(ClassroomResponseDto::id, c -> c));
         List<ClassroomResponseDto> suggested = classroomIds.stream().map(byId::get).filter(Objects::nonNull).toList();
         int overcrowdedBy = suggested.stream()
-                .mapToInt(c -> Math.max(0, inputs.enrolled() - c.capacity()))
+                .mapToInt(c -> Math.max(0, enrolledPerRoom - c.capacity()))
                 .max()
                 .orElse(0);
 

@@ -87,8 +87,29 @@ class RoomRequestSuggestionServiceImplTest {
         assertThat(events.getValue()).extracting(OptimizerEvent::planningId).containsExactly("rr-7-0", "rr-7-1");
         assertThat(response.status()).isEqualTo(SuggestionStatus.SUGGESTED);
         assertThat(response.classrooms()).extracting(ClassroomResponseDto::id).containsExactly(10L, 20L);
-        assertThat(response.overcrowdedBy()).isEqualTo(5);
+        assertThat(response.overcrowdedBy()).isZero();
         assertThat(response.suggestionId()).startsWith("sug_");
+    }
+
+    @Test
+    void repartePorAulaLosInscriptosEntreLasAulasPedidas() {
+        stubSolver(new OptimizerAllocation("rr-7-0", 10L), new OptimizerAllocation("rr-7-1", 20L));
+        when(inputLoader.load(eq(ITEM_ID), any(), eq(ACTOR))).thenReturn(inputs(2, List.of(room(10L, 13), room(20L, 13))));
+
+        service.suggest(ITEM_ID, null, ACTOR);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<OptimizerEvent>> events = ArgumentCaptor.forClass(List.class);
+        verify(optimizerService).optimize(events.capture(), any(), any(), eq(2));
+        assertThat(events.getValue()).extracting(OptimizerEvent::enrolled).containsExactly(13, 13);
+    }
+
+    @Test
+    void calculaElSobrecupoContraLaParteDeInscriptosDeCadaAula() {
+        stubSolver(new OptimizerAllocation("rr-7-0", 10L));
+        when(inputLoader.load(eq(ITEM_ID), any(), eq(ACTOR))).thenReturn(inputs(1, List.of(room(10L, 20))));
+
+        assertThat(service.suggest(ITEM_ID, null, ACTOR).overcrowdedBy()).isEqualTo(5);
     }
 
     @Test
