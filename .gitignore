@@ -186,9 +186,9 @@ buildNumber.properties
 .env
 
 # Claude Code
-plans/
-AGENTS.md
-CLAUDE.md
+/plans/
+/AGENTS.md
+/CLAUDE.md
 .claude/settings.local.json
 .claude/plans/
 .claude/agent-memory-local/
