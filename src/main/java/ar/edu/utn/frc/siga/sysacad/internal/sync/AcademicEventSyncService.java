@@ -1,6 +1,8 @@
 package ar.edu.utn.frc.siga.sysacad.internal.sync;
 
 import ar.edu.utn.frc.siga.audit.AuditOperation;
+import ar.edu.utn.frc.siga.audit.AuditOperations;
+import ar.edu.utn.frc.siga.common.util.Plurals;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.model.TermType;
@@ -80,10 +82,16 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
             }
         }
 
-        Set<Long> presentEventIds = academicEventService.syncRecurringEvents(commands).stream()
+        List<UpsertRecurringEventResult> results = academicEventService.syncRecurringEvents(commands);
+        Set<Long> presentEventIds = results.stream()
                 .map(UpsertRecurringEventResult::eventId)
                 .collect(Collectors.toSet());
+        long created = results.stream().filter(UpsertRecurringEventResult::created).count();
+        long updated = results.stream().filter(UpsertRecurringEventResult::updated).count();
+        int absent = academicEventService.markRecurringEventsAbsent(presentEventIds);
 
-        return presentEventIds.size() + academicEventService.markRecurringEventsAbsent(presentEventIds);
+        AuditOperations.describe("Sincronización de eventos desde SysAcad: " + Plurals.count(created, "alta", "altas")
+                + ", " + Plurals.count(updated, "cambio", "cambios") + ", " + Plurals.count(absent, "baja", "bajas"));
+        return presentEventIds.size() + absent;
     }
 }

@@ -1015,6 +1015,35 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(changeSummary(modified)).containsExactly("enabled:true:false");
     }
 
+    @Test
+    @DisplayName("reallocate de 2 aulas del mismo edificio genera una OPERATION cuya descripción lleva '2 aulas' y el edificio")
+    void reallocateDescriptionCarriesClassroomCountAndBuilding() throws Exception {
+        var sc = testData.materiaYComision();
+        LocalDate first = LocalDate.now().plusDays(71);
+        var eventDto = new CreateRecurringEventRequestDto(30, LocalTime.of(8, 0), 90,
+                first.getDayOfWeek(), first, first.plusDays(7), sc.subjectId(), sc.commissionId());
+        Long eventId = asFixtureUser(() -> academicEventService.createRecurringEvent(eventDto)).id();
+        List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId);
+        assertThat(occurrences).hasSize(2);
+        var building = testData.edificio();
+        Long classroomA = testData.aula(building).getId();
+        Long classroomB = testData.aula(building).getId();
+        var body = new AllocationBatchRequestDto(List.of(
+                new AllocationItemRequestDto(List.of(occurrences.get(0).getId()), null, null, null, classroomA),
+                new AllocationItemRequestDto(List.of(occurrences.get(1).getId()), null, null, null, classroomB)), null);
+
+        mockMvc.perform(put("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().is2xxSuccessful());
+
+        String expected = "Reasignación de 2 aulas, edificio " + building.getName();
+        String operationId = latestOperationId(expected);
+        JsonNode entry = operationEntry(json(mockMvc, get("/v1/audit").param("size", "200")), operationId);
+        assertThat(entry.get("type").asText()).isEqualTo("OPERATION");
+        assertThat(entry.get("description").asText()).contains("2 aulas").contains(building.getName());
+    }
+
     /** Operation ids of the release flow: the parent (release) and the child (listener thread). */
     private record ReleaseChain(String parentId, String childId) {
     }

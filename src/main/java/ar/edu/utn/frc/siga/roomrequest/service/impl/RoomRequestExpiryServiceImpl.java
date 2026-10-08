@@ -1,6 +1,8 @@
 package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
 import ar.edu.utn.frc.siga.audit.AuditOperation;
+import ar.edu.utn.frc.siga.audit.AuditOperations;
+import ar.edu.utn.frc.siga.common.util.Plurals;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
@@ -44,6 +46,8 @@ public class RoomRequestExpiryServiceImpl implements RoomRequestExpiryService {
         Instant now = Instant.now();
         expired.forEach(item -> item.decide(RoomRequestStatus.CANCELLED, SYSTEM_ACTOR, EXPIRY_REASON, now));
 
+        AuditOperations.describe("Vencimiento automático de " + Plurals.count(expired.size(), "ítem", "ítems")
+                + " de solicitudes de aula");
         log.info("Vencimiento automático de pedidos de aula: {} cancelado(s)", expired.size());
         return expired.size();
     }

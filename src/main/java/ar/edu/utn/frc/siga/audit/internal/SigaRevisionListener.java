@@ -30,6 +30,7 @@ public class SigaRevisionListener implements RevisionListener {
             revision.setOperacionId(operation.id());
             revision.setDescripcion(operation.description());
             revision.setParentOperationId(operation.parentId());
+            AuditOperationContext.markStamped();
         }
     }
 }

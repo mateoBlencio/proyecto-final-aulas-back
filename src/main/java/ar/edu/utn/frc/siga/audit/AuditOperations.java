@@ -14,4 +14,12 @@ public final class AuditOperations {
     public static String currentOperationId() {
         return AuditOperationContext.currentOperationId();
     }
+
+    /**
+     * Replaces the description of the operation in progress with one that carries business data
+     * (counts, building). Truncated to 255 characters. Outside an operation it does nothing.
+     */
+    public static void describe(String description) {
+        AuditOperationContext.describe(description);
+    }
 }

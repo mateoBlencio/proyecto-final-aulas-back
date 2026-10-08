@@ -29,6 +29,7 @@ import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.model.EventType;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
+import ar.edu.utn.frc.siga.audit.internal.AuditDescriptionProbe;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.ingest.ExcelTestWorkbooks;
 import ar.edu.utn.frc.siga.ingest.ExcelTestWorkbooks.DataRow;
@@ -267,6 +268,41 @@ class IngestServiceImplTest {
         assertThat(startLog).contains("planilla-2026.xlsx");
     }
 
+
+    /** Runs the import through the real audit aspect and returns the description seen when the allocation runs. */
+    private String descriptionDuringImport(String filename) {
+        stubHappyPath(DataRow.defaultRow());
+        AuditDescriptionProbe probe = new AuditDescriptionProbe();
+        when(allocationService.reallocate(any())).thenAnswer(inv -> {
+            probe.peek();
+            return List.of();
+        });
+        MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow().toMultipartFile(filename);
+
+        probe.audited(service).ingestFile(file);
+
+        return probe.peeked();
+    }
+
+    @Test
+    @DisplayName("la descripción de la operación lleva el nombre del archivo importado")
+    void descriptionCarriesFilename() {
+        assertThat(descriptionDuringImport("planilla-2026.xlsx"))
+            .isEqualTo("Importación de eventos desde archivo planilla-2026.xlsx");
+    }
+
+    @Test
+    @DisplayName("los caracteres de control del nombre de archivo se reemplazan por espacio en la descripción")
+    void descriptionReplacesControlCharactersInFilename() {
+        assertThat(descriptionDuringImport("a\nb.xlsx"))
+            .isEqualTo("Importación de eventos desde archivo a b.xlsx");
+    }
+
+    @Test
+    @DisplayName("un nombre de archivo larguísimo deja la descripción en 255 caracteres como máximo")
+    void descriptionIsTruncatedForLongFilename() {
+        assertThat(descriptionDuringImport("x".repeat(300) + ".xlsx")).hasSize(255).endsWith("…");
+    }
 
     private void stubHappyPath(DataRow row) {
         stubHappyPath(row, true);

@@ -6,25 +6,45 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
+import lombok.RequiredArgsConstructor;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+/**
+ * Opens the operation context around methods annotated with {@code @AuditOperation}.
+ * <p>
+ * Limitation: if the annotated method joins an outer transaction, its revisions are stamped at the
+ * outer commit, after {@code end()} already cleared the context, so they get no {@code operacion_id}
+ * (and no description update applies).
+ */
 @Aspect
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
+@RequiredArgsConstructor
 public class AuditOperationAspect {
+
+    private final RevisionDescriptionUpdater descriptionUpdater;
 
     @Around("@annotation(ar.edu.utn.frc.siga.audit.AuditOperation)")
     public Object aroundAuditOperation(ProceedingJoinPoint joinPoint) throws Throwable {
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         AuditOperation auditOperation = signature.getMethod().getAnnotation(AuditOperation.class);
         AuditOperationContext.begin(auditOperation.value(), originOperationId(joinPoint.getArgs()));
+        Object result;
         try {
-            return joinPoint.proceed();
-        } finally {
+            result = joinPoint.proceed();
+        } catch (Throwable t) {
             AuditOperationContext.end();
+            throw t;
         }
+        // The aspect has the highest precedence: the method transaction (and any REQUIRES_NEW one) is
+        // already committed here, so every revision of the operation is visible to the UPDATE.
+        AuditOperationContext.PendingDescription pending = AuditOperationContext.end();
+        if (pending != null) {
+            descriptionUpdater.update(pending.operationId(), pending.description());
+        }
+        return result;
     }
 
     private static String originOperationId(Object[] args) {

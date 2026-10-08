@@ -12,6 +12,8 @@ import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
 import ar.edu.utn.frc.siga.audit.AuditOperation;
+import ar.edu.utn.frc.siga.audit.AuditOperations;
+import ar.edu.utn.frc.siga.common.util.Plurals;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
@@ -98,7 +100,7 @@ public class AllocationServiceImpl implements AllocationService {
     @Transactional
     @AuditOperation("Asignación de aulas en lote")
     public List<AllocationResponseDto> allocate(AllocationCommand command) {
-        Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolveAndValidate(command);
+        Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolveAndValidate(command, "Asignación");
         List<Allocation> saved = writer.create(classroomByOccurrence, command.observation(), command.source());
         log.info("Asignación creada: source={}, count={}", command.source(), saved.size());
         return composer.composeAll(saved);
@@ -108,7 +110,7 @@ public class AllocationServiceImpl implements AllocationService {
     @Transactional
     @AuditOperation("Reasignación de aulas en lote")
     public List<AllocationResponseDto> reallocate(AllocationCommand command) {
-        Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolveAndValidate(command);
+        Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolveAndValidate(command, "Reasignación");
         List<Allocation> saved = writer.upsert(classroomByOccurrence, command.observation(), command.source());
         log.info("Asignación actualizada: source={}, count={}", command.source(), saved.size());
         return composer.composeAll(saved);
@@ -119,6 +121,7 @@ public class AllocationServiceImpl implements AllocationService {
     @AuditOperation("Liberación de aulas en lote")
     public List<DeallocatedOccurrenceDto> deallocate(DeallocationCommand command) {
         List<OccurrenceSlotDto> occurrences = targetResolver.resolveAll(command.targets(), null);
+        AuditOperations.describe("Liberación de " + Plurals.count(occurrences.size(), "ocurrencia", "ocurrencias"));
         occurrences.forEach(validator::validateNotPast);
         requireAccessToCurrentClassrooms(occurrences);
 
@@ -134,13 +137,22 @@ public class AllocationServiceImpl implements AllocationService {
     @AuditOperation("Sincronización de asignaciones desde SysAcad")
     public int syncFromSysacad(List<AllocationItem> items) {
         AllocationCommand command = new AllocationCommand(items, null, AllocationSource.SYSACAD);
-        Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolveAndValidate(command);
+        Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolveAndValidate(command, null);
         int affected = writer.syncFromSysacad(classroomByOccurrence);
+        AuditOperations.describe("Sincronización de asignaciones desde SysAcad: " + Plurals.count(affected, "afectada", "afectadas"));
         log.info("Sync de SysAcad: asignaciones afectadas={}", affected);
         return affected;
     }
 
-    private Map<OccurrenceSlotDto, Long> resolveAndValidate(AllocationCommand command) {
+    /** E.g. "Reasignación de 12 aulas, edificio Central" or "..., 3 edificios". */
+    private void describeAllocation(String action, List<ClassroomResponseDto> classrooms) {
+        List<String> buildings = classrooms.stream().map(ClassroomResponseDto::buildingName).distinct().toList();
+        AuditOperations.describe(action + " de " + Plurals.count(classrooms.size(), "aula", "aulas")
+                + (buildings.size() == 1 ? ", edificio " + buildings.get(0) : ", " + Plurals.count(buildings.size(), "edificio", "edificios")));
+    }
+
+    /** A non-null {@code action} also sets the audit description once the classrooms are validated. */
+    private Map<OccurrenceSlotDto, Long> resolveAndValidate(AllocationCommand command, String action) {
         // IMPORTED (ingest Excel) y SYSACAD no clampean: el primer sync/import de una comisión a mitad
         // de año trae ocurrencias ya pasadas, y rechazarlas dejaría esos slots sin asignación (plan §4).
         LocalDate clampFrom = (command.source() == AllocationSource.IMPORTED || command.source() == AllocationSource.SYSACAD)
@@ -154,8 +166,11 @@ public class AllocationServiceImpl implements AllocationService {
 
         Set<Long> classroomIds = Set.copyOf(classroomByOccurrence.values());
         classroomLock.lock(classroomIds);
-        requireAccessToClassrooms(classroomIds);
+        List<ClassroomResponseDto> classrooms = requireAccessToClassrooms(classroomIds);
         validator.validateClassroomsAvailable(classroomIds);
+        if (action != null) {
+            describeAllocation(action, classrooms);
+        }
 
         if (command.source() == AllocationSource.MANUAL || command.source() == AllocationSource.AUTOMATIC) {
             List<AllocationCandidate> candidates = classroomByOccurrence.entrySet().stream()
@@ -175,14 +190,16 @@ public class AllocationServiceImpl implements AllocationService {
         return Finder.orThrow(allocationRepository::findById, id, "Allocation");
     }
 
-    private void requireAccessToClassrooms(Set<Long> classroomIds) {
+    private List<ClassroomResponseDto> requireAccessToClassrooms(Set<Long> classroomIds) {
         if (classroomIds.isEmpty()) {
-            return;
+            return List.of();
         }
-        Set<Long> buildingIds = classroomService.findByIds(classroomIds).stream()
+        List<ClassroomResponseDto> classrooms = classroomService.findByIds(classroomIds);
+        Set<Long> buildingIds = classrooms.stream()
                 .map(ClassroomResponseDto::buildingId)
                 .collect(Collectors.toSet());
         buildingScopeResolver.requireAccess(Permission.ALLOCATION_WRITE, buildingIds);
+        return classrooms;
     }
 
     private void requireAccessToCurrentClassrooms(List<OccurrenceSlotDto> occurrences) {

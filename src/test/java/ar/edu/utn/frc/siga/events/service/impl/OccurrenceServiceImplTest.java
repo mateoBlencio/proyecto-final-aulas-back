@@ -73,7 +73,7 @@ class OccurrenceServiceImplTest {
         }).when(eventPublisher).publishEvent(any(OccurrenceVacated.class));
         AspectJProxyFactory factory = new AspectJProxyFactory(service);
         factory.setProxyTargetClass(true);
-        factory.addAspect(new AuditOperationAspect());
+        factory.addAspect(new AuditOperationAspect(org.mockito.Mockito.mock(ar.edu.utn.frc.siga.audit.internal.RevisionDescriptionUpdater.class)));
         OccurrenceServiceImpl audited = factory.getProxy();
 
         audited.release(10L);

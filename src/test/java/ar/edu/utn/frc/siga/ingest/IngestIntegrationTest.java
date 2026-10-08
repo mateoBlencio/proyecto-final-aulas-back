@@ -113,6 +113,24 @@ class IngestIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("POST /v1/imports: las revisiones de las asignaciones llevan la descripción con el nombre del archivo, no la del reallocate anidado")
+    void importExcel_revisionsCarryFilenameDescription() throws Exception {
+        DataRow row = uniqueRow(uniqueBuilding());
+        seedCatalog(row);
+        String filename = "planilla-auditoria-" + IntegrationTestData.nextSeq() + ".xlsx";
+
+        mockMvc.perform(multipart("/v1/imports")
+                        .file(ExcelTestWorkbooks.validTemplate().withDataRow(row).toMultipartFile(filename)))
+                .andExpect(status().isOk());
+
+        Classroom classroom = classroomRepository.findByRoomNumberAndDeletedAtIsNull((Integer) row.roomNumber()).orElseThrow();
+        List<String> descriptions = jdbcTemplate.queryForList(
+                "SELECT DISTINCT r.descripcion FROM revinfo r JOIN asignacion_aula_aud a ON a.rev = r.rev "
+                        + "WHERE a.id_aula = ?", String.class, classroom.getId());
+        assertThat(descriptions).containsExactly("Importación de eventos desde archivo " + filename);
+    }
+
+    @Test
     @DisplayName("POST /v1/imports importa 2 filas válidas y persiste toda la cadena académica y de asignación, incluidas fechas pasadas")
     void importExcel_validRows_persistsFullChain() throws Exception {
         DataRow row1 = uniqueRow(uniqueBuilding());
