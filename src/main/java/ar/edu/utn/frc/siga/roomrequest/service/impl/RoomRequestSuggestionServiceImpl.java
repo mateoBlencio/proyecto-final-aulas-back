@@ -107,7 +107,7 @@ public class RoomRequestSuggestionServiceImpl implements RoomRequestSuggestionSe
         try {
             response = resolutionService.assignAutomatic(itemId, suggestion.classroomIds(), reason, actor);
         } catch (RuntimeException e) {
-            // El cache no hace rollback con la transacción: se devuelve la sugerencia para que el usuario pueda reintentar (ej. completar el motivo).
+            // El cache no hace rollback con la transacción: sin esto, un 400 por falta de motivo quemaría la sugerencia.
             store.save(suggestion);
             throw e;
         }

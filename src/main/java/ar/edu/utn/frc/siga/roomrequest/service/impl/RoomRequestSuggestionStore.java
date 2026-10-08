@@ -31,7 +31,6 @@ class RoomRequestSuggestionStore {
                 .build();
     }
 
-    // A diferencia de reconstruir el cache, cambiar el TTL en el lugar conserva las sugerencias vigentes.
     @ApplicationModuleListener
     void onSettingChanged(SettingChangedEvent event) {
         if (event.key() == SettingKey.PREVIEW_TTL_MINUTES) {
