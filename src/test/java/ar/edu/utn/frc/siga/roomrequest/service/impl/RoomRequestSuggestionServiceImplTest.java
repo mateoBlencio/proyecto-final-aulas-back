@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
+import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizationResult;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizerAllocation;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizerEvent;
@@ -9,6 +10,7 @@ import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestSuggestionRespons
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestSuggestionResponseDto.SuggestionStatus;
 import ar.edu.utn.frc.siga.roomrequest.exception.ExpiredSuggestionException;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestResolutionService;
 import ar.edu.utn.frc.siga.settings.api.SettingsReader;
@@ -124,7 +126,7 @@ class RoomRequestSuggestionServiceImplTest {
     void confirmAsignaLasAulasSugeridasEnModoAutomatico() {
         String suggestionId = suggestOneRoom();
         stubItemVersion(1L);
-        RoomRequestItemResponseDto expected = mock(RoomRequestItemResponseDto.class);
+        RoomRequestItemResponseDto expected = response();
         when(resolutionService.assignAutomatic(ITEM_ID, List.of(10L), "motivo", ACTOR)).thenReturn(expected);
 
         assertThat(service.confirm(ITEM_ID, suggestionId, "motivo", ACTOR)).isSameAs(expected);
@@ -166,6 +168,42 @@ class RoomRequestSuggestionServiceImplTest {
         verify(resolutionService, never()).assignAutomatic(any(), any(), any(), any());
     }
 
+    @Test
+    void confirmFallaSiElPedidoYaNoExiste() {
+        String suggestionId = suggestOneRoom();
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.confirm(ITEM_ID, suggestionId, null, ACTOR))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(resolutionService, never()).assignAutomatic(any(), any(), any(), any());
+    }
+
+    @Test
+    void suggestPropagaLaExcepcionDelSolver() {
+        when(settingsReader.getInt(SettingKey.PREVIEW_SUGGESTION_TIME_LIMIT_SECONDS)).thenReturn(2);
+        when(optimizerService.optimize(any(), any(), any(), anyInt())).thenThrow(new IllegalStateException("solver"));
+        when(inputLoader.load(eq(ITEM_ID), any(), eq(ACTOR))).thenReturn(inputs(1, List.of(room(10L, 30))));
+
+        assertThatThrownBy(() -> service.suggest(ITEM_ID, null, ACTOR))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("solver");
+    }
+
+    @Test
+    void confirmConsumeLaSugerenciaAunqueFalleLaValidacionDeVersion() {
+        String suggestionId = suggestOneRoom();
+        RoomRequestItem item = mock(RoomRequestItem.class);
+        when(item.getVersion()).thenReturn(2L, 1L);
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> service.confirm(ITEM_ID, suggestionId, null, ACTOR))
+                .isInstanceOf(ExpiredSuggestionException.class);
+        assertThatThrownBy(() -> service.confirm(ITEM_ID, suggestionId, null, ACTOR))
+                .isInstanceOf(ExpiredSuggestionException.class);
+
+        verify(resolutionService, never()).assignAutomatic(any(), any(), any(), any());
+    }
+
     private String suggestOneRoom() {
         stubSolver(new OptimizerAllocation("rr-7-0", 10L));
         when(inputLoader.load(eq(ITEM_ID), any(), eq(ACTOR))).thenReturn(inputs(1, List.of(room(10L, 30))));
@@ -182,6 +220,12 @@ class RoomRequestSuggestionServiceImplTest {
         RoomRequestItem item = mock(RoomRequestItem.class);
         when(item.getVersion()).thenReturn(version);
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+    }
+
+    private static RoomRequestItemResponseDto response() {
+        return new RoomRequestItemResponseDto(ITEM_ID, 1, RoomRequestStatus.IN_EVALUATION, ACTOR, null, "motivo",
+                List.of(), null, null, null, null, null, null, null, 1, false, false, null, false, null, null,
+                List.of(), null, List.of(), null, null, null, null, null, null);
     }
 
     private static ClassroomResponseDto room(Long id, int capacity) {

@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
+import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
@@ -692,6 +693,54 @@ class RoomRequestResolutionServiceImplTest {
         assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.NEW);
         assertThat(item.getAllocations()).isEmpty();
         verifyNoInteractions(composer);
+    }
+
+    @Test
+    @DisplayName("assignAutomatic: reasigna con source AUTOMATIC y deja el pedido IN_EVALUATION")
+    void assignAutomatic_usaOrigenAutomatico() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 1, false)).thenReturn(List.of(List.of(9000L)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assignAutomatic(1L, List.of(104L), null, "subsecretaria@frc.utn.edu.ar");
+
+        ArgumentCaptor<AllocationCommand> captor = ArgumentCaptor.forClass(AllocationCommand.class);
+        verify(allocationService).reallocate(captor.capture());
+        assertThat(captor.getValue().source()).isEqualTo(AllocationSource.AUTOMATIC);
+        assertThat(captor.getValue().items()).hasSize(1);
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.IN_EVALUATION);
+        assertThat(item.getAllocations()).extracting(RoomRequestItemAllocation::getClassroomId).containsExactly(104L);
+    }
+
+    @Test
+    @DisplayName("assignAutomatic: mantiene las validaciones de assign (menos aulas sin motivo se rechaza)")
+    void assignAutomatic_menosAulasSinReason() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(2).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> service.assignAutomatic(1L, List.of(104L), null, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(PartialAssignmentReasonRequiredException.class);
+        verifyNoInteractions(allocationService);
+    }
+
+    @Test
+    @DisplayName("assign: sigue reasignando con source MANUAL y el motivo como observación")
+    void assign_usaOrigenManual() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(2).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 1, false)).thenReturn(List.of(List.of(9000L)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(104L), "solo hay una disponible", "subsecretaria@frc.utn.edu.ar");
+
+        ArgumentCaptor<AllocationCommand> captor = ArgumentCaptor.forClass(AllocationCommand.class);
+        verify(allocationService).reallocate(captor.capture());
+        assertThat(captor.getValue().source()).isEqualTo(AllocationSource.MANUAL);
+        assertThat(captor.getValue().observation()).isEqualTo("solo hay una disponible");
     }
 
     private static RoomRequest requestOfType(RoomRequestType type) {
