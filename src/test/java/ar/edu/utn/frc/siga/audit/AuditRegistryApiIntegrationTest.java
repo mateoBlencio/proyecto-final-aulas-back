@@ -28,6 +28,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -36,6 +38,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,7 +50,9 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -62,6 +67,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
 
     private static final String USER = "integration-test@frc.utn.edu.ar";
+    private static final String SETTINGS_OPERATION = "Modificación de configuración";
 
     @Autowired
     private IntegrationTestData testData;
@@ -81,9 +87,21 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
     private RecurringEventRepository recurringEventRepository;
     @Autowired
     private OccurrenceRepository occurrenceRepository;
+    @Autowired
+    private WebApplicationContext webApplicationContext;
 
     /** Original values of the keys the test touched via {@link #writeSettingsInOneTransaction}. */
     private final Map<SettingKey, String> originalSettings = new LinkedHashMap<>();
+
+    /** Operations whose description a test overwrote; restored so other tests find them by description. */
+    private final List<String> relabeledOperations = new ArrayList<>();
+
+    @AfterEach
+    void restoreRelabeledOperations() {
+        relabeledOperations.forEach(operationId -> jdbcTemplate.update(
+                "UPDATE revinfo SET descripcion = ? WHERE operacion_id = ?", SETTINGS_OPERATION, operationId));
+        relabeledOperations.clear();
+    }
 
     @AfterEach
     void restoreSettings() {
@@ -194,6 +212,236 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"value\":\"" + value + "\"}"))
                 .andExpect(status().isOk());
+    }
+
+    /**
+     * Bumps a setting through the API (one OPERATION) and overwrites the description of that operation
+     * with {@code description}, so the search tests control exactly which literals it contains.
+     */
+    private String operationWithDescription(String settingValue, String description) throws Exception {
+        bumpSetting(settingValue);
+        String operationId = latestOperationId(SETTINGS_OPERATION);
+        jdbcTemplate.update("UPDATE revinfo SET descripcion = ? WHERE operacion_id = ?", description, operationId);
+        relabeledOperations.add(operationId);
+        return operationId;
+    }
+
+    private List<String> operationIds(JsonNode page) {
+        List<String> ids = new ArrayList<>();
+        for (JsonNode entry : page.get("content")) {
+            if (!isAbsent(entry.get("operationId"))) {
+                ids.add(entry.get("operationId").asText());
+            }
+        }
+        return ids;
+    }
+
+    private JsonNode searchByText(String q) throws Exception {
+        return json(mockMvc, get("/v1/audit").param("size", "200").param("q", q));
+    }
+
+    private Map<String, Object> publicRoomRequestBody() {
+        var sc = testData.materiaYComision();
+        Map<String, Object> requester = new LinkedHashMap<>();
+        requester.put("scope", "GRADO");
+        requester.put("teacherName", "Ada Lovelace");
+        requester.put("teacherEmail", "ada@frc.utn.edu.ar");
+        requester.put("teacherPhone", "351-1234567");
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("commissionId", sc.commissionId());
+        item.put("date", LocalDate.now().plusDays(7).toString());
+        item.put("startTime", "10:00:00");
+        item.put("endTime", "12:00:00");
+        item.put("estimated", 35);
+        item.put("classroomCount", 1);
+        item.put("requiresProjector", true);
+        item.put("requiresComputers", false);
+        item.put("preferredClassroomIds", List.of());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("type", "PARTIAL_EXAM_OFF_SCHEDULE");
+        body.put("requester", requester);
+        body.put("subjectId", sc.subjectId());
+        body.put("items", List.of(item));
+        return body;
+    }
+
+    @Test
+    @DisplayName("PUT /v1/settings/{key} con usuario queda con actorType=HUMAN y ?actor=SYSTEM no lo devuelve")
+    void settingsPutByUserIsHuman() throws Exception {
+        bumpSetting("21:51");
+        String operationId = latestOperationId(SETTINGS_OPERATION);
+
+        JsonNode all = json(mockMvc, get("/v1/audit").param("size", "200"));
+        assertThat(operationEntry(all, operationId).get("actorType").asText()).isEqualTo("HUMAN");
+        assertThat(operationEntry(all, operationId).get("user").asText()).isEqualTo(USER);
+
+        JsonNode human = json(mockMvc, get("/v1/audit").param("size", "200").param("actor", "HUMAN"));
+        assertThat(operationIds(human)).contains(operationId);
+        assertThat(human.get("content")).allSatisfy(entry ->
+                assertThat(entry.get("actorType").asText()).isEqualTo("HUMAN"));
+
+        JsonNode system = json(mockMvc, get("/v1/audit").param("size", "200").param("actor", "SYSTEM"));
+        assertThat(operationIds(system)).doesNotContain(operationId);
+        assertThat(system.get("content")).allSatisfy(entry ->
+                assertThat(entry.get("actorType").asText()).isEqualTo("SYSTEM"));
+    }
+
+    @Test
+    @DisplayName("el filtro actor también aplica a los drill-downs de operación y de revisión")
+    void actorFilterAppliesToDrillDowns() throws Exception {
+        bumpSetting("21:52");
+        String operationId = latestOperationId(SETTINGS_OPERATION);
+        int revision = jdbcTemplate.queryForObject(
+                "SELECT MAX(rev) FROM revinfo WHERE operacion_id = ?", Integer.class, operationId);
+
+        mockMvc.perform(get("/v1/audit/operations/{operationId}", operationId).param("actor", "HUMAN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].actorType").value("HUMAN"));
+        mockMvc.perform(get("/v1/audit/operations/{operationId}", operationId).param("actor", "SYSTEM"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(0));
+        mockMvc.perform(get("/v1/audit/revisions/{revision}", revision).param("actor", "HUMAN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(1));
+        mockMvc.perform(get("/v1/audit/revisions/{revision}", revision).param("actor", "SYSTEM"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(0));
+    }
+
+    @Test
+    @DisplayName("SettingsStore.write fuera de un request, en una transacción propia, queda SYSTEM y ?actor=HUMAN no lo devuelve")
+    void writeOutsideRequestIsSystem() throws Exception {
+        // MockMvc test context binds a request to the test thread; a scheduler thread has none
+        int revision = CompletableFuture.supplyAsync(
+                () -> writeSettingsInOneTransaction(SettingKey.PREVIEW_TTL_MINUTES)).join();
+
+        JsonNode all = json(mockMvc, get("/v1/audit").param("size", "200"));
+        JsonNode entry = entriesOfRevision(all, revision).getFirst();
+        assertThat(entry.get("actorType").asText()).isEqualTo("SYSTEM");
+        assertThat(isAbsent(entry.get("user"))).isTrue();
+
+        JsonNode system = json(mockMvc, get("/v1/audit").param("size", "200").param("actor", "SYSTEM"));
+        assertThat(entriesOfRevision(system, revision)).hasSize(1);
+        assertThat(system.get("content")).allSatisfy(e ->
+                assertThat(e.get("actorType").asText()).isEqualTo("SYSTEM"));
+
+        JsonNode human = json(mockMvc, get("/v1/audit").param("size", "200").param("actor", "HUMAN"));
+        assertThat(entriesOfRevision(human, revision)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("POST /v1/room-requests sin token queda con user null y actorType=HUMAN")
+    void publicRoomRequestIsHumanWithoutUser() throws Exception {
+        MockMvc anonymousMockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
+                .apply(springSecurity())
+                .build();
+
+        anonymousMockMvc.perform(post("/v1/room-requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(publicRoomRequestBody())))
+                .andExpect(status().isCreated());
+        int revision = jdbcTemplate.queryForObject(
+                "SELECT MAX(rev) FROM solicitud_aula_aud WHERE revtype = 0", Integer.class);
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT usuario FROM revinfo WHERE rev = ?", String.class, revision)).isNull();
+        JsonNode human = json(mockMvc, get("/v1/audit").param("size", "200").param("actor", "HUMAN"));
+        List<JsonNode> entries = entriesOfRevision(human, revision);
+        assertThat(entries).hasSize(1);
+        assertThat(isAbsent(entries.getFirst().get("user"))).isTrue();
+        assertThat(entries.getFirst().get("actorType").asText()).isEqualTo("HUMAN");
+
+        JsonNode system = json(mockMvc, get("/v1/audit").param("size", "200").param("actor", "SYSTEM"));
+        assertThat(entriesOfRevision(system, revision)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("?q=configuración en minúsculas encuentra 'Modificación de configuración' y excluye operaciones sin ese texto")
+    void searchFindsOperationByDescription() throws Exception {
+        bumpSetting("21:53");
+        String settingsOperation = latestOperationId(SETTINGS_OPERATION);
+        seedRecurringEvent(LocalDate.now().plusDays(41));
+        String unrelatedOperation = latestOperationId("Alta de evento recurrente");
+
+        JsonNode result = searchByText("configuración");
+
+        assertThat(operationIds(result)).contains(settingsOperation).doesNotContain(unrelatedOperation);
+        assertThat(result.get("content")).allSatisfy(entry ->
+                assertThat(entry.get("description").asText().toLowerCase()).contains("configuración"));
+    }
+
+    @Test
+    @DisplayName("?q ignora mayúsculas y espacios alrededor del texto")
+    void searchIsCaseInsensitiveAndStripped() throws Exception {
+        String operationId = operationWithDescription("21:54", "Corrección de Aulas del Edificio Central");
+
+        assertThat(operationIds(searchByText("aulas del edificio"))).contains(operationId);
+        assertThat(operationIds(searchByText("  EDIFICIO CENTRAL  "))).contains(operationId);
+    }
+
+    @Test
+    @DisplayName("?q=50% trata el % como literal: no encuentra una descripción con '50' sin porcentaje")
+    void searchEscapesPercent() throws Exception {
+        String decoy = operationWithDescription("21:55", "Lote 50 aulas sin signo");
+        String literal = operationWithDescription("21:56", "Lote 50% de aulas");
+
+        JsonNode result = searchByText("50%");
+
+        assertThat(operationIds(result)).contains(literal).doesNotContain(decoy);
+    }
+
+    @Test
+    @DisplayName("?q=a_b trata el _ como literal: no encuentra una descripción donde _ sería un comodín")
+    void searchEscapesUnderscore() throws Exception {
+        String decoy = operationWithDescription("21:57", "Lote aXb de aulas");
+        String literal = operationWithDescription("21:58", "Lote a_b de aulas");
+
+        JsonNode result = searchByText("a_b");
+
+        assertThat(operationIds(result)).contains(literal).doesNotContain(decoy);
+    }
+
+    @Test
+    @DisplayName("?q en blanco no filtra")
+    void blankSearchDoesNotFilter() throws Exception {
+        String operationId = operationWithDescription("21:59", "Texto único de búsqueda en blanco");
+
+        assertThat(operationIds(searchByText("   "))).contains(operationId);
+    }
+
+    @Test
+    @DisplayName("?q también filtra los drill-downs: una operación que no coincide devuelve página vacía")
+    void searchAppliesToDrillDown() throws Exception {
+        String operationId = operationWithDescription("21:41", "Descripción para drill-down");
+
+        mockMvc.perform(get("/v1/audit/operations/{operationId}", operationId).param("q", "drill-down"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(1));
+        mockMvc.perform(get("/v1/audit/operations/{operationId}", operationId).param("q", "no coincide"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(0));
+    }
+
+    @Test
+    @DisplayName("actor con un valor desconocido responde 400")
+    void unknownActorReturns400() throws Exception {
+        mockMvc.perform(get("/v1/audit").param("actor", "OTRO")).andExpect(status().isBadRequest());
+        mockMvc.perform(get("/v1/audit/revisions/{revision}", 1).param("actor", "OTRO"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/v1/audit/operations/{operationId}", "x").param("actor", "OTRO"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("q de más de 100 caracteres responde 400 y de exactamente 100 responde 200")
+    void tooLongSearchReturns400() throws Exception {
+        mockMvc.perform(get("/v1/audit").param("q", "a".repeat(101))).andExpect(status().isBadRequest());
+        mockMvc.perform(get("/v1/audit/revisions/{revision}", 1).param("q", "a".repeat(101)))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/v1/audit/operations/{operationId}", "x").param("q", "a".repeat(101)))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/v1/audit").param("q", "a".repeat(100))).andExpect(status().isOk());
     }
 
     @Test

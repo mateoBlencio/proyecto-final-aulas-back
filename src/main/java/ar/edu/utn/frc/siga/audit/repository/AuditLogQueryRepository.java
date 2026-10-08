@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.audit.repository;
 
 import ar.edu.utn.frc.siga.audit.dto.RevisionMetadata;
+import ar.edu.utn.frc.siga.audit.model.ActorType;
 import ar.edu.utn.frc.siga.audit.model.RevisionKind;
 import ar.edu.utn.frc.siga.audit.service.AuditedEntity;
 import ar.edu.utn.frc.siga.audit.service.AuditedEntityRegistry;
@@ -75,7 +76,7 @@ public class AuditLogQueryRepository {
         }
         String union = unionBranches(criteria, aggParams, "(" + String.join(" OR ", restrictions) + ")");
         String aggSql = "SELECT c.operacion_id, MAX(c.rev) AS revision, MAX(c.fecha_revision) AS fecha, "
-                + "MAX(c.usuario) AS usuario, MAX(c.descripcion) AS descripcion, COUNT(*) AS record_count, "
+                + "MAX(c.usuario) AS usuario, MAX(c.tipo_actor) AS tipo_actor, MAX(c.descripcion) AS descripcion, COUNT(*) AS record_count, "
                 + "MIN(c.revtype) AS min_revtype, MAX(c.revtype) AS max_revtype, "
                 + "MIN(c.entity_idx) AS min_entity_idx, MIN(c.record_id) AS min_record_id, "
                 + "string_agg(DISTINCT CAST(c.entity_idx AS varchar), ',') AS entity_idxs "
@@ -96,6 +97,7 @@ public class AuditLogQueryRepository {
                     rs.getInt("revision"),
                     rs.getObject("fecha", LocalDateTime.class),
                     rs.getString("usuario"),
+                    ActorType.valueOf(rs.getString("tipo_actor")),
                     rs.getString("descripcion"),
                     rs.getLong("record_count"),
                     entityTypes,
@@ -126,6 +128,7 @@ public class AuditLogQueryRepository {
                         rs.getInt("rev"),
                         rs.getObject("fecha_revision", LocalDateTime.class),
                         rs.getString("usuario"),
+                        ActorType.valueOf(rs.getString("tipo_actor")),
                         toKind(rs.getInt("revtype")),
                         rs.getString("descripcion"),
                         rs.getString("operacion_id")),
@@ -151,7 +154,7 @@ public class AuditLogQueryRepository {
     private String unionBranches(AuditLogCriteria criteria, MapSqlParameterSource params, String extraRestriction) {
         String revFilters = revisionFilters(criteria, params);
         return criteria.targets().stream()
-                .map(target -> "SELECT r." + REV + ", r.fecha_revision, r.usuario, r.descripcion, r.operacion_id, "
+                .map(target -> "SELECT r." + REV + ", r.fecha_revision, r.usuario, r.tipo_actor, r.descripcion, r.operacion_id, "
                         + "x." + REVTYPE + ", CAST(x." + target.idColumn() + " AS varchar) AS record_id, "
                         + registry.indexOf(target) + " AS entity_idx "
                         + "FROM revinfo r JOIN " + target.auditTable() + " x ON x." + REV + " = r." + REV
@@ -181,6 +184,14 @@ public class AuditLogQueryRepository {
         if (criteria.user() != null && !criteria.user().isBlank()) {
             sql.append(" AND r.usuario ILIKE :userPattern ESCAPE '\\'");
             params.addValue("userPattern", "%" + escapeLike(criteria.user()) + "%");
+        }
+        if (criteria.actor() != null) {
+            sql.append(" AND r.tipo_actor = :actor");
+            params.addValue("actor", criteria.actor().name());
+        }
+        if (criteria.q() != null && !criteria.q().isBlank()) {
+            sql.append(" AND r.descripcion ILIKE :descriptionPattern ESCAPE '\\'");
+            params.addValue("descriptionPattern", "%" + escapeLike(criteria.q().strip()) + "%");
         }
         return sql.toString();
     }

@@ -24,6 +24,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -188,6 +189,20 @@ class RoomRequestExpiryServiceImplIntegrationTest extends AbstractIntegrationTes
                         + "ORDER BY r.rev DESC LIMIT 1", overdueId).getFirst();
         assertThat(latest.get("descripcion")).isEqualTo("Vencimiento automático de solicitudes de aula");
         assertThat(latest.get("operacion_id")).isNotNull();
+    }
+
+    @Test
+    @DisplayName("la revisión del ítem vencido queda con tipo_actor SYSTEM")
+    void expiryRevisionIsSystemActor() {
+        Long overdueId = seedItem(RoomRequestStatus.NEW, LocalDate.now().minusDays(1)).getId();
+
+        // MockMvc test context binds a request to the test thread; the scheduler thread has none
+        CompletableFuture.runAsync(expiryService::expireOverdueItems).join();
+
+        String actorType = jdbcTemplate.queryForObject(
+                "SELECT r.tipo_actor FROM revinfo r JOIN solicitud_aula_item_aud a ON a.rev = r.rev "
+                        + "WHERE a.id_item = ? ORDER BY r.rev DESC LIMIT 1", String.class, overdueId);
+        assertThat(actorType).isEqualTo("SYSTEM");
     }
 
     @Test

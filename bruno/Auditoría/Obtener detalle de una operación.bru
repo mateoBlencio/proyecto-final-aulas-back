@@ -20,6 +20,8 @@ params:query {
   ~user:
   ~entityType:
   ~kind:
+  ~actor:
+  ~q:
   ~page: 0
   ~size: 20
 }
@@ -29,4 +31,5 @@ docs {
   paginados y ordenados por revisión descendente. Requiere rol SUBSECRETARIA.
   El operationId sale del campo operationId de las entradas type=OPERATION de
   GET /v1/audit. Página vacía si el operationId no existe.
+  Los filtros actor (HUMAN | SYSTEM) y q (texto en la descripción) también aplican.
 }

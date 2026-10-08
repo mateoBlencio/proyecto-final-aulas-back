@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.audit.repository;
 
+import ar.edu.utn.frc.siga.audit.model.ActorType;
 import ar.edu.utn.frc.siga.audit.model.RevisionKind;
 
 import java.time.LocalDateTime;
@@ -15,6 +16,7 @@ public record AuditGroupRow(
         int revision,
         LocalDateTime date,
         String user,
+        ActorType actorType,
         String description,
         long recordCount,
         List<String> entityTypes,

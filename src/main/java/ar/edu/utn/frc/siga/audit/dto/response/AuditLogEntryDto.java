@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.audit.dto.response;
 
+import ar.edu.utn.frc.siga.audit.model.ActorType;
 import ar.edu.utn.frc.siga.audit.model.RevisionKind;
 
 import java.time.LocalDateTime;
@@ -18,6 +19,8 @@ import java.util.List;
  *       {@code GET /v1/audit/revisions/{revision}}. {@code operationId}, {@code entityType} and
  *       {@code recordId} are null.</li>
  * </ul>
+ * {@code actorType} indicates whether a person ({@code HUMAN}) or a system process ({@code SYSTEM}) made
+ * the change; a null {@code user} with {@code HUMAN} is a request from the public form.
  * For {@code OPERATION} and {@code TRANSACTION}, {@code kind} is the change type shared by all their rows,
  * or null if they are mixed. When the {@code kind} filter is applied, it always matches the filter.
  */
@@ -26,6 +29,7 @@ public record AuditLogEntryDto(
         Integer revision,
         LocalDateTime date,
         String user,
+        ActorType actorType,
         String description,
         RevisionKind kind,
         String entityType,

@@ -20,6 +20,8 @@ params:query {
   ~user:
   ~entityType:
   ~kind:
+  ~actor:
+  ~q:
   ~page: 0
   ~size: 20
 }
@@ -29,4 +31,5 @@ docs {
   paginados y ordenados por revisión descendente, tipo de entidad y recordId. La
   revision sale del campo revision de las entradas type=TRANSACTION de GET /v1/audit.
   Página vacía si la revisión no existe. Filtros opcionales iguales a GET /v1/audit.
+  Los filtros actor (HUMAN | SYSTEM) y q (texto en la descripción) también aplican.
 }

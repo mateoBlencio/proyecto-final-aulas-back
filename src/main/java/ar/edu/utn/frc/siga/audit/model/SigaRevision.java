@@ -2,6 +2,8 @@ package ar.edu.utn.frc.siga.audit.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -39,4 +41,8 @@ public class SigaRevision {
 
     @Column(name = "operacion_id", length = 36)
     private String operacionId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_actor", nullable = false, length = 10)
+    private ActorType actorType;
 }
