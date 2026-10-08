@@ -73,7 +73,8 @@ public class AuditRegistryController {
 
     @GetMapping("/operations/{operationId}")
     @Operation(summary = "Detalle de una operación en lote",
-               description = "Cambios individuales (type=CHANGE) que componen la operación, paginados y "
+               description = "Cambios individuales (type=CHANGE) que componen la operación, con el diff por campo "
+                       + "en 'changes', paginados y "
                        + "ordenados por revisión descendente. Página vacía si el operationId no existe. "
                        + "Filtros opcionales iguales a GET /v1/audit; con los mismos filtros, totalElements "
                        + "coincide con recordCount de la entrada. 'actor' y 'q' también aplican.")
@@ -94,7 +95,8 @@ public class AuditRegistryController {
 
     @GetMapping("/revisions/{revision}")
     @Operation(summary = "Detalle de una transacción (revisión de Envers)",
-               description = "Cambios (type=CHANGE) de una revisión de Envers (una transacción), paginados, "
+               description = "Cambios (type=CHANGE) de una revisión de Envers (una transacción), con el diff por campo "
+                       + "en 'changes', paginados, "
                        + "ordenados por revisión descendente, tipo de entidad y recordId. Página vacía si la "
                        + "revisión no existe. Filtros opcionales iguales a GET /v1/audit; con los mismos "
                        + "filtros, totalElements coincide con recordCount de la entrada. 400 por 'entityType' "

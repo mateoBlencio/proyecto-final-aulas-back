@@ -26,6 +26,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -39,6 +40,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,7 +53,9 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -810,5 +814,201 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
     void pastToWithoutFromReturns200() throws Exception {
         mockMvc.perform(get("/v1/audit").param("to", LocalDate.now().minusDays(1).toString()))
                 .andExpect(status().isOk());
+    }
+    // ---- field-level diff (changes) ----
+
+    private static final AtomicLong DIFF_SEQ = new AtomicLong();
+
+    /** Items of {@code changes} as {@code field:old:new} strings ("null" for a null side), in response order. */
+    private static List<String> changeSummary(JsonNode entry) {
+        List<String> summary = new ArrayList<>();
+        for (JsonNode change : entry.get("changes")) {
+            summary.add(change.get("field").asText() + ":" + change.get("oldValue").asText("null")
+                    + ":" + change.get("newValue").asText("null"));
+        }
+        return summary;
+    }
+
+    private List<JsonNode> operationItems(String operationId) throws Exception {
+        List<JsonNode> items = new ArrayList<>();
+        json(mockMvc, get("/v1/audit/operations/{id}", operationId).param("size", "200")).get("content")
+                .forEach(items::add);
+        return items;
+    }
+
+    private List<JsonNode> revisionItems(int revision) throws Exception {
+        List<JsonNode> items = new ArrayList<>();
+        json(mockMvc, get("/v1/audit/revisions/{rev}", revision).param("size", "200")).get("content")
+                .forEach(items::add);
+        return items;
+    }
+
+    private static JsonNode ofType(List<JsonNode> items, String entityType) {
+        return items.stream().filter(item -> entityType.equals(item.get("entityType").asText()))
+                .findFirst().orElseThrow(() -> new AssertionError("No hay una entrada de " + entityType));
+    }
+
+    private String uniqueUserEmail() {
+        return "diff" + DIFF_SEQ.incrementAndGet() + "." + System.nanoTime() + "@frc.utn.edu.ar";
+    }
+
+    private long createUser(String email, boolean withRole) throws Exception {
+        String role = withRole ? ",\"initialRole\":{\"role\":\"CONSULTA\",\"scopeType\":\"GLOBAL\"}" : "";
+        MvcResult result = mockMvc.perform(post("/v1/users").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"supersegura\","
+                                + "\"firstName\":\"Diff\",\"lastName\":\"Test\"" + role + "}"))
+                .andExpect(status().isCreated()).andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
+    }
+
+    private int lastRevisionOf(String table, String idColumn, Object id) {
+        return jdbcTemplate.queryForObject(
+                "SELECT MAX(rev) FROM " + table + " WHERE " + idColumn + " = ?", Integer.class, id);
+    }
+
+    @Test
+    @DisplayName("dos PUT /v1/settings/{key} (A y luego B): el item de la segunda operación trae changes=[{value, A, B}]")
+    void secondSettingsPutShowsPreviousAndNewValue() throws Exception {
+        SettingKey key = SettingKey.EVENTS_HOURS_END;
+        String current = settingsStore.getRaw(key);
+        originalSettings.putIfAbsent(key, current);
+        List<String> candidates = List.of("21:10", "21:11", "21:12").stream().filter(v -> !v.equals(current)).toList();
+        String a = candidates.get(0);
+        String b = candidates.get(1);
+
+        bumpSetting(a);
+        bumpSetting(b);
+        String secondOperation = latestOperationId(SETTINGS_OPERATION);
+
+        List<JsonNode> items = operationItems(secondOperation);
+        assertThat(items).hasSize(1);
+        assertThat(items.getFirst().get("kind").asText()).isEqualTo("MODIFIED");
+        assertThat(changeSummary(items.getFirst())).containsExactly("value:" + a + ":" + b);
+    }
+
+    @Test
+    @DisplayName("liberar una ocurrencia deja un único cambio en status: NEEDS_ROOM a ROOM_RELEASED")
+    void releasingAnOccurrenceShowsOnlyStatusChange() throws Exception {
+        seedRecurringEvent(LocalDate.now().plusDays(60));
+        long occurrenceId = jdbcTemplate.queryForObject(
+                "SELECT MAX(id_ocurrencia) FROM ocurrencia_aud WHERE revtype = 0", Long.class);
+        mockMvc.perform(post("/v1/events/occurrences/{id}/release", occurrenceId)).andExpect(status().is2xxSuccessful());
+        String operationId = latestOperationId("Liberación de ocurrencia");
+
+        List<JsonNode> items = operationItems(operationId);
+
+        assertThat(items).hasSize(1);
+        assertThat(items.getFirst().get("entityType").asText()).isEqualTo("Ocurrencia");
+        assertThat(changeSummary(items.getFirst())).containsExactly("status:NEEDS_ROOM:ROOM_RELEASED");
+    }
+
+    @Test
+    @DisplayName("el cambio de un campo de la subclase de un evento recurrente (dayOfWeek) aparece en el diff de la revisión")
+    void subclassFieldChangeOfRecurringEventAppearsInDiff() throws Exception {
+        LocalDate date = LocalDate.now().plusDays(70);
+        seedRecurringEvent(date);
+        long eventId = jdbcTemplate.queryForObject("SELECT MAX(id_evento_academico) FROM evento_recurrente_aud", Long.class);
+        DayOfWeek newDay = date.getDayOfWeek().plus(1);
+        new TransactionTemplate(transactionManager).executeWithoutResult(tx ->
+                ReflectionTestUtils.setField(recurringEventRepository.findById(eventId).orElseThrow(), "dayOfWeek", newDay));
+        int revision = lastRevisionOf("evento_academico_aud", "id_evento_academico", eventId);
+
+        JsonNode change = ofType(revisionItems(revision), "Evento académico");
+
+        assertThat(change.get("kind").asText()).isEqualTo("MODIFIED");
+        assertThat(changeSummary(change)).containsExactly("dayOfWeek:" + date.getDayOfWeek() + ":" + newDay);
+    }
+
+    @Test
+    @DisplayName("una baja (revocar un rol) trae el último estado con newValue null en todos los campos")
+    void deletionShowsLastStateWithNullNewValues() throws Exception {
+        long userId = createUser(uniqueUserEmail(), true);
+        long assignmentId = jdbcTemplate.queryForObject(
+                "SELECT id_usuario_rol FROM usuario_rol WHERE id_usuario = ?", Long.class, userId);
+        mockMvc.perform(delete("/v1/users/{id}/role-assignments/{aid}", userId, assignmentId))
+                .andExpect(status().is2xxSuccessful());
+        String operationId = latestOperationId("Revocación de rol");
+
+        List<JsonNode> items = operationItems(operationId);
+
+        assertThat(items).hasSize(1);
+        assertThat(items.getFirst().get("kind").asText()).isEqualTo("DELETED");
+        assertThat(changeSummary(items.getFirst())).containsExactlyInAnyOrder(
+                "user:" + userId + ":null", "role:CONSULTA:null", "scopeType:GLOBAL:null");
+    }
+
+    @Test
+    @DisplayName("GET /v1/audit devuelve changes null en todas las entradas")
+    void mainListingHasNullChanges() throws Exception {
+        bumpSetting("21:13");
+        seedRecurringEvent(LocalDate.now().plusDays(80));
+
+        JsonNode page = json(mockMvc, get("/v1/audit").param("size", "200"));
+
+        assertThat(page.get("content")).isNotEmpty().allSatisfy(entry -> assertThat(isAbsent(entry.get("changes"))).isTrue());
+        assertThat(page.get("content")).extracting(entry -> entry.get("type").asText())
+                .contains("OPERATION");
+    }
+
+    @Test
+    @DisplayName("las entradas OPERATION y TRANSACTION no traen changes; solo los CHANGE de los drill-downs")
+    void drillDownItemsHaveChangesAndGroupsDoNot() throws Exception {
+        seedRecurringEvent(LocalDate.now().plusDays(81));
+        String operationId = latestOperationId("Alta de evento recurrente");
+
+        JsonNode listing = json(mockMvc, get("/v1/audit").param("size", "200"));
+        assertThat(isAbsent(operationEntry(listing, operationId).get("changes"))).isTrue();
+        assertThat(operationItems(operationId)).isNotEmpty().allSatisfy(item -> {
+            assertThat(item.get("type").asText()).isEqualTo("CHANGE");
+            assertThat(item.get("changes").isArray()).isTrue();
+        });
+    }
+
+    @Test
+    @DisplayName("las relaciones salen con el nombre de la propiedad (event, user), sin sufijo _id")
+    void relationsUseThePropertyNameWithoutIdSuffix() throws Exception {
+        seedRecurringEvent(LocalDate.now().plusDays(90));
+        long eventId = jdbcTemplate.queryForObject("SELECT MAX(id_evento_academico) FROM evento_recurrente_aud", Long.class);
+        long occurrenceId = jdbcTemplate.queryForObject("SELECT MAX(id_ocurrencia) FROM ocurrencia_aud WHERE revtype = 0", Long.class);
+        JsonNode occurrence = ofType(revisionItems(lastRevisionOf("ocurrencia_aud", "id_ocurrencia", occurrenceId)),
+                "Ocurrencia");
+
+        long userId = createUser(uniqueUserEmail(), true);
+        long assignmentId = jdbcTemplate.queryForObject(
+                "SELECT id_usuario_rol FROM usuario_rol WHERE id_usuario = ?", Long.class, userId);
+        JsonNode assignment = ofType(revisionItems(lastRevisionOf("usuario_rol_aud", "id_usuario_rol", assignmentId)),
+                "Asignación de rol");
+
+        assertThat(changeSummary(occurrence)).contains("event:null:" + eventId);
+        assertThat(changeSummary(assignment)).contains("user:null:" + userId);
+        for (JsonNode entry : List.of(occurrence, assignment)) {
+            for (JsonNode change : entry.get("changes")) {
+                assertThat(change.get("field").asText()).doesNotEndWith("_id");
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("passwordHash no aparece en el diff de un User: ni al crearlo ni al modificarlo, ni su valor en la respuesta")
+    void passwordHashNeverAppearsInUserDiff() throws Exception {
+        long userId = createUser(uniqueUserEmail(), false);
+        String hash = jdbcTemplate.queryForObject("SELECT password_hash FROM usuario WHERE id_usuario = ?",
+                String.class, userId);
+        int creation = lastRevisionOf("usuario_aud", "id_usuario", userId);
+        mockMvc.perform(patch("/v1/users/{id}/enabled", userId).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":false}")).andExpect(status().isOk());
+        int modification = lastRevisionOf("usuario_aud", "id_usuario", userId);
+        assertThat(modification).isGreaterThan(creation);
+
+        for (int revision : List.of(creation, modification)) {
+            MvcResult result = mockMvc.perform(get("/v1/audit/revisions/{rev}", revision).param("size", "200"))
+                    .andExpect(status().isOk()).andReturn();
+            String body = result.getResponse().getContentAsString();
+            assertThat(body).doesNotContain(hash).doesNotContain("passwordHash").doesNotContain("password_hash");
+        }
+        JsonNode created = ofType(revisionItems(creation), "Usuario");
+        assertThat(changeSummary(created)).anyMatch(c -> c.startsWith("email:null:"));
+        JsonNode modified = ofType(revisionItems(modification), "Usuario");
+        assertThat(changeSummary(modified)).containsExactly("enabled:true:false");
     }
 }

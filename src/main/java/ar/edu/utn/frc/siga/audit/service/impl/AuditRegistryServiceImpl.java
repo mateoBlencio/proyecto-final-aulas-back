@@ -8,6 +8,9 @@ import ar.edu.utn.frc.siga.audit.repository.AuditChangeRow;
 import ar.edu.utn.frc.siga.audit.repository.AuditGroupRow;
 import ar.edu.utn.frc.siga.audit.repository.AuditLogCriteria;
 import ar.edu.utn.frc.siga.audit.repository.AuditLogQueryRepository;
+import ar.edu.utn.frc.siga.audit.repository.AuditRecordStateRepository;
+import ar.edu.utn.frc.siga.audit.repository.AuditRecordStateRepository.RecordRevision;
+import ar.edu.utn.frc.siga.audit.repository.AuditRecordStateRepository.RecordStates;
 import ar.edu.utn.frc.siga.audit.repository.ChangeScope;
 import ar.edu.utn.frc.siga.audit.service.AuditRegistryService;
 import ar.edu.utn.frc.siga.audit.service.AuditedEntity;
@@ -25,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -32,6 +36,7 @@ import java.util.List;
 public class AuditRegistryServiceImpl implements AuditRegistryService {
 
     private final AuditLogQueryRepository repository;
+    private final AuditRecordStateRepository stateRepository;
     private final AuditedEntityRegistry registry;
     private final AuditLogEntryMapper auditLogEntryMapper;
 
@@ -66,8 +71,23 @@ public class AuditRegistryServiceImpl implements AuditRegistryService {
 
     private Page<AuditLogEntryDto> findItems(AuditLogCriteria criteria, ChangeScope scope, Pageable pageable) {
         long total = repository.countChanges(criteria, scope);
-        List<AuditLogEntryDto> content = repository.findChanges(criteria, scope, pageable).stream()
-                .map((AuditChangeRow row) -> auditLogEntryMapper.toChange(row.metadata(), row.entityType()))
+        List<AuditChangeRow> rows = repository.findChanges(criteria, scope, pageable);
+        // Diff only for the requested page: one query per entity type present in it.
+        Map<RecordRevision, RecordStates> states = stateRepository.load(rows.stream()
+                .map(row -> new RecordRevision(row.entity(), row.metadata().recordId(), row.metadata().revision()))
+                .toList());
+        List<AuditLogEntryDto> content = rows.stream()
+                .map(row -> {
+                    RecordRevision key = new RecordRevision(row.entity(), row.metadata().recordId(), row.metadata().revision());
+                    RecordStates recordStates = states.get(key);
+                    if (recordStates == null) {
+                        log.warn("Audited state not found for {} id={} rev={}; changes left null",
+                                row.entity().label(), key.recordId(), key.revision());
+                    }
+                    return auditLogEntryMapper.toChange(row.metadata(), row.entity().label(),
+                            recordStates == null ? null
+                                    : FieldDiffCalculator.calculate(row.entity(), row.metadata().kind(), recordStates));
+                })
                 .toList();
         return new PageImpl<>(content, pageable, total);
     }
@@ -79,7 +99,7 @@ public class AuditRegistryServiceImpl implements AuditRegistryService {
         if (row.recordCount() == 1) {
             RevisionMetadata metadata = new RevisionMetadata(row.singleRecordId(), row.revision(), row.date(),
                     row.user(), row.actorType(), row.commonKind(), row.description(), null);
-            return auditLogEntryMapper.toChange(metadata, row.singleEntityType());
+            return auditLogEntryMapper.toChange(metadata, row.singleEntityType(), null);
         }
         return auditLogEntryMapper.toTransaction(row);
     }

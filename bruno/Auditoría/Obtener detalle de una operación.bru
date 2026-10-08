@@ -32,4 +32,14 @@ docs {
   El operationId sale del campo operationId de las entradas type=OPERATION de
   GET /v1/audit. Página vacía si el operationId no existe.
   Los filtros actor (HUMAN | SYSTEM) y q (texto en la descripción) también aplican.
+
+  Cada CHANGE trae 'changes': diff por campo [{field, oldValue, newValue}] de
+  esa revisión, calculado contra la revisión anterior del mismo registro.
+  CREATED lista los campos con valor (oldValue null), DELETED lista el último
+  estado (newValue null) y MODIFIED solo los campos que cambiaron (sin
+  revisión anterior, todos los campos con valor). 'field' es el nombre de la
+  propiedad Java; las relaciones muestran el id del registro relacionado.
+  Viene vacío si no cambió ningún campo auditado y null si el estado auditado
+  del registro no está disponible. Se calcula solo para
+  la página pedida.
 }

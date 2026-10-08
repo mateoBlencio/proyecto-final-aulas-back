@@ -11,6 +11,10 @@ import ar.edu.utn.frc.siga.audit.repository.AuditChangeRow;
 import ar.edu.utn.frc.siga.audit.repository.AuditGroupRow;
 import ar.edu.utn.frc.siga.audit.repository.AuditLogCriteria;
 import ar.edu.utn.frc.siga.audit.repository.AuditLogQueryRepository;
+import ar.edu.utn.frc.siga.audit.repository.AuditRecordStateRepository;
+import ar.edu.utn.frc.siga.audit.repository.AuditRecordStateRepository.RecordRevision;
+import ar.edu.utn.frc.siga.audit.repository.AuditRecordStateRepository.RecordStates;
+import ar.edu.utn.frc.siga.audit.dto.response.FieldChangeDto;
 import ar.edu.utn.frc.siga.audit.repository.ChangeScope;
 import ar.edu.utn.frc.siga.audit.service.AuditedEntity;
 import ar.edu.utn.frc.siga.audit.service.AuditedEntityRegistry;
@@ -29,13 +33,16 @@ import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -45,13 +52,15 @@ import static org.mockito.Mockito.when;
 class AuditRegistryServiceImplTest {
 
     private static final AuditedEntity ALLOCATION =
-            new AuditedEntity(String.class, "Allocation", "Asignación", "asignacion_aula_aud", "id_asignacion");
+            new AuditedEntity(String.class, "Allocation", "Asignación", "asignacion_aula_aud", "id_asignacion", Long.class, List.of());
     private static final AuditedEntity SETTING =
-            new AuditedEntity(Integer.class, "Setting", "Configuración", "configuracion_aud", "clave");
+            new AuditedEntity(Integer.class, "Setting", "Configuración", "configuracion_aud", "clave", String.class, List.of());
     private static final LocalDateTime DATE = LocalDateTime.of(2026, 5, 4, 10, 30);
 
     @Mock
     private AuditLogQueryRepository repository;
+    @Mock
+    private AuditRecordStateRepository stateRepository;
     @Mock
     private AuditedEntityRegistry registry;
 
@@ -59,7 +68,7 @@ class AuditRegistryServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new AuditRegistryServiceImpl(repository, registry, new AuditLogEntryMapperImpl());
+        service = new AuditRegistryServiceImpl(repository, stateRepository, registry, new AuditLogEntryMapperImpl());
         lenient().when(registry.all()).thenReturn(List.of(ALLOCATION, SETTING));
         lenient().when(registry.byLabel("Asignación")).thenReturn(Optional.of(ALLOCATION));
         lenient().when(registry.byLabel("Configuración")).thenReturn(Optional.of(SETTING));
@@ -311,7 +320,7 @@ class AuditRegistryServiceImplTest {
                 "Reasignación en lote", "op-9");
         when(repository.countChanges(any(), any())).thenReturn(40L);
         when(repository.findChanges(any(), any(), any())).thenReturn(List.of(
-                new AuditChangeRow(first, "Asignación"), new AuditChangeRow(second, "Configuración")));
+                new AuditChangeRow(first, ALLOCATION), new AuditChangeRow(second, SETTING)));
 
         Page<AuditLogEntryDto> page = service.findOperationItems("op-9", filter(null), PageRequest.of(0, 2));
 
@@ -323,6 +332,93 @@ class AuditRegistryServiceImplTest {
         assertThat(page.getContent()).extracting(AuditLogEntryDto::operationId).containsOnly("op-9");
         verify(repository).countChanges(any(), org.mockito.ArgumentMatchers.eq(ChangeScope.ofOperation("op-9")));
         verify(repository).findChanges(any(), org.mockito.ArgumentMatchers.eq(ChangeScope.ofOperation("op-9")), any());
+    }
+
+    @Test
+    @DisplayName("findOperationItems carga el estado con una sola llamada a stateRepository.load por página, con la clave de cada fila")
+    @SuppressWarnings("unchecked")
+    void findOperationItems_loadsStatesOncePerPage() {
+        RevisionMetadata first = new RevisionMetadata("1", 21, DATE, "user@frc", ActorType.HUMAN, RevisionKind.CREATED,
+                "Reasignación en lote", "op-9");
+        RevisionMetadata second = new RevisionMetadata("2", 20, DATE, "user@frc", ActorType.HUMAN, RevisionKind.MODIFIED,
+                "Reasignación en lote", "op-9");
+        when(repository.countChanges(any(), any())).thenReturn(2L);
+        when(repository.findChanges(any(), any(), any())).thenReturn(List.of(
+                new AuditChangeRow(first, ALLOCATION), new AuditChangeRow(second, SETTING)));
+
+        service.findOperationItems("op-9", filter(null), PageRequest.of(0, 2));
+
+        ArgumentCaptor<Collection<RecordRevision>> keys = ArgumentCaptor.forClass(Collection.class);
+        verify(stateRepository, times(1)).load(keys.capture());
+        assertThat(keys.getValue()).containsExactlyInAnyOrder(
+                new RecordRevision(ALLOCATION, "1", 21), new RecordRevision(SETTING, "2", 20));
+    }
+
+    @Test
+    @DisplayName("findRevisionItems también carga el estado una vez por página")
+    void findRevisionItems_loadsStatesOncePerPage() {
+        when(repository.countChanges(any(), any())).thenReturn(0L);
+
+        service.findRevisionItems(77, filter(null), PageRequest.of(0, 10));
+
+        verify(stateRepository, times(1)).load(any());
+    }
+
+    @Test
+    @DisplayName("findAll no consulta stateRepository y sus entradas traen changes null")
+    void findAll_doesNotLoadStates() {
+        when(repository.countGroups(any())).thenReturn(3L);
+        when(repository.findGroups(any(), any())).thenReturn(List.of(
+                operationGroup(11, "op-1", "Asignación de aulas en lote", 3),
+                looseGroup(5, 1, List.of("Asignación"), RevisionKind.CREATED, null),
+                looseGroup(4, 2, List.of("Asignación", "Configuración"), RevisionKind.MODIFIED, null)));
+
+        Page<AuditLogEntryDto> page = service.findAll(filter(null), PageRequest.of(0, 10));
+
+        assertThat(page.getContent()).extracting(AuditLogEntryDto::type).containsExactly(
+                AuditLogEntryType.OPERATION, AuditLogEntryType.CHANGE, AuditLogEntryType.TRANSACTION);
+        assertThat(page.getContent()).allSatisfy(entry -> assertThat(entry.changes()).isNull());
+        verifyNoInteractions(stateRepository);
+    }
+
+    @Test
+    @DisplayName("el diff de cada fila usa su estado cargado y una fila sin estado cargado queda con changes null")
+    void findOperationItems_buildsChangesFromLoadedStates() {
+        AuditedEntity withColumns = new AuditedEntity(Integer.class, "Setting", "Configuración", "configuracion_aud",
+                "clave", String.class, List.of(new AuditedEntity.AuditedColumn("configuracion_aud", "valor", "value")));
+        RevisionMetadata loaded = new RevisionMetadata("k1", 31, DATE, "user@frc", ActorType.HUMAN,
+                RevisionKind.MODIFIED, "Modificación de configuración", "op-1");
+        RevisionMetadata missing = new RevisionMetadata("k2", 30, DATE, "user@frc", ActorType.HUMAN,
+                RevisionKind.MODIFIED, "Modificación de configuración", "op-1");
+        when(repository.countChanges(any(), any())).thenReturn(2L);
+        when(repository.findChanges(any(), any(), any())).thenReturn(List.of(
+                new AuditChangeRow(loaded, withColumns), new AuditChangeRow(missing, withColumns)));
+        when(stateRepository.load(any())).thenReturn(Map.of(
+                new RecordRevision(withColumns, "k1", 31),
+                new RecordStates(Map.of("value", "B"), Map.of("value", "A"))));
+
+        Page<AuditLogEntryDto> page = service.findOperationItems("op-1", filter(null), PageRequest.of(0, 2));
+
+        assertThat(page.getContent().get(0).changes()).containsExactly(new FieldChangeDto("value", "A", "B"));
+        assertThat(page.getContent().get(1).changes()).isNull();
+    }
+
+    @Test
+    @DisplayName("un MODIFIED con estado cargado y sin campos auditados distintos queda con changes de lista vacía, no null")
+    void findOperationItems_modifiedWithoutAuditedChangesHasEmptyList() {
+        AuditedEntity withColumns = new AuditedEntity(Integer.class, "Setting", "Configuración", "configuracion_aud",
+                "clave", String.class, List.of(new AuditedEntity.AuditedColumn("configuracion_aud", "valor", "value")));
+        RevisionMetadata metadata = new RevisionMetadata("k1", 31, DATE, "user@frc", ActorType.HUMAN,
+                RevisionKind.MODIFIED, "Modificación de configuración", "op-1");
+        when(repository.countChanges(any(), any())).thenReturn(1L);
+        when(repository.findChanges(any(), any(), any())).thenReturn(List.of(new AuditChangeRow(metadata, withColumns)));
+        when(stateRepository.load(any())).thenReturn(Map.of(
+                new RecordRevision(withColumns, "k1", 31),
+                new RecordStates(Map.of("value", "A"), Map.of("value", "A"))));
+
+        Page<AuditLogEntryDto> page = service.findOperationItems("op-1", filter(null), PageRequest.of(0, 1));
+
+        assertThat(page.getContent().getFirst().changes()).isNotNull().isEmpty();
     }
 
     @Test
