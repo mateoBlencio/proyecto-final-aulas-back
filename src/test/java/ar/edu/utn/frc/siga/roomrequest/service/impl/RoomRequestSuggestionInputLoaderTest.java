@@ -242,7 +242,7 @@ class RoomRequestSuggestionInputLoaderTest {
         RoomRequestItem item = item(RoomRequestType.ONE_TIME_ROOM_CHANGE).sourceRecurringEventId(100L).build();
         item.assignClassrooms(List.of(10L), List.of(List.of(900L)));
         stubItem(item);
-        stubCandidates(item, List.of(room(10L, 30, 1L)));
+        stubCandidates(item, List.of(room(11L, 30, 1L)));
         stubPermissions(Map.of());
         LocalTime s = LocalTime.of(8, 0);
         LocalTime e = LocalTime.of(9, 0);
@@ -254,6 +254,21 @@ class RoomRequestSuggestionInputLoaderTest {
         RoomRequestSuggestionInputLoader.Inputs inputs = loader.load(ITEM_ID, Set.of(), ACTOR);
 
         assertThat(inputs.occupancy()).containsExactly(new OptimizerOccupancy(10L, DATE, s, e));
+    }
+
+    @Test
+    void noSugiereElAulaDondeYaEstaLaClaseDelEventoDeOrigen() {
+        RoomRequestItem item = item(RoomRequestType.ONE_TIME_ROOM_CHANGE).sourceRecurringEventId(100L).build();
+        stubItem(item);
+        stubCandidates(item, List.of(room(10L, 30, 1L), room(11L, 30, 1L)));
+        stubPermissions(Map.of());
+        when(allocationOccupancyService.findOccupancy(DATE, DATE)).thenReturn(List.of(
+                new OccupiedSlot(10L, DATE, LocalTime.of(8, 0), LocalTime.of(9, 0), 100L, 1L, 800L)));
+
+        RoomRequestSuggestionInputLoader.Inputs inputs = loader.load(ITEM_ID, Set.of(), ACTOR);
+
+        assertThat(inputs.classrooms()).extracting(ClassroomResponseDto::id).containsExactly(11L);
+        assertThat(inputs.rooms()).extracting(OptimizerRoom::id).containsExactly(11L);
     }
 
     @Test

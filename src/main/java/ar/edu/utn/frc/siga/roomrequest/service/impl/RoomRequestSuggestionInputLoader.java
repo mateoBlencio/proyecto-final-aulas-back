@@ -67,22 +67,31 @@ class RoomRequestSuggestionInputLoader {
         }
         Set<LocalDate> dates = datesOf(item);
 
+        Set<Long> ownOccurrenceIds = item.getAllocations().stream()
+                .map(RoomRequestItemAllocation::getOccurrenceId)
+                .collect(Collectors.toSet());
+        LocalDate from = dates.stream().min(Comparator.naturalOrder()).orElseThrow();
+        LocalDate to = dates.stream().max(Comparator.naturalOrder()).orElseThrow();
+        Long sourceEventId = item.getSourceRecurringEventId();
+        List<OccupiedSlot> slots = allocationOccupancyService.findOccupancy(from, to).stream()
+                .filter(slot -> !ownOccurrenceIds.contains(slot.occurrenceId()))
+                .toList();
+        Set<Long> currentClassroomIds = sourceEventId == null ? Set.of() : slots.stream()
+                .filter(slot -> sourceEventId.equals(slot.eventId()))
+                .map(OccupiedSlot::classroomId)
+                .collect(Collectors.toSet());
+
         List<ClassroomResponseDto> classrooms = candidateResolver.candidateClassrooms(item).stream()
                 .filter(c -> !excludedClassroomIds.contains(c.id()))
+                .filter(c -> !currentClassroomIds.contains(c.id()))
                 .filter(c -> item.getDerivedBuildingId() == null || item.getDerivedBuildingId().equals(c.buildingId()))
                 .toList();
         Map<Long, ClassroomSubjectPermissionDto> permissionsByRoom = classrooms.isEmpty() ? Map.of()
                 : classroomService.findSubjectPermissions(classrooms.stream().map(ClassroomResponseDto::id).toList());
         List<OptimizerRoom> rooms = classrooms.stream().map(c -> toSolverRoom(c, permissionsByRoom.get(c.id()))).toList();
 
-        Set<Long> ownOccurrenceIds = item.getAllocations().stream()
-                .map(RoomRequestItemAllocation::getOccurrenceId)
-                .collect(Collectors.toSet());
-        LocalDate from = dates.stream().min(Comparator.naturalOrder()).orElseThrow();
-        LocalDate to = dates.stream().max(Comparator.naturalOrder()).orElseThrow();
-        List<OptimizerOccupancy> occupancy = allocationOccupancyService.findOccupancy(from, to).stream()
-                .filter(slot -> !Objects.equals(slot.eventId(), item.getSourceRecurringEventId()))
-                .filter(slot -> !ownOccurrenceIds.contains(slot.occurrenceId()))
+        List<OptimizerOccupancy> occupancy = slots.stream()
+                .filter(slot -> sourceEventId == null || !sourceEventId.equals(slot.eventId()))
                 .map(this::toOccupancy)
                 .toList();
 

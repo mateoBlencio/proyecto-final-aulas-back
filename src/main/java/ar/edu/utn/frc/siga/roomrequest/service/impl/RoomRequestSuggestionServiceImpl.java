@@ -63,7 +63,7 @@ public class RoomRequestSuggestionServiceImpl implements RoomRequestSuggestionSe
 
         List<Long> classroomIds = result.allocations().stream()
                 .filter(a -> a.classroomId() != null)
-                .sorted(Comparator.comparing(OptimizerAllocation::eventId))
+                .sorted(Comparator.comparingInt(a -> Integer.parseInt(a.eventId().substring(a.eventId().lastIndexOf('-') + 1))))
                 .map(OptimizerAllocation::classroomId)
                 .toList();
         if (classroomIds.isEmpty()) {
@@ -91,16 +91,25 @@ public class RoomRequestSuggestionServiceImpl implements RoomRequestSuggestionSe
     @Transactional
     public RoomRequestItemResponseDto confirm(Long itemId, String suggestionId, String reason, String actor) {
         RoomRequestSuggestion suggestion = store.take(suggestionId)
-                .filter(s -> s.itemId().equals(itemId))
                 .orElseThrow(() -> new ExpiredSuggestionException(suggestionId));
+        if (!suggestion.itemId().equals(itemId)) {
+            store.save(suggestion);
+            throw new ExpiredSuggestionException(suggestionId);
+        }
         Long currentVersion = itemRepository.findById(itemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId))
                 .getVersion();
         if (!currentVersion.equals(suggestion.itemVersion())) {
             throw new ExpiredSuggestionException(suggestionId);
         }
-        RoomRequestItemResponseDto response =
-                resolutionService.assignAutomatic(itemId, suggestion.classroomIds(), reason, actor);
+        RoomRequestItemResponseDto response;
+        try {
+            response = resolutionService.assignAutomatic(itemId, suggestion.classroomIds(), reason, actor);
+        } catch (RuntimeException e) {
+            // El cache no hace rollback con la transacción: se devuelve la sugerencia para que el usuario pueda reintentar (ej. completar el motivo).
+            store.save(suggestion);
+            throw e;
+        }
         log.info("Confirm de sugerencia de pedido: suggestionId={}, itemId={}", suggestionId, itemId);
         return response;
     }

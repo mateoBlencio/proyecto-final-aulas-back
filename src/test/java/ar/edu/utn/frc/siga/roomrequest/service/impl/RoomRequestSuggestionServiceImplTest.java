@@ -156,6 +156,39 @@ class RoomRequestSuggestionServiceImplTest {
 
         assertThatThrownBy(() -> service.confirm(99L, suggestionId, null, ACTOR))
                 .isInstanceOf(ExpiredSuggestionException.class);
+
+        stubItemVersion(1L);
+        service.confirm(ITEM_ID, suggestionId, null, ACTOR);
+        verify(resolutionService).assignAutomatic(ITEM_ID, List.of(10L), null, ACTOR);
+    }
+
+    @Test
+    void confirmDevuelveLaSugerenciaSiLaAsignacionFalla() {
+        String suggestionId = suggestOneRoom();
+        stubItemVersion(1L);
+        when(resolutionService.assignAutomatic(ITEM_ID, List.of(10L), null, ACTOR))
+                .thenThrow(new IllegalStateException("falta el motivo"))
+                .thenReturn(null);
+
+        assertThatThrownBy(() -> service.confirm(ITEM_ID, suggestionId, null, ACTOR))
+                .isInstanceOf(IllegalStateException.class);
+        service.confirm(ITEM_ID, suggestionId, "motivo", ACTOR);
+    }
+
+    @Test
+    void ordenaLasAulasPorIndiceDeEventoNoPorTexto() {
+        List<Long> ids = java.util.stream.LongStream.rangeClosed(100, 110).boxed().toList();
+        OptimizerAllocation[] allocations = new OptimizerAllocation[11];
+        for (int i = 0; i < 11; i++) {
+            allocations[10 - i] = new OptimizerAllocation("rr-7-" + i, ids.get(i));
+        }
+        stubSolver(allocations);
+        when(inputLoader.load(eq(ITEM_ID), any(), eq(ACTOR)))
+                .thenReturn(inputs(11, ids.stream().map(id -> room(id, 30)).toList()));
+
+        RoomRequestSuggestionResponseDto response = service.suggest(ITEM_ID, null, ACTOR);
+
+        assertThat(response.classrooms()).extracting(ClassroomResponseDto::id).containsExactlyElementsOf(ids);
     }
 
     @Test
