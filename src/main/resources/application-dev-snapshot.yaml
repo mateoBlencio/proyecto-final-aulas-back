@@ -12,7 +12,8 @@ spring:
     # dev real tiene una fila huerfana en flyway_schema_history (una migracion de "notification"
     # que se corrio sin commitear y se reviertio en el codigo, ver CLAUDE.md). El dump la trae
     # pegada; sin esto Flyway rechaza el arranque con "applied migration not resolved locally".
-    ignore-migration-patterns: "*:missing"
+    # "future" cubre migraciones de otras ramas ya aplicadas en dev que todavia no estan en esta.
+    ignore-migration-patterns: "*:missing,*:future"
 
 springdoc:
   swagger-ui:

@@ -44,6 +44,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 
 /** Transiciones de estado de un ítem (assign/cancel/derive/return/notify). La resolución de qué ocurrencias u
  *  aulas/edificios son candidatos vive en {@link RoomRequestOccurrenceResolver} y {@link RoomRequestCandidateResolver}. */
@@ -68,6 +69,18 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
     @Override
     @Transactional
     public RoomRequestItemResponseDto assign(Long itemId, List<Long> classroomIds, String reason, String actor) {
+        return assign(itemId, classroomIds, reason, actor, items -> AllocationCommand.manual(items, reason));
+    }
+
+    @Override
+    @Transactional
+    public RoomRequestItemResponseDto assignAutomatic(Long itemId, List<Long> classroomIds, String reason,
+                                                      String actor) {
+        return assign(itemId, classroomIds, reason, actor, items -> AllocationCommand.automatic(items, reason));
+    }
+
+    private RoomRequestItemResponseDto assign(Long itemId, List<Long> classroomIds, String reason, String actor,
+                                              Function<List<AllocationItem>, AllocationCommand> commandFactory) {
         log.debug("Asignando aula(s) a pedido: itemId={}, classroomIds={}", itemId, classroomIds);
 
         RoomRequestItem item = itemRepository.findWithRequestById(itemId)
@@ -109,7 +122,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
             allocationItems.add(new AllocationItem(
                     new AllocationTarget.Occurrences(occurrencesBySlot.get(i)), ids.get(i)));
         }
-        allocationService.reallocate(AllocationCommand.manual(allocationItems, reason));
+        allocationService.reallocate(commandFactory.apply(allocationItems));
 
         item.assignClassrooms(ids, occurrencesBySlot);
         item.decide(RoomRequestStatus.IN_EVALUATION, actor, reason, LocalDateTime.now());

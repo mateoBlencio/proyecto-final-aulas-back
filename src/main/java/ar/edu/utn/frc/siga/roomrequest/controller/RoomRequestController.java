@@ -3,9 +3,11 @@ package ar.edu.utn.frc.siga.roomrequest.controller;
 import ar.edu.utn.frc.siga.roomrequest.dto.RoomRequestItemFilter;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.AssignRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CancelRoomRequestItemDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.ConfirmRoomRequestSuggestionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.DeriveRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.ReturnRoomRequestItemDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.SuggestRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
@@ -13,11 +15,13 @@ import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemRowDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemStatusCountDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestResponseDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestSuggestionResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestResolutionService;
 import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestService;
+import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestSuggestionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -55,6 +59,7 @@ public class RoomRequestController {
 
     private final RoomRequestService roomRequestService;
     private final RoomRequestResolutionService roomRequestResolutionService;
+    private final RoomRequestSuggestionService roomRequestSuggestionService;
 
     @PostMapping
     @Operation(summary = "Crear una solicitud de aula",
@@ -226,6 +231,43 @@ public class RoomRequestController {
         log.debug("GET /v1/room-requests/items/{}/candidate-buildings", id);
         List<CandidateBuildingDto> response = roomRequestResolutionService.findCandidateBuildings(id);
         log.info("Edificios candidatos listados vía controller: itemId={}, total={}", id, response.size());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/items/{id}/suggestion")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
+    @Operation(summary = "Sugerir aula(s) para un pedido",
+               description = "Corre el solver con la fecha, el horario y los requisitos del pedido y devuelve "
+                       + "las aulas sugeridas con su suggestionId, sin persistir nada. status=PARTIAL si el "
+                       + "solver cubre menos aulas que classroomCount; NO_ROOM_AVAILABLE (sin suggestionId) si "
+                       + "ninguna cumple las reglas hard. El body es opcional.")
+    public ResponseEntity<RoomRequestSuggestionResponseDto> suggestItem(
+            @PathVariable Long id,
+            @Valid @RequestBody(required = false) SuggestRoomRequestItemDto dto,
+            Principal principal) {
+        log.debug("POST /v1/room-requests/items/{}/suggestion", id);
+        RoomRequestSuggestionResponseDto response = roomRequestSuggestionService.suggest(
+                id, dto == null ? null : dto.excludedClassroomIds(), principal.getName());
+        log.info("Sugerencia de aula para pedido vía controller: itemId={}, status={}", id, response.status());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/items/{id}/suggestion/{suggestionId}/confirm")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
+    @Operation(summary = "Confirmar la sugerencia de aula de un pedido",
+               description = "Asigna, con source=AUTOMATIC, las aulas de la sugerencia y deja el pedido en "
+                       + "IN_EVALUATION, revalidando todo contra la base. 410 si la sugerencia expiró, no "
+                       + "existe, ya se usó (se consume al primer intento) o el pedido cambió desde que se generó. "
+                       + "El body es opcional: el motivo solo es obligatorio si la sugerencia es PARTIAL.")
+    public ResponseEntity<RoomRequestItemResponseDto> confirmSuggestion(
+            @PathVariable Long id,
+            @PathVariable String suggestionId,
+            @RequestBody(required = false) ConfirmRoomRequestSuggestionDto dto,
+            Principal principal) {
+        log.debug("POST /v1/room-requests/items/{}/suggestion/{}/confirm", id, suggestionId);
+        RoomRequestItemResponseDto response = roomRequestSuggestionService.confirm(
+                id, suggestionId, dto == null ? null : dto.reason(), principal.getName());
+        log.info("Sugerencia de aula confirmada vía controller: itemId={}, suggestionId={}", id, suggestionId);
         return ResponseEntity.ok(response);
     }
 }
