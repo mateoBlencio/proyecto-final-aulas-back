@@ -20,17 +20,17 @@ public interface AuditLogEntryMapper {
     @Mapping(target = "parentOperationId", ignore = true)
     @Mapping(target = "recordCount", ignore = true)
     @Mapping(target = "entityTypes", ignore = true)
-    AuditLogEntryDto toChange(RevisionMetadata metadata, String entityType, List<FieldChangeDto> changes);
+    AuditLogEntryDto toChange(RevisionMetadata metadata, String entityType, String recordLabel, List<FieldChangeDto> changes);
 
     default AuditLogEntryDto toOperation(AuditGroupRow row) {
         return new AuditLogEntryDto(AuditLogEntryType.OPERATION, row.revision(), row.date(), row.user(), row.actorType(),
-                row.description(), row.commonKind(), null, null, row.operationId(), row.parentOperationId(),
+                row.description(), row.commonKind(), null, null, null, row.operationId(), row.parentOperationId(),
                 (int) row.recordCount(), row.entityTypes(), null);
     }
 
     default AuditLogEntryDto toTransaction(AuditGroupRow row) {
         return new AuditLogEntryDto(AuditLogEntryType.TRANSACTION, row.revision(), row.date(), row.user(), row.actorType(),
-                describeTransaction(row), row.commonKind(), null, null, null, null,
+                describeTransaction(row), row.commonKind(), null, null, null, null, null,
                 (int) row.recordCount(), row.entityTypes(), null);
     }
 

@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.audit.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditLabelProvider;
+import ar.edu.utn.frc.siga.audit.AuditedRecord;
 import ar.edu.utn.frc.siga.audit.dto.AuditLogFilter;
 import ar.edu.utn.frc.siga.audit.dto.RevisionMetadata;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditLogEntryDto;
@@ -25,6 +27,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -34,6 +37,7 @@ import org.springframework.data.domain.Pageable;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -41,7 +45,10 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -68,11 +75,55 @@ class AuditRegistryServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new AuditRegistryServiceImpl(repository, stateRepository, registry, new AuditLogEntryMapperImpl());
+        service = serviceWith();
         lenient().when(registry.all()).thenReturn(List.of(ALLOCATION, SETTING));
         lenient().when(registry.byLabel("Asignación")).thenReturn(Optional.of(ALLOCATION));
         lenient().when(registry.byLabel("Configuración")).thenReturn(Optional.of(SETTING));
         lenient().when(registry.byLabel("NoExiste")).thenReturn(Optional.empty());
+    }
+
+    private AuditRegistryServiceImpl serviceWith(AuditLabelProvider... providers) {
+        return new AuditRegistryServiceImpl(repository, stateRepository, registry, new AuditLogEntryMapperImpl(),
+                new AuditLabelResolver(List.of(providers), mock(PlatformTransactionManager.class)));
+    }
+
+    /** Provider of {@code ALLOCATION} records (java type String in this fixture) labelling each with "L-{id}". */
+    private static AuditLabelProvider allocationLabels() {
+        return new AuditLabelProvider() {
+            @Override
+            public Class<?> entityType() {
+                return String.class;
+            }
+
+            @Override
+            public Map<String, String> labels(List<AuditedRecord> records) {
+                Map<String, String> labels = new HashMap<>();
+                records.forEach(record -> labels.put(record.recordId(), "L-" + record.recordId()));
+                return labels;
+            }
+        };
+    }
+
+    private static AuditLabelProvider failingAllocationLabels() {
+        return new AuditLabelProvider() {
+            @Override
+            public Class<?> entityType() {
+                return String.class;
+            }
+
+            @Override
+            public Map<String, String> labels(List<AuditedRecord> records) {
+                throw new IllegalStateException("provider down");
+            }
+        };
+    }
+
+    private static RecordStates someState() {
+        return new RecordStates(Map.of("name", "x"), Map.of());
+    }
+
+    private void verifyNoStatesRequested() {
+        verify(stateRepository, never()).load(argThat(keys -> !keys.isEmpty()));
     }
 
     private static AuditGroupRow operationGroup(int revision, String operationId, String description,
@@ -365,20 +416,156 @@ class AuditRegistryServiceImplTest {
     }
 
     @Test
-    @DisplayName("findAll no consulta stateRepository y sus entradas traen changes null")
-    void findAll_doesNotLoadStates() {
-        when(repository.countGroups(any())).thenReturn(3L);
+    @DisplayName("findAll no pide estados si la página no tiene CHANGE sueltos y sus entradas traen changes null")
+    void findAll_withoutLooseChanges_loadsNoStates() {
+        service = serviceWith(allocationLabels());
+        when(repository.countGroups(any())).thenReturn(2L);
         when(repository.findGroups(any(), any())).thenReturn(List.of(
                 operationGroup(11, "op-1", "Asignación de aulas en lote", 3),
-                looseGroup(5, 1, List.of("Asignación"), RevisionKind.CREATED, null),
                 looseGroup(4, 2, List.of("Asignación", "Configuración"), RevisionKind.MODIFIED, null)));
 
         Page<AuditLogEntryDto> page = service.findAll(filter(null), PageRequest.of(0, 10));
 
         assertThat(page.getContent()).extracting(AuditLogEntryDto::type).containsExactly(
-                AuditLogEntryType.OPERATION, AuditLogEntryType.CHANGE, AuditLogEntryType.TRANSACTION);
+                AuditLogEntryType.OPERATION, AuditLogEntryType.TRANSACTION);
+        assertThat(page.getContent()).allSatisfy(entry -> {
+            assertThat(entry.changes()).isNull();
+            assertThat(entry.recordLabel()).isNull();
+        });
+        verifyNoStatesRequested();
+    }
+
+    @Test
+    @DisplayName("findAll no pide estados de un CHANGE suelto cuya entidad no tiene proveedor")
+    void findAll_looseChangeOfEntityWithoutProvider_loadsNoStates() {
+        service = serviceWith(allocationLabels());
+        when(repository.countGroups(any())).thenReturn(1L);
+        when(repository.findGroups(any(), any())).thenReturn(List.of(
+                looseGroup(5, 1, List.of("Configuración"), RevisionKind.MODIFIED, null)));
+
+        Page<AuditLogEntryDto> page = service.findAll(filter(null), PageRequest.of(0, 10));
+
+        assertThat(page.getContent().getFirst().type()).isEqualTo(AuditLogEntryType.CHANGE);
+        assertThat(page.getContent().getFirst().recordLabel()).isNull();
+        verifyNoStatesRequested();
+    }
+
+    @Test
+    @DisplayName("findAll carga los estados de todos los CHANGE sueltos de la página en una sola llamada y les pone recordLabel")
+    @SuppressWarnings("unchecked")
+    void findAll_looseChanges_loadStatesOnceAndSetRecordLabel() {
+        service = serviceWith(allocationLabels());
+        AuditGroupRow first = new AuditGroupRow(null, null, 5, DATE, "user@frc", ActorType.HUMAN, null, 1,
+                List.of("Asignación"), RevisionKind.CREATED, "Asignación", "42");
+        AuditGroupRow second = new AuditGroupRow(null, null, 6, DATE, "user@frc", ActorType.HUMAN, null, 1,
+                List.of("Asignación"), RevisionKind.DELETED, "Asignación", "43");
+        when(repository.countGroups(any())).thenReturn(3L);
+        when(repository.findGroups(any(), any())).thenReturn(List.of(first, second,
+                operationGroup(11, "op-1", "Asignación de aulas en lote", 3)));
+        RecordRevision key42 = new RecordRevision(ALLOCATION, "42", 5);
+        RecordRevision key43 = new RecordRevision(ALLOCATION, "43", 6);
+        when(stateRepository.load(any())).thenReturn(Map.of(key42, someState(), key43, someState()));
+
+        Page<AuditLogEntryDto> page = service.findAll(filter(null), PageRequest.of(0, 10));
+
+        ArgumentCaptor<Collection<RecordRevision>> keys = ArgumentCaptor.forClass(Collection.class);
+        verify(stateRepository, times(1)).load(keys.capture());
+        assertThat(keys.getValue()).containsExactlyInAnyOrder(key42, key43);
+        assertThat(page.getContent()).extracting(AuditLogEntryDto::recordLabel).containsExactly("L-42", "L-43", null);
         assertThat(page.getContent()).allSatisfy(entry -> assertThat(entry.changes()).isNull());
-        verifyNoInteractions(stateRepository);
+    }
+
+    @Test
+    @DisplayName("findAll sin proveedor deja recordLabel null en el CHANGE suelto")
+    void findAll_withoutProvider_recordLabelIsNull() {
+        when(repository.countGroups(any())).thenReturn(1L);
+        when(repository.findGroups(any(), any())).thenReturn(List.of(
+                looseGroup(5, 1, List.of("Asignación"), RevisionKind.CREATED, null)));
+        lenient().when(stateRepository.load(any()))
+                .thenReturn(Map.of(new RecordRevision(ALLOCATION, "42", 5), someState()));
+
+        Page<AuditLogEntryDto> page = service.findAll(filter(null), PageRequest.of(0, 10));
+
+        assertThat(page.getContent().getFirst().recordLabel()).isNull();
+        assertThat(page.getContent().getFirst().recordId()).isEqualTo("42");
+    }
+
+    @Test
+    @DisplayName("findAll con un proveedor que lanza devuelve el CHANGE con recordLabel null en vez de fallar")
+    void findAll_failingProvider_recordLabelIsNull() {
+        service = serviceWith(failingAllocationLabels());
+        when(repository.countGroups(any())).thenReturn(1L);
+        when(repository.findGroups(any(), any())).thenReturn(List.of(
+                looseGroup(5, 1, List.of("Asignación"), RevisionKind.CREATED, null)));
+        when(stateRepository.load(any())).thenReturn(Map.of(new RecordRevision(ALLOCATION, "42", 5), someState()));
+
+        Page<AuditLogEntryDto> page = service.findAll(filter(null), PageRequest.of(0, 10));
+
+        assertThat(page.getContent()).singleElement().satisfies(entry -> {
+            assertThat(entry.type()).isEqualTo(AuditLogEntryType.CHANGE);
+            assertThat(entry.recordLabel()).isNull();
+            assertThat(entry.recordId()).isEqualTo("42");
+        });
+    }
+
+    @Test
+    @DisplayName("findOperationItems y findRevisionItems ponen recordLabel en cada CHANGE con proveedor y null en el resto")
+    void drillDownItems_carryRecordLabel() {
+        service = serviceWith(allocationLabels());
+        RevisionMetadata allocation = new RevisionMetadata("1", 21, DATE, "user@frc", ActorType.HUMAN,
+                RevisionKind.CREATED, "Asignación", "op-9");
+        RevisionMetadata setting = new RevisionMetadata("k", 21, DATE, "user@frc", ActorType.HUMAN,
+                RevisionKind.MODIFIED, "Config", "op-9");
+        when(repository.countChanges(any(), any())).thenReturn(2L);
+        when(repository.findChanges(any(), any(), any())).thenReturn(List.of(
+                new AuditChangeRow(allocation, ALLOCATION), new AuditChangeRow(setting, SETTING)));
+        when(stateRepository.load(any())).thenReturn(Map.of(
+                new RecordRevision(ALLOCATION, "1", 21), someState(),
+                new RecordRevision(SETTING, "k", 21), someState()));
+
+        Page<AuditLogEntryDto> byOperation = service.findOperationItems("op-9", filter(null), PageRequest.of(0, 10));
+        Page<AuditLogEntryDto> byRevision = service.findRevisionItems(21, filter(null), PageRequest.of(0, 10));
+
+        assertThat(byOperation.getContent()).extracting(AuditLogEntryDto::recordLabel).containsExactly("L-1", null);
+        assertThat(byRevision.getContent()).extracting(AuditLogEntryDto::recordLabel).containsExactly("L-1", null);
+    }
+
+    @Test
+    @DisplayName("findEntityHistory ancla recordLabel en la revisión más reciente: todas las filas del registro llevan la misma etiqueta")
+    void findEntityHistory_recordLabelOnEveryRow() {
+        service = serviceWith(allocationLabels());
+        RevisionMetadata newer = new RevisionMetadata("7", 30, DATE, "user@frc", ActorType.HUMAN, RevisionKind.MODIFIED,
+                "Edición", null);
+        RevisionMetadata older = new RevisionMetadata("7", 20, DATE, "user@frc", ActorType.HUMAN, RevisionKind.CREATED,
+                "Alta", null);
+        when(repository.countChanges(any(), any())).thenReturn(2L);
+        when(repository.findChanges(any(), any(), any())).thenReturn(List.of(
+                new AuditChangeRow(newer, ALLOCATION), new AuditChangeRow(older, ALLOCATION)));
+        when(stateRepository.load(any())).thenReturn(Map.of(
+                new RecordRevision(ALLOCATION, "7", 30), someState(),
+                new RecordRevision(ALLOCATION, "7", 20), someState()));
+
+        Page<AuditLogEntryDto> page = service.findEntityHistory("Asignación", "7", PageRequest.of(0, 10));
+
+        assertThat(page.getContent()).extracting(AuditLogEntryDto::recordLabel).containsExactly("L-7", "L-7");
+    }
+
+    @Test
+    @DisplayName("findOperationItems con un proveedor que lanza devuelve los items con recordLabel null y su diff intacto")
+    void drillDown_failingProvider_keepsItemsWithNullLabel() {
+        service = serviceWith(failingAllocationLabels());
+        RevisionMetadata metadata = new RevisionMetadata("1", 21, DATE, "user@frc", ActorType.HUMAN,
+                RevisionKind.CREATED, "Asignación", "op-9");
+        when(repository.countChanges(any(), any())).thenReturn(1L);
+        when(repository.findChanges(any(), any(), any())).thenReturn(List.of(new AuditChangeRow(metadata, ALLOCATION)));
+        when(stateRepository.load(any())).thenReturn(Map.of(new RecordRevision(ALLOCATION, "1", 21), someState()));
+
+        Page<AuditLogEntryDto> page = service.findOperationItems("op-9", filter(null), PageRequest.of(0, 10));
+
+        assertThat(page.getContent()).singleElement().satisfies(entry -> {
+            assertThat(entry.recordLabel()).isNull();
+            assertThat(entry.changes()).isNotNull();
+        });
     }
 
     @Test

@@ -79,6 +79,13 @@ public class SubjectServiceImpl implements SubjectService {
     }
 
     @Override
+    public List<SubjectResponseDto> findByIdsIncludingDeactivated(Collection<Long> ids) {
+        return subjectRepository.findAllById(ids).stream()
+                .map(subjectMapper::toDto)
+                .toList();
+    }
+
+    @Override
     public SubjectResponseDto findByCodeAndStudyPlan(Integer code, Integer studyPlanCode, Integer specialtyCode) {
         StudyPlan studyPlan = requireStudyPlan(studyPlanCode, specialtyCode);
         return subjectMapper.toDto(subjectRepository.findByCodeAndStudyPlanAndDeletedAtIsNull(code, studyPlan)

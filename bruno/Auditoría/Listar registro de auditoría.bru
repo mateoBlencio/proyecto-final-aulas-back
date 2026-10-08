@@ -35,7 +35,13 @@ docs {
     recordCount y entityTypes. Detalle en GET /v1/audit/revisions/{revision}.
   - type=CHANGE: revisión sin operación con un solo cambio. Trae kind,
     entityType y recordId; 'description' se deriva del tipo de cambio
-    ("Alta de ...", "Modificación de ...", "Baja de ...").
+    ("Alta de ...", "Modificación de ...", "Baja de ..."). Trae 'recordLabel'
+    (ver abajo).
+  'recordLabel' es el nombre legible del registro de un CHANGE, por ejemplo
+  "Aula 101, Central · 04/03/2026" para una asignación. Se calcula al leer y
+  es null si la entidad no tiene etiqueta (Configuración, ítems de solicitud)
+  o no se pudo resolver; en ese caso usar recordId. En OPERATION y TRANSACTION
+  'recordLabel' es siempre null.
   En OPERATION y TRANSACTION, 'kind' viene informado si todos sus cambios
   comparten el mismo tipo; si no, es null.
 

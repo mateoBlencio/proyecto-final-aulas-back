@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -12,6 +13,16 @@ import java.util.List;
 
 @Repository
 public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
+
+    interface OccurrenceDate {
+        Long getId();
+
+        LocalDate getDate();
+    }
+
+    /** Id and date only: does not initialize the event. */
+    @Query("select o.id as id, o.date as date from Occurrence o where o.id in :ids")
+    List<OccurrenceDate> findDatesByIdIn(Collection<Long> ids);
 
     List<Occurrence> findByEvent_Id(Long eventId);
 
