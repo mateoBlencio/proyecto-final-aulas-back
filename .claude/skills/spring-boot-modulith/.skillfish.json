@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "spring-boot-modulith",
+  "owner": "joaquimscosta",
+  "repo": "arkhe-claude-plugins",
+  "path": "plugins/spring-boot/skills/spring-boot-modulith",
+  "branch": "main",
+  "sha": "7ce537cf883ea8d70ad09cf8a6a4bf2f80aa7184",
+  "source": "manual"
+}

@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 
+import java.time.Instant;
 import java.time.LocalDate;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -143,7 +144,7 @@ class RoomRequestItemDeriveApiIntegrationTest extends AbstractIntegrationTest {
                 .build();
         request.addItem(item);
         if (status != RoomRequestStatus.NEW) {
-            item.decide(status, "subsecretaria@frc.utn.edu.ar", "motivo de prueba", java.time.LocalDateTime.now());
+            item.decide(status, "subsecretaria@frc.utn.edu.ar", "motivo de prueba", Instant.now());
         }
         roomRequestRepository.save(request);
         return item;

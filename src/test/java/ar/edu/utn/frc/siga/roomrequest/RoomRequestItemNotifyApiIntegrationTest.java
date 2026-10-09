@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.Instant;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -147,7 +148,7 @@ class RoomRequestItemNotifyApiIntegrationTest extends AbstractIntegrationTest {
                 .classroomCount(classroomCount)
                 .status(RoomRequestStatus.IN_EVALUATION)
                 .decidedBy("subsecretaria@frc.utn.edu.ar")
-                .decidedAt(LocalDateTime.now())
+                .decidedAt(Instant.now())
                 .build();
         item.assignClassrooms(List.of(classroomId), List.of(List.of(occurrenceId)));
         request.addItem(item);
@@ -174,7 +175,7 @@ class RoomRequestItemNotifyApiIntegrationTest extends AbstractIntegrationTest {
                 .build();
         request.addItem(item);
         if (status != RoomRequestStatus.NEW) {
-            item.decide(status, "subsecretaria@frc.utn.edu.ar", null, LocalDateTime.now());
+            item.decide(status, "subsecretaria@frc.utn.edu.ar", null, Instant.now());
         }
         roomRequestRepository.save(request);
         return item;

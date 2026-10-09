@@ -1,0 +1,98 @@
+{
+  "skills": [
+    {
+      "name": "graphify",
+      "usedBy": "CLAUDE.md (graphify), frontend-docs-writer",
+      "install": "git checkout origin/develop -- .claude/skills/graphify",
+      "source": "github.com/Graphify-Labs/graphify (Apache-2.0, ver LICENSE y NOTICE)"
+    },
+    {
+      "name": "ponytail",
+      "usedBy": "implementer",
+      "source": "github.com/DietrichGebert/ponytail (MIT, ver LICENSE)",
+      "install": "git checkout origin/develop -- .claude/skills/ponytail"
+    },
+    {
+      "name": "ponytail-audit",
+      "usedBy": "diff-reviewer",
+      "source": "github.com/DietrichGebert/ponytail (MIT, ver LICENSE)",
+      "install": "git checkout origin/develop -- .claude/skills/ponytail-audit"
+    },
+    {
+      "name": "ponytail-debt",
+      "usedBy": "diff-reviewer",
+      "source": "github.com/DietrichGebert/ponytail (MIT, ver LICENSE)",
+      "install": "git checkout origin/develop -- .claude/skills/ponytail-debt"
+    },
+    {
+      "name": "ponytail-review",
+      "usedBy": "diff-reviewer",
+      "source": "github.com/DietrichGebert/ponytail (MIT, ver LICENSE)",
+      "install": "git checkout origin/develop -- .claude/skills/ponytail-review"
+    },
+    {
+      "name": "security-audit",
+      "usedBy": "security-reviewer",
+      "source": "github.com/cloudflare/security-audit-skill (MIT, ver LICENSE)",
+      "install": "git checkout origin/develop -- .claude/skills/security-audit"
+    },
+    {
+      "name": "software-design",
+      "usedBy": "implementer, planner",
+      "install": "git checkout origin/develop -- .claude/skills/software-design",
+      "source": "propia (armada con Claude para este repo)"
+    },
+    {
+      "name": "spring-boot-modulith",
+      "usedBy": "implementer, planner",
+      "source": "github.com/joaquimscosta/arkhe-claude-plugins (MIT, ver LICENSE)",
+      "install": "git checkout origin/develop -- .claude/skills/spring-boot-modulith"
+    },
+    {
+      "name": "stop-slop",
+      "usedBy": "CLAUDE.md, todos los agentes",
+      "install": "git checkout origin/develop -- .claude/skills/stop-slop",
+      "source": "propia (armada con Claude para este repo)"
+    },
+    {
+      "name": "testing-pyramid",
+      "usedBy": "test-writer",
+      "install": "git checkout origin/develop -- .claude/skills/testing-pyramid",
+      "source": "propia (armada con Claude para este repo)"
+    }
+  ],
+  "clis": [
+    {
+      "name": "jq",
+      "command": "jq",
+      "usedBy": "hooks de .claude/hooks/",
+      "install": "sudo dnf install jq  (o apt install jq)"
+    },
+    {
+      "name": "gh",
+      "command": "gh",
+      "usedBy": "diff-reviewer (PRs)",
+      "install": "sudo dnf install gh && gh auth login"
+    },
+    {
+      "name": "graphify",
+      "command": ".venv/bin/graphify",
+      "usedBy": "CLAUDE.md (graphify), MCP graphify, hooks hook-guard",
+      "install": "python3 -m venv .venv && .venv/bin/pip install graphifyy==0.9.64"
+    },
+    {
+      "name": "headroom",
+      "command": "headroom",
+      "onlyIfPlugin": "headroom@headroom-marketplace",
+      "usedBy": "hooks del plugin headroom (SessionStart y cada Bash)",
+      "install": "python3 -m venv ~/.local/share/headroom/venv && ~/.local/share/headroom/venv/bin/pip install \"headroom-ai[all]\" && ln -sf ~/.local/share/headroom/venv/bin/headroom ~/.local/bin/headroom  (o con uv: uv tool install --python 3.13 \"headroom-ai[all]\"; ocupa ~7 GB)"
+    }
+  ],
+  "plugins": [
+    {
+      "name": "caveman@caveman",
+      "usedBy": "estilo de respuesta (settings.json)",
+      "install": "claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman"
+    }
+  ]
+}

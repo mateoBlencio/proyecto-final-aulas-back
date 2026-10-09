@@ -39,6 +39,7 @@ import ar.edu.utn.frc.siga.space.repository.ClassroomResourceRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
 import ar.edu.utn.frc.siga.space.repository.ResourceTypeRepository;
 
+import java.time.Instant;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -235,7 +236,7 @@ public class IntegrationTestData {
                 .build();
         request.addItem(item);
         if (status != RoomRequestStatus.NEW) {
-            item.decide(status, "subsecretaria@frc.utn.edu.ar", "motivo de prueba", LocalDateTime.now());
+            item.decide(status, "subsecretaria@frc.utn.edu.ar", "motivo de prueba", Instant.now());
         }
         return item;
     }

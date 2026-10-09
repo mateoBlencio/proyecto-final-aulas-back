@@ -14,10 +14,11 @@ public class AllocationConflictException extends SigaAppException {
 
     public AllocationConflictException(String detail) {
         super(HttpStatus.CONFLICT, "Allocation error", detail);
+        withProperty("code", "ALLOCATION_CONFLICT");
     }
 
     public AllocationConflictException(String detail, Long classroomId) {
-        super(HttpStatus.CONFLICT, "Allocation error", detail);
+        this(detail);
         withProperty("classroomId", classroomId);
     }
 }

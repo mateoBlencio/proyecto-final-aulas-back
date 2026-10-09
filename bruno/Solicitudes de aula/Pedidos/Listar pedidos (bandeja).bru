@@ -52,6 +52,9 @@ docs {
   - wasReturned: true/false. Calculado: returnedFromBuildingId != null (queda
     marcado aunque después se haya vuelto a derivar)
 
+  Las fechas de evento (request.createdAt, decidedAt, derivedAt) viajan como instante
+  ISO-8601 con Z; el front las muestra en hora de Buenos Aires.
+
   sort acepta: date, startTime, createdAt (fecha de alta de la solicitud),
   derivedAt, decidedAt, id. Cualquier otro valor responde 400. Por defecto
   ordena por date,startTime ascendente, con id ascendente appendeado como

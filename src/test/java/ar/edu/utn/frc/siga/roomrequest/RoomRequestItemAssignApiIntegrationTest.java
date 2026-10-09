@@ -23,6 +23,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.time.Instant;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -419,8 +420,8 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
                 .classroomCount(1)
                 .status(RoomRequestStatus.RESOLVED)
                 .decidedBy("subsecretaria@frc.utn.edu.ar")
-                .decidedAt(LocalDateTime.now())
-                .notifiedAt(LocalDateTime.now())
+                .decidedAt(Instant.now())
+                .notifiedAt(Instant.now())
                 .build();
         request.addItem(item);
         roomRequestRepository.save(request);

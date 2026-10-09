@@ -16,6 +16,7 @@ import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -68,7 +69,7 @@ class RoomRequestItemVersionConcurrencyIntegrationTest extends AbstractIntegrati
                 RoomRequestItem loaded = itemRepository.findById(itemId).orElseThrow();
                 awaitBothReady(barrier);
                 loaded.decide(RoomRequestStatus.CANCELLED, "subsecretaria@frc.utn.edu.ar", "motivo",
-                        LocalDateTime.now());
+                        Instant.now());
                 itemRepository.saveAndFlush(loaded);
             });
             return null;

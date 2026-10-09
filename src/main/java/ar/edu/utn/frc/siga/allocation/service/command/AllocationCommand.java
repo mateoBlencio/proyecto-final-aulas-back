@@ -18,6 +18,10 @@ public record AllocationCommand(List<AllocationItem> items, String observation, 
     }
 
     public static AllocationCommand automatic(List<AllocationItem> items) {
-        return new AllocationCommand(items, null, AllocationSource.AUTOMATIC);
+        return automatic(items, null);
+    }
+
+    public static AllocationCommand automatic(List<AllocationItem> items, String observation) {
+        return new AllocationCommand(items, observation, AllocationSource.AUTOMATIC);
     }
 }

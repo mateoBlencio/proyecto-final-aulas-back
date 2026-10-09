@@ -92,8 +92,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(OptimisticLockingFailureException.class)
     public ProblemDetail handleOptimisticLock(OptimisticLockingFailureException ex) {
         log.warn("Conflicto de concurrencia: {}", ex.getMessage());
-        return ProblemDetails.of(HttpStatus.CONFLICT, "Concurrent modification",
+        ProblemDetail problem = ProblemDetails.of(HttpStatus.CONFLICT, "Concurrent modification",
                 "El recurso fue modificado por otra operación mientras tanto. Volvé a intentar con los datos actualizados.");
+        problem.setProperty("code", "CONCURRENT_MODIFICATION");
+        return problem;
     }
 
     @ExceptionHandler(Exception.class)

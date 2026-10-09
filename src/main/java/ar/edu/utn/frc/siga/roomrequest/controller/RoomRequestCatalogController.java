@@ -18,7 +18,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/** Combos públicos del formulario; evita abrir los controllers internos de {@code academic}/{@code space} (cerrados por rol). */
 @Slf4j
 @RestController
 @RequestMapping("${siga.api.base-path}/room-requests/catalog")

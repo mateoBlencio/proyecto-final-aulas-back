@@ -41,10 +41,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 
 /** Transiciones de estado de un ítem (assign/cancel/derive/return/notify). La resolución de qué ocurrencias u
  *  aulas/edificios son candidatos vive en {@link RoomRequestOccurrenceResolver} y {@link RoomRequestCandidateResolver}. */
@@ -70,6 +71,18 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
     @Transactional
     @AuditOperation("Asignación de aula a solicitud")
     public RoomRequestItemResponseDto assign(Long itemId, List<Long> classroomIds, String reason, String actor) {
+        return assign(itemId, classroomIds, reason, actor, items -> AllocationCommand.manual(items, reason));
+    }
+
+    @Override
+    @Transactional
+    public RoomRequestItemResponseDto assignAutomatic(Long itemId, List<Long> classroomIds, String reason,
+                                                      String actor) {
+        return assign(itemId, classroomIds, reason, actor, items -> AllocationCommand.automatic(items, reason));
+    }
+
+    private RoomRequestItemResponseDto assign(Long itemId, List<Long> classroomIds, String reason, String actor,
+                                              Function<List<AllocationItem>, AllocationCommand> commandFactory) {
         log.debug("Asignando aula(s) a pedido: itemId={}, classroomIds={}", itemId, classroomIds);
 
         RoomRequestItem item = itemRepository.findWithRequestById(itemId)
@@ -111,10 +124,10 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
             allocationItems.add(new AllocationItem(
                     new AllocationTarget.Occurrences(occurrencesBySlot.get(i)), ids.get(i)));
         }
-        allocationService.reallocate(AllocationCommand.manual(allocationItems, reason));
+        allocationService.reallocate(commandFactory.apply(allocationItems));
 
         item.assignClassrooms(ids, occurrencesBySlot);
-        item.decide(RoomRequestStatus.IN_EVALUATION, actor, reason, LocalDateTime.now());
+        item.decide(RoomRequestStatus.IN_EVALUATION, actor, reason, Instant.now());
 
         log.info("Pedido de aula asignado: itemId={}, aulas={}, ocurrencias={}",
                 itemId, ids.size(), occurrencesBySlot.stream().mapToInt(List::size).sum());
@@ -148,7 +161,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
                     "Solicitud de aula cancelada: " + reason));
         }
 
-        item.decide(RoomRequestStatus.CANCELLED, actor, reason, LocalDateTime.now());
+        item.decide(RoomRequestStatus.CANCELLED, actor, reason, Instant.now());
 
         log.info("Pedido de aula cancelado: itemId={}, aulasLiberadas={}", itemId, occurrenceIds.size());
         return composer.composeItem(item);
@@ -191,7 +204,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
             throw new BuildingNotAvailableException(buildingId);
         }
 
-        item.deriveTo(buildingId, actor, LocalDateTime.now());
+        item.deriveTo(buildingId, actor, Instant.now());
 
         log.info("Pedido de aula derivado: itemId={}, buildingId={}", itemId, buildingId);
         return composer.composeItem(item);
@@ -238,7 +251,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
             throw new InvalidRoomRequestException("El pedido no tiene ninguna aula asignada.");
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        Instant now = Instant.now();
         item.resolve(actor, now);
 
         RoomRequestItemDetailDto detail = composer.composeDetail(item);

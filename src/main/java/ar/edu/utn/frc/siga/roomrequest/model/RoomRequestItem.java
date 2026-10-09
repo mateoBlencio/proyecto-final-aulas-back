@@ -30,8 +30,8 @@ import org.hibernate.envers.Audited;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -74,7 +74,7 @@ public class RoomRequestItem extends TimestampedEntity {
     private String decidedBy;
 
     @Column(name = "fecha_decision")
-    private LocalDateTime decidedAt;
+    private Instant decidedAt;
 
     @Column(name = "motivo_decision")
     private String decisionReason;
@@ -139,7 +139,7 @@ public class RoomRequestItem extends TimestampedEntity {
     private Long derivedBuildingId;
 
     @Column(name = "fecha_derivacion")
-    private LocalDateTime derivedAt;
+    private Instant derivedAt;
 
     @Column(name = "id_edificio_devuelto")
     private Long returnedFromBuildingId;
@@ -148,7 +148,7 @@ public class RoomRequestItem extends TimestampedEntity {
     private String returnedReason;
 
     @Column(name = "fecha_notificacion")
-    private LocalDateTime notifiedAt;
+    private Instant notifiedAt;
 
     /** Aula que ocupaba la clase antes del primer assign. Solo se completa una vez: si Subsecretaría
      *  reasigna A -> B -> C, el docente sigue viendo A como aula anterior, porque nunca vio B. */
@@ -183,7 +183,7 @@ public class RoomRequestItem extends TimestampedEntity {
     }
 
     /** Trunca a microsegundos: Postgres guarda timestamp con esa precisión, y sin truncar acá la respuesta de la misma llamada (en memoria, con nanosegundos) no coincide byte a byte con una relectura posterior desde la base. */
-    public void decide(RoomRequestStatus target, String decidedBy, String reason, LocalDateTime decidedAt) {
+    public void decide(RoomRequestStatus target, String decidedBy, String reason, Instant decidedAt) {
         this.status = target;
         this.decidedBy = decidedBy;
         this.decisionReason = reason;
@@ -191,8 +191,8 @@ public class RoomRequestItem extends TimestampedEntity {
     }
 
     /** decidedBy/decidedAt trackean la última decisión sea cual sea; el CHECK chk_solicitud_item_decision exige ambos no nulos fuera de NEW. */
-    public void deriveTo(Long buildingId, String decidedBy, LocalDateTime derivedAt) {
-        LocalDateTime truncated = truncateToMicros(derivedAt);
+    public void deriveTo(Long buildingId, String decidedBy, Instant derivedAt) {
+        Instant truncated = truncateToMicros(derivedAt);
         this.status = RoomRequestStatus.DERIVED_TO_BUILDING;
         this.derivedBuildingId = buildingId;
         this.derivedAt = truncated;
@@ -201,15 +201,15 @@ public class RoomRequestItem extends TimestampedEntity {
     }
 
     /** No toca decisionReason: preserva el motivo de resolución parcial que haya dejado el último assign. */
-    public void resolve(String decidedBy, LocalDateTime notifiedAt) {
-        LocalDateTime truncated = truncateToMicros(notifiedAt);
+    public void resolve(String decidedBy, Instant notifiedAt) {
+        Instant truncated = truncateToMicros(notifiedAt);
         this.status = RoomRequestStatus.RESOLVED;
         this.decidedBy = decidedBy;
         this.decidedAt = truncated;
         this.notifiedAt = truncated;
     }
 
-    private static LocalDateTime truncateToMicros(LocalDateTime value) {
+    private static Instant truncateToMicros(Instant value) {
         return value.truncatedTo(ChronoUnit.MICROS);
     }
 

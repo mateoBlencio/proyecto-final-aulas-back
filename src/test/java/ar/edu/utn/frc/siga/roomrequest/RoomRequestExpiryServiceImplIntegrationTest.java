@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.time.Instant;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -90,7 +91,7 @@ class RoomRequestExpiryServiceImplIntegrationTest extends AbstractIntegrationTes
                 .classroomCount(1)
                 .status(RoomRequestStatus.IN_EVALUATION)
                 .decidedBy("subsecretaria@frc.utn.edu.ar")
-                .decidedAt(java.time.LocalDateTime.now())
+                .decidedAt(Instant.now())
                 .build();
         item.assignClassrooms(java.util.List.of(classroomId), java.util.List.of(java.util.List.of(occurrenceId)));
         request.addItem(item);
@@ -213,7 +214,7 @@ class RoomRequestExpiryServiceImplIntegrationTest extends AbstractIntegrationTes
                 .build();
         request.addItem(item);
         if (status != RoomRequestStatus.NEW) {
-            item.decide(status, "subsecretaria@frc.utn.edu.ar", "motivo de prueba", java.time.LocalDateTime.now());
+            item.decide(status, "subsecretaria@frc.utn.edu.ar", "motivo de prueba", Instant.now());
         }
         roomRequestRepository.save(request);
         return item;

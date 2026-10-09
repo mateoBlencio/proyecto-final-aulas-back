@@ -93,16 +93,23 @@ class RoomRequestOccurrenceResolver {
                         "No se encontró la clase de este pedido en el calendario."));
     }
 
+    List<LocalDate> futureDatesOnDayOfWeek(RoomRequestItem item) {
+        return futureSlotsOnDayOfWeek(item).stream().map(OccurrenceSlotDto::date).toList();
+    }
+
     private List<Long> findFutureOccurrencesOnDayOfWeek(RoomRequestItem item) {
-        List<Long> occurrenceIds = occurrenceService.findSlotsByEvent(item.getSourceRecurringEventId(), LocalDate.now())
+        return futureSlotsOnDayOfWeek(item).stream().map(OccurrenceSlotDto::occurrenceId).toList();
+    }
+
+    private List<OccurrenceSlotDto> futureSlotsOnDayOfWeek(RoomRequestItem item) {
+        List<OccurrenceSlotDto> slots = occurrenceService.findSlotsByEvent(item.getSourceRecurringEventId(), LocalDate.now())
                 .stream()
                 .filter(slot -> slot.date().getDayOfWeek() == item.getDayOfWeek())
-                .map(OccurrenceSlotDto::occurrenceId)
                 .toList();
-        if (occurrenceIds.isEmpty()) {
+        if (slots.isEmpty()) {
             throw new InvalidRoomRequestException("No quedan clases futuras para este cambio regular de aula.");
         }
-        return occurrenceIds;
+        return slots;
     }
 
     private Long createEventOccurrence(RoomRequestItem item, RoomRequestType type) {

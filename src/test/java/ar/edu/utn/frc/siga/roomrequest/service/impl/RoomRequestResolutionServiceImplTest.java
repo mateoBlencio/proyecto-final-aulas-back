@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
+import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
@@ -44,6 +45,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -347,7 +349,7 @@ class RoomRequestResolutionServiceImplTest {
     @DisplayName("return: DERIVED_TO_BUILDING → NEW, copia el edificio a returnedFromBuildingId y limpia derivedBuildingId/derivedAt")
     void return_ok() {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.DERIVED_TO_BUILDING)
-                .derivedBuildingId(5L).derivedAt(java.time.LocalDateTime.now()).build();
+                .derivedBuildingId(5L).derivedAt(Instant.now()).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         when(composer.composeItem(item)).thenReturn(mockResponse());
 
@@ -364,7 +366,7 @@ class RoomRequestResolutionServiceImplTest {
     @DisplayName("return: un segundo return pisa returnedFromBuildingId/returnedReason con los datos nuevos")
     void return_segundaVezPisaDatosAnteriores() {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.DERIVED_TO_BUILDING)
-                .derivedBuildingId(7L).derivedAt(java.time.LocalDateTime.now())
+                .derivedBuildingId(7L).derivedAt(Instant.now())
                 .returnedFromBuildingId(5L).returnedReason("motivo viejo").build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         when(composer.composeItem(item)).thenReturn(mockResponse());
@@ -432,7 +434,7 @@ class RoomRequestResolutionServiceImplTest {
         when(composer.composeItem(item)).thenReturn(mockResponse());
 
         service.notify(1L, "subsecretaria@frc.utn.edu.ar");
-        java.time.LocalDateTime firstNotifiedAt = item.getNotifiedAt();
+        Instant firstNotifiedAt = item.getNotifiedAt();
         service.notify(1L, "subsecretaria@frc.utn.edu.ar");
 
         assertThat(item.getNotifiedAt()).isEqualTo(firstNotifiedAt);
@@ -447,7 +449,7 @@ class RoomRequestResolutionServiceImplTest {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.RESOLVED)
                 .request(requestOfType(RoomRequestType.FINAL_EXAM))
                 .allocations(new java.util.ArrayList<>(List.of(allocation)))
-                .notifiedAt(java.time.LocalDateTime.now())
+                .notifiedAt(Instant.now())
                 .build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         when(composer.composeItem(item)).thenReturn(mockResponse());
@@ -694,6 +696,55 @@ class RoomRequestResolutionServiceImplTest {
         verifyNoInteractions(composer);
     }
 
+    @Test
+    @DisplayName("assignAutomatic: reasigna con source AUTOMATIC y deja el pedido IN_EVALUATION")
+    void assignAutomatic_usaOrigenAutomatico() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 1, false)).thenReturn(List.of(List.of(9000L)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assignAutomatic(1L, List.of(104L), "solo hay un aula libre", "subsecretaria@frc.utn.edu.ar");
+
+        ArgumentCaptor<AllocationCommand> captor = ArgumentCaptor.forClass(AllocationCommand.class);
+        verify(allocationService).reallocate(captor.capture());
+        assertThat(captor.getValue().source()).isEqualTo(AllocationSource.AUTOMATIC);
+        assertThat(captor.getValue().observation()).isEqualTo("solo hay un aula libre");
+        assertThat(captor.getValue().items()).hasSize(1);
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.IN_EVALUATION);
+        assertThat(item.getAllocations()).extracting(RoomRequestItemAllocation::getClassroomId).containsExactly(104L);
+    }
+
+    @Test
+    @DisplayName("assignAutomatic: mantiene las validaciones de assign (menos aulas sin motivo se rechaza)")
+    void assignAutomatic_menosAulasSinReason() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(2).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> service.assignAutomatic(1L, List.of(104L), null, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(PartialAssignmentReasonRequiredException.class);
+        verifyNoInteractions(allocationService);
+    }
+
+    @Test
+    @DisplayName("assign: sigue reasignando con source MANUAL y el motivo como observación")
+    void assign_usaOrigenManual() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(2).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 1, false)).thenReturn(List.of(List.of(9000L)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(104L), "solo hay una disponible", "subsecretaria@frc.utn.edu.ar");
+
+        ArgumentCaptor<AllocationCommand> captor = ArgumentCaptor.forClass(AllocationCommand.class);
+        verify(allocationService).reallocate(captor.capture());
+        assertThat(captor.getValue().source()).isEqualTo(AllocationSource.MANUAL);
+        assertThat(captor.getValue().observation()).isEqualTo("solo hay una disponible");
+    }
+
     private static RoomRequest requestOfType(RoomRequestType type) {
         return RoomRequest.builder()
                 .type(type)
@@ -727,7 +778,7 @@ class RoomRequestResolutionServiceImplTest {
     private static RoomRequestItemDetailDto mockDetail() {
         RoomRequestItemDetailHeaderDto header = new RoomRequestItemDetailHeaderDto(1L, RoomRequestType.FINAL_EXAM,
                 ar.edu.utn.frc.siga.roomrequest.model.AcademicScope.GRADO, "Ada Lovelace", "ada@frc.utn.edu.ar",
-                "351-1234567", null, null);
+                "351-1234567", null, null, 1);
         return new RoomRequestItemDetailDto(header, mockResponse());
     }
 }

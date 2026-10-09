@@ -10,6 +10,8 @@ public interface RoomRequestResolutionService {
 
     RoomRequestItemResponseDto assign(Long itemId, List<Long> classroomIds, String reason, String actor);
 
+    RoomRequestItemResponseDto assignAutomatic(Long itemId, List<Long> classroomIds, String reason, String actor);
+
     RoomRequestItemResponseDto cancel(Long itemId, String reason, String actor);
 
     List<AllowedClassroomDto> findAllowedClassrooms(Long itemId);

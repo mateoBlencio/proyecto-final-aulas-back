@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -67,7 +68,7 @@ class RoomRequestItemDetailApiIntegrationTest extends AbstractIntegrationTest {
         RoomRequest request = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
         RoomRequestItem item = testData.itemDePedido(request, academic.commissionId(), LocalDate.now().plusDays(11),
                 RoomRequestStatus.NEW);
-        item.deriveTo(building.getId(), "subsecretaria@frc.utn.edu.ar", LocalDateTime.now());
+        item.deriveTo(building.getId(), "subsecretaria@frc.utn.edu.ar", Instant.now());
         item.returnFromBuilding("no había proyector");
         roomRequestRepository.save(request);
 
@@ -120,13 +121,13 @@ class RoomRequestItemDetailApiIntegrationTest extends AbstractIntegrationTest {
         RoomRequest requestPropio = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
         RoomRequestItem itemPropio = testData.itemDePedido(requestPropio, academic.commissionId(),
                 LocalDate.now().plusDays(10), RoomRequestStatus.NEW);
-        itemPropio.deriveTo(suEdificio.getId(), "subsecretaria@frc.utn.edu.ar", LocalDateTime.now());
+        itemPropio.deriveTo(suEdificio.getId(), "subsecretaria@frc.utn.edu.ar", Instant.now());
         roomRequestRepository.save(requestPropio);
 
         RoomRequest requestAjeno = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
         RoomRequestItem itemAjeno = testData.itemDePedido(requestAjeno, academic.commissionId(),
                 LocalDate.now().plusDays(10), RoomRequestStatus.NEW);
-        itemAjeno.deriveTo(otroEdificio.getId(), "subsecretaria@frc.utn.edu.ar", LocalDateTime.now());
+        itemAjeno.deriveTo(otroEdificio.getId(), "subsecretaria@frc.utn.edu.ar", Instant.now());
         roomRequestRepository.save(requestAjeno);
 
         RoomRequest requestSinDerivar = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
