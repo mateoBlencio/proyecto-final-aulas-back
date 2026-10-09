@@ -1174,11 +1174,13 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
                 Integer.class, operationId, parentId);
         jdbcTemplate.update("INSERT INTO configuracion_aud (clave, rev, revtype, valor) VALUES (?, ?, 1, 'x')",
                 "chain-test-" + java.util.UUID.randomUUID(), rev);
+        jdbcTemplate.update("INSERT INTO revinfo_resumen (rev, tabla_aud, revtype, cantidad) VALUES (?, 'configuracion_aud', 1, 1)", rev);
         return rev;
     }
 
     private void deleteRevisions(List<Integer> revisions) {
         revisions.forEach(rev -> {
+            jdbcTemplate.update("DELETE FROM revinfo_resumen WHERE rev = ?", rev);
             jdbcTemplate.update("DELETE FROM configuracion_aud WHERE rev = ?", rev);
             jdbcTemplate.update("DELETE FROM revinfo WHERE rev = ?", rev);
         });

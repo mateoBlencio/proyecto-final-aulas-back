@@ -38,6 +38,7 @@ class AuditLogQueryRepositoryRecordScopeIntegrationTest extends AbstractIntegrat
     @AfterEach
     void cleanUp() {
         insertedRevisions.forEach(rev -> {
+            jdbcTemplate.update("DELETE FROM revinfo_resumen WHERE rev = ?", rev);
             jdbcTemplate.update("DELETE FROM configuracion_aud WHERE rev = ?", rev);
             jdbcTemplate.update("DELETE FROM ocurrencia_aud WHERE rev = ?", rev);
             jdbcTemplate.update("DELETE FROM revinfo WHERE rev = ?", rev);
@@ -60,6 +61,7 @@ class AuditLogQueryRepositoryRecordScopeIntegrationTest extends AbstractIntegrat
     private int settingRevision(String key) {
         int rev = newRevision();
         jdbcTemplate.update("INSERT INTO configuracion_aud (clave, rev, revtype, valor) VALUES (?, ?, 1, 'x')", key, rev);
+        jdbcTemplate.update("INSERT INTO revinfo_resumen (rev, tabla_aud, revtype, cantidad) VALUES (?, 'configuracion_aud', 1, 1)", rev);
         return rev;
     }
 
@@ -67,6 +69,7 @@ class AuditLogQueryRepositoryRecordScopeIntegrationTest extends AbstractIntegrat
         int rev = newRevision();
         jdbcTemplate.update("INSERT INTO ocurrencia_aud (id_ocurrencia, rev, revtype, estado) VALUES (?, ?, 1, 'NEEDS_ROOM')",
                 id, rev);
+        jdbcTemplate.update("INSERT INTO revinfo_resumen (rev, tabla_aud, revtype, cantidad) VALUES (?, 'ocurrencia_aud', 1, 1)", rev);
         return rev;
     }
 
