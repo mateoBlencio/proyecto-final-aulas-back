@@ -11,7 +11,9 @@ spring:
   flyway:
     user: ${DB_MIGRATION_USERNAME}
     password: ${DB_MIGRATION_PASSWORD}
-    ignore-migration-patterns: "*:missing"
+    # TEMPORAL: dev tiene la V12 de feature/agrupacion-registro-auditoria, aun sin mergear.
+    # Quitar "*:future" cuando esa rama llegue a develop.
+    ignore-migration-patterns: "*:missing,*:future"
 
 springdoc:
   swagger-ui:
