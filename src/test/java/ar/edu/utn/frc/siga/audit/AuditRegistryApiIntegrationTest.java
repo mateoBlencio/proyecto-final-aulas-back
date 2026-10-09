@@ -55,6 +55,7 @@ import org.springframework.web.context.WebApplicationContext;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -782,6 +783,120 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
 
         auxMockMvc.perform(get("/v1/audit"))
                 .andExpect(status().isForbidden());
+    }
+
+    private static final String EXPORT = "/v1/audit/export";
+
+    /** CSV body without the BOM, split into lines (valid while no cell holds a line break). */
+    private List<String> csvLines(MvcResult result) throws Exception {
+        String body = result.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(body).startsWith("\uFEFF");
+        return List.of(body.substring(1).split("\r\n"));
+    }
+
+    private String[] csvRowOfOperation(List<String> lines, String operationId) {
+        return lines.stream().skip(1).map(line -> line.split(";", -1))
+                .filter(cells -> operationId.equals(cells[9])).findFirst()
+                .orElseThrow(() -> new AssertionError("No hay fila CSV con operacion " + operationId));
+    }
+
+    @Test
+    @DisplayName("GET /v1/audit/export responde 200 CSV adjunto y tiene una línea por entrada del listado más la cabecera")
+    void exportReturnsCsvWithOneLinePerListedEntry() throws Exception {
+        bumpSetting("21:41");
+        bumpSetting("21:42");
+        LocalDateTime before = LocalDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.MINUTES);
+
+        MvcResult result = mockMvc.perform(get(EXPORT).param("entityType", "Configuración"))
+                .andExpect(status().isOk())
+                .andReturn();
+        LocalDateTime after = LocalDateTime.now();
+
+        assertThat(result.getResponse().getContentType()).startsWith("text/csv");
+        assertThat(result.getResponse().getHeader("Cache-Control")).contains("no-store");
+        String disposition = result.getResponse().getHeader("Content-Disposition");
+        assertThat(disposition).matches("attachment; filename=\"auditoria-\\d{8}-\\d{4}\\.csv\"");
+        LocalDateTime stamp = LocalDateTime.parse(
+                disposition.replaceAll(".*auditoria-(\\d{8}-\\d{4})\\.csv.*", "$1"),
+                DateTimeFormatter.ofPattern("yyyyMMdd-HHmm"));
+        assertThat(stamp).isBetween(before, after);
+
+        long total = json(mockMvc, get("/v1/audit").param("entityType", "Configuración"))
+                .get("page").get("totalElements").asLong();
+        List<String> lines = csvLines(result);
+        assertThat(lines.getFirst()).isEqualTo("fecha;tipo;actor;usuario;descripcion;entidades;cantidad;tipo_cambio;"
+                + "registro;operacion;operacion_padre;revision");
+        assertThat(total).isGreaterThanOrEqualTo(2);
+        assertThat(lines).hasSize((int) total + 1);
+    }
+
+    @Test
+    @DisplayName("la fila del CSV coincide con la entrada JSON: fecha local igual a date, tipo, actor, usuario y descripción")
+    void exportRowMatchesJsonEntry() throws Exception {
+        bumpSetting("21:43");
+        String operationId = latestOperationId(SETTINGS_OPERATION);
+
+        JsonNode entry = operationEntry(json(mockMvc, get("/v1/audit").param("size", "200")), operationId);
+        List<String> lines = csvLines(mockMvc.perform(get(EXPORT)).andExpect(status().isOk()).andReturn());
+        String[] cells = csvRowOfOperation(lines, operationId);
+
+        LocalDateTime jsonDate = LocalDateTime.parse(entry.get("date").asText());
+        assertThat(cells[0]).isEqualTo(jsonDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        assertThat(cells[1]).isEqualTo(entry.get("type").asText());
+        assertThat(cells[2]).isEqualTo(entry.get("actorType").asText());
+        assertThat(cells[3]).isEqualTo(entry.get("user").asText());
+        assertThat(cells[4]).isEqualTo(entry.get("description").asText());
+    }
+
+    @Test
+    @DisplayName("la fecha del CSV es la hora local guardada en revinfo, sin desfase de zona horaria")
+    void exportDateEqualsStoredLocalTime() throws Exception {
+        bumpSetting("21:44");
+        String operationId = latestOperationId(SETTINGS_OPERATION);
+        LocalDateTime stored = jdbcTemplate.queryForObject(
+                "SELECT fecha_revision FROM revinfo WHERE operacion_id = ? ORDER BY rev DESC LIMIT 1",
+                LocalDateTime.class, operationId);
+
+        String[] cells = csvRowOfOperation(
+                csvLines(mockMvc.perform(get(EXPORT)).andExpect(status().isOk()).andReturn()), operationId);
+
+        assertThat(LocalDateTime.parse(cells[0], DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")))
+                .isEqualTo(stored.truncatedTo(java.time.temporal.ChronoUnit.SECONDS));
+    }
+
+    @Test
+    @DisplayName("GET /v1/audit/export sin PERM_AUDIT_READ responde 403")
+    void exportForbiddenWithoutAuditRead() throws Exception {
+        MockMvc auxMockMvc = mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
+
+        auxMockMvc.perform(get(EXPORT)).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("GET /v1/audit/export sin autenticar responde 401")
+    void exportUnauthenticated() throws Exception {
+        MockMvc anonymousMockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
+                .apply(springSecurity()).build();
+
+        anonymousMockMvc.perform(get(EXPORT)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("GET /v1/audit/export con q de 101 caracteres responde 400 y con 100 responde 200")
+    void exportRejectsLongQuery() throws Exception {
+        mockMvc.perform(get(EXPORT).param("q", "a".repeat(101))).andExpect(status().isBadRequest());
+        mockMvc.perform(get(EXPORT).param("q", "a".repeat(100))).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("GET /v1/audit/export con filtro inválido responde 400 JSON sin Content-Disposition")
+    void exportInvalidFilterIsJsonError() throws Exception {
+        MvcResult result = mockMvc.perform(get(EXPORT).param("entityType", "NoExiste"))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader("Content-Disposition")).isNull();
+        assertThat(result.getResponse().getContentType()).doesNotStartWith("text/csv");
     }
 
     @Test

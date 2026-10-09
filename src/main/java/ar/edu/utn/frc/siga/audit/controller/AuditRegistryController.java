@@ -7,7 +7,10 @@ import ar.edu.utn.frc.siga.audit.dto.response.AuditLogEntryDto;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditOperationChainDto;
 import ar.edu.utn.frc.siga.audit.service.AuditRegistryService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +18,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -24,7 +28,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Slf4j
@@ -35,6 +43,8 @@ import java.util.List;
 @PreAuthorize("hasAuthority('PERM_AUDIT_READ')")
 @Tag(name = "Auditoría", description = "Registro unificado de revisiones de todas las entidades auditadas")
 public class AuditRegistryController {
+
+    private static final DateTimeFormatter FILE_DATE = DateTimeFormatter.ofPattern("yyyyMMdd-HHmm");
 
     private final AuditRegistryService auditRegistryService;
 
@@ -70,6 +80,52 @@ public class AuditRegistryController {
                 new AuditLogFilter(from, to, user, entityType, kind, actor, q), pageable);
         log.info("Registro de auditoría consultado: total={}", page.getTotalElements());
         return ResponseEntity.ok(page);
+    }
+
+    @GetMapping("/export")
+    @Operation(summary = "Exportar el registro de auditoría a CSV",
+               description = "Mismos filtros que GET /v1/audit (from, to, user, entityType, kind, actor, q), sin "
+                       + "paginación: una fila por entrada del listado (OPERATION, TRANSACTION o CHANGE). CSV UTF-8 "
+                       + "con BOM, separador ';' y comillas según RFC 4180. Columnas: fecha, tipo, actor, usuario, "
+                       + "descripcion, entidades, cantidad, tipo_cambio, registro (recordLabel o recordId), "
+                       + "operacion, operacion_padre, revision. Las celdas de texto que empiezan con =, +, -, @, "
+                       + "tab o CR llevan un prefijo ' contra inyección de fórmulas. 400 si el filtro devuelve más "
+                       + "entradas que 'siga.audit.export.max-rows' (10000 por defecto): hay que acotar los filtros; "
+                       + "no se trunca en silencio. También 400 por los mismos filtros inválidos que GET /v1/audit. "
+                       + "'fecha' y el nombre del archivo están en hora de Buenos Aires. Si entran revisiones "
+                       + "mientras se exporta, puede haber filas repetidas en el borde entre páginas. Un error "
+                       + "después de enviado el primer byte deja el archivo truncado (queda en el log del servidor).",
+               responses = {
+                       @ApiResponse(responseCode = "200", description = "Archivo CSV",
+                               content = @Content(mediaType = "text/csv")),
+                       @ApiResponse(responseCode = "400", description = "Filtro inválido o con más entradas que "
+                               + "el máximo exportable")})
+    public void export(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String user,
+            @RequestParam(required = false) String entityType,
+            @RequestParam(required = false) RevisionKind kind,
+            @RequestParam(required = false) ActorType actor,
+            @RequestParam(required = false) @Size(max = 100) String q,
+            HttpServletResponse response) {
+        log.debug("GET /v1/audit/export: from={}, to={}, user={}, entityType={}, kind={}", from, to, user, entityType, kind);
+        try {
+            auditRegistryService.exportCsv(new AuditLogFilter(from, to, user, entityType, kind, actor, q), () -> {
+                response.setContentType("text/csv; charset=UTF-8");
+                response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+                response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"auditoria-"
+                        + LocalDateTime.now().format(FILE_DATE) + ".csv\"");
+                try {
+                    return response.getOutputStream();
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+        } catch (UncheckedIOException e) {
+            // Client closed the connection mid-download: the response is already committed, nothing to answer.
+            log.debug("Exportación de auditoría interrumpida", e);
+        }
     }
 
     @GetMapping("/operations/{operationId}")
