@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.ingest.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.ingest.dto.IngestResultDto;
@@ -22,6 +23,7 @@ public class IngestServiceImpl implements IngestService {
     private final AllocationService allocationService;
 
     @Override
+    @AuditOperation("Importación de eventos desde archivo")
     public IngestResultDto ingestFile(MultipartFile file) {
         String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "(sin nombre)";
         log.info("Iniciando importación: {} - {} bytes", originalFilename, file.getSize());

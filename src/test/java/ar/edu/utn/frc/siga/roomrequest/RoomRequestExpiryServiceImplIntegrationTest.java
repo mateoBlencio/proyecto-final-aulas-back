@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -172,6 +173,21 @@ class RoomRequestExpiryServiceImplIntegrationTest extends AbstractIntegrationTes
 
         assertThat(itemRepository.findById(item.getId()).orElseThrow().getStatus())
                 .isEqualTo(RoomRequestStatus.NEW);
+    }
+
+    @Test
+    @DisplayName("la revisión del ítem vencido lleva la descripción de la operación y un operacion_id")
+    void expiryRevisionCarriesOperation() {
+        Long overdueId = seedItem(RoomRequestStatus.NEW, LocalDate.now().minusDays(1)).getId();
+
+        expiryService.expireOverdueItems();
+
+        Map<String, Object> latest = jdbcTemplate.queryForList(
+                "SELECT r.descripcion AS descripcion, r.operacion_id AS operacion_id FROM revinfo r "
+                        + "JOIN solicitud_aula_item_aud a ON a.rev = r.rev WHERE a.id_item = ? "
+                        + "ORDER BY r.rev DESC LIMIT 1", overdueId).getFirst();
+        assertThat(latest.get("descripcion")).isEqualTo("Vencimiento automático de solicitudes de aula");
+        assertThat(latest.get("operacion_id")).isNotNull();
     }
 
     @Test

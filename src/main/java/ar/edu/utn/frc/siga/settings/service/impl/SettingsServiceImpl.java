@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.settings.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.settings.dto.request.SettingUpdateItemDto;
 import ar.edu.utn.frc.siga.settings.dto.response.SettingResponseDto;
@@ -68,6 +69,7 @@ public class SettingsServiceImpl implements SettingsService {
 
     @Override
     @Transactional
+    @AuditOperation("Modificación de configuración")
     public SettingResponseDto update(String key, String value) {
         SettingKey settingKey = resolveKey(key);
         String normalized = validator.validate(settingKey, value);
@@ -78,6 +80,7 @@ public class SettingsServiceImpl implements SettingsService {
 
     @Override
     @Transactional
+    @AuditOperation("Modificación de configuraciones en lote")
     public List<SettingResponseDto> updateBatch(List<SettingUpdateItemDto> items) {
         return items.stream()
                 .map(item -> update(item.key(), item.value()))

@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.events.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.events.dto.AcademicEventFilter;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
@@ -156,6 +157,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
     @Override
     @Transactional
+    @AuditOperation("Alta de evento recurrente")
     public AcademicEventResponseDto createRecurringEvent(CreateRecurringEventRequestDto dto) {
         log.debug("Creando evento recurrente: subjectId={}, commissionId={}, dayOfWeek={}, startDate={}",
                 dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startDate());
@@ -184,12 +186,14 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
     @Override
     @Transactional
+    @AuditOperation("Alta de evento recurrente")
     public FindOrCreateResult<Long> findOrCreateRecurringEvent(CreateRecurringEventRequestDto dto) {
         return findOrCreateRecurringEvents(List.of(dto)).getFirst();
     }
 
     @Override
     @Transactional
+    @AuditOperation("Alta de eventos recurrentes en lote")
     public List<FindOrCreateResult<Long>> findOrCreateRecurringEvents(List<CreateRecurringEventRequestDto> requests) {
         Partition partition = partitionByKey(requests, AcademicEventServiceImpl::keyOf,
                 AcademicEventServiceImpl::buildRecurringEvent, null);
@@ -254,6 +258,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
     @Override
     @Transactional
+    @AuditOperation("Sincronización de eventos desde SysAcad")
     public List<UpsertRecurringEventResult> syncRecurringEvents(List<SyncRecurringEventCommand> commands) {
         Instant now = Instant.now();
         Set<RecurringEvent> updated = new LinkedHashSet<>();
@@ -345,6 +350,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
     @Override
     @Transactional
+    @AuditOperation("Sincronización de evento desde SysAcad")
     public UpsertRecurringEventResult syncRecurringEvent(SyncRecurringEventCommand cmd) {
         return syncRecurringEvents(List.of(cmd)).getFirst();
     }
@@ -411,6 +417,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
     @Override
     @Transactional
+    @AuditOperation("Baja de eventos ausentes en SysAcad")
     public int markRecurringEventsAbsent(Collection<Long> presentEventIds) {
         Instant now = Instant.now();
         int affected = 0;
@@ -448,6 +455,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
     @Override
     @Transactional
+    @AuditOperation("Alta de evento único")
     public AcademicEventResponseDto createUniqueEvent(CreateUniqueEventRequestDto dto) {
         log.debug("Creando evento único: eventType={}, subjectId={}, commissionId={}, date={}",
                 dto.eventType(), dto.subjectId(), dto.commissionId(), dto.date());
@@ -491,6 +499,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
     @Override
     @Transactional
+    @AuditOperation("Modificación de evento único")
     public AcademicEventResponseDto updateUniqueEvent(Long id, UpdateUniqueEventRequestDto dto) {
         log.debug("Actualizando evento único: id={}", id);
 

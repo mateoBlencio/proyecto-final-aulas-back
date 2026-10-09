@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.events.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
@@ -49,6 +50,7 @@ public class OccurrenceServiceImpl implements OccurrenceService {
 
     @Override
     @Transactional
+    @AuditOperation("Alta de ocurrencias simultáneas")
     public List<Long> createSimultaneous(Long occurrenceId, int count) {
         Occurrence principal = Finder.orThrow(occurrenceRepository::findById, occurrenceId, "Occurrence");
         int nextSlot = occurrenceRepository.findByEvent_IdAndDate(principal.getEvent().getId(), principal.getDate())
@@ -112,6 +114,7 @@ public class OccurrenceServiceImpl implements OccurrenceService {
 
     @Override
     @Transactional
+    @AuditOperation("Liberación de ocurrencia")
     public void release(Long occurrenceId) {
         Occurrence occurrence = Finder.orThrow(occurrenceRepository::findById, occurrenceId, "Occurrence");
         eventScheduleValidator.validateNotPast(occurrence);
@@ -121,6 +124,7 @@ public class OccurrenceServiceImpl implements OccurrenceService {
 
     @Override
     @Transactional
+    @AuditOperation("Pedido de aula para ocurrencia")
     public void requestRoom(Long occurrenceId) {
         Occurrence occurrence = Finder.orThrow(occurrenceRepository::findById, occurrenceId, "Occurrence");
         eventScheduleValidator.validateNotPast(occurrence);

@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
@@ -68,12 +69,14 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
     @Override
     @Transactional
+    @AuditOperation("Asignación de aula a solicitud")
     public RoomRequestItemResponseDto assign(Long itemId, List<Long> classroomIds, String reason, String actor) {
         return assign(itemId, classroomIds, reason, actor, items -> AllocationCommand.manual(items, reason));
     }
 
     @Override
     @Transactional
+    @AuditOperation("Asignación automática de aula a solicitud")
     public RoomRequestItemResponseDto assignAutomatic(Long itemId, List<Long> classroomIds, String reason,
                                                       String actor) {
         return assign(itemId, classroomIds, reason, actor, items -> AllocationCommand.automatic(items, reason));
@@ -134,6 +137,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
     @Override
     @Transactional
+    @AuditOperation("Cancelación de solicitud de aula")
     public RoomRequestItemResponseDto cancel(Long itemId, String reason, String actor) {
         log.debug("Cancelando pedido de aula: itemId={}", itemId);
 
@@ -176,6 +180,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
     @Override
     @Transactional
+    @AuditOperation("Derivación de solicitud de aula a otro edificio")
     public RoomRequestItemResponseDto derive(Long itemId, Long buildingId, String actor) {
         log.debug("Derivando pedido de aula: itemId={}, buildingId={}", itemId, buildingId);
 
@@ -208,6 +213,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
     @Override
     @Transactional
+    @AuditOperation("Devolución de solicitud de aula")
     public RoomRequestItemResponseDto returnItem(Long itemId, String reason, String actor) {
         log.debug("Devolviendo pedido de aula desde su edificio: itemId={}", itemId);
 
@@ -228,6 +234,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
     @Override
     @Transactional
+    @AuditOperation("Notificación de solicitud de aula")
     public RoomRequestItemResponseDto notify(Long itemId, String actor) {
         log.debug("Notificando pedido de aula: itemId={}", itemId);
 

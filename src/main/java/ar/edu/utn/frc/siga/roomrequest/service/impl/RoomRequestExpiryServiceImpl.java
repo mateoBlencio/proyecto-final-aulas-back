@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
@@ -33,6 +34,7 @@ public class RoomRequestExpiryServiceImpl implements RoomRequestExpiryService {
 
     @Override
     @Transactional
+    @AuditOperation("Vencimiento automático de solicitudes de aula")
     public int expireOverdueItems() {
         LocalDate today = LocalDate.now();
 

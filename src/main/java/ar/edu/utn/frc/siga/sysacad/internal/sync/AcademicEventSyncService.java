@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.sysacad.internal.sync;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.model.TermType;
@@ -41,6 +42,7 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
     }
 
     @Override
+    @AuditOperation("Sincronización de eventos desde SysAcad")
     public void sync(SysacadCatalogReader catalog) {
         ViewSyncRunner.run(syncStateService, SysacadView.EVENTOS, "Eventos", log, () -> doSync(catalog));
     }
