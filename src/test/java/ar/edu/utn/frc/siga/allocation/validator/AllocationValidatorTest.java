@@ -199,7 +199,9 @@ class AllocationValidatorTest {
 
         assertThatThrownBy(() -> validator.validateNoOverlap(List.of(candidate), List.of(occupied)))
                 .isInstanceOf(ReallocationConflictException.class)
-                .satisfies(ex -> assertThat(((ReallocationConflictException) ex).getConflicts()).hasSize(1));
+                .satisfies(ex -> assertThat(((ReallocationConflictException) ex).getConflicts()).hasSize(1))
+                .satisfies(ex -> assertThat(((ReallocationConflictException) ex).getProperties())
+                        .containsEntry("code", "ALLOCATION_CONFLICT"));
     }
 
     @Test
@@ -405,7 +407,9 @@ class AllocationValidatorTest {
 
         assertThatThrownBy(() -> validator.validateClassroomsAvailable(Set.of(5L)))
                 .isInstanceOf(AllocationConflictException.class)
-                .hasMessageContaining("5");
+                .hasMessageContaining("5")
+                .satisfies(ex -> assertThat(((AllocationConflictException) ex).getProperties())
+                        .containsEntry("code", "ALLOCATION_CONFLICT"));
     }
 
     @Test
