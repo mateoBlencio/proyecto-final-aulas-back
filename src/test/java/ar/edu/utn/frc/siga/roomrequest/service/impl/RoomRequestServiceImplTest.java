@@ -39,6 +39,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -150,21 +151,21 @@ class RoomRequestServiceImplTest {
     }
 
     @Test
-    @DisplayName("countItemsByStatus: un conteo por cada estado del enum, en orden, sin tocar el composer")
+    @DisplayName("countItemsByStatus: una sola consulta agrupada; los estados sin filas salen en 0, en orden del enum")
     void countItemsByStatusReturnsOneEntryPerStatus() {
-        when(itemRepository.count(ArgumentMatchers.<Specification<RoomRequestItem>>any()))
-                .thenReturn(30L, 5L, 10L, 2L, 0L);
+        when(itemRepository.countByStatus(ArgumentMatchers.<Specification<RoomRequestItem>>any()))
+                .thenReturn(Map.of(RoomRequestStatus.NEW, 30L, RoomRequestStatus.RESOLVED, 2L));
 
         List<RoomRequestItemStatusCountDto> result =
                 service.countItemsByStatus(true, null, null, "subsecretaria@frc.utn.edu.ar");
 
         assertThat(result).containsExactly(
                 new RoomRequestItemStatusCountDto(RoomRequestStatus.NEW, 30L),
-                new RoomRequestItemStatusCountDto(RoomRequestStatus.DERIVED_TO_BUILDING, 5L),
-                new RoomRequestItemStatusCountDto(RoomRequestStatus.IN_EVALUATION, 10L),
+                new RoomRequestItemStatusCountDto(RoomRequestStatus.DERIVED_TO_BUILDING, 0L),
+                new RoomRequestItemStatusCountDto(RoomRequestStatus.IN_EVALUATION, 0L),
                 new RoomRequestItemStatusCountDto(RoomRequestStatus.RESOLVED, 2L),
                 new RoomRequestItemStatusCountDto(RoomRequestStatus.CANCELLED, 0L));
-        verify(itemRepository, times(5)).count(ArgumentMatchers.<Specification<RoomRequestItem>>any());
+        verify(itemRepository, times(1)).countByStatus(ArgumentMatchers.<Specification<RoomRequestItem>>any());
         verifyNoInteractions(composer);
     }
 
