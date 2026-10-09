@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
+import ar.edu.utn.frc.siga.audit.internal.AuditDescriptionProbe;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.command.SyncRecurringEventCommand;
@@ -34,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -231,5 +233,74 @@ class AcademicEventSyncServiceTest {
 
         verify(syncStateService).recordFailure(SysacadView.EVENTOS, "SysAcad caído");
         verify(academicEventService, never()).markRecurringEventsAbsent(anyCollection());
+    }
+
+    // ---------- audit description ----------
+
+    private String syncAndReadDescription(List<UpsertRecurringEventResult> results, int absent) {
+        SysacadAcademicEventDto row = new SysacadAcademicEventDto(
+                "101", 55, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
+        when(catalogReader.findAcademicEvents()).thenReturn(List.of(row));
+        when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(academicEventService.syncRecurringEvents(anyList())).thenAnswer(inv -> {
+            AuditDescriptionProbe.stamp();
+            return results;
+        });
+        when(academicEventService.markRecurringEventsAbsent(anySet())).thenReturn(absent);
+        AuditDescriptionProbe probe = new AuditDescriptionProbe();
+
+        probe.audited(service).sync(catalogReader);
+
+        return probe.rewrittenDescription();
+    }
+
+    private UpsertRecurringEventResult updated(long eventId) {
+        return new UpsertRecurringEventResult(eventId, false, true);
+    }
+
+    private UpsertRecurringEventResult unchanged(long eventId) {
+        return new UpsertRecurringEventResult(eventId, false, false);
+    }
+
+    @Test
+    @DisplayName("sync: 1 alta, 0 cambios, 2 bajas → los contadores salen de created/updated y de markRecurringEventsAbsent")
+    void syncDescribesCreatedUpdatedAndAbsent() {
+        String description = syncAndReadDescription(List.of(created(100L)), 2);
+
+        assertThat(description).isEqualTo("Sincronización de eventos desde SysAcad: 1 alta, 0 cambios, 2 bajas");
+    }
+
+    @Test
+    @DisplayName("sync: 0 altas, 1 cambio, 1 baja → singular en cambio y en baja")
+    void syncDescribesSingularUpdateAndAbsent() {
+        String description = syncAndReadDescription(List.of(updated(100L)), 1);
+
+        assertThat(description).isEqualTo("Sincronización de eventos desde SysAcad: 0 altas, 1 cambio, 1 baja");
+    }
+
+    @Test
+    @DisplayName("sync: los eventos sin cambios no suman a altas ni a cambios")
+    void syncDescribesIgnoresUnchangedEvents() {
+        String description = syncAndReadDescription(
+                List.of(created(1L), created(2L), updated(3L), updated(4L), updated(5L), unchanged(6L), unchanged(7L)), 0);
+
+        assertThat(description).isEqualTo("Sincronización de eventos desde SysAcad: 2 altas, 3 cambios, 0 bajas");
+    }
+
+    @Test
+    @DisplayName("sync: el valor de retorno sigue siendo presentes más bajas, no cambia por la descripción")
+    void syncReturnValueUnchangedByDescription() {
+        SysacadAcademicEventDto row = new SysacadAcademicEventDto(
+                "101", 55, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
+        when(catalogReader.findAcademicEvents()).thenReturn(List.of(row));
+        when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(academicEventService.syncRecurringEvents(anyList())).thenReturn(List.of(created(1L), unchanged(2L)));
+        when(academicEventService.markRecurringEventsAbsent(anySet())).thenReturn(3);
+
+        service.sync(catalogReader);
+
+        verify(syncStateService).recordSuccess(SysacadView.EVENTOS, 5);
     }
 }

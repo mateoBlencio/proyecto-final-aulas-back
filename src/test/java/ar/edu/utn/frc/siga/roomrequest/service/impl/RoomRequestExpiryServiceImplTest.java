@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
+import ar.edu.utn.frc.siga.audit.internal.AuditDescriptionProbe;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.model.EventType;
@@ -10,6 +11,8 @@ import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -98,6 +101,28 @@ class RoomRequestExpiryServiceImplTest {
 
         assertThat(cancelled).isZero();
         assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.NEW);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"0,0 ítems", "1,1 ítem", "2,2 ítems"})
+    @DisplayName("la descripción de la operación lleva la cantidad de ítems con la concordancia correcta")
+    void describesExpiredCount(int count, String expectedCount) {
+        List<RoomRequestItem> expired = new java.util.ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            expired.add(RoomRequestItem.builder().id(100L + i).status(RoomRequestStatus.NEW)
+                    .date(LocalDate.now().minusDays(1)).build());
+        }
+        when(itemRepository.findExpiredByDate(any())).thenAnswer(inv -> {
+            AuditDescriptionProbe.stamp();
+            return expired;
+        });
+        when(itemRepository.findActiveRegularRoomChangeItems()).thenReturn(List.of());
+        AuditDescriptionProbe probe = new AuditDescriptionProbe();
+
+        probe.audited(newService()).expireOverdueItems();
+
+        assertThat(probe.rewrittenDescription())
+                .isEqualTo("Vencimiento automático de " + expectedCount + " de solicitudes de aula");
     }
 
     private AcademicEventResponseDto recurringEvent(Long id, LocalDate endDate) {

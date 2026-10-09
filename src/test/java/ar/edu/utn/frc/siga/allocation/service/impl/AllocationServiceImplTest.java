@@ -14,6 +14,7 @@ import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationCandidate;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
+import ar.edu.utn.frc.siga.audit.internal.AuditDescriptionProbe;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.security.BuildingScope;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
@@ -28,6 +29,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
@@ -711,6 +714,179 @@ class AllocationServiceImplTest {
         Optional<Long> result = service.findClassroomIdByOccurrence(10L);
 
         assertThat(result).isEmpty();
+    }
+
+    // ---------- audit descriptions ----------
+
+    private static final String CENTRAL = "Edificio Central";
+
+    private AuditDescriptionProbe probe;
+    private AllocationServiceImpl audited;
+
+    private void auditedService() {
+        probe = new AuditDescriptionProbe();
+        audited = probe.audited(service);
+    }
+
+    private ClassroomResponseDto classroomIn(long id, long buildingId, String buildingName) {
+        return new ClassroomResponseDto(id, 100 + (int) id, 40, buildingId, buildingName, 1L, "Normal");
+    }
+
+    /** Resolves {@code resolved} for a manual command and records the description seen when the writer runs. */
+    private AllocationCommand stubManualWrite(Map<OccurrenceSlotDto, Long> resolved, boolean upsert) {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5L);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
+        if (upsert) {
+            when(writer.upsert(eq(resolved), any(), any())).thenAnswer(inv -> {
+                probe.peek();
+                return List.of();
+            });
+        } else {
+            when(writer.create(eq(resolved), any(), any())).thenAnswer(inv -> {
+                probe.peek();
+                return List.of();
+            });
+        }
+        return command;
+    }
+
+    @Test
+    @DisplayName("allocate: 1 aula en un edificio → 'Asignación de 1 aula, edificio X' (singular)")
+    void allocateDescribesSingularClassroom() {
+        auditedService();
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occurrenceSlot(10L, 1L, futureDate(1)), 5);
+        AllocationCommand command = stubManualWrite(resolved, false);
+        when(classroomService.findByIds(Set.of(5L))).thenReturn(List.of(classroomIn(5L, 1L, CENTRAL)));
+
+        audited.allocate(command);
+
+        assertThat(probe.peeked()).isEqualTo("Asignación de 1 aula, edificio Edificio Central");
+    }
+
+    @Test
+    @DisplayName("allocate: 2 aulas del mismo edificio → 'Asignación de 2 aulas, edificio X' (plural)")
+    void allocateDescribesPluralClassrooms() {
+        auditedService();
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(
+                occurrenceSlot(10L, 1L, futureDate(1)), 5, occurrenceSlot(11L, 1L, futureDate(2)), 6);
+        AllocationCommand command = stubManualWrite(resolved, false);
+        when(classroomService.findByIds(Set.of(5L, 6L)))
+                .thenReturn(List.of(classroomIn(5L, 1L, CENTRAL), classroomIn(6L, 1L, CENTRAL)));
+
+        audited.allocate(command);
+
+        assertThat(probe.peeked()).isEqualTo("Asignación de 2 aulas, edificio Edificio Central");
+    }
+
+    @Test
+    @DisplayName("allocate: varias ocurrencias en la misma aula cuentan 1 aula")
+    void allocateCountsDistinctClassrooms() {
+        auditedService();
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(
+                occurrenceSlot(10L, 1L, futureDate(1)), 5, occurrenceSlot(11L, 1L, futureDate(2)), 5);
+        AllocationCommand command = stubManualWrite(resolved, false);
+        when(classroomService.findByIds(Set.of(5L))).thenReturn(List.of(classroomIn(5L, 1L, CENTRAL)));
+
+        audited.allocate(command);
+
+        assertThat(probe.peeked()).isEqualTo("Asignación de 1 aula, edificio Edificio Central");
+    }
+
+    @Test
+    @DisplayName("allocate: aulas de dos edificios → 'Asignación de 2 aulas, 2 edificios' sin nombrar edificio")
+    void allocateDescribesSeveralBuildings() {
+        auditedService();
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(
+                occurrenceSlot(10L, 1L, futureDate(1)), 5, occurrenceSlot(11L, 1L, futureDate(2)), 6);
+        AllocationCommand command = stubManualWrite(resolved, false);
+        when(classroomService.findByIds(Set.of(5L, 6L)))
+                .thenReturn(List.of(classroomIn(5L, 1L, CENTRAL), classroomIn(6L, 2L, "Edificio Norte")));
+
+        audited.allocate(command);
+
+        assertThat(probe.peeked()).isEqualTo("Asignación de 2 aulas, 2 edificios");
+    }
+
+    @Test
+    @DisplayName("reallocate: 2 aulas del mismo edificio → 'Reasignación de 2 aulas, edificio X'")
+    void reallocateDescribesClassroomsAndBuilding() {
+        auditedService();
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(
+                occurrenceSlot(10L, 1L, futureDate(1)), 5, occurrenceSlot(11L, 1L, futureDate(2)), 6);
+        AllocationCommand command = stubManualWrite(resolved, true);
+        when(classroomService.findByIds(Set.of(5L, 6L)))
+                .thenReturn(List.of(classroomIn(5L, 1L, CENTRAL), classroomIn(6L, 1L, CENTRAL)));
+
+        audited.reallocate(command);
+
+        assertThat(probe.peeked()).isEqualTo("Reasignación de 2 aulas, edificio Edificio Central");
+    }
+
+    @Test
+    @DisplayName("allocate y reallocate sin ocurrencias resueltas conservan el texto fijo de @AuditOperation")
+    void emptyBatchKeepsFixedDescription() {
+        auditedService();
+        AllocationCommand command = stubManualWrite(Map.of(), false);
+        audited.allocate(command);
+        assertThat(probe.peeked()).isEqualTo("Asignación de aulas en lote");
+
+        AllocationCommand reCommand = stubManualWrite(Map.of(), true);
+        audited.reallocate(reCommand);
+        assertThat(probe.peeked()).isEqualTo("Reasignación de aulas en lote");
+    }
+
+    @Test
+    @DisplayName("deallocate: 1 ocurrencia → 'Liberación de 1 ocurrencia' (singular)")
+    void deallocateDescribesSingularOccurrence() {
+        auditedService();
+        DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(10L))), "obs");
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
+        when(targetResolver.resolveAll(command.targets(), null)).thenReturn(List.of(occ));
+        when(writer.delete(List.of(occ))).thenAnswer(inv -> {
+            probe.peek();
+            return List.of();
+        });
+
+        audited.deallocate(command);
+
+        assertThat(probe.peeked()).isEqualTo("Liberación de 1 ocurrencia");
+    }
+
+    @Test
+    @DisplayName("deallocate: 2 ocurrencias → 'Liberación de 2 ocurrencias' (plural)")
+    void deallocateDescribesPluralOccurrences() {
+        auditedService();
+        DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Event(1L)), "obs");
+        OccurrenceSlotDto occ1 = occurrenceSlot(10L, 1L, futureDate(1));
+        OccurrenceSlotDto occ2 = occurrenceSlot(11L, 1L, futureDate(8));
+        when(targetResolver.resolveAll(command.targets(), null)).thenReturn(List.of(occ1, occ2));
+        when(writer.delete(List.of(occ1, occ2))).thenAnswer(inv -> {
+            probe.peek();
+            return List.of();
+        });
+
+        audited.deallocate(command);
+
+        assertThat(probe.peeked()).isEqualTo("Liberación de 2 ocurrencias");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"0,0 afectadas", "1,1 afectada", "2,2 afectadas"})
+    @DisplayName("syncFromSysacad: la descripción lleva el conteo con la concordancia correcta")
+    void syncFromSysacadDescribesAffected(int affected, String expectedCount) {
+        auditedService();
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5L);
+        when(targetResolver.resolveClassroomByOccurrence(List.of(item), null)).thenReturn(Map.of());
+        when(writer.syncFromSysacad(Map.of())).thenAnswer(inv -> {
+            AuditDescriptionProbe.stamp();
+            return affected;
+        });
+
+        audited.syncFromSysacad(List.of(item));
+
+        assertThat(probe.rewrittenDescription())
+                .isEqualTo("Sincronización de asignaciones desde SysAcad: " + expectedCount);
     }
 
     // ---------- helpers ----------

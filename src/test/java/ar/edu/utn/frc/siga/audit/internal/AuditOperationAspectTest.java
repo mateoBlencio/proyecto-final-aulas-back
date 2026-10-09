@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.audit.internal;
 
 import ar.edu.utn.frc.siga.audit.AuditCause;
 import ar.edu.utn.frc.siga.audit.AuditOperation;
+import ar.edu.utn.frc.siga.audit.AuditOperations;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -9,9 +10,14 @@ import org.springframework.aop.aspectj.annotation.AspectJProxyFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @DisplayName("AuditOperationAspect")
 class AuditOperationAspectTest {
+
+    private final RevisionDescriptionUpdater updater = mock(RevisionDescriptionUpdater.class);
 
     @AfterEach
     void clear() {
@@ -27,6 +33,33 @@ class AuditOperationAspectTest {
     public static class Target {
 
         AuditOperationContext.Operation seen;
+
+        @AuditOperation("Inicial")
+        public void describeAfterStamp() {
+            seen = AuditOperationContext.current();
+            AuditOperationContext.markStamped();
+            AuditOperations.describe("Final");
+        }
+
+        @AuditOperation("Inicial")
+        public void describeBeforeStamp() {
+            seen = AuditOperationContext.current();
+            AuditOperations.describe("Final");
+            AuditOperationContext.markStamped();
+        }
+
+        @AuditOperation("Inicial")
+        public void stampWithoutDescribe() {
+            AuditOperationContext.markStamped();
+        }
+
+        @AuditOperation("Inicial")
+        public void describeAfterStampThenFail() {
+            seen = AuditOperationContext.current();
+            AuditOperationContext.markStamped();
+            AuditOperations.describe("Final");
+            throw new IllegalStateException("boom");
+        }
 
         @AuditOperation("Operación hija")
         public void handle(AuditCause cause) {
@@ -57,7 +90,7 @@ class AuditOperationAspectTest {
 
     private Target proxied(Target target) {
         AspectJProxyFactory factory = new AspectJProxyFactory(target);
-        factory.addAspect(new AuditOperationAspect());
+        factory.addAspect(new AuditOperationAspect(updater));
         return factory.getProxy();
     }
 
@@ -124,6 +157,48 @@ class AuditOperationAspectTest {
                 .isInstanceOf(IllegalStateException.class);
 
         assertThat(target.seen.parentId()).isEqualTo("parent-op-1");
+        assertThat(AuditOperationContext.current()).isNull();
+    }
+
+    @Test
+    @DisplayName("describe tardío (después de sellar una revisión) reescribe la descripción de esa operación al cerrar")
+    void lateDescribeCallsUpdaterWithOperationId() {
+        Target target = new Target();
+
+        proxied(target).describeAfterStamp();
+
+        verify(updater).update(target.seen.id(), "Final");
+        assertThat(AuditOperationContext.current()).isNull();
+    }
+
+    @Test
+    @DisplayName("describe antes de sellar no necesita UPDATE: el updater no se llama")
+    void earlyDescribeDoesNotCallUpdater() {
+        Target target = new Target();
+
+        proxied(target).describeBeforeStamp();
+
+        verifyNoInteractions(updater);
+    }
+
+    @Test
+    @DisplayName("revisión sellada sin describe no llama al updater")
+    void stampWithoutDescribeDoesNotCallUpdater() {
+        proxied(new Target()).stampWithoutDescribe();
+
+        verifyNoInteractions(updater);
+    }
+
+    @Test
+    @DisplayName("si el método falla después de un describe tardío no reescribe la descripción y propaga la excepción")
+    void failingMethodDoesNotCallUpdater() {
+        Target target = new Target();
+
+        assertThatThrownBy(() -> proxied(target).describeAfterStampThenFail())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("boom");
+
+        verifyNoInteractions(updater);
         assertThat(AuditOperationContext.current()).isNull();
     }
 }
