@@ -35,6 +35,7 @@ class AuditLogQueryRepositoryChainIntegrationTest extends AbstractIntegrationTes
     @AfterEach
     void cleanUp() {
         insertedRevisions.forEach(rev -> {
+            jdbcTemplate.update("DELETE FROM revinfo_resumen WHERE rev = ?", rev);
             jdbcTemplate.update("DELETE FROM configuracion_aud WHERE rev = ?", rev);
             jdbcTemplate.update("DELETE FROM revinfo WHERE rev = ?", rev);
         });
@@ -54,6 +55,7 @@ class AuditLogQueryRepositoryChainIntegrationTest extends AbstractIntegrationTes
                 Integer.class, parentId == null ? "HUMAN" : "SYSTEM", "Op " + operationId, operationId, parentId);
         jdbcTemplate.update("INSERT INTO configuracion_aud (clave, rev, revtype, valor) VALUES (?, ?, 1, 'x')",
                 "chain-test-" + UUID.randomUUID(), rev);
+        jdbcTemplate.update("INSERT INTO revinfo_resumen (rev, tabla_aud, revtype, cantidad) VALUES (?, 'configuracion_aud', 1, 1)", rev);
         insertedRevisions.add(rev);
         insertedOperations.add(operationId);
         return rev;

@@ -15,12 +15,16 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Audit log read using aggregate SQL over {@code revinfo} and the {@code _aud} tables.
+ * Audit log read using aggregate SQL over {@code revinfo}, {@code revinfo_resumen} and the {@code _aud} tables.
  * Only table/column names coming from {@link AuditedEntityRegistry} and branch indexes are
  * integer concatenated into the SQL; every request value travels as a parameter.
  */
@@ -134,25 +138,27 @@ public class AuditLogQueryRepository {
             restrictions.add("(r.operacion_id IS NULL AND r." + REV + " IN (:revisions))");
             aggParams.addValue("revisions", revisions);
         }
-        String union = unionBranches(criteria, aggParams, target -> "(" + String.join(" OR ", restrictions) + ")");
-        String aggSql = "SELECT c.operacion_id, MAX(c.rev) AS revision, MAX(c.fecha_revision) AS fecha, "
-                + "MAX(c.usuario) AS usuario, MAX(c.tipo_actor) AS tipo_actor, MAX(c.descripcion) AS descripcion, MAX(c.operacion_padre_id) AS operacion_padre_id, COUNT(*) AS record_count, "
-                + "MIN(c.revtype) AS min_revtype, MAX(c.revtype) AS max_revtype, "
-                + "MIN(c.entity_idx) AS min_entity_idx, MIN(c.record_id) AS min_record_id, "
-                + "string_agg(DISTINCT CAST(c.entity_idx AS varchar), ',') AS entity_idxs "
-                + "FROM (" + union + ") c "
-                + "GROUP BY c.operacion_id, CASE WHEN c.operacion_id IS NULL THEN c.rev END "
+        String aggSql = "SELECT r.operacion_id, MAX(r." + REV + ") AS revision, MAX(r.fecha_revision) AS fecha, "
+                + "MAX(r.usuario) AS usuario, MAX(r.tipo_actor) AS tipo_actor, MAX(r.descripcion) AS descripcion, MAX(r.operacion_padre_id) AS operacion_padre_id, "
+                + "SUM(s.cantidad) AS record_count, MIN(s.revtype) AS min_revtype, MAX(s.revtype) AS max_revtype, "
+                + "string_agg(DISTINCT s.tabla_aud, ',') AS audit_tables "
+                + "FROM revinfo r JOIN revinfo_resumen s ON s.rev = r.rev "
+                + "WHERE " + revisionFilters(criteria, aggParams) + " AND (" + String.join(" OR ", restrictions) + ")"
+                + summaryFilter(criteria, aggParams)
+                + " GROUP BY r.operacion_id, CASE WHEN r.operacion_id IS NULL THEN r." + REV + " END "
                 + "ORDER BY revision DESC";
 
         List<AuditedEntity> entities = registry.all();
-        return jdbc.query(aggSql, aggParams, (rs, rowNum) -> {
-            List<String> entityTypes = Arrays.stream(rs.getString("entity_idxs").split(","))
-                    .map(idx -> entities.get(Integer.parseInt(idx)).label())
-                    .sorted()
+        record Group(AuditGroupRow row, List<AuditedEntity> tables) {
+        }
+        List<Group> groups = jdbc.query(aggSql, aggParams, (rs, rowNum) -> {
+            List<AuditedEntity> tables = Arrays.stream(rs.getString("audit_tables").split(","))
+                    .map(this::entityOf)
+                    .sorted(Comparator.comparingInt(registry::indexOf))
                     .toList();
             int minRevtype = rs.getInt("min_revtype");
             RevisionKind commonKind = minRevtype == rs.getInt("max_revtype") ? toKind(minRevtype) : null;
-            return new AuditGroupRow(
+            return new Group(new AuditGroupRow(
                     rs.getString("operacion_id"),
                     rs.getString("operacion_padre_id"),
                     rs.getInt("revision"),
@@ -161,11 +167,63 @@ public class AuditLogQueryRepository {
                     ActorType.valueOf(rs.getString("tipo_actor")),
                     rs.getString("descripcion"),
                     rs.getLong("record_count"),
-                    entityTypes,
+                    tables.stream().map(AuditedEntity::label).sorted().toList(),
                     commonKind,
-                    entities.get(rs.getInt("min_entity_idx")).label(),
-                    rs.getString("min_record_id"));
+                    tables.getFirst().label(),
+                    null), tables);
         });
+
+        Map<String, String> singleIds = singleRecordIds(criteria, groups.stream()
+                .filter(g -> g.row().recordCount() == 1)
+                .map(g -> new SingleGroup(g.row().operationId(), g.row().revision(), g.tables().getFirst()))
+                .toList());
+        return groups.stream().map(g -> {
+            AuditGroupRow row = g.row();
+            String recordId = row.recordCount() == 1 ? singleIds.get(groupKey(row.operationId(), row.revision())) : null;
+            return new AuditGroupRow(row.operationId(), row.parentOperationId(), row.revision(), row.date(), row.user(),
+                    row.actorType(), row.description(), row.recordCount(), row.entityTypes(), row.commonKind(),
+                    row.singleEntityType(), recordId);
+        }).toList();
+    }
+
+    private record SingleGroup(String operationId, int revision, AuditedEntity table) {
+    }
+
+    private static String groupKey(String operationId, int revision) {
+        return operationId != null ? "op:" + operationId : "rev:" + revision;
+    }
+
+    /**
+     * Record id of the groups with exactly one row, read from the {@code _aud} table of that row
+     * (index {@code idx_*_aud_rev}). One query per table, restricted to the revisions of the page.
+     */
+    private Map<String, String> singleRecordIds(AuditLogCriteria criteria, List<SingleGroup> singles) {
+        Map<String, String> ids = new HashMap<>();
+        singles.stream().collect(Collectors.groupingBy(SingleGroup::table)).forEach((table, groups) -> {
+            MapSqlParameterSource params = new MapSqlParameterSource();
+            List<String> operationIds = groups.stream().map(SingleGroup::operationId).filter(Objects::nonNull).toList();
+            List<Integer> revisions = groups.stream().filter(g -> g.operationId() == null).map(SingleGroup::revision).toList();
+            List<String> restrictions = new ArrayList<>();
+            if (!operationIds.isEmpty()) {
+                restrictions.add("r.operacion_id IN (:operationIds)");
+                params.addValue("operationIds", operationIds);
+            }
+            if (!revisions.isEmpty()) {
+                restrictions.add("(r.operacion_id IS NULL AND r." + REV + " IN (:revisions))");
+                params.addValue("revisions", revisions);
+            }
+            String sql = "SELECT r.operacion_id, r." + REV + ", CAST(x." + table.idColumn() + " AS varchar) AS record_id "
+                    + "FROM " + table.auditTable() + " x JOIN revinfo r ON r." + REV + " = x." + REV
+                    + " WHERE (" + String.join(" OR ", restrictions) + ")" + rowFilter(criteria, params);
+            jdbc.query(sql, params, rs -> {
+                ids.put(groupKey(rs.getString("operacion_id"), rs.getInt(REV)), rs.getString("record_id"));
+            });
+        });
+        return ids;
+    }
+
+    private AuditedEntity entityOf(String auditTable) {
+        return registry.all().stream().filter(e -> e.auditTable().equals(auditTable)).findFirst().orElseThrow();
     }
 
     public long countChanges(AuditLogCriteria criteria, ChangeScope scope) {
@@ -198,18 +256,25 @@ public class AuditLogQueryRepository {
 
     /**
      * Groups revisions: one per operation, or one per standalone revision. Restricts to revisions with rows
-     * in the target tables with an IN over a UNION ALL: with an OR of correlated EXISTS, Postgres
-     * scanned the whole asignacion_aula_aud table for each revision (39 s vs 73 ms in dev with ~416k _aud rows).
+     * in the target tables via {@code revinfo_resumen} (one row per revision, table and type, fed on write),
+     * instead of a UNION over every {@code _aud} table (~416k index entries in dev).
      */
     private String groupsQuery(AuditLogCriteria criteria, MapSqlParameterSource params, String select) {
-        StringBuilder where = new StringBuilder(revisionFilters(criteria, params));
-        String revisionsWithRows = criteria.targets().stream()
-                .map(target -> "SELECT x." + REV + " FROM " + target.auditTable() + " x WHERE TRUE"
-                        + rowFilter(criteria, params))
-                .collect(Collectors.joining(" UNION ALL "));
-        where.append(" AND r.").append(REV).append(" IN (").append(revisionsWithRows).append(")");
+        String where = revisionFilters(criteria, params)
+                + " AND r." + REV + " IN (SELECT s.rev FROM revinfo_resumen s WHERE TRUE" + summaryFilter(criteria, params) + ")";
         return select + " FROM revinfo r WHERE " + where
                 + " GROUP BY r.operacion_id, CASE WHEN r.operacion_id IS NULL THEN r." + REV + " END";
+    }
+
+    /** Restricts a {@code revinfo_resumen s} to the target tables and the {@code kind} filter. */
+    private static String summaryFilter(AuditLogCriteria criteria, MapSqlParameterSource params) {
+        params.addValue("summaryTables", criteria.targets().stream().map(AuditedEntity::auditTable).toList());
+        String sql = " AND s.tabla_aud IN (:summaryTables)";
+        if (criteria.kind() != null) {
+            params.addValue("summaryRevtype", toType(criteria.kind()).getRepresentation());
+            sql += " AND s.revtype = :summaryRevtype";
+        }
+        return sql;
     }
 
     private String unionBranches(AuditLogCriteria criteria, MapSqlParameterSource params,
