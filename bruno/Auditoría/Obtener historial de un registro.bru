@@ -28,6 +28,8 @@ docs {
   tiene espacios o acentos, el cliente la codifica en la URL (Bruno lo hace solo;
   a mano: Asignaci%C3%B3n%20de%20rol). recordId es el id del registro.
 
+  Cada item trae 'recordLabel' (nombre legible del registro; ver GET /v1/audit), o null.
+
   Página vacía si el registro no tiene revisiones. 400 si entityType es desconocido
   o si recordId no tiene el formato del id de la entidad (texto para un id numérico).
   Los ids String que contengan '/' no se pueden consultar por esta ruta.

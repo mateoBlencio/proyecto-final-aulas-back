@@ -118,6 +118,13 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     @Override
+    public List<ClassroomResponseDto> findByIdsIncludingDeactivated(Collection<Long> ids) {
+        return classroomRepository.findAllById(ids).stream()
+                .map(classroomMapper::toDto)
+                .toList();
+    }
+
+    @Override
     public Set<Long> findIdsWithResourceAtLeast(String resourceTypeName, int minQuantity) {
         log.debug("Buscando aulas con recurso: resourceTypeName={}, minQuantity={}", resourceTypeName, minQuantity);
         return classroomResourceRepository.findClassroomIdsWithResourceAtLeast(resourceTypeName, minQuantity);

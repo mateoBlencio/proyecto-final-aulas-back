@@ -32,6 +32,7 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -42,6 +43,7 @@ public class AuditRegistryServiceImpl implements AuditRegistryService {
     private final AuditRecordStateRepository stateRepository;
     private final AuditedEntityRegistry registry;
     private final AuditLogEntryMapper auditLogEntryMapper;
+    private final AuditLabelResolver labelResolver;
 
     @Override
     @Transactional(readOnly = true)
@@ -49,8 +51,10 @@ public class AuditRegistryServiceImpl implements AuditRegistryService {
         AuditLogCriteria criteria = toCriteria(filter);
 
         long total = repository.countGroups(criteria);
-        List<AuditLogEntryDto> content = repository.findGroups(criteria, pageable).stream()
-                .map(this::toEntry)
+        List<AuditGroupRow> groups = repository.findGroups(criteria, pageable);
+        Map<RecordRevision, String> labels = loadSingleChangeLabels(groups);
+        List<AuditLogEntryDto> content = groups.stream()
+                .map(row -> toEntry(row, labels))
                 .toList();
         return new PageImpl<>(content, pageable, total);
     }
@@ -99,6 +103,7 @@ public class AuditRegistryServiceImpl implements AuditRegistryService {
         Map<RecordRevision, RecordStates> states = stateRepository.load(rows.stream()
                 .map(row -> new RecordRevision(row.entity(), row.metadata().recordId(), row.metadata().revision()))
                 .toList());
+        Map<RecordRevision, String> labels = labelResolver.resolve(states);
         List<AuditLogEntryDto> content = rows.stream()
                 .map(row -> {
                     RecordRevision key = new RecordRevision(row.entity(), row.metadata().recordId(), row.metadata().revision());
@@ -107,7 +112,7 @@ public class AuditRegistryServiceImpl implements AuditRegistryService {
                         log.warn("Audited state not found for {} id={} rev={}; changes left null",
                                 row.entity().label(), key.recordId(), key.revision());
                     }
-                    return auditLogEntryMapper.toChange(row.metadata(), row.entity().label(),
+                    return auditLogEntryMapper.toChange(row.metadata(), row.entity().label(), labels.get(key),
                             recordStates == null ? null
                                     : FieldDiffCalculator.calculate(row.entity(), row.metadata().kind(), recordStates));
                 })
@@ -115,14 +120,35 @@ public class AuditRegistryServiceImpl implements AuditRegistryService {
         return new PageImpl<>(content, pageable, total);
     }
 
-    private AuditLogEntryDto toEntry(AuditGroupRow row) {
+    // Standalone single-record changes of the listing: one state load per entity type of the page.
+    private Map<RecordRevision, String> loadSingleChangeLabels(List<AuditGroupRow> groups) {
+        List<RecordRevision> keys = groups.stream()
+                .filter(AuditRegistryServiceImpl::isSingleChange)
+                .map(this::singleChangeKey)
+                .flatMap(Optional::stream)
+                .filter(key -> labelResolver.supports(key.entity()))
+                .toList();
+        return labelResolver.resolve(stateRepository.load(keys));
+    }
+
+    private Optional<RecordRevision> singleChangeKey(AuditGroupRow row) {
+        return registry.byLabel(row.singleEntityType())
+                .map(entity -> new RecordRevision(entity, row.singleRecordId(), row.revision()));
+    }
+
+    private static boolean isSingleChange(AuditGroupRow row) {
+        return row.operationId() == null && row.recordCount() == 1;
+    }
+
+    private AuditLogEntryDto toEntry(AuditGroupRow row, Map<RecordRevision, String> labels) {
         if (row.operationId() != null) {
             return auditLogEntryMapper.toOperation(row);
         }
         if (row.recordCount() == 1) {
             RevisionMetadata metadata = new RevisionMetadata(row.singleRecordId(), row.revision(), row.date(),
                     row.user(), row.actorType(), row.commonKind(), row.description(), null);
-            return auditLogEntryMapper.toChange(metadata, row.singleEntityType(), null);
+            String label = singleChangeKey(row).map(labels::get).orElse(null);
+            return auditLogEntryMapper.toChange(metadata, row.singleEntityType(), label, null);
         }
         return auditLogEntryMapper.toTransaction(row);
     }

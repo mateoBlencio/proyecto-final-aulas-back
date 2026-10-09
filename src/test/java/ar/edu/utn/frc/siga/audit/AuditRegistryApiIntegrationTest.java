@@ -17,6 +17,24 @@ import ar.edu.utn.frc.siga.settings.model.SettingKey;
 import ar.edu.utn.frc.siga.settings.service.SettingsStore;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 
+import ar.edu.utn.frc.siga.auth.model.RoleAssignment;
+import ar.edu.utn.frc.siga.auth.model.User;
+import ar.edu.utn.frc.siga.auth.repository.RoleAssignmentRepository;
+import ar.edu.utn.frc.siga.common.security.ScopeType;
+import ar.edu.utn.frc.siga.auth.repository.UserRepository;
+import ar.edu.utn.frc.siga.space.model.Classroom;
+import ar.edu.utn.frc.siga.space.service.ClassroomService;
+import ar.edu.utn.frc.siga.settings.model.Setting;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.annotation.Transactional;
+import java.time.format.DateTimeFormatter;
+import java.util.concurrent.atomic.AtomicReference;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -69,7 +87,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * de Envers en varias entidades (evento académico + configuración) con commits reales
  * (sin {@code @Transactional}, Envers lo exige) y consulta {@code GET /v1/audit}.
  */
-@Import(IntegrationTestData.class)
+@Import({IntegrationTestData.class, AuditRegistryApiIntegrationTest.TestLabelProviderConfig.class})
 @DisplayName("Audit Registry API (integración)")
 class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
 
@@ -96,6 +114,12 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
     private OccurrenceRepository occurrenceRepository;
     @Autowired
     private WebApplicationContext webApplicationContext;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private RoleAssignmentRepository roleAssignmentRepository;
+    @MockitoSpyBean
+    private ClassroomService classroomService;
 
     /** Original values of the keys the test touched via {@link #writeSettingsInOneTransaction}. */
     private final Map<SettingKey, String> originalSettings = new LinkedHashMap<>();
@@ -1362,5 +1386,306 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
         int firstRevision = first.get("content").get(0).get("revision").asInt();
         int secondRevision = second.get("content").get(0).get("revision").asInt();
         assertThat(secondRevision).isLessThan(firstRevision);
+    }
+
+    // ---- recordLabel -------------------------------------------------------------------------------------
+
+    private static final DateTimeFormatter LABEL_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+    private void resetLabelProviderMode() {
+        TestLabelProviderConfig.MODE.set(TestLabelProviderConfig.Mode.OK);
+    }
+
+    @AfterEach
+    void restoreLabelProviderMode() {
+        resetLabelProviderMode();
+    }
+
+    /** Weekly recurring event of {@code count} occurrences starting {@code daysAhead} days from now. */
+    private List<Long> seedWeeklyOccurrences(int daysAhead, int count) {
+        var sc = testData.materiaYComision();
+        LocalDate start = LocalDate.now().plusDays(daysAhead);
+        var dto = new CreateRecurringEventRequestDto(30, LocalTime.of(8, 0), 90, start.getDayOfWeek(), start,
+                start.plusWeeks(count - 1L), sc.subjectId(), sc.commissionId());
+        Long eventId = asFixtureUser(() -> academicEventService.createRecurringEvent(dto)).id();
+        List<Long> ids = occurrenceRepository.findByEvent_Id(eventId).stream().map(Occurrence::getId).toList();
+        assertThat(ids).hasSize(count);
+        return ids;
+    }
+
+    private List<Long> allocate(List<Long> occurrenceIds, Long classroomId) throws Exception {
+        var body = new AllocationBatchRequestDto(
+                List.of(new AllocationItemRequestDto(occurrenceIds, null, null, null, classroomId)), null);
+        MvcResult created = mockMvc.perform(post("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isCreated()).andReturn();
+        List<Long> allocationIds = new ArrayList<>();
+        objectMapper.readTree(created.getResponse().getContentAsString()).forEach(node -> allocationIds.add(node.get("id").asLong()));
+        return allocationIds;
+    }
+
+    @Test
+    @DisplayName("la revisión del borrado de una asignación liberada devuelve recordLabel con el número de aula, aunque el registro ya no exista")
+    void recordLabel_ofDeletedAllocation_hasRoomNumber() throws Exception {
+        LocalDate date = LocalDate.now().plusDays(310);
+        var building = testData.edificio();
+        Classroom classroom = testData.aula(building);
+        Long occurrenceId = seedWeeklyOccurrences(310, 1).getFirst();
+        long allocationId = allocate(List.of(occurrenceId), classroom.getId()).getFirst();
+
+        mockMvc.perform(post("/v1/events/occurrences/{id}/release", occurrenceId)).andExpect(status().is2xxSuccessful());
+        String deletionSql = "SELECT rev FROM asignacion_aula_aud WHERE id_asignacion = ? AND revtype = 2";
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() ->
+                assertThat(jdbcTemplate.queryForList(deletionSql, Integer.class, allocationId)).hasSize(1));
+        int deletionRevision = jdbcTemplate.queryForObject(deletionSql, Integer.class, allocationId);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM asignacion_aula WHERE id_asignacion = ?", Long.class, allocationId)).isZero();
+
+        JsonNode allocation = ofType(revisionItems(deletionRevision), "Asignación");
+
+        assertThat(allocation.get("kind").asText()).isEqualTo("DELETED");
+        assertThat(allocation.get("recordLabel").asText()).isEqualTo(
+                "Aula " + classroom.getRoomNumber() + ", " + building.getName() + " · " + date.format(LABEL_DATE));
+    }
+
+    @Test
+    @DisplayName("una página de 20 asignaciones invoca una sola vez ClassroomService.findByIdsIncludingDeactivated y todas llevan etiqueta")
+    void recordLabel_pageOfTwentyAllocations_singleClassroomLookup() throws Exception {
+        Classroom classroom = testData.aula(testData.edificio());
+        List<Long> allocationIds = allocate(seedWeeklyOccurrences(330, 20), classroom.getId());
+        String operationId = jdbcTemplate.queryForObject(
+                "SELECT r.operacion_id FROM revinfo r JOIN asignacion_aula_aud a ON a.rev = r.rev "
+                        + "WHERE a.id_asignacion = ? AND a.revtype = 0", String.class, allocationIds.getFirst());
+        clearInvocations(classroomService);
+
+        JsonNode page = json(mockMvc, get("/v1/audit/operations/{id}", operationId)
+                .param("entityType", "Asignación").param("size", "20"));
+
+        assertThat(page.get("content")).hasSize(20).allSatisfy(item ->
+                assertThat(item.get("recordLabel").asText()).startsWith("Aula " + classroom.getRoomNumber() + ", "));
+        verify(classroomService, times(1)).findByIdsIncludingDeactivated(any());
+    }
+
+    @Test
+    @DisplayName("el CHANGE de alta de un usuario lleva su email como recordLabel")
+    void recordLabel_ofUser_isEmail() throws Exception {
+        String email = uniqueUserEmail();
+        long userId = createUser(email, false);
+
+        JsonNode user = ofType(revisionItems(lastRevisionOf("usuario_aud", "id_usuario", userId)), "Usuario");
+
+        assertThat(user.get("recordLabel").asText()).isEqualTo(email);
+    }
+
+    @Test
+    @DisplayName("la asignación de rol lleva '{ROL} de {email}' como recordLabel")
+    void recordLabel_ofRoleAssignment_isRoleAndEmail() throws Exception {
+        String email = uniqueUserEmail();
+        long userId = createUser(email, true);
+        long assignmentId = jdbcTemplate.queryForObject(
+                "SELECT id_usuario_rol FROM usuario_rol WHERE id_usuario = ?", Long.class, userId);
+
+        JsonNode assignment = ofType(revisionItems(lastRevisionOf("usuario_rol_aud", "id_usuario_rol", assignmentId)),
+                "Asignación de rol");
+
+        assertThat(assignment.get("recordLabel").asText()).isEqualTo("CONSULTA de " + email);
+    }
+
+    @Test
+    @DisplayName("la solicitud de aula creada por el formulario público lleva 'Solicitud de {docente}' como recordLabel")
+    void recordLabel_ofRoomRequest_isTeacherName() throws Exception {
+        MockMvc anonymousMockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
+                .apply(springSecurity()).build();
+        anonymousMockMvc.perform(post("/v1/room-requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(publicRoomRequestBody())))
+                .andExpect(status().isCreated());
+        int revision = jdbcTemplate.queryForObject(
+                "SELECT MAX(rev) FROM solicitud_aula_aud WHERE revtype = 0", Integer.class);
+
+        JsonNode request = ofType(revisionItems(revision), "Solicitud de aula");
+
+        assertThat(request.get("recordLabel").asText()).isEqualTo("Solicitud de Ada Lovelace");
+    }
+
+    @Test
+    @DisplayName("GET /v1/audit devuelve recordLabel en un CHANGE suelto y null en una entidad sin proveedor")
+    void recordLabel_inListingLooseChange() throws Exception {
+        String email = uniqueUserEmail();
+        long userId = createUser(email, false);
+        new TransactionTemplate(transactionManager).executeWithoutResult(tx ->
+                userRepository.findById(userId).orElseThrow().setFirstName("Cambiado"));
+        int revision = lastRevisionOf("usuario_aud", "id_usuario", userId);
+        TestLabelProviderConfig.MODE.set(TestLabelProviderConfig.Mode.NO_LABEL);
+        int settingRevision = writeSettingsInOneTransaction(SettingKey.PREVIEW_TTL_MINUTES);
+
+        JsonNode listing = json(mockMvc, get("/v1/audit").param("size", "200"));
+
+        JsonNode change = entriesOfRevision(listing, revision).getFirst();
+        assertThat(change.get("type").asText()).isEqualTo("CHANGE");
+        assertThat(change.get("entityType").asText()).isEqualTo("Usuario");
+        assertThat(change.get("recordLabel").asText()).isEqualTo(email);
+        JsonNode setting = entriesOfRevision(listing, settingRevision).getFirst();
+        assertThat(setting.get("type").asText()).isEqualTo("CHANGE");
+        assertThat(isAbsent(setting.get("recordLabel"))).isTrue();
+    }
+
+    /**
+     * One revision with a user change and a new role assignment (labelled by real providers; the role one queries the
+     * database) and a setting change (labelled by the test provider, which misbehaves according to the mode).
+     * Which provider runs first is not fixed, so over several runs a poisoned transaction would break the page
+     * whenever the role provider runs after the failing one. Returns the revision.
+     */
+    private int userAndSettingInOneRevision(String email) throws Exception {
+        long userId = createUser(email, false);
+        originalSettings.putIfAbsent(SettingKey.PREVIEW_TTL_MINUTES, settingsStore.getRaw(SettingKey.PREVIEW_TTL_MINUTES));
+        new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
+            User user = userRepository.findById(userId).orElseThrow();
+            user.setFirstName("Cambiado");
+            roleAssignmentRepository.save(RoleAssignment.builder()
+                    .user(user).role(SystemRole.CONSULTA).scopeType(ScopeType.GLOBAL).build());
+            settingsStore.write(SettingKey.PREVIEW_TTL_MINUTES,
+                    String.valueOf(Long.parseLong(settingsStore.getRaw(SettingKey.PREVIEW_TTL_MINUTES)) + 1));
+        });
+        int revision = lastRevisionOf("usuario_aud", "id_usuario", userId);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM configuracion_aud WHERE rev = ?", Long.class, revision)).isEqualTo(1);
+        return revision;
+    }
+
+    @Test
+    @DisplayName("control: con el proveedor de prueba sano, Configuración y Usuario llevan etiqueta en la misma revisión")
+    void recordLabel_healthyTestProvider_labelsBothEntities() throws Exception {
+        String email = uniqueUserEmail();
+        int revision = userAndSettingInOneRevision(email);
+
+        List<JsonNode> items = revisionItems(revision);
+
+        assertThat(ofType(items, "Usuario").get("recordLabel").asText()).isEqualTo(email);
+        assertThat(ofType(items, "Configuración").get("recordLabel").asText()).isEqualTo("setting-label");
+        assertThat(ofType(items, "Asignación de rol").get("recordLabel").asText()).isEqualTo("CONSULTA de " + email);
+    }
+
+    @Test
+    @DisplayName("un proveedor que lanza una excepción simple: 200, null solo en su entidad y el resto etiquetado")
+    void recordLabel_providerThrowsPlainException_responseStaysOk() throws Exception {
+        String email = uniqueUserEmail();
+        int revision = userAndSettingInOneRevision(email);
+        TestLabelProviderConfig.MODE.set(TestLabelProviderConfig.Mode.PLAIN_THROW);
+        TestLabelProviderConfig.CALLS.set(0);
+
+        MvcResult result = mockMvc.perform(get("/v1/audit/revisions/{rev}", revision).param("size", "200"))
+                .andExpect(status().isOk()).andReturn();
+
+        assertOnlySettingUnlabelled(objectMapper.readTree(result.getResponse().getContentAsString()), email);
+    }
+
+    @Test
+    @DisplayName("un proveedor que lanza a través de un bean @Transactional (rollback-only): 200, null solo en su entidad")
+    void recordLabel_providerThrowsThroughTransactionalBean_responseStaysOk() throws Exception {
+        String email = uniqueUserEmail();
+        int revision = userAndSettingInOneRevision(email);
+        TestLabelProviderConfig.MODE.set(TestLabelProviderConfig.Mode.THROW_THROUGH_TRANSACTIONAL_BEAN);
+        TestLabelProviderConfig.CALLS.set(0);
+
+        MvcResult result = mockMvc.perform(get("/v1/audit/revisions/{rev}", revision).param("size", "200"))
+                .andExpect(status().isOk()).andReturn();
+
+        assertOnlySettingUnlabelled(objectMapper.readTree(result.getResponse().getContentAsString()), email);
+    }
+
+    @Test
+    @DisplayName("un proveedor que ejecuta SQL inválido no deja abortada la transacción de lectura: 200, null solo en su entidad")
+    void recordLabel_providerRunsInvalidSql_responseStaysOk() throws Exception {
+        String email = uniqueUserEmail();
+        int revision = userAndSettingInOneRevision(email);
+        TestLabelProviderConfig.MODE.set(TestLabelProviderConfig.Mode.INVALID_SQL);
+        TestLabelProviderConfig.CALLS.set(0);
+
+        MvcResult result = mockMvc.perform(get("/v1/audit/revisions/{rev}", revision).param("size", "200"))
+                .andExpect(status().isOk()).andReturn();
+
+        assertOnlySettingUnlabelled(objectMapper.readTree(result.getResponse().getContentAsString()), email);
+    }
+
+    @Test
+    @DisplayName("los tres modos de falla también dejan 200 en GET /v1/audit con el CHANGE suelto de la entidad que falla")
+    void recordLabel_failingProviderInListing_responseStaysOk() throws Exception {
+        int settingRevision = writeSettingsInOneTransaction(SettingKey.PREVIEW_TTL_MINUTES);
+        for (TestLabelProviderConfig.Mode mode : List.of(TestLabelProviderConfig.Mode.PLAIN_THROW,
+                TestLabelProviderConfig.Mode.THROW_THROUGH_TRANSACTIONAL_BEAN, TestLabelProviderConfig.Mode.INVALID_SQL)) {
+            TestLabelProviderConfig.MODE.set(mode);
+
+            JsonNode listing = json(mockMvc, get("/v1/audit").param("size", "200"));
+
+            JsonNode setting = entriesOfRevision(listing, settingRevision).getFirst();
+            assertThat(isAbsent(setting.get("recordLabel"))).as("modo %s", mode).isTrue();
+        }
+    }
+
+    private void assertOnlySettingUnlabelled(JsonNode page, String email) {
+        assertThat(TestLabelProviderConfig.CALLS.get()).as("the failing provider must have run").isEqualTo(1);
+        List<JsonNode> items = new ArrayList<>();
+        page.get("content").forEach(items::add);
+        assertThat(isAbsent(ofType(items, "Configuración").get("recordLabel"))).isTrue();
+        assertThat(ofType(items, "Usuario").get("recordLabel").asText()).isEqualTo(email);
+        assertThat(ofType(items, "Asignación de rol").get("recordLabel").asText()).isEqualTo("CONSULTA de " + email);
+    }
+
+    /**
+     * Test provider for {@code Setting} (no production provider exists for it) that can misbehave. The
+     * misbehaviours reach the audit read transaction: a plain exception, an exception crossing a
+     * {@code @Transactional} proxy (marks the transaction rollback-only) and an invalid SQL statement
+     * (aborts the Postgres transaction).
+     */
+    @TestConfiguration
+    static class TestLabelProviderConfig {
+
+        enum Mode { OK, NO_LABEL, PLAIN_THROW, THROW_THROUGH_TRANSACTIONAL_BEAN, INVALID_SQL }
+
+        static final AtomicReference<Mode> MODE = new AtomicReference<>(Mode.OK);
+        static final java.util.concurrent.atomic.AtomicInteger CALLS = new java.util.concurrent.atomic.AtomicInteger();
+
+        static class FailingTransactionalService {
+            @Transactional
+            public void fail() {
+                throw new IllegalStateException("label lookup failed");
+            }
+        }
+
+        @Bean
+        FailingTransactionalService failingTransactionalService() {
+            return new FailingTransactionalService();
+        }
+
+        @Bean
+        AuditLabelProvider settingLabelProvider(FailingTransactionalService failing, JdbcTemplate jdbc) {
+            return new AuditLabelProvider() {
+                @Override
+                public Class<?> entityType() {
+                    return Setting.class;
+                }
+
+                @Override
+                public Map<String, String> labels(List<AuditedRecord> records) {
+                    CALLS.incrementAndGet();
+                    switch (MODE.get()) {
+                        case PLAIN_THROW -> throw new IllegalStateException("plain failure");
+                        case THROW_THROUGH_TRANSACTIONAL_BEAN -> failing.fail();
+                        case INVALID_SQL -> jdbc.queryForList("SELECT * FROM table_that_does_not_exist");
+                        case NO_LABEL -> {
+                            return Map.of();
+                        }
+                        case OK -> {
+                            // falls through to the labelling below
+                        }
+                    }
+                    Map<String, String> labels = new LinkedHashMap<>();
+                    records.forEach(record -> labels.put(record.recordId(), "setting-label"));
+                    return labels;
+                }
+            };
+        }
     }
 }

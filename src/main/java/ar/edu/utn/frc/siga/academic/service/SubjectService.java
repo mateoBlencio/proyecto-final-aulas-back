@@ -20,6 +20,12 @@ public interface SubjectService extends ActivationService<Long> {
 
     List<SubjectResponseDto> findByIds(Collection<Long> ids);
 
+    /**
+     * Como {@link #findByIds}, pero incluye las materias desactivadas (para referencias históricas). No aplica
+     * alcance por edificio; pensado para etiquetas de auditoría.
+     */
+    List<SubjectResponseDto> findByIdsIncludingDeactivated(Collection<Long> ids);
+
     SubjectResponseDto findByCodeAndStudyPlan(Integer code, Integer studyPlanCode, Integer specialtyCode);
 
     /**

@@ -32,6 +32,12 @@ public interface ClassroomService extends ActivationService<Long> {
     List<ClassroomResponseDto> findByIds(Collection<Long> ids);
 
     /**
+     * Como {@link #findByIds}, pero incluye las aulas desactivadas (para referencias históricas). No aplica alcance
+     * por edificio; pensado para etiquetas de auditoría.
+     */
+    List<ClassroomResponseDto> findByIdsIncludingDeactivated(Collection<Long> ids);
+
+    /**
      * Ids de aulas con un recurso ({@code resourceTypeName}, insensible a mayúsculas) cuya
      * {@code cantidad} llega a {@code minQuantity}. Para un recurso {@code BOOLEAN} (p. ej.
      * "Proyector") alcanza con pedir {@code minQuantity = 1}.

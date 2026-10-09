@@ -19,6 +19,8 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -38,6 +40,14 @@ public class OccurrenceServiceImpl implements OccurrenceService {
     @Transactional(readOnly = true)
     public List<OccurrenceSlotDto> findSlots(Collection<Long> occurrenceIds) {
         return occurrenceRepository.findAllById(occurrenceIds).stream().map(OccurrenceServiceImpl::toSlot).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<Long, LocalDate> findDatesByIds(Collection<Long> occurrenceIds) {
+        return occurrenceRepository.findDatesByIdIn(occurrenceIds).stream()
+                .collect(Collectors.toMap(OccurrenceRepository.OccurrenceDate::getId,
+                        OccurrenceRepository.OccurrenceDate::getDate));
     }
 
     @Override

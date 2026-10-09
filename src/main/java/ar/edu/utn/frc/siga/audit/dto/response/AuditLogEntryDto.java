@@ -25,6 +25,7 @@ import java.util.List;
  * {@code GET /v1/audit/operations/{operationId}/chain}.
  * {@code actorType} indicates whether a person ({@code HUMAN}) or a system process ({@code SYSTEM}) made
  * the change; a null {@code user} with {@code HUMAN} is a request from the public form.
+ * {@code recordLabel} is a readable name for the record of a {@code CHANGE} (null if unavailable); it is calculated on read.
  * {@code changes} is the field-level diff of a {@code CHANGE}. It is only filled in the items of
  * {@code GET /v1/audit/operations/{operationId}} and {@code GET /v1/audit/revisions/{revision}}; it is null in the
  * main listing and in {@code OPERATION} and {@code TRANSACTION}. It is empty when no audited field changed.
@@ -42,6 +43,9 @@ public record AuditLogEntryDto(
         RevisionKind kind,
         String entityType,
         String recordId,
+        @Schema(description = "Etiqueta legible del registro de un CHANGE (por ejemplo, 'Aula 101, Central · 04/03/2026'). "
+                + "Null si la entidad no tiene etiqueta o no se pudo resolver; usar recordId en ese caso.")
+        String recordLabel,
         String operationId,
         @Schema(description = "Id de la operación que causó esta (solo OPERATION). Null si no tiene causa. "
                 + "Puede apuntar a una operación sin filas visibles con los filtros activos.")

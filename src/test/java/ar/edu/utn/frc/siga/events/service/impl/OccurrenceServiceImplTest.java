@@ -62,6 +62,24 @@ class OccurrenceServiceImplTest {
     }
 
     @Test
+    @DisplayName("findDatesByIds devuelve id -> fecha con una sola consulta de proyección, sin cargar entidades")
+    void findDatesByIds_mapsProjectionByIdWithOneQuery() {
+        OccurrenceRepository.OccurrenceDate first = org.mockito.Mockito.mock(OccurrenceRepository.OccurrenceDate.class);
+        OccurrenceRepository.OccurrenceDate second = org.mockito.Mockito.mock(OccurrenceRepository.OccurrenceDate.class);
+        when(first.getId()).thenReturn(1L);
+        when(first.getDate()).thenReturn(LocalDate.of(2026, 3, 4));
+        when(second.getId()).thenReturn(2L);
+        when(second.getDate()).thenReturn(LocalDate.of(2026, 12, 31));
+        when(occurrenceRepository.findDatesByIdIn(List.of(1L, 2L, 3L))).thenReturn(List.of(first, second));
+
+        java.util.Map<Long, LocalDate> dates = service.findDatesByIds(List.of(1L, 2L, 3L));
+
+        assertThat(dates).containsOnly(
+                java.util.Map.entry(1L, LocalDate.of(2026, 3, 4)), java.util.Map.entry(2L, LocalDate.of(2026, 12, 31)));
+        verify(occurrenceRepository, never()).findAllById(any());
+    }
+
+    @Test
     @DisplayName("release dentro de una operación activa publica OccurrenceVacated con el id real de esa operación")
     void releasePublicaElEventoConLaOperacionEnCurso() {
         Occurrence occurrence = occurrence(10L, OccurrenceStatus.NEEDS_ROOM);

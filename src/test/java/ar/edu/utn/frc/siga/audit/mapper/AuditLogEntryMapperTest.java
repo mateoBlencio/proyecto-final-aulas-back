@@ -57,9 +57,29 @@ class AuditLogEntryMapperTest {
         RevisionMetadata metadata = new RevisionMetadata("9", 7, DATE, "user@frc", ActorType.HUMAN,
                 RevisionKind.MODIFIED, "Descripción", "op-1");
 
-        AuditLogEntryDto dto = mapper.toChange(metadata, "Asignación", List.of());
+        AuditLogEntryDto dto = mapper.toChange(metadata, "Asignación", null, List.of());
 
         assertThat(dto.type()).isEqualTo(AuditLogEntryType.CHANGE);
         assertThat(dto.parentOperationId()).isNull();
+    }
+
+    @Test
+    @DisplayName("toChange copia recordLabel al DTO")
+    void toChangeCopiesRecordLabel() {
+        RevisionMetadata metadata = new RevisionMetadata("9", 7, DATE, "user@frc", ActorType.HUMAN,
+                RevisionKind.MODIFIED, "Descripción", "op-1");
+
+        AuditLogEntryDto dto = mapper.toChange(metadata, "Asignación", "Aula 101, Central · 04/03/2026", List.of());
+
+        assertThat(dto.recordLabel()).isEqualTo("Aula 101, Central · 04/03/2026");
+        assertThat(dto.recordId()).isEqualTo("9");
+        assertThat(dto.entityType()).isEqualTo("Asignación");
+    }
+
+    @Test
+    @DisplayName("toOperation y toTransaction dejan recordLabel en null")
+    void groupsLeaveRecordLabelNull() {
+        assertThat(mapper.toOperation(group("op-root", null)).recordLabel()).isNull();
+        assertThat(mapper.toTransaction(group(null, null)).recordLabel()).isNull();
     }
 }

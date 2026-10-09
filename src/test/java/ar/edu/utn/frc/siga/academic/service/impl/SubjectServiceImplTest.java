@@ -33,6 +33,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -95,6 +96,22 @@ class SubjectServiceImplTest {
         List<SubjectResponseDto> result = service.findByIds(List.of(5L, 99L));
 
         assertThat(result).containsExactly(dto);
+    }
+
+    @Test
+    @DisplayName("findByIds excluye las materias desactivadas y findByIdsIncludingDeactivated las incluye")
+    void findByIds_excludesDeactivated_butIncludingDeactivatedKeepsThem() {
+        Subject active = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
+        Subject deactivated = Subject.builder().id(6L).code(102).name("Química").studyPlan(studyPlan).build();
+        deactivated.deactivate();
+        SubjectResponseDto activeDto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true);
+        SubjectResponseDto deactivatedDto = new SubjectResponseDto(6L, 102, "Química", null, null, false);
+        when(subjectRepository.findAllById(List.of(5L, 6L))).thenReturn(List.of(active, deactivated));
+        when(subjectMapper.toDto(active)).thenReturn(activeDto);
+        lenient().when(subjectMapper.toDto(deactivated)).thenReturn(deactivatedDto);
+
+        assertThat(service.findByIds(List.of(5L, 6L))).containsExactly(activeDto);
+        assertThat(service.findByIdsIncludingDeactivated(List.of(5L, 6L))).containsExactly(activeDto, deactivatedDto);
     }
 
     @Test

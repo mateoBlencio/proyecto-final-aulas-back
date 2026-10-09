@@ -240,6 +240,22 @@ class ClassroomServiceImplTest {
     }
 
     @Test
+    @DisplayName("findByIds excluye las aulas desactivadas y findByIdsIncludingDeactivated las incluye")
+    void findByIds_excludesDeactivated_butIncludingDeactivatedKeepsThem() {
+        Classroom active = SpaceTestData.classroom().id(1L).build();
+        Classroom deactivated = SpaceTestData.classroom().id(2L).build();
+        deactivated.deactivate();
+        ClassroomResponseDto activeDto = new ClassroomResponseDto(1L, 101, 40, 1L, "Central", 1L, "Normal");
+        ClassroomResponseDto deactivatedDto = new ClassroomResponseDto(2L, 102, 40, 1L, "Central", 1L, "Normal");
+        when(classroomRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(active, deactivated));
+        when(classroomMapper.toDto(active)).thenReturn(activeDto);
+        lenient().when(classroomMapper.toDto(deactivated)).thenReturn(deactivatedDto);
+
+        assertThat(service.findByIds(List.of(1L, 2L))).containsExactly(activeDto);
+        assertThat(service.findByIdsIncludingDeactivated(List.of(1L, 2L))).containsExactly(activeDto, deactivatedDto);
+    }
+
+    @Test
     @DisplayName("findAll: aplica filtro vía specification y delega el armado del listado en el composer")
     void findAllMapsPagedResult() {
         ClassroomFilter filter = new ClassroomFilter(101, null, null, null, null);

@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.modulith.NamedInterface;
 
@@ -15,6 +16,9 @@ public interface OccurrenceService {
     OccurrenceSlotDto findSlot(Long occurrenceId);
 
     List<OccurrenceSlotDto> findSlots(Collection<Long> occurrenceIds);
+
+    /** Fecha de cada ocurrencia por id, sin cargar el evento (para etiquetas de auditoría). */
+    Map<Long, LocalDate> findDatesByIds(Collection<Long> occurrenceIds);
 
     List<OccurrenceSlotDto> findSlotsByEvent(Long eventId, LocalDate from);
 

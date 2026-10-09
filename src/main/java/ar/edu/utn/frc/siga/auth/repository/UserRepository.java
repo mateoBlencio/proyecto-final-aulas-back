@@ -73,4 +73,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
               and ra.scopeType = ar.edu.utn.frc.siga.common.security.ScopeType.BUILDING
             """)
     Set<Long> findBuildingIdsForUserAndRole(@Param("email") String email, @Param("role") SystemRole role);
+
+    /** Id and email of the users, without loading their role assignments. */
+    @Query("select u.id as id, u.email as email from User u where u.id in :ids")
+    List<UserEmail> findEmailsByIdIn(@Param("ids") Collection<Long> ids);
+
+    interface UserEmail {
+        Long getId();
+
+        String getEmail();
+    }
 }
