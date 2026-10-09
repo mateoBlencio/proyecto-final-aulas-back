@@ -25,8 +25,9 @@ docs {
   derivedBuildingId, wasReturned): cada badge es el total de ese estado.
   Parámetros:
 
-  - includePast: default false, oculta los pedidos con fecha ya pasada (mismo
-    criterio que la bandeja). includePast=true suma el histórico completo.
+  - includePast: default true (incluye el histórico completo). Con
+    includePast=false oculta los pedidos con fecha ya pasada (mismo criterio
+    que la bandeja).
   - requiresSpecialAssignment / partiallyResolved: opcionales, mismos cálculos
     que en el listado (ver 08-listar-pedidos), por si el front quiere un badge
     de "requieren atención especial" o "resueltos parcialmente".

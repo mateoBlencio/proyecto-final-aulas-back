@@ -30,7 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -87,9 +87,9 @@ public class RoomRequestServiceImpl implements RoomRequestService {
 
         RoomRequestItemFilter base = scoped(RoomRequestItemFilter.of(null, null, null, null, null, null, includePast,
                 requiresSpecialAssignment, null, partiallyResolved, null), actorEmail);
+        Map<RoomRequestStatus, Long> byStatus = itemRepository.countByStatus(RoomRequestItemSpecification.withFilter(base));
         List<RoomRequestItemStatusCountDto> counts = Arrays.stream(RoomRequestStatus.values())
-                .map(status -> new RoomRequestItemStatusCountDto(status, itemRepository.count(
-                        RoomRequestItemSpecification.withFilter(onlyStatus(base, status)))))
+                .map(status -> new RoomRequestItemStatusCountDto(status, byStatus.getOrDefault(status, 0L)))
                 .toList();
         log.info("Pedidos de aula contados por estado: {}", counts);
         return counts;
@@ -97,13 +97,6 @@ public class RoomRequestServiceImpl implements RoomRequestService {
 
     private RoomRequestItemFilter scoped(RoomRequestItemFilter filter, String actorEmail) {
         return accessControl.readScope(actorEmail).map(filter::restrictedToBuildings).orElse(filter);
-    }
-
-    private static RoomRequestItemFilter onlyStatus(RoomRequestItemFilter base, RoomRequestStatus status) {
-        return new RoomRequestItemFilter(null, Set.of(status), null, null,
-                base.dateFrom(), base.dateTo(), base.includePast(),
-                base.requiresSpecialAssignment(), null, base.partiallyResolved(), null,
-                base.restrictToBuildingIds());
     }
 
     @Override

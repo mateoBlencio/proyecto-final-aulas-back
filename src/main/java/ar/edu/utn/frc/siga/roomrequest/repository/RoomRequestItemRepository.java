@@ -18,7 +18,8 @@ import java.util.Optional;
 
 @Repository
 public interface RoomRequestItemRepository
-        extends JpaRepository<RoomRequestItem, Long>, JpaSpecificationExecutor<RoomRequestItem> {
+        extends JpaRepository<RoomRequestItem, Long>, JpaSpecificationExecutor<RoomRequestItem>,
+                RoomRequestItemCountRepository {
 
     @Override
     @EntityGraph(attributePaths = "request")
