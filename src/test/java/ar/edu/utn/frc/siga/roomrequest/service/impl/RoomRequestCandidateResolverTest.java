@@ -5,7 +5,9 @@ import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.service.UserService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
+import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
@@ -18,6 +20,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -37,6 +40,10 @@ import static org.mockito.Mockito.when;
 @DisplayName("RoomRequestCandidateResolver")
 class RoomRequestCandidateResolverTest {
 
+    private static final LocalDate MONDAY_1 = LocalDate.of(2026, 10, 12);
+    private static final LocalDate MONDAY_2 = LocalDate.of(2026, 10, 19);
+    private static final LocalDate MONDAY_3 = LocalDate.of(2026, 10, 26);
+
     @Mock
     private RoomRequestItemRepository itemRepository;
     @Mock
@@ -45,6 +52,8 @@ class RoomRequestCandidateResolverTest {
     private AllocationOccupancyService allocationOccupancyService;
     @Mock
     private UserService userService;
+    @Mock
+    private RoomRequestOccurrenceResolver occurrenceResolver;
 
     @InjectMocks
     private RoomRequestCandidateResolver resolver;
@@ -122,16 +131,75 @@ class RoomRequestCandidateResolverTest {
     }
 
     @Test
-    @DisplayName("findAllowedClassrooms: sin fecha (cambio regular), no consulta ocupación y nada sale ocupado")
-    void findAllowedClassrooms_sinFecha() {
-        RoomRequestItem item = RoomRequestItem.builder()
-                .startTime(LocalTime.of(10, 0)).duration(Duration.ofMinutes(60)).build();
-        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
-        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(101L)));
+    @DisplayName("occupiedClassroomIds: cambio regular, aula ocupada todos los lunes → ocupada")
+    void occupiedClassroomIds_regularOcupadaTodosLosDias() {
+        RoomRequestItem item = regularItem();
+        givenOwnMondays(item);
+        when(allocationOccupancyService.findOccupancy(MONDAY_1, MONDAY_3)).thenReturn(List.of(
+                busy(230L, MONDAY_1, "19:55", "22:10", 1L),
+                busy(230L, MONDAY_2, "19:55", "22:10", 2L),
+                busy(230L, MONDAY_3, "19:55", "22:10", 3L)));
 
-        List<AllowedClassroomDto> result = resolver.findAllowedClassrooms(1L);
+        assertThat(resolver.occupiedClassroomIds(item)).containsExactly(230L);
+    }
 
-        assertThat(result).extracting(AllowedClassroomDto::available).containsExactly(true);
+    @Test
+    @DisplayName("occupiedClassroomIds: cambio regular, aula ocupada en un solo lunes → ocupada")
+    void occupiedClassroomIds_regularOcupadaUnSoloDia() {
+        RoomRequestItem item = regularItem();
+        givenOwnMondays(item);
+        when(allocationOccupancyService.findOccupancy(MONDAY_1, MONDAY_3)).thenReturn(List.of(
+                busy(1L, MONDAY_2, "20:00", "21:00", 2L)));
+
+        assertThat(resolver.occupiedClassroomIds(item)).containsExactly(1L);
+    }
+
+    @Test
+    @DisplayName("occupiedClassroomIds: cambio regular, aula tomada solo por las ocurrencias propias → libre")
+    void occupiedClassroomIds_regularSoloOcurrenciasPropias() {
+        RoomRequestItem item = regularItem();
+        givenOwnMondays(item);
+        when(allocationOccupancyService.findOccupancy(MONDAY_1, MONDAY_3)).thenReturn(List.of(
+                busy(215L, MONDAY_1, "19:55", "22:55", 100L),
+                busy(215L, MONDAY_2, "19:55", "22:55", 101L),
+                busy(215L, MONDAY_3, "19:55", "22:55", 102L)));
+
+        assertThat(resolver.occupiedClassroomIds(item)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("occupiedClassroomIds: cambio regular, aula ocupada solo otro día de la semana → libre")
+    void occupiedClassroomIds_regularOtroDiaDeLaSemana() {
+        RoomRequestItem item = regularItem();
+        givenOwnMondays(item);
+        when(allocationOccupancyService.findOccupancy(MONDAY_1, MONDAY_3)).thenReturn(List.of(
+                busy(230L, MONDAY_2.plusDays(1), "19:55", "22:10", 9L)));
+
+        assertThat(resolver.occupiedClassroomIds(item)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("occupiedClassroomIds: pedido por fecha mira solo ese día y no resuelve días de dictado")
+    void occupiedClassroomIds_pedidoPorFecha() {
+        LocalDate date = LocalDate.of(2026, 10, 20);
+        RoomRequestItem item = itemFor(date, LocalTime.of(18, 0), 120);
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of(
+                busy(5L, date, "19:00", "20:00", 9L),
+                busy(6L, date, "21:00", "22:00", 10L)));
+
+        assertThat(resolver.occupiedClassroomIds(item)).containsExactly(5L);
+        verifyNoInteractions(occurrenceResolver);
+    }
+
+    @Test
+    @DisplayName("occupiedClassroomIds: cambio regular sin clases futuras propaga el error")
+    void occupiedClassroomIds_regularSinClasesFuturas() {
+        RoomRequestItem item = regularItem();
+        when(occurrenceResolver.futureSlotsOnDayOfWeek(item))
+                .thenThrow(new InvalidRoomRequestException("No quedan clases futuras"));
+
+        assertThatThrownBy(() -> resolver.occupiedClassroomIds(item))
+                .isInstanceOf(InvalidRoomRequestException.class);
         verifyNoInteractions(allocationOccupancyService);
     }
 
@@ -201,6 +269,26 @@ class RoomRequestCandidateResolverTest {
         when(userService.findBuildingIdsCoveredByRole(eq(SystemRole.AUXILIAR_AULICO), any())).thenReturn(Set.of());
 
         assertThat(resolver.findCandidateBuildings(1L)).isEmpty();
+    }
+
+    private static RoomRequestItem regularItem() {
+        return RoomRequestItem.builder()
+                .dayOfWeek(DayOfWeek.MONDAY).startTime(LocalTime.of(19, 55)).duration(Duration.ofHours(3))
+                .build();
+    }
+
+    private void givenOwnMondays(RoomRequestItem item) {
+        when(occurrenceResolver.futureSlotsOnDayOfWeek(item)).thenReturn(List.of(
+                ownSlot(100L, MONDAY_1), ownSlot(101L, MONDAY_2), ownSlot(102L, MONDAY_3)));
+    }
+
+    private static OccurrenceSlotDto ownSlot(Long occurrenceId, LocalDate date) {
+        return new OccurrenceSlotDto(occurrenceId, 1L, date, LocalTime.of(19, 55), LocalTime.of(22, 55), null, null);
+    }
+
+    private static OccupiedSlot busy(Long classroomId, LocalDate date, String start, String end, Long occurrenceId) {
+        return new OccupiedSlot(classroomId, date, LocalTime.parse(start), LocalTime.parse(end),
+                9000L, 1L, occurrenceId);
     }
 
     private static RoomRequestItem itemFor(LocalDate date, LocalTime startTime, int durationMinutes) {

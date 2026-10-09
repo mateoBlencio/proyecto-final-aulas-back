@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.service.UserService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.TimeRanges;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
@@ -17,7 +18,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +39,7 @@ class RoomRequestCandidateResolver {
     private final ClassroomService classroomService;
     private final AllocationOccupancyService allocationOccupancyService;
     private final UserService userService;
+    private final RoomRequestOccurrenceResolver occurrenceResolver;
 
     @Transactional(readOnly = true)
     List<AllowedClassroomDto> findAllowedClassrooms(Long itemId) {
@@ -97,10 +101,18 @@ class RoomRequestCandidateResolver {
     }
 
     Set<Long> occupiedClassroomIds(RoomRequestItem item) {
-        if (item.getDate() == null) {
-            return Set.of();
-        }
-        return allocationOccupancyService.findOccupancy(item.getDate(), item.getDate()).stream()
+        List<OccurrenceSlotDto> own = item.getDate() == null
+                ? occurrenceResolver.futureSlotsOnDayOfWeek(item) : List.of();
+        Set<LocalDate> dates = item.getDate() != null
+                ? Set.of(item.getDate())
+                : own.stream().map(OccurrenceSlotDto::date).collect(Collectors.toSet());
+        Set<Long> ownOccurrenceIds = own.stream().map(OccurrenceSlotDto::occurrenceId).collect(Collectors.toSet());
+        LocalDate min = Collections.min(dates);
+        LocalDate max = Collections.max(dates);
+
+        return allocationOccupancyService.findOccupancy(min, max).stream()
+                .filter(slot -> dates.contains(slot.date()))
+                .filter(slot -> !ownOccurrenceIds.contains(slot.occurrenceId()))
                 .filter(slot -> TimeRanges.overlaps(item.getStartTime(), item.endTime(),
                         slot.startTime(), slot.endTime()))
                 .map(OccupiedSlot::classroomId)
