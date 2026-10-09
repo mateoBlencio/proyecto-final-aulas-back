@@ -27,6 +27,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -34,13 +35,18 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -750,5 +756,198 @@ class AuditRegistryServiceImplTest {
 
         assertThat(chain.entries()).isEmpty();
         assertThat(chain.truncated()).isFalse();
+    }
+
+    // ---- exportCsv ----
+
+    private static final int EXPORT_PAGE = 500;
+
+    private AuditRegistryServiceImpl exportService(long maxRows, AuditLabelProvider... providers) {
+        AuditRegistryServiceImpl exporter = serviceWith(providers);
+        ReflectionTestUtils.setField(exporter, "exportMaxRows", maxRows);
+        return exporter;
+    }
+
+    private static AuditGroupRow looseChange(int revision) {
+        return new AuditGroupRow(null, null, revision, DATE, "user@frc", ActorType.HUMAN, null, 1,
+                List.of("Asignación"), RevisionKind.CREATED, "Asignación", String.valueOf(revision));
+    }
+
+    /** Stubs {@code findGroups} to serve {@code total} rows in pages of the requested size. */
+    private void stubGroupPages(int total) {
+        when(repository.findGroups(any(), any())).thenAnswer(invocation -> {
+            Pageable pageable = invocation.getArgument(1);
+            int from = (int) pageable.getOffset();
+            int to = Math.min(from + pageable.getPageSize(), total);
+            List<AuditGroupRow> rows = new ArrayList<>();
+            for (int i = from; i < to; i++) {
+                rows.add(looseChange(i + 1));
+            }
+            return rows;
+        });
+    }
+
+    private static Supplier<OutputStream> into(ByteArrayOutputStream out) {
+        return () -> out;
+    }
+
+    private static long dataLines(ByteArrayOutputStream out) {
+        // header line excluded; rows in these tests contain no embedded line breaks
+        return out.toString(StandardCharsets.UTF_8).split("\r\n").length - 1;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Supplier<OutputStream> neverCalled() {
+        Supplier<OutputStream> supplier = mock(Supplier.class);
+        return supplier;
+    }
+
+    @Test
+    @DisplayName("exportCsv con más filas que max-rows lanza InvalidSelectionException con el total y el máximo, sin pedir el stream")
+    void exportCsv_overLimit_throwsBeforeOutput() {
+        AuditRegistryServiceImpl exporter = exportService(1000);
+        when(repository.countGroups(any())).thenReturn(1001L);
+        Supplier<OutputStream> output = neverCalled();
+
+        assertThatThrownBy(() -> exporter.exportCsv(filter(null), output))
+                .isInstanceOf(InvalidSelectionException.class)
+                .hasMessageContaining("1001")
+                .hasMessageContaining("1000");
+
+        verifyNoInteractions(output);
+        verify(repository, never()).findGroups(any(), any());
+    }
+
+    @Test
+    @DisplayName("exportCsv con exactamente max-rows filas exporta todo (límite inclusivo)")
+    void exportCsv_exactlyAtLimit_exports() {
+        AuditRegistryServiceImpl exporter = exportService(EXPORT_PAGE);
+        when(repository.countGroups(any())).thenReturn((long) EXPORT_PAGE);
+        stubGroupPages(EXPORT_PAGE);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+        exporter.exportCsv(filter(null), into(out));
+
+        assertThat(dataLines(out)).isEqualTo(EXPORT_PAGE);
+        // A full page forces one more read; the empty second page ends the loop.
+        verify(repository, times(2)).findGroups(any(), any());
+    }
+
+    @Test
+    @DisplayName("exportCsv con 'to' anterior a 'from' lanza InvalidDateRangeException sin pedir el stream ni contar")
+    void exportCsv_invalidDateRange_doesNotCallOutput() {
+        AuditLogFilter bad = new AuditLogFilter(LocalDate.of(2026, 5, 10), LocalDate.of(2026, 5, 9), null, null, null,
+                null, null);
+        Supplier<OutputStream> output = neverCalled();
+
+        assertThatThrownBy(() -> service.exportCsv(bad, output)).isInstanceOf(InvalidDateRangeException.class);
+
+        verifyNoInteractions(output);
+        verify(repository, never()).countGroups(any());
+    }
+
+    @Test
+    @DisplayName("exportCsv con entityType desconocido lanza InvalidSelectionException sin pedir el stream ni contar")
+    void exportCsv_unknownEntityType_doesNotCallOutput() {
+        Supplier<OutputStream> output = neverCalled();
+
+        assertThatThrownBy(() -> service.exportCsv(filter("NoExiste"), output))
+                .isInstanceOf(InvalidSelectionException.class);
+
+        verifyNoInteractions(output);
+        verify(repository, never()).countGroups(any());
+    }
+
+    @Test
+    @DisplayName("exportCsv recorre páginas de 500 y corta cuando una trae menos")
+    void exportCsv_paginatesUntilShortPage() {
+        AuditRegistryServiceImpl exporter = exportService(10_000);
+        when(repository.countGroups(any())).thenReturn(1100L);
+        stubGroupPages(1100);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+        exporter.exportCsv(filter(null), into(out));
+
+        ArgumentCaptor<Pageable> pages = ArgumentCaptor.forClass(Pageable.class);
+        verify(repository, times(3)).findGroups(any(), pages.capture());
+        assertThat(pages.getAllValues()).containsExactly(
+                PageRequest.of(0, EXPORT_PAGE), PageRequest.of(1, EXPORT_PAGE), PageRequest.of(2, EXPORT_PAGE));
+        assertThat(dataLines(out)).isEqualTo(1100);
+    }
+
+    @Test
+    @DisplayName("exportCsv con un múltiplo exacto de 500 pide una página más y corta al recibirla vacía")
+    void exportCsv_exactMultipleOfPageSize_stopsOnEmptyPage() {
+        AuditRegistryServiceImpl exporter = exportService(10_000);
+        when(repository.countGroups(any())).thenReturn(1000L);
+        stubGroupPages(1000);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+        exporter.exportCsv(filter(null), into(out));
+
+        verify(repository, times(3)).findGroups(any(), any());
+        assertThat(dataLines(out)).isEqualTo(1000);
+    }
+
+    @Test
+    @DisplayName("exportCsv sin resultados escribe solo la cabecera")
+    void exportCsv_noRows_writesHeaderOnly() {
+        AuditRegistryServiceImpl exporter = exportService(10_000);
+        when(repository.countGroups(any())).thenReturn(0L);
+        when(repository.findGroups(any(), any())).thenReturn(List.of());
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+        exporter.exportCsv(filter(null), into(out));
+
+        assertThat(dataLines(out)).isZero();
+        assertThat(out.toString(StandardCharsets.UTF_8)).startsWith("\uFEFFfecha;tipo;");
+    }
+
+    @Test
+    @DisplayName("exportCsv resuelve las etiquetas con una sola llamada a stateRepository.load por página")
+    void exportCsv_loadsLabelStatesOncePerPage() {
+        AuditRegistryServiceImpl exporter = exportService(10_000, allocationLabels());
+        when(repository.countGroups(any())).thenReturn(503L);
+        stubGroupPages(503);
+        when(stateRepository.load(any())).thenAnswer(invocation -> {
+            Map<RecordRevision, RecordStates> states = new HashMap<>();
+            Collection<RecordRevision> keys = invocation.getArgument(0);
+            keys.forEach(key -> states.put(key, someState()));
+            return states;
+        });
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+        exporter.exportCsv(filter(null), into(out));
+
+        ArgumentCaptor<Collection<RecordRevision>> loads = ArgumentCaptor.forClass(Collection.class);
+        verify(stateRepository, times(2)).load(loads.capture());
+        assertThat(loads.getAllValues()).extracting(Collection::size).containsExactly(EXPORT_PAGE, 3);
+        assertThat(out.toString(StandardCharsets.UTF_8)).contains(";L-1;").contains(";L-503;");
+    }
+
+    @Test
+    @DisplayName("exportCsv propaga el error de lectura de la primera página sin pedir el stream")
+    void exportCsv_firstPageReadFails_doesNotCallOutput() {
+        AuditRegistryServiceImpl exporter = exportService(10_000);
+        when(repository.countGroups(any())).thenReturn(10L);
+        when(repository.findGroups(any(), any())).thenThrow(new IllegalStateException("db down"));
+        Supplier<OutputStream> output = neverCalled();
+
+        assertThatThrownBy(() -> exporter.exportCsv(filter(null), output))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("db down");
+
+        verifyNoInteractions(output);
+    }
+
+    @Test
+    @DisplayName("max-rows menor o igual a 0 falla al validar la configuración, y 1 es válido")
+    void exportMaxRows_mustBePositive() {
+        AuditRegistryServiceImpl zero = exportService(0);
+        AuditRegistryServiceImpl negative = exportService(-5);
+
+        assertThatThrownBy(zero::validateExportMaxRows).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(negative::validateExportMaxRows).isInstanceOf(IllegalStateException.class);
+        exportService(1).validateExportMaxRows();
     }
 }

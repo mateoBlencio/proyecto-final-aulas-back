@@ -6,7 +6,9 @@ import ar.edu.utn.frc.siga.audit.dto.response.AuditOperationChainDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.io.OutputStream;
 import java.util.List;
+import java.util.function.Supplier;
 
 public interface AuditRegistryService {
 
@@ -16,6 +18,13 @@ public interface AuditRegistryService {
      * and standalone individual changes.
      */
     Page<AuditLogEntryDto> findAll(AuditLogFilter filter, Pageable pageable);
+
+    /**
+     * Writes the listing (same filters as {@link #findAll}) as CSV to the stream given by {@code output}, page by
+     * page. Throws 400 before calling {@code output} if the filter is invalid or matches more entries than
+     * {@code siga.audit.export.max-rows}, so the caller can set response headers inside the supplier.
+     */
+    void exportCsv(AuditLogFilter filter, Supplier<OutputStream> output);
 
     /** Individual changes that make up an operation (drill-down), with optional filters. */
     Page<AuditLogEntryDto> findOperationItems(String operationId, AuditLogFilter filter, Pageable pageable);
