@@ -36,7 +36,7 @@ class AuditedEntityRegistryTest extends AbstractIntegrationTest {
                 .containsExactlyInAnyOrder(
                         "Allocation", "User", "RoleAssignment", "AcademicEvent", "Occurrence",
                         "RoomRequest", "RoomRequestItem", "RoomPreference", "RoomRequestItemAllocation",
-                        "Setting");
+                        "Setting", "AuditArchiveRun");
     }
 
     @Test

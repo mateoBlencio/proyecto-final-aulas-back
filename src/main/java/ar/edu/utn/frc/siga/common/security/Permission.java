@@ -39,6 +39,7 @@ public enum Permission {
     SYSACAD_READ(ScopeType.GLOBAL),
     SYSACAD_SYNC(ScopeType.GLOBAL),
     AUDIT_READ(ScopeType.GLOBAL),
+    AUDIT_ARCHIVE(ScopeType.GLOBAL),
     USER_READ(ScopeType.GLOBAL),
     USER_MANAGE(ScopeType.GLOBAL),
     ROLE_ASSIGN(ScopeType.GLOBAL);

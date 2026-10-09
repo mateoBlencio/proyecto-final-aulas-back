@@ -12,3 +12,8 @@ logging:
   level:
     root: ERROR
     ar.edu.utn.frc.siga: WARN
+
+siga:
+  audit:
+    archive:
+      enabled: ${AUDIT_ARCHIVE_ENABLED:true}

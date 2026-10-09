@@ -900,11 +900,11 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /v1/audit/entity-types responde con las diez etiquetas de entidades auditadas")
+    @DisplayName("GET /v1/audit/entity-types responde con las once etiquetas de entidades auditadas")
     void entityTypesReturnsAllLabels() throws Exception {
         mockMvc.perform(get("/v1/audit/entity-types"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(10)))
+                .andExpect(jsonPath("$", hasSize(11)))
                 .andExpect(jsonPath("$", hasItem("Asignación de rol")))
                 .andExpect(jsonPath("$", hasItem("Asignación de solicitud de aula")));
     }

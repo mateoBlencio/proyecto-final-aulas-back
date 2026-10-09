@@ -554,6 +554,7 @@ class RevisionSummaryIntegrationTest extends AbstractIntegrationTest {
             literals.add(matcher.group(1));
         }
         Set<String> registryTables = registry.all().stream().map(AuditedEntity::auditTable)
+                .filter(table -> !RevisionSummaryMigration.TABLES_CREATED_LATER.contains(table))
                 .collect(Collectors.toCollection(TreeSet::new));
 
         assertThat(literals).containsExactlyElementsOf(registryTables);
