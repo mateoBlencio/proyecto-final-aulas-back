@@ -76,6 +76,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
     @Override
     @Transactional
+    @AuditOperation("Asignación automática de aula a solicitud")
     public RoomRequestItemResponseDto assignAutomatic(Long itemId, List<Long> classroomIds, String reason,
                                                       String actor) {
         return assign(itemId, classroomIds, reason, actor, items -> AllocationCommand.automatic(items, reason));

@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizationResult;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizerAllocation;
@@ -90,6 +91,7 @@ public class RoomRequestSuggestionServiceImpl implements RoomRequestSuggestionSe
 
     @Override
     @Transactional
+    @AuditOperation("Confirmación de aula sugerida para solicitud")
     public RoomRequestItemResponseDto confirm(Long itemId, String suggestionId, String reason, String actor) {
         RoomRequestSuggestion suggestion = store.take(suggestionId)
                 .orElseThrow(() -> new ExpiredSuggestionException(suggestionId));
