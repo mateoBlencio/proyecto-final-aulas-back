@@ -101,7 +101,7 @@ class RoomRequestOccurrenceResolver {
         return futureSlotsOnDayOfWeek(item).stream().map(OccurrenceSlotDto::occurrenceId).toList();
     }
 
-    private List<OccurrenceSlotDto> futureSlotsOnDayOfWeek(RoomRequestItem item) {
+    List<OccurrenceSlotDto> futureSlotsOnDayOfWeek(RoomRequestItem item) {
         List<OccurrenceSlotDto> slots = occurrenceService.findSlotsByEvent(item.getSourceRecurringEventId(), LocalDate.now())
                 .stream()
                 .filter(slot -> slot.date().getDayOfWeek() == item.getDayOfWeek())
