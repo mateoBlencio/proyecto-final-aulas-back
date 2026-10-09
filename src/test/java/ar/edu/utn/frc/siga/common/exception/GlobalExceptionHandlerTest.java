@@ -172,6 +172,7 @@ class GlobalExceptionHandlerTest {
         assertThat(problem.getStatus()).isEqualTo(409);
         assertThat(problem.getTitle()).isEqualTo("Concurrent modification");
         assertThat(problem.getDetail()).doesNotContain("Row was updated or deleted");
+        assertThat(problem.getProperties()).containsEntry("code", "CONCURRENT_MODIFICATION");
     }
 
     // ---------- catch-all ----------

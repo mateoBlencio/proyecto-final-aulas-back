@@ -20,6 +20,7 @@ public final class ReallocationConflictException extends SigaAppException {
         super(HttpStatus.CONFLICT, "Reallocation conflict",
                 "No se puede reasignar: " + conflicts.size() + " ocurrencia(s) solapan con asignaciones existentes.");
         this.conflicts = conflicts;
+        withProperty("code", "ALLOCATION_CONFLICT");
         withProperty("conflicts", conflicts);
     }
 }

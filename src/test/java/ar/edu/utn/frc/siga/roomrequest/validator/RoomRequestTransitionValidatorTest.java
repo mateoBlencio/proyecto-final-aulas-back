@@ -28,7 +28,9 @@ class RoomRequestTransitionValidatorTest {
                 RoomRequestStatus.NEW, RoomRequestStatus.CANCELLED)).doesNotThrowAnyException();
         assertThatThrownBy(() -> validator.validateTransition(
                 RoomRequestStatus.NEW, RoomRequestStatus.RESOLVED))
-                .isInstanceOf(InvalidRoomRequestTransitionException.class);
+                .isInstanceOf(InvalidRoomRequestTransitionException.class)
+                .satisfies(ex -> assertThat(((InvalidRoomRequestTransitionException) ex).getProperties())
+                        .containsEntry("code", "INVALID_STATE"));
     }
 
     @Test
