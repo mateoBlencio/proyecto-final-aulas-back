@@ -16,6 +16,8 @@ params:query {
   ~user: admin@frc.utn.edu.ar
   ~entityType: Configuración
   ~kind: MODIFIED
+  ~actor: HUMAN
+  ~q: asignación
   ~page: 0
   ~size: 20
 }
@@ -46,4 +48,14 @@ docs {
     "Asignación", "Ocurrencia", "Usuario", "Solicitud de aula",
     "Ítem de solicitud de aula", "Preferencia de aula"). 400 si no existe.
   - kind: CREATED | MODIFIED | DELETED
+  - actor: HUMAN | SYSTEM. HUMAN es una persona (con sesión, o el formulario
+    público de solicitudes, que no tiene usuario); SYSTEM es un proceso sin
+    sesión ni request (schedulers, listeners asíncronos). 400 si el valor no es
+    uno de esos dos.
+  - q: texto a buscar en la descripción de la operación (coincidencia parcial,
+    sin distinguir mayúsculas). La descripción solo existe en type=OPERATION:
+    un CHANGE o TRANSACTION sin operación nunca coincide con q.
+
+  Cada entrada trae 'actorType' (HUMAN | SYSTEM). user null con actorType=HUMAN
+  es una solicitud del formulario público.
 }

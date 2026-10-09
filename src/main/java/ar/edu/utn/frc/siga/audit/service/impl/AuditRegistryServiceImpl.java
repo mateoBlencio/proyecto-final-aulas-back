@@ -78,7 +78,7 @@ public class AuditRegistryServiceImpl implements AuditRegistryService {
         }
         if (row.recordCount() == 1) {
             RevisionMetadata metadata = new RevisionMetadata(row.singleRecordId(), row.revision(), row.date(),
-                    row.user(), row.commonKind(), row.description(), null);
+                    row.user(), row.actorType(), row.commonKind(), row.description(), null);
             return auditLogEntryMapper.toChange(metadata, row.singleEntityType());
         }
         return auditLogEntryMapper.toTransaction(row);
@@ -90,7 +90,7 @@ public class AuditRegistryServiceImpl implements AuditRegistryService {
         List<AuditedEntity> targets = resolveTargets(filter.entityType());
         LocalDateTime from = atStartOfDay(filter.from());
         LocalDateTime toExclusive = filter.to() != null ? filter.to().plusDays(1).atStartOfDay() : null;
-        return new AuditLogCriteria(from, toExclusive, filter.user(), filter.kind(), targets);
+        return new AuditLogCriteria(from, toExclusive, filter.user(), filter.kind(), targets, filter.actor(), filter.q());
     }
 
     private List<AuditedEntity> resolveTargets(String entityType) {

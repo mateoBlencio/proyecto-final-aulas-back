@@ -19,13 +19,13 @@ public interface AuditLogEntryMapper {
     AuditLogEntryDto toChange(RevisionMetadata metadata, String entityType);
 
     default AuditLogEntryDto toOperation(AuditGroupRow row) {
-        return new AuditLogEntryDto(AuditLogEntryType.OPERATION, row.revision(), row.date(), row.user(),
+        return new AuditLogEntryDto(AuditLogEntryType.OPERATION, row.revision(), row.date(), row.user(), row.actorType(),
                 row.description(), row.commonKind(), null, null, row.operationId(),
                 (int) row.recordCount(), row.entityTypes());
     }
 
     default AuditLogEntryDto toTransaction(AuditGroupRow row) {
-        return new AuditLogEntryDto(AuditLogEntryType.TRANSACTION, row.revision(), row.date(), row.user(),
+        return new AuditLogEntryDto(AuditLogEntryType.TRANSACTION, row.revision(), row.date(), row.user(), row.actorType(),
                 describeTransaction(row), row.commonKind(), null, null, null,
                 (int) row.recordCount(), row.entityTypes());
     }

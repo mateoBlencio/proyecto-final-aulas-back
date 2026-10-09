@@ -1,11 +1,13 @@
 package ar.edu.utn.frc.siga.audit.controller;
 
+import ar.edu.utn.frc.siga.audit.model.ActorType;
 import ar.edu.utn.frc.siga.audit.model.RevisionKind;
 import ar.edu.utn.frc.siga.audit.dto.AuditLogFilter;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditLogEntryDto;
 import ar.edu.utn.frc.siga.audit.service.AuditRegistryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -14,6 +16,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,6 +30,7 @@ import java.util.List;
 @RestController
 @RequestMapping("${siga.api.base-path}/audit")
 @RequiredArgsConstructor
+@Validated
 @PreAuthorize("hasAuthority('PERM_AUDIT_READ')")
 @Tag(name = "Auditoría", description = "Registro unificado de revisiones de todas las entidades auditadas")
 public class AuditRegistryController {
@@ -47,17 +51,22 @@ public class AuditRegistryController {
                        + "fila, y recordCount y entityTypes cuentan solo las filas que pasan el filtro (una "
                        + "revisión con varias filas puede pasar de TRANSACTION a CHANGE al filtrar). 400 si "
                        + "'entityType' no es un tipo conocido o si se envían las dos fechas y 'to' es anterior "
-                       + "a 'from'.")
+                       + "a 'from'. 'actor' (HUMAN o SYSTEM) filtra por quién hizo el cambio: una persona o un "
+                       + "proceso del sistema; 400 si no es uno de esos valores. 'q' busca texto (sin distinguir "
+                       + "mayúsculas) en la descripción guardada de la operación, que solo existe para "
+                       + "type=OPERATION: un CHANGE o TRANSACTION sin operación nunca coincide con 'q'.")
     public ResponseEntity<Page<AuditLogEntryDto>> findAll(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) String user,
             @RequestParam(required = false) String entityType,
             @RequestParam(required = false) RevisionKind kind,
+            @RequestParam(required = false) ActorType actor,
+            @RequestParam(required = false) @Size(max = 100) String q,
             @PageableDefault(size = 20) Pageable pageable) {
         log.debug("GET /v1/audit: from={}, to={}, user={}, entityType={}, kind={}", from, to, user, entityType, kind);
         Page<AuditLogEntryDto> page = auditRegistryService.findAll(
-                new AuditLogFilter(from, to, user, entityType, kind), pageable);
+                new AuditLogFilter(from, to, user, entityType, kind, actor, q), pageable);
         log.info("Registro de auditoría consultado: total={}", page.getTotalElements());
         return ResponseEntity.ok(page);
     }
@@ -67,7 +76,7 @@ public class AuditRegistryController {
                description = "Cambios individuales (type=CHANGE) que componen la operación, paginados y "
                        + "ordenados por revisión descendente. Página vacía si el operationId no existe. "
                        + "Filtros opcionales iguales a GET /v1/audit; con los mismos filtros, totalElements "
-                       + "coincide con recordCount de la entrada.")
+                       + "coincide con recordCount de la entrada. 'actor' y 'q' también aplican.")
     public ResponseEntity<Page<AuditLogEntryDto>> findOperationItems(
             @PathVariable String operationId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -75,10 +84,12 @@ public class AuditRegistryController {
             @RequestParam(required = false) String user,
             @RequestParam(required = false) String entityType,
             @RequestParam(required = false) RevisionKind kind,
+            @RequestParam(required = false) ActorType actor,
+            @RequestParam(required = false) @Size(max = 100) String q,
             @PageableDefault(size = 20) Pageable pageable) {
         log.debug("GET /v1/audit/operations/{}", operationId);
         return ResponseEntity.ok(auditRegistryService.findOperationItems(
-                operationId, new AuditLogFilter(from, to, user, entityType, kind), pageable));
+                operationId, new AuditLogFilter(from, to, user, entityType, kind, actor, q), pageable));
     }
 
     @GetMapping("/revisions/{revision}")
@@ -95,10 +106,12 @@ public class AuditRegistryController {
             @RequestParam(required = false) String user,
             @RequestParam(required = false) String entityType,
             @RequestParam(required = false) RevisionKind kind,
+            @RequestParam(required = false) ActorType actor,
+            @RequestParam(required = false) @Size(max = 100) String q,
             @PageableDefault(size = 20) Pageable pageable) {
         log.debug("GET /v1/audit/revisions/{}", revision);
         return ResponseEntity.ok(auditRegistryService.findRevisionItems(
-                revision, new AuditLogFilter(from, to, user, entityType, kind), pageable));
+                revision, new AuditLogFilter(from, to, user, entityType, kind, actor, q), pageable));
     }
 
     @GetMapping("/entity-types")

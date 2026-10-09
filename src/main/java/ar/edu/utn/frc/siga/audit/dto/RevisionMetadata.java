@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.audit.dto;
 
 import java.time.LocalDateTime;
 
+import ar.edu.utn.frc.siga.audit.model.ActorType;
 import ar.edu.utn.frc.siga.audit.model.RevisionKind;
 
 public record RevisionMetadata(
@@ -9,6 +10,7 @@ public record RevisionMetadata(
         Integer revision,
         LocalDateTime date,
         String user,
+        ActorType actorType,
         RevisionKind kind,
         String description,
         String operationId) {

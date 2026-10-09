@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.audit.dto.RevisionMetadata;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditLogEntryDto;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditLogEntryType;
 import ar.edu.utn.frc.siga.audit.mapper.AuditLogEntryMapperImpl;
+import ar.edu.utn.frc.siga.audit.model.ActorType;
 import ar.edu.utn.frc.siga.audit.model.RevisionKind;
 import ar.edu.utn.frc.siga.audit.repository.AuditChangeRow;
 import ar.edu.utn.frc.siga.audit.repository.AuditGroupRow;
@@ -67,18 +68,18 @@ class AuditRegistryServiceImplTest {
 
     private static AuditGroupRow operationGroup(int revision, String operationId, String description,
                                                 long recordCount) {
-        return new AuditGroupRow(operationId, revision, DATE, "user@frc", description, recordCount,
+        return new AuditGroupRow(operationId, revision, DATE, "user@frc", ActorType.HUMAN, description, recordCount,
                 List.of("Asignación"), RevisionKind.CREATED, "Asignación", "7");
     }
 
     private static AuditGroupRow looseGroup(int revision, long recordCount, List<String> entityTypes,
                                             RevisionKind commonKind, String description) {
-        return new AuditGroupRow(null, revision, DATE, "user@frc", description, recordCount, entityTypes,
+        return new AuditGroupRow(null, revision, DATE, "user@frc", ActorType.HUMAN, description, recordCount, entityTypes,
                 commonKind, entityTypes.getFirst(), "42");
     }
 
     private static AuditLogFilter filter(String entityType) {
-        return new AuditLogFilter(null, null, null, entityType, null);
+        return new AuditLogFilter(null, null, null, entityType, null, null, null);
     }
 
     private AuditLogCriteria capturedGroupCriteria() {
@@ -233,7 +234,7 @@ class AuditRegistryServiceImplTest {
     @DisplayName("'to' anterior a 'from' -> InvalidDateRangeException sin tocar el repositorio")
     void findAll_toBeforeFrom_throws() {
         AuditLogFilter bad = new AuditLogFilter(
-                LocalDate.of(2026, 1, 10), LocalDate.of(2026, 1, 1), null, null, null);
+                LocalDate.of(2026, 1, 10), LocalDate.of(2026, 1, 1), null, null, null, null, null);
 
         assertThatThrownBy(() -> service.findAll(bad, PageRequest.of(0, 10)))
                 .isInstanceOf(InvalidDateRangeException.class);
@@ -247,7 +248,7 @@ class AuditRegistryServiceImplTest {
         LocalDate to = LocalDate.of(2026, 3, 1);
 
         Page<AuditLogEntryDto> result = service.findAll(
-                new AuditLogFilter(null, to, null, null, null), PageRequest.of(0, 10));
+                new AuditLogFilter(null, to, null, null, null, null, null), PageRequest.of(0, 10));
 
         assertThat(result.getContent()).isEmpty();
         AuditLogCriteria criteria = capturedGroupCriteria();
@@ -260,7 +261,7 @@ class AuditRegistryServiceImplTest {
     void findAll_sameDayRange_coversWholeDay() {
         LocalDate day = LocalDate.of(2026, 1, 10);
 
-        service.findAll(new AuditLogFilter(day, day, null, null, null), PageRequest.of(0, 10));
+        service.findAll(new AuditLogFilter(day, day, null, null, null, null, null), PageRequest.of(0, 10));
 
         AuditLogCriteria criteria = capturedGroupCriteria();
         assertThat(criteria.from()).isEqualTo(LocalDateTime.of(2026, 1, 10, 0, 0));
@@ -280,7 +281,7 @@ class AuditRegistryServiceImplTest {
     @Test
     @DisplayName("propaga usuario y kind al criterio")
     void findAll_passesUserAndKind() {
-        service.findAll(new AuditLogFilter(null, null, "someone@frc", null, RevisionKind.DELETED),
+        service.findAll(new AuditLogFilter(null, null, "someone@frc", null, RevisionKind.DELETED, null, null),
                 PageRequest.of(0, 10));
 
         AuditLogCriteria criteria = capturedGroupCriteria();
@@ -292,7 +293,7 @@ class AuditRegistryServiceImplTest {
     @DisplayName("el criterio de countGroups es el mismo que el de findGroups")
     void findAll_countAndFindShareCriteria() {
         AuditLogFilter f = new AuditLogFilter(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 2), "u",
-                "Configuración", RevisionKind.MODIFIED);
+                "Configuración", RevisionKind.MODIFIED, null, null);
 
         service.findAll(f, PageRequest.of(0, 10));
 
@@ -304,9 +305,9 @@ class AuditRegistryServiceImplTest {
     @Test
     @DisplayName("findOperationItems pasa ChangeScope.ofOperation y mapea las filas a CHANGE con el total del count")
     void findOperationItems_usesOperationScope() {
-        RevisionMetadata first = new RevisionMetadata("1", 21, DATE, "user@frc", RevisionKind.CREATED,
+        RevisionMetadata first = new RevisionMetadata("1", 21, DATE, "user@frc", ActorType.HUMAN, RevisionKind.CREATED,
                 "Reasignación en lote", "op-9");
-        RevisionMetadata second = new RevisionMetadata("2", 20, DATE, "user@frc", RevisionKind.MODIFIED,
+        RevisionMetadata second = new RevisionMetadata("2", 20, DATE, "user@frc", ActorType.HUMAN, RevisionKind.MODIFIED,
                 "Reasignación en lote", "op-9");
         when(repository.countChanges(any(), any())).thenReturn(40L);
         when(repository.findChanges(any(), any(), any())).thenReturn(List.of(
@@ -339,7 +340,7 @@ class AuditRegistryServiceImplTest {
     @DisplayName("los drill-downs aplican los filtros: entityType acota targets y las fechas llegan al criterio")
     void drillDowns_applyFilters() {
         AuditLogFilter f = new AuditLogFilter(LocalDate.of(2026, 2, 1), LocalDate.of(2026, 2, 1), null,
-                "Asignación", RevisionKind.CREATED);
+                "Asignación", RevisionKind.CREATED, null, null);
 
         service.findRevisionItems(5, f, PageRequest.of(0, 10));
         service.findOperationItems("op", f, PageRequest.of(0, 10));
@@ -359,7 +360,7 @@ class AuditRegistryServiceImplTest {
     void drillDowns_validateFilters() {
         assertThatThrownBy(() -> service.findRevisionItems(1, filter("NoExiste"), PageRequest.of(0, 10)))
                 .isInstanceOf(InvalidSelectionException.class);
-        AuditLogFilter bad = new AuditLogFilter(LocalDate.of(2026, 1, 10), LocalDate.of(2026, 1, 1), null, null, null);
+        AuditLogFilter bad = new AuditLogFilter(LocalDate.of(2026, 1, 10), LocalDate.of(2026, 1, 1), null, null, null, null, null);
         assertThatThrownBy(() -> service.findOperationItems("op", bad, PageRequest.of(0, 10)))
                 .isInstanceOf(InvalidDateRangeException.class);
 
