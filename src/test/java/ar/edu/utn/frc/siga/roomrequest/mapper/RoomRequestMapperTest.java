@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AssignedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.BuildingOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailHeaderDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemRowDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestResponseDto;
@@ -18,10 +19,12 @@ import org.junit.jupiter.api.Test;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -144,7 +147,7 @@ class RoomRequestMapperTest {
     @Test
     @DisplayName("notifiedAt, derivedAt y returnedReason viajan del entity al DTO sin pasar por el composer")
     void itemCarriesResolutionTimestampsDirectlyFromEntity() {
-        LocalDateTime now = LocalDateTime.of(2026, 9, 1, 10, 0);
+        Instant now = Instant.parse("2026-09-01T13:00:00Z");
         RoomRequestItem entity = RoomRequestItem.builder()
                 .id(5L).position(1).classroomCount(1)
                 .notifiedAt(now).derivedAt(now).returnedReason("no había proyector")
@@ -208,6 +211,22 @@ class RoomRequestMapperTest {
                 .teacherPhone("351-1234567")
                 .subjectId(42L)
                 .build();
+    }
+
+    @Test
+    @DisplayName("el header del detalle trae createdAt como el mismo instante y cuenta todos los pedidos de la solicitud")
+    void detailHeaderKeepsCreatedAtInstantAndCountsItems() {
+        Instant createdAt = Instant.parse("2026-09-29T17:42:00Z");
+        RoomRequest request = RoomRequest.builder().id(9L).teacherName("Ada").build();
+        request.addItem(itemEntity());
+        request.addItem(itemEntity());
+        request.addItem(itemEntity());
+        ReflectionTestUtils.setField(request, "createdAt", createdAt);
+
+        RoomRequestItemDetailHeaderDto header = mapper.toDetailHeaderDto(request, null);
+
+        assertThat(header.createdAt()).isEqualTo(createdAt);
+        assertThat(header.itemCount()).isEqualTo(3);
     }
 
     private static RoomRequestItem itemEntity() {

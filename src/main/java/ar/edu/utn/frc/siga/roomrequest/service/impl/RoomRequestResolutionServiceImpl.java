@@ -40,7 +40,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -125,7 +125,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         allocationService.reallocate(commandFactory.apply(allocationItems));
 
         item.assignClassrooms(ids, occurrencesBySlot);
-        item.decide(RoomRequestStatus.IN_EVALUATION, actor, reason, LocalDateTime.now());
+        item.decide(RoomRequestStatus.IN_EVALUATION, actor, reason, Instant.now());
 
         log.info("Pedido de aula asignado: itemId={}, aulas={}, ocurrencias={}",
                 itemId, ids.size(), occurrencesBySlot.stream().mapToInt(List::size).sum());
@@ -158,7 +158,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
                     "Solicitud de aula cancelada: " + reason));
         }
 
-        item.decide(RoomRequestStatus.CANCELLED, actor, reason, LocalDateTime.now());
+        item.decide(RoomRequestStatus.CANCELLED, actor, reason, Instant.now());
 
         log.info("Pedido de aula cancelado: itemId={}, aulasLiberadas={}", itemId, occurrenceIds.size());
         return composer.composeItem(item);
@@ -200,7 +200,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
             throw new BuildingNotAvailableException(buildingId);
         }
 
-        item.deriveTo(buildingId, actor, LocalDateTime.now());
+        item.deriveTo(buildingId, actor, Instant.now());
 
         log.info("Pedido de aula derivado: itemId={}, buildingId={}", itemId, buildingId);
         return composer.composeItem(item);
@@ -245,7 +245,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
             throw new InvalidRoomRequestException("El pedido no tiene ninguna aula asignada.");
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        Instant now = Instant.now();
         item.resolve(actor, now);
 
         RoomRequestItemDetailDto detail = composer.composeDetail(item);

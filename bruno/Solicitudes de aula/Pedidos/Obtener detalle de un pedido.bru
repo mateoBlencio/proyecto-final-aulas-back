@@ -31,6 +31,10 @@ docs {
     Se completa una sola vez: si se reasigna varias veces (A→B→C), sigue
     mostrando A, porque el docente nunca vio B. null si no aplica o todavía
     no se asignó nada.
+  - request.itemCount: cantidad de pedidos de la solicitud (incluye cancelados).
+  - Fechas de evento (request.createdAt, decidedAt, notifiedAt, derivedAt): instante
+    ISO-8601 con Z (UTC). El front las muestra en America/Argentina/Buenos_Aires.
+    date y startTime siguen sin zona: son hora de pared de la facultad.
   - notifiedAt: fecha en que se avisó al docente (notify), null si no se avisó.
   - derivedBuilding / derivedAt: edificio y fecha de la derivación vigente
     (DERIVED_TO_BUILDING), null si nunca se derivó o ya se devolvió.

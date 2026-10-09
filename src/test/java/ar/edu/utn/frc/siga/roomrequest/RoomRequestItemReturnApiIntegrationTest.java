@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 
+import java.time.Instant;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -98,9 +99,9 @@ class RoomRequestItemReturnApiIntegrationTest extends AbstractIntegrationTest {
                 .classroomCount(1)
                 .status(RoomRequestStatus.DERIVED_TO_BUILDING)
                 .derivedBuildingId(derivedBuildingId)
-                .derivedAt(LocalDateTime.now())
+                .derivedAt(Instant.now())
                 .decidedBy("subsecretaria@frc.utn.edu.ar")
-                .decidedAt(LocalDateTime.now())
+                .decidedAt(Instant.now())
                 .build();
         request.addItem(item);
         roomRequestRepository.save(request);

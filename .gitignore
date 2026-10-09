@@ -202,3 +202,4 @@ graphify-out/
 .vscode
 .codegraph
 CLAUDE.local.md
+.claude/*.graphify-bak
