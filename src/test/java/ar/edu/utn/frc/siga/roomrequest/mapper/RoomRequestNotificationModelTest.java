@@ -50,7 +50,7 @@ class RoomRequestNotificationModelTest {
                 entry("aulaAnterior", "Aula 3 (Pabellón 2)"),
                 entry("asuntoTitulo", "Cambio de aula regular"),
                 entry("asuntoPartes", List.of("Análisis Matemático I", "3K1")),
-                entry("parrafoConfirmacion", "Confirmamos el cambio de aula de tu pedido #10."),
+                entry("parrafoConfirmacion", "Confirmamos el cambio de aula de tu pedido #10 (solicitud #1)."),
                 entry("notaAdicional", "Rige para todas las clases de ese día hasta fin del cuatrimestre.")));
     }
 
@@ -77,7 +77,7 @@ class RoomRequestNotificationModelTest {
                 entry("aulaAnterior", "Aula 6 (Edificio Anexo)"),
                 entry("asuntoTitulo", "Cambio de aula"),
                 entry("asuntoPartes", List.of("Bases de Datos I", "14/10")),
-                entry("parrafoConfirmacion", "Confirmamos el cambio de aula de tu pedido #11, solo para esa fecha."),
+                entry("parrafoConfirmacion", "Confirmamos el cambio de aula de tu pedido #11 (solicitud #1), solo para esa fecha."),
                 entry("notaAdicional", "Después de esa clase volvés al aula habitual.")));
     }
 
@@ -103,7 +103,7 @@ class RoomRequestNotificationModelTest {
                 entry("horario", "09:00 a 11:00"),
                 entry("asuntoTitulo", "Aula confirmada"),
                 entry("asuntoPartes", List.of("Final de Sistemas Operativos", "20/11")),
-                entry("parrafoConfirmacion", "Confirmamos el aula para tu examen final, pedido #12.")));
+                entry("parrafoConfirmacion", "Confirmamos el aula para tu examen final, pedido #12 (solicitud #1).")));
     }
 
     @Test
@@ -128,7 +128,7 @@ class RoomRequestNotificationModelTest {
                 entry("horario", "14:00 a 16:00 (horario de cursado)"),
                 entry("asuntoTitulo", "Aula confirmada"),
                 entry("asuntoPartes", List.of("Parcial de Programación II", "4K2 y 4K3")),
-                entry("parrafoConfirmacion", "Confirmamos el aula para el parcial de tu pedido #13.")));
+                entry("parrafoConfirmacion", "Confirmamos el aula para el parcial de tu pedido #13 (solicitud #1).")));
     }
 
     @Test
@@ -154,7 +154,7 @@ class RoomRequestNotificationModelTest {
                 entry("horario", "08:00 a 10:00"),
                 entry("asuntoTitulo", "Aula confirmada"),
                 entry("asuntoPartes", List.of("Parcial de Redes de Datos", "fuera de horario")),
-                entry("parrafoConfirmacion", "Confirmamos el aula para tu parcial, pedido #14."),
+                entry("parrafoConfirmacion", "Confirmamos el aula para tu parcial, pedido #14 (solicitud #1)."),
                 entry("notaAdicional", "Es fuera del horario habitual de cursado.")));
     }
 
@@ -175,7 +175,7 @@ class RoomRequestNotificationModelTest {
                 entry("aulas", List.of("Aula 1 (Aula Magna)")),
                 entry("asuntoTitulo", "Aula confirmada"),
                 entry("asuntoPartes", List.of("Congreso / Conferencia")),
-                entry("parrafoConfirmacion", "Confirmamos el aula para tu actividad, pedido #15.")));
+                entry("parrafoConfirmacion", "Confirmamos el aula para tu actividad, pedido #15 (solicitud #1).")));
     }
 
     @Test
@@ -196,7 +196,7 @@ class RoomRequestNotificationModelTest {
                 entry("observaciones", "Necesita pizarra adicional"),
                 entry("asuntoTitulo", "Aula confirmada"),
                 entry("asuntoPartes", List.of("Otro")),
-                entry("parrafoConfirmacion", "Confirmamos el aula para tu pedido #16.")));
+                entry("parrafoConfirmacion", "Confirmamos el aula para tu pedido #16 (solicitud #1).")));
     }
 
     @Test
@@ -251,7 +251,7 @@ class RoomRequestNotificationModelTest {
             List<AssignedClassroomDto> assignedClassrooms, AssignedClassroomDto previousClassroom,
             String decisionReason, String observations) {
         RoomRequestItemDetailHeaderDto header = new RoomRequestItemDetailHeaderDto(
-                1L, type, null, "Ada Lovelace", "ada@frc.utn.edu.ar", null, subject, null);
+                1L, type, null, "Ada Lovelace", "ada@frc.utn.edu.ar", null, subject, null, 1);
         RoomRequestItemResponseDto item = new RoomRequestItemResponseDto(
                 itemId, 1, null, null, null, decisionReason, commissions, date, dayOfWeek, startTime, endTime,
                 null, null, null, classroomCount, null, null, null, null, null, observations,

@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Instant;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -213,7 +214,7 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
         RoomRequest request = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
         RoomRequestItem derived = testData.itemDePedido(request, academic.commissionId(), LocalDate.now().plusDays(12),
                 RoomRequestStatus.NEW);
-        derived.deriveTo(building.getId(), "subsecretaria@frc.utn.edu.ar", LocalDateTime.now());
+        derived.deriveTo(building.getId(), "subsecretaria@frc.utn.edu.ar", Instant.now());
         testData.itemDePedido(request, academic.commissionId(), LocalDate.now().plusDays(13), RoomRequestStatus.NEW);
         roomRequestRepository.save(request);
 
@@ -235,7 +236,7 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
         RoomRequest request = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
         RoomRequestItem returned = testData.itemDePedido(request, academic.commissionId(), LocalDate.now().plusDays(14),
                 RoomRequestStatus.NEW);
-        returned.deriveTo(building.getId(), "subsecretaria@frc.utn.edu.ar", LocalDateTime.now());
+        returned.deriveTo(building.getId(), "subsecretaria@frc.utn.edu.ar", Instant.now());
         returned.returnFromBuilding("no había proyector");
         testData.itemDePedido(request, academic.commissionId(), LocalDate.now().plusDays(15), RoomRequestStatus.NEW);
         roomRequestRepository.save(request);

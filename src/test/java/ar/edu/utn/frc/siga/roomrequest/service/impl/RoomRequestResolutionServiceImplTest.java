@@ -45,6 +45,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -348,7 +349,7 @@ class RoomRequestResolutionServiceImplTest {
     @DisplayName("return: DERIVED_TO_BUILDING → NEW, copia el edificio a returnedFromBuildingId y limpia derivedBuildingId/derivedAt")
     void return_ok() {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.DERIVED_TO_BUILDING)
-                .derivedBuildingId(5L).derivedAt(java.time.LocalDateTime.now()).build();
+                .derivedBuildingId(5L).derivedAt(Instant.now()).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         when(composer.composeItem(item)).thenReturn(mockResponse());
 
@@ -365,7 +366,7 @@ class RoomRequestResolutionServiceImplTest {
     @DisplayName("return: un segundo return pisa returnedFromBuildingId/returnedReason con los datos nuevos")
     void return_segundaVezPisaDatosAnteriores() {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.DERIVED_TO_BUILDING)
-                .derivedBuildingId(7L).derivedAt(java.time.LocalDateTime.now())
+                .derivedBuildingId(7L).derivedAt(Instant.now())
                 .returnedFromBuildingId(5L).returnedReason("motivo viejo").build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         when(composer.composeItem(item)).thenReturn(mockResponse());
@@ -433,7 +434,7 @@ class RoomRequestResolutionServiceImplTest {
         when(composer.composeItem(item)).thenReturn(mockResponse());
 
         service.notify(1L, "subsecretaria@frc.utn.edu.ar");
-        java.time.LocalDateTime firstNotifiedAt = item.getNotifiedAt();
+        Instant firstNotifiedAt = item.getNotifiedAt();
         service.notify(1L, "subsecretaria@frc.utn.edu.ar");
 
         assertThat(item.getNotifiedAt()).isEqualTo(firstNotifiedAt);
@@ -448,7 +449,7 @@ class RoomRequestResolutionServiceImplTest {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.RESOLVED)
                 .request(requestOfType(RoomRequestType.FINAL_EXAM))
                 .allocations(new java.util.ArrayList<>(List.of(allocation)))
-                .notifiedAt(java.time.LocalDateTime.now())
+                .notifiedAt(Instant.now())
                 .build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         when(composer.composeItem(item)).thenReturn(mockResponse());
@@ -777,7 +778,7 @@ class RoomRequestResolutionServiceImplTest {
     private static RoomRequestItemDetailDto mockDetail() {
         RoomRequestItemDetailHeaderDto header = new RoomRequestItemDetailHeaderDto(1L, RoomRequestType.FINAL_EXAM,
                 ar.edu.utn.frc.siga.roomrequest.model.AcademicScope.GRADO, "Ada Lovelace", "ada@frc.utn.edu.ar",
-                "351-1234567", null, null);
+                "351-1234567", null, null, 1);
         return new RoomRequestItemDetailDto(header, mockResponse());
     }
 }

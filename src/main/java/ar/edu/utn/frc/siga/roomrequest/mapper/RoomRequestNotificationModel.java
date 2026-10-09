@@ -74,54 +74,54 @@ public class RoomRequestNotificationModel {
             model.put("aulaAnterior", formatClassroom(item.previousClassroom()));
         }
 
-        putPorTipo(model, type, item.id(), materiaNombre, comisiones, item.date());
+        putPorTipo(model, type, item.id(), request.id(), materiaNombre, comisiones, item.date());
         return model;
     }
 
-    private void putPorTipo(Map<String, Object> model, RoomRequestType type, Long itemId,
+    private void putPorTipo(Map<String, Object> model, RoomRequestType type, Long itemId, Long requestId,
                              String materiaNombre, String comisiones, LocalDate date) {
         switch (type) {
             case REGULAR_ROOM_CHANGE -> {
                 model.put("asuntoTitulo", "Cambio de aula regular");
                 model.put("asuntoPartes", asuntoPartes(materiaNombre, comisiones));
-                model.put("parrafoConfirmacion", "Confirmamos el cambio de aula de tu pedido #%d.".formatted(itemId));
+                model.put("parrafoConfirmacion", "Confirmamos el cambio de aula de tu pedido #%d (solicitud #%d).".formatted(itemId, requestId));
                 model.put("notaAdicional", "Rige para todas las clases de ese día hasta fin del cuatrimestre.");
             }
             case ONE_TIME_ROOM_CHANGE -> {
                 model.put("asuntoTitulo", "Cambio de aula");
                 model.put("asuntoPartes", asuntoPartes(materiaNombre, formatShortDate(date)));
                 model.put("parrafoConfirmacion",
-                        "Confirmamos el cambio de aula de tu pedido #%d, solo para esa fecha.".formatted(itemId));
+                        "Confirmamos el cambio de aula de tu pedido #%d (solicitud #%d), solo para esa fecha.".formatted(itemId, requestId));
                 model.put("notaAdicional", "Después de esa clase volvés al aula habitual.");
             }
             case FINAL_EXAM -> {
                 model.put("asuntoTitulo", "Aula confirmada");
                 model.put("asuntoPartes",
                         asuntoPartes(materiaNombre != null ? "Final de " + materiaNombre : null, formatShortDate(date)));
-                model.put("parrafoConfirmacion", "Confirmamos el aula para tu examen final, pedido #%d.".formatted(itemId));
+                model.put("parrafoConfirmacion", "Confirmamos el aula para tu examen final, pedido #%d (solicitud #%d).".formatted(itemId, requestId));
             }
             case PARTIAL_EXAM_IN_CLASS -> {
                 model.put("asuntoTitulo", "Aula confirmada");
                 model.put("asuntoPartes",
                         asuntoPartes(materiaNombre != null ? "Parcial de " + materiaNombre : null, comisiones));
-                model.put("parrafoConfirmacion", "Confirmamos el aula para el parcial de tu pedido #%d.".formatted(itemId));
+                model.put("parrafoConfirmacion", "Confirmamos el aula para el parcial de tu pedido #%d (solicitud #%d).".formatted(itemId, requestId));
             }
             case PARTIAL_EXAM_OFF_SCHEDULE -> {
                 model.put("asuntoTitulo", "Aula confirmada");
                 model.put("asuntoPartes",
                         asuntoPartes(materiaNombre != null ? "Parcial de " + materiaNombre : null, "fuera de horario"));
-                model.put("parrafoConfirmacion", "Confirmamos el aula para tu parcial, pedido #%d.".formatted(itemId));
+                model.put("parrafoConfirmacion", "Confirmamos el aula para tu parcial, pedido #%d (solicitud #%d).".formatted(itemId, requestId));
                 model.put("notaAdicional", "Es fuera del horario habitual de cursado.");
             }
             case CONFERENCE -> {
                 model.put("asuntoTitulo", "Aula confirmada");
                 model.put("asuntoPartes", List.of("Congreso / Conferencia"));
-                model.put("parrafoConfirmacion", "Confirmamos el aula para tu actividad, pedido #%d.".formatted(itemId));
+                model.put("parrafoConfirmacion", "Confirmamos el aula para tu actividad, pedido #%d (solicitud #%d).".formatted(itemId, requestId));
             }
             case OTHER -> {
                 model.put("asuntoTitulo", "Aula confirmada");
                 model.put("asuntoPartes", List.of("Otro"));
-                model.put("parrafoConfirmacion", "Confirmamos el aula para tu pedido #%d.".formatted(itemId));
+                model.put("parrafoConfirmacion", "Confirmamos el aula para tu pedido #%d (solicitud #%d).".formatted(itemId, requestId));
             }
         }
     }

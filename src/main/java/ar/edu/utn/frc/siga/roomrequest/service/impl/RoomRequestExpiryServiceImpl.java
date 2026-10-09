@@ -11,8 +11,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -39,7 +39,7 @@ public class RoomRequestExpiryServiceImpl implements RoomRequestExpiryService {
         List<RoomRequestItem> expired = new ArrayList<>(itemRepository.findExpiredByDate(today));
         expired.addAll(expiredRegularRoomChangeItems(today));
 
-        LocalDateTime now = LocalDateTime.now();
+        Instant now = Instant.now();
         expired.forEach(item -> item.decide(RoomRequestStatus.CANCELLED, SYSTEM_ACTOR, EXPIRY_REASON, now));
 
         log.info("Vencimiento automático de pedidos de aula: {} cancelado(s)", expired.size());
