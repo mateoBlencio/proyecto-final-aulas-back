@@ -58,4 +58,8 @@ docs {
 
   Cada entrada trae 'actorType' (HUMAN | SYSTEM). user null con actorType=HUMAN
   es una solicitud del formulario público.
+
+  'changes' viene siempre null en este listado: el diff por campo se obtiene
+  en GET /v1/audit/operations/{operationId} y GET /v1/audit/revisions/{revision}.
+  Un type=CHANGE suelto se abre con esta última usando su 'revision'.
 }

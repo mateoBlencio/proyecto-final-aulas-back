@@ -11,6 +11,7 @@ import org.hibernate.envers.Audited;
 import org.hibernate.envers.boot.internal.EnversService;
 import org.hibernate.metamodel.mapping.SelectableMapping;
 import org.hibernate.persister.entity.AbstractEntityPersister;
+import ar.edu.utn.frc.siga.audit.service.AuditedEntity.AuditedColumn;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -38,6 +39,12 @@ public class AuditedEntityRegistry {
             "RoomRequestItemAllocation", "Asignación de solicitud de aula",
             "Setting", "Configuración");
 
+    // Audited properties never shown in the diff.
+    private static final Map<String, Set<String>> EXCLUDED_PROPERTIES = Map.of(
+            "User", Set.of("passwordHash"));
+
+    private static final Set<String> ENVERS_COLUMNS = Set.of("rev", "revtype");
+
     private final EntityManager entityManager;
     private final EntityManagerFactory entityManagerFactory;
 
@@ -58,7 +65,7 @@ public class AuditedEntityRegistry {
                     return javaType.isAnnotationPresent(Audited.class)
                             && !hasAuditedAncestor(javaType, auditedTypes);
                 })
-                .map(type -> toAuditedEntity(sessionFactory, type))
+                .map(type -> toAuditedEntity(sessionFactory, type, auditedTypes))
                 .sorted(Comparator.comparing(AuditedEntity::label))
                 .toList();
 
@@ -79,21 +86,61 @@ public class AuditedEntityRegistry {
         return entities.stream().filter(entity -> entity.label().equals(label)).findFirst();
     }
 
-    private static AuditedEntity toAuditedEntity(SessionFactoryImplementor sessionFactory, EntityType<?> type) {
+    private static AuditedEntity toAuditedEntity(SessionFactoryImplementor sessionFactory, EntityType<?> type,
+                                                 Set<Class<?>> auditedTypes) {
         Class<?> javaType = type.getJavaType();
-        String auditEntityName = sessionFactory.getServiceRegistry().getService(EnversService.class)
-                .getConfig().getAuditEntityName(javaType.getName());
-        String auditTable = ((AbstractEntityPersister) sessionFactory.getMappingMetamodel()
-                .getEntityDescriptor(auditEntityName)).getTableName();
+        EnversService envers = sessionFactory.getServiceRegistry().getService(EnversService.class);
+        AbstractEntityPersister auditPersister = auditPersister(sessionFactory, envers, javaType);
+        String auditTable = auditPersister.getTableName();
 
         List<String> idColumns = new ArrayList<>();
-        sessionFactory.getMappingMetamodel().getEntityDescriptor(javaType).getIdentifierMapping()
-                .forEachSelectable((index, selectable) -> idColumns.add(((SelectableMapping) selectable).getSelectionExpression()));
+        var identifierMapping = sessionFactory.getMappingMetamodel().getEntityDescriptor(javaType).getIdentifierMapping();
+        identifierMapping.forEachSelectable((index, selectable) -> idColumns.add(((SelectableMapping) selectable).getSelectionExpression()));
         if (idColumns.size() != 1) {
             throw new IllegalStateException("La entidad auditada " + javaType.getName()
                     + " debe tener un identificador de una sola columna, tiene " + idColumns);
         }
-        return new AuditedEntity(javaType, type.getName(), labelFor(type.getName()), auditTable, idColumns.getFirst());
+        String idColumn = idColumns.getFirst();
+
+        String jpaName = type.getName();
+        Set<String> excluded = EXCLUDED_PROPERTIES.getOrDefault(jpaName, Set.of());
+        List<AuditedColumn> columns = new ArrayList<>(columnsOf(auditPersister, idColumn, excluded));
+        // JOINED subclasses keep their own columns in their own _aud table.
+        auditedTypes.stream()
+                .filter(subtype -> subtype != javaType && javaType.isAssignableFrom(subtype))
+                .sorted(Comparator.comparing(Class::getName))
+                .forEach(subtype -> columns.addAll(
+                        columnsOf(auditPersister(sessionFactory, envers, subtype), idColumn, excluded)));
+
+        return new AuditedEntity(javaType, jpaName, labelFor(jpaName), auditTable, idColumn,
+                identifierMapping.getJavaType().getJavaTypeClass(), List.copyOf(columns));
+    }
+
+    private static AbstractEntityPersister auditPersister(SessionFactoryImplementor sessionFactory,
+                                                          EnversService envers, Class<?> javaType) {
+        String auditEntityName = envers.getConfig().getAuditEntityName(javaType.getName());
+        return (AbstractEntityPersister) sessionFactory.getMappingMetamodel().getEntityDescriptor(auditEntityName);
+    }
+
+    private static List<AuditedColumn> columnsOf(AbstractEntityPersister auditPersister, String idColumn,
+                                                 Set<String> excluded) {
+        List<AuditedColumn> columns = new ArrayList<>();
+        auditPersister.getDeclaredAttributeMappings().forEachValue(attribute -> {
+            // Envers audits a to-one as a basic property "<property>_id"; the diff uses the Java property name.
+            String property = attribute.getAttributeName().endsWith("_id")
+                    ? attribute.getAttributeName().substring(0, attribute.getAttributeName().length() - 3)
+                    : attribute.getAttributeName();
+            if (excluded.contains(property)) {
+                return;
+            }
+            attribute.forEachSelectable((index, selectable) -> {
+                String column = selectable.getSelectionExpression();
+                if (!column.equals(idColumn) && !ENVERS_COLUMNS.contains(column.toLowerCase())) {
+                    columns.add(new AuditedColumn(selectable.getContainingTableExpression(), column, property));
+                }
+            });
+        });
+        return columns;
     }
 
     private static boolean hasAuditedAncestor(Class<?> type, Set<Class<?>> auditedTypes) {

@@ -3,10 +3,13 @@ package ar.edu.utn.frc.siga.audit.mapper;
 import ar.edu.utn.frc.siga.audit.dto.RevisionMetadata;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditLogEntryDto;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditLogEntryType;
+import ar.edu.utn.frc.siga.audit.dto.response.FieldChangeDto;
 import ar.edu.utn.frc.siga.audit.repository.AuditGroupRow;
 import ar.edu.utn.frc.siga.common.mapper.CentralMapperConfig;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+
+import java.util.List;
 
 @Mapper(config = CentralMapperConfig.class)
 public interface AuditLogEntryMapper {
@@ -16,18 +19,18 @@ public interface AuditLogEntryMapper {
     @Mapping(target = "description", expression = "java(describe(metadata, entityType))")
     @Mapping(target = "recordCount", ignore = true)
     @Mapping(target = "entityTypes", ignore = true)
-    AuditLogEntryDto toChange(RevisionMetadata metadata, String entityType);
+    AuditLogEntryDto toChange(RevisionMetadata metadata, String entityType, List<FieldChangeDto> changes);
 
     default AuditLogEntryDto toOperation(AuditGroupRow row) {
         return new AuditLogEntryDto(AuditLogEntryType.OPERATION, row.revision(), row.date(), row.user(), row.actorType(),
                 row.description(), row.commonKind(), null, null, row.operationId(),
-                (int) row.recordCount(), row.entityTypes());
+                (int) row.recordCount(), row.entityTypes(), null);
     }
 
     default AuditLogEntryDto toTransaction(AuditGroupRow row) {
         return new AuditLogEntryDto(AuditLogEntryType.TRANSACTION, row.revision(), row.date(), row.user(), row.actorType(),
                 describeTransaction(row), row.commonKind(), null, null, null,
-                (int) row.recordCount(), row.entityTypes());
+                (int) row.recordCount(), row.entityTypes(), null);
     }
 
     default String describeTransaction(AuditGroupRow row) {

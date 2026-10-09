@@ -132,7 +132,7 @@ public class AuditLogQueryRepository {
                         toKind(rs.getInt("revtype")),
                         rs.getString("descripcion"),
                         rs.getString("operacion_id")),
-                entities.get(rs.getInt("entity_idx")).label()));
+                entities.get(rs.getInt("entity_idx"))));
     }
 
     /**
