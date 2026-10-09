@@ -1,7 +1,7 @@
--- Indexes for the aggregate read of the audit log (AuditLogQueryRepository).
--- The _aud tables have PK (id, rev) and no index starting with rev: the listing does
--- JOIN/EXISTS on x.rev = r.rev against revinfo, and without these indexes it scans the whole table.
--- idx_revinfo_fecha_revision speeds up the date-range filter on revinfo.
+-- Índices para la lectura agregada del registro de auditoría (AuditLogQueryRepository).
+-- Las tablas _aud tienen PK (id, rev) y ningún índice que empiece por rev: el listado hace
+-- JOIN/EXISTS por x.rev = r.rev contra revinfo, y sin estos índices recorre la tabla entera.
+-- idx_revinfo_fecha_revision acelera el filtro por rango de fechas sobre revinfo.
 CREATE INDEX IF NOT EXISTS idx_asignacion_aula_aud_rev ON asignacion_aula_aud (rev);
 CREATE INDEX IF NOT EXISTS idx_usuario_aud_rev ON usuario_aud (rev);
 CREATE INDEX IF NOT EXISTS idx_usuario_rol_aud_rev ON usuario_rol_aud (rev);
