@@ -77,13 +77,13 @@ class AuditRegistryServiceImplTest {
 
     private static AuditGroupRow operationGroup(int revision, String operationId, String description,
                                                 long recordCount) {
-        return new AuditGroupRow(operationId, revision, DATE, "user@frc", ActorType.HUMAN, description, recordCount,
+        return new AuditGroupRow(operationId, null, revision, DATE, "user@frc", ActorType.HUMAN, description, recordCount,
                 List.of("Asignación"), RevisionKind.CREATED, "Asignación", "7");
     }
 
     private static AuditGroupRow looseGroup(int revision, long recordCount, List<String> entityTypes,
                                             RevisionKind commonKind, String description) {
-        return new AuditGroupRow(null, revision, DATE, "user@frc", ActorType.HUMAN, description, recordCount, entityTypes,
+        return new AuditGroupRow(null, null, revision, DATE, "user@frc", ActorType.HUMAN, description, recordCount, entityTypes,
                 commonKind, entityTypes.getFirst(), "42");
     }
 
@@ -467,5 +467,34 @@ class AuditRegistryServiceImplTest {
     @DisplayName("findEntityTypes devuelve las etiquetas del registry en su orden")
     void findEntityTypes_returnsRegistryLabelsInOrder() {
         assertThat(service.findEntityTypes()).containsExactly("Asignación", "Configuración");
+    }
+
+    @Test
+    @DisplayName("findOperationChain ordena por revisión ascendente, mapea parentOperationId y conserva truncated")
+    void findOperationChainSortsAndMaps() {
+        AuditGroupRow child = new AuditGroupRow("op-child", "op-parent", 9, DATE, null, ActorType.SYSTEM, "Hija", 1,
+                List.of("Asignación"), RevisionKind.DELETED, "Asignación", "7");
+        AuditGroupRow parent = operationGroup(4, "op-parent", "Madre", 1);
+        when(repository.findOperationChain("op-child"))
+                .thenReturn(new ar.edu.utn.frc.siga.audit.repository.AuditChainRows(List.of(child, parent), true));
+
+        var chain = service.findOperationChain("op-child");
+
+        assertThat(chain.truncated()).isTrue();
+        assertThat(chain.entries()).extracting(AuditLogEntryDto::operationId).containsExactly("op-parent", "op-child");
+        assertThat(chain.entries()).extracting(AuditLogEntryDto::parentOperationId).containsExactly(null, "op-parent");
+        assertThat(chain.entries()).extracting(AuditLogEntryDto::type).containsOnly(AuditLogEntryType.OPERATION);
+    }
+
+    @Test
+    @DisplayName("findOperationChain de un id inexistente devuelve entries vacío y truncated false")
+    void findOperationChainUnknownId() {
+        when(repository.findOperationChain("x"))
+                .thenReturn(new ar.edu.utn.frc.siga.audit.repository.AuditChainRows(List.of(), false));
+
+        var chain = service.findOperationChain("x");
+
+        assertThat(chain.entries()).isEmpty();
+        assertThat(chain.truncated()).isFalse();
     }
 }

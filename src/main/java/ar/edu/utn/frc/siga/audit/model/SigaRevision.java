@@ -42,6 +42,9 @@ public class SigaRevision {
     @Column(name = "operacion_id", length = 36)
     private String operacionId;
 
+    @Column(name = "operacion_padre_id", length = 36)
+    private String parentOperationId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "tipo_actor", nullable = false, length = 10)
     private ActorType actorType;

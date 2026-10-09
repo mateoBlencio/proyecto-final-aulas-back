@@ -115,12 +115,29 @@ class SigaRevisionListenerTest {
     @Test
     @DisplayName("una operación abierta no cambia la clasificación del actor y se copia a la revisión")
     void operationDoesNotAffectActorType() {
-        AuditOperationContext.begin("Vencimiento automático");
+        AuditOperationContext.begin("Vencimiento automático", null);
 
         SigaRevision revision = newRevision();
 
         assertThat(revision.getActorType()).isEqualTo(ActorType.SYSTEM);
         assertThat(revision.getDescripcion()).isEqualTo("Vencimiento automático");
         assertThat(revision.getOperacionId()).isNotBlank();
+    }
+
+    @Test
+    @DisplayName("la operación abierta con padre copia el padre a la revisión")
+    void operationParentIsCopiedToRevision() {
+        AuditOperationContext.begin("Liberación", "parent-op-1");
+
+        SigaRevision revision = newRevision();
+
+        assertThat(revision.getParentOperationId()).isEqualTo("parent-op-1");
+        assertThat(revision.getOperacionId()).isEqualTo(AuditOperationContext.currentOperationId());
+    }
+
+    @Test
+    @DisplayName("sin operación abierta la revisión no tiene padre")
+    void noOperationMeansNoParent() {
+        assertThat(newRevision().getParentOperationId()).isNull();
     }
 }

@@ -28,7 +28,7 @@ class OccurrenceVacatedListenerTest {
     void onDesasignaLaOcurrenciaLiberada() {
         OccurrenceVacatedListener listener = new OccurrenceVacatedListener(allocationService);
 
-        listener.on(new OccurrenceVacated(10L));
+        listener.on(new OccurrenceVacated(10L, null));
 
         ArgumentCaptor<DeallocationCommand> captor = ArgumentCaptor.forClass(DeallocationCommand.class);
         verify(allocationService).deallocate(captor.capture());

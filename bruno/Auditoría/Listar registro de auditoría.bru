@@ -28,7 +28,9 @@ docs {
   Cada entrada trae 'type' y 'description':
   - type=OPERATION: operación de negocio (@AuditOperation), aunque tenga un solo
     cambio. Trae operationId, recordCount y entityTypes. Detalle en
-    GET /v1/audit/operations/{operationId}.
+    GET /v1/audit/operations/{operationId}. Trae parentOperationId si fue
+    causada por otra operación; la cadena completa en
+    GET /v1/audit/operations/{operationId}/chain.
   - type=TRANSACTION: revisión sin operación con más de un cambio. Trae revision,
     recordCount y entityTypes. Detalle en GET /v1/audit/revisions/{revision}.
   - type=CHANGE: revisión sin operación con un solo cambio. Trae kind,

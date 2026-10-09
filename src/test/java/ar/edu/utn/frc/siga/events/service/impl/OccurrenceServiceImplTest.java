@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.events.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperations;
+import ar.edu.utn.frc.siga.audit.internal.AuditOperationAspect;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.events.EventTestData;
 import ar.edu.utn.frc.siga.events.exception.OccurrenceAlreadyPastException;
@@ -16,18 +18,21 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.aop.aspectj.annotation.AspectJProxyFactory;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -57,6 +62,31 @@ class OccurrenceServiceImplTest {
     }
 
     @Test
+    @DisplayName("release dentro de una operación activa publica OccurrenceVacated con el id real de esa operación")
+    void releasePublicaElEventoConLaOperacionEnCurso() {
+        Occurrence occurrence = occurrence(10L, OccurrenceStatus.NEEDS_ROOM);
+        when(occurrenceRepository.findById(10L)).thenReturn(Optional.of(occurrence));
+        AtomicReference<String> operationIdAtPublish = new AtomicReference<>();
+        doAnswer(invocation -> {
+            operationIdAtPublish.set(AuditOperations.currentOperationId());
+            return null;
+        }).when(eventPublisher).publishEvent(any(OccurrenceVacated.class));
+        AspectJProxyFactory factory = new AspectJProxyFactory(service);
+        factory.setProxyTargetClass(true);
+        factory.addAspect(new AuditOperationAspect());
+        OccurrenceServiceImpl audited = factory.getProxy();
+
+        audited.release(10L);
+
+        ArgumentCaptor<OccurrenceVacated> captor = ArgumentCaptor.forClass(OccurrenceVacated.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(operationIdAtPublish.get()).isNotNull();
+        assertThat(captor.getValue().originOperationId()).isEqualTo(operationIdAtPublish.get());
+        assertThat(captor.getValue().occurrenceId()).isEqualTo(10L);
+        assertThat(AuditOperations.currentOperationId()).isNull();
+    }
+
+    @Test
     @DisplayName("release: pasa a ROOM_RELEASED y publica OccurrenceVacated")
     void releaseCambiaEstadoYPublicaEvento() {
         Occurrence occurrence = occurrence(10L, OccurrenceStatus.NEEDS_ROOM);
@@ -65,7 +95,7 @@ class OccurrenceServiceImplTest {
         service.release(10L);
 
         assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.ROOM_RELEASED);
-        verify(eventPublisher).publishEvent(eq(new OccurrenceVacated(10L)));
+        verify(eventPublisher).publishEvent(eq(new OccurrenceVacated(10L, null)));
     }
 
     @Test

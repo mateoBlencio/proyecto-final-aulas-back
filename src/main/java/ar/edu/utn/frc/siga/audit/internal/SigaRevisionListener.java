@@ -29,6 +29,7 @@ public class SigaRevisionListener implements RevisionListener {
         if (operation != null) {
             revision.setOperacionId(operation.id());
             revision.setDescripcion(operation.description());
+            revision.setParentOperationId(operation.parentId());
         }
     }
 }

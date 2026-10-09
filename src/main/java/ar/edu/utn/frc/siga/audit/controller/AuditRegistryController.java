@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.audit.model.ActorType;
 import ar.edu.utn.frc.siga.audit.model.RevisionKind;
 import ar.edu.utn.frc.siga.audit.dto.AuditLogFilter;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditLogEntryDto;
+import ar.edu.utn.frc.siga.audit.dto.response.AuditOperationChainDto;
 import ar.edu.utn.frc.siga.audit.service.AuditRegistryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -91,6 +92,21 @@ public class AuditRegistryController {
         log.debug("GET /v1/audit/operations/{}", operationId);
         return ResponseEntity.ok(auditRegistryService.findOperationItems(
                 operationId, new AuditLogFilter(from, to, user, entityType, kind, actor, q), pageable));
+    }
+
+    @GetMapping("/operations/{operationId}/chain")
+    @Operation(summary = "Cadena de causa y efecto de una operación",
+               description = "Operaciones (type=OPERATION) de la cadena que contiene a operationId: la raíz, sus "
+                       + "descendientes y la propia operación, hasta 10 niveles y 200 operaciones. Ordenadas por "
+                       + "revisión ascendente (la causa primero). Sin filtros ni paginación. 'truncated' es true si "
+                       + "la cadena está incompleta: se cortó a las 200 operaciones, o el recorrido llegó a los 10 "
+                       + "niveles sin alcanzar la raíz real (la que no tiene padre) o las hojas. Si el operationId "
+                       + "no existe, 'entries' es [] y 'truncated' false. "
+                       + "Cada entrada trae 'parentOperationId' con la operación que la causó; el detalle de "
+                       + "cada una está en /audit/operations/{operationId}.")
+    public ResponseEntity<AuditOperationChainDto> findOperationChain(@PathVariable String operationId) {
+        log.debug("GET /v1/audit/operations/{}/chain", operationId);
+        return ResponseEntity.ok(auditRegistryService.findOperationChain(operationId));
     }
 
     @GetMapping("/revisions/{revision}")
