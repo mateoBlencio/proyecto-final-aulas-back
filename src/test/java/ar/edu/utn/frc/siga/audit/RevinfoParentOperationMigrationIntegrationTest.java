@@ -22,7 +22,7 @@ class RevinfoParentOperationMigrationIntegrationTest extends AbstractIntegration
     void columnExists() {
         List<Map<String, Object>> columns = jdbcTemplate.queryForList(
                 "SELECT data_type, character_maximum_length, is_nullable FROM information_schema.columns "
-                        + "WHERE table_name = 'revinfo' AND column_name = 'operacion_padre_id'");
+                        + "WHERE table_schema = 'public' AND table_name = 'revinfo' AND column_name = 'operacion_padre_id'");
 
         assertThat(columns).hasSize(1);
         assertThat(columns.getFirst().get("data_type")).isEqualTo("character varying");

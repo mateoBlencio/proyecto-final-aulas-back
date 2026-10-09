@@ -36,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AuditOperationCoverageTest {
 
     private static final List<String> PACKAGES = List.of(
+            "ar.edu.utn.frc.siga.audit",
             "ar.edu.utn.frc.siga.allocation",
             "ar.edu.utn.frc.siga.auth",
             "ar.edu.utn.frc.siga.events",
@@ -56,6 +57,13 @@ class AuditOperationCoverageTest {
             Map.entry("RefreshTokenServiceImpl#refresh", "refresh tokens are not @Audited"),
             Map.entry("RefreshTokenServiceImpl#revoke", "refresh tokens are not @Audited"),
             Map.entry("RefreshTokenServiceImpl#revokeAllByUserId", "refresh tokens are not @Audited"),
+            Map.entry("AuditArchiveScheduler#archive",
+                    "only delegates to AuditArchiveServiceImpl.archive, which carries the annotation"),
+            Map.entry("AuditArchiveRepository#archiveBatch",
+                    "writes the _aud tables by JDBC (Envers does not see it); runs inside AuditArchiveServiceImpl.archive,"
+                            + " whose AuditArchiveRun record carries the operation"),
+            Map.entry("AuditArchiveRepository#tryLock",
+                    "propagation MANDATORY, only takes an advisory lock and writes nothing"),
             Map.entry("ClassroomAllocationLock#lock", "propagation MANDATORY, only takes an advisory lock and writes nothing"),
             Map.entry("IngestRowResolver#resolveRefs",
                     "runs inside IngestServiceImpl.ingestFile, which opens the operation"),

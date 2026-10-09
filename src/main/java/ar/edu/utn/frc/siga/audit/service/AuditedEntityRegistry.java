@@ -27,17 +27,18 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AuditedEntityRegistry {
 
-    private static final Map<String, String> LABELS = Map.of(
-            "Allocation", "Asignación",
-            "User", "Usuario",
-            "RoleAssignment", "Asignación de rol",
-            "AcademicEvent", "Evento académico",
-            "Occurrence", "Ocurrencia",
-            "RoomRequest", "Solicitud de aula",
-            "RoomRequestItem", "Ítem de solicitud de aula",
-            "RoomPreference", "Preferencia de aula",
-            "RoomRequestItemAllocation", "Asignación de solicitud de aula",
-            "Setting", "Configuración");
+    private static final Map<String, String> LABELS = Map.ofEntries(
+            Map.entry("Allocation", "Asignación"),
+            Map.entry("User", "Usuario"),
+            Map.entry("RoleAssignment", "Asignación de rol"),
+            Map.entry("AcademicEvent", "Evento académico"),
+            Map.entry("Occurrence", "Ocurrencia"),
+            Map.entry("RoomRequest", "Solicitud de aula"),
+            Map.entry("RoomRequestItem", "Ítem de solicitud de aula"),
+            Map.entry("RoomPreference", "Preferencia de aula"),
+            Map.entry("RoomRequestItemAllocation", "Asignación de solicitud de aula"),
+            Map.entry("Setting", "Configuración"),
+            Map.entry("AuditArchiveRun", "Archivado de auditoría"));
 
     // Audited properties never shown in the diff.
     private static final Map<String, Set<String>> EXCLUDED_PROPERTIES = Map.of(

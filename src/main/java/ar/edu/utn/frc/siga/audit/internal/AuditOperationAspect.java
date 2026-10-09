@@ -35,7 +35,12 @@ public class AuditOperationAspect {
         try {
             result = joinPoint.proceed();
         } catch (Throwable t) {
-            AuditOperationContext.end();
+            // A description set before the failure (e.g. "failed after N rows") still applies to the
+            // revisions committed by earlier REQUIRES_NEW steps; if everything rolled back it updates 0 rows.
+            AuditOperationContext.PendingDescription failed = AuditOperationContext.end();
+            if (failed != null) {
+                descriptionUpdater.update(failed.operationId(), failed.description());
+            }
             throw t;
         }
         // The aspect has the highest precedence: the method transaction (and any REQUIRES_NEW one) is

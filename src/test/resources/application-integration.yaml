@@ -28,6 +28,9 @@ cors:
     - http://localhost:5173
 
 siga:
+  audit:
+    archive:
+      enabled: false
   solver:
     unimproved-seconds-limit: 1
   jwt:

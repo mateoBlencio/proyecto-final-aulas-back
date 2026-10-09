@@ -180,15 +180,16 @@ class AuditLateDescriptionIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("si el método falla después del describe, las revisiones commiteadas conservan la descripción inicial")
-    void failingMethodKeepsInitialDescription() {
+    @DisplayName("si el método falla después del describe, las revisiones ya commiteadas toman la descripción final")
+    void failingMethodAppliesTheFinalDescriptionToCommittedRevisions() {
         rememberOriginals();
         int before = maxRevision();
+        String finalText = uniqueText();
 
-        assertThatThrownBy(() -> describer.writeTwiceDescribeThenFail(uniqueText()))
+        assertThatThrownBy(() -> describer.writeTwiceDescribeThenFail(finalText))
                 .isInstanceOf(IllegalStateException.class);
 
-        assertThat(operationDescriptionsAfter(before)).containsExactly(INITIAL, INITIAL);
+        assertThat(operationDescriptionsAfter(before)).containsExactly(finalText, finalText);
     }
 
     @Test

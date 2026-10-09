@@ -190,15 +190,24 @@ class AuditOperationAspectTest {
     }
 
     @Test
-    @DisplayName("si el método falla después de un describe tardío no reescribe la descripción y propaga la excepción")
-    void failingMethodDoesNotCallUpdater() {
+    @DisplayName("si el método falla después de un describe tardío reescribe igual la descripción de lo ya commiteado y propaga la excepción")
+    void failingMethodAfterLateDescribeStillCallsUpdater() {
         Target target = new Target();
 
         assertThatThrownBy(() -> proxied(target).describeAfterStampThenFail())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("boom");
 
-        verifyNoInteractions(updater);
+        verify(updater).update(target.seen.id(), "Final");
         assertThat(AuditOperationContext.current()).isNull();
+    }
+
+    @Test
+    @DisplayName("si el método falla sin haber descrito nada el updater no se llama")
+    void failingMethodWithoutDescribeDoesNotCallUpdater() {
+        assertThatThrownBy(() -> proxied(new Target()).fail(new Cause("parent-op-1")))
+                .isInstanceOf(IllegalStateException.class);
+
+        verifyNoInteractions(updater);
     }
 }

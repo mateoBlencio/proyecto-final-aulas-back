@@ -99,6 +99,10 @@ siga:
   audit:
     export:
       max-rows: 10000
+    archive:
+      enabled: ${AUDIT_ARCHIVE_ENABLED:false}
+      cron: "0 0 4 * * SAT"
+      batch-size: 5000
   room-requests:
     expiry:
       cron: "0 0 7 * * *"

@@ -1,0 +1,32 @@
+meta {
+  name: Archivar auditoría antigua
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/v1/audit/archive
+  body: none
+  auth: inherit
+}
+
+docs {
+  Mueve al schema "archivo" las revisiones de ocurrencias y asignaciones anteriores
+  al inicio del ciclo lectivo previo al actual, y las borra de las tablas activas.
+  Espera a que termine (request síncrona): la primera corrida sobre una base con historial
+  grande conviene lanzarla con el cron, porque puede tardar y un proxy puede cortar la request.
+  Requiere PERM_AUDIT_ARCHIVE (solo SUBSECRETARIA).
+  Funciona aunque siga.audit.archive.enabled (el cron) esté apagado.
+
+  Respuesta 200: outcome, retainedFromCycle, cutoff, occurrenceRows, allocationRows,
+  deletedRevisions.
+  outcome: COMPLETED, NOTHING_TO_ARCHIVE, NO_PERIODS (faltan períodos académicos
+  para calcular el corte), INVALID_PERIODS (las fechas dan un corte posterior al inicio del
+  ciclo actual o a menos de 12 meses) o STOPPED_BY_CONCURRENT_RUN (otra corrida tenía el lock).
+
+  Si un lote falla, la request responde con error, lo ya movido queda archivado y la corrida
+  queda con estado FAILED y el mensaje del error; la siguiente corrida retoma.
+
+  Cada corrida que mueve filas queda en GET /v1/audit como entrada OPERATION
+  "Archivado de auditoría" (entityType "Archivado de auditoría").
+}
