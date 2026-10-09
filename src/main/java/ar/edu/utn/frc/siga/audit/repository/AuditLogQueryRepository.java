@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -133,7 +134,7 @@ public class AuditLogQueryRepository {
             restrictions.add("(r.operacion_id IS NULL AND r." + REV + " IN (:revisions))");
             aggParams.addValue("revisions", revisions);
         }
-        String union = unionBranches(criteria, aggParams, "(" + String.join(" OR ", restrictions) + ")");
+        String union = unionBranches(criteria, aggParams, target -> "(" + String.join(" OR ", restrictions) + ")");
         String aggSql = "SELECT c.operacion_id, MAX(c.rev) AS revision, MAX(c.fecha_revision) AS fecha, "
                 + "MAX(c.usuario) AS usuario, MAX(c.tipo_actor) AS tipo_actor, MAX(c.descripcion) AS descripcion, MAX(c.operacion_padre_id) AS operacion_padre_id, COUNT(*) AS record_count, "
                 + "MIN(c.revtype) AS min_revtype, MAX(c.revtype) AS max_revtype, "
@@ -169,14 +170,14 @@ public class AuditLogQueryRepository {
 
     public long countChanges(AuditLogCriteria criteria, ChangeScope scope) {
         MapSqlParameterSource params = new MapSqlParameterSource();
-        String sql = "SELECT COUNT(*) FROM (" + unionBranches(criteria, params, scopeRestriction(scope, params)) + ") c";
+        String sql = "SELECT COUNT(*) FROM (" + unionBranches(criteria, params, target -> scopeRestriction(scope, target, params)) + ") c";
         Long total = jdbc.queryForObject(sql, params, Long.class);
         return total == null ? 0 : total;
     }
 
     public List<AuditChangeRow> findChanges(AuditLogCriteria criteria, ChangeScope scope, Pageable pageable) {
         MapSqlParameterSource params = new MapSqlParameterSource();
-        String sql = "SELECT c.* FROM (" + unionBranches(criteria, params, scopeRestriction(scope, params)) + ") c "
+        String sql = "SELECT c.* FROM (" + unionBranches(criteria, params, target -> scopeRestriction(scope, target, params)) + ") c "
                 + "ORDER BY c.rev DESC, c.entity_idx, c.record_id LIMIT :limit OFFSET :offset";
         params.addValue("limit", pageable.getPageSize());
         params.addValue("offset", pageable.getOffset());
@@ -211,21 +212,30 @@ public class AuditLogQueryRepository {
                 + " GROUP BY r.operacion_id, CASE WHEN r.operacion_id IS NULL THEN r." + REV + " END";
     }
 
-    private String unionBranches(AuditLogCriteria criteria, MapSqlParameterSource params, String extraRestriction) {
+    private String unionBranches(AuditLogCriteria criteria, MapSqlParameterSource params,
+                                Function<AuditedEntity, String> extraRestriction) {
         String revFilters = revisionFilters(criteria, params);
         return criteria.targets().stream()
                 .map(target -> "SELECT r." + REV + ", r.fecha_revision, r.usuario, r.tipo_actor, r.descripcion, r.operacion_id, r.operacion_padre_id, "
                         + "x." + REVTYPE + ", CAST(x." + target.idColumn() + " AS varchar) AS record_id, "
                         + registry.indexOf(target) + " AS entity_idx "
                         + "FROM revinfo r JOIN " + target.auditTable() + " x ON x." + REV + " = r." + REV
-                        + " WHERE " + revFilters + rowFilter(criteria, params) + " AND " + extraRestriction)
+                        + " WHERE " + revFilters + rowFilter(criteria, params) + " AND " + extraRestriction.apply(target))
                 .collect(Collectors.joining(" UNION ALL "));
     }
 
-    private static String scopeRestriction(ChangeScope scope, MapSqlParameterSource params) {
+    private static String scopeRestriction(ChangeScope scope, AuditedEntity target, MapSqlParameterSource params) {
         if (scope.operationId() != null) {
             params.addValue("scopeOperationId", scope.operationId());
             return "r.operacion_id = :scopeOperationId";
+        }
+        if (scope.entity() != null) {
+            // Only the branch of the scoped entity can match; the others use their own id column, which may not exist here.
+            if (!target.equals(scope.entity())) {
+                return "FALSE";
+            }
+            params.addValue("scopeRecordId", scope.recordId());
+            return "x." + target.idColumn() + " = :scopeRecordId";
         }
         params.addValue("scopeRevision", scope.revision());
         return "r." + REV + " = :scopeRevision";

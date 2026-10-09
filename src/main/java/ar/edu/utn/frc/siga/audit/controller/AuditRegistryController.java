@@ -132,6 +132,25 @@ public class AuditRegistryController {
                 revision, new AuditLogFilter(from, to, user, entityType, kind, actor, q), pageable));
     }
 
+    @GetMapping("/entities/{entityType}/{recordId}")
+    @Operation(summary = "Historial de un registro",
+               description = "Cambios (type=CHANGE) de un único registro a lo largo de todas sus revisiones, con el "
+                       + "diff por campo en 'changes', paginados y ordenados por revisión descendente. "
+                       + "'entityType' es una etiqueta de GET /v1/audit/entity-types tal cual (con espacios y "
+                       + "acentos, codificada en la URL por el cliente, por ejemplo 'Asignaci%C3%B3n%20de%20rol'); "
+                       + "'recordId' es el id del registro. Página vacía si el registro no tiene revisiones "
+                       + "(incluye ids que nunca existieron). 400 si 'entityType' no es un tipo conocido o si "
+                       + "'recordId' no tiene el formato del id de la entidad (por ejemplo, texto para un id numérico). "
+                       + "Convive con /v1/allocations/history y el historial de eventos, que piden otros permisos "
+                       + "y devuelven snapshots tipados.")
+    public ResponseEntity<Page<AuditLogEntryDto>> findEntityHistory(
+            @PathVariable String entityType,
+            @PathVariable String recordId,
+            @PageableDefault(size = 20) Pageable pageable) {
+        log.debug("GET /v1/audit/entities/{}/{}", entityType, recordId);
+        return ResponseEntity.ok(auditRegistryService.findEntityHistory(entityType, recordId, pageable));
+    }
+
     @GetMapping("/entity-types")
     @Operation(summary = "Tipos de entidad auditados",
                description = "Etiquetas de dominio aceptadas por el parámetro 'entityType' de "

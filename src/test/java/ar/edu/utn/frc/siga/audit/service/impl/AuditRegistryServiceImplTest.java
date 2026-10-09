@@ -433,6 +433,73 @@ class AuditRegistryServiceImplTest {
     }
 
     @Test
+    @DisplayName("findEntityHistory resuelve la entidad por etiqueta, pasa ChangeScope.ofRecord y un criteria con ese único target")
+    void findEntityHistory_usesRecordScopeAndSingleTarget() {
+        when(repository.countChanges(any(), any())).thenReturn(0L);
+
+        service.findEntityHistory("Asignación", "7", PageRequest.of(0, 10));
+
+        ArgumentCaptor<AuditLogCriteria> countCriteria = ArgumentCaptor.forClass(AuditLogCriteria.class);
+        ArgumentCaptor<AuditLogCriteria> findCriteria = ArgumentCaptor.forClass(AuditLogCriteria.class);
+        verify(repository).countChanges(countCriteria.capture(),
+                org.mockito.ArgumentMatchers.eq(ChangeScope.ofRecord(ALLOCATION, "7")));
+        verify(repository).findChanges(findCriteria.capture(),
+                org.mockito.ArgumentMatchers.eq(ChangeScope.ofRecord(ALLOCATION, "7")), any());
+        assertThat(List.of(countCriteria.getValue(), findCriteria.getValue())).allSatisfy(criteria -> {
+            assertThat(criteria.targets()).containsExactly(ALLOCATION);
+            assertThat(criteria.from()).isNull();
+            assertThat(criteria.toExclusive()).isNull();
+            assertThat(criteria.user()).isNull();
+            assertThat(criteria.kind()).isNull();
+            assertThat(criteria.actor()).isNull();
+            assertThat(criteria.q()).isNull();
+        });
+    }
+
+    @Test
+    @DisplayName("findEntityHistory resuelve 'Configuración' con un id de texto y lo pasa a ofRecord con la entidad de Setting")
+    void findEntityHistory_convertsIdToEntityIdType() {
+        when(repository.countChanges(any(), any())).thenReturn(0L);
+
+        service.findEntityHistory("Configuración", "events.hours.end", PageRequest.of(0, 10));
+
+        verify(repository).findChanges(any(),
+                org.mockito.ArgumentMatchers.eq(ChangeScope.ofRecord(SETTING, "events.hours.end")), any());
+    }
+
+    @Test
+    @DisplayName("findEntityHistory mapea las filas a CHANGE con el total del count y el diff calculado")
+    void findEntityHistory_mapsRowsToChanges() {
+        RevisionMetadata row = new RevisionMetadata("7", 30, DATE, "user@frc", ActorType.HUMAN, RevisionKind.MODIFIED,
+                "Edición", null);
+        when(repository.countChanges(any(), any())).thenReturn(5L);
+        when(repository.findChanges(any(), any(), any())).thenReturn(List.of(new AuditChangeRow(row, ALLOCATION)));
+
+        Page<AuditLogEntryDto> page = service.findEntityHistory("Asignación", "7", PageRequest.of(0, 1));
+
+        assertThat(page.getTotalElements()).isEqualTo(5);
+        assertThat(page.getContent()).singleElement().satisfies(entry -> {
+            assertThat(entry.type()).isEqualTo(AuditLogEntryType.CHANGE);
+            assertThat(entry.entityType()).isEqualTo("Asignación");
+            assertThat(entry.recordId()).isEqualTo("7");
+            assertThat(entry.revision()).isEqualTo(30);
+        });
+        verify(stateRepository).load(any());
+    }
+
+    @Test
+    @DisplayName("findEntityHistory con una etiqueta desconocida o un id no convertible lanza InvalidSelectionException sin consultar")
+    void findEntityHistory_invalidInput_throwsWithoutQuerying() {
+        assertThatThrownBy(() -> service.findEntityHistory("NoExiste", "1", PageRequest.of(0, 10)))
+                .isInstanceOf(InvalidSelectionException.class);
+        assertThatThrownBy(() -> service.findEntityHistory("Asignación", "abc", PageRequest.of(0, 10)))
+                .isInstanceOf(InvalidSelectionException.class);
+
+        verifyNoInteractions(repository);
+        verifyNoInteractions(stateRepository);
+    }
+
+    @Test
     @DisplayName("los drill-downs aplican los filtros: entityType acota targets y las fechas llegan al criterio")
     void drillDowns_applyFilters() {
         AuditLogFilter f = new AuditLogFilter(LocalDate.of(2026, 2, 1), LocalDate.of(2026, 2, 1), null,

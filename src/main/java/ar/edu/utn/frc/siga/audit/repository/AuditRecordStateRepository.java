@@ -16,7 +16,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -73,7 +72,7 @@ public class AuditRecordStateRepository {
         List<Object[]> idsAndRevisions = new ArrayList<>();
         for (RecordRevision key : keys) {
             keyByRecord.put(key.recordId() + "@" + key.revision(), key);
-            idsAndRevisions.add(new Object[]{convertId(key.recordId(), entity.idType()), key.revision()});
+            idsAndRevisions.add(new Object[]{entity.convertId(key.recordId()), key.revision()});
         }
         String sql = select.append(from).append(" WHERE (cur." + id + ", cur.rev) IN (:keys)").toString();
 
@@ -87,22 +86,6 @@ public class AuditRecordStateRepository {
             RecordRevision key = keyByRecord.get(rs.getString("record_id") + "@" + rs.getInt("rev"));
             result.put(key, new RecordStates(current, previous));
         });
-    }
-
-    private static Object convertId(String recordId, Class<?> idType) {
-        if (idType == Long.class) {
-            return Long.valueOf(recordId);
-        }
-        if (idType == Integer.class) {
-            return Integer.valueOf(recordId);
-        }
-        if (idType == UUID.class) {
-            return UUID.fromString(recordId);
-        }
-        if (idType == String.class) {
-            return recordId;
-        }
-        throw new IllegalStateException("Tipo de identificador no soportado: " + idType.getName());
     }
 
     private static Object normalize(Object value) {

@@ -1203,4 +1203,164 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
             deleteRevisions(revisions);
         }
     }
+
+    // ---- GET /v1/audit/entities/{entityType}/{recordId} ----
+
+    private static final String ENTITY_HISTORY = "/v1/audit/entities/{entityType}/{recordId}";
+
+    /** Seeds a recurring event and releases its occurrence: the occurrence ends with a creation and a modification. */
+    private long occurrenceWithTwoRevisions(int daysAhead) throws Exception {
+        seedRecurringEvent(LocalDate.now().plusDays(daysAhead));
+        long occurrenceId = jdbcTemplate.queryForObject(
+                "SELECT MAX(id_ocurrencia) FROM ocurrencia_aud WHERE revtype = 0", Long.class);
+        mockMvc.perform(post("/v1/events/occurrences/{id}/release", occurrenceId)).andExpect(status().is2xxSuccessful());
+        return occurrenceId;
+    }
+
+    private List<Integer> revisionsOf(JsonNode page) {
+        List<Integer> revisions = new ArrayList<>();
+        page.get("content").forEach(item -> revisions.add(item.get("revision").asInt()));
+        return revisions;
+    }
+
+    @Test
+    @DisplayName("la configuración modificada dos veces trae sus revisiones en orden descendente y nada de otras claves")
+    void entityHistory_settingModifiedTwice_returnsOnlyThatKeyDescending() throws Exception {
+        SettingKey key = SettingKey.EVENTS_HOURS_END;
+        String current = settingsStore.getRaw(key);
+        originalSettings.putIfAbsent(key, current);
+        List<String> candidates = List.of("21:20", "21:21", "21:22").stream().filter(v -> !v.equals(current)).toList();
+        String a = candidates.get(0);
+        String b = candidates.get(1);
+        bumpSetting(a);
+        bumpSetting(b);
+        writeSettingsInOneTransaction(SettingKey.OPTIMIZER_WEIGHT_OVERCROWDING);
+        List<Integer> expectedRevisions = jdbcTemplate.queryForList(
+                "SELECT rev FROM configuracion_aud WHERE clave = ? ORDER BY rev DESC", Integer.class, key.getKey());
+
+        JsonNode page = json(mockMvc, get(ENTITY_HISTORY, "Configuración", key.getKey()).param("size", "100"));
+
+        assertThat(expectedRevisions.size()).isGreaterThanOrEqualTo(2);
+        assertThat(revisionsOf(page)).containsExactlyElementsOf(expectedRevisions);
+        assertThat(page.get("page").get("totalElements").asLong()).isEqualTo(expectedRevisions.size());
+        page.get("content").forEach(item -> {
+            assertThat(item.get("type").asText()).isEqualTo("CHANGE");
+            assertThat(item.get("entityType").asText()).isEqualTo("Configuración");
+            assertThat(item.get("recordId").asText()).isEqualTo(key.getKey());
+        });
+        assertThat(changeSummary(page.get("content").get(0))).containsExactly("value:" + a + ":" + b);
+        assertThat(changeSummary(page.get("content").get(1)).getFirst()).endsWith(":" + a);
+    }
+
+    @Test
+    @DisplayName("la historia de una ocurrencia: totalElements igual al count de ocurrencia_aud, todos con recordId igual al id y con diff")
+    void entityHistory_occurrence_matchesAuditTableAndCarriesDiff() throws Exception {
+        long occurrenceId = occurrenceWithTwoRevisions(80);
+        long expected = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM ocurrencia_aud WHERE id_ocurrencia = ?", Long.class, occurrenceId);
+
+        JsonNode page = json(mockMvc, get(ENTITY_HISTORY, "Ocurrencia", occurrenceId).param("size", "100"));
+
+        assertThat(expected).isGreaterThanOrEqualTo(2);
+        assertThat(page.get("page").get("totalElements").asLong()).isEqualTo(expected);
+        assertThat(page.get("content")).hasSize((int) expected);
+        page.get("content").forEach(item -> {
+            assertThat(item.get("recordId").asText()).isEqualTo(String.valueOf(occurrenceId));
+            assertThat(item.get("entityType").asText()).isEqualTo("Ocurrencia");
+            assertThat(item.get("changes").isArray()).isTrue();
+            assertThat(item.get("changes")).isNotEmpty();
+        });
+        assertThat(changeSummary(page.get("content").get(0))).containsExactly("status:NEEDS_ROOM:ROOM_RELEASED");
+    }
+
+    @Test
+    @DisplayName("un id no numérico para una entidad con id numérico responde 400")
+    void entityHistory_nonNumericId_returns400() throws Exception {
+        mockMvc.perform(get(ENTITY_HISTORY, "Ocurrencia", "abc")).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("un entityType desconocido responde 400")
+    void entityHistory_unknownEntityType_returns400() throws Exception {
+        mockMvc.perform(get(ENTITY_HISTORY, "Inexistente", "1")).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("un id numérico que nunca existió responde 200 con página vacía")
+    void entityHistory_idThatNeverExisted_returnsEmptyPage() throws Exception {
+        mockMvc.perform(get(ENTITY_HISTORY, "Ocurrencia", 987654321L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(0)))
+                .andExpect(jsonPath("$.page.totalElements").value(0));
+        mockMvc.perform(get(ENTITY_HISTORY, "Configuración", "no.existe.clave"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(0)));
+    }
+
+    @Test
+    @DisplayName("un AUXILIAR_AULICO, sin PERM_AUDIT_READ, recibe 403")
+    void entityHistory_forbiddenWithoutAuditPermission() throws Exception {
+        MockMvc auxMockMvc = mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
+
+        auxMockMvc.perform(get(ENTITY_HISTORY, "Ocurrencia", 1)).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("'Asignación de rol' con espacios y acento, codificada en la URL, se decodifica y devuelve la historia del registro")
+    void entityHistory_labelWithSpacesAndAccent_isDecodedFromTheUrl() throws Exception {
+        long userId = createUser(uniqueUserEmail(), true);
+        long assignmentId = jdbcTemplate.queryForObject(
+                "SELECT id_usuario_rol FROM usuario_rol WHERE id_usuario = ?", Long.class, userId);
+
+        MvcResult result = mockMvc.perform(get(ENTITY_HISTORY, "Asignación de rol", assignmentId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].entityType").value("Asignación de rol"))
+                .andExpect(jsonPath("$.content[0].kind").value("CREATED"))
+                .andExpect(jsonPath("$.content[0].recordId").value(String.valueOf(assignmentId)))
+                .andReturn();
+
+        // Proves the template variable was percent-encoded on the wire, so the controller really decoded it.
+        assertThat(result.getRequest().getRequestURI())
+                .contains("Asignaci%C3%B3n%20de%20rol")
+                .doesNotContain(" ");
+    }
+
+    @Test
+    @DisplayName("'Evento académico' codificada en la URL devuelve la historia del evento, que incluye la subclase")
+    void entityHistory_academicEventLabel_isDecodedFromTheUrl() throws Exception {
+        seedRecurringEvent(LocalDate.now().plusDays(90));
+        long eventId = jdbcTemplate.queryForObject("SELECT MAX(id_evento_academico) FROM evento_recurrente_aud", Long.class);
+        long expected = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM evento_academico_aud WHERE id_evento_academico = ?", Long.class, eventId);
+
+        MvcResult result = mockMvc.perform(get(ENTITY_HISTORY, "Evento académico", eventId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(expected))
+                .andExpect(jsonPath("$.content[0].entityType").value("Evento académico"))
+                .andExpect(jsonPath("$.content[0].recordId").value(String.valueOf(eventId)))
+                .andReturn();
+
+        assertThat(result.getRequest().getRequestURI()).contains("Evento%20acad%C3%A9mico");
+    }
+
+    @Test
+    @DisplayName("size=1 sobre un registro con dos revisiones da el totalElements correcto y la página 2 distinta de la 1")
+    void entityHistory_pagination_secondPageDiffersFromFirst() throws Exception {
+        long occurrenceId = occurrenceWithTwoRevisions(100);
+        long total = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM ocurrencia_aud WHERE id_ocurrencia = ?", Long.class, occurrenceId);
+
+        JsonNode first = json(mockMvc, get(ENTITY_HISTORY, "Ocurrencia", occurrenceId).param("size", "1").param("page", "0"));
+        JsonNode second = json(mockMvc, get(ENTITY_HISTORY, "Ocurrencia", occurrenceId).param("size", "1").param("page", "1"));
+
+        assertThat(total).isGreaterThanOrEqualTo(2);
+        assertThat(first.get("page").get("totalElements").asLong()).isEqualTo(total);
+        assertThat(second.get("page").get("totalElements").asLong()).isEqualTo(total);
+        assertThat(first.get("content")).hasSize(1);
+        assertThat(second.get("content")).hasSize(1);
+        int firstRevision = first.get("content").get(0).get("revision").asInt();
+        int secondRevision = second.get("content").get(0).get("revision").asInt();
+        assertThat(secondRevision).isLessThan(firstRevision);
+    }
 }
