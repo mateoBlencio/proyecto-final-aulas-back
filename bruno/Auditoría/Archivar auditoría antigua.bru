@@ -24,6 +24,9 @@ docs {
   para calcular el corte), INVALID_PERIODS (las fechas dan un corte posterior al inicio del
   ciclo actual o a menos de 12 meses) o STOPPED_BY_CONCURRENT_RUN (otra corrida tenía el lock).
 
+  Si un lote falla, la request responde con error, lo ya movido queda archivado y la corrida
+  queda con estado FAILED y el mensaje del error; la siguiente corrida retoma.
+
   Cada corrida que mueve filas queda en GET /v1/audit como entrada OPERATION
   "Archivado de auditoría" (entityType "Archivado de auditoría").
 }
