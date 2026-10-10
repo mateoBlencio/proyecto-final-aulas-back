@@ -7,7 +7,7 @@ import java.util.List;
 
 public record DashboardReportResponseDto(
         YearMonth month, LocalDate from, LocalDate to,
-        Instant generatedAt, String generatedBy, String regenerationReason,
+        Instant generatedAt, String generatedBy, String regenerationReason, boolean regenerated,
         int schemaVersion, boolean restrictedScope,
         DashboardParametersResponseDto parameters,
         ReportCampusResponseDto campus,

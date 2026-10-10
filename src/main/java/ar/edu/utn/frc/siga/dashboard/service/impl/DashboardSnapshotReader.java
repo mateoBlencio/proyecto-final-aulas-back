@@ -107,7 +107,9 @@ public class DashboardSnapshotReader {
             campusDto = reportCampus(sum.metrics(), null, sum.requests(), null, campus);
         }
         return new DashboardReportResponseDto(month, campus.from(), campus.to(), campusRow.snapshot().getGeneratedAt(),
-                campusRow.snapshot().getGeneratedBy(), campusRow.snapshot().getRegenerationReason(),
+                scope.isUnrestricted() ? campusRow.snapshot().getGeneratedBy() : null,
+                scope.isUnrestricted() ? campusRow.snapshot().getRegenerationReason() : null,
+                campusRow.snapshot().getRegenerationReason() != null,
                 campusRow.snapshot().getSchemaVersion(), !scope.isUnrestricted(), parameters, campusDto, buildings);
     }
 
