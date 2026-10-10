@@ -189,6 +189,7 @@ siga:
       allocations: "0 0 3 * * SUN"
       subjects: "0 0 3 * * SUN"
       commissions: "0 0 3 * * SUN"
+      holidays: "0 0 3 * * SUN"
   notifications:
     max-attempts: 5
     retry-interval: PT1M

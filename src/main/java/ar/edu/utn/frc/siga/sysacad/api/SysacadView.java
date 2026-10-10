@@ -7,5 +7,6 @@ public enum SysacadView {
     MATERIAS,
     COMISIONES,
     EVENTOS,
-    ASIGNACIONES
+    ASIGNACIONES,
+    FERIADOS
 }
