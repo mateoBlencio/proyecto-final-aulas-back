@@ -78,7 +78,7 @@
       "name": "graphify",
       "command": ".venv/bin/graphify",
       "usedBy": "CLAUDE.md (graphify), MCP graphify, hooks hook-guard",
-      "install": "python3 -m venv .venv && .venv/bin/pip install graphifyy==0.9.64"
+      "install": "python3 -m venv .venv && .venv/bin/pip install 'graphifyy[sql]==0.9.64'"
     },
     {
       "name": "headroom",
