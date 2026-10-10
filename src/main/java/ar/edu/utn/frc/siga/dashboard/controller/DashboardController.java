@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.dashboard.controller;
 
+import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardBadgesResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardWeekResponseDto;
 import ar.edu.utn.frc.siga.dashboard.service.DashboardQueryService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,5 +34,15 @@ public class DashboardController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekOf) {
         log.debug("GET /v1/dashboard/week?weekOf={}", weekOf);
         return ResponseEntity.ok(queryService.week(weekOf));
+    }
+
+    @GetMapping("/badges")
+    @PreAuthorize("hasAuthority('PERM_DASHBOARD_READ')")
+    @Operation(summary = "Contadores del menú",
+               description = "Solicitudes que esperan acción del usuario, solicitudes por vencer en 48 horas, "
+                       + "clases sin aula y conflictos en los próximos 7 días. Liviano: se puede consultar cada minuto.")
+    public ResponseEntity<DashboardBadgesResponseDto> badges() {
+        log.debug("GET /v1/dashboard/badges");
+        return ResponseEntity.ok(queryService.badges());
     }
 }

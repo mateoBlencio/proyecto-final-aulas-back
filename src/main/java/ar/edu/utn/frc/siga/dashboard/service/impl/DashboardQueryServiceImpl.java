@@ -6,6 +6,7 @@ import static java.time.temporal.TemporalAdjusters.previousOrSame;
 import ar.edu.utn.frc.siga.common.security.BuildingScope;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.Permission;
+import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardBadgesResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardWeekResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.ExcludedDayResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.OpenRoomRequestsResponseDto;
@@ -14,6 +15,7 @@ import ar.edu.utn.frc.siga.dashboard.dto.response.WeekBuildingResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.WeekCampusResponseDto;
 import ar.edu.utn.frc.siga.dashboard.model.AllocationUnitRow;
 import ar.edu.utn.frc.siga.dashboard.model.BuildingRoomsRow;
+import ar.edu.utn.frc.siga.dashboard.model.CategoryCounts;
 import ar.edu.utn.frc.siga.dashboard.model.PeriodMetrics;
 import ar.edu.utn.frc.siga.dashboard.model.PendingItemRow;
 import ar.edu.utn.frc.siga.dashboard.model.ScopeMetrics;
@@ -41,7 +43,11 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class DashboardQueryServiceImpl implements DashboardQueryService {
 
+    private static final String NEW = "NEW";
     private static final String DERIVED_TO_BUILDING = "DERIVED_TO_BUILDING";
+    private static final String IN_EVALUATION = "IN_EVALUATION";
+    private static final int EXPIRING_SOON_HOURS = 48;
+    private static final int BADGE_WINDOW_DAYS = 7;
 
     private final DashboardMetricsService metricsService;
     private final DashboardReadRepository repository;
@@ -76,6 +82,49 @@ public class DashboardQueryServiceImpl implements DashboardQueryService {
                 .toList();
         return new DashboardWeekResponseDto(monday, monday.plusDays(5), currentWeek, !scope.isUnrestricted(),
                 DashboardDtoMapper.parameters(period.parameters()), excluded, campus, buildings);
+    }
+
+    @Override
+    public DashboardBadgesResponseDto badges() {
+        BuildingScope scope = buildingScopeResolver.scopeFor(Permission.DASHBOARD_READ);
+        LocalDate today = LocalDate.now(clock);
+        List<PendingItemRow> openItems = repository.findOpenItems();
+        PeriodMetrics window = metricsService.compute(today, today.plusDays(BADGE_WINDOW_DAYS - 1), scope);
+
+        long awaiting = openItems.stream().filter(item -> awaitsAction(item, scope)).count();
+        LocalDateTime now = LocalDateTime.now(clock);
+        long expiring = openItems.stream().filter(item -> inScope(item, scope))
+                .filter(item -> expiresWithin(item, now)).count();
+        CategoryCounts categories = window.campus().categories();
+        return new DashboardBadgesResponseDto(awaiting, expiring, window.unallocated(),
+                categories.overlap() + categories.overcrowded());
+    }
+
+    /**
+     * Who acts on each state: without building restriction, NEW and IN_EVALUATION not derived; with
+     * restriction, what was derived to its buildings (DERIVED_TO_BUILDING, or IN_EVALUATION that the building
+     * allocates and notifies).
+     */
+    private static boolean awaitsAction(PendingItemRow item, BuildingScope scope) {
+        if (scope.isUnrestricted()) {
+            return NEW.equals(item.status())
+                    || (IN_EVALUATION.equals(item.status()) && item.derivedBuildingId() == null);
+        }
+        return (DERIVED_TO_BUILDING.equals(item.status()) || IN_EVALUATION.equals(item.status()))
+                && inScope(item, scope);
+    }
+
+    private static boolean inScope(PendingItemRow item, BuildingScope scope) {
+        return scope.isUnrestricted() || (item.derivedBuildingId() != null && scope.allows(item.derivedBuildingId()));
+    }
+
+    /** Dated items only; one without a start time counts until the end of its day. */
+    private static boolean expiresWithin(PendingItemRow item, LocalDateTime now) {
+        if (item.date() == null) {
+            return false;
+        }
+        LocalDateTime start = item.date().atTime(item.startTime() == null ? LocalTime.MAX : item.startTime());
+        return !start.isBefore(now) && !start.isAfter(now.plusHours(EXPIRING_SOON_HOURS));
     }
 
     private WeekBuildingResponseDto weekBuilding(BuildingRoomsRow building, PeriodMetrics period,
