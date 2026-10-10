@@ -19,4 +19,6 @@ public interface SysacadCatalogReader {
     List<SysacadAcademicEventDto> findAcademicEvents();
 
     List<SysacadAllocationDto> findAllocations();
+
+    List<SysacadHolidayDto> findHolidays();
 }

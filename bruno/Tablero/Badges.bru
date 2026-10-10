@@ -1,0 +1,25 @@
+meta {
+  name: Badges
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/v1/dashboard/badges
+  body: none
+  auth: inherit
+}
+
+docs {
+  GET /v1/dashboard/badges. Permiso: PERM_DASHBOARD_READ.
+  Contadores livianos para el menú; se pueden consultar cada minuto.
+
+  - roomRequestsAwaitingAction: sin restricción de edificio, ítems NEW e IN_EVALUATION sin
+    derivar; con restricción, ítems DERIVED_TO_BUILDING e IN_EVALUATION derivados a sus edificios.
+  - roomRequestsExpiringSoon: ítems pendientes con fecha y hora de inicio dentro de las
+    próximas 48 horas. Los cambios regulares (sin fecha) no cuentan.
+  - unallocatedClassesNext7Days: clases sin aula en los próximos 7 días. null para un usuario acotado.
+  - conflictsNext7Days: asignaciones con superposición fuera de tolerancia o sobrecupo en los
+    próximos 7 días, dentro del alcance del usuario.
+  Los días no disponibles (domingo, feriado, receso) no cuentan.
+}

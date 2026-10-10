@@ -254,6 +254,41 @@ class AcademicPeriodServiceImplTest {
     }
 
     @Test
+    @DisplayName("findRecessesBetween: queries ANUAL periods (semester 0) with the range end first and the start second")
+    void findRecessesBetweenQueriesAnnualPeriodsWithRangeBounds() {
+        LocalDate from = LocalDate.of(2026, 7, 6);
+        LocalDate to = LocalDate.of(2026, 7, 10);
+        AcademicPeriod annual = AcademicPeriod.builder()
+                .id(1L).year(2026).semester(0)
+                .startDate(LocalDate.of(2026, 3, 1)).endDate(LocalDate.of(2026, 11, 30))
+                .recessStart(LocalDate.of(2026, 7, 6)).recessEnd(LocalDate.of(2026, 7, 27))
+                .build();
+        // A swapped argument order would not match the stub and the service would return an empty list.
+        when(academicPeriodRepository
+                .findBySemesterAndDeletedAtIsNullAndRecessStartLessThanEqualAndRecessEndGreaterThanEqual(
+                        TermType.ANUAL.getSemester(), to, from))
+                .thenReturn(List.of(annual));
+
+        List<AcademicPeriodResponseDto> result = service.findRecessesBetween(from, to);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().semester()).isZero();
+        assertThat(result.getFirst().recessStart()).isEqualTo(LocalDate.of(2026, 7, 6));
+        assertThat(result.getFirst().recessEnd()).isEqualTo(LocalDate.of(2026, 7, 27));
+    }
+
+    @Test
+    @DisplayName("findRecessesBetween: returns an empty list when no recess crosses the range")
+    void findRecessesBetweenWithoutMatchesIsEmpty() {
+        when(academicPeriodRepository
+                .findBySemesterAndDeletedAtIsNullAndRecessStartLessThanEqualAndRecessEndGreaterThanEqual(
+                        any(), any(), any()))
+                .thenReturn(List.of());
+
+        assertThat(service.findRecessesBetween(LocalDate.of(2026, 5, 4), LocalDate.of(2026, 5, 9))).isEmpty();
+    }
+
+    @Test
     @DisplayName("findCurrent: es lectura pura, no materializa nada aunque falte el año en curso")
     void findCurrentDoesNotWrite() {
         when(academicPeriodRepository.findAllActive()).thenReturn(List.of());

@@ -66,6 +66,15 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
     }
 
     @Override
+    public List<AcademicPeriodResponseDto> findRecessesBetween(LocalDate from, LocalDate to) {
+        return academicPeriodRepository
+                .findBySemesterAndDeletedAtIsNullAndRecessStartLessThanEqualAndRecessEndGreaterThanEqual(
+                        TermType.ANUAL.getSemester(), to, from).stream()
+                .map(academicPeriodMapper::toDto)
+                .toList();
+    }
+
+    @Override
     public List<AcademicPeriodResponseDto> findCurrent() {
         LocalDate today = LocalDate.now();
         return academicPeriodRepository.findAllActive().stream()

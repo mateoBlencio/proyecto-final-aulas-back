@@ -15,7 +15,7 @@ final class RevisionSummaryMigration {
     static final String RESOURCE_PATTERN = "classpath:db/migration/V" + VERSION + "__*.sql";
 
     /** Audited tables born after the V17 backfill, so its SQL does not name them. */
-    static final Set<String> TABLES_CREATED_LATER = Set.of("archivado_auditoria_aud");
+    static final Set<String> TABLES_CREATED_LATER = Set.of("archivado_auditoria_aud", "regeneracion_tablero_aud");
 
     private RevisionSummaryMigration() {
     }

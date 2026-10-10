@@ -1,7 +1,9 @@
 package ar.edu.utn.frc.siga.sysacad.internal.service.impl;
 
 import ar.edu.utn.frc.siga.common.util.Lazy;
+import ar.edu.utn.frc.siga.sysacad.api.SysacadHolidayDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectDto;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawHoliday;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSubject;
 import ar.edu.utn.frc.siga.sysacad.internal.mapper.SysacadCatalogMapper;
@@ -10,6 +12,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -32,6 +35,7 @@ class SysacadCatalogSnapshotTest {
                 Lazy.of(List::of),
                 Lazy.of(() -> schedules),
                 Lazy.of(() -> subjects),
+                Lazy.of(List::of),
                 mapper);
     }
 
@@ -139,6 +143,7 @@ class SysacadCatalogSnapshotTest {
                     return List.of(scheduleRow(17, 94, 519, "A", 1));
                 }),
                 Lazy.of(() -> List.of(new RawSubject(17, 94, 519, "Análisis Matemático I"))),
+                Lazy.of(List::of),
                 mapper);
 
         snapshot.findSubjects();
@@ -147,5 +152,24 @@ class SysacadCatalogSnapshotTest {
         snapshot.findAllocations();
 
         assertThat(scheduleReads).hasValue(1);
+    }
+
+    @Test
+    @DisplayName("findHolidays: skips rows with an invalid date and keeps the valid ones")
+    void findHolidaysSkipsInvalidRows() {
+        SysacadCatalogSnapshot snapshot = new SysacadCatalogSnapshot(
+                Lazy.of(List::of),
+                Lazy.of(List::of),
+                Lazy.of(List::of),
+                Lazy.of(List::of),
+                Lazy.of(List::of),
+                Lazy.of(List::of),
+                Lazy.of(() -> List.of(
+                        new RawHoliday("20261208", "Inmaculada Concepción"),
+                        new RawHoliday("20261332", "Invalid"))),
+                mapper);
+
+        assertThat(snapshot.findHolidays())
+                .containsExactly(new SysacadHolidayDto(LocalDate.of(2026, 12, 8), "Inmaculada Concepción"));
     }
 }

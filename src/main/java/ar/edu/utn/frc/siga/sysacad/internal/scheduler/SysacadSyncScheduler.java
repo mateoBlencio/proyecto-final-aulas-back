@@ -58,4 +58,10 @@ public class SysacadSyncScheduler {
         log.info("Cron de sync de Asignaciones disparado");
         orchestrator.sync(SysacadView.ASIGNACIONES);
     }
+
+    @Scheduled(cron = "${siga.sysacad.sync.holidays}")
+    public void syncHolidays() {
+        log.info("Cron de sync de Feriados disparado");
+        orchestrator.sync(SysacadView.FERIADOS);
+    }
 }
