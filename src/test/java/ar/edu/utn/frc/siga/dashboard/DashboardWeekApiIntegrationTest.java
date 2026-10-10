@@ -13,24 +13,40 @@ import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.temporal.ChronoUnit;
+import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.JsonNode;
 
-@Import(IntegrationTestData.class)
+@Import({IntegrationTestData.class, DashboardWeekApiIntegrationTest.FixedClockConfig.class})
 @DisplayName("Dashboard - GET /v1/dashboard/week (integración)")
 class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
+
+    /** Wednesday at 12:00 in a week no other test touches: "now" is fixed so the in-use test never skips. */
+    private static final LocalDateTime FIXED_NOW = week(20).plusDays(2).atTime(12, 0);
+
+    @TestConfiguration
+    static class FixedClockConfig {
+        @Bean
+        @Primary
+        Clock fixedClock() {
+            ZoneId zone = ZoneId.systemDefault();
+            return Clock.fixed(FIXED_NOW.atZone(zone).toInstant(), zone);
+        }
+    }
 
     @Autowired
     private AcademicEventService academicEventService;
@@ -237,11 +253,8 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
     @Test
     @DisplayName("the current week counts the rooms with a class in progress right now")
     void currentWeekShowsRoomsInUseNow() throws Exception {
-        LocalDateTime nowMinute = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
+        LocalDateTime nowMinute = FIXED_NOW;
         LocalDate today = nowMinute.toLocalDate();
-        Assumptions.assumeTrue(today.getDayOfWeek() != DayOfWeek.SUNDAY, "Sunday is not an available day");
-        Assumptions.assumeTrue(nowMinute.toLocalTime().isAfter(LocalTime.of(0, 10))
-                && nowMinute.toLocalTime().isBefore(LocalTime.of(22, 50)), "class window would cross midnight");
         Building a = building();
         Building b = building();
         Classroom running = room(a, 100);
