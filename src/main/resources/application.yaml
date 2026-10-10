@@ -103,6 +103,11 @@ siga:
       enabled: ${AUDIT_ARCHIVE_ENABLED:false}
       cron: "0 0 4 * * SAT"
       batch-size: 5000
+  dashboard:
+    underused-threshold-percent: 50
+    snapshot:
+      enabled: ${DASHBOARD_SNAPSHOT_ENABLED:true}
+      cron: "0 0 3 1 * *"
   room-requests:
     expiry:
       cron: "0 0 7 * * *"
