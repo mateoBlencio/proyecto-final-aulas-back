@@ -1,6 +1,8 @@
 package ar.edu.utn.frc.siga.dashboard.controller;
 
+import ar.edu.utn.frc.siga.dashboard.dto.response.AllocationTrendResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardBadgesResponseDto;
+import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardReportResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardWeekResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.RoomRequestStatsResponseDto;
 import ar.edu.utn.frc.siga.dashboard.service.DashboardQueryService;
@@ -9,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -16,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -60,5 +64,25 @@ public class DashboardController {
             @RequestParam(defaultValue = "5") @Min(1) @Max(10) int years) {
         log.debug("GET /v1/dashboard/room-requests?years={}", years);
         return ResponseEntity.ok(queryService.roomRequests(years));
+    }
+
+    @GetMapping("/allocation-trend")
+    @PreAuthorize("hasAuthority('PERM_DASHBOARD_READ')")
+    @Operation(summary = "Tendencia mensual de asignaciones",
+               description = "Serie de meses cerrados (snapshots), mes en curso parcial calculado en vivo, "
+                       + "línea de base y último mes cerrado.")
+    public ResponseEntity<AllocationTrendResponseDto> allocationTrend() {
+        log.debug("GET /v1/dashboard/allocation-trend");
+        return ResponseEntity.ok(queryService.allocationTrend());
+    }
+
+    @GetMapping("/reports/{month}")
+    @PreAuthorize("hasAuthority('PERM_DASHBOARD_READ')")
+    @Operation(summary = "Informe de un mes cerrado",
+               description = "Informe leído del snapshot del mes (yyyy-MM): campus, edificios, solicitudes del mes, "
+                       + "parámetros y versión de reglas. 404 si el mes no tiene snapshot.")
+    public ResponseEntity<DashboardReportResponseDto> report(@PathVariable YearMonth month) {
+        log.debug("GET /v1/dashboard/reports/{}", month);
+        return ResponseEntity.ok(queryService.report(month));
     }
 }

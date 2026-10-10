@@ -1,0 +1,24 @@
+meta {
+  name: Informe mensual
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/v1/dashboard/reports/2026-09
+  body: none
+  auth: inherit
+}
+
+docs {
+  GET /v1/dashboard/reports/{yyyy-MM}. Permiso: PERM_DASHBOARD_READ.
+  Informe de un mes cerrado leído de su snapshot: campus, edificios, solicitudes del mes
+  (resolved y expired del mes, pending al cierre), parámetros con que se calculó
+  (umbral, tolerancia de solape, franja horaria, versión de reglas) y quién y cuándo lo generó.
+  Pedido dos veces devuelve lo mismo. El PDF lo arma el front con esta respuesta.
+
+  Un usuario acotado recibe solo sus edificios y un campus recalculado como suma de ellos.
+
+  Errores (ProblemDetail): 404 si el mes no tiene snapshot (por ejemplo, el mes en curso);
+  400 si el mes no tiene formato yyyy-MM.
+}

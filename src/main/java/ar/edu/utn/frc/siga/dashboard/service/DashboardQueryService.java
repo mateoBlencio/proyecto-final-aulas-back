@@ -1,9 +1,12 @@
 package ar.edu.utn.frc.siga.dashboard.service;
 
+import ar.edu.utn.frc.siga.dashboard.dto.response.AllocationTrendResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardBadgesResponseDto;
+import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardReportResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardWeekResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.RoomRequestStatsResponseDto;
 import java.time.LocalDate;
+import java.time.YearMonth;
 
 public interface DashboardQueryService {
 
@@ -15,4 +18,10 @@ public interface DashboardQueryService {
 
     /** Resolved, pending and expired room request items of the last {@code years} years, by building. */
     RoomRequestStatsResponseDto roomRequests(int years);
+
+    /** Monthly series from the closed-month snapshots plus the current month computed live (partial). */
+    AllocationTrendResponseDto allocationTrend();
+
+    /** Report of a closed month read from its snapshot. 404 when the month has none. */
+    DashboardReportResponseDto report(YearMonth month);
 }

@@ -6,7 +6,9 @@ import static java.time.temporal.TemporalAdjusters.previousOrSame;
 import ar.edu.utn.frc.siga.common.security.BuildingScope;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.Permission;
+import ar.edu.utn.frc.siga.dashboard.dto.response.AllocationTrendResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardBadgesResponseDto;
+import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardReportResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardWeekResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.ExcludedDayResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.OpenRoomRequestsResponseDto;
@@ -27,6 +29,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -53,6 +56,7 @@ public class DashboardQueryServiceImpl implements DashboardQueryService {
     private final DashboardMetricsService metricsService;
     private final DashboardReadRepository repository;
     private final DashboardRoomRequestStats roomRequestStats;
+    private final DashboardSnapshotReader snapshotReader;
     private final BuildingScopeResolver buildingScopeResolver;
     private final Clock clock;
 
@@ -84,6 +88,16 @@ public class DashboardQueryServiceImpl implements DashboardQueryService {
                 .toList();
         return new DashboardWeekResponseDto(monday, monday.plusDays(5), currentWeek, !scope.isUnrestricted(),
                 DashboardDtoMapper.parameters(period.parameters()), excluded, campus, buildings);
+    }
+
+    @Override
+    public AllocationTrendResponseDto allocationTrend() {
+        return snapshotReader.trend(buildingScopeResolver.scopeFor(Permission.DASHBOARD_READ));
+    }
+
+    @Override
+    public DashboardReportResponseDto report(YearMonth month) {
+        return snapshotReader.report(month, buildingScopeResolver.scopeFor(Permission.DASHBOARD_READ));
     }
 
     @Override

@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.dashboard.dto.response.AllocationStatusResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardParametersResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.HourlyOccupancyResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.OccupancyResponseDto;
+import ar.edu.utn.frc.siga.dashboard.dto.response.SourceBreakdownResponseDto;
 import ar.edu.utn.frc.siga.dashboard.model.CategoryCounts;
 import ar.edu.utn.frc.siga.dashboard.model.DashboardParameters;
 import ar.edu.utn.frc.siga.dashboard.model.DashboardRules;
@@ -51,5 +52,11 @@ final class DashboardDtoMapper {
 
     static List<HourlyOccupancyResponseDto> hourlyProfile(ScopeMetrics m, DashboardParameters p) {
         return hourlyProfile(m.occupiedBySlot(), m.availableBySlot(), p.firstSlotHour());
+    }
+
+    static List<SourceBreakdownResponseDto> bySource(ScopeMetrics m) {
+        return m.bySource().entrySet().stream()
+                .map(entry -> new SourceBreakdownResponseDto(entry.getKey(), allocationStatus(entry.getValue())))
+                .toList();
     }
 }
