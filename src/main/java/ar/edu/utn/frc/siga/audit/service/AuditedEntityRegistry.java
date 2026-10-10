@@ -38,7 +38,8 @@ public class AuditedEntityRegistry {
             Map.entry("RoomPreference", "Preferencia de aula"),
             Map.entry("RoomRequestItemAllocation", "Asignación de solicitud de aula"),
             Map.entry("Setting", "Configuración"),
-            Map.entry("AuditArchiveRun", "Archivado de auditoría"));
+            Map.entry("AuditArchiveRun", "Archivado de auditoría"),
+            Map.entry("DashboardSnapshotRegeneration", "Regeneración de informe del tablero"));
 
     // Audited properties never shown in the diff.
     private static final Map<String, Set<String>> EXCLUDED_PROPERTIES = Map.of(

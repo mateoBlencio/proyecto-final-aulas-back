@@ -1,0 +1,31 @@
+meta {
+  name: Regenerar informe mensual
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/v1/dashboard/reports/2026-09/regeneration
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "reason": "Se corrigió la capacidad de un aula y el informe de septiembre quedó desactualizado"
+  }
+}
+
+docs {
+  POST /v1/dashboard/reports/{yyyy-MM}/regeneration. Permiso: PERM_DASHBOARD_SNAPSHOT_REGENERATE
+  (solo SUBSECRETARIA).
+  Recalcula un mes cerrado con los datos actuales (inscriptos, capacidades, feriados, parámetros).
+  Las filas anteriores del mes se conservan con vigente = false; las nuevas llevan el motivo y
+  el email de quien regeneró. Responde el informe nuevo, igual que GET /v1/dashboard/reports/{yyyy-MM}.
+
+  reason: obligatorio, hasta 500 caracteres.
+  La operación queda en GET /v1/audit como "Regeneración de informe del tablero".
+
+  Errores (ProblemDetail): 400 sin motivo, con motivo en blanco o con un mes mal formado;
+  403 sin permiso; 404 si el mes no tiene snapshot; 422 si el mes es el actual o uno futuro.
+}

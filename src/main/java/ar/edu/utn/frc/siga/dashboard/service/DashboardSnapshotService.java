@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.dashboard.service;
 
+import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardReportResponseDto;
 import java.time.YearMonth;
 
 public interface DashboardSnapshotService {
@@ -12,4 +13,10 @@ public interface DashboardSnapshotService {
 
     /** Computes and stores the rows of one month: one per active building plus the campus. */
     void generate(YearMonth month, String actor, String reason);
+
+    /**
+     * Retires the current rows of a closed month and generates new ones; the previous version stays stored.
+     * 422 if the month is not closed, 404 if it has no snapshot. Audited.
+     */
+    DashboardReportResponseDto regenerate(YearMonth month, String reason, String actor);
 }

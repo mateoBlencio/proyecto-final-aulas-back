@@ -1,6 +1,13 @@
 package ar.edu.utn.frc.siga.dashboard.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
+import ar.edu.utn.frc.siga.audit.AuditOperations;
+import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.security.BuildingScope;
+import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardReportResponseDto;
+import ar.edu.utn.frc.siga.dashboard.exception.MonthNotClosedException;
+import ar.edu.utn.frc.siga.dashboard.model.DashboardSnapshotRegeneration;
+import ar.edu.utn.frc.siga.dashboard.repository.DashboardSnapshotRegenerationRepository;
 import ar.edu.utn.frc.siga.dashboard.model.AllocationUnitRow;
 import ar.edu.utn.frc.siga.dashboard.model.BuildingRoomsRow;
 import ar.edu.utn.frc.siga.dashboard.model.CategoryCounts;
@@ -45,6 +52,8 @@ public class DashboardSnapshotServiceImpl implements DashboardSnapshotService {
     private final DashboardMetricsService metricsService;
     private final DashboardReadRepository readRepository;
     private final DashboardSnapshotRepository snapshotRepository;
+    private final DashboardSnapshotRegenerationRepository regenerationRepository;
+    private final DashboardSnapshotReader snapshotReader;
     private final ObjectMapper objectMapper;
     private final PlatformTransactionManager transactionManager;
     private final Clock clock;
@@ -78,6 +87,24 @@ public class DashboardSnapshotServiceImpl implements DashboardSnapshotService {
                 log.error("No se pudo generar el snapshot del tablero de {}", month, e);
             }
         }
+    }
+
+    @Override
+    @Transactional
+    @AuditOperation("Regeneración de informe del tablero")
+    public DashboardReportResponseDto regenerate(YearMonth month, String reason, String actor) {
+        if (!month.isBefore(YearMonth.now(clock))) {
+            throw new MonthNotClosedException(month);
+        }
+        if (snapshotRepository.findByYearAndMonthAndCurrentTrue(month.getYear(), month.getMonthValue()).isEmpty()) {
+            throw new ResourceNotFoundException("No hay informe del tablero para el mes " + month);
+        }
+        snapshotRepository.retire(month.getYear(), month.getMonthValue());
+        generate(month, actor, reason);
+        regenerationRepository.save(new DashboardSnapshotRegeneration(
+                month.getYear(), month.getMonthValue(), reason, clock.instant()));
+        AuditOperations.describe("Regeneración del informe " + month + " del tablero: " + reason);
+        return snapshotReader.report(month, BuildingScope.unrestricted());
     }
 
     @Override
