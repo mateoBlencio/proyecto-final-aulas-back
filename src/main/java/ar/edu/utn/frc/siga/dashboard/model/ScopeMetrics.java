@@ -14,9 +14,14 @@ public record ScopeMetrics(
         Map<String, CategoryCounts> bySource) {
 
     public static ScopeMetrics empty(int slots) {
+        return empty(slots, 0);
+    }
+
+    /** Empty metrics for a calendar with the given available days (the days do not depend on the buildings). */
+    public static ScopeMetrics empty(int slots, int availableDays) {
         Map<String, CategoryCounts> bySource = new LinkedHashMap<>();
         DashboardRules.SOURCES.forEach(source -> bySource.put(source, CategoryCounts.ZERO));
-        return new ScopeMetrics(0, 0, CategoryCounts.ZERO, 0, 0, new long[slots], new long[slots], bySource);
+        return new ScopeMetrics(0, availableDays, CategoryCounts.ZERO, 0, 0, new long[slots], new long[slots], bySource);
     }
 
     public ScopeMetrics plus(ScopeMetrics other) {

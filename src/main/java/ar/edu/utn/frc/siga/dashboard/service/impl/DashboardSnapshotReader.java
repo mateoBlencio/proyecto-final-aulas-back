@@ -158,7 +158,7 @@ public class DashboardSnapshotReader {
     }
 
     private static Aggregate sumBuildings(List<SnapshotPayload> buildings, SnapshotPayload reference) {
-        ScopeMetrics total = ScopeMetrics.empty(reference.hourlyProfile().size());
+        ScopeMetrics total = ScopeMetrics.empty(reference.hourlyProfile().size(), reference.availableDays());
         long resolved = 0;
         long expired = 0;
         long pending = 0;
