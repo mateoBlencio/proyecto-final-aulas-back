@@ -126,8 +126,8 @@ public class DashboardQueryServiceImpl implements DashboardQueryService {
     }
 
     /**
-     * Adds up the metrics of two non-contiguous periods: absolutes and available days are summed, excluded days
-     * concatenated. Units are dropped; the response does not use them.
+     * Adds up the metrics of two non-contiguous periods ({@code b} the later one): absolutes and available days are
+     * summed, room count is the one of {@code b}, excluded days concatenated. Units are dropped; the response does not use them.
      */
     private static PeriodMetrics addPeriods(PeriodMetrics a, PeriodMetrics b) {
         Map<Long, ScopeMetrics> byBuilding = new LinkedHashMap<>(a.byBuilding());
@@ -141,13 +141,15 @@ public class DashboardQueryServiceImpl implements DashboardQueryService {
                         .collect(Collectors.toSet()),
                 Stream.concat(a.availability().excludedDays().stream(), b.availability().excludedDays().stream())
                         .toList());
-        return new PeriodMetrics(byBuilding, addScopes(a.campus(), b.campus()), List.copyOf(buildings.values()),
+        return new PeriodMetrics(byBuilding, addScopes(a.campus(), b.campus()), buildings.values().stream()
+                        .sorted(Comparator.comparing(BuildingRoomsRow::code, Comparator.nullsLast(Comparator.naturalOrder())))
+                        .toList(),
                 List.of(), unallocated, availability, a.parameters());
     }
 
     private static ScopeMetrics addScopes(ScopeMetrics a, ScopeMetrics b) {
         ScopeMetrics sum = a.plus(b);
-        return new ScopeMetrics(sum.roomCount(), a.availableDays() + b.availableDays(), sum.categories(),
+        return new ScopeMetrics(b.roomCount(), a.availableDays() + b.availableDays(), sum.categories(),
                 sum.occupiedRoomMinutes(), sum.availableRoomMinutes(), sum.occupiedBySlot(), sum.availableBySlot(),
                 sum.bySource());
     }
