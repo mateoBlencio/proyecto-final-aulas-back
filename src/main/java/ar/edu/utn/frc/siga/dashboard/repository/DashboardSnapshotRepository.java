@@ -19,4 +19,8 @@ public interface DashboardSnapshotRepository extends JpaRepository<DashboardSnap
     @Query("update DashboardSnapshot s set s.current = false "
             + "where s.year = :year and s.month = :month and s.current = true")
     int retire(@Param("year") int year, @Param("month") int month);
+
+    /** Transaction-scoped advisory lock for one month; released on commit or rollback. */
+    @Query(value = "SELECT COUNT(*) FROM (SELECT pg_advisory_xact_lock(:key)) l", nativeQuery = true)
+    long lockMonth(@Param("key") long key);
 }

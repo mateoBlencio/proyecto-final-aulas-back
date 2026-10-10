@@ -92,9 +92,12 @@ public class DashboardSnapshotServiceImpl implements DashboardSnapshotService {
     @Transactional
     @AuditOperation("Regeneración de informe del tablero")
     public DashboardReportResponseDto regenerate(YearMonth month, String reason, String actor) {
+        DashboardDateLimits.requireWithinRange(month, clock);
         if (!month.isBefore(YearMonth.now(clock))) {
             throw new MonthNotClosedException(month);
         }
+        // Serializes concurrent regenerations of the same month: the second waits and then retires the first's rows.
+        snapshotRepository.lockMonth(month.getYear() * 100L + month.getMonthValue());
         if (snapshotRepository.findByYearAndMonthAndCurrentTrue(month.getYear(), month.getMonthValue()).isEmpty()) {
             throw new ResourceNotFoundException("No hay informe del tablero para el mes " + month);
         }
