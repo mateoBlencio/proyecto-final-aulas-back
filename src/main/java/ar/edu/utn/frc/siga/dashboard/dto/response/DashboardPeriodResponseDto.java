@@ -5,7 +5,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 public record DashboardPeriodResponseDto(
-        DashboardPeriodType type, int year, Integer semester,
+        DashboardPeriodType type, Integer year, Integer semester, Integer years,
         LocalDate periodStart, LocalDate periodEnd, LocalDate from, LocalDate to,
         boolean partial, boolean restrictedScope,
         DashboardParametersResponseDto parameters,

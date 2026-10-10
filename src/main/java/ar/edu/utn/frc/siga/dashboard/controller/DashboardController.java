@@ -57,13 +57,18 @@ public class DashboardController {
     @GetMapping("/period")
     @PreAuthorize("hasAuthority('PERM_DASHBOARD_READ')")
     @Operation(summary = "Tablero de un período",
-               description = "Cuatrimestre en curso (TERM, por defecto), año académico (ACADEMIC_YEAR) o mes en curso "
-                       + "(CURRENT_MONTH), desde el inicio del período hasta hoy. Fuera de cuatrimestre devuelve "
-                       + "completo el último que empezó. 400 si type no es válido.")
+               description = "Cuatrimestre (TERM, por defecto), año académico (ACADEMIC_YEAR) o últimos años "
+                       + "académicos (LAST_YEARS), desde el inicio del período hasta hoy. TERM acepta year y semester "
+                       + "(1|2) juntos; ACADEMIC_YEAR acepta year; LAST_YEARS exige years (1 a 10). Sin year, "
+                       + "devuelve el período en curso o el último que empezó. 400 por parámetros inválidos, "
+                       + "422 si el período pedido todavía no empezó.")
     public ResponseEntity<DashboardPeriodResponseDto> period(
-            @RequestParam(defaultValue = "TERM") DashboardPeriodType type) {
-        log.debug("GET /v1/dashboard/period?type={}", type);
-        return ResponseEntity.ok(queryService.period(type));
+            @RequestParam(defaultValue = "TERM") DashboardPeriodType type,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer semester,
+            @RequestParam(required = false) Integer years) {
+        log.debug("GET /v1/dashboard/period?type={}&year={}&semester={}&years={}", type, year, semester, years);
+        return ResponseEntity.ok(queryService.period(type, year, semester, years));
     }
 
     @GetMapping("/badges")

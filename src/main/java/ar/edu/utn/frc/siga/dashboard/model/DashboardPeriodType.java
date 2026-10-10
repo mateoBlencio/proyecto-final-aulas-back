@@ -4,5 +4,5 @@ package ar.edu.utn.frc.siga.dashboard.model;
 public enum DashboardPeriodType {
     TERM,
     ACADEMIC_YEAR,
-    CURRENT_MONTH
+    LAST_YEARS
 }

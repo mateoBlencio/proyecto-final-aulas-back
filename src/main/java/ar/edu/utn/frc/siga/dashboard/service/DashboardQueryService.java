@@ -27,6 +27,9 @@ public interface DashboardQueryService {
     /** Report of a closed month read from its snapshot. 404 when the month has none. */
     DashboardReportResponseDto report(YearMonth month);
 
-    /** Term, academic year or current month, from its start up to today. */
-    DashboardPeriodResponseDto period(DashboardPeriodType type);
+    /**
+     * Term, academic year or last academic years, from the start of the period up to today. Parameters that do
+     * not apply to {@code type} are ignored.
+     */
+    DashboardPeriodResponseDto period(DashboardPeriodType type, Integer year, Integer semester, Integer years);
 }
