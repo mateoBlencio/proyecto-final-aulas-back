@@ -26,6 +26,8 @@ docs {
   reason: obligatorio, hasta 500 caracteres.
   La operación queda en GET /v1/audit como "Regeneración de informe del tablero".
 
-  Errores (ProblemDetail): 400 sin motivo, con motivo en blanco o con un mes mal formado;
-  403 sin permiso; 404 si el mes no tiene snapshot; 422 si el mes es el actual o uno futuro.
+  Dos regeneraciones simultáneas del mismo mes se serializan: la segunda espera y reemplaza a la primera.
+
+  Errores (ProblemDetail): 400 sin motivo, con motivo en blanco, con un mes mal formado o a más
+  de 10 años de hoy; 403 sin permiso; 404 si el mes no tiene snapshot; 422 si el mes es el actual o uno futuro.
 }

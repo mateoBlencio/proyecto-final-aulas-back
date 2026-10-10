@@ -18,7 +18,9 @@ docs {
   Pedido dos veces devuelve lo mismo. El PDF lo arma el front con esta respuesta.
 
   Un usuario acotado recibe solo sus edificios y un campus recalculado como suma de ellos.
+  Tampoco ve generatedBy ni regenerationReason (llegan en null); solo regenerated (true si
+  el mes fue regenerado a mano).
 
   Errores (ProblemDetail): 404 si el mes no tiene snapshot (por ejemplo, el mes en curso);
-  400 si el mes no tiene formato yyyy-MM.
+  400 si el mes no tiene formato yyyy-MM o cae a más de 10 años de hoy.
 }
