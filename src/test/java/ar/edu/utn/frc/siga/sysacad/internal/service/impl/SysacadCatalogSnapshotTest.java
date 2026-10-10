@@ -32,6 +32,7 @@ class SysacadCatalogSnapshotTest {
                 Lazy.of(List::of),
                 Lazy.of(() -> schedules),
                 Lazy.of(() -> subjects),
+                Lazy.of(List::of),
                 mapper);
     }
 
@@ -139,6 +140,7 @@ class SysacadCatalogSnapshotTest {
                     return List.of(scheduleRow(17, 94, 519, "A", 1));
                 }),
                 Lazy.of(() -> List.of(new RawSubject(17, 94, 519, "Análisis Matemático I"))),
+                Lazy.of(List::of),
                 mapper);
 
         snapshot.findSubjects();

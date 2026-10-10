@@ -5,19 +5,24 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadAllocationDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadBuildingDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadClassroomDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadCommissionDto;
+import ar.edu.utn.frc.siga.sysacad.api.SysacadHolidayDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSpecialtyDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectCommissionDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectDto;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawBuilding;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawClassroom;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawCommission;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawHoliday;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSpecialty;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSubject;
 import java.time.DayOfWeek;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -27,6 +32,8 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(prefix = "siga.sysacad", name = "enabled", havingValue = "true")
 public class SysacadCatalogMapper {
 
+    private static final DateTimeFormatter HOLIDAY_DATE =
+            DateTimeFormatter.ofPattern("uuuuMMdd").withResolverStyle(ResolverStyle.STRICT);
     private static final String YES = "S";
     private static final int MIN_ISO_DAY = DayOfWeek.MONDAY.getValue();
     private static final int MAX_ISO_DAY = DayOfWeek.SUNDAY.getValue();
@@ -48,6 +55,20 @@ public class SysacadCatalogMapper {
                 raw.especialid(),
                 trim(raw.asEspecialidadNombre()),
                 trim(raw.abreviatura()));
+    }
+
+    /** Devuelve null (y loguea) si la fecha viene nula, vacía o inválida. */
+    public SysacadHolidayDto toHoliday(RawHoliday raw) {
+        String text = trim(raw.fecha());
+        try {
+            if (text == null || text.isEmpty()) {
+                throw new DateTimeParseException("empty", "", 0);
+            }
+            return new SysacadHolidayDto(LocalDate.parse(text, HOLIDAY_DATE), trim(raw.descripcion()));
+        } catch (DateTimeParseException e) {
+            log.warn("Feriado de SysAcad ignorado por fecha inválida: {}", raw.fecha());
+            return null;
+        }
     }
 
     public SysacadCommissionDto toCommission(RawCommission raw) {

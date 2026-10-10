@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.BuildingViewFetcher;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.ClassroomViewFetcher;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.CommissionViewFetcher;
+import ar.edu.utn.frc.siga.sysacad.internal.client.view.HolidayViewFetcher;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.ScheduleViewFetcher;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.SpecialtyViewFetcher;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.SubjectViewFetcher;
@@ -24,6 +25,7 @@ public class SysacadCatalogSnapshotFactory {
     private final CommissionViewFetcher commissionViewFetcher;
     private final ScheduleViewFetcher scheduleViewFetcher;
     private final SubjectViewFetcher subjectViewFetcher;
+    private final HolidayViewFetcher holidayViewFetcher;
     private final SysacadCatalogMapper mapper;
 
     public SysacadCatalogReader newSnapshot() {
@@ -34,6 +36,7 @@ public class SysacadCatalogSnapshotFactory {
                 Lazy.of(commissionViewFetcher::fetch),
                 Lazy.of(scheduleViewFetcher::fetch),
                 Lazy.of(subjectViewFetcher::fetch),
+                Lazy.of(holidayViewFetcher::fetch),
                 mapper);
     }
 }

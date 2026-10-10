@@ -10,12 +10,14 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadBuildingDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadClassroomDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadCommissionDto;
+import ar.edu.utn.frc.siga.sysacad.api.SysacadHolidayDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSpecialtyDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectCommissionDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectDto;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawBuilding;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawClassroom;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawCommission;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawHoliday;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSpecialty;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSubject;
@@ -37,6 +39,7 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
     private final Lazy<List<RawCommission>> commissionsRaw;
     private final Lazy<List<RawSchedule>> schedulesRaw;
     private final Lazy<List<RawSubject>> subjectsRaw;
+    private final Lazy<List<RawHoliday>> holidaysRaw;
     private final SysacadCatalogMapper mapper;
 
     SysacadCatalogSnapshot(Lazy<List<RawBuilding>> buildingsRaw,
@@ -45,6 +48,7 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
             Lazy<List<RawCommission>> commissionsRaw,
             Lazy<List<RawSchedule>> schedulesRaw,
             Lazy<List<RawSubject>> subjectsRaw,
+            Lazy<List<RawHoliday>> holidaysRaw,
             SysacadCatalogMapper mapper) {
         this.buildingsRaw = buildingsRaw;
         this.classroomsRaw = classroomsRaw;
@@ -52,6 +56,7 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
         this.commissionsRaw = commissionsRaw;
         this.schedulesRaw = schedulesRaw;
         this.subjectsRaw = subjectsRaw;
+        this.holidaysRaw = holidaysRaw;
         this.mapper = mapper;
     }
 
@@ -101,6 +106,14 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
         List<RawSchedule> rows = schedulesRaw.get();
         return rows.stream()
                 .map(mapper::toAllocation)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    @Override
+    public List<SysacadHolidayDto> findHolidays() {
+        return holidaysRaw.get().stream()
+                .map(mapper::toHoliday)
                 .filter(Objects::nonNull)
                 .toList();
     }
