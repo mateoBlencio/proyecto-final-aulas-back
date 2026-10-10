@@ -1,10 +1,12 @@
 package ar.edu.utn.frc.siga.dashboard;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.offset;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
+import ar.edu.utn.frc.siga.dashboard.model.DashboardRules;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
@@ -85,8 +87,8 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
         // The events.hours setting may have been changed by another test: expectations come from the response.
         LocalTime hoursStart = LocalTime.parse(root.get("parameters").get("hoursStart").asText());
         LocalTime hoursEnd = LocalTime.parse(root.get("parameters").get("hoursEnd").asText());
-        double bandHours = Duration.between(hoursStart, hoursEnd).toMinutes() / 60.0;
-        assertThat(mine.get("occupancy").get("availableHours").asDouble()).isEqualTo(bandHours * 6);
+        long bandMinutes = Duration.between(hoursStart, hoursEnd).toMinutes();
+        assertThat(mine.get("occupancy").get("availableHours").asDouble()).isEqualTo(DashboardRules.hours(bandMinutes * 6));
         assertThat(mine.get("hourlyProfile")).hasSize(hoursEnd.minusMinutes(1).getHour() - hoursStart.getHour() + 1);
         assertThat(mine.get("roomsInUseNow").isNull()).isTrue();
         assertThat(mine.get("openRoomRequests").get("count").asLong()).isZero();
@@ -108,11 +110,11 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
 
         JsonNode nodeA = byId(root.get("buildings"), "buildingId", a.getId());
         JsonNode nodeB = byId(root.get("buildings"), "buildingId", b.getId());
-        double days = availableDays(root);
+        int days = availableDays(root);
         assertThat(nodeA.get("allocationStatus").get("total").asLong()).isEqualTo(1);
         assertThat(nodeA.get("allocationStatus").get("overcrowded").asLong()).isEqualTo(1);
         assertThat(nodeA.get("occupancy").get("occupiedHours").asDouble()).isEqualTo(1.0);
-        assertThat(nodeA.get("occupancy").get("availableHours").asDouble()).isEqualTo(bandHours() * days);
+        assertThat(nodeA.get("occupancy").get("availableHours").asDouble()).isEqualTo(DashboardRules.hours(bandMinutes() * days));
         assertThat(nodeB.get("allocationStatus").get("total").asLong()).isEqualTo(2);
         assertThat(nodeB.get("allocationStatus").get("adequate").asLong()).isEqualTo(1);
         assertThat(nodeB.get("allocationStatus").get("underused").asLong()).isEqualTo(1);
@@ -125,7 +127,9 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
         for (JsonNode building : root.get("buildings")) {
             buildingAvailable += building.get("occupancy").get("availableHours").asDouble();
         }
-        assertThat(campus.get("occupancy").get("availableHours").asDouble()).isEqualTo(buildingAvailable);
+        // Each building's hours are rounded to one decimal on their own, so their sum can drift from the campus total.
+        assertThat(campus.get("occupancy").get("availableHours").asDouble())
+                .isCloseTo(buildingAvailable, offset(0.05 * root.get("buildings").size()));
         JsonNode firstSlot = nodeA.get("hourlyProfile").get(0);
         assertThat(firstSlot.get("hour").asInt()).isEqualTo(bandStart().getHour());
         assertThat(firstSlot.get("occupiedRoomMinutes").asLong()).isEqualTo(60);
@@ -212,7 +216,7 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
             assertThat(excluded.get(0).get("reason").asText()).isEqualTo("HOLIDAY");
             assertThat(excluded.get(0).get("description").asText()).isEqualTo("Test holiday");
             JsonNode nodeA = byId(root.get("buildings"), "buildingId", a.getId());
-            assertThat(nodeA.get("occupancy").get("availableHours").asDouble()).isEqualTo(bandHours() * 5);
+            assertThat(nodeA.get("occupancy").get("availableHours").asDouble()).isEqualTo(DashboardRules.hours(bandMinutes() * 5));
             assertThat(nodeA.get("allocationStatus").get("total").asLong()).isEqualTo(1);
             assertThat(nodeA.get("occupancy").get("occupiedHours").asDouble()).isEqualTo(1.0);
         } finally {

@@ -94,9 +94,9 @@ abstract class DashboardIntegrationSupport extends AbstractIntegrationTest {
         return settingsReader.getTime(SettingKey.EVENTS_HOURS_START);
     }
 
-    protected double bandHours() {
+    protected long bandMinutes() {
         return Duration.between(settingsReader.getTime(SettingKey.EVENTS_HOURS_START),
-                settingsReader.getTime(SettingKey.EVENTS_HOURS_END)).toMinutes() / 60.0;
+                settingsReader.getTime(SettingKey.EVENTS_HOURS_END)).toMinutes();
     }
 
     protected SubjectAndCommission sc() {
