@@ -221,7 +221,7 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
     }
 
     private Map<Long, ClassroomResponseDto> fetchClassroomsById(Set<Long> ids) {
-        return Maps.byId(classroomService.findByIds(ids), ClassroomResponseDto::id);
+        return Maps.byId(classroomService.findByIdsIncludingDeactivated(ids), ClassroomResponseDto::id);
     }
 
     private Range resolveRange(LocalDate from, LocalDate to) {

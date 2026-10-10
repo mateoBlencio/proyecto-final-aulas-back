@@ -73,8 +73,8 @@ class RoomRequestCatalogsResolverTest {
     @Test
     @DisplayName("resolve: pide subjectService/commissionService por los ids exactos que le pasan")
     void resolve_batchesByGivenIds() {
-        when(subjectService.findByIds(Set.of(10L))).thenReturn(List.of(subject(10L)));
-        when(commissionService.findByIds(Set.of(5L))).thenReturn(List.of(new CommissionResponseDto(5L, "CUR-5", null)));
+        when(subjectService.findByIdsIncludingDeactivated(Set.of(10L))).thenReturn(List.of(subject(10L)));
+        when(commissionService.findByIdsIncludingDeactivated(Set.of(5L))).thenReturn(List.of(new CommissionResponseDto(5L, "CUR-5", null)));
 
         Catalogs catalogs = resolver.resolve(Set.of(10L), Set.of(5L), Set.of(), Set.of(), Set.of());
 
@@ -88,7 +88,7 @@ class RoomRequestCatalogsResolverTest {
         LocalDate date = LocalDate.of(2026, 5, 4);
         ActiveCommissionsKey key = new ActiveCommissionsKey(10L, date);
         when(classScheduleService.activeCommissionIds(10L, date)).thenReturn(List.of(7L, 8L));
-        when(commissionService.findByIds(any())).thenReturn(List.of(
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(
                 new CommissionResponseDto(7L, "CUR-7", null),
                 new CommissionResponseDto(8L, "CUR-8", null)));
 
@@ -100,7 +100,7 @@ class RoomRequestCatalogsResolverTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Collection<Long>> commissionIds = ArgumentCaptor.forClass(Collection.class);
-        verify(commissionService, times(1)).findByIds(commissionIds.capture());
+        verify(commissionService, times(1)).findByIdsIncludingDeactivated(commissionIds.capture());
         assertThat(commissionIds.getValue()).containsExactlyInAnyOrder(7L, 8L);
     }
 
@@ -108,7 +108,7 @@ class RoomRequestCatalogsResolverTest {
     @DisplayName("resolve: classroomIds se resuelven una sola vez y alimentan tanto las opciones como las asignadas")
     void resolve_classroomsFeedBothOptionsAndAssigned() {
         ClassroomResponseDto classroom = new ClassroomResponseDto(101L, 101, 40, 1L, "Edificio A", 1L, "Aula");
-        when(classroomService.findByIds(Set.of(101L))).thenReturn(List.of(classroom));
+        when(classroomService.findByIdsIncludingDeactivated(Set.of(101L))).thenReturn(List.of(classroom));
         when(catalogMapper.toClassroomOptions(List.of(classroom)))
                 .thenReturn(List.of(new ClassroomOptionDto(101L, 101, "Edificio A")));
         when(catalogMapper.toAssignedClassroomOptions(List.of(classroom)))
@@ -118,7 +118,7 @@ class RoomRequestCatalogsResolverTest {
 
         assertThat(catalogs.classroomsById()).containsOnlyKeys(101L);
         assertThat(catalogs.assignedClassroomsById()).containsOnlyKeys(101L);
-        verify(classroomService, times(1)).findByIds(any());
+        verify(classroomService, times(1)).findByIdsIncludingDeactivated(any());
     }
 
     @Test

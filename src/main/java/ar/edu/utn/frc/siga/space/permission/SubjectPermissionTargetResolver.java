@@ -25,7 +25,7 @@ public class SubjectPermissionTargetResolver implements PermissionTargetResolver
         if (targetIds.isEmpty()) {
             return Map.of();
         }
-        return subjectService.findByIds(targetIds).stream()
+        return subjectService.findByIdsIncludingDeactivated(targetIds).stream()
                 .collect(Collectors.toMap(SubjectResponseDto::id, SubjectResponseDto::name, (a, b) -> a));
     }
 }

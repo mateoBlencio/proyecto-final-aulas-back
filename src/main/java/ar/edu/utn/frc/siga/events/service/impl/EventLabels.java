@@ -43,7 +43,7 @@ class EventLabels {
         Map<Long, SubjectResponseDto> subjects = subjectIds.isEmpty() ? new HashMap<>()
                 : Maps.byId(subjectService.findByIdsIncludingDeactivated(subjectIds), SubjectResponseDto::id);
         Map<Long, CommissionResponseDto> commissions = commissionIds.isEmpty() ? new HashMap<>()
-                : Maps.byId(commissionService.findByIds(commissionIds), CommissionResponseDto::id);
+                : Maps.byId(commissionService.findByIdsIncludingDeactivated(commissionIds), CommissionResponseDto::id);
 
         Map<Long, String> labels = new HashMap<>();
         refsByEventId.forEach((eventId, ref) -> {

@@ -68,7 +68,7 @@ class AllocationImpactServiceImpl implements AllocationImpactService {
         }
 
         Set<Long> classroomIds = Set.copyOf(classroomByOccurrence.values());
-        Set<Long> buildingIds = classroomService.findByIds(classroomIds).stream()
+        Set<Long> buildingIds = classroomService.findByIdsIncludingDeactivated(classroomIds).stream()
                 .map(ClassroomResponseDto::buildingId)
                 .collect(Collectors.toSet());
         buildingScopeResolver.requireAccess(Permission.ALLOCATION_WRITE, buildingIds);

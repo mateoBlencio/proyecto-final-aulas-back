@@ -73,7 +73,7 @@ class CommissionServiceImplTest {
     void findByIdReturnsMappedDto() {
         Commission commission = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build();
         CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null);
-        when(commissionRepository.findActiveById(3L)).thenReturn(Optional.of(commission));
+        when(commissionRepository.findById(3L)).thenReturn(Optional.of(commission));
         when(commissionMapper.toDto(commission)).thenReturn(dto);
 
         CommissionResponseDto result = service.findById(3L);
@@ -84,7 +84,7 @@ class CommissionServiceImplTest {
     @Test
     @DisplayName("findById: si la comisión no existe, lanza ResourceNotFoundException")
     void findByIdWithMissingCommissionThrowsResourceNotFound() {
-        when(commissionRepository.findActiveById(99L)).thenReturn(Optional.empty());
+        when(commissionRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -184,6 +184,70 @@ class CommissionServiceImplTest {
         CommissionResponseDto result = service.findActiveByCourseCode("K1001");
 
         assertThat(result).isEqualTo(dto);
+    }
+
+    @Test
+    @DisplayName("find: si el período de la comisión está inhabilitado, lanza ResourceNotFoundException sin mapear")
+    void findWithCommissionOfInactivePeriodThrowsResourceNotFound() {
+        AcademicPeriod inactivePeriod = AcademicPeriod.builder().id(1L).year(2026).semester(1).build();
+        inactivePeriod.deactivate();
+        Commission existing = Commission.builder().id(3L).courseCode("K1001").academicPeriod(inactivePeriod).build();
+        when(academicPeriodRepository.findByYearAndSemester(2026, 1)).thenReturn(Optional.of(inactivePeriod));
+        when(commissionRepository.findByCourseCodeAndAcademicPeriod("K1001", inactivePeriod))
+                .thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> service.findByCourseAndPeriod("K1001", 2026, 1))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(commissionMapper, never()).toDto(any());
+    }
+
+    @Test
+    @DisplayName("findActiveByCourseCode: la única candidata tiene el período inhabilitado, lanza ResourceNotFoundException")
+    void findActiveByCourseCodeWithInactivePeriodThrowsResourceNotFound() {
+        AcademicPeriod inactivePeriod = AcademicPeriod.builder().id(1L).year(2026).semester(1).build();
+        inactivePeriod.deactivate();
+        Commission commission = Commission.builder().id(3L).courseCode("K1001").academicPeriod(inactivePeriod)
+                .sysacadEnabled(true).build();
+        when(commissionRepository.findByCourseCodeAndSysacadEnabledTrueAndDeletedAtIsNull("K1001"))
+                .thenReturn(List.of(commission));
+
+        assertThatThrownBy(() -> service.findActiveByCourseCode("K1001"))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(commissionMapper, never()).toDto(any());
+    }
+
+    @Test
+    @DisplayName("findActiveByCourseCode: una candidata con período inhabilitado no vuelve ambigua a la que sí está disponible")
+    void findActiveByCourseCodeIgnoresCandidatesOfInactivePeriod() {
+        AcademicPeriod inactivePeriod = AcademicPeriod.builder().id(2L).year(2025).semester(1).build();
+        inactivePeriod.deactivate();
+        Commission stale = Commission.builder().id(2L).courseCode("K1001").academicPeriod(inactivePeriod)
+                .sysacadEnabled(true).build();
+        Commission current = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period)
+                .sysacadEnabled(true).build();
+        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null);
+        when(commissionRepository.findByCourseCodeAndSysacadEnabledTrueAndDeletedAtIsNull("K1001"))
+                .thenReturn(List.of(stale, current));
+        when(commissionMapper.toDto(current)).thenReturn(dto);
+
+        assertThat(service.findActiveByCourseCode("K1001")).isEqualTo(dto);
+    }
+
+    @Test
+    @DisplayName("findByIds filtra las comisiones de períodos inhabilitados y findByIdsIncludingDeactivated las devuelve")
+    void findByIdsFiltersCommissionsOfInactivePeriodButIncludingDeactivatedKeepsThem() {
+        AcademicPeriod inactivePeriod = AcademicPeriod.builder().id(2L).year(2025).semester(1).build();
+        inactivePeriod.deactivate();
+        Commission available = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build();
+        Commission hidden = Commission.builder().id(4L).courseCode("K1002").academicPeriod(inactivePeriod).build();
+        CommissionResponseDto availableDto = new CommissionResponseDto(3L, "K1001", null);
+        CommissionResponseDto hiddenDto = new CommissionResponseDto(4L, "K1002", null);
+        when(commissionRepository.findAllById(List.of(3L, 4L))).thenReturn(List.of(available, hidden));
+        when(commissionMapper.toDto(available)).thenReturn(availableDto);
+        when(commissionMapper.toDto(hidden)).thenReturn(hiddenDto);
+
+        assertThat(service.findByIds(List.of(3L, 4L))).containsExactly(availableDto);
+        assertThat(service.findByIdsIncludingDeactivated(List.of(3L, 4L))).containsExactly(availableDto, hiddenDto);
     }
 
     @Test

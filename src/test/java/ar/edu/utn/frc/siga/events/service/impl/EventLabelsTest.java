@@ -54,7 +54,7 @@ class EventLabelsTest {
     @DisplayName("evento con materia y comisión: '{materia} {comisión}'")
     void labelsOf_subjectAndCommission() {
         when(subjectService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(subject(1L, "Álgebra")));
-        when(commissionService.findByIds(any())).thenReturn(List.of(commission(2L, "1K1")));
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(commission(2L, "1K1")));
 
         Map<Long, String> result = labels.labelsOf(Map.of(10L, new EventRef(1L, 2L, null)));
 
@@ -66,7 +66,7 @@ class EventLabelsTest {
     @SuppressWarnings("unchecked")
     void labelsOf_manyEvents_oneBatchCallPerCatalog() {
         when(subjectService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(subject(1L, "Álgebra"), subject(3L, "Física")));
-        when(commissionService.findByIds(any())).thenReturn(List.of(commission(2L, "1K1"), commission(4L, "2K2")));
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(commission(2L, "1K1"), commission(4L, "2K2")));
         Map<Long, EventRef> refs = new LinkedHashMap<>();
         refs.put(10L, new EventRef(1L, 2L, null));
         refs.put(11L, new EventRef(1L, 4L, null));
@@ -77,7 +77,7 @@ class EventLabelsTest {
         ArgumentCaptor<Collection<Long>> subjectIds = ArgumentCaptor.forClass(Collection.class);
         ArgumentCaptor<Collection<Long>> commissionIds = ArgumentCaptor.forClass(Collection.class);
         verify(subjectService, times(1)).findByIdsIncludingDeactivated(subjectIds.capture());
-        verify(commissionService, times(1)).findByIds(commissionIds.capture());
+        verify(commissionService, times(1)).findByIdsIncludingDeactivated(commissionIds.capture());
         verify(subjectService, never()).findByIds(any());
         assertThat(subjectIds.getValue()).containsExactlyInAnyOrder(1L, 3L);
         assertThat(commissionIds.getValue()).containsExactlyInAnyOrder(2L, 4L);
@@ -98,7 +98,7 @@ class EventLabelsTest {
     @Test
     @DisplayName("evento único sin materia usa la descripción, sin la comisión")
     void labelsOf_noSubject_usesDescription() {
-        when(commissionService.findByIds(any())).thenReturn(List.of(commission(2L, "1K1")));
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(commission(2L, "1K1")));
 
         assertThat(labels.labelsOf(Map.of(10L, new EventRef(null, 2L, "Charla de ingreso"))))
                 .containsExactly(Map.entry(10L, "Charla de ingreso"));
@@ -116,7 +116,7 @@ class EventLabelsTest {
     @Test
     @DisplayName("sin materia y con descripción en blanco usa la comisión")
     void labelsOf_noSubjectBlankDescription_usesCommission() {
-        when(commissionService.findByIds(any())).thenReturn(List.of(commission(2L, "1K1")));
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(commission(2L, "1K1")));
 
         assertThat(labels.labelsOf(Map.of(10L, new EventRef(null, 2L, "   "))))
                 .containsExactly(Map.entry(10L, "1K1"));

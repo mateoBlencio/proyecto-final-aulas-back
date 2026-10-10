@@ -69,7 +69,7 @@ public class PreviewComposer {
 
         Set<Long> classroomIds = new LinkedHashSet<>(effectiveRoomByEventId.values());
         priorSlotsByEvent.values().stream().flatMap(List::stream).map(OccupiedSlot::classroomId).forEach(classroomIds::add);
-        Map<Long, ClassroomResponseDto> classroomDtoById = Maps.byId(classroomService.findByIds(classroomIds), ClassroomResponseDto::id);
+        Map<Long, ClassroomResponseDto> classroomDtoById = Maps.byId(classroomService.findByIdsIncludingDeactivated(classroomIds), ClassroomResponseDto::id);
 
         List<PreviewItemDto> allocations = resolved.stream()
                 .map(a -> toPreviewItemDto(a, eventDtoById, datesByEvent,

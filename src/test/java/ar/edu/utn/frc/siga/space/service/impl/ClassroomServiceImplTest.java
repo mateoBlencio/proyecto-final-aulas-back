@@ -405,7 +405,7 @@ class ClassroomServiceImplTest {
         Building building = SpaceTestData.building().build();
         Classroom existing = SpaceTestData.classroom().build();
         ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
-        when(buildingRepository.findById(1L)).thenReturn(Optional.of(building));
+        when(buildingRepository.findActiveById(1L)).thenReturn(Optional.of(building));
         when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, building)).thenReturn(Optional.of(existing));
         when(classroomMapper.toDto(existing)).thenReturn(dto);
 
@@ -416,18 +416,12 @@ class ClassroomServiceImplTest {
     }
 
     @Test
-    @DisplayName("findByRoomNumberAndBuilding: no exige edificio activo")
-    void findByRoomNumberAndBuildingDoesNotRequireActiveBuilding() {
-        Building inactive = SpaceTestData.deactivated(SpaceTestData.building().build());
-        Classroom existing = SpaceTestData.classroom().build();
-        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
-        when(buildingRepository.findById(1L)).thenReturn(Optional.of(inactive));
-        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, inactive)).thenReturn(Optional.of(existing));
-        when(classroomMapper.toDto(existing)).thenReturn(dto);
+    @DisplayName("findByRoomNumberAndBuilding: si el edificio está inactivo, lanza ResourceNotFoundException")
+    void findByRoomNumberAndBuildingWithInactiveBuildingThrowsResourceNotFound() {
+        when(buildingRepository.findActiveById(1L)).thenReturn(Optional.empty());
 
-        ClassroomResponseDto result = service.findByRoomNumberAndBuilding(101, 1L);
-
-        assertThat(result).isEqualTo(dto);
+        assertThatThrownBy(() -> service.findByRoomNumberAndBuilding(101, 1L))
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
@@ -436,7 +430,7 @@ class ClassroomServiceImplTest {
         Building informedBuilding = SpaceTestData.building().id(2L).name("Edif. Ing.Inchaurrondo").build();
         Classroom actual = SpaceTestData.classroom().build();
         ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
-        when(buildingRepository.findById(2L)).thenReturn(Optional.of(informedBuilding));
+        when(buildingRepository.findActiveById(2L)).thenReturn(Optional.of(informedBuilding));
         when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, informedBuilding)).thenReturn(Optional.empty());
         when(classroomRepository.findAllByRoomNumberAndDeletedAtIsNull(101)).thenReturn(List.of(actual));
         when(classroomMapper.toDto(actual)).thenReturn(dto);
@@ -452,7 +446,7 @@ class ClassroomServiceImplTest {
         Building informedBuilding = SpaceTestData.building().id(2L).name("Otro edificio").build();
         Classroom other1 = SpaceTestData.classroom().id(10L).build();
         Classroom other2 = SpaceTestData.classroom().id(11L).build();
-        when(buildingRepository.findById(2L)).thenReturn(Optional.of(informedBuilding));
+        when(buildingRepository.findActiveById(2L)).thenReturn(Optional.of(informedBuilding));
         when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(999, informedBuilding)).thenReturn(Optional.empty());
         when(classroomRepository.findAllByRoomNumberAndDeletedAtIsNull(999)).thenReturn(List.of(other1, other2));
 
@@ -465,7 +459,7 @@ class ClassroomServiceImplTest {
     @DisplayName("findByRoomNumberAndBuilding: si el aula no existe en el edificio, lanza ResourceNotFoundException")
     void findByRoomNumberAndBuildingWithMissingClassroomThrowsResourceNotFound() {
         Building building = SpaceTestData.building().build();
-        when(buildingRepository.findById(1L)).thenReturn(Optional.of(building));
+        when(buildingRepository.findActiveById(1L)).thenReturn(Optional.of(building));
         when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, building)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findByRoomNumberAndBuilding(101, 1L))
@@ -476,7 +470,7 @@ class ClassroomServiceImplTest {
     @Test
     @DisplayName("findByRoomNumberAndBuilding: si el edificio no existe, lanza ResourceNotFoundException")
     void findByRoomNumberAndBuildingWithMissingBuildingThrowsResourceNotFound() {
-        when(buildingRepository.findById(1L)).thenReturn(Optional.empty());
+        when(buildingRepository.findActiveById(1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findByRoomNumberAndBuilding(101, 1L))
                 .isInstanceOf(ResourceNotFoundException.class)

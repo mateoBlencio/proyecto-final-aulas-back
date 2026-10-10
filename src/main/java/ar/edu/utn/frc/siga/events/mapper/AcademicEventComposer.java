@@ -58,8 +58,8 @@ public class AcademicEventComposer {
             }
         }
 
-        Map<Long, SubjectResponseDto> subjectsById = Maps.byId(subjectService.findByIds(subjectIds), SubjectResponseDto::id);
-        Map<Long, CommissionResponseDto> commissionsById = Maps.byId(commissionService.findByIds(commissionIds), CommissionResponseDto::id);
+        Map<Long, SubjectResponseDto> subjectsById = Maps.byId(subjectService.findByIdsIncludingDeactivated(subjectIds), SubjectResponseDto::id);
+        Map<Long, CommissionResponseDto> commissionsById = Maps.byId(commissionService.findByIdsIncludingDeactivated(commissionIds), CommissionResponseDto::id);
 
         List<AcademicEventResponseDto> result = new ArrayList<>(realEvents.size());
         for (AcademicEvent event : realEvents) {

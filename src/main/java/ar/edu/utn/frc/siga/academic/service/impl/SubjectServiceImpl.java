@@ -13,7 +13,6 @@ import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.academic.service.command.SubjectSyncCommand;
 import ar.edu.utn.frc.siga.academic.specification.SubjectSpecification;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
-import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.common.util.Maps;
@@ -29,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,14 +48,16 @@ public class SubjectServiceImpl implements SubjectService {
     public Page<SubjectResponseDto> findAll(SubjectFilter filter, Pageable pageable, boolean includeDeactivated) {
         return subjectRepository.findAll(
                         SubjectSpecification.withFilter(filter)
-                                .and(SoftDeleteSpecifications.activeUnless(includeDeactivated)),
+                                .and(includeDeactivated ? Specification.<Subject>unrestricted() : SubjectSpecification.available()),
                         pageable)
                 .map(subjectMapper::toDto);
     }
 
     @Override
     public SubjectResponseDto findById(Long id) {
-        return subjectMapper.toDto(Finder.orThrow(subjectRepository::findActiveById, id, "Subject"));
+        return subjectMapper.toDto(subjectRepository.findById(id)
+                .filter(Subject::isAvailable)
+                .orElseThrow(() -> ResourceNotFoundException.of("Subject", id)));
     }
 
     @Override
@@ -73,7 +75,7 @@ public class SubjectServiceImpl implements SubjectService {
     @Override
     public List<SubjectResponseDto> findByIds(Collection<Long> ids) {
         return subjectRepository.findAllById(ids).stream()
-                .filter(Subject::isActive)
+                .filter(Subject::isAvailable)
                 .map(subjectMapper::toDto)
                 .toList();
     }

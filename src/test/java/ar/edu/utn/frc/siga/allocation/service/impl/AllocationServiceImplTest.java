@@ -95,7 +95,7 @@ class AllocationServiceImplTest {
     void setUp() {
         service = new AllocationServiceImpl(allocationRepository, occurrenceService, composer, validator, targetResolver,
                 writer, classroomService, buildingScopeResolver, classroomLock);
-        lenient().when(classroomService.findByIds(any())).thenReturn(List.of());
+        lenient().when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of());
         lenient().when(buildingScopeResolver.scopeFor(any())).thenReturn(BuildingScope.unrestricted());
     }
 
@@ -223,7 +223,7 @@ class AllocationServiceImplTest {
         Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
         when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
         ClassroomResponseDto classroom = new ClassroomResponseDto(5L, 101, 40, 9L, "Edificio Ajeno", 1L, "Normal");
-        when(classroomService.findByIds(Set.of(5L))).thenReturn(List.of(classroom));
+        when(classroomService.findByIdsIncludingDeactivated(Set.of(5L))).thenReturn(List.of(classroom));
         doThrow(new AccessDeniedException("sin acceso"))
                 .when(buildingScopeResolver).requireAccess(Permission.ALLOCATION_WRITE, Set.of(9L));
 
@@ -492,7 +492,7 @@ class AllocationServiceImplTest {
         when(allocationRepository.findByOccurrenceIdIn(List.of(10L)))
                 .thenReturn(List.of(allocation(100L, 10L, 5, AllocationSource.MANUAL)));
         ClassroomResponseDto classroom = new ClassroomResponseDto(5L, 101, 40, 9L, "Edificio Ajeno", 1L, "Normal");
-        when(classroomService.findByIds(Set.of(5L))).thenReturn(List.of(classroom));
+        when(classroomService.findByIdsIncludingDeactivated(Set.of(5L))).thenReturn(List.of(classroom));
         doThrow(new AccessDeniedException("sin acceso"))
                 .when(buildingScopeResolver).requireAccess(Permission.ALLOCATION_WRITE, Set.of(9L));
 
@@ -757,7 +757,7 @@ class AllocationServiceImplTest {
         auditedService();
         Map<OccurrenceSlotDto, Long> resolved = mapOf(occurrenceSlot(10L, 1L, futureDate(1)), 5);
         AllocationCommand command = stubManualWrite(resolved, false);
-        when(classroomService.findByIds(Set.of(5L))).thenReturn(List.of(classroomIn(5L, 1L, CENTRAL)));
+        when(classroomService.findByIdsIncludingDeactivated(Set.of(5L))).thenReturn(List.of(classroomIn(5L, 1L, CENTRAL)));
 
         audited.allocate(command);
 
@@ -771,7 +771,7 @@ class AllocationServiceImplTest {
         Map<OccurrenceSlotDto, Long> resolved = mapOf(
                 occurrenceSlot(10L, 1L, futureDate(1)), 5, occurrenceSlot(11L, 1L, futureDate(2)), 6);
         AllocationCommand command = stubManualWrite(resolved, false);
-        when(classroomService.findByIds(Set.of(5L, 6L)))
+        when(classroomService.findByIdsIncludingDeactivated(Set.of(5L, 6L)))
                 .thenReturn(List.of(classroomIn(5L, 1L, CENTRAL), classroomIn(6L, 1L, CENTRAL)));
 
         audited.allocate(command);
@@ -786,7 +786,7 @@ class AllocationServiceImplTest {
         Map<OccurrenceSlotDto, Long> resolved = mapOf(
                 occurrenceSlot(10L, 1L, futureDate(1)), 5, occurrenceSlot(11L, 1L, futureDate(2)), 5);
         AllocationCommand command = stubManualWrite(resolved, false);
-        when(classroomService.findByIds(Set.of(5L))).thenReturn(List.of(classroomIn(5L, 1L, CENTRAL)));
+        when(classroomService.findByIdsIncludingDeactivated(Set.of(5L))).thenReturn(List.of(classroomIn(5L, 1L, CENTRAL)));
 
         audited.allocate(command);
 
@@ -800,7 +800,7 @@ class AllocationServiceImplTest {
         Map<OccurrenceSlotDto, Long> resolved = mapOf(
                 occurrenceSlot(10L, 1L, futureDate(1)), 5, occurrenceSlot(11L, 1L, futureDate(2)), 6);
         AllocationCommand command = stubManualWrite(resolved, false);
-        when(classroomService.findByIds(Set.of(5L, 6L)))
+        when(classroomService.findByIdsIncludingDeactivated(Set.of(5L, 6L)))
                 .thenReturn(List.of(classroomIn(5L, 1L, CENTRAL), classroomIn(6L, 2L, "Edificio Norte")));
 
         audited.allocate(command);
@@ -815,7 +815,7 @@ class AllocationServiceImplTest {
         Map<OccurrenceSlotDto, Long> resolved = mapOf(
                 occurrenceSlot(10L, 1L, futureDate(1)), 5, occurrenceSlot(11L, 1L, futureDate(2)), 6);
         AllocationCommand command = stubManualWrite(resolved, true);
-        when(classroomService.findByIds(Set.of(5L, 6L)))
+        when(classroomService.findByIdsIncludingDeactivated(Set.of(5L, 6L)))
                 .thenReturn(List.of(classroomIn(5L, 1L, CENTRAL), classroomIn(6L, 1L, CENTRAL)));
 
         audited.reallocate(command);

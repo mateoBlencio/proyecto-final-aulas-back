@@ -56,4 +56,8 @@ public class Subject extends SoftDeletableEntity {
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
+
+    public boolean isAvailable() {
+        return isActive() && studyPlan.isActive();
+    }
 }

@@ -66,6 +66,7 @@ public class BuildingServiceImpl implements BuildingService {
     @Override
     public BuildingResponseDto findByName(String name) {
         return buildingMapper.toDto(buildingRepository.findByName(name)
+                .filter(Building::isActive)
                 .orElseThrow(() -> ResourceNotFoundException.of("Building", name)));
     }
 

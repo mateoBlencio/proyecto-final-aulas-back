@@ -194,7 +194,7 @@ public class AllocationServiceImpl implements AllocationService {
         if (classroomIds.isEmpty()) {
             return List.of();
         }
-        List<ClassroomResponseDto> classrooms = classroomService.findByIds(classroomIds);
+        List<ClassroomResponseDto> classrooms = classroomService.findByIdsIncludingDeactivated(classroomIds);
         Set<Long> buildingIds = classrooms.stream()
                 .map(ClassroomResponseDto::buildingId)
                 .collect(Collectors.toSet());

@@ -68,7 +68,7 @@ class OccurrenceAuditLabelProviderTest {
     private void catalogs() {
         when(subjectService.findByIdsIncludingDeactivated(any()))
                 .thenReturn(List.of(new SubjectResponseDto(1L, 100, "Álgebra", null, null, true)));
-        when(commissionService.findByIds(any())).thenReturn(List.of(new CommissionResponseDto(2L, "1K1", null)));
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(new CommissionResponseDto(2L, "1K1", null)));
     }
 
     @Test
@@ -101,7 +101,7 @@ class OccurrenceAuditLabelProviderTest {
         ArgumentCaptor<Collection<Long>> eventIds = ArgumentCaptor.forClass(Collection.class);
         verify(eventRepository, times(1)).findAllById(eventIds.capture());
         verify(subjectService, times(1)).findByIdsIncludingDeactivated(any());
-        verify(commissionService, times(1)).findByIds(any());
+        verify(commissionService, times(1)).findByIdsIncludingDeactivated(any());
         assertThat(eventIds.getValue()).containsExactly(10L);
         assertThat(labels).containsOnly(
                 Map.entry("100", "Álgebra 1K1 · 04/03/2026"), Map.entry("101", "Álgebra 1K1 · 11/03/2026"));

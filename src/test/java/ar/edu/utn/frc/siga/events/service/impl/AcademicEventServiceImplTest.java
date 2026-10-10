@@ -163,7 +163,7 @@ class AcademicEventServiceImplTest {
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19));
         when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of());
         when(subjectService.findByIds(any())).thenReturn(List.of(EventTestData.subjectResponseDto(1L)));
-        when(commissionService.findByIds(any())).thenReturn(List.of(EventTestData.commissionResponseDto(1L)));
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(EventTestData.commissionResponseDto(1L)));
         when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(9L));
 
         FindOrCreateResult<Long> result = service.findOrCreateRecurringEvent(dto);
@@ -173,7 +173,7 @@ class AcademicEventServiceImplTest {
         verify(subjectService, never()).findById(any());
         verify(commissionService, never()).findById(any());
         verify(subjectService).findByIds(any());
-        verify(commissionService).findByIds(any());
+        verify(commissionService).findByIdsIncludingDeactivated(any());
         verify(occurrenceRepository).saveAll(any());
     }
 
@@ -189,7 +189,7 @@ class AcademicEventServiceImplTest {
         when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any()))
                 .thenReturn(List.of(existingTuesday));
         when(subjectService.findByIds(any())).thenReturn(List.of(EventTestData.subjectResponseDto(1L)));
-        when(commissionService.findByIds(any())).thenReturn(List.of(EventTestData.commissionResponseDto(1L)));
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(EventTestData.commissionResponseDto(1L)));
         when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(10L));
 
         List<FindOrCreateResult<Long>> results = service.findOrCreateRecurringEvents(
@@ -730,6 +730,41 @@ class AcademicEventServiceImplTest {
         verify(eventScheduleValidator, never()).validateNotPast(mirror);
         assertThat(principal.getDate()).isEqualTo(dto.date());
         assertThat(mirror.getDate()).isEqualTo(dto.date());
+    }
+
+    @Test
+    @DisplayName("updateUniqueEvent: si la materia y la comisión no cambian, no se revalidan (un período inhabilitado no bloquea editar el horario)")
+    void updateUniqueEventSinCambiarReferenciasNoRevalida() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence occurrence = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.NEEDS_ROOM);
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
+        when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyUniqueResponseDto(3L));
+
+        service.updateUniqueEvent(3L, updateDto());
+
+        verify(subjectService, never()).findById(any());
+        verify(commissionService, never()).findById(any());
+        verify(eventScheduleValidator, never()).validateCommissionBelongsToSubject(any(), any());
+        assertThat(event.getStartTime()).isEqualTo(LocalTime.of(11, 0));
+    }
+
+    @Test
+    @DisplayName("updateUniqueEvent: si cambia la comisión, se valida y una comisión no disponible rechaza la edición sin escribir")
+    void updateUniqueEventCambiandoAComisionNoDisponibleRechaza() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence occurrence = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.NEEDS_ROOM);
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
+        when(commissionService.findById(2L)).thenThrow(ResourceNotFoundException.of("Commission", 2L));
+        UpdateUniqueEventRequestDto dto = new UpdateUniqueEventRequestDto(
+                UniqueEventKind.PARCIAL, 1L, 2L, LocalDate.of(2026, 3, 15),
+                LocalTime.of(11, 0), 90, 25, "descripcion actualizada");
+
+        assertThatThrownBy(() -> service.updateUniqueEvent(3L, dto))
+                .isInstanceOf(ResourceNotFoundException.class);
+        assertThat(event.getCommissionId()).isEqualTo(1L);
+        assertThat(event.getStartTime()).isEqualTo(LocalTime.of(10, 0));
     }
 
     @Test

@@ -32,4 +32,10 @@ public class ClassroomSpecification {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
     }
+
+    public static Specification<Classroom> available() {
+        return (root, query, cb) -> cb.and(
+                cb.isNull(root.get("deletedAt")),
+                cb.isNull(root.get("building").get("deletedAt")));
+    }
 }

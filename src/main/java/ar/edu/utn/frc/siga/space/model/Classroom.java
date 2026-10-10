@@ -73,4 +73,7 @@ public class Classroom extends SoftDeletableEntity {
     @Column(name = "observaciones", length = 500)
     private String observations;
 
+    public boolean isAvailable() {
+        return isActive() && building.isActive();
+    }
 }

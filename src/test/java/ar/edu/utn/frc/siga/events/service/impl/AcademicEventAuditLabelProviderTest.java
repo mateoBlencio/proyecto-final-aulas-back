@@ -58,20 +58,20 @@ class AcademicEventAuditLabelProviderTest {
     void labels_subjectAndCommission_oneBatchCallPerService() {
         when(subjectService.findByIdsIncludingDeactivated(any()))
                 .thenReturn(List.of(new SubjectResponseDto(1L, 100, "Álgebra", null, null, false)));
-        when(commissionService.findByIds(any())).thenReturn(List.of(new CommissionResponseDto(2L, "1K1", null)));
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(new CommissionResponseDto(2L, "1K1", null)));
 
         Map<String, String> labels = provider.labels(List.of(
                 record("10", 1L, 2L, null), record("11", 1L, 2L, null)));
 
         assertThat(labels).containsOnly(Map.entry("10", "Álgebra 1K1"), Map.entry("11", "Álgebra 1K1"));
         verify(subjectService, times(1)).findByIdsIncludingDeactivated(any());
-        verify(commissionService, times(1)).findByIds(any());
+        verify(commissionService, times(1)).findByIdsIncludingDeactivated(any());
     }
 
     @Test
     @DisplayName("evento único sin materia usa la descripción; sin descripción, la comisión")
     void labels_noSubject_fallsBackToDescriptionThenCommission() {
-        when(commissionService.findByIds(any())).thenReturn(List.of(new CommissionResponseDto(2L, "1K1", null)));
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(new CommissionResponseDto(2L, "1K1", null)));
 
         Map<String, String> labels = provider.labels(List.of(
                 record("10", null, 2L, "Charla de ingreso"), record("11", null, 2L, null)));
@@ -88,7 +88,7 @@ class AcademicEventAuditLabelProviderTest {
     @Test
     @DisplayName("un recordId no numérico se saltea sin romper el resto del lote")
     void labels_nonNumericRecordId_isSkippedWithoutBreakingOthers() {
-        when(commissionService.findByIds(any())).thenReturn(List.of(new CommissionResponseDto(2L, "1K1", null)));
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(new CommissionResponseDto(2L, "1K1", null)));
 
         Map<String, String> labels = provider.labels(List.of(
                 record("abc", null, 2L, null), record("11", null, 2L, null)));

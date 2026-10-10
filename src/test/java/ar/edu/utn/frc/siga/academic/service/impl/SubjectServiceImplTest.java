@@ -67,7 +67,7 @@ class SubjectServiceImplTest {
     void findByIdReturnsMappedDto() {
         Subject subject = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
         SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true);
-        when(subjectRepository.findActiveById(5L)).thenReturn(Optional.of(subject));
+        when(subjectRepository.findById(5L)).thenReturn(Optional.of(subject));
         when(subjectMapper.toDto(subject)).thenReturn(dto);
 
         SubjectResponseDto result = service.findById(5L);
@@ -78,7 +78,7 @@ class SubjectServiceImplTest {
     @Test
     @DisplayName("findById: si la materia no existe, lanza ResourceNotFoundException")
     void findByIdWithMissingSubjectThrowsResourceNotFound() {
-        when(subjectRepository.findActiveById(99L)).thenReturn(Optional.empty());
+        when(subjectRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)

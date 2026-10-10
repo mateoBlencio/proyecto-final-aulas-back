@@ -43,4 +43,8 @@ public class Commission extends SoftDeletableEntity {
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
+
+    public boolean isAvailable() {
+        return isActive() && academicPeriod.isActive();
+    }
 }

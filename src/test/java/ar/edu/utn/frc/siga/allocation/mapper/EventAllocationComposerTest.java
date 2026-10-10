@@ -48,7 +48,7 @@ class EventAllocationComposerTest {
         composer = new EventAllocationComposer(occurrenceService, allocationRepository, classroomService);
         lenient().when(occurrenceService.findSlotsByEvents(any())).thenReturn(List.of());
         lenient().when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of());
-        lenient().when(classroomService.findByIds(any())).thenReturn(List.of());
+        lenient().when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of());
     }
 
     @Test
@@ -102,7 +102,7 @@ class EventAllocationComposerTest {
                 .id(1L).occurrenceId(10L).classroomId(5L).observation("obs").build();
         when(occurrenceService.findSlotsByEvents(any())).thenReturn(List.of(slot));
         when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(allocation));
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, 30)));
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 30)));
 
         List<UniqueEventAllocationResponseDto> result = composer.composeAll(List.of(event));
 

@@ -45,7 +45,7 @@ class AcademicPeriodChangedListenerTest {
         RecurringEvent matching = event(1L, 10L);
         RecurringEvent otherPeriod = event(2L, 20L);
         when(recurringEventRepository.findAll()).thenReturn(List.of(matching, otherPeriod));
-        when(commissionService.findByIds(any())).thenReturn(List.of(
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(
                 commission(10L, 2026, 0),
                 commission(20L, 2026, 1)));
 

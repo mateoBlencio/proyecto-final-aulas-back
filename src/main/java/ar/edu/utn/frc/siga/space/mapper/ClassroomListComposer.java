@@ -44,6 +44,7 @@ public class ClassroomListComposer {
         Map<Long, List<ClassroomResource>> resourcesByClassroom = classroomIds.isEmpty()
                 ? Map.of()
                 : classroomResourceRepository.findByClassroomIdInAndDeletedAtIsNull(classroomIds).stream()
+                        .filter(resource -> resource.getResourceType().isActive())
                         .collect(Collectors.groupingBy(resource -> resource.getClassroom().getId()));
 
         Map<Long, List<ClassroomPermission>> permissionsByClassroom = classroomIds.isEmpty()

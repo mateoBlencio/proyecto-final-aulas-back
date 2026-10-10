@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SubjectCommissionMapper;
 import ar.edu.utn.frc.siga.academic.model.Commission;
 import ar.edu.utn.frc.siga.academic.model.Subject;
+import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
@@ -12,12 +13,12 @@ import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
 import ar.edu.utn.frc.siga.academic.specification.SubjectCommissionSpecification;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
-import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,11 +59,13 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
 
     private Subject requireSubject(Long id) {
         return subjectRepository.findById(id)
+                .filter(Subject::isAvailable)
                 .orElseThrow(() -> ResourceNotFoundException.of("Subject", id));
     }
 
     private Commission requireCommission(Long id) {
         return commissionRepository.findById(id)
+                .filter(Commission::isAvailable)
                 .orElseThrow(() -> ResourceNotFoundException.of("Commission", id));
     }
 
@@ -80,7 +83,9 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
             boolean includeDeactivated) {
         return subjectCommissionRepository.findAll(
                         SubjectCommissionSpecification.withFilter(filter)
-                                .and(SoftDeleteSpecifications.activeUnless(includeDeactivated)),
+                                .and(includeDeactivated
+                                        ? Specification.<SubjectCommission>unrestricted()
+                                        : SubjectCommissionSpecification.available()),
                         pageable)
                 .map(subjectCommissionMapper::toDto);
     }
