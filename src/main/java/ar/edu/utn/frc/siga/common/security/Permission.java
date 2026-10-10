@@ -30,6 +30,9 @@ public enum Permission {
 
     PREVIEW_RUN(ScopeType.BUILDING),
 
+    DASHBOARD_READ(ScopeType.BUILDING),
+    DASHBOARD_SNAPSHOT_REGENERATE(ScopeType.GLOBAL),
+
     ROOM_REQUEST_READ(ScopeType.GLOBAL),
     ROOM_REQUEST_WRITE(ScopeType.GLOBAL),
 
