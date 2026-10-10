@@ -8,7 +8,10 @@ import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.dashboard.dto.response.AllocationTrendResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardBadgesResponseDto;
+import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardPeriodResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardReportResponseDto;
+import ar.edu.utn.frc.siga.dashboard.dto.response.ReportBuildingResponseDto;
+import ar.edu.utn.frc.siga.dashboard.dto.response.ReportCampusResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardWeekResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.OpenRoomRequestsResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.RoomRequestStatsResponseDto;
@@ -18,9 +21,13 @@ import ar.edu.utn.frc.siga.dashboard.dto.response.WeekCampusResponseDto;
 import ar.edu.utn.frc.siga.dashboard.model.AllocationUnitRow;
 import ar.edu.utn.frc.siga.dashboard.model.BuildingRoomsRow;
 import ar.edu.utn.frc.siga.dashboard.model.CategoryCounts;
+import ar.edu.utn.frc.siga.dashboard.model.DashboardPeriodType;
 import ar.edu.utn.frc.siga.dashboard.model.PeriodMetrics;
 import ar.edu.utn.frc.siga.dashboard.model.PendingItemRow;
+import ar.edu.utn.frc.siga.dashboard.model.ResolvedPeriod;
 import ar.edu.utn.frc.siga.dashboard.model.ScopeMetrics;
+import ar.edu.utn.frc.siga.dashboard.model.SnapshotPayload.RoomRequestCounts;
+import ar.edu.utn.frc.siga.dashboard.model.WindowRoomRequests;
 import ar.edu.utn.frc.siga.dashboard.repository.DashboardReadRepository;
 import ar.edu.utn.frc.siga.dashboard.service.DashboardQueryService;
 import java.time.Clock;
@@ -56,6 +63,8 @@ public class DashboardQueryServiceImpl implements DashboardQueryService {
     private final DashboardReadRepository repository;
     private final DashboardRoomRequestStats roomRequestStats;
     private final DashboardSnapshotReader snapshotReader;
+    private final DashboardPeriodResolver periodResolver;
+    private final DashboardRoomRequestCounter roomRequestCounter;
     private final BuildingScopeResolver buildingScopeResolver;
     private final Clock clock;
 
@@ -87,6 +96,42 @@ public class DashboardQueryServiceImpl implements DashboardQueryService {
 
         return new DashboardWeekResponseDto(monday, monday.plusDays(5), currentWeek, !scope.isUnrestricted(),
                 DashboardDtoMapper.parameters(period.parameters()), DashboardDtoMapper.excludedDays(period.availability()), campus, buildings);
+    }
+
+    @Override
+    public DashboardPeriodResponseDto period(DashboardPeriodType type) {
+        BuildingScope scope = buildingScopeResolver.scopeFor(Permission.DASHBOARD_READ);
+        ResolvedPeriod p = periodResolver.resolve(type);
+        PeriodMetrics m = metricsService.compute(p.from(), p.to(), scope);
+        WindowRoomRequests requests = roomRequestCounter.count(p.from(), p.to());
+        int firstHour = m.parameters().firstSlotHour();
+
+        List<ReportBuildingResponseDto> buildings = m.buildings().stream()
+                .map(b -> DashboardDtoMapper.reportBuilding(b.buildingId(), b.code(), b.name(),
+                        m.byBuilding().get(b.buildingId()), requests.forBuilding(b.buildingId()), firstHour))
+                .toList();
+        ReportCampusResponseDto campus = scope.isUnrestricted()
+                ? DashboardDtoMapper.reportCampus(m.campus(), m.unallocated(), requests.campus(),
+                        requests.unassignedBuilding(), firstHour)
+                : DashboardDtoMapper.reportCampus(m.campus(), null, scopedRequests(m, requests), null, firstHour);
+        return new DashboardPeriodResponseDto(p.type(), p.year(), p.semester(), p.periodStart(), p.periodEnd(),
+                p.from(), p.to(), p.partial(), !scope.isUnrestricted(),
+                DashboardDtoMapper.parameters(m.parameters()), DashboardDtoMapper.excludedDays(m.availability()),
+                campus, buildings);
+    }
+
+    /** Restricted campus: the sum of the counts of the user's buildings. */
+    private static RoomRequestCounts scopedRequests(PeriodMetrics m, WindowRoomRequests requests) {
+        long resolved = 0;
+        long expired = 0;
+        long pending = 0;
+        for (BuildingRoomsRow b : m.buildings()) {
+            RoomRequestCounts c = requests.forBuilding(b.buildingId());
+            resolved += c.resolved();
+            expired += c.expired();
+            pending += c.pending();
+        }
+        return new RoomRequestCounts(resolved, expired, pending);
     }
 
     @Override

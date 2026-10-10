@@ -2,9 +2,11 @@ package ar.edu.utn.frc.siga.dashboard.service;
 
 import ar.edu.utn.frc.siga.dashboard.dto.response.AllocationTrendResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardBadgesResponseDto;
+import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardPeriodResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardReportResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardWeekResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.RoomRequestStatsResponseDto;
+import ar.edu.utn.frc.siga.dashboard.model.DashboardPeriodType;
 import java.time.LocalDate;
 import java.time.YearMonth;
 
@@ -24,4 +26,7 @@ public interface DashboardQueryService {
 
     /** Report of a closed month read from its snapshot. 404 when the month has none. */
     DashboardReportResponseDto report(YearMonth month);
+
+    /** Term, academic year or current month, from its start up to today. */
+    DashboardPeriodResponseDto period(DashboardPeriodType type);
 }

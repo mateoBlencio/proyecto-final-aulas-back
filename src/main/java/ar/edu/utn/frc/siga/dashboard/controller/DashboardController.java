@@ -3,9 +3,11 @@ package ar.edu.utn.frc.siga.dashboard.controller;
 import ar.edu.utn.frc.siga.dashboard.dto.request.SnapshotRegenerationRequestDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.AllocationTrendResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardBadgesResponseDto;
+import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardPeriodResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardReportResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardWeekResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.RoomRequestStatsResponseDto;
+import ar.edu.utn.frc.siga.dashboard.model.DashboardPeriodType;
 import ar.edu.utn.frc.siga.dashboard.service.DashboardQueryService;
 import ar.edu.utn.frc.siga.dashboard.service.DashboardSnapshotService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -50,6 +52,18 @@ public class DashboardController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekOf) {
         log.debug("GET /v1/dashboard/week?weekOf={}", weekOf);
         return ResponseEntity.ok(queryService.week(weekOf));
+    }
+
+    @GetMapping("/period")
+    @PreAuthorize("hasAuthority('PERM_DASHBOARD_READ')")
+    @Operation(summary = "Tablero de un período",
+               description = "Cuatrimestre en curso (TERM, por defecto), año académico (ACADEMIC_YEAR) o mes en curso "
+                       + "(CURRENT_MONTH), desde el inicio del período hasta hoy. Fuera de cuatrimestre devuelve "
+                       + "completo el último que empezó. 400 si type no es válido.")
+    public ResponseEntity<DashboardPeriodResponseDto> period(
+            @RequestParam(defaultValue = "TERM") DashboardPeriodType type) {
+        log.debug("GET /v1/dashboard/period?type={}", type);
+        return ResponseEntity.ok(queryService.period(type));
     }
 
     @GetMapping("/badges")
