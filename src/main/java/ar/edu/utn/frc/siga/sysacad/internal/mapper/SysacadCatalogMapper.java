@@ -60,10 +60,11 @@ public class SysacadCatalogMapper {
     /** Devuelve null (y loguea) si la fecha viene nula, vacía o inválida. */
     public SysacadHolidayDto toHoliday(RawHoliday raw) {
         String text = trim(raw.fecha());
+        if (text == null || text.isEmpty()) {
+            log.warn("Feriado de SysAcad ignorado por fecha vacía");
+            return null;
+        }
         try {
-            if (text == null || text.isEmpty()) {
-                throw new DateTimeParseException("empty", "", 0);
-            }
             return new SysacadHolidayDto(LocalDate.parse(text, HOLIDAY_DATE), trim(raw.descripcion()));
         } catch (DateTimeParseException e) {
             log.warn("Feriado de SysAcad ignorado por fecha inválida: {}", raw.fecha());
