@@ -10,7 +10,6 @@ import ar.edu.utn.frc.siga.dashboard.dto.response.AllocationTrendResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardBadgesResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardReportResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardWeekResponseDto;
-import ar.edu.utn.frc.siga.dashboard.dto.response.ExcludedDayResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.OpenRoomRequestsResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.RoomRequestStatsResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.RoomsInUseResponseDto;
@@ -86,11 +85,8 @@ public class DashboardQueryServiceImpl implements DashboardQueryService {
                 period.unallocated(),
                 campusOpenRoomRequests(scope, openItems, open));
 
-        List<ExcludedDayResponseDto> excluded = period.availability().excludedDays().stream()
-                .map(d -> new ExcludedDayResponseDto(d.date(), d.reason(), d.description()))
-                .toList();
         return new DashboardWeekResponseDto(monday, monday.plusDays(5), currentWeek, !scope.isUnrestricted(),
-                DashboardDtoMapper.parameters(period.parameters()), excluded, campus, buildings);
+                DashboardDtoMapper.parameters(period.parameters()), DashboardDtoMapper.excludedDays(period.availability()), campus, buildings);
     }
 
     @Override

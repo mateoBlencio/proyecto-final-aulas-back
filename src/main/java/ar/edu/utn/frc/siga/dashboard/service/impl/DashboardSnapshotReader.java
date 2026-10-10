@@ -8,7 +8,6 @@ import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardReportResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.MonthlyAllocationResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.ReportBuildingResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.ReportCampusResponseDto;
-import ar.edu.utn.frc.siga.dashboard.dto.response.RoomRequestCountsResponseDto;
 import ar.edu.utn.frc.siga.dashboard.model.CategoryCounts;
 import ar.edu.utn.frc.siga.dashboard.model.DashboardParameters;
 import ar.edu.utn.frc.siga.dashboard.model.DashboardSnapshot;
@@ -100,11 +99,11 @@ public class DashboardSnapshotReader {
         ReportCampusResponseDto campusDto;
         if (scope.isUnrestricted()) {
             ScopeMetrics metrics = toMetrics(campus);
-            campusDto = reportCampus(metrics, campus.unallocatedClasses(), campus.roomRequests(),
-                    campus.unassignedBuildingRoomRequests(), campus);
+            campusDto = DashboardDtoMapper.reportCampus(metrics, campus.unallocatedClasses(), campus.roomRequests(),
+                    campus.unassignedBuildingRoomRequests(), firstHour(campus));
         } else {
             Aggregate sum = sumBuildings(buildingRows.stream().map(Row::payload).toList(), campus);
-            campusDto = reportCampus(sum.metrics(), null, sum.requests(), null, campus);
+            campusDto = DashboardDtoMapper.reportCampus(sum.metrics(), null, sum.requests(), null, firstHour(campus));
         }
         return new DashboardReportResponseDto(month, campus.from(), campus.to(), campusRow.snapshot().getGeneratedAt(),
                 scope.isUnrestricted() ? campusRow.snapshot().getGeneratedBy() : null,
@@ -115,25 +114,8 @@ public class DashboardSnapshotReader {
 
     private ReportBuildingResponseDto reportBuilding(Row row) {
         SnapshotPayload p = row.payload();
-        ScopeMetrics m = toMetrics(p);
-        return new ReportBuildingResponseDto(p.buildingId(), p.buildingCode(), p.buildingName(), p.roomCount(),
-                p.availableDays(), DashboardDtoMapper.allocationStatus(m.categories()),
-                DashboardDtoMapper.occupancy(m),
-                DashboardDtoMapper.hourlyProfile(m.occupiedBySlot(), m.availableBySlot(), firstHour(p)),
-                DashboardDtoMapper.bySource(m), requests(p.roomRequests()));
-    }
-
-    private ReportCampusResponseDto reportCampus(ScopeMetrics m, Long unallocated, RoomRequestCounts requests,
-                                                 RoomRequestCounts unassigned, SnapshotPayload reference) {
-        return new ReportCampusResponseDto(m.roomCount(), m.availableDays(),
-                DashboardDtoMapper.allocationStatus(m.categories()), unallocated, DashboardDtoMapper.occupancy(m),
-                DashboardDtoMapper.hourlyProfile(m.occupiedBySlot(), m.availableBySlot(), firstHour(reference)),
-                DashboardDtoMapper.bySource(m), requests(requests),
-                unassigned == null ? null : requests(unassigned));
-    }
-
-    private static RoomRequestCountsResponseDto requests(RoomRequestCounts c) {
-        return new RoomRequestCountsResponseDto(c.resolved(), c.pending(), c.expired());
+        return DashboardDtoMapper.reportBuilding(p.buildingId(), p.buildingCode(), p.buildingName(), toMetrics(p),
+                p.roomRequests(), firstHour(p));
     }
 
     private static MonthlyAllocationResponseDto monthly(YearMonth month, boolean partial, LocalDate from, LocalDate to,

@@ -13,7 +13,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ar.edu.utn.frc.siga.dashboard.model.DashboardSnapshot;
-import ar.edu.utn.frc.siga.dashboard.repository.DashboardReadRepository;
 import ar.edu.utn.frc.siga.dashboard.repository.DashboardSnapshotRegenerationRepository;
 import ar.edu.utn.frc.siga.dashboard.repository.DashboardSnapshotRepository;
 import java.time.Clock;
@@ -43,7 +42,7 @@ class DashboardSnapshotServiceImplTest {
         snapshotRepository = mock(DashboardSnapshotRepository.class);
         Clock clock = Clock.fixed(Instant.parse("2027-03-01T06:00:00Z"), ZoneId.of("America/Argentina/Buenos_Aires"));
         // generate() is stubbed on the spy: these tests only check which months generateMissingMonths asks for.
-        service = spy(new DashboardSnapshotServiceImpl(null, mock(DashboardReadRepository.class), snapshotRepository,
+        service = spy(new DashboardSnapshotServiceImpl(null, mock(DashboardRoomRequestCounter.class), snapshotRepository,
                 mock(DashboardSnapshotRegenerationRepository.class), null, new ObjectMapper(),
                 mock(PlatformTransactionManager.class), clock));
         doNothing().when(service).generate(any(), anyString(), isNull());
