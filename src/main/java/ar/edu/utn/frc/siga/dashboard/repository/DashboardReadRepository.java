@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.common.security.BuildingScope;
 import ar.edu.utn.frc.siga.dashboard.model.AllocationUnitRow;
 import ar.edu.utn.frc.siga.dashboard.model.BuildingRoomsRow;
 import ar.edu.utn.frc.siga.dashboard.model.PendingItemRow;
+import ar.edu.utn.frc.siga.dashboard.model.RequestCountRow;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
@@ -88,6 +89,60 @@ public class DashboardReadRepository {
                         rs.getObject("fecha", LocalDate.class), rs.getObject("hora_inicio", LocalTime.class),
                         rs.getObject("creado_en", LocalDateTime.class),
                         rs.getObject("fecha_derivacion", LocalDateTime.class)));
+    }
+
+    /**
+     * Items resolved (RESOLVED) with notification in [from, to), per year. Per building of the allocated room
+     * (an item with rooms in two buildings counts once in each) plus a campus row that counts it once.
+     */
+    public List<RequestCountRow> countResolved(LocalDateTime from, LocalDateTime to) {
+        return jdbc.query("""
+                SELECT EXTRACT(YEAR FROM i.fecha_notificacion)::int AS year,
+                       c.id_edificio AS building_id, GROUPING(c.id_edificio) AS is_campus,
+                       COUNT(DISTINCT i.id_item) AS total
+                FROM solicitud_aula_item i
+                LEFT JOIN solicitud_item_asignacion ia ON ia.id_item = i.id_item
+                LEFT JOIN aula c ON c.id_aula = ia.id_aula
+                WHERE i.estado = 'RESOLVED' AND i.fecha_notificacion >= :from AND i.fecha_notificacion < :to
+                GROUP BY GROUPING SETS ((EXTRACT(YEAR FROM i.fecha_notificacion)),
+                                        (EXTRACT(YEAR FROM i.fecha_notificacion), c.id_edificio))
+                """, new MapSqlParameterSource().addValue("from", from).addValue("to", to),
+                (rs, i) -> new RequestCountRow(rs.getInt("year"), (Long) rs.getObject("building_id"),
+                        rs.getInt("is_campus") == 1, rs.getLong("total")))
+                .stream()
+                .filter(row -> row.campus() || row.buildingId() != null)
+                .toList();
+    }
+
+    /** Items cancelled by the expiry process (decidido_por = SISTEMA) with decision in [from, to), per year and derived building. */
+    public List<RequestCountRow> countExpired(LocalDateTime from, LocalDateTime to) {
+        return jdbc.query("""
+                SELECT EXTRACT(YEAR FROM i.fecha_decision)::int AS year,
+                       i.id_edificio_derivado AS building_id, COUNT(*) AS total
+                FROM solicitud_aula_item i
+                WHERE i.estado = 'CANCELLED' AND i.decidido_por = 'SISTEMA'
+                  AND i.fecha_decision >= :from AND i.fecha_decision < :to
+                GROUP BY 1, 2
+                """, new MapSqlParameterSource().addValue("from", from).addValue("to", to),
+                (rs, i) -> new RequestCountRow(rs.getInt("year"), (Long) rs.getObject("building_id"),
+                        false, rs.getLong("total")));
+    }
+
+    /**
+     * Items that were open at {@code at}, per derived building (current derived building). Rebuilt from the
+     * current state: created before {@code at} and not resolved (notified) or cancelled before it.
+     */
+    public List<RequestCountRow> countPendingAt(LocalDateTime at) {
+        return jdbc.query("""
+                SELECT i.id_edificio_derivado AS building_id, COUNT(*) AS total
+                FROM solicitud_aula_item i JOIN solicitud_aula s ON s.id_solicitud = i.id_solicitud
+                WHERE s.creado_en < :at
+                  AND NOT (i.estado = 'RESOLVED'  AND COALESCE(i.fecha_notificacion < :at, TRUE))
+                  AND NOT (i.estado = 'CANCELLED' AND COALESCE(i.fecha_decision    < :at, TRUE))
+                GROUP BY 1
+                """, new MapSqlParameterSource().addValue("at", at),
+                (rs, i) -> new RequestCountRow(at.getYear(), (Long) rs.getObject("building_id"),
+                        false, rs.getLong("total")));
     }
 
     private static AllocationUnitRow toUnit(ResultSet rs) throws SQLException {

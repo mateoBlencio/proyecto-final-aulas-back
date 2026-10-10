@@ -10,6 +10,7 @@ import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardBadgesResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardWeekResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.ExcludedDayResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.OpenRoomRequestsResponseDto;
+import ar.edu.utn.frc.siga.dashboard.dto.response.RoomRequestStatsResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.RoomsInUseResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.WeekBuildingResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.WeekCampusResponseDto;
@@ -51,6 +52,7 @@ public class DashboardQueryServiceImpl implements DashboardQueryService {
 
     private final DashboardMetricsService metricsService;
     private final DashboardReadRepository repository;
+    private final DashboardRoomRequestStats roomRequestStats;
     private final BuildingScopeResolver buildingScopeResolver;
     private final Clock clock;
 
@@ -82,6 +84,11 @@ public class DashboardQueryServiceImpl implements DashboardQueryService {
                 .toList();
         return new DashboardWeekResponseDto(monday, monday.plusDays(5), currentWeek, !scope.isUnrestricted(),
                 DashboardDtoMapper.parameters(period.parameters()), excluded, campus, buildings);
+    }
+
+    @Override
+    public RoomRequestStatsResponseDto roomRequests(int years) {
+        return roomRequestStats.stats(years, buildingScopeResolver.scopeFor(Permission.DASHBOARD_READ));
     }
 
     @Override
