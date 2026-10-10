@@ -64,6 +64,9 @@ public class DashboardQueryServiceImpl implements DashboardQueryService {
     public DashboardWeekResponseDto week(LocalDate weekOf) {
         BuildingScope scope = buildingScopeResolver.scopeFor(Permission.DASHBOARD_READ);
         LocalDate today = LocalDate.now(clock);
+        if (weekOf != null) {
+            DashboardDateLimits.requireWithinRange(weekOf, clock);
+        }
         LocalDate monday = (weekOf == null ? today : weekOf).with(previousOrSame(MONDAY));
         boolean currentWeek = monday.equals(today.with(previousOrSame(MONDAY)));
 
@@ -97,6 +100,7 @@ public class DashboardQueryServiceImpl implements DashboardQueryService {
 
     @Override
     public DashboardReportResponseDto report(YearMonth month) {
+        DashboardDateLimits.requireWithinRange(month, clock);
         return snapshotReader.report(month, buildingScopeResolver.scopeFor(Permission.DASHBOARD_READ));
     }
 
