@@ -1,0 +1,38 @@
+meta {
+  name: Tablero por período
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/v1/dashboard/period?type=TERM
+  body: none
+  auth: inherit
+}
+
+params:query {
+  type: TERM
+}
+
+docs {
+  GET /v1/dashboard/period. Permiso: PERM_DASHBOARD_READ (SUBSECRETARIA, AUXILIAR_AULICO, CONSULTA).
+
+  type (opcional, por defecto TERM): TERM (cuatrimestre), ACADEMIC_YEAR (año académico) o
+  CURRENT_MONTH (mes en curso). El rango va del inicio del período a hoy, inclusive. Las
+  asignaciones posteriores a hoy no cuentan. Si el período ya terminó, to es su último día
+  y partial es false.
+
+  Fuera de cuatrimestre (receso, diciembre, enero y febrero) devuelve completo el último que
+  empezó. ACADEMIC_YEAR igual: si el año académico de este año no empezó, devuelve el anterior.
+  Las fechas salen del período ANUAL y su receso; lo que falte sale de las fechas por defecto
+  de TermType (1.º cuatrimestre hasta el 31/07, 2.º desde el 01/08, año de 01/03 a 30/11).
+
+  Respuesta 200: mismo formato de campus y buildings que el informe mensual, más type, year,
+  semester (0 año académico, null mes), periodStart, periodEnd, from, to, partial y excludedDays.
+  roomRequests: resolved y expired dentro de [from, to]; pending es lo abierto al final del día to.
+
+  Usuario acotado: restrictedScope = true, el campus es la suma de sus edificios y
+  campus.unallocatedClasses y campus.unassignedBuildingRoomRequests son null.
+
+  Errores (ProblemDetail): 400 si type no es uno de los tres valores (distingue mayúsculas).
+}
