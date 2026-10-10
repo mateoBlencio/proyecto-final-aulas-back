@@ -1,0 +1,10 @@
+package ar.edu.utn.frc.siga.dashboard.service;
+
+import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardWeekResponseDto;
+import java.time.LocalDate;
+
+public interface DashboardQueryService {
+
+    /** Campus and per-building view of the week containing {@code weekOf} (default: the current week). */
+    DashboardWeekResponseDto week(LocalDate weekOf);
+}

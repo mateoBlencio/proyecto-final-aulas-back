@@ -1,0 +1,33 @@
+meta {
+  name: Semana
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/dashboard/week
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~weekOf: 2026-09-07
+}
+
+docs {
+  GET /v1/dashboard/week. Permiso: PERM_DASHBOARD_READ (SUBSECRETARIA, AUXILIAR_AULICO, CONSULTA).
+  El alcance sale de la asignación de rol: un usuario acotado solo ve sus edificios y
+  el campus se recalcula como suma de ellos (restrictedScope = true).
+
+  weekOf (yyyy-MM-dd, opcional): cualquier día de la semana pedida. Sin él se usa la semana en curso.
+  La semana va de lunes a sábado. Los domingos, feriados y días de receso no cuentan como
+  disponibles; los feriados y recesos se listan en excludedDays.
+
+  Respuesta 200: campus + buildings (buildingId, code, name). Por cada uno: ocupación (horas
+  ocupadas, disponibles, libres y %), estado de las asignaciones (superposición, sobrecupo,
+  subutilizada, adecuada), perfil horario de 8 a 22 y solicitudes abiertas.
+  roomsInUseNow es null si la semana no es la actual. campus.unallocatedClasses es null
+  para un usuario acotado.
+
+  Sin datos: 200 con buildings vacío y porcentajes null.
+}
