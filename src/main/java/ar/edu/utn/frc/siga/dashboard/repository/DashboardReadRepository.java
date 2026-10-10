@@ -7,9 +7,13 @@ import ar.edu.utn.frc.siga.dashboard.model.PendingItemRow;
 import ar.edu.utn.frc.siga.dashboard.model.RequestCountRow;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +31,7 @@ import org.springframework.stereotype.Repository;
 public class DashboardReadRepository {
 
     private final NamedParameterJdbcTemplate jdbc;
+    private final Clock clock;
 
     public List<BuildingRoomsRow> findBuildings(BuildingScope scope) {
         if (hasNoBuildings(scope)) {
@@ -87,26 +92,27 @@ public class DashboardReadRepository {
                 """, new MapSqlParameterSource(),
                 (rs, i) -> new PendingItemRow(rs.getString("estado"), (Long) rs.getObject("id_edificio_derivado"),
                         rs.getObject("fecha", LocalDate.class), rs.getObject("hora_inicio", LocalTime.class),
-                        rs.getObject("creado_en", LocalDateTime.class),
-                        rs.getObject("fecha_derivacion", LocalDateTime.class)));
+                        toInstant(rs.getObject("creado_en", LocalDateTime.class)),
+                        toInstant(rs.getObject("fecha_derivacion", OffsetDateTime.class))));
     }
 
     /**
      * Items resolved (RESOLVED) with notification in [from, to), per year. Per building of the allocated room
      * (an item with rooms in two buildings counts once in each) plus a campus row that counts it once.
+     * The year is the one in the clock's zone.
      */
-    public List<RequestCountRow> countResolved(LocalDateTime from, LocalDateTime to) {
+    public List<RequestCountRow> countResolved(Instant from, Instant to) {
         return jdbc.query("""
-                SELECT EXTRACT(YEAR FROM i.fecha_notificacion)::int AS year,
-                       c.id_edificio AS building_id, GROUPING(c.id_edificio) AS is_campus,
-                       COUNT(DISTINCT i.id_item) AS total
-                FROM solicitud_aula_item i
-                LEFT JOIN solicitud_item_asignacion ia ON ia.id_item = i.id_item
-                LEFT JOIN aula c ON c.id_aula = ia.id_aula
-                WHERE i.estado = 'RESOLVED' AND i.fecha_notificacion >= :from AND i.fecha_notificacion < :to
-                GROUP BY GROUPING SETS ((EXTRACT(YEAR FROM i.fecha_notificacion)),
-                                        (EXTRACT(YEAR FROM i.fecha_notificacion), c.id_edificio))
-                """, new MapSqlParameterSource().addValue("from", from).addValue("to", to),
+                SELECT t.year, t.building_id, GROUPING(t.building_id) AS is_campus,
+                       COUNT(DISTINCT t.id_item) AS total
+                FROM (SELECT EXTRACT(YEAR FROM i.fecha_notificacion AT TIME ZONE :zone)::int AS year,
+                             c.id_edificio AS building_id, i.id_item
+                      FROM solicitud_aula_item i
+                      LEFT JOIN solicitud_item_asignacion ia ON ia.id_item = i.id_item
+                      LEFT JOIN aula c ON c.id_aula = ia.id_aula
+                      WHERE i.estado = 'RESOLVED' AND i.fecha_notificacion >= :from AND i.fecha_notificacion < :to) t
+                GROUP BY GROUPING SETS ((t.year), (t.year, t.building_id))
+                """, rangeParams(from, to),
                 (rs, i) -> new RequestCountRow(rs.getInt("year"), (Long) rs.getObject("building_id"),
                         rs.getInt("is_campus") == 1, rs.getLong("total")))
                 .stream()
@@ -115,15 +121,15 @@ public class DashboardReadRepository {
     }
 
     /** Items cancelled by the expiry process (decidido_por = SISTEMA) with decision in [from, to), per year and derived building. */
-    public List<RequestCountRow> countExpired(LocalDateTime from, LocalDateTime to) {
+    public List<RequestCountRow> countExpired(Instant from, Instant to) {
         return jdbc.query("""
-                SELECT EXTRACT(YEAR FROM i.fecha_decision)::int AS year,
+                SELECT EXTRACT(YEAR FROM i.fecha_decision AT TIME ZONE :zone)::int AS year,
                        i.id_edificio_derivado AS building_id, COUNT(*) AS total
                 FROM solicitud_aula_item i
                 WHERE i.estado = 'CANCELLED' AND i.decidido_por = 'SISTEMA'
                   AND i.fecha_decision >= :from AND i.fecha_decision < :to
                 GROUP BY 1, 2
-                """, new MapSqlParameterSource().addValue("from", from).addValue("to", to),
+                """, rangeParams(from, to),
                 (rs, i) -> new RequestCountRow(rs.getInt("year"), (Long) rs.getObject("building_id"),
                         false, rs.getLong("total")));
     }
@@ -131,18 +137,36 @@ public class DashboardReadRepository {
     /**
      * Items that were open at {@code at}, per derived building (current derived building). Rebuilt from the
      * current state: created before {@code at} and not resolved (notified) or cancelled before it.
+     * {@code creado_en} has no zone, so it is compared in the clock's zone.
      */
-    public List<RequestCountRow> countPendingAt(LocalDateTime at) {
+    public List<RequestCountRow> countPendingAt(Instant at) {
         return jdbc.query("""
                 SELECT i.id_edificio_derivado AS building_id, COUNT(*) AS total
                 FROM solicitud_aula_item i JOIN solicitud_aula s ON s.id_solicitud = i.id_solicitud
-                WHERE s.creado_en < :at
+                WHERE s.creado_en < :atLocal
                   AND NOT (i.estado = 'RESOLVED'  AND COALESCE(i.fecha_notificacion < :at, TRUE))
                   AND NOT (i.estado = 'CANCELLED' AND COALESCE(i.fecha_decision    < :at, TRUE))
                 GROUP BY 1
-                """, new MapSqlParameterSource().addValue("at", at),
-                (rs, i) -> new RequestCountRow(at.getYear(), (Long) rs.getObject("building_id"),
-                        false, rs.getLong("total")));
+                """, new MapSqlParameterSource().addValue("at", utc(at))
+                        .addValue("atLocal", LocalDateTime.ofInstant(at, clock.getZone())),
+                (rs, i) -> new RequestCountRow(0, (Long) rs.getObject("building_id"), false, rs.getLong("total")));
+    }
+
+    private MapSqlParameterSource rangeParams(Instant from, Instant to) {
+        return new MapSqlParameterSource().addValue("zone", clock.getZone().getId())
+                .addValue("from", utc(from)).addValue("to", utc(to));
+    }
+
+    private static OffsetDateTime utc(Instant instant) {
+        return instant.atOffset(ZoneOffset.UTC);
+    }
+
+    private Instant toInstant(LocalDateTime local) {
+        return local == null ? null : local.atZone(clock.getZone()).toInstant();
+    }
+
+    private static Instant toInstant(OffsetDateTime offset) {
+        return offset == null ? null : offset.toInstant();
     }
 
     private static AllocationUnitRow toUnit(ResultSet rs) throws SQLException {

@@ -10,7 +10,8 @@ import ar.edu.utn.frc.siga.dashboard.model.PendingItemRow;
 import ar.edu.utn.frc.siga.dashboard.model.RequestCountRow;
 import ar.edu.utn.frc.siga.dashboard.repository.DashboardReadRepository;
 import java.time.Clock;
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.Year;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,8 +31,8 @@ public class DashboardRoomRequestStats {
     public RoomRequestStatsResponseDto stats(int years, BuildingScope scope) {
         int currentYear = Year.now(clock).getValue();
         int firstYear = currentYear - years + 1;
-        LocalDateTime from = LocalDateTime.of(firstYear, 1, 1, 0, 0);
-        LocalDateTime to = LocalDateTime.of(currentYear + 1, 1, 1, 0, 0);
+        Instant from = LocalDate.of(firstYear, 1, 1).atStartOfDay(clock.getZone()).toInstant();
+        Instant to = LocalDate.of(currentYear + 1, 1, 1).atStartOfDay(clock.getZone()).toInstant();
 
         List<BuildingRoomsRow> buildings = repository.findBuildings(scope);
         List<RequestCountRow> resolved = repository.countResolved(from, to);

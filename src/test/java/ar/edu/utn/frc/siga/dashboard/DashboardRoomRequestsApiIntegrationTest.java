@@ -15,6 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -28,6 +29,8 @@ class DashboardRoomRequestsApiIntegrationTest extends AbstractIntegrationTest {
     private RoomRequestRepository roomRequestRepository;
     @Autowired
     private ObjectMapper objectMapper;
+    @Autowired
+    private JdbcTemplate jdbc;
 
     @Test
     @DisplayName("a pending item shows up in the current year, marked partial")
@@ -47,6 +50,31 @@ class DashboardRoomRequestsApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(current.get("partial").asBoolean()).isTrue();
         assertThat(current.get("campus").get("pending").asLong()).isGreaterThanOrEqualTo(1);
         assertThat(current.get("unassignedBuilding").get("pending").asLong()).isGreaterThanOrEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("an item resolved and one expired by the system show up in the current year")
+    void resolvedAndExpiredItemsAreCounted() throws Exception {
+        var sc = testData.materiaYComision();
+        RoomRequest request = testData.solicitudDeAula(RoomRequestType.ONE_TIME_ROOM_CHANGE, sc.subjectId());
+        var resolved = testData.itemDePedido(request, sc.commissionId(), LocalDate.now().plusDays(30), RoomRequestStatus.NEW);
+        var expired = testData.itemDePedido(request, sc.commissionId(), LocalDate.now().plusDays(31), RoomRequestStatus.NEW);
+        roomRequestRepository.save(request);
+        jdbc.update("""
+                UPDATE solicitud_aula_item SET estado = 'RESOLVED', decidido_por = 'x', fecha_decision = now(),
+                       fecha_notificacion = now() WHERE id_item = ?""", resolved.getId());
+        jdbc.update("""
+                UPDATE solicitud_aula_item SET estado = 'CANCELLED', decidido_por = 'SISTEMA', fecha_decision = now()
+                WHERE id_item = ?""", expired.getId());
+
+        String body = mockMvc.perform(get("/v1/dashboard/room-requests"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode years = objectMapper.readTree(body).get("years");
+        JsonNode current = years.get(years.size() - 1);
+        assertThat(current.get("campus").get("expired").asLong()).isGreaterThanOrEqualTo(1);
+        assertThat(current.get("campus").get("resolved").asLong()).isGreaterThanOrEqualTo(1);
     }
 
     @Test

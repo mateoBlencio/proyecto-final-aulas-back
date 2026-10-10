@@ -214,8 +214,7 @@ public class DashboardQueryServiceImpl implements DashboardQueryService {
         return new OpenRoomRequestsResponseDto(count, oldest);
     }
 
-    private Instant oldest(Stream<LocalDateTime> timestamps) {
-        return timestamps.filter(Objects::nonNull).min(Comparator.naturalOrder())
-                .map(t -> t.atZone(clock.getZone()).toInstant()).orElse(null);
+    private static Instant oldest(Stream<Instant> timestamps) {
+        return timestamps.filter(Objects::nonNull).min(Comparator.naturalOrder()).orElse(null);
     }
 }

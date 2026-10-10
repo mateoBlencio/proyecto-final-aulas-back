@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.dashboard.model.DashboardSnapshot;
 import ar.edu.utn.frc.siga.dashboard.repository.DashboardSnapshotRepository;
 import ar.edu.utn.frc.siga.dashboard.service.DashboardSnapshotService;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
+import java.time.LocalTime;
 import java.time.YearMonth;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -57,7 +58,9 @@ class DashboardSnapshotIntegrationTest extends AbstractIntegrationTest {
         assertThat(json.get("schemaVersion").asInt()).isEqualTo(1);
         assertThat(json.get("rulesVersion").asInt()).isEqualTo(1);
         assertThat(json.get("month").asText()).isEqualTo("2020-03");
-        assertThat(json.get("hourlyProfile")).hasSize(15);
+        LocalTime hoursStart = LocalTime.parse(json.get("parameters").get("hoursStart").asText());
+        LocalTime hoursEnd = LocalTime.parse(json.get("parameters").get("hoursEnd").asText());
+        assertThat(json.get("hourlyProfile")).hasSize(hoursEnd.minusMinutes(1).getHour() - hoursStart.getHour() + 1);
         assertThat(json.get("bySource")).hasSize(4);
         assertThat(jdbc.queryForObject(
                 "SELECT jsonb_typeof(datos) FROM tablero_snapshot WHERE id_snapshot = ?", String.class, campus.getId()))

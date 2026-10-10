@@ -16,6 +16,7 @@ import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
@@ -71,8 +72,12 @@ class DashboardWeekApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(mine.get("allocationStatus").get("overcrowded").asLong()).isEqualTo(1);
         assertThat(mine.get("allocationStatus").get("total").asLong()).isEqualTo(1);
         assertThat(mine.get("occupancy").get("occupiedHours").asDouble()).isEqualTo(1.0);
-        assertThat(mine.get("occupancy").get("availableHours").asDouble()).isEqualTo(15.0 * 6);
-        assertThat(mine.get("hourlyProfile")).hasSize(15);
+        // The events.hours setting may have been changed by another test: expectations come from the response.
+        LocalTime hoursStart = LocalTime.parse(root.get("parameters").get("hoursStart").asText());
+        LocalTime hoursEnd = LocalTime.parse(root.get("parameters").get("hoursEnd").asText());
+        double bandHours = Duration.between(hoursStart, hoursEnd).toMinutes() / 60.0;
+        assertThat(mine.get("occupancy").get("availableHours").asDouble()).isEqualTo(bandHours * 6);
+        assertThat(mine.get("hourlyProfile")).hasSize(hoursEnd.minusMinutes(1).getHour() - hoursStart.getHour() + 1);
         assertThat(mine.get("roomsInUseNow").isNull()).isTrue();
         assertThat(mine.get("openRoomRequests").get("count").asLong()).isZero();
     }

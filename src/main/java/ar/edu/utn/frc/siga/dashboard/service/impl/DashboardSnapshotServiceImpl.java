@@ -28,7 +28,6 @@ import ar.edu.utn.frc.siga.dashboard.service.DashboardSnapshotService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -114,8 +113,8 @@ public class DashboardSnapshotServiceImpl implements DashboardSnapshotService {
         LocalDate to = month.atEndOfMonth();
         PeriodMetrics period = metricsService.compute(from, to, BuildingScope.unrestricted());
 
-        LocalDateTime start = from.atStartOfDay();
-        LocalDateTime end = month.plusMonths(1).atDay(1).atStartOfDay();
+        Instant start = from.atStartOfDay(clock.getZone()).toInstant();
+        Instant end = month.plusMonths(1).atDay(1).atStartOfDay(clock.getZone()).toInstant();
         List<RequestCountRow> resolved = readRepository.countResolved(start, end);
         List<RequestCountRow> expired = readRepository.countExpired(start, end);
         List<RequestCountRow> pending = readRepository.countPendingAt(end);
