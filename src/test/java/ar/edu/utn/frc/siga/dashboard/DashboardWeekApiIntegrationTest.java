@@ -323,4 +323,11 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
 
         userWithoutRoles().perform(get("/v1/dashboard/week")).andExpect(status().isForbidden());
     }
+
+    @Test
+    @DisplayName("weekOf too far from today answers 400 instead of overflowing")
+    void weekOfOutOfRangeIsRejected() throws Exception {
+        mockMvc.perform(get("/v1/dashboard/week").param("weekOf", "+999999999-12-31")).andExpect(status().isBadRequest());
+        mockMvc.perform(get("/v1/dashboard/week").param("weekOf", "1990-01-01")).andExpect(status().isBadRequest());
+    }
 }

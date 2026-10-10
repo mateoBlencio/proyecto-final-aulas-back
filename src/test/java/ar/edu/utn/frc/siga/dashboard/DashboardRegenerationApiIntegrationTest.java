@@ -183,4 +183,56 @@ class DashboardRegenerationApiIntegrationTest extends DashboardIntegrationSuppor
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM regeneracion_tablero", Integer.class))
                 .isEqualTo(regenerationsBefore);
     }
+
+    @Test
+    @DisplayName("a building-restricted user sees only that the report was regenerated, not who did it nor why")
+    void restrictedUserDoesNotSeeAuthorNorReason() throws Exception {
+        snapshotService.generate(YearMonth.of(2020, 3), "SISTEMA", null);
+        regenerate(mockMvc, BODY).andExpect(status().isOk());
+
+        JsonNode restricted = getJson(auxiliarOf(building()), "/v1/dashboard/reports/2020-03");
+        JsonNode global = getJson(mockMvc, "/v1/dashboard/reports/2020-03");
+
+        assertThat(restricted.get("regenerated").asBoolean()).isTrue();
+        assertThat(restricted.get("generatedBy").isNull()).isTrue();
+        assertThat(restricted.get("regenerationReason").isNull()).isTrue();
+        assertThat(global.get("generatedBy").asText()).isEqualTo("integration-test@frc.utn.edu.ar");
+        assertThat(global.get("regenerationReason").asText()).isEqualTo("Se corrigió una capacidad");
+    }
+
+    @Test
+    @DisplayName("two simultaneous regenerations of the same month both succeed and leave one current version")
+    void concurrentRegenerationsAreSerialized() throws Exception {
+        snapshotService.generate(YearMonth.of(2020, 3), "SISTEMA", null);
+        Integer rowsPerGeneration = jdbc.queryForObject("SELECT COUNT(*) FROM tablero_snapshot", Integer.class);
+        java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            List<java.util.concurrent.Future<Integer>> calls = new java.util.ArrayList<>();
+            for (int i = 0; i < 2; i++) {
+                calls.add(pool.submit(() -> {
+                    start.await();
+                    return regenerate(mockMvc, BODY).andReturn().getResponse().getStatus();
+                }));
+            }
+            start.countDown();
+            for (java.util.concurrent.Future<Integer> call : calls) {
+                assertThat(call.get()).isEqualTo(200);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM tablero_snapshot WHERE vigente", Integer.class))
+                .isEqualTo(rowsPerGeneration);
+    }
+
+    @Test
+    @DisplayName("a month too far from today answers 400 on the report and on the regeneration")
+    void monthOutOfRangeIsRejected() throws Exception {
+        mockMvc.perform(get("/v1/dashboard/reports/-999999-01")).andExpect(status().isBadRequest());
+        mockMvc.perform(get("/v1/dashboard/reports/1990-01")).andExpect(status().isBadRequest());
+        mockMvc.perform(post("/v1/dashboard/reports/1990-01/regeneration").contentType(MediaType.APPLICATION_JSON)
+                .content(BODY)).andExpect(status().isBadRequest());
+    }
 }
