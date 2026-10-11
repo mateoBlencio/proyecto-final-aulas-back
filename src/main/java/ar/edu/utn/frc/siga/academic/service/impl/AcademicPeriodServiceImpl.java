@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -72,6 +73,13 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
                         TermType.ANUAL.getSemester(), to, from).stream()
                 .map(academicPeriodMapper::toDto)
                 .toList();
+    }
+
+    @Override
+    public Optional<AcademicPeriodResponseDto> findAnnual(int year) {
+        return academicPeriodRepository.findByYearAndSemester(year, TermType.ANUAL.getSemester())
+                .filter(period -> !period.isDeleted())
+                .map(academicPeriodMapper::toDto);
     }
 
     @Override

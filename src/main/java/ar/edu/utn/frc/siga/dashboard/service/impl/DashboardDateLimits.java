@@ -26,4 +26,11 @@ final class DashboardDateLimits {
             throw new InvalidDateRangeException("El mes debe estar a menos de " + MAX_YEARS + " años de hoy");
         }
     }
+
+    static void requireWithinRange(int year, Clock clock) {
+        int current = LocalDate.now(clock).getYear();
+        if (year < current - MAX_YEARS || year > current + MAX_YEARS) {
+            throw new InvalidDateRangeException("El año debe estar a menos de " + MAX_YEARS + " años de hoy");
+        }
+    }
 }

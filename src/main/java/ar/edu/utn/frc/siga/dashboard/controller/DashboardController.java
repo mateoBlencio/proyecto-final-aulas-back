@@ -3,9 +3,11 @@ package ar.edu.utn.frc.siga.dashboard.controller;
 import ar.edu.utn.frc.siga.dashboard.dto.request.SnapshotRegenerationRequestDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.AllocationTrendResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardBadgesResponseDto;
+import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardPeriodResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardReportResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardWeekResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.RoomRequestStatsResponseDto;
+import ar.edu.utn.frc.siga.dashboard.model.DashboardPeriodType;
 import ar.edu.utn.frc.siga.dashboard.service.DashboardQueryService;
 import ar.edu.utn.frc.siga.dashboard.service.DashboardSnapshotService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -50,6 +52,23 @@ public class DashboardController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekOf) {
         log.debug("GET /v1/dashboard/week?weekOf={}", weekOf);
         return ResponseEntity.ok(queryService.week(weekOf));
+    }
+
+    @GetMapping("/period")
+    @PreAuthorize("hasAuthority('PERM_DASHBOARD_READ')")
+    @Operation(summary = "Tablero de un período",
+               description = "Cuatrimestre (TERM, por defecto), año académico (ACADEMIC_YEAR) o últimos años "
+                       + "académicos (LAST_YEARS), desde el inicio del período hasta hoy. TERM acepta year y semester "
+                       + "(1|2) juntos; ACADEMIC_YEAR acepta year; LAST_YEARS exige years (1 a 10). Sin year, "
+                       + "devuelve el período en curso o el último que empezó. 400 por parámetros inválidos, "
+                       + "422 si el período pedido todavía no empezó.")
+    public ResponseEntity<DashboardPeriodResponseDto> period(
+            @RequestParam(defaultValue = "TERM") DashboardPeriodType type,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer semester,
+            @RequestParam(required = false) Integer years) {
+        log.debug("GET /v1/dashboard/period?type={}&year={}&semester={}&years={}", type, year, semester, years);
+        return ResponseEntity.ok(queryService.period(type, year, semester, years));
     }
 
     @GetMapping("/badges")
