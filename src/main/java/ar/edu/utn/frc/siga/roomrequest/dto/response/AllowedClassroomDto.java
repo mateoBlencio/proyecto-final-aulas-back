@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.roomrequest.dto.response;
 
-/** {@code computerCount}: "Cantidad de PC" del aula; {@code null} si no tiene el recurso. */
+/** {@code computerCount}: "Cantidad de PC" del aula; {@code null} si el pedido no pide computadoras o el aula no
+ *  tiene el recurso. */
 public record AllowedClassroomDto(
         Long id,
         Integer roomNumber,

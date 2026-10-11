@@ -353,6 +353,23 @@ class RoomRequestSuggestionInputLoaderTest {
     }
 
     @Test
+    void laboratorioDescartaElEdificioOcupadoAunqueLeAlcanceConMenosAulas() {
+        RoomRequestItem item = item(RoomRequestType.FINAL_EXAM).requiresComputers(true).computerCount(67)
+                .classroomCount(1).estimated(null).build();
+        stubItem(item);
+        stubCandidates(item, List.of(room(1L, 70, 1L), room(2L, 40, 2L), room(3L, 40, 2L)));
+        when(candidateResolver.occupiedClassroomIds(item)).thenReturn(Set.of(1L));
+        when(candidateResolver.computersByClassroom(any())).thenReturn(Map.of(2L, 40, 3L, 40));
+        stubPermissions(Map.of());
+        when(allocationOccupancyService.findOccupancy(DATE, DATE)).thenReturn(List.of());
+
+        RoomRequestSuggestionInputLoader.Inputs inputs = loader.load(ITEM_ID, Set.of(), ACTOR);
+
+        assertThat(inputs.classrooms()).extracting(ClassroomResponseDto::id).containsExactlyInAnyOrder(2L, 3L);
+        assertThat(inputs.classroomCount()).isEqualTo(2);
+    }
+
+    @Test
     void laboratorioQueNingunEdificioCubreUsaTodosLosLabsDelQueMasSuma() {
         RoomRequestItem item = item(RoomRequestType.FINAL_EXAM).requiresComputers(true).computerCount(67)
                 .classroomCount(1).estimated(null).build();

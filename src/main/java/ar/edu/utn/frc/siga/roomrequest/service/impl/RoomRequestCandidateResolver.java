@@ -55,8 +55,9 @@ class RoomRequestCandidateResolver {
                 .filter(c -> !(item.getRequiresComputers() && item.getDerivedBuildingId() != null)
                         || item.getDerivedBuildingId().equals(c.buildingId()))
                 .toList();
-        Map<Long, Integer> computersByClassroom = computersByClassroom(
-                candidates.stream().map(ClassroomResponseDto::id).toList());
+        Map<Long, Integer> computersByClassroom = item.getRequiresComputers()
+                ? computersByClassroom(candidates.stream().map(ClassroomResponseDto::id).toList())
+                : Map.of();
         return candidates.stream()
                 .map(classroom -> new AllowedClassroomDto(classroom.id(), classroom.roomNumber(),
                         classroom.buildingId(), classroom.buildingName(), classroom.capacity(),

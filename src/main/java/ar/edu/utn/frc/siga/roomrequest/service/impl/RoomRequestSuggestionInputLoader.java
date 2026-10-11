@@ -92,6 +92,8 @@ class RoomRequestSuggestionInputLoader {
         Map<Long, Integer> computersByClassroom = Map.of();
         int classroomCount = item.getClassroomCount();
         if (lab) {
+            Set<Long> occupiedClassroomIds = candidateResolver.occupiedClassroomIds(item);
+            classrooms = classrooms.stream().filter(c -> !occupiedClassroomIds.contains(c.id())).toList();
             computersByClassroom = candidateResolver.computersByClassroom(
                     classrooms.stream().map(ClassroomResponseDto::id).toList());
             LabCombo combo = bestCombo(classrooms, computersByClassroom, enrolled);

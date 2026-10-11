@@ -9,6 +9,8 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestRepository;
 import ar.edu.utn.frc.siga.space.model.Building;
+import ar.edu.utn.frc.siga.space.model.ResourceType;
+import ar.edu.utn.frc.siga.space.model.ResourceValueKind;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -46,6 +48,23 @@ class RoomRequestItemCandidateBuildingsApiIntegrationTest extends AbstractIntegr
                 .andExpect(jsonPath("$[?(@.id == " + building.getId() + ")].availableClassroomCount").value(1));
     }
 
+    @Test
+    @DisplayName("laboratorio de 67 PCs: el edificio con dos labs de 35 aparece con las PCs sumadas")
+    void candidateBuildings_laboratorioSumaLasPcsDelEdificio() throws Exception {
+        Building building = testData.edificio();
+        ResourceType pcs = testData.tipoRecurso("Cantidad de PC", ResourceValueKind.COUNT);
+        testData.recursoDeAula(testData.aula(building), pcs, 35);
+        testData.recursoDeAula(testData.aula(building), pcs, 35);
+        mockMvcAsScoped("auxiliar-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar",
+                SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, building.getId());
+        RoomRequestItem item = seedLabItem(67);
+
+        mockMvc.perform(get("/v1/room-requests/items/" + item.getId() + "/candidate-buildings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == " + building.getId() + ")].availableClassroomCount").value(2))
+                .andExpect(jsonPath("$[?(@.id == " + building.getId() + ")].availableComputerCount").value(70));
+    }
+
     // El caso "edificio sin auxiliar asignado no aparece" no es testeable acá de forma confiable:
     // otros *ApiIntegrationTest del módulo autentican como AUXILIAR_AULICO con mockMvcAs(...), que
     // crea el fixture con scope GLOBAL -- cubre todos los edificios para el resto de la corrida de
@@ -78,6 +97,31 @@ class RoomRequestItemCandidateBuildingsApiIntegrationTest extends AbstractIntegr
                 .duration(Duration.ofMinutes(120))
                 .estimated(35)
                 .classroomCount(1)
+                .build();
+        request.addItem(item);
+        roomRequestRepository.save(request);
+        return item;
+    }
+
+    private RoomRequestItem seedLabItem(int computerCount) {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+        RoomRequest request = RoomRequest.builder()
+                .type(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE)
+                .scope(AcademicScope.GRADO)
+                .teacherName("Ada Lovelace")
+                .teacherEmail("ada@frc.utn.edu.ar")
+                .teacherPhone("351-1234567")
+                .subjectId(academic.subjectId())
+                .build();
+        RoomRequestItem item = RoomRequestItem.builder()
+                .commissionId(academic.commissionId())
+                .date(LocalDate.now().plusDays(12))
+                .startTime(LocalTime.of(10, 0))
+                .duration(Duration.ofMinutes(120))
+                .estimated(computerCount)
+                .classroomCount(1)
+                .requiresComputers(true)
+                .computerCount(computerCount)
                 .build();
         request.addItem(item);
         roomRequestRepository.save(request);

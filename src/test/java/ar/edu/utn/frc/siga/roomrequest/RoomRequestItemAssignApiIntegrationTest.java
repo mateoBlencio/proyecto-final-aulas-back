@@ -13,7 +13,10 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestRepository;
+import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
+import ar.edu.utn.frc.siga.space.model.ResourceType;
+import ar.edu.utn.frc.siga.space.model.ResourceValueKind;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -320,6 +323,68 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("laboratorio de 67 PCs: dos labs de 35 las suman y se aceptan aunque pidió 1 aula")
+    void assign_laboratorioDosAulasSumanLasPcs() throws Exception {
+        Building edificio = testData.edificio();
+        ResourceType pcs = testData.tipoRecurso("Cantidad de PC", ResourceValueKind.COUNT);
+        Classroom lab1 = testData.aula(edificio);
+        Classroom lab2 = testData.aula(edificio);
+        testData.recursoDeAula(lab1, pcs, 35);
+        testData.recursoDeAula(lab2, pcs, 35);
+        RoomRequestItem item = seedLabItem(LocalDate.now().plusDays(43), 67);
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/assign")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(List.of(lab1.getId(), lab2.getId()), null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_EVALUATION"));
+
+        List<Long> assigned = jdbcTemplate.queryForList(
+                "select id_aula from solicitud_item_asignacion where id_item = ?", Long.class, item.getId());
+        assertThat(assigned).containsExactlyInAnyOrder(lab1.getId(), lab2.getId());
+    }
+
+    @Test
+    @DisplayName("laboratorio cuyas PCs no alcanzan: 400 sin motivo, 200 con motivo")
+    void assign_laboratorioPcsInsuficientes_exigeMotivo() throws Exception {
+        Building edificio = testData.edificio();
+        ResourceType pcs = testData.tipoRecurso("Cantidad de PC", ResourceValueKind.COUNT);
+        Classroom lab = testData.aula(edificio);
+        testData.recursoDeAula(lab, pcs, 35);
+        RoomRequestItem item = seedLabItem(LocalDate.now().plusDays(44), 67);
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/assign")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(List.of(lab.getId()), null)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Partial assignment reason required"))
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("35 de las 67")));
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/assign")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(List.of(lab.getId()), "el docente arma dos turnos")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_EVALUATION"));
+    }
+
+    @Test
+    @DisplayName("laboratorio con aulas de dos edificios: 400")
+    void assign_laboratorioAulasDeEdificiosDistintos_returnsBadRequest() throws Exception {
+        ResourceType pcs = testData.tipoRecurso("Cantidad de PC", ResourceValueKind.COUNT);
+        Classroom lab1 = testData.aula(testData.edificio());
+        Classroom lab2 = testData.aula(testData.edificioConNombre("Edificio-Lejano-" + IntegrationTestData.nextSeq()));
+        testData.recursoDeAula(lab1, pcs, 35);
+        testData.recursoDeAula(lab2, pcs, 35);
+        RoomRequestItem item = seedLabItem(LocalDate.now().plusDays(45), 67);
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/assign")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(List.of(lab1.getId(), lab2.getId()), null)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Invalid room request"));
+    }
+
+    @Test
     @DisplayName("id inexistente: 404")
     void assign_idInexistente_returnsNotFound() throws Exception {
         long unknownId = 999_999_000L + IntegrationTestData.nextSeq();
@@ -373,6 +438,30 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
                 .duration(Duration.ofMinutes(90))
                 .estimated(30)
                 .classroomCount(classroomCount)
+                .build();
+        request.addItem(item);
+        roomRequestRepository.save(request);
+        return item;
+    }
+
+    private RoomRequestItem seedLabItem(LocalDate date, int computerCount) {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+        RoomRequest request = RoomRequest.builder()
+                .type(RoomRequestType.FINAL_EXAM)
+                .scope(AcademicScope.GRADO)
+                .teacherName("Ada Lovelace")
+                .teacherEmail("ada@frc.utn.edu.ar")
+                .teacherPhone("351-1234567")
+                .subjectId(academic.subjectId())
+                .build();
+        RoomRequestItem item = RoomRequestItem.builder()
+                .date(date)
+                .startTime(LocalTime.of(9, 0))
+                .duration(Duration.ofMinutes(90))
+                .estimated(30)
+                .classroomCount(1)
+                .requiresComputers(true)
+                .computerCount(computerCount)
                 .build();
         request.addItem(item);
         roomRequestRepository.save(request);
