@@ -36,7 +36,7 @@ cmd_refresh() {
 
     local pg16_bin
     pg16_bin="$(find_pg16_bin)"
-    dump_file="$(mktemp -t dev-snapshot-dump)"
+    dump_file="$(mktemp -t dev-snapshot-dump.XXXXXX)"
     trap 'rm -f "${dump_file:-}"' EXIT
 
     echo "Dump de dev ($admin_user@$ADMIN_HOST:$ADMIN_PORT/$ADMIN_DB) -> temp"
@@ -52,7 +52,7 @@ cmd_refresh() {
 
     echo "Limpiando schema del postgres local"
     docker exec -e PGPASSWORD=secret "$CONTAINER" psql -U myuser -d mydatabase \
-        -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+        -c "DROP SCHEMA IF EXISTS archivo CASCADE; DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 
     echo "Restaurando dump"
     PGPASSWORD=secret "$pg16_bin/pg_restore" -h localhost -p 5432 -U myuser -d mydatabase \
