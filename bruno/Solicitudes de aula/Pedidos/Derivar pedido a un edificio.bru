@@ -30,7 +30,9 @@ docs {
     resuelva ahí, no es un destino válido);
   - 400 si el edificio no tiene ninguna aula libre que cumpla los requisitos del
     pedido (computadoras, proyector) en su fecha y horario. No exige llegar a
-    `classroomCount`: alcanza con una aula libre, aunque el pedido pida más.
+    `classroomCount`: alcanza con una aula libre, aunque el pedido pida más. En un
+    pedido de laboratorio alcanza con un aula libre con al menos 1 PC: las PCs pedidas
+    se suman entre varias aulas, no hace falta un aula que las tenga todas.
 
   Respuesta: 200 con el pedido actualizado (`status: "DERIVED_TO_BUILDING"`).
 }

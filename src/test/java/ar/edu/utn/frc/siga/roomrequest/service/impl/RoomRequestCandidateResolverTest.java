@@ -286,6 +286,23 @@ class RoomRequestCandidateResolverTest {
     }
 
     @Test
+    @DisplayName("findCandidateBuildings: si ningún edificio alcanza las PCs pedidas, va primero el que más suma")
+    void findCandidateBuildings_ningunoAlcanzaOrdenaPorPcs() {
+        LocalDate date = LocalDate.of(2026, 3, 10);
+        RoomRequestItem item = RoomRequestItem.builder()
+                .date(date).startTime(LocalTime.of(10, 0)).duration(Duration.ofMinutes(60))
+                .requiresComputers(true).computerCount(200).build();
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(301L, 3L, "C"), classroom(101L, 1L, "A")));
+        when(classroomService.findIdsWithResourceAtLeast("Cantidad de PC", 1)).thenReturn(Set.of(101L, 301L));
+        when(classroomService.findResourceAmounts(eq("Cantidad de PC"), any())).thenReturn(Map.of(101L, 20, 301L, 50));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of());
+        when(userService.findBuildingIdsCoveredByRole(eq(SystemRole.AUXILIAR_AULICO), any())).thenReturn(Set.of(1L, 3L));
+
+        assertThat(resolver.findCandidateBuildings(1L)).extracting(CandidateBuildingDto::id).containsExactly(3L, 1L);
+    }
+
+    @Test
     @DisplayName("findCandidateBuildings: edificio sin ninguna aula libre no aparece y no consulta auxiliares")
     void findCandidateBuildings_sinAulasLibres() {
         LocalDate date = LocalDate.of(2026, 3, 10);

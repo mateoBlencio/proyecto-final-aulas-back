@@ -41,9 +41,18 @@ docs {
 
   Validaciones (400 Invalid room request salvo que se indique lo contrario):
   - 0 aulas: para cancelar el pedido está `cancel`, no esto;
-  - más aulas que `classroomCount`, o ids repetidos;
+  - más aulas que `classroomCount` (solo en pedidos sin computadoras; en un pedido de
+    laboratorio no hay tope de cantidad), o ids repetidos;
   - menos aulas que `classroomCount` sin `reason` (resolución parcial: `reason` pasa
-    a ser obligatorio; opcional si se asigna la cantidad completa);
+    a ser obligatorio; opcional si se asigna la cantidad completa). En un pedido de
+    laboratorio (`requiresComputers`) no cuenta la cantidad de aulas sino las PCs:
+    `computerCount` es el total y se suma entre las aulas, y `reason` es obligatorio si
+    la suma de "Cantidad de PC" de las aulas elegidas no llega;
+  - aulas de edificios distintos en un pedido de laboratorio, o de un edificio que no
+    es el derivado si el pedido está derivado;
+  - `reason` también es obligatorio, en cualquier tipo de pedido, si la capacidad
+    sumada de las aulas es menor que los asistentes (`estimated` o, si falta, los
+    inscriptos del evento recurrente; sin ninguno no se valida);
   - pedido ya notificado (`notifiedAt` no nulo): queda congelado aunque el estado
     técnicamente permitiera la transición;
   - 409 si el aula ya está ocupada en esa fecha/horario (conflicto de asignación,

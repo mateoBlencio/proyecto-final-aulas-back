@@ -30,6 +30,12 @@ docs {
   - Los inscriptos salen de `estimated` o, si falta, del evento recurrente de origen; si no
     hay ninguno responde 400. Se reparten entre las aulas pedidas
     (`ceil(inscriptos / classroomCount)` por aula).
+  - En un pedido de laboratorio (`requiresComputers`) el cupo que manda son las PCs, no los
+    inscriptos: elige un solo edificio (el derivado, o el que llega a `computerCount` con
+    menos laboratorios y, a igualdad, el que más PCs suma) y sugiere los laboratorios
+    necesarios de ese edificio, sin tope de cantidad. Si ningún edificio llega, sugiere todos
+    los labs del que más PCs suma. No exige `estimated` ni inscriptos. `overcrowdedBy` son las
+    PCs que faltan (0 si llega) y `status` es `PARTIAL` si no llega.
   - Pide `classroomCount` aulas distintas. `status`: `SUGGESTED` (las cubre),
     `PARTIAL` (cubre menos) o `NO_ROOM_AVAILABLE` (sin `suggestionId`, ninguna cumple las
     reglas hard).

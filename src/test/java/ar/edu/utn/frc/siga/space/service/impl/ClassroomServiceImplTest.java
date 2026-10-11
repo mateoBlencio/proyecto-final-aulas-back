@@ -17,7 +17,9 @@ import ar.edu.utn.frc.siga.space.dto.response.ClassroomSubjectPermissionDto;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.model.ClassroomPermission;
+import ar.edu.utn.frc.siga.space.model.ClassroomResource;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
+import ar.edu.utn.frc.siga.space.model.ResourceType;
 import ar.edu.utn.frc.siga.space.model.PermissionMode;
 import ar.edu.utn.frc.siga.space.model.PermissionTargetKind;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
@@ -55,6 +57,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -654,6 +657,31 @@ class ClassroomServiceImplTest {
     void findSubjectPermissionsVacio() {
         assertThat(service.findSubjectPermissions(List.of())).isEmpty();
         verify(classroomRepository, never()).findAllById(any());
+    }
+
+    @Test
+    @DisplayName("findResourceAmounts: suma por aula solo el recurso pedido, sin importar mayúsculas, y descarta tipos dados de baja")
+    void findResourceAmountsFiltersByActiveResourceName() {
+        ResourceType pcs = ResourceType.builder().id(1L).name("Cantidad de PC").build();
+        ResourceType retiredPcs = ResourceType.builder().id(2L).name("Cantidad de PC").build();
+        retiredPcs.deactivate(java.time.Instant.now());
+        ResourceType projector = ResourceType.builder().id(3L).name("Proyector").build();
+        Classroom lab1 = Classroom.builder().id(1L).build();
+        Classroom lab2 = Classroom.builder().id(2L).build();
+        when(classroomResourceRepository.findByClassroomIdInAndDeletedAtIsNull(List.of(1L, 2L, 3L))).thenReturn(List.of(
+                ClassroomResource.builder().classroom(lab1).resourceType(pcs).quantity(35).build(),
+                ClassroomResource.builder().classroom(lab1).resourceType(projector).quantity(1).build(),
+                ClassroomResource.builder().classroom(lab2).resourceType(retiredPcs).quantity(99).build(),
+                ClassroomResource.builder().classroom(lab2).resourceType(pcs).quantity(null).build()));
+
+        assertThat(service.findResourceAmounts("cantidad de pc", List.of(1L, 2L, 3L))).containsExactly(Map.entry(1L, 35));
+    }
+
+    @Test
+    @DisplayName("findResourceAmounts: sin ids no consulta el repositorio")
+    void findResourceAmountsWithoutIdsReturnsEmpty() {
+        assertThat(service.findResourceAmounts("Cantidad de PC", List.of())).isEmpty();
+        verifyNoInteractions(classroomResourceRepository);
     }
 
     private static Classroom syncClassroom(Integer roomNumber, Integer capacity, Boolean sysacadEnabled, String hash) {

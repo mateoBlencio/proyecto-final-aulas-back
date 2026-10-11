@@ -25,8 +25,9 @@ docs {
   `source = AUTOMATIC`: la auditoría distingue la asignación del algoritmo de la manual, y el
   solapamiento se valida con tolerancia 0 bajo el lock por aula. El body es opcional.
 
-  - `reason` solo es obligatorio si la sugerencia fue `PARTIAL` (400 si falta). Se guarda
-    también como observación de la asignación.
+  - `reason` es obligatorio si la sugerencia fue `PARTIAL`, o si las aulas no tienen lugar
+    para los asistentes (`overcrowdedBy > 0`), o si en un laboratorio no suman las PCs
+    pedidas (400 si falta). Se guarda también como observación de la asignación.
   - 410 si la sugerencia no existe, expiró, ya se usó o el pedido cambió desde que se
     generó. Si es de otro pedido también da 410, pero no se consume.
   - Si la asignación falla (ej. falta el `reason`), la sugerencia se conserva y se puede
