@@ -75,15 +75,17 @@ public class RoomRequestSuggestionServiceImpl implements RoomRequestSuggestionSe
         Map<Long, ClassroomResponseDto> byId = inputs.classrooms().stream()
                 .collect(Collectors.toMap(ClassroomResponseDto::id, c -> c));
         List<ClassroomResponseDto> suggested = classroomIds.stream().map(byId::get).filter(Objects::nonNull).toList();
-        int overcrowdedBy = suggested.stream()
-                .mapToInt(c -> Math.max(0, enrolledPerRoom - c.capacity()))
-                .max()
-                .orElse(0);
+        boolean lab = inputs.requiredComputers() != null;
+        int suggestedPcs = lab ? classroomIds.stream()
+                .mapToInt(id -> inputs.computersByClassroom().getOrDefault(id, 0)).sum() : 0;
+        int overcrowdedBy = lab
+                ? Math.max(0, inputs.requiredComputers() - suggestedPcs)
+                : suggested.stream().mapToInt(c -> Math.max(0, enrolledPerRoom - c.capacity())).max().orElse(0);
 
         String suggestionId = "sug_" + UUID.randomUUID();
         store.save(new RoomRequestSuggestion(suggestionId, itemId, inputs.itemVersion(), classroomIds));
-        SuggestionStatus status = classroomIds.size() == inputs.classroomCount()
-                ? SuggestionStatus.SUGGESTED : SuggestionStatus.PARTIAL;
+        boolean complete = classroomIds.size() == inputs.classroomCount() && (!lab || overcrowdedBy == 0);
+        SuggestionStatus status = complete ? SuggestionStatus.SUGGESTED : SuggestionStatus.PARTIAL;
         log.info("Sugerencia generada: suggestionId={}, itemId={}, status={}, aulas={}",
                 suggestionId, itemId, status, classroomIds);
         return new RoomRequestSuggestionResponseDto(suggestionId, itemId, status, suggested, overcrowdedBy);

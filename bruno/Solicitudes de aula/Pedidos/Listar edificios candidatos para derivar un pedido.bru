@@ -23,7 +23,13 @@ docs {
   No exige llegar a `classroomCount`: un edificio con 1 de 2 aulas libres igual
   aparece, con `availableClassroomCount: 1` (la resolución puede ser parcial).
 
-  Respuesta: array de { id, name, availableClassroomCount }. Lista vacía es una
+  En un pedido de laboratorio (`requiresComputers`), `computerCount` es el total
+  de PCs y se suma entre las aulas: cualquier aula con al menos 1 PC es candidata.
+  `availableComputerCount` es la suma de PCs de las aulas libres del edificio
+  (`null` si el pedido no pide PCs). Primero van los edificios que llegan a
+  `computerCount`, después los que se quedan cortos, de más a menos PCs.
+
+  Respuesta: array de { id, name, availableClassroomCount, availableComputerCount }. Lista vacía es una
   respuesta válida (200, no 404) cuando ningún edificio tiene nada libre. 404
   solo si el id del ítem no existe.
 }

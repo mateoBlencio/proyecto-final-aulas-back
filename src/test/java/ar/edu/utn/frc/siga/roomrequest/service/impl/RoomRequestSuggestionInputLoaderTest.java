@@ -69,7 +69,7 @@ class RoomRequestSuggestionInputLoaderTest {
     void setUp() {
         loader = new RoomRequestSuggestionInputLoader(itemRepository, transitionValidator, accessControl,
                 candidateResolver, occurrenceResolver, classroomService, allocationOccupancyService,
-                academicEventService);
+                new RoomRequestAttendees(academicEventService));
     }
 
     @Test
@@ -329,6 +329,56 @@ class RoomRequestSuggestionInputLoaderTest {
         assertThatThrownBy(() -> loader.load(ITEM_ID, Set.of(), ACTOR))
                 .isInstanceOf(InvalidRoomRequestException.class);
         verifyNoInteractions(candidateResolver, allocationOccupancyService);
+    }
+
+    @Test
+    void laboratorioEligeElEdificioQueCubreLasPcsConMenosAulasYUsaLasPcsComoCupo() {
+        RoomRequestItem item = item(RoomRequestType.FINAL_EXAM).requiresComputers(true).computerCount(67)
+                .classroomCount(1).estimated(null).build();
+        stubItem(item);
+        stubCandidates(item, List.of(room(1L, 40, 1L), room(2L, 40, 1L), room(3L, 40, 2L), room(4L, 40, 2L),
+                room(5L, 40, 2L)));
+        when(candidateResolver.computersByClassroom(any()))
+                .thenReturn(Map.of(1L, 35, 2L, 35, 3L, 30, 4L, 30, 5L, 30));
+        stubPermissions(Map.of());
+        when(allocationOccupancyService.findOccupancy(DATE, DATE)).thenReturn(List.of());
+
+        RoomRequestSuggestionInputLoader.Inputs inputs = loader.load(ITEM_ID, Set.of(), ACTOR);
+
+        assertThat(inputs.classrooms()).extracting(ClassroomResponseDto::id).containsExactlyInAnyOrder(1L, 2L);
+        assertThat(inputs.classroomCount()).isEqualTo(2);
+        assertThat(inputs.enrolled()).isEqualTo(67);
+        assertThat(inputs.requiredComputers()).isEqualTo(67);
+        assertThat(inputs.rooms()).extracting(r -> r.capacity()).containsExactly(35, 35);
+    }
+
+    @Test
+    void laboratorioQueNingunEdificioCubreUsaTodosLosLabsDelQueMasSuma() {
+        RoomRequestItem item = item(RoomRequestType.FINAL_EXAM).requiresComputers(true).computerCount(67)
+                .classroomCount(1).estimated(null).build();
+        stubItem(item);
+        stubCandidates(item, List.of(room(1L, 40, 1L), room(2L, 40, 1L), room(3L, 40, 2L)));
+        when(candidateResolver.computersByClassroom(any())).thenReturn(Map.of(1L, 30, 2L, 30, 3L, 20));
+        stubPermissions(Map.of());
+        when(allocationOccupancyService.findOccupancy(DATE, DATE)).thenReturn(List.of());
+
+        RoomRequestSuggestionInputLoader.Inputs inputs = loader.load(ITEM_ID, Set.of(), ACTOR);
+
+        assertThat(inputs.classrooms()).extracting(ClassroomResponseDto::id).containsExactlyInAnyOrder(1L, 2L);
+        assertThat(inputs.classroomCount()).isEqualTo(2);
+    }
+
+    @Test
+    void laboratorioSinInscriptosNiEstimadoIgualSeSugiere() {
+        RoomRequestItem item = item(RoomRequestType.FINAL_EXAM).requiresComputers(true).computerCount(20)
+                .classroomCount(1).estimated(null).build();
+        stubItem(item);
+        stubCandidates(item, List.of(room(1L, 40, 1L)));
+        when(candidateResolver.computersByClassroom(any())).thenReturn(Map.of(1L, 25));
+        stubPermissions(Map.of());
+        when(allocationOccupancyService.findOccupancy(DATE, DATE)).thenReturn(List.of());
+
+        assertThat(loader.load(ITEM_ID, Set.of(), ACTOR).classroomCount()).isEqualTo(1);
     }
 
     private void stubItem(RoomRequestItem item) {

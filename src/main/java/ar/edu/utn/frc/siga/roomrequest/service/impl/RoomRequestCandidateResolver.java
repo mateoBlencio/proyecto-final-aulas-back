@@ -20,7 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,10 +51,17 @@ class RoomRequestCandidateResolver {
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
 
         Set<Long> occupiedClassroomIds = occupiedClassroomIds(item);
-        return candidateClassrooms(item).stream()
+        List<ClassroomResponseDto> candidates = candidateClassrooms(item).stream()
+                .filter(c -> !(item.getRequiresComputers() && item.getDerivedBuildingId() != null)
+                        || item.getDerivedBuildingId().equals(c.buildingId()))
+                .toList();
+        Map<Long, Integer> computersByClassroom = computersByClassroom(
+                candidates.stream().map(ClassroomResponseDto::id).toList());
+        return candidates.stream()
                 .map(classroom -> new AllowedClassroomDto(classroom.id(), classroom.roomNumber(),
                         classroom.buildingId(), classroom.buildingName(), classroom.capacity(),
-                        !occupiedClassroomIds.contains(classroom.id())))
+                        !occupiedClassroomIds.contains(classroom.id()),
+                        computersByClassroom.get(classroom.id())))
                 .toList();
     }
 
@@ -74,14 +83,29 @@ class RoomRequestCandidateResolver {
         Set<Long> buildingIdsWithAuxiliar = userService.findBuildingIdsCoveredByRole(
                 SystemRole.AUXILIAR_AULICO, freeByBuilding.keySet());
 
+        boolean requiresComputers = item.getRequiresComputers();
+        Map<Long, Integer> computersByClassroom = requiresComputers
+                ? computersByClassroom(freeByBuilding.values().stream().flatMap(List::stream)
+                        .map(ClassroomResponseDto::id).toList())
+                : Map.of();
+
         List<CandidateBuildingDto> result = new ArrayList<>();
         for (Map.Entry<Long, List<ClassroomResponseDto>> entry : freeByBuilding.entrySet()) {
             Long buildingId = entry.getKey();
             if (!buildingIdsWithAuxiliar.contains(buildingId)) {
                 continue;
             }
+            Integer computers = requiresComputers
+                    ? entry.getValue().stream().mapToInt(c -> computersByClassroom.getOrDefault(c.id(), 0)).sum()
+                    : null;
             result.add(new CandidateBuildingDto(buildingId, entry.getValue().getFirst().buildingName(),
-                    entry.getValue().size()));
+                    entry.getValue().size(), computers));
+        }
+        if (requiresComputers) {
+            int required = item.getComputerCount();
+            result.sort(Comparator
+                    .comparing((CandidateBuildingDto b) -> b.availableComputerCount() < required)
+                    .thenComparing(CandidateBuildingDto::availableComputerCount, Comparator.reverseOrder()));
         }
         return result;
     }
@@ -89,8 +113,8 @@ class RoomRequestCandidateResolver {
     List<ClassroomResponseDto> candidateClassrooms(RoomRequestItem item) {
         List<ClassroomResponseDto> candidates = classroomService.findAllAvailable();
         if (item.getRequiresComputers()) {
-            Set<Long> withComputers = classroomService.findIdsWithResourceAtLeast(
-                    COMPUTERS_RESOURCE_NAME, item.getComputerCount());
+            // Las PCs se suman entre las aulas asignadas: cualquier laboratorio sirve como candidato.
+            Set<Long> withComputers = classroomService.findIdsWithResourceAtLeast(COMPUTERS_RESOURCE_NAME, 1);
             candidates = candidates.stream().filter(c -> withComputers.contains(c.id())).toList();
         }
         if (item.getRequiresProjector()) {
@@ -98,6 +122,10 @@ class RoomRequestCandidateResolver {
             candidates = candidates.stream().filter(c -> withProjector.contains(c.id())).toList();
         }
         return candidates;
+    }
+
+    Map<Long, Integer> computersByClassroom(Collection<Long> classroomIds) {
+        return classroomService.findResourceAmounts(COMPUTERS_RESOURCE_NAME, classroomIds);
     }
 
     Set<Long> occupiedClassroomIds(RoomRequestItem item) {
