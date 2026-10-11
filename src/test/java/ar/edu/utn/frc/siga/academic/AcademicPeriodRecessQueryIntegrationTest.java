@@ -22,7 +22,7 @@ import org.springframework.context.annotation.Import;
  * away from the periods other tests create.
  */
 @Import(IntegrationTestData.class)
-@DisplayName("AcademicPeriodService.findRecessesBetween (integración)")
+@DisplayName("AcademicPeriodService.findRecessesBetween y findAnnual (integración)")
 class AcademicPeriodRecessQueryIntegrationTest extends AbstractIntegrationTest {
 
     private static final int ANNUAL_YEAR = 4000;
@@ -105,5 +105,36 @@ class AcademicPeriodRecessQueryIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("an annual period without recess dates is not returned")
     void periodWithoutRecessIsIgnored() {
         assertThat(yearsFound(LocalDate.of(NO_RECESS_YEAR, 1, 1), LocalDate.of(NO_RECESS_YEAR, 12, 31))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("findAnnual returns the ANUAL period of the requested year with its recess dates")
+    void findAnnualReturnsTheAnnualPeriod() {
+        AcademicPeriodResponseDto found = periodService.findAnnual(ANNUAL_YEAR).orElseThrow();
+
+        assertThat(found.year()).isEqualTo(4000);
+        assertThat(found.semester()).isZero();
+        assertThat(found.startDate()).isEqualTo(LocalDate.of(4000, 3, 1));
+        assertThat(found.endDate()).isEqualTo(LocalDate.of(4000, 11, 30));
+        assertThat(found.recessStart()).isEqualTo(LocalDate.of(4000, 7, 6));
+        assertThat(found.recessEnd()).isEqualTo(LocalDate.of(4000, 7, 27));
+    }
+
+    @Test
+    @DisplayName("findAnnual is empty when the year only has a term period")
+    void findAnnualIgnoresTermPeriods() {
+        assertThat(periodService.findAnnual(FIRST_TERM_YEAR)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("findAnnual is empty when the ANUAL period is deactivated")
+    void findAnnualIgnoresDeactivatedPeriods() {
+        assertThat(periodService.findAnnual(DEACTIVATED_YEAR)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("findAnnual is empty when the year has no period at all")
+    void findAnnualIsEmptyForUnknownYear() {
+        assertThat(periodService.findAnnual(4999)).isEmpty();
     }
 }
