@@ -142,10 +142,10 @@ public class BuildingServiceImpl implements BuildingService {
                 affected++;
                 continue;
             }
-            if (isUpToDate(building, hash)) {
+            if (hash.equals(building.getSysacadHash())) {
                 continue;
             }
-            building.activate();
+            // Deactivation is owned by the faculty: the sync updates data but never reactivates a building.
             building.setName(command.name());
             building.setSyncedAt(syncedAt);
             building.setSysacadHash(hash);
@@ -169,9 +169,5 @@ public class BuildingServiceImpl implements BuildingService {
             log.info("Edificio marcado como no vigente en SysAcad: codigo={}", building.getBuildingCode());
         }
         return affected;
-    }
-
-    private static boolean isUpToDate(Building building, String hash) {
-        return hash.equals(building.getSysacadHash()) && building.isActive();
     }
 }
