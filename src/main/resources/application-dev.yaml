@@ -11,7 +11,7 @@ spring:
   flyway:
     user: ${DB_MIGRATION_USERNAME}
     password: ${DB_MIGRATION_PASSWORD}
-    ignore-migration-patterns: "*:missing"
+    ignore-migration-patterns: "*:missing,*:future"
 
 springdoc:
   swagger-ui:
