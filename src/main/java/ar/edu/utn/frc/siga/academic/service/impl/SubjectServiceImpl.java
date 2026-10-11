@@ -145,10 +145,10 @@ public class SubjectServiceImpl implements SubjectService {
                 affected++;
                 continue;
             }
-            if (hash.equals(subject.getSysacadHash()) && subject.isActive()) {
+            if (hash.equals(subject.getSysacadHash())) {
                 continue;
             }
-            subject.activate();
+            // Deactivation is owned by the faculty: the sync updates data but never reactivates a subject.
             subject.setName(command.name());
             subject.setTerm(command.term());
             subject.setSyncedAt(syncedAt);

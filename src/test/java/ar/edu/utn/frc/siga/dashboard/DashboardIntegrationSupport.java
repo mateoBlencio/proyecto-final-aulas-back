@@ -75,7 +75,7 @@ abstract class DashboardIntegrationSupport extends AbstractIntegrationTest {
     @Autowired
     private WebApplicationContext webApplicationContext;
 
-    private SubjectAndCommission subjectAndCommission;
+    protected SubjectAndCommission subjectAndCommission;
 
     /** An event, its single occurrence and (if allocated) the allocation row. */
     protected record Placed(Long eventId, Long occurrenceId, Long allocationId) {

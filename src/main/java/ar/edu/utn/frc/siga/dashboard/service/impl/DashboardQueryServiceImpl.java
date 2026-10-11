@@ -8,20 +8,27 @@ import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.dashboard.dto.response.AllocationTrendResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardBadgesResponseDto;
+import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardPeriodResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardReportResponseDto;
+import ar.edu.utn.frc.siga.dashboard.dto.response.ReportBuildingResponseDto;
+import ar.edu.utn.frc.siga.dashboard.dto.response.ReportCampusResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardWeekResponseDto;
-import ar.edu.utn.frc.siga.dashboard.dto.response.ExcludedDayResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.OpenRoomRequestsResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.RoomRequestStatsResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.RoomsInUseResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.WeekBuildingResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.WeekCampusResponseDto;
 import ar.edu.utn.frc.siga.dashboard.model.AllocationUnitRow;
+import ar.edu.utn.frc.siga.dashboard.model.Availability;
 import ar.edu.utn.frc.siga.dashboard.model.BuildingRoomsRow;
 import ar.edu.utn.frc.siga.dashboard.model.CategoryCounts;
+import ar.edu.utn.frc.siga.dashboard.model.DashboardPeriodType;
 import ar.edu.utn.frc.siga.dashboard.model.PeriodMetrics;
 import ar.edu.utn.frc.siga.dashboard.model.PendingItemRow;
+import ar.edu.utn.frc.siga.dashboard.model.ResolvedPeriod;
 import ar.edu.utn.frc.siga.dashboard.model.ScopeMetrics;
+import ar.edu.utn.frc.siga.dashboard.model.SnapshotPayload.RoomRequestCounts;
+import ar.edu.utn.frc.siga.dashboard.model.WindowRoomRequests;
 import ar.edu.utn.frc.siga.dashboard.repository.DashboardReadRepository;
 import ar.edu.utn.frc.siga.dashboard.service.DashboardQueryService;
 import java.time.Clock;
@@ -32,11 +39,13 @@ import java.time.LocalTime;
 import java.time.YearMonth;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -57,6 +66,8 @@ public class DashboardQueryServiceImpl implements DashboardQueryService {
     private final DashboardReadRepository repository;
     private final DashboardRoomRequestStats roomRequestStats;
     private final DashboardSnapshotReader snapshotReader;
+    private final DashboardPeriodResolver periodResolver;
+    private final DashboardRoomRequestCounter roomRequestCounter;
     private final BuildingScopeResolver buildingScopeResolver;
     private final Clock clock;
 
@@ -86,11 +97,75 @@ public class DashboardQueryServiceImpl implements DashboardQueryService {
                 period.unallocated(),
                 campusOpenRoomRequests(scope, openItems, open));
 
-        List<ExcludedDayResponseDto> excluded = period.availability().excludedDays().stream()
-                .map(d -> new ExcludedDayResponseDto(d.date(), d.reason(), d.description()))
-                .toList();
         return new DashboardWeekResponseDto(monday, monday.plusDays(5), currentWeek, !scope.isUnrestricted(),
-                DashboardDtoMapper.parameters(period.parameters()), excluded, campus, buildings);
+                DashboardDtoMapper.parameters(period.parameters()), DashboardDtoMapper.excludedDays(period.availability()), campus, buildings);
+    }
+
+    @Override
+    public DashboardPeriodResponseDto period(DashboardPeriodType type, Integer year, Integer semester,
+                                             Integer years) {
+        BuildingScope scope = buildingScopeResolver.scopeFor(Permission.DASHBOARD_READ);
+        ResolvedPeriod p = periodResolver.resolve(type, year, semester, years);
+        PeriodMetrics m = p.windows().stream().map(w -> metricsService.compute(w.from(), w.to(), scope))
+                .reduce(DashboardQueryServiceImpl::addPeriods).orElseThrow();
+        WindowRoomRequests requests = roomRequestCounter.count(p.windows());
+        int firstHour = m.parameters().firstSlotHour();
+
+        List<ReportBuildingResponseDto> buildings = m.buildings().stream()
+                .map(b -> DashboardDtoMapper.reportBuilding(b.buildingId(), b.code(), b.name(),
+                        m.byBuilding().get(b.buildingId()), requests.forBuilding(b.buildingId()), firstHour))
+                .toList();
+        ReportCampusResponseDto campus = scope.isUnrestricted()
+                ? DashboardDtoMapper.reportCampus(m.campus(), m.unallocated(), requests.campus(),
+                        requests.unassignedBuilding(), firstHour)
+                : DashboardDtoMapper.reportCampus(m.campus(), null, scopedRequests(m, requests), null, firstHour);
+        return new DashboardPeriodResponseDto(p.type(), p.year(), p.semester(), p.years(), p.periodStart(),
+                p.periodEnd(), p.from(), p.to(), p.partial(), !scope.isUnrestricted(),
+                DashboardDtoMapper.parameters(m.parameters()), DashboardDtoMapper.excludedDays(m.availability()),
+                campus, buildings);
+    }
+
+    /**
+     * Adds up the metrics of two non-contiguous periods ({@code b} the later one): absolutes and available days are
+     * summed, room count is the one of {@code b}, excluded days concatenated. Units are dropped; the response does not use them.
+     */
+    private static PeriodMetrics addPeriods(PeriodMetrics a, PeriodMetrics b) {
+        Map<Long, ScopeMetrics> byBuilding = new LinkedHashMap<>(a.byBuilding());
+        b.byBuilding().forEach((id, metrics) -> byBuilding.merge(id, metrics, DashboardQueryServiceImpl::addScopes));
+        Map<Long, BuildingRoomsRow> buildings = new LinkedHashMap<>();
+        Stream.concat(a.buildings().stream(), b.buildings().stream()).forEach(row -> buildings.putIfAbsent(row.buildingId(), row));
+        Long unallocated = a.unallocated() == null || b.unallocated() == null ? null
+                : a.unallocated() + b.unallocated();
+        Availability availability = new Availability(
+                Stream.concat(a.availability().availableDays().stream(), b.availability().availableDays().stream())
+                        .collect(Collectors.toSet()),
+                Stream.concat(a.availability().excludedDays().stream(), b.availability().excludedDays().stream())
+                        .toList());
+        return new PeriodMetrics(byBuilding, addScopes(a.campus(), b.campus()), buildings.values().stream()
+                        .sorted(Comparator.comparing(BuildingRoomsRow::code, Comparator.nullsLast(Comparator.naturalOrder())))
+                        .toList(),
+                List.of(), unallocated, availability, a.parameters());
+    }
+
+    private static ScopeMetrics addScopes(ScopeMetrics a, ScopeMetrics b) {
+        ScopeMetrics sum = a.plus(b);
+        return new ScopeMetrics(b.roomCount(), a.availableDays() + b.availableDays(), sum.categories(),
+                sum.occupiedRoomMinutes(), sum.availableRoomMinutes(), sum.occupiedBySlot(), sum.availableBySlot(),
+                sum.bySource());
+    }
+
+    /** Restricted campus: the sum of the counts of the user's buildings. */
+    private static RoomRequestCounts scopedRequests(PeriodMetrics m, WindowRoomRequests requests) {
+        long resolved = 0;
+        long expired = 0;
+        long pending = 0;
+        for (BuildingRoomsRow b : m.buildings()) {
+            RoomRequestCounts c = requests.forBuilding(b.buildingId());
+            resolved += c.resolved();
+            expired += c.expired();
+            pending += c.pending();
+        }
+        return new RoomRequestCounts(resolved, expired, pending);
     }
 
     @Override

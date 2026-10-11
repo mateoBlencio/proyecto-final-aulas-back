@@ -241,6 +241,35 @@ class BuildingServiceImplTest {
     }
 
     @Test
+    @DisplayName("syncBuildings: no reactiva un edificio dado de baja que sigue en SysAcad con el mismo nombre")
+    void syncBuildingsKeepsDeactivatedBuildingWithSameHash() {
+        Building deactivated = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));
+        deactivated.deactivate();
+        when(buildingRepository.findAll()).thenReturn(List.of(deactivated));
+
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(9, "Almafuerte")));
+
+        assertThat(deactivated.getDeletedAt()).isNotNull();
+        verify(buildingRepository, never()).save(any());
+        assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("syncBuildings: actualiza el nombre de un edificio dado de baja sin reactivarlo")
+    void syncBuildingsRenamesDeactivatedBuildingWithoutReactivating() {
+        Building deactivated = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));
+        deactivated.deactivate();
+        when(buildingRepository.findAll()).thenReturn(List.of(deactivated));
+
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(9, "Almafuerte Sede")));
+
+        assertThat(deactivated.getName()).isEqualTo("Almafuerte Sede");
+        assertThat(deactivated.getDeletedAt()).isNotNull();
+        verify(buildingRepository).save(deactivated);
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("syncBuildings: el edificio ausente upstream queda no vigente y con deletedAt, sin borrarse")
     void syncBuildingsMarksAbsentBuildingAsNotCurrent() {
         Building absent = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));

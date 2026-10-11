@@ -36,7 +36,7 @@ cmd_refresh() {
 
     local pg16_bin
     pg16_bin="$(find_pg16_bin)"
-    dump_file="$(mktemp -t dev-snapshot-dump)"
+    dump_file="$(mktemp -t dev-snapshot-dump.XXXXXX)"
     trap 'rm -f "${dump_file:-}"' EXIT
 
     echo "Dump de dev ($admin_user@$ADMIN_HOST:$ADMIN_PORT/$ADMIN_DB) -> temp"

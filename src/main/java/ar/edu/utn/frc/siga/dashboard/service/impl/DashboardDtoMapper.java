@@ -2,13 +2,19 @@ package ar.edu.utn.frc.siga.dashboard.service.impl;
 
 import ar.edu.utn.frc.siga.dashboard.dto.response.AllocationStatusResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.DashboardParametersResponseDto;
+import ar.edu.utn.frc.siga.dashboard.dto.response.ExcludedDayResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.HourlyOccupancyResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.OccupancyResponseDto;
+import ar.edu.utn.frc.siga.dashboard.dto.response.ReportBuildingResponseDto;
+import ar.edu.utn.frc.siga.dashboard.dto.response.ReportCampusResponseDto;
+import ar.edu.utn.frc.siga.dashboard.dto.response.RoomRequestCountsResponseDto;
 import ar.edu.utn.frc.siga.dashboard.dto.response.SourceBreakdownResponseDto;
+import ar.edu.utn.frc.siga.dashboard.model.Availability;
 import ar.edu.utn.frc.siga.dashboard.model.CategoryCounts;
 import ar.edu.utn.frc.siga.dashboard.model.DashboardParameters;
 import ar.edu.utn.frc.siga.dashboard.model.DashboardRules;
 import ar.edu.utn.frc.siga.dashboard.model.ScopeMetrics;
+import ar.edu.utn.frc.siga.dashboard.model.SnapshotPayload.RoomRequestCounts;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -57,6 +63,32 @@ final class DashboardDtoMapper {
     static List<SourceBreakdownResponseDto> bySource(ScopeMetrics m) {
         return m.bySource().entrySet().stream()
                 .map(entry -> new SourceBreakdownResponseDto(entry.getKey(), allocationStatus(entry.getValue())))
+                .toList();
+    }
+
+    static RoomRequestCountsResponseDto roomRequests(RoomRequestCounts c) {
+        return new RoomRequestCountsResponseDto(c.resolved(), c.pending(), c.expired());
+    }
+
+    static ReportBuildingResponseDto reportBuilding(Long buildingId, Integer code, String name, ScopeMetrics m,
+                                                    RoomRequestCounts requests, int firstHour) {
+        return new ReportBuildingResponseDto(buildingId, code, name, m.roomCount(), m.availableDays(),
+                allocationStatus(m.categories()), occupancy(m),
+                hourlyProfile(m.occupiedBySlot(), m.availableBySlot(), firstHour), bySource(m),
+                roomRequests(requests));
+    }
+
+    /** {@code unassigned} null: the field is left out of the response. */
+    static ReportCampusResponseDto reportCampus(ScopeMetrics m, Long unallocated, RoomRequestCounts requests,
+                                                RoomRequestCounts unassigned, int firstHour) {
+        return new ReportCampusResponseDto(m.roomCount(), m.availableDays(), allocationStatus(m.categories()),
+                unallocated, occupancy(m), hourlyProfile(m.occupiedBySlot(), m.availableBySlot(), firstHour),
+                bySource(m), roomRequests(requests), unassigned == null ? null : roomRequests(unassigned));
+    }
+
+    static List<ExcludedDayResponseDto> excludedDays(Availability availability) {
+        return availability.excludedDays().stream()
+                .map(d -> new ExcludedDayResponseDto(d.date(), d.reason(), d.description()))
                 .toList();
     }
 }

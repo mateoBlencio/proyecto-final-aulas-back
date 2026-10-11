@@ -15,14 +15,13 @@ import ar.edu.utn.frc.siga.dashboard.model.DashboardParameters;
 import ar.edu.utn.frc.siga.dashboard.model.DashboardRules;
 import ar.edu.utn.frc.siga.dashboard.model.DashboardSnapshot;
 import ar.edu.utn.frc.siga.dashboard.model.PeriodMetrics;
-import ar.edu.utn.frc.siga.dashboard.model.RequestCountRow;
+import ar.edu.utn.frc.siga.dashboard.model.WindowRoomRequests;
 import ar.edu.utn.frc.siga.dashboard.model.ScopeMetrics;
 import ar.edu.utn.frc.siga.dashboard.model.SnapshotPayload;
 import ar.edu.utn.frc.siga.dashboard.model.SnapshotPayload.RoomRequestCounts;
 import ar.edu.utn.frc.siga.dashboard.model.SnapshotPayload.SlotMinutes;
 import ar.edu.utn.frc.siga.dashboard.model.SnapshotPayload.SnapshotParameters;
 import ar.edu.utn.frc.siga.dashboard.model.SnapshotPayload.SourceCounts;
-import ar.edu.utn.frc.siga.dashboard.repository.DashboardReadRepository;
 import ar.edu.utn.frc.siga.dashboard.repository.DashboardSnapshotRepository;
 import ar.edu.utn.frc.siga.dashboard.service.DashboardSnapshotService;
 import java.time.Clock;
@@ -49,7 +48,7 @@ public class DashboardSnapshotServiceImpl implements DashboardSnapshotService {
     static final String SYSTEM_ACTOR = "SISTEMA";
 
     private final DashboardMetricsService metricsService;
-    private final DashboardReadRepository readRepository;
+    private final DashboardRoomRequestCounter roomRequestCounter;
     private final DashboardSnapshotRepository snapshotRepository;
     private final DashboardSnapshotRegenerationRepository regenerationRepository;
     private final DashboardSnapshotReader snapshotReader;
@@ -116,34 +115,15 @@ public class DashboardSnapshotServiceImpl implements DashboardSnapshotService {
         LocalDate to = month.atEndOfMonth();
         PeriodMetrics period = metricsService.compute(from, to, BuildingScope.unrestricted());
 
-        Instant start = from.atStartOfDay(clock.getZone()).toInstant();
-        Instant end = month.plusMonths(1).atDay(1).atStartOfDay(clock.getZone()).toInstant();
-        List<RequestCountRow> resolved = readRepository.countResolved(start, end);
-        List<RequestCountRow> expired = readRepository.countExpired(start, end);
-        List<RequestCountRow> pending = readRepository.countPendingAt(end);
+        WindowRoomRequests requests = roomRequestCounter.count(from, to);
 
         Instant now = clock.instant();
         for (BuildingRoomsRow building : period.buildings()) {
-            RoomRequestCounts counts = new RoomRequestCounts(
-                    sum(resolved, building.buildingId(), false), sum(expired, building.buildingId(), false),
-                    sum(pending, building.buildingId(), false));
             save(month, from, to, building, period.byBuilding().get(building.buildingId()), period.parameters(),
-                    null, counts, null, now, actor, reason);
+                    null, requests.forBuilding(building.buildingId()), null, now, actor, reason);
         }
-        RoomRequestCounts campusCounts = new RoomRequestCounts(
-                resolved.stream().filter(RequestCountRow::campus).mapToLong(RequestCountRow::total).sum(),
-                expired.stream().mapToLong(RequestCountRow::total).sum(),
-                pending.stream().mapToLong(RequestCountRow::total).sum());
-        RoomRequestCounts unassigned = new RoomRequestCounts(0, sum(expired, null, true), sum(pending, null, true));
-        save(month, from, to, null, period.campus(), period.parameters(), period.unallocated(), campusCounts,
-                unassigned, now, actor, reason);
-    }
-
-    /** Total of the rows of one building ({@code noBuilding}: the rows without building); campus rows are skipped. */
-    private static long sum(List<RequestCountRow> rows, Long buildingId, boolean noBuilding) {
-        return rows.stream().filter(row -> !row.campus())
-                .filter(row -> noBuilding ? row.buildingId() == null : buildingId.equals(row.buildingId()))
-                .mapToLong(RequestCountRow::total).sum();
+        save(month, from, to, null, period.campus(), period.parameters(), period.unallocated(), requests.campus(),
+                requests.unassignedBuilding(), now, actor, reason);
     }
 
     private void save(YearMonth month, LocalDate from, LocalDate to, BuildingRoomsRow building,
