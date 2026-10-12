@@ -80,7 +80,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
         if (classroomRepository.findByRoomNumberAndDeletedAtIsNull(dto.roomNumber()).isPresent()) {
             log.warn("Creación de aula rechazada: roomNumber '{}' ya existe", dto.roomNumber());
-            throw new SpaceDomainException("Classroom roomNumber already exists: " + dto.roomNumber());
+            throw new SpaceDomainException("Ya existe un aula con el número " + dto.roomNumber() + ".");
         }
 
         validateCapacity(dto);
