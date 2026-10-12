@@ -18,11 +18,11 @@ public record DirectEventDraftDto(
         @NotNull @FutureOrPresent LocalDate date,
         LocalTime startTime,
         LocalTime endTime,
-        @NotNull @Min(1) Integer estimated,
+        @NotNull @Min(1) @Max(10_000) Integer estimated,
         @Min(1) @Max(100) Integer classroomCount,
         Boolean requiresProjector,
         Boolean requiresComputers,
-        @Min(1) Integer computerCount,
+        @Min(1) @Max(1_000) Integer computerCount,
         Boolean requiresExamUsers,
         @Size(max = 255) String requiredSoftware,
         @Size(max = 1000) String description

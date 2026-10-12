@@ -712,6 +712,35 @@ class AcademicEventServiceImplTest {
     }
 
     @Test
+    @DisplayName("updateUniqueEvent: si el dto omite los cinco requisitos, conserva los que el evento ya tenía")
+    void updateUniqueEventSinRequisitosLosPreserva() {
+        UniqueEvent event = eventWithComputers();
+        stubUpdate(event);
+
+        service.updateUniqueEvent(3L, updateDto());
+
+        assertThat(event.isRequiresComputers()).isTrue();
+        assertThat(event.getComputerCount()).isEqualTo(40);
+        assertThat(event.getRequiredSoftware()).isEqualTo("MATLAB");
+    }
+
+    @Test
+    @DisplayName("updateUniqueEvent: requiresComputers=false limpia cantidad y software (CHECK chk_evento_unico_computadoras)")
+    void updateUniqueEventRequiresComputersFalseLosLimpia() {
+        UniqueEvent event = eventWithComputers();
+        stubUpdate(event);
+        UpdateUniqueEventRequestDto dto = new UpdateUniqueEventRequestDto(
+                UniqueEventKind.PARCIAL, 1L, 1L, LocalDate.of(2026, 3, 15),
+                LocalTime.of(11, 0), 90, 25, "descripcion actualizada", null, false, null, null, null);
+
+        service.updateUniqueEvent(3L, dto);
+
+        assertThat(event.isRequiresComputers()).isFalse();
+        assertThat(event.getComputerCount()).isNull();
+        assertThat(event.getRequiredSoftware()).isNull();
+    }
+
+    @Test
     @DisplayName("updateUniqueEvent: evento con ocurrencias simultáneas mueve la fecha de todas, valida contra la principal")
     void updateUniqueEventConOcurrenciasSimultaneas() {
         UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
@@ -879,6 +908,21 @@ class AcademicEventServiceImplTest {
     private UniqueEventResponseDto dummyUniqueResponseDto(Long id) {
         return new UniqueEventResponseDto(id, EventType.UNIQUE_EVENT, UniqueEventKind.EXAMEN_FINAL, 20,
                 LocalTime.of(10, 0), 60, LocalDate.of(2026, 3, 10), "evento especial", null, null, false, false, null, null, null);
+    }
+
+    private UniqueEvent eventWithComputers() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        event.setRequiresComputers(true);
+        event.setComputerCount(40);
+        event.setRequiredSoftware("MATLAB");
+        return event;
+    }
+
+    private void stubUpdate(UniqueEvent event) {
+        Occurrence occurrence = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.NEEDS_ROOM);
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
+        when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyUniqueResponseDto(3L));
     }
 
     private UpdateUniqueEventRequestDto updateDto() {

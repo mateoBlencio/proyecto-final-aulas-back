@@ -151,6 +151,7 @@ public class DirectEventServiceImpl implements DirectEventService {
         if (classroomIds.stream().distinct().count() != classroomIds.size()) {
             throw new InvalidRoomRequestException("No se puede repetir un aula en el alta.");
         }
+        requireCandidates(draft, schedule, classroomIds);
 
         DirectEventSuggestion suggestion = null;
         if (request.suggestionId() != null) {
@@ -190,6 +191,19 @@ public class DirectEventServiceImpl implements DirectEventService {
                 store.save(suggestion);
             }
             throw e;
+        }
+    }
+
+    // Sin esto, el borrador podría pedir computadoras y el alta asignar un aula común: los filtros
+    // de /available-classrooms y /suggestion son del front, el back tiene que volver a exigirlos.
+    private void requireCandidates(DirectEventDraftDto draft, ResolvedSchedule schedule, List<Long> classroomIds) {
+        Set<Long> candidateIds = candidateResolver.candidateClassrooms(needsOf(draft, schedule)).stream()
+                .map(ClassroomResponseDto::id)
+                .collect(Collectors.toSet());
+        List<Long> rejected = classroomIds.stream().filter(id -> !candidateIds.contains(id)).toList();
+        if (!rejected.isEmpty()) {
+            throw new InvalidRoomRequestException(
+                    "Estas aulas no cumplen los requisitos del evento o están fuera de su alcance: " + rejected + ".");
         }
     }
 

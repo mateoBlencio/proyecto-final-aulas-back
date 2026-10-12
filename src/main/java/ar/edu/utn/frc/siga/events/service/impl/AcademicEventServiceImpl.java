@@ -533,11 +533,18 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         event.setDuration(duration);
         event.setDate(dto.date());
         event.setDescription(dto.description());
-        event.setRequiresProjector(Boolean.TRUE.equals(dto.requiresProjector()));
-        event.setRequiresComputers(Boolean.TRUE.equals(dto.requiresComputers()));
-        event.setComputerCount(dto.computerCount());
-        event.setRequiredSoftware(dto.requiredSoftware());
-        event.setRequiresExamUsers(dto.requiresExamUsers());
+        // Los cinco requisitos son un grupo: si el cliente no manda ninguno (el front previo a la
+        // feature de alta directa), no habló de requisitos y los que ya estaban no se borran.
+        boolean requirementsAbsent = dto.requiresProjector() == null && dto.requiresComputers() == null
+                && dto.computerCount() == null && dto.requiredSoftware() == null
+                && dto.requiresExamUsers() == null;
+        if (!requirementsAbsent) {
+            event.setRequiresProjector(Boolean.TRUE.equals(dto.requiresProjector()));
+            event.setRequiresComputers(Boolean.TRUE.equals(dto.requiresComputers()));
+            event.setComputerCount(dto.computerCount());
+            event.setRequiredSoftware(dto.requiredSoftware());
+            event.setRequiresExamUsers(dto.requiresExamUsers());
+        }
         event.setKind(dto.eventType());
         event.setSubjectId(dto.subjectId());
         event.setCommissionId(dto.commissionId());

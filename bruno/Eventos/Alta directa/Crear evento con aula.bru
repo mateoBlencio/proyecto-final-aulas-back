@@ -41,6 +41,7 @@ docs {
     410 si expiró, ya se usó o no coincide con el borrador. Un error posterior (400, 409)
     no consume la sugerencia.
   - `reason`: obligatorio, hasta 500 caracteres; queda como observación de cada asignación.
-  - 403 si un aula está fuera del edificio del usuario; 409 con `ALLOCATION_CONFLICT` si
-    está ocupada.
+  - 400 si un aula no cumple los requisitos del borrador (computadoras, proyector) o está
+    fuera de los edificios del usuario: el back revalida los filtros, no confía en el front.
+  - 409 con `ALLOCATION_CONFLICT` si el aula se ocupó mientras el usuario elegía.
 }

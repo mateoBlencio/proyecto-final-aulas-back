@@ -10,7 +10,7 @@ import java.util.List;
 
 public record CreateDirectEventRequestDto(
         @NotNull @Valid DirectEventDraftDto draft,
-        @NotEmpty List<Long> classroomIds,
-        String suggestionId,
+        @NotEmpty @Size(max = 100) List<@NotNull Long> classroomIds,
+        @Size(max = 64) String suggestionId,
         @NotBlank @Size(max = 500) String reason
 ) {}

@@ -3,13 +3,17 @@ package ar.edu.utn.frc.siga.roomrequest.direct;
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocationBatchRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocationItemRequestDto;
+import ar.edu.utn.frc.siga.auth.model.SystemRole;
+import ar.edu.utn.frc.siga.common.security.ScopeType;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestRepository;
+import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
+import ar.edu.utn.frc.siga.space.model.ResourceValueKind;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.ObjectMapper;
 
@@ -168,6 +173,8 @@ class DirectEventIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("alta directa con requisitos: evento_unico guarda proyector, computadoras, cantidad y software")
     void create_withRequirements_persistsThem() throws Exception {
         Classroom aula = testData.aula(testData.edificio());
+        testData.recursoDeAula(aula, testData.tipoRecurso("Cantidad de PC", ResourceValueKind.COUNT), 40);
+        testData.recursoDeAula(aula, testData.tipoRecurso("Proyector", ResourceValueKind.BOOLEAN), 1);
         Map<String, Object> draft = draft("CONFERENCE", LocalDate.now().plusDays(36));
         draft.put("requiresProjector", true);
         draft.put("requiresComputers", true);
@@ -220,6 +227,56 @@ class DirectEventIntegrationTest extends AbstractIntegrationTest {
         direct(draft, List.of(aula.getId())).andExpect(status().isCreated());
 
         assertThat(rowFor(aula).get("descripcion")).isEqualTo(description);
+    }
+
+    @Test
+    @DisplayName("auxiliar con un aula sin computadoras de su edificio para un borrador que las exige: 400 y nada persistido")
+    void create_auxiliarRoomWithoutComputers_returnsBadRequest() throws Exception {
+        Building building = testData.edificio();
+        Classroom plainRoom = testData.aula(building);
+        MockMvc auxiliar = auxiliarOf(building);
+        Map<String, Object> draft = draft("CONFERENCE", LocalDate.now().plusDays(39));
+        draft.put("requiresComputers", true);
+        draft.put("computerCount", 30);
+
+        directAs(auxiliar, draft, List.of(plainRoom.getId())).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("Estas aulas no cumplen")));
+
+        assertNothingPersisted(plainRoom, draft);
+    }
+
+    @Test
+    @DisplayName("auxiliar con un aula de otro edificio: 400 por no ser candidata y nada persistido")
+    void create_auxiliarRoomOfOtherBuilding_isRejected() throws Exception {
+        Classroom foreignRoom = testData.aula(testData.edificio());
+        testData.recursoDeAula(foreignRoom, testData.tipoRecurso("Cantidad de PC", ResourceValueKind.COUNT), 40);
+        MockMvc auxiliar = auxiliarOf(testData.edificio());
+        Map<String, Object> draft = draft("CONFERENCE", LocalDate.now().plusDays(40));
+        draft.put("requiresComputers", true);
+        draft.put("computerCount", 30);
+
+        directAs(auxiliar, draft, List.of(foreignRoom.getId())).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("Estas aulas no cumplen")));
+
+        assertNothingPersisted(foreignRoom, draft);
+    }
+
+    private MockMvc auxiliarOf(Building building) {
+        return mockMvcAsScoped("auxiliar-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar",
+                SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, building.getId());
+    }
+
+    private void assertNothingPersisted(Classroom classroom, Map<String, Object> draft) {
+        assertThat(jdbcTemplate.queryForObject(
+                "select count(*) from asignacion_aula where id_aula = ?", Integer.class, classroom.getId())).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "select count(*) from ocurrencia where fecha = ?", Integer.class,
+                java.sql.Date.valueOf((String) draft.get("date")))).isZero();
+    }
+
+    private ResultActions directAs(MockMvc client, Map<String, Object> draft, List<Long> classroomIds) throws Exception {
+        return client.perform(post("/v1/events/direct").contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(body(draft, classroomIds, null))));
     }
 
     private static void assertRequirements(Map<String, Object> row) {

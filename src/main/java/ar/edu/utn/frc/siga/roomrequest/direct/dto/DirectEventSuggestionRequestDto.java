@@ -8,5 +8,5 @@ import java.util.List;
 
 public record DirectEventSuggestionRequestDto(
         @NotNull @Valid DirectEventDraftDto draft,
-        @Size(max = 200) List<Long> excludedClassroomIds
+        @Size(max = 200) List<@NotNull Long> excludedClassroomIds
 ) {}
