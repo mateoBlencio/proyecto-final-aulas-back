@@ -76,10 +76,10 @@ public final class EventTestData {
     }
 
     public static SubjectResponseDto subjectResponseDto(Long id) {
-        return new SubjectResponseDto(id, 100, "Materia de prueba", "anual", null, true);
+        return new SubjectResponseDto(id, 100, "Materia de prueba", "anual", null, true, null);
     }
 
     public static CommissionResponseDto commissionResponseDto(Long id) {
-        return new CommissionResponseDto(id, "K1234", null);
+        return new CommissionResponseDto(id, "K1234", null, null);
     }
 }

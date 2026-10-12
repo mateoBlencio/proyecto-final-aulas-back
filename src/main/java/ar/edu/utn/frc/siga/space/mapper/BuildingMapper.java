@@ -10,5 +10,6 @@ import org.mapstruct.Mapping;
 public interface BuildingMapper {
 
     @Mapping(target = "active", expression = "java(building.isActive())")
+    @Mapping(target = "unavailableReason", expression = "java(building.unavailableReason())")
     BuildingResponseDto toDto(Building building);
 }

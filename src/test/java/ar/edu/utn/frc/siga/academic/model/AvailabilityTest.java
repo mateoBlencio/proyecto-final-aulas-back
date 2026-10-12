@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.academic.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -71,6 +72,99 @@ class AvailabilityTest {
         assertThat(link(okSubject, commission(period(false), true), true).isAvailable()).isFalse();
         assertThat(link(okSubject, commission(period(true), false), true).isAvailable()).isFalse();
     }
+
+    private static Commission commission(AcademicPeriod period, boolean active, boolean enabled, String hash) {
+        Commission commission = Commission.builder().id(1L).academicPeriod(period)
+                .sysacadEnabled(enabled).sysacadHash(hash).build();
+        if (!active) {
+            commission.deactivate();
+        }
+        return commission;
+    }
+
+    @Test
+    @DisplayName("Subject.unavailableReason: null si está disponible")
+    void subjectReasonIsNullWhenAvailable() {
+        assertThat(subject(plan(true), true).unavailableReason()).isNull();
+    }
+
+    @Test
+    @DisplayName("Subject.unavailableReason: baja propia es DEACTIVATED")
+    void subjectReasonDeactivated() {
+        assertThat(subject(plan(true), false).unavailableReason()).isEqualTo(UnavailableReason.DEACTIVATED);
+    }
+
+    @Test
+    @DisplayName("Subject.unavailableReason: plan dado de baja es PARENT_DEACTIVATED")
+    void subjectReasonParentDeactivated() {
+        assertThat(subject(plan(false), true).unavailableReason()).isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
+    }
+
+    @Test
+    @DisplayName("Subject.unavailableReason: baja propia y baja del plan a la vez, gana DEACTIVATED")
+    void subjectOwnDeactivationWinsOverParent() {
+        assertThat(subject(plan(false), false).unavailableReason()).isEqualTo(UnavailableReason.DEACTIVATED);
+    }
+
+    @Test
+    @DisplayName("Commission.unavailableReason: null si está activa, su período activo y vigente")
+    void commissionReasonIsNullWhenAvailable() {
+        assertThat(commission(period(true), true, true, "h").unavailableReason()).isNull();
+    }
+
+    @Test
+    @DisplayName("Commission.unavailableReason: baja propia es DEACTIVATED")
+    void commissionReasonDeactivated() {
+        assertThat(commission(period(true), false, true, "h").unavailableReason())
+                .isEqualTo(UnavailableReason.DEACTIVATED);
+    }
+
+    @Test
+    @DisplayName("Commission.unavailableReason: período dado de baja es PARENT_DEACTIVATED")
+    void commissionReasonParentDeactivated() {
+        assertThat(commission(period(false), true, true, "h").unavailableReason())
+                .isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
+    }
+
+    @Test
+    @DisplayName("Commission.unavailableReason: con hash y flag apagado es NOT_IN_SYSACAD")
+    void commissionReasonNotInSysacad() {
+        Commission commission = commission(period(true), true, false, "h");
+
+        assertThat(commission.unavailableReason()).isEqualTo(UnavailableReason.NOT_IN_SYSACAD);
+        assertThat(commission.isAvailable()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Commission: una comisión manual (hash nulo, flag apagado) sigue disponible")
+    void manualCommissionStaysAvailable() {
+        Commission commission = commission(period(true), true, false, null);
+
+        assertThat(commission.unavailableReason()).isNull();
+        assertThat(commission.isAvailable()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Commission.unavailableReason: baja propia y baja del período a la vez, gana DEACTIVATED")
+    void commissionOwnDeactivationWinsOverParent() {
+        assertThat(commission(period(false), false, true, "h").unavailableReason())
+                .isEqualTo(UnavailableReason.DEACTIVATED);
+    }
+
+    @Test
+    @DisplayName("Commission.unavailableReason: baja del período gana sobre no estar vigente")
+    void commissionParentDeactivationWinsOverNotInSysacad() {
+        assertThat(commission(period(false), true, false, "h").unavailableReason())
+                .isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
+    }
+
+    @Test
+    @DisplayName("Commission.unavailableReason: baja propia gana sobre no estar vigente")
+    void commissionOwnDeactivationWinsOverNotInSysacad() {
+        assertThat(commission(period(true), false, false, "h").unavailableReason())
+                .isEqualTo(UnavailableReason.DEACTIVATED);
+    }
+
 
     private static SubjectCommission link(Subject subject, Commission commission, boolean active) {
         SubjectCommission link = SubjectCommission.builder().subject(subject).commission(commission).build();

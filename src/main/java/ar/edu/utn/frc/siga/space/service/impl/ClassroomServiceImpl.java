@@ -230,16 +230,20 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Override
     public ClassroomResponseDto findByRoomNumberAndBuilding(Integer roomNumber, Long buildingId) {
         Building building = findActiveBuilding(buildingId);
-        return classroomMapper.toDto(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(roomNumber, building)
-                .or(() -> fallbackByRoomNumberOnly(roomNumber, buildingId))
-                .orElseThrow(() -> ResourceNotFoundException.of("Classroom", roomNumber)));
+        Optional<Classroom> inBuilding = classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(roomNumber, building);
+        // Un aula que existe en el edificio pero no está disponible no cae al fallback: asignaría el aula de otro edificio.
+        Optional<Classroom> found = inBuilding.isPresent()
+                ? inBuilding.filter(Classroom::isAvailable)
+                : fallbackByRoomNumberOnly(roomNumber, buildingId);
+        return classroomMapper.toDto(found.orElseThrow(() -> ResourceNotFoundException.of("Classroom", roomNumber)));
     }
 
     @Override
     public Optional<ClassroomResponseDto> findByRoomNumberAndBuildingCode(Integer roomNumber, Integer buildingCode) {
         return buildingRepository.findByBuildingCode(buildingCode)
-                .filter(Building::isActive)
+                .filter(Building::isAvailable)
                 .flatMap(building -> classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(roomNumber, building))
+                .filter(Classroom::isAvailable)
                 .map(classroomMapper::toDto);
     }
 

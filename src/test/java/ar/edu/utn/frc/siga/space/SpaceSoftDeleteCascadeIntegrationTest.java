@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.space;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -10,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
@@ -21,11 +23,14 @@ import ar.edu.utn.frc.siga.space.repository.ResourceTypeRepository;
 import ar.edu.utn.frc.siga.space.service.BuildingService;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
+import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.web.servlet.ResultActions;
 
 @Import(IntegrationTestData.class)
 @DisplayName("Baja lógica en cascada del módulo space (integración)")
@@ -43,6 +48,65 @@ class SpaceSoftDeleteCascadeIntegrationTest extends AbstractIntegrationTest {
     private ClassroomService classroomService;
     @Autowired
     private BuildingService buildingService;
+
+    private final List<Building> notCurrentBuildings = new ArrayList<>();
+    private final List<Classroom> notCurrentClassrooms = new ArrayList<>();
+
+    @AfterEach
+    void restoreSysacadFlags() {
+        notCurrentBuildings.forEach(building -> {
+            Building fresh = buildingRepository.findById(building.getId()).orElseThrow();
+            fresh.setSysacadEnabled(true);
+            buildingRepository.save(fresh);
+        });
+        notCurrentClassrooms.forEach(classroom -> {
+            Classroom fresh = classroomRepository.findById(classroom.getId()).orElseThrow();
+            fresh.setSysacadEnabled(true);
+            classroomRepository.save(fresh);
+        });
+        notCurrentBuildings.clear();
+        notCurrentClassrooms.clear();
+    }
+
+    private Building markNotCurrent(Building building) {
+        building.setSysacadEnabled(false);
+        building.setSysacadHash("hash-" + building.getId());
+        notCurrentBuildings.add(building);
+        return buildingRepository.save(building);
+    }
+
+    private Classroom markNotCurrent(Classroom classroom) {
+        classroom.setSysacadEnabled(false);
+        classroom.setSysacadHash("hash-" + classroom.getId());
+        notCurrentClassrooms.add(classroom);
+        return classroomRepository.save(classroom);
+    }
+
+    private Classroom markCurrent(Classroom classroom) {
+        Classroom fresh = classroomRepository.findById(classroom.getId()).orElseThrow();
+        fresh.setSysacadEnabled(true);
+        return classroomRepository.save(fresh);
+    }
+
+    private Building markCurrent(Building building) {
+        Building fresh = buildingRepository.findById(building.getId()).orElseThrow();
+        fresh.setSysacadEnabled(true);
+        return buildingRepository.save(fresh);
+    }
+
+    private ResultActions listClassrooms(Building building, boolean includeDeactivated)
+            throws Exception {
+        return mockMvc.perform(get("/v1/classrooms")
+                .param("buildingId", String.valueOf(building.getId()))
+                .param("includeDeactivated", String.valueOf(includeDeactivated)));
+    }
+
+    private ResultActions listBuilding(Building building, boolean includeDeactivated)
+            throws Exception {
+        return mockMvc.perform(get("/v1/buildings")
+                .param("name", building.getName())
+                .param("includeDeactivated", String.valueOf(includeDeactivated)));
+    }
 
     private List<Long> availableIds() {
         return asFixtureUser(() -> classroomService.findAllAvailable()).stream()
@@ -154,5 +218,127 @@ class SpaceSoftDeleteCascadeIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].resources[*].name", hasItem(kept.getName())))
                 .andExpect(jsonPath("$.content[0].resources[*].name", not(hasItem(dropped.getName()))));
+    }
+
+    @Test
+    @DisplayName("un aula no vigente en SysAcad no se lista ni es candidata, aparece con includeDeactivated y reaparece al volver a marcarla vigente")
+    void classroomNotInSysacad_isHiddenAndComesBackWhenFlagIsRestored() throws Exception {
+        Building building = testData.edificio();
+        Classroom classroom = testData.aula(building);
+        Long id = classroom.getId();
+
+        markNotCurrent(classroom);
+
+        assertThat(classroomRepository.findById(id).orElseThrow().isActive()).isTrue();
+        assertThat(availableIds()).doesNotContain(id);
+        assertThat(classroomService.findByIds(List.of(id))).isEmpty();
+        listClassrooms(building, false)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].id", not(hasItem(id.intValue()))));
+        listClassrooms(building, true)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.id==" + id + ")].unavailableReason",
+                        contains(UnavailableReason.NOT_IN_SYSACAD.name())));
+
+        markCurrent(classroom);
+
+        assertThat(availableIds()).contains(id);
+        listClassrooms(building, false)
+                .andExpect(jsonPath("$.content[*].id", hasItem(id.intValue())))
+                .andExpect(jsonPath("$.content[?(@.id==" + id + ")].unavailableReason", contains((Object) null)));
+    }
+
+    @Test
+    @DisplayName("un aula cargada a mano (hash nulo, flag apagado) sigue apareciendo y sin motivo de no disponibilidad")
+    void manualClassroom_staysVisible() throws Exception {
+        Building building = testData.edificio();
+        Classroom classroom = testData.aula(building);
+        classroom.setSysacadEnabled(false);
+        classroomRepository.save(classroom);
+        Long id = classroom.getId();
+
+        assertThat(classroomRepository.findById(id).orElseThrow().getSysacadHash()).isNull();
+        assertThat(availableIds()).contains(id);
+        assertThat(classroomService.findByIds(List.of(id))).hasSize(1);
+        listClassrooms(building, false)
+                .andExpect(jsonPath("$.content[?(@.id==" + id + ")].unavailableReason", contains((Object) null)));
+    }
+
+    @Test
+    @DisplayName("un edificio no vigente oculta a sus aulas (NOT_IN_SYSACAD) y reaparecen al volver a marcarlo vigente")
+    void buildingNotInSysacad_hidesItsClassroomsAndTheyComeBack() throws Exception {
+        Building building = testData.edificio();
+        Classroom classroom = testData.aula(building);
+        Long id = classroom.getId();
+
+        markNotCurrent(building);
+
+        assertThat(availableIds()).doesNotContain(id);
+        assertThat(classroomService.findByIds(List.of(id))).isEmpty();
+        listClassrooms(building, false)
+                .andExpect(jsonPath("$.content[*].id", not(hasItem(id.intValue()))));
+        listClassrooms(building, true)
+                .andExpect(jsonPath("$.content[?(@.id==" + id + ")].unavailableReason",
+                        contains(UnavailableReason.NOT_IN_SYSACAD.name())));
+
+        markCurrent(building);
+
+        assertThat(availableIds()).contains(id);
+    }
+
+    @Test
+    @DisplayName("un edificio no vigente sale del listado de edificios, aparece con includeDeactivated y reaparece al volver a marcarlo vigente")
+    void buildingNotInSysacad_isListedOnlyWithIncludeDeactivated() throws Exception {
+        Building building = testData.edificio("Edificio-NoVigente", true);
+        Long id = building.getId();
+        listBuilding(building, false).andExpect(jsonPath("$.content[*].id", hasItem(id.intValue())));
+
+        markNotCurrent(building);
+
+        listBuilding(building, false)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].id", not(hasItem(id.intValue()))));
+        listBuilding(building, true)
+                .andExpect(jsonPath("$.content[?(@.id==" + id + ")].unavailableReason",
+                        contains(UnavailableReason.NOT_IN_SYSACAD.name())));
+        assertThatThrownBy(() -> buildingService.findByName(building.getName()))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        markCurrent(building);
+
+        listBuilding(building, false).andExpect(jsonPath("$.content[*].id", hasItem(id.intValue())));
+        assertThat(buildingService.findByName(building.getName()).id()).isEqualTo(id);
+    }
+
+    @Test
+    @DisplayName("un edificio manual (hash nulo, flag apagado) sigue en el listado")
+    void manualBuilding_staysListed() throws Exception {
+        Building building = testData.edificio("Edificio-Manual", true);
+        building.setSysacadEnabled(false);
+        buildingRepository.save(building);
+
+        listBuilding(building, false)
+                .andExpect(jsonPath("$.content[*].id", hasItem(building.getId().intValue())))
+                .andExpect(jsonPath("$.content[0].unavailableReason").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("el motivo en el DTO respeta la precedencia: baja propia, luego edificio dado de baja, luego no vigente")
+    void unavailableReasonInDto_followsPrecedence() throws Exception {
+        Building building = testData.edificio();
+        Classroom classroom = markNotCurrent(testData.aula(building));
+        Long id = classroom.getId();
+        String reasonPath = "$.content[?(@.id==" + id + ")].unavailableReason";
+
+        building.deactivate();
+        buildingRepository.save(building);
+        listClassrooms(building, true)
+                .andExpect(jsonPath(reasonPath, contains(UnavailableReason.PARENT_DEACTIVATED.name())));
+
+        classroom = classroomRepository.findById(id).orElseThrow();
+        classroom.deactivate();
+        classroomRepository.save(classroom);
+        listClassrooms(building, true)
+                .andExpect(jsonPath(reasonPath, contains(UnavailableReason.DEACTIVATED.name())));
     }
 }

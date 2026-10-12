@@ -51,7 +51,7 @@ class AllocationAuditLabelProviderTest {
     }
 
     private static ClassroomResponseDto classroom(Long id, int roomNumber, String building) {
-        return new ClassroomResponseDto(id, roomNumber, 40, 1L, building, 1L, "Aula común");
+        return new ClassroomResponseDto(id, roomNumber, 40, 1L, building, 1L, "Aula común", null);
     }
 
     @Test

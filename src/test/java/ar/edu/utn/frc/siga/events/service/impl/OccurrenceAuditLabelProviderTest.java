@@ -67,8 +67,8 @@ class OccurrenceAuditLabelProviderTest {
 
     private void catalogs() {
         when(subjectService.findByIdsIncludingDeactivated(any()))
-                .thenReturn(List.of(new SubjectResponseDto(1L, 100, "Álgebra", null, null, true)));
-        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(new CommissionResponseDto(2L, "1K1", null)));
+                .thenReturn(List.of(new SubjectResponseDto(1L, 100, "Álgebra", null, null, true, null)));
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(new CommissionResponseDto(2L, "1K1", null, null)));
     }
 
     @Test

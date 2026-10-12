@@ -423,7 +423,7 @@ class AllocationValidatorTest {
     // ---------- helpers ----------
 
     private ClassroomResponseDto classroom(Long id) {
-        return new ClassroomResponseDto(id, id.intValue(), 100, 1L, "Edificio 1", 1L, "Tipo");
+        return new ClassroomResponseDto(id, id.intValue(), 100, 1L, "Edificio 1", 1L, "Tipo", null);
     }
 
     private LocalDate futureDate(int daysFromNow) {

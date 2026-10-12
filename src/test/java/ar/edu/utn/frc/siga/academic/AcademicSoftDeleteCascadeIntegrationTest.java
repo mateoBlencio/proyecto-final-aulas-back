@@ -24,8 +24,11 @@ import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
+import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,6 +55,34 @@ class AcademicSoftDeleteCascadeIntegrationTest extends AbstractIntegrationTest {
     private SubjectCommissionService subjectCommissionService;
 
     private static final Pageable ALL = Pageable.unpaged();
+
+    private final List<Long> notCurrentCommissionIds = new ArrayList<>();
+
+    @AfterEach
+    void restoreSysacadFlags() {
+        notCurrentCommissionIds.forEach(id -> setCurrent(id, true));
+        notCurrentCommissionIds.clear();
+    }
+
+    private void markNotCurrent(Commission commission) {
+        Commission fresh = commissionRepository.findById(commission.getId()).orElseThrow();
+        fresh.setSysacadEnabled(false);
+        fresh.setSysacadHash("hash-" + fresh.getId());
+        commissionRepository.save(fresh);
+        notCurrentCommissionIds.add(fresh.getId());
+    }
+
+    private void setCurrent(Long commissionId, boolean current) {
+        Commission fresh = commissionRepository.findById(commissionId).orElseThrow();
+        fresh.setSysacadEnabled(current);
+        commissionRepository.save(fresh);
+    }
+
+    private UnavailableReason reasonOf(Long commissionId, Long periodId) {
+        return commissionService.findAll(new CommissionFilter(null, periodId), ALL, true).getContent().stream()
+                .filter(dto -> dto.id().equals(commissionId))
+                .findFirst().orElseThrow().unavailableReason();
+    }
 
     private StudyPlan newPlan() {
         Specialty specialty = testData.especialidad((int) IntegrationTestData.nextSeq());
@@ -199,5 +230,79 @@ class AcademicSoftDeleteCascadeIntegrationTest extends AbstractIntegrationTest {
         assertThat(linkedCommissionIds(false, subject.getId())).containsExactly(commission.getId());
         assertThat(subjectService.findByIds(List.of(subject.getId()))).hasSize(1);
         assertThat(commissionService.findByIds(List.of(commission.getId()))).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("una comisión no vigente en SysAcad no se lista ni se resuelve, aparece con includeDeactivated con NOT_IN_SYSACAD y reaparece al volver a marcarla vigente")
+    void commissionNotInSysacad_isHiddenAndComesBackWhenFlagIsRestored() {
+        AcademicPeriod period = newPeriod();
+        Commission commission = testData.comision("CAS-" + IntegrationTestData.nextSeq(), period);
+        Long id = commission.getId();
+        assertThat(reasonOf(id, period.getId())).isNull();
+
+        markNotCurrent(commission);
+
+        assertThat(commissionRepository.findById(id).orElseThrow().isActive()).isTrue();
+        assertThat(commissionIds(false, period.getId())).isEmpty();
+        assertThat(commissionIds(true, period.getId())).containsExactly(id);
+        assertThat(reasonOf(id, period.getId())).isEqualTo(UnavailableReason.NOT_IN_SYSACAD);
+        assertThatThrownBy(() -> commissionService.findById(id)).isInstanceOf(ResourceNotFoundException.class);
+        assertThat(commissionService.findByIds(List.of(id))).isEmpty();
+        assertThat(commissionService.findByIdsIncludingDeactivated(List.of(id)))
+                .extracting(CommissionResponseDto::id).containsExactly(id);
+
+        setCurrent(id, true);
+
+        assertThat(commissionIds(false, period.getId())).containsExactly(id);
+        assertThat(reasonOf(id, period.getId())).isNull();
+        assertThat(commissionService.findById(id).id()).isEqualTo(id);
+    }
+
+    @Test
+    @DisplayName("una comisión cargada a mano (hash nulo, flag apagado) sigue listándose")
+    void manualCommission_staysVisible() {
+        AcademicPeriod period = newPeriod();
+        Commission commission = testData.comision("CAS-" + IntegrationTestData.nextSeq(), period);
+        setCurrent(commission.getId(), false);
+
+        assertThat(commissionRepository.findById(commission.getId()).orElseThrow().getSysacadHash()).isNull();
+        assertThat(commissionIds(false, period.getId())).containsExactly(commission.getId());
+        assertThat(reasonOf(commission.getId(), period.getId())).isNull();
+    }
+
+    @Test
+    @DisplayName("una comisión no vigente conserva el motivo PARENT_DEACTIVATED si además su período está dado de baja")
+    void commissionNotInSysacadInInactivePeriod_reportsParentDeactivated() {
+        AcademicPeriod period = newPeriod();
+        Commission commission = testData.comision("CAS-" + IntegrationTestData.nextSeq(), period);
+        markNotCurrent(commission);
+
+        period.deactivate();
+        period = academicPeriodRepository.save(period);
+
+        assertThat(reasonOf(commission.getId(), period.getId())).isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
+
+        academicPeriodRepository.restore(period);
+    }
+
+    @Test
+    @DisplayName("un vínculo materia-comisión se oculta si su comisión no está vigente en SysAcad y reaparece al volver a marcarla vigente")
+    void subjectCommissionOfCommissionNotInSysacad_isHiddenAndComesBack() {
+        Subject subject = testData.materia((int) IntegrationTestData.nextSeq(), "Materia vig", newPlan(), "Anual");
+        Commission commission = testData.comision("CAS-" + IntegrationTestData.nextSeq(), newPeriod());
+        testData.materiaComision(subject, commission, 30);
+        Long subjectId = subject.getId();
+        assertThat(linkedCommissionIds(false, subjectId)).containsExactly(commission.getId());
+
+        markNotCurrent(commission);
+
+        assertThat(linkedCommissionIds(false, subjectId)).isEmpty();
+        assertThat(linkedCommissionIds(true, subjectId)).containsExactly(commission.getId());
+        assertThatThrownBy(() -> subjectCommissionService.findBySubjectAndCommission(subjectId, commission.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        setCurrent(commission.getId(), true);
+
+        assertThat(linkedCommissionIds(false, subjectId)).containsExactly(commission.getId());
     }
 }

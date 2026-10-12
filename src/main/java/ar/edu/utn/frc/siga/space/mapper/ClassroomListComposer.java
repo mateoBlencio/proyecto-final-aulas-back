@@ -107,7 +107,8 @@ public class ClassroomListComposer {
                 classroom.isActive(),
                 classroom.getPermissionMode(),
                 allowedDisplay(classroom.getPermissionMode(), targetDtos),
-                targetDtos);
+                targetDtos,
+                classroom.unavailableReason());
     }
 
     private String allowedDisplay(PermissionMode mode, List<ClassroomPermissionTargetDto> targets) {

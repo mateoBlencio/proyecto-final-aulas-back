@@ -72,7 +72,7 @@ class CommissionServiceImplTest {
     @DisplayName("findById: devuelve el DTO mapeado cuando la comisión existe")
     void findByIdReturnsMappedDto() {
         Commission commission = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build();
-        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null);
+        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null, null);
         when(commissionRepository.findById(3L)).thenReturn(Optional.of(commission));
         when(commissionMapper.toDto(commission)).thenReturn(dto);
 
@@ -95,7 +95,7 @@ class CommissionServiceImplTest {
     @DisplayName("findByIds: mapea cada comisión encontrada")
     void findByIdsMapsAllFound() {
         Commission commission = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build();
-        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null);
+        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null, null);
         when(commissionRepository.findAllById(List.of(3L))).thenReturn(List.of(commission));
         when(commissionMapper.toDto(commission)).thenReturn(dto);
 
@@ -108,7 +108,7 @@ class CommissionServiceImplTest {
     @DisplayName("find: si la comisión existe para ese período, devuelve el DTO mapeado")
     void findWithExistingCommissionReturnsMappedDto() {
         Commission existing = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build();
-        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null);
+        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null, null);
         when(academicPeriodRepository.findByYearAndSemester(2026, 1)).thenReturn(Optional.of(period));
         when(commissionRepository.findByCourseCodeAndAcademicPeriod("K1001", period))
                 .thenReturn(Optional.of(existing));
@@ -146,7 +146,7 @@ class CommissionServiceImplTest {
     @DisplayName("findAll: devuelve la página de comisiones mapeadas según el Specification")
     void findAllMapsAllCommissions() {
         Commission commission = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build();
-        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null);
+        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null, null);
         when(commissionRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(commission)));
         when(commissionMapper.toDto(commission)).thenReturn(dto);
@@ -161,8 +161,8 @@ class CommissionServiceImplTest {
         Commission active = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build();
         Commission inactive = Commission.builder().id(4L).courseCode("K1002").academicPeriod(period).build();
         inactive.deactivate();
-        CommissionResponseDto activeDto = new CommissionResponseDto(3L, "K1001", null);
-        CommissionResponseDto inactiveDto = new CommissionResponseDto(4L, "K1002", null);
+        CommissionResponseDto activeDto = new CommissionResponseDto(3L, "K1001", null, null);
+        CommissionResponseDto inactiveDto = new CommissionResponseDto(4L, "K1002", null, null);
         when(commissionRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(active, inactive)));
         when(commissionMapper.toDto(active)).thenReturn(activeDto);
@@ -177,7 +177,7 @@ class CommissionServiceImplTest {
     void findActiveByCourseCodeWithSingleActiveReturnsMappedDto() {
         Commission commission = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period)
                 .sysacadEnabled(true).build();
-        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null);
+        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null, null);
         when(commissionRepository.findByCourseCodeAndSysacadEnabledTrueAndDeletedAtIsNull("K1001")).thenReturn(List.of(commission));
         when(commissionMapper.toDto(commission)).thenReturn(dto);
 
@@ -225,7 +225,7 @@ class CommissionServiceImplTest {
                 .sysacadEnabled(true).build();
         Commission current = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period)
                 .sysacadEnabled(true).build();
-        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null);
+        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null, null);
         when(commissionRepository.findByCourseCodeAndSysacadEnabledTrueAndDeletedAtIsNull("K1001"))
                 .thenReturn(List.of(stale, current));
         when(commissionMapper.toDto(current)).thenReturn(dto);
@@ -240,8 +240,8 @@ class CommissionServiceImplTest {
         inactivePeriod.deactivate();
         Commission available = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build();
         Commission hidden = Commission.builder().id(4L).courseCode("K1002").academicPeriod(inactivePeriod).build();
-        CommissionResponseDto availableDto = new CommissionResponseDto(3L, "K1001", null);
-        CommissionResponseDto hiddenDto = new CommissionResponseDto(4L, "K1002", null);
+        CommissionResponseDto availableDto = new CommissionResponseDto(3L, "K1001", null, null);
+        CommissionResponseDto hiddenDto = new CommissionResponseDto(4L, "K1002", null, null);
         when(commissionRepository.findAllById(List.of(3L, 4L))).thenReturn(List.of(available, hidden));
         when(commissionMapper.toDto(available)).thenReturn(availableDto);
         when(commissionMapper.toDto(hidden)).thenReturn(hiddenDto);

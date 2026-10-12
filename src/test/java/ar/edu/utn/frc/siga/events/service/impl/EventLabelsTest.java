@@ -43,11 +43,11 @@ class EventLabelsTest {
     }
 
     private static SubjectResponseDto subject(Long id, String name) {
-        return new SubjectResponseDto(id, 100, name, null, null, true);
+        return new SubjectResponseDto(id, 100, name, null, null, true, null);
     }
 
     private static CommissionResponseDto commission(Long id, String courseCode) {
-        return new CommissionResponseDto(id, courseCode, null);
+        return new CommissionResponseDto(id, courseCode, null, null);
     }
 
     @Test

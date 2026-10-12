@@ -128,6 +128,6 @@ class EventAllocationComposerTest {
     }
 
     private ClassroomResponseDto classroom(Long id, Integer capacity) {
-        return new ClassroomResponseDto(id, id.intValue(), capacity, 1L, "Edificio 1", 1L, "Tipo");
+        return new ClassroomResponseDto(id, id.intValue(), capacity, 1L, "Edificio 1", 1L, "Tipo", null);
     }
 }

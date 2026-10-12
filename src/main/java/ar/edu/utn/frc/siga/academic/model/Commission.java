@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.academic.model;
 
 import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
+import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import jakarta.persistence.*;
 import java.time.Instant;
 import lombok.AllArgsConstructor;
@@ -44,7 +45,21 @@ public class Commission extends SoftDeletableEntity {
     @Column(name = "version", nullable = false)
     private Long version;
 
+    public boolean isCurrentInSysacad() {
+        return Boolean.TRUE.equals(sysacadEnabled) || sysacadHash == null;
+    }
+
+    public UnavailableReason unavailableReason() {
+        if (!isActive()) {
+            return UnavailableReason.DEACTIVATED;
+        }
+        if (!academicPeriod.isActive()) {
+            return UnavailableReason.PARENT_DEACTIVATED;
+        }
+        return isCurrentInSysacad() ? null : UnavailableReason.NOT_IN_SYSACAD;
+    }
+
     public boolean isAvailable() {
-        return isActive() && academicPeriod.isActive();
+        return unavailableReason() == null;
     }
 }

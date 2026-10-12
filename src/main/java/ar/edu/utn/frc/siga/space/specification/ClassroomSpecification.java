@@ -36,6 +36,9 @@ public class ClassroomSpecification {
     public static Specification<Classroom> available() {
         return (root, query, cb) -> cb.and(
                 cb.isNull(root.get("deletedAt")),
-                cb.isNull(root.get("building").get("deletedAt")));
+                cb.or(cb.isTrue(root.get("sysacadEnabled")), cb.isNull(root.get("sysacadHash"))),
+                cb.isNull(root.get("building").get("deletedAt")),
+                cb.or(cb.isTrue(root.get("building").get("sysacadEnabled")),
+                        cb.isNull(root.get("building").get("sysacadHash"))));
     }
 }

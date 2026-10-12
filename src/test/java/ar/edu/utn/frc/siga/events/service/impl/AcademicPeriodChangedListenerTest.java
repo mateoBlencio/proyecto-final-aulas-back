@@ -66,6 +66,6 @@ class AcademicPeriodChangedListenerTest {
 
     private CommissionResponseDto commission(Long id, int year, int semester) {
         return new CommissionResponseDto(id, "C-" + id,
-                new AcademicPeriodResponseDto(year, semester, LocalDate.of(year, 3, 16), LocalDate.of(year, 11, 30)));
+                new AcademicPeriodResponseDto(year, semester, LocalDate.of(year, 3, 16), LocalDate.of(year, 11, 30)), null);
     }
 }

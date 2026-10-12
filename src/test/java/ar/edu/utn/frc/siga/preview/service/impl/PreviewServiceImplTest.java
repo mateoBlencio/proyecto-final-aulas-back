@@ -272,7 +272,7 @@ class PreviewServiceImplTest {
         when(allocationService.resolveOccurrences(any())).thenReturn(List.of(
                 slot(10L, 1L, LocalDate.of(2026, 3, 2)),
                 slot(20L, 1L, LocalDate.of(2026, 3, 9))));
-        ClassroomResponseDto classroom = new ClassroomResponseDto(5L, 5, 40, 1L, "Edificio 1", 1L, "Tipo");
+        ClassroomResponseDto classroom = new ClassroomResponseDto(5L, 5, 40, 1L, "Edificio 1", 1L, "Tipo", null);
         when(previewEngine.suggest(any(), any(), any(), anyInt()))
                 .thenReturn(new PreviewEngine.Suggestion(null, classroom, 0));
         ReallocationSuggestionRequestDto request =

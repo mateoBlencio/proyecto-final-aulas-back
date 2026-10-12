@@ -222,7 +222,7 @@ class AllocationServiceImplTest {
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
         Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
         when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(resolved);
-        ClassroomResponseDto classroom = new ClassroomResponseDto(5L, 101, 40, 9L, "Edificio Ajeno", 1L, "Normal");
+        ClassroomResponseDto classroom = new ClassroomResponseDto(5L, 101, 40, 9L, "Edificio Ajeno", 1L, "Normal", null);
         when(classroomService.findByIdsIncludingDeactivated(Set.of(5L))).thenReturn(List.of(classroom));
         doThrow(new AccessDeniedException("sin acceso"))
                 .when(buildingScopeResolver).requireAccess(Permission.ALLOCATION_WRITE, Set.of(9L));
@@ -491,7 +491,7 @@ class AllocationServiceImplTest {
         when(targetResolver.resolveAll(command.targets(), null)).thenReturn(List.of(occ));
         when(allocationRepository.findByOccurrenceIdIn(List.of(10L)))
                 .thenReturn(List.of(allocation(100L, 10L, 5, AllocationSource.MANUAL)));
-        ClassroomResponseDto classroom = new ClassroomResponseDto(5L, 101, 40, 9L, "Edificio Ajeno", 1L, "Normal");
+        ClassroomResponseDto classroom = new ClassroomResponseDto(5L, 101, 40, 9L, "Edificio Ajeno", 1L, "Normal", null);
         when(classroomService.findByIdsIncludingDeactivated(Set.of(5L))).thenReturn(List.of(classroom));
         doThrow(new AccessDeniedException("sin acceso"))
                 .when(buildingScopeResolver).requireAccess(Permission.ALLOCATION_WRITE, Set.of(9L));
@@ -645,7 +645,7 @@ class AllocationServiceImplTest {
     @DisplayName("findById: aula fuera del alcance de lectura → ResourceNotFoundException, no AccessDeniedException")
     void findByIdFueraDeAlcanceEsNotFound() {
         Allocation alloc = allocation(1L, 10L, 5, AllocationSource.MANUAL);
-        ClassroomResponseDto classroom = new ClassroomResponseDto(5L, 101, 40, 9L, "Edificio Ajeno", 1L, "Normal");
+        ClassroomResponseDto classroom = new ClassroomResponseDto(5L, 101, 40, 9L, "Edificio Ajeno", 1L, "Normal", null);
         when(allocationRepository.findById(1L)).thenReturn(Optional.of(alloc));
         when(composer.compose(alloc)).thenReturn(responseDtoWithClassroom(classroom));
         when(buildingScopeResolver.scopeFor(Permission.ALLOCATION_READ)).thenReturn(BuildingScope.of(Set.of(1L)));
@@ -659,7 +659,7 @@ class AllocationServiceImplTest {
         LocalDate date = futureDate(1);
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, date);
         Allocation alloc = allocation(1L, 10L, 5, AllocationSource.MANUAL);
-        ClassroomResponseDto classroom = new ClassroomResponseDto(5L, 101, 40, 9L, "Edificio Ajeno", 1L, "Normal");
+        ClassroomResponseDto classroom = new ClassroomResponseDto(5L, 101, 40, 9L, "Edificio Ajeno", 1L, "Normal", null);
         when(occurrenceService.findSlotsByDate(date)).thenReturn(List.of(occ));
         when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of(alloc));
         when(composer.composeAll(List.of(alloc))).thenReturn(List.of(responseDtoWithClassroom(classroom)));
@@ -683,7 +683,7 @@ class AllocationServiceImplTest {
     @DisplayName("findByOccurrenceIds: compone las asignaciones de las ocurrencias dadas, sin filtrar por alcance de edificio")
     void findByOccurrenceIdsComponeSinFiltrarAlcance() {
         Allocation alloc = allocation(1L, 10L, 5, AllocationSource.MANUAL);
-        ClassroomResponseDto classroom = new ClassroomResponseDto(5L, 101, 40, 9L, "Edificio Ajeno", 1L, "Normal");
+        ClassroomResponseDto classroom = new ClassroomResponseDto(5L, 101, 40, 9L, "Edificio Ajeno", 1L, "Normal", null);
         when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of(alloc));
         when(composer.composeAll(List.of(alloc))).thenReturn(List.of(responseDtoWithClassroom(classroom)));
 
@@ -729,7 +729,7 @@ class AllocationServiceImplTest {
     }
 
     private ClassroomResponseDto classroomIn(long id, long buildingId, String buildingName) {
-        return new ClassroomResponseDto(id, 100 + (int) id, 40, buildingId, buildingName, 1L, "Normal");
+        return new ClassroomResponseDto(id, 100 + (int) id, 40, buildingId, buildingName, 1L, "Normal", null);
     }
 
     /** Resolves {@code resolved} for a manual command and records the description seen when the writer runs. */

@@ -302,6 +302,6 @@ class RoomRequestCandidateResolverTest {
     }
 
     private static ClassroomResponseDto classroom(Long id, Long buildingId, String buildingName) {
-        return new ClassroomResponseDto(id, id.intValue(), 40, buildingId, buildingName, 1L, "Aula común");
+        return new ClassroomResponseDto(id, id.intValue(), 40, buildingId, buildingName, 1L, "Aula común", null);
     }
 }

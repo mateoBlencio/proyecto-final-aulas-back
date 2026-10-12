@@ -20,4 +20,10 @@ public class BuildingSpecification {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
     }
+
+    public static Specification<Building> available() {
+        return (root, query, cb) -> cb.and(
+                cb.isNull(root.get("deletedAt")),
+                cb.or(cb.isTrue(root.get("sysacadEnabled")), cb.isNull(root.get("sysacadHash"))));
+    }
 }
