@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.common.exception;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -26,7 +27,12 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(SigaAppException.class)
-    public ProblemDetail handleAppException(SigaAppException ex) {
+    public ProblemDetail handleAppException(SigaAppException ex, HttpServletResponse response) {
+        ex.getHeaders().forEach(response::setHeader);
+        return handleAppException(ex);
+    }
+
+    ProblemDetail handleAppException(SigaAppException ex) {
         log.warn("{}: {}", ex.getTitle(), ex.getMessage());
         ProblemDetail problem = ProblemDetails.of(ex.getStatus(), ex.getTitle(), ex.getMessage());
         ex.getProperties().forEach(problem::setProperty);

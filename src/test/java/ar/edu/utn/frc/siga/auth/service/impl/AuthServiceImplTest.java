@@ -26,6 +26,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
@@ -114,9 +115,11 @@ class AuthServiceImplTest {
     void loginRateLimitExcedido() {
         when(authDomainProperties.isAllowedEmail(any())).thenReturn(true);
         when(loginRateLimiter.isRateLimited(any(), any())).thenReturn(true);
+        when(loginRateLimiter.retryAfter(any(), any())).thenReturn(Duration.ofSeconds(90));
 
         assertThatThrownBy(() -> service.login(loginRequest("user@frc.utn.edu.ar"), httpRequest))
-                .isInstanceOf(LoginRateLimitExceededException.class);
+                .isInstanceOfSatisfying(LoginRateLimitExceededException.class,
+                        ex -> assertThat(ex.getRetryAfterSeconds()).isEqualTo(90));
 
         verify(authenticationManager, never()).authenticate(any());
     }

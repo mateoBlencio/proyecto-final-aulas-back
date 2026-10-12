@@ -27,6 +27,14 @@ public class LoginRateLimiter {
         return record.isRateLimited(now, Duration.ofMinutes(properties.getWindowMinutes()), properties.getMaxAttempts());
     }
 
+    public Duration retryAfter(String email, Instant now) {
+        LoginRateLimitRecord record = records.getIfPresent(email);
+        if (record == null) {
+            return Duration.ZERO;
+        }
+        return record.retryAfter(now, Duration.ofMinutes(properties.getWindowMinutes()), properties.getMaxAttempts());
+    }
+
     public void recordFailure(String email, Instant now) {
         LoginRateLimitRecord record = records.get(email, k -> new LoginRateLimitRecord());
         record.recordFailure(now, Duration.ofMinutes(properties.getWindowMinutes()));

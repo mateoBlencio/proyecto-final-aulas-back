@@ -1,14 +1,17 @@
 package ar.edu.utn.frc.siga.common.exception;
 
+import ar.edu.utn.frc.siga.auth.exception.LoginRateLimitExceededException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Path;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -18,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.Serial;
 import java.lang.reflect.Method;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
 
@@ -225,5 +229,28 @@ class GlobalExceptionHandlerTest {
             super.withProperty(key, value);
             return this;
         }
+    }
+
+    @Test
+    @DisplayName("el 429 del login incluye el header Retry-After y la propiedad retryAfterSeconds")
+    void loginRateLimit_incluyeRetryAfter() {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        ProblemDetail problem = handler.handleAppException(
+                new LoginRateLimitExceededException(Duration.ofSeconds(125)), response);
+
+        assertThat(problem.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
+        assertThat(response.getHeader(HttpHeaders.RETRY_AFTER)).isEqualTo("125");
+        assertThat(requireNonNull(problem.getProperties()).get("retryAfterSeconds")).isEqualTo(125L);
+    }
+
+    @Test
+    @DisplayName("una excepción sin headers no agrega ninguno a la respuesta")
+    void excepcionSinHeaders() {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.handleAppException(ResourceNotFoundException.of("Subject", 5L), response);
+
+        assertThat(response.getHeaderNames()).isEmpty();
     }
 }
