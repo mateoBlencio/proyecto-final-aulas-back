@@ -1,0 +1,23 @@
+meta {
+  name: Descargar ciclo archivado
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/v1/audit/archive/cycles/2025/export
+  body: none
+  auth: inherit
+}
+
+docs {
+  Descarga un ZIP con asignaciones.csv y ocurrencias.csv de un ciclo archivado.
+  Requiere PERM_AUDIT_READ (solo SUBSECRETARIA).
+
+  Una fila por revisión: fecha_revision, usuario, tipo_actor, descripcion, operacion_id y las
+  columnas de la tabla de auditoría (revtype sale como CREATED, MODIFIED o DELETED).
+  CSV UTF-8 con BOM, separador ';'. Las celdas de texto que empiezan con =, +, -, @, tab o CR
+  llevan un prefijo '.
+
+  404 si el ciclo no está archivado (ver Listar ciclos archivados).
+}

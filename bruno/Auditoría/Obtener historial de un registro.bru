@@ -29,7 +29,7 @@ docs {
   a mano: Asignaci%C3%B3n%20de%20rol). recordId es el id del registro.
 
   Las revisiones archivadas (ocurrencias y asignaciones de ciclos viejos, ver
-  POST /v1/audit/archive) no aparecen. Cada item trae 'actorType' y 'recordLabel' (nombre legible del registro; ver GET /v1/audit), o null.
+  GET /v1/audit/archive/cycles) no aparecen. Cada item trae 'actorType' y 'recordLabel' (nombre legible del registro; ver GET /v1/audit), o null.
 
   Página vacía si el registro no tiene revisiones. 400 si entityType es desconocido
   o si recordId no tiene el formato del id de la entidad (texto para un id numérico).
