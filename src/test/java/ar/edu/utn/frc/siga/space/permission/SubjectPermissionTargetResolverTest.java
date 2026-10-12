@@ -32,9 +32,9 @@ class SubjectPermissionTargetResolverTest {
     @Test
     @DisplayName("resolveNames: resuelve id -> nombre en batch")
     void resolveNamesBatch() {
-        when(subjectService.findByIds(Set.of(1L, 2L))).thenReturn(List.of(
-                new SubjectResponseDto(1L, 100, "Análisis Matemático", "ANUAL", null, true),
-                new SubjectResponseDto(2L, 200, "Física I", "ANUAL", null, true)));
+        when(subjectService.findByIdsIncludingDeactivated(Set.of(1L, 2L))).thenReturn(List.of(
+                new SubjectResponseDto(1L, 100, "Análisis Matemático", "ANUAL", null, true, null),
+                new SubjectResponseDto(2L, 200, "Física I", "ANUAL", null, true, null)));
 
         assertThat(new SubjectPermissionTargetResolver(subjectService).resolveNames(Set.of(1L, 2L)))
                 .containsEntry(1L, "Análisis Matemático")

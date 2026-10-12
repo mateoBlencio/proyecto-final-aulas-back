@@ -62,7 +62,8 @@ public class ClassroomController {
     @PreAuthorize("hasAuthority('PERM_CLASSROOM_READ')")
     @Operation(summary = "Listar aulas", description = "Listado paginado con filtros opcionales por número, "
             + "edificio, tipo y capacidad. Por defecto solo devuelve las aulas activas; con "
-            + "includeDeactivated=true incluye también las desactivadas.")
+            + "includeDeactivated=true incluye también las desactivadas. notInSysacad=true devuelve solo las "
+            + "aulas que SysAcad dejó de traer.")
     public ResponseEntity<Page<ClassroomListItemDto>> findAll(
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
             @RequestParam(required = false) Integer roomNumber,
@@ -70,12 +71,13 @@ public class ClassroomController {
             @RequestParam(required = false) Long classroomTypeId,
             @RequestParam(required = false) Integer capacityMin,
             @RequestParam(required = false) Integer capacityMax,
-            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
+            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated,
+            @RequestParam(required = false, defaultValue = "false") boolean notInSysacad) {
 
-        log.debug("GET /v1/classrooms: buildingId={}, page={}, includeDeactivated={}",
-                buildingId, pageable.getPageNumber(), includeDeactivated);
+        log.debug("GET /v1/classrooms: buildingId={}, page={}, includeDeactivated={}, notInSysacad={}",
+                buildingId, pageable.getPageNumber(), includeDeactivated, notInSysacad);
         ClassroomFilter filter = new ClassroomFilter(roomNumber, buildingId, classroomTypeId,
-                capacityMin, capacityMax);
+                capacityMin, capacityMax, notInSysacad);
         Page<ClassroomListItemDto> page = classroomService.findAll(filter, pageable, includeDeactivated);
         log.info("Aulas listadas: total={}", page.getTotalElements());
         return ResponseEntity.ok(page);

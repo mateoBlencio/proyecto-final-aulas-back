@@ -63,8 +63,8 @@ class RoomRequestCatalogsResolver {
     Catalogs resolve(Set<Long> subjectIds, Set<Long> commissionIds, Set<Long> classroomIds,
                      Set<Long> buildingIds, Set<ActiveCommissionsKey> activeCommissionsKeys) {
         Map<Long, SubjectResponseDto> subjectsById =
-                Maps.byId(subjectService.findByIds(subjectIds), SubjectResponseDto::id);
-        List<ClassroomResponseDto> classrooms = classroomService.findByIds(classroomIds);
+                Maps.byId(subjectService.findByIdsIncludingDeactivated(subjectIds), SubjectResponseDto::id);
+        List<ClassroomResponseDto> classrooms = classroomService.findByIdsIncludingDeactivated(classroomIds);
         Map<Long, ClassroomOptionDto> classroomsById =
                 Maps.byId(catalogMapper.toClassroomOptions(classrooms), ClassroomOptionDto::id);
         Map<Long, AssignedClassroomDto> assignedClassroomsById =
@@ -81,7 +81,7 @@ class RoomRequestCatalogsResolver {
             allCommissionIds.addAll(activeIds);
         }
         Map<Long, CommissionResponseDto> commissionsById =
-                Maps.byId(commissionService.findByIds(allCommissionIds), CommissionResponseDto::id);
+                Maps.byId(commissionService.findByIdsIncludingDeactivated(allCommissionIds), CommissionResponseDto::id);
 
         return new Catalogs(subjectsById, commissionsById, classroomsById, assignedClassroomsById, buildingsById,
                 activeCommissionIdsByKey);

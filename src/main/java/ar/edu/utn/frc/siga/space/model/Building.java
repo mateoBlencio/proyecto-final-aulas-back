@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.space.model;
 
 import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
+import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -45,6 +46,10 @@ public class Building extends SoftDeletableEntity {
     @Column(name = "hash_sysacad", length = 64)
     private String sysacadHash;
 
+    @Builder.Default
+    @Column(name = "habilitado_sysacad", nullable = false)
+    private Boolean sysacadEnabled = true;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
@@ -53,4 +58,18 @@ public class Building extends SoftDeletableEntity {
     @OneToMany(mappedBy = "building", fetch = FetchType.LAZY)
     private List<Classroom> classrooms;
 
+    public boolean isCurrentInSysacad() {
+        return Boolean.TRUE.equals(sysacadEnabled) || sysacadHash == null;
+    }
+
+    public UnavailableReason unavailableReason() {
+        if (!isActive()) {
+            return UnavailableReason.DEACTIVATED;
+        }
+        return isCurrentInSysacad() ? null : UnavailableReason.NOT_IN_SYSACAD;
+    }
+
+    public boolean isAvailable() {
+        return unavailableReason() == null;
+    }
 }

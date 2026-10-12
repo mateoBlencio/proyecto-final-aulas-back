@@ -224,7 +224,7 @@ class IngestServiceImplTest {
     void aulaEnEdificioDistintoReportaWarning() {
         stubHappyPath(DataRow.defaultRow());
         ClassroomResponseDto classroomEnOtroEdificio = new ClassroomResponseDto(5L, 105, 40,
-            7L, "Otro Edificio", 1L, "Aula");
+            7L, "Otro Edificio", 1L, "Aula", null, true);
         when(classroomService.findByRoomNumberAndBuilding(105, 5L)).thenReturn(classroomEnOtroEdificio);
         MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow().toMultipartFile();
 
@@ -317,7 +317,7 @@ class IngestServiceImplTest {
             .thenReturn(plan);
 
         SubjectResponseDto subject = new SubjectResponseDto(10L, row.subjectCode(), row.subjectName(),
-            row.termType(), plan, true);
+            row.termType(), plan, true, null);
         when(subjectService.findByCodeAndStudyPlan(row.subjectCode(), row.studyPlanCode(), row.specialtyCode()))
             .thenReturn(subject);
 
@@ -326,7 +326,7 @@ class IngestServiceImplTest {
         when(academicPeriodService.findOrCreate(2026, TermType.ANUAL))
             .thenReturn(new FindOrCreateResult<>(period, created));
 
-        CommissionResponseDto commission = new CommissionResponseDto(20L, row.courseCode(), period);
+        CommissionResponseDto commission = new CommissionResponseDto(20L, row.courseCode(), period, null);
         when(commissionService.findByCourseAndPeriod(row.courseCode(), 2026, 0))
             .thenReturn(commission);
 
@@ -335,11 +335,11 @@ class IngestServiceImplTest {
         when(subjectCommissionService.findBySubjectAndCommission(10L, 20L))
             .thenReturn(subjectCommission);
 
-        BuildingResponseDto building = new BuildingResponseDto(5L, row.buildingName(), true);
+        BuildingResponseDto building = new BuildingResponseDto(5L, row.buildingName(), true, null);
         when(buildingService.findByName(row.buildingName())).thenReturn(building);
 
         ClassroomResponseDto classroom = new ClassroomResponseDto(5L, (Integer) row.roomNumber(), 40,
-            5L, row.buildingName(), 1L, "Aula");
+            5L, row.buildingName(), 1L, "Aula", null, true);
         when(classroomService.findByRoomNumberAndBuilding((Integer) row.roomNumber(), 5L))
             .thenReturn(classroom);
 
@@ -358,14 +358,14 @@ class IngestServiceImplTest {
         StudyPlanResponseDto plan = new StudyPlanResponseDto(1L, 1, specialty, true);
         when(studyPlanService.findByPlanCodeAndSpecialtyCode(1, 1)).thenReturn(plan);
 
-        SubjectResponseDto subject = new SubjectResponseDto(subjectId, subjectCode, subjectName, "Anual", plan, true);
+        SubjectResponseDto subject = new SubjectResponseDto(subjectId, subjectCode, subjectName, "Anual", plan, true, null);
         when(subjectService.findByCodeAndStudyPlan(subjectCode, 1, 1)).thenReturn(subject);
 
         AcademicPeriodResponseDto period = new AcademicPeriodResponseDto(2026, 0,
             LocalDate.of(2026, 3, 1), LocalDate.of(2026, 11, 30));
         when(academicPeriodService.findOrCreate(2026, TermType.ANUAL)).thenReturn(new FindOrCreateResult<>(period, true));
 
-        CommissionResponseDto commission = new CommissionResponseDto(commissionId, courseCode, period);
+        CommissionResponseDto commission = new CommissionResponseDto(commissionId, courseCode, period, null);
         when(commissionService.findByCourseAndPeriod(courseCode, 2026, 0))
             .thenReturn(commission);
 
@@ -374,11 +374,11 @@ class IngestServiceImplTest {
         when(subjectCommissionService.findBySubjectAndCommission(subjectId, commissionId))
             .thenReturn(subjectCommission);
 
-        BuildingResponseDto building = new BuildingResponseDto(buildingId, "Edificio Central", true);
+        BuildingResponseDto building = new BuildingResponseDto(buildingId, "Edificio Central", true, null);
         when(buildingService.findByName("Edificio Central")).thenReturn(building);
 
         ClassroomResponseDto classroom = new ClassroomResponseDto(buildingId, roomNumber, 40,
-            buildingId, "Edificio Central", 1L, "Aula");
+            buildingId, "Edificio Central", 1L, "Aula", null, true);
         when(classroomService.findByRoomNumberAndBuilding(roomNumber, buildingId)).thenReturn(classroom);
 
         RecurringEventResponseDto event = new RecurringEventResponseDto(eventId, EventType.RECURRING, 30,
@@ -392,7 +392,7 @@ class IngestServiceImplTest {
 
     private void stubForSecondSubject(SpecialtyResponseDto specialty) {
         StudyPlanResponseDto plan = new StudyPlanResponseDto(1L, 1, specialty, true);
-        SubjectResponseDto subject = new SubjectResponseDto(21L, 101, "Álgebra", "Anual", plan, true);
+        SubjectResponseDto subject = new SubjectResponseDto(21L, 101, "Álgebra", "Anual", plan, true, null);
         when(subjectService.findByCodeAndStudyPlan(101, 1, 1)).thenReturn(subject);
 
         SubjectCommissionResponseDto subjectCommission = new SubjectCommissionResponseDto(21L, 30L, null, 30, true);

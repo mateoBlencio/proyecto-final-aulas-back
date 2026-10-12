@@ -45,7 +45,7 @@ class AcademicPeriodChangedListenerTest {
         RecurringEvent matching = event(1L, 10L);
         RecurringEvent otherPeriod = event(2L, 20L);
         when(recurringEventRepository.findAll()).thenReturn(List.of(matching, otherPeriod));
-        when(commissionService.findByIds(any())).thenReturn(List.of(
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(
                 commission(10L, 2026, 0),
                 commission(20L, 2026, 1)));
 
@@ -66,6 +66,6 @@ class AcademicPeriodChangedListenerTest {
 
     private CommissionResponseDto commission(Long id, int year, int semester) {
         return new CommissionResponseDto(id, "C-" + id,
-                new AcademicPeriodResponseDto(year, semester, LocalDate.of(year, 3, 16), LocalDate.of(year, 11, 30)));
+                new AcademicPeriodResponseDto(year, semester, LocalDate.of(year, 3, 16), LocalDate.of(year, 11, 30)), null);
     }
 }

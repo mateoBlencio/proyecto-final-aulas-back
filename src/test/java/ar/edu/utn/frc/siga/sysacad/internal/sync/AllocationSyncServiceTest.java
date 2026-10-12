@@ -83,7 +83,7 @@ class AllocationSyncServiceTest {
 
     private CommissionResponseDto commission(Long id, String courseCode, int year) {
         return new CommissionResponseDto(id, courseCode,
-                new AcademicPeriodResponseDto(year, TermType.ANUAL.getSemester(), null, null));
+                new AcademicPeriodResponseDto(year, TermType.ANUAL.getSemester(), null, null), null);
     }
 
     private SubjectCommissionResponseDto link(Long subjectId, Long commissionId, int enrolled) {
@@ -91,7 +91,7 @@ class AllocationSyncServiceTest {
     }
 
     private ClassroomResponseDto classroom(Long id) {
-        return new ClassroomResponseDto(id, 200, 40, 5L, "Edificio", 1L, "Normal");
+        return new ClassroomResponseDto(id, 200, 40, 5L, "Edificio", 1L, "Normal", null, true);
     }
 
     private SysacadAllocationDto row(String courseCode, Integer subjectCode, Integer semester,

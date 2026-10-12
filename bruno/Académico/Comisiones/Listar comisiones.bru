@@ -22,4 +22,7 @@ docs {
   Listado paginado. Filtros opcionales: courseCode (contiene, case-insensitive),
   academicPeriodId. La respuesta es
   { content: [...], page: { size, number, totalElements, totalPages } }.
+  Sin includeDeactivated oculta las comisiones dadas de baja, las de un periodo
+  dado de baja y las que SysAcad dejo de traer.
+  unavailableReason: null, DEACTIVATED, PARENT_DEACTIVATED (periodo) o NOT_IN_SYSACAD.
 }

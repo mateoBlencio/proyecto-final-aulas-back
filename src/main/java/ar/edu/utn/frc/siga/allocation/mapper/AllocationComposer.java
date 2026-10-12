@@ -47,7 +47,7 @@ public class AllocationComposer {
         Set<Long> classroomIds = allocations.stream()
                 .map(Allocation::getClassroomId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
-        Map<Long, ClassroomResponseDto> classroomsById = Maps.byId(classroomService.findByIds(classroomIds), ClassroomResponseDto::id);
+        Map<Long, ClassroomResponseDto> classroomsById = Maps.byId(classroomService.findByIdsIncludingDeactivated(classroomIds), ClassroomResponseDto::id);
 
         List<AllocationResponseDto> result = new ArrayList<>(allocations.size());
         for (Allocation allocation : allocations) {

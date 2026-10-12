@@ -24,4 +24,6 @@ docs {
   Listado paginado. Filtros opcionales: code, name (contiene, case-insensitive),
   specialtyCode, studyPlanId. La respuesta es
   { content: [...], page: { size, number, totalElements, totalPages } }.
+  Sin includeDeactivated oculta las materias de un plan dado de baja.
+  unavailableReason: null, DEACTIVATED o PARENT_DEACTIVATED (plan de estudio).
 }

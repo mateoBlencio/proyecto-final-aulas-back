@@ -1,13 +1,13 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
-import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
 import ar.edu.utn.frc.siga.common.security.BuildingScopedSpecifications;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
+import ar.edu.utn.frc.siga.space.specification.ClassroomSpecification;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -38,7 +38,7 @@ class ScopedClassroomFinder {
     }
 
     List<Classroom> findAllActiveInScope(Permission permission) {
-        return classroomRepository.findAll(SoftDeleteSpecifications.<Classroom>active().and(scopeSpec(permission)));
+        return classroomRepository.findAll(ClassroomSpecification.available().and(scopeSpec(permission)));
     }
 
     Page<Classroom> findAll(Specification<Classroom> spec, Permission permission, Pageable pageable) {

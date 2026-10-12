@@ -44,7 +44,7 @@ class AcademicPeriodChangedListener {
             return;
         }
 
-        Map<Long, CommissionResponseDto> commissionsById = commissionService.findByIds(commissionIds).stream()
+        Map<Long, CommissionResponseDto> commissionsById = commissionService.findByIdsIncludingDeactivated(commissionIds).stream()
                 .collect(Collectors.toMap(CommissionResponseDto::id, commission -> commission, (first, ignored) -> first));
 
         List<RecurringEvent> affected = allEvents.stream()

@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadCommissionDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectCommissionDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
+import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadEmptyViewException;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,6 +20,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -110,5 +116,17 @@ class CommissionSyncServiceTest {
         assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(IllegalStateException.class);
 
         verify(syncStateService).recordFailure(SysacadView.COMISIONES, "SysAcad caído");
+    }
+
+    @Test
+    @DisplayName("sync: con la vista vacía no llama al servicio de dominio y registra el fallo")
+    void syncWithEmptyViewSkipsDomainServiceAndRecordsFailure() {
+        when(catalogReader.findCommissions()).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(SysacadEmptyViewException.class);
+
+        verify(commissionService, never()).syncCommissions(anyList());
+        verify(syncStateService).recordFailure(eq(SysacadView.COMISIONES), anyString());
+        verify(syncStateService, never()).recordSuccess(any(), anyInt());
     }
 }

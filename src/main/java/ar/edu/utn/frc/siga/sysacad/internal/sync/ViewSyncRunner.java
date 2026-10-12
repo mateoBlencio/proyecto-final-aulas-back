@@ -2,12 +2,21 @@ package ar.edu.utn.frc.siga.sysacad.internal.sync;
 
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
+import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadEmptyViewException;
+import java.util.List;
 import java.util.function.IntSupplier;
 import org.slf4j.Logger;
 
 final class ViewSyncRunner {
 
     private ViewSyncRunner() {
+    }
+
+    static <T> List<T> requireRows(List<T> rows, SysacadView view) {
+        if (rows.isEmpty()) {
+            throw new SysacadEmptyViewException(view.name());
+        }
+        return rows;
     }
 
     static void run(SysacadSyncStateService syncStateService, SysacadView view, String label, Logger log,
