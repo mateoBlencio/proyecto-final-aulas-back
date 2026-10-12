@@ -20,6 +20,7 @@ public enum Permission {
 
     EVENT_READ(ScopeType.GLOBAL),
     EVENT_MANAGE(ScopeType.GLOBAL),
+    EVENT_DIRECT_CREATE(ScopeType.BUILDING),
     OCCURRENCE_RELEASE(ScopeType.GLOBAL),
     OCCURRENCE_REQUEST_ROOM(ScopeType.GLOBAL),
 

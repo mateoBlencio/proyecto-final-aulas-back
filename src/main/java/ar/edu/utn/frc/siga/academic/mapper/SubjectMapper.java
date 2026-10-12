@@ -10,5 +10,6 @@ import org.mapstruct.Mapping;
 public interface SubjectMapper {
 
     @Mapping(target = "enabled", expression = "java(subject.isActive())")
+    @Mapping(target = "unavailableReason", expression = "java(subject.unavailableReason())")
     SubjectResponseDto toDto(Subject subject);
 }

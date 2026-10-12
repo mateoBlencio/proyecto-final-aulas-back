@@ -73,8 +73,8 @@ class RoomRequestComposerTest {
 
         ActiveCommissionsKey key = new ActiveCommissionsKey(10L, date);
         Catalogs catalogs = new Catalogs(Map.of(), Map.of(
-                7L, new CommissionResponseDto(7L, "CUR-7", null),
-                8L, new CommissionResponseDto(8L, "CUR-8", null)),
+                7L, new CommissionResponseDto(7L, "CUR-7", null, null),
+                8L, new CommissionResponseDto(8L, "CUR-8", null, null)),
                 Map.of(), Map.of(), Map.of(), Map.of(key, List.of(7L, 8L)));
         when(catalogsResolver.resolve(any(), any(), any(), any(), any())).thenReturn(catalogs);
 

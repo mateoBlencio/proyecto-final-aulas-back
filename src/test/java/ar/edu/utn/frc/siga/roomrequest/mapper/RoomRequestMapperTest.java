@@ -36,7 +36,7 @@ class RoomRequestMapperTest {
     @Test
     @DisplayName("la cabecera se arma con la materia y los items que le pasa el composer")
     void headerUsesComposedPieces() {
-        SubjectResponseDto subject = new SubjectResponseDto(42L, 101, "Análisis Matemático I", "ANUAL", null, true);
+        SubjectResponseDto subject = new SubjectResponseDto(42L, 101, "Análisis Matemático I", "ANUAL", null, true, null);
         RoomRequestItemResponseDto itemDto =
                 mapper.toDto(itemEntity(), null, List.of(), List.of(), List.of(), null, null, null, null);
 
@@ -112,7 +112,7 @@ class RoomRequestMapperTest {
     @Test
     @DisplayName("comisión y aulas de preferencia se pegan tal cual las resolvió el composer")
     void itemUsesComposedPieces() {
-        CommissionResponseDto commission = new CommissionResponseDto(7L, "3K1", null);
+        CommissionResponseDto commission = new CommissionResponseDto(7L, "3K1", null, null);
         List<ClassroomOptionDto> preferred = List.of(new ClassroomOptionDto(11L, 11, "Pabellón"));
 
         RoomRequestItemResponseDto dto =

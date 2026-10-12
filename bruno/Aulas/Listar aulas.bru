@@ -16,4 +16,18 @@ params:query {
   ~capacityMin: 60
   ~page: 0
   ~includeDeactivated: true
+  ~notInSysacad: true
+}
+
+docs {
+  GET /v1/classrooms. Permiso: PERM_CLASSROOM_READ.
+  Sin includeDeactivated solo devuelve aulas que se ofrecen: aula y edificio
+  activos y edificio vigente en SysAcad. Un aula que SysAcad dejo de traer se sigue
+  ofreciendo. Con includeDeactivated=true devuelve todas.
+  notInSysacad=true devuelve solo las aulas que SysAcad dejo de traer (lo cargado a
+  mano nunca entra); se combina con el resto de los filtros y respeta el alcance por edificio.
+  Cada elemento trae unavailableReason: null si se puede ofrecer; DEACTIVATED si
+  tiene baja propia; PARENT_DEACTIVATED si lo oculta la baja de su edificio;
+  NOT_IN_SYSACAD si SysAcad dejo de traer su edificio.
+  currentInSysacad=false es el aviso de que SysAcad dejo de traer el aula.
 }

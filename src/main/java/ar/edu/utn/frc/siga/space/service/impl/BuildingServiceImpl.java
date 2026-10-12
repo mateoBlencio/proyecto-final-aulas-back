@@ -1,7 +1,6 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
-import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
 import ar.edu.utn.frc.siga.common.security.BuildingScope;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.BuildingScopedSpecifications;
@@ -28,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,7 +51,7 @@ public class BuildingServiceImpl implements BuildingService {
         BuildingScope scope = buildingScopeResolver.scopeFor(Permission.BUILDING_READ);
         return buildingRepository.findAll(
                         BuildingSpecification.withFilter(filter)
-                                .and(SoftDeleteSpecifications.activeUnless(includeDeactivated))
+                                .and(includeDeactivated ? Specification.<Building>unrestricted() : BuildingSpecification.available())
                                 .and(BuildingScopedSpecifications.withinScope(scope, "id")),
                         pageable)
                 .map(buildingMapper::toDto);
@@ -66,6 +66,7 @@ public class BuildingServiceImpl implements BuildingService {
     @Override
     public BuildingResponseDto findByName(String name) {
         return buildingMapper.toDto(buildingRepository.findByName(name)
+                .filter(Building::isAvailable)
                 .orElseThrow(() -> ResourceNotFoundException.of("Building", name)));
     }
 
@@ -145,8 +146,9 @@ public class BuildingServiceImpl implements BuildingService {
             if (isUpToDate(building, hash)) {
                 continue;
             }
-            building.activate();
+            // La baja es de la persona: el sync solo escribe datos y el flag de vigencia, nunca eliminado_en.
             building.setName(command.name());
+            building.setSysacadEnabled(true);
             building.setSyncedAt(syncedAt);
             building.setSysacadHash(hash);
             buildingRepository.save(building);
@@ -159,10 +161,10 @@ public class BuildingServiceImpl implements BuildingService {
     private int markAbsent(Iterable<Building> existing, Set<Integer> incoming, Instant syncedAt) {
         int affected = 0;
         for (Building building : existing) {
-            if (incoming.contains(building.getBuildingCode()) || building.isDeleted()) {
+            if (incoming.contains(building.getBuildingCode()) || Boolean.FALSE.equals(building.getSysacadEnabled())) {
                 continue;
             }
-            building.deactivate(syncedAt);
+            building.setSysacadEnabled(false);
             building.setSyncedAt(syncedAt);
             buildingRepository.save(building);
             affected++;
@@ -172,6 +174,6 @@ public class BuildingServiceImpl implements BuildingService {
     }
 
     private static boolean isUpToDate(Building building, String hash) {
-        return hash.equals(building.getSysacadHash()) && building.isActive();
+        return hash.equals(building.getSysacadHash()) && Boolean.TRUE.equals(building.getSysacadEnabled());
     }
 }

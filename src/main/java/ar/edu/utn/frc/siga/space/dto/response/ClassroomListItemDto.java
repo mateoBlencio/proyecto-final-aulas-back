@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.space.dto.response;
 
+import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import ar.edu.utn.frc.siga.space.model.PermissionMode;
 import java.util.List;
 
@@ -16,6 +17,8 @@ public record ClassroomListItemDto(
         boolean enabled,
         PermissionMode permissionMode,
         String allowedDisplay,
-        List<ClassroomPermissionTargetDto> permissionTargets
+        List<ClassroomPermissionTargetDto> permissionTargets,
+        UnavailableReason unavailableReason,
+        boolean currentInSysacad
 ) {
 }

@@ -9,3 +9,8 @@ get {
   body: none
   auth: inherit
 }
+
+docs {
+  GET /v1/classrooms/{id}. Permiso: PERM_CLASSROOM_READ.
+  Responde aunque el aula o su edificio esten dados de baja o no vigentes; unavailableReason explica por que no se ofrece y currentInSysacad=false avisa que SysAcad dejo de traer el aula (el aula se sigue ofreciendo).
+}

@@ -54,7 +54,7 @@ class PreviewComposerRoomStretchesTest {
     @BeforeEach
     void setUp() {
         composer = new PreviewComposer(classroomService, previewValidator);
-        when(classroomService.findByIds(anyCollection())).thenReturn(List.of(
+        when(classroomService.findByIdsIncludingDeactivated(anyCollection())).thenReturn(List.of(
                 classroom(3), classroom(12), classroom(20)));
     }
 
@@ -147,6 +147,6 @@ class PreviewComposerRoomStretchesTest {
     }
 
     private static ClassroomResponseDto classroom(long id) {
-        return new ClassroomResponseDto(id, (int) id, 40, 1L, "Edificio", 1L, "Aula común");
+        return new ClassroomResponseDto(id, (int) id, 40, 1L, "Edificio", 1L, "Aula común", null, true);
     }
 }

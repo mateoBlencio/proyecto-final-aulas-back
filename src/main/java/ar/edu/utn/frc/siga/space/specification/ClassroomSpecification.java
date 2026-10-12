@@ -28,8 +28,20 @@ public class ClassroomSpecification {
             if (filter.capacityMax() != null) {
                 predicates.add(cb.lessThanOrEqualTo(root.get("capacity"), filter.capacityMax()));
             }
+            if (filter.notInSysacad()) {
+                predicates.add(cb.isFalse(root.get("sysacadEnabled")));
+                predicates.add(cb.isNotNull(root.get("sysacadHash")));
+            }
 
             return cb.and(predicates.toArray(new Predicate[0]));
         };
+    }
+
+    public static Specification<Classroom> available() {
+        return (root, query, cb) -> cb.and(
+                cb.isNull(root.get("deletedAt")),
+                cb.isNull(root.get("building").get("deletedAt")),
+                cb.or(cb.isTrue(root.get("building").get("sysacadEnabled")),
+                        cb.isNull(root.get("building").get("sysacadHash"))));
     }
 }

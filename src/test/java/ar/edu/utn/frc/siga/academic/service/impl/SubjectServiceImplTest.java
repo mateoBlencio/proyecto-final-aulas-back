@@ -66,8 +66,8 @@ class SubjectServiceImplTest {
     @DisplayName("findById: devuelve el DTO mapeado cuando la materia existe")
     void findByIdReturnsMappedDto() {
         Subject subject = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
-        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true);
-        when(subjectRepository.findActiveById(5L)).thenReturn(Optional.of(subject));
+        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true, null);
+        when(subjectRepository.findById(5L)).thenReturn(Optional.of(subject));
         when(subjectMapper.toDto(subject)).thenReturn(dto);
 
         SubjectResponseDto result = service.findById(5L);
@@ -78,7 +78,7 @@ class SubjectServiceImplTest {
     @Test
     @DisplayName("findById: si la materia no existe, lanza ResourceNotFoundException")
     void findByIdWithMissingSubjectThrowsResourceNotFound() {
-        when(subjectRepository.findActiveById(99L)).thenReturn(Optional.empty());
+        when(subjectRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -89,7 +89,7 @@ class SubjectServiceImplTest {
     @DisplayName("findByIds: mapea cada materia encontrada, sin fallar por ids inexistentes")
     void findByIdsMapsAllFound() {
         Subject subject = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
-        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true);
+        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true, null);
         when(subjectRepository.findAllById(List.of(5L, 99L))).thenReturn(List.of(subject));
         when(subjectMapper.toDto(subject)).thenReturn(dto);
 
@@ -104,8 +104,8 @@ class SubjectServiceImplTest {
         Subject active = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
         Subject deactivated = Subject.builder().id(6L).code(102).name("Química").studyPlan(studyPlan).build();
         deactivated.deactivate();
-        SubjectResponseDto activeDto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true);
-        SubjectResponseDto deactivatedDto = new SubjectResponseDto(6L, 102, "Química", null, null, false);
+        SubjectResponseDto activeDto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true, null);
+        SubjectResponseDto deactivatedDto = new SubjectResponseDto(6L, 102, "Química", null, null, false, null);
         when(subjectRepository.findAllById(List.of(5L, 6L))).thenReturn(List.of(active, deactivated));
         when(subjectMapper.toDto(active)).thenReturn(activeDto);
         lenient().when(subjectMapper.toDto(deactivated)).thenReturn(deactivatedDto);
@@ -118,7 +118,7 @@ class SubjectServiceImplTest {
     @DisplayName("findAll: devuelve la página de materias mapeadas según el Specification")
     void findAllMapsAllSubjects() {
         Subject subject = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
-        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true);
+        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true, null);
         when(subjectRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(subject)));
         when(subjectMapper.toDto(subject)).thenReturn(dto);
@@ -133,8 +133,8 @@ class SubjectServiceImplTest {
         Subject active = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
         Subject inactive = Subject.builder().id(6L).code(102).name("Química").studyPlan(studyPlan).build();
         inactive.deactivate();
-        SubjectResponseDto activeDto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true);
-        SubjectResponseDto inactiveDto = new SubjectResponseDto(6L, 102, "Química", null, null, false);
+        SubjectResponseDto activeDto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true, null);
+        SubjectResponseDto inactiveDto = new SubjectResponseDto(6L, 102, "Química", null, null, false, null);
         when(subjectRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(active, inactive)));
         when(subjectMapper.toDto(active)).thenReturn(activeDto);
@@ -148,7 +148,7 @@ class SubjectServiceImplTest {
     @DisplayName("findByCodeAndStudyPlan: devuelve el DTO mapeado cuando la materia existe para ese plan")
     void findByCodeAndStudyPlanReturnsMappedDto() {
         Subject existing = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
-        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", "Anual", null, true);
+        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", "Anual", null, true, null);
         when(specialtyRepository.findBySpecialtyCode(10)).thenReturn(Optional.of(specialty));
         when(studyPlanRepository.findByPlanCodeAndSpecialtyAndDeletedAtIsNull(2020, specialty)).thenReturn(Optional.of(studyPlan));
         when(subjectRepository.findByCodeAndStudyPlanAndDeletedAtIsNull(101, studyPlan)).thenReturn(Optional.of(existing));
@@ -336,8 +336,8 @@ class SubjectServiceImplTest {
     }
 
     @Test
-    @DisplayName("syncSubjects: reactiva la materia dada de baja aunque el hash no cambió y la cuenta como afectada")
-    void syncSubjectsReactivatesSoftDeletedSubjectWithSameHash() {
+    @DisplayName("syncSubjects: no reactiva la materia dada de baja que sigue en SysAcad con el mismo hash")
+    void syncSubjectsKeepsSoftDeletedSubjectWithSameHash() {
         StudyPlan syncStudyPlan = syncStudyPlan();
         Subject existing = Subject.builder().id(1L).code(519).name("Análisis Matemático I").term("C")
                 .studyPlan(syncStudyPlan).sysacadHash(Hashes.sha256Hex("Análisis Matemático I", "C")).build();
@@ -348,9 +348,9 @@ class SubjectServiceImplTest {
         int affected = service.syncSubjects(
                 List.of(new SubjectSyncCommand(17, 94, 519, "Análisis Matemático I", "C")));
 
-        assertThat(existing.getDeletedAt()).isNull();
-        verify(subjectRepository).save(existing);
-        assertThat(affected).isEqualTo(1);
+        assertThat(existing.getDeletedAt()).isNotNull();
+        verify(subjectRepository, never()).save(existing);
+        assertThat(affected).isZero();
     }
 
     @Test

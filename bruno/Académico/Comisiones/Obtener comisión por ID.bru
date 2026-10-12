@@ -13,3 +13,9 @@ get {
 params:path {
   id: 1
 }
+
+docs {
+  GET /v1/commissions/{id}. Responde 404 si la comision esta dada de baja, su
+  periodo esta dado de baja o SysAcad dejo de traerla. Para ver esas comisiones y
+  su unavailableReason, usar el listado con includeDeactivated=true.
+}

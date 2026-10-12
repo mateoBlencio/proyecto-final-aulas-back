@@ -55,6 +55,7 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -374,7 +375,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         if (commissionIds.isEmpty()) {
             return Map.of();
         }
-        return commissionService.findByIds(commissionIds).stream()
+        return commissionService.findByIdsIncludingDeactivated(commissionIds).stream()
                 .collect(Collectors.toMap(CommissionResponseDto::id,
                         commission -> windowFor(commission.academicPeriod())));
     }
@@ -477,6 +478,11 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 .duration(duration)
                 .date(dto.date())
                 .description(dto.description())
+                .requiresProjector(Boolean.TRUE.equals(dto.requiresProjector()))
+                .requiresComputers(Boolean.TRUE.equals(dto.requiresComputers()))
+                .computerCount(dto.computerCount())
+                .requiredSoftware(dto.requiredSoftware())
+                .requiresExamUsers(dto.requiresExamUsers())
                 .kind(dto.eventType())
                 .subjectId(dto.subjectId())
                 .commissionId(dto.commissionId())
@@ -515,19 +521,36 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         Duration duration = Duration.ofMinutes(dto.durationMinutes());
         eventScheduleValidator.validateBusinessHours(dto.startTime(), dto.startTime().plus(duration));
         eventScheduleValidator.validateAcademicReference(dto.eventType(), dto.subjectId(), dto.commissionId());
-        if (dto.subjectId() != null) {
-            subjectService.findById(dto.subjectId());
+        // Una referencia que no cambió no se revalida: la baja del plan o del período no debe impedir editar el horario.
+        boolean referencesChanged = !Objects.equals(event.getSubjectId(), dto.subjectId())
+                || !Objects.equals(event.getCommissionId(), dto.commissionId());
+        if (referencesChanged) {
+            if (dto.subjectId() != null) {
+                subjectService.findById(dto.subjectId());
+            }
+            if (dto.commissionId() != null) {
+                commissionService.findById(dto.commissionId());
+            }
+            eventScheduleValidator.validateCommissionBelongsToSubject(dto.subjectId(), dto.commissionId());
         }
-        if (dto.commissionId() != null) {
-            commissionService.findById(dto.commissionId());
-        }
-        eventScheduleValidator.validateCommissionBelongsToSubject(dto.subjectId(), dto.commissionId());
 
         event.setEnrolled(dto.enrolled());
         event.setStartTime(dto.startTime());
         event.setDuration(duration);
         event.setDate(dto.date());
         event.setDescription(dto.description());
+        // Los cinco requisitos son un grupo: si el cliente no manda ninguno (el front previo a la
+        // feature de alta directa), no habló de requisitos y los que ya estaban no se borran.
+        boolean requirementsAbsent = dto.requiresProjector() == null && dto.requiresComputers() == null
+                && dto.computerCount() == null && dto.requiredSoftware() == null
+                && dto.requiresExamUsers() == null;
+        if (!requirementsAbsent) {
+            event.setRequiresProjector(Boolean.TRUE.equals(dto.requiresProjector()));
+            event.setRequiresComputers(Boolean.TRUE.equals(dto.requiresComputers()));
+            event.setComputerCount(dto.computerCount());
+            event.setRequiredSoftware(dto.requiredSoftware());
+            event.setRequiresExamUsers(dto.requiresExamUsers());
+        }
         event.setKind(dto.eventType());
         event.setSubjectId(dto.subjectId());
         event.setCommissionId(dto.commissionId());

@@ -99,7 +99,7 @@ class RoleAssignmentServiceImplTest {
     void assignDuplicateThrows() {
         User u = user(1L, "u@frc.utn.edu.ar");
         when(userRepository.findById(1L)).thenReturn(Optional.of(u));
-        when(buildingService.findById(5L)).thenReturn(new BuildingResponseDto(5L, "Edificio 5", true));
+        when(buildingService.findById(5L)).thenReturn(new BuildingResponseDto(5L, "Edificio 5", true, null));
         RoleAssignment existing = RoleAssignment.builder().id(10L).user(u).role(ROLE)
                 .scopeType(ScopeType.BUILDING).scopeId(5L).build();
         when(roleAssignmentRepository.findAllByUserId(1L)).thenReturn(List.of(existing));
@@ -116,7 +116,7 @@ class RoleAssignmentServiceImplTest {
     void assignHappyPath() {
         User u = user(1L, "u@frc.utn.edu.ar");
         when(userRepository.findById(1L)).thenReturn(Optional.of(u));
-        when(buildingService.findById(5L)).thenReturn(new BuildingResponseDto(5L, "Edificio 5", true));
+        when(buildingService.findById(5L)).thenReturn(new BuildingResponseDto(5L, "Edificio 5", true, null));
         when(roleAssignmentRepository.findAllByUserId(1L)).thenReturn(List.of());
         when(roleAssignmentRepository.save(any(RoleAssignment.class))).thenAnswer(inv -> {
             RoleAssignment a = inv.getArgument(0);

@@ -5,6 +5,7 @@ public record ClassroomFilter(
     Long buildingId,
     Long classroomTypeId,
     Integer capacityMin,
-    Integer capacityMax
+    Integer capacityMax,
+    boolean notInSysacad
 ) {
 }

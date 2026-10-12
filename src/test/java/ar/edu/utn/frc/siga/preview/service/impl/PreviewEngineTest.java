@@ -91,7 +91,7 @@ class PreviewEngineTest {
     @DisplayName("generate: UniqueEvent rechazado, auto-preview solo soporta recurrentes")
     void generateRechazaUniqueEvent() {
         UniqueEventResponseDto unique = new UniqueEventResponseDto(3L, EventType.UNIQUE_EVENT,
-                UniqueEventKind.PARCIAL, 20, LocalTime.of(18, 0), 120, LocalDate.of(2026, 3, 10), null, null, null);
+                UniqueEventKind.PARCIAL, 20, LocalTime.of(18, 0), 120, LocalDate.of(2026, 3, 10), null, null, null, false, false, null, null, null);
         when(academicEventService.findByIds(any())).thenReturn(List.of(unique));
 
         assertThatThrownBy(() -> engine.generate(Set.of(3L), 30))
@@ -137,7 +137,7 @@ class PreviewEngineTest {
         RecurringEventResponseDto event = recurringEvent(1L);
         when(academicEventService.findByIds(any())).thenReturn(List.of(event));
         when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of());
-        ClassroomResponseDto outOfScope = new ClassroomResponseDto(6L, 6, 100, 9L, "Edificio Ajeno", 1L, "Tipo");
+        ClassroomResponseDto outOfScope = new ClassroomResponseDto(6L, 6, 100, 9L, "Edificio Ajeno", 1L, "Tipo", null, true);
         when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5L, 100), outOfScope));
         when(buildingScopeResolver.scopeFor(Permission.PREVIEW_RUN)).thenReturn(BuildingScope.of(Set.of(1L)));
 
@@ -164,7 +164,7 @@ class PreviewEngineTest {
     @Test
     @DisplayName("generate: la materia del evento y el permiso del aula viajan al optimizador")
     void generatePropagaPermisosYMateria() {
-        SubjectResponseDto subject = new SubjectResponseDto(7L, 700, "Análisis", "1C", null, true);
+        SubjectResponseDto subject = new SubjectResponseDto(7L, 700, "Análisis", "1C", null, true, null);
         RecurringEventResponseDto event = new RecurringEventResponseDto(1L, EventType.RECURRING, 30,
                 LocalTime.of(8, 0), 90, DayOfWeek.MONDAY, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 6, 30),
                 subject, null);
@@ -274,7 +274,7 @@ class PreviewEngineTest {
         RecurringEventResponseDto event = recurringEvent(1L);
         when(academicEventService.findByIds(any())).thenReturn(List.of(event));
         ClassroomResponseDto excluded = classroom(5L, 100);
-        ClassroomResponseDto outOfScope = new ClassroomResponseDto(6L, 6, 100, 9L, "Edificio Ajeno", 1L, "Tipo");
+        ClassroomResponseDto outOfScope = new ClassroomResponseDto(6L, 6, 100, 9L, "Edificio Ajeno", 1L, "Tipo", null, true);
         ClassroomResponseDto candidate = classroom(7L, 100);
         when(classroomService.findAllAvailable()).thenReturn(List.of(excluded, outOfScope, candidate));
         when(buildingScopeResolver.scopeFor(Permission.ALLOCATION_WRITE)).thenReturn(BuildingScope.of(Set.of(1L)));
@@ -328,7 +328,7 @@ class PreviewEngineTest {
     @DisplayName("suggest: evento único no lanza y viaja con commissionKey null")
     void suggestEventoUnicoCommissionKeyNull() {
         UniqueEventResponseDto event = new UniqueEventResponseDto(3L, EventType.UNIQUE_EVENT,
-                UniqueEventKind.PARCIAL, 20, LocalTime.of(18, 0), 120, LocalDate.of(2026, 3, 10), null, null, null);
+                UniqueEventKind.PARCIAL, 20, LocalTime.of(18, 0), 120, LocalDate.of(2026, 3, 10), null, null, null, false, false, null, null, null);
         when(academicEventService.findByIds(any())).thenReturn(List.of(event));
         when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5L, 100)));
         when(buildingScopeResolver.scopeFor(Permission.ALLOCATION_WRITE)).thenReturn(BuildingScope.unrestricted());
@@ -355,6 +355,6 @@ class PreviewEngineTest {
     }
 
     private ClassroomResponseDto classroom(Long id, Integer capacity) {
-        return new ClassroomResponseDto(id, id.intValue(), capacity, 1L, "Edificio 1", 1L, "Tipo");
+        return new ClassroomResponseDto(id, id.intValue(), capacity, 1L, "Edificio 1", 1L, "Tipo", null, true);
     }
 }

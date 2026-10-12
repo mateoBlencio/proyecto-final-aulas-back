@@ -18,6 +18,12 @@ public interface CommissionService extends ActivationService<Long> {
 
     List<CommissionResponseDto> findByIds(Collection<Long> ids);
 
+    /**
+     * Como {@link #findByIds}, pero incluye las comisiones desactivadas o de períodos desactivados (para
+     * referencias históricas).
+     */
+    List<CommissionResponseDto> findByIdsIncludingDeactivated(Collection<Long> ids);
+
     Page<CommissionResponseDto> findAll(CommissionFilter filter, Pageable pageable, boolean includeDeactivated);
 
     CommissionResponseDto findByCourseAndPeriod(String courseCode, Integer periodYear, Integer periodSemester);

@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.space.model;
 
 import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
+import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -73,4 +74,21 @@ public class Classroom extends SoftDeletableEntity {
     @Column(name = "observaciones", length = 500)
     private String observations;
 
+    public boolean isCurrentInSysacad() {
+        return Boolean.TRUE.equals(sysacadEnabled) || sysacadHash == null;
+    }
+
+    public UnavailableReason unavailableReason() {
+        if (!isActive()) {
+            return UnavailableReason.DEACTIVATED;
+        }
+        if (!building.isActive()) {
+            return UnavailableReason.PARENT_DEACTIVATED;
+        }
+        return building.isCurrentInSysacad() ? null : UnavailableReason.NOT_IN_SYSACAD;
+    }
+
+    public boolean isAvailable() {
+        return unavailableReason() == null;
+    }
 }

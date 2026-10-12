@@ -13,3 +13,9 @@ get {
 params:path {
   id: 1
 }
+
+docs {
+  GET /v1/subjects/{id}. Responde 404 si la materia esta dada de baja o su plan de
+  estudio esta dado de baja. Para ver esas materias y su unavailableReason, usar
+  el listado con includeDeactivated=true.
+}

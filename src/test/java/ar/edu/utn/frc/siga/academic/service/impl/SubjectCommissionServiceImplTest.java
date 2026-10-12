@@ -3,7 +3,9 @@ package ar.edu.utn.frc.siga.academic.service.impl;
 import ar.edu.utn.frc.siga.academic.dto.SubjectCommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SubjectCommissionMapper;
+import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
 import ar.edu.utn.frc.siga.academic.model.Commission;
+import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
@@ -46,8 +48,10 @@ class SubjectCommissionServiceImplTest {
 
     private SubjectCommissionServiceImpl service;
 
-    private final Subject subject = Subject.builder().id(1L).code(101).name("Algoritmos").build();
-    private final Commission commission = Commission.builder().id(2L).courseCode("K1001").build();
+    private final Subject subject = Subject.builder().id(1L).code(101).name("Algoritmos")
+            .studyPlan(StudyPlan.builder().id(1L).build()).build();
+    private final Commission commission = Commission.builder().id(2L).courseCode("K1001")
+            .academicPeriod(AcademicPeriod.builder().id(1L).build()).build();
 
     @BeforeEach
     void setUp() {
