@@ -47,8 +47,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 
-/** Transiciones de estado de un ítem (assign/cancel/derive/return/notify). La resolución de qué ocurrencias u
- *  aulas/edificios son candidatos vive en {@link RoomRequestOccurrenceResolver} y {@link RoomRequestCandidateResolver}. */
 @Slf4j
 @Service
 @RequiredArgsConstructor
