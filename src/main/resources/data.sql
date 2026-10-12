@@ -47,3 +47,19 @@ WHERE u.correo = 'admin@frc.utn.edu.ar'
   AND NOT EXISTS (
       SELECT 1 FROM usuario_rol ur WHERE ur.id_usuario = u.id_usuario AND ur.rol = 'SUBSECRETARIA'
   );
+
+-- Auxiliar áulico inicial de dev-local. Password de desarrollo: "auxiliar_maderns" (BCrypt, no es un secreto real).
+INSERT INTO usuario (correo, password_hash, habilitado, nombre, apellido)
+SELECT 'auxiliar_maderns@frc.utn.edu.ar', '$2y$10$dKWjIhXPcT1ErJiiNYLEr.vNih4K/tn58Drs78a2LyRAVjE0vekrW', true, 'Auxiliar', 'Maderns'
+WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE correo = 'auxiliar_maderns@frc.utn.edu.ar');
+
+-- Alcance acotado al edificio "Edif. Ing.Maders"; si dev-local arranca sin edificios importados, no inserta nada.
+INSERT INTO usuario_rol (id_usuario, rol, tipo_alcance, id_alcance)
+SELECT u.id_usuario, 'AUXILIAR_AULICO', 'BUILDING', e.id_edificio
+FROM usuario u, edificio e
+WHERE u.correo = 'auxiliar_maderns@frc.utn.edu.ar'
+  AND e.nombre = 'Edif. Ing.Maders'
+  AND e.eliminado_en IS NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM usuario_rol ur WHERE ur.id_usuario = u.id_usuario AND ur.rol = 'AUXILIAR_AULICO'
+  );
