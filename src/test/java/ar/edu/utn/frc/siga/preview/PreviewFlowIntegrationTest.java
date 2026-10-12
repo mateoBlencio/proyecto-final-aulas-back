@@ -238,7 +238,7 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
         var scUnico = testData.materiaYComision();
         var uniqueDto = new CreateUniqueEventRequestDto(
                 UniqueEventKind.EXAMEN_FINAL, scUnico.subjectId(), scUnico.commissionId(),
-                LocalDate.now().plusDays(104), START, DURATION, 20, null);
+                LocalDate.now().plusDays(104), START, DURATION, 20, null, null, null, null, null, null);
         Long uniqueEventId = academicEventService.createUniqueEvent(uniqueDto).id();
 
         mockMvc.perform(post("/v1/previews")

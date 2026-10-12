@@ -21,6 +21,7 @@ public enum SystemRole {
             Permission.RESOURCE_TYPE_READ,
             Permission.ACADEMIC_READ,
             Permission.EVENT_READ,
+            Permission.EVENT_DIRECT_CREATE,
             Permission.ALLOCATION_READ,
             Permission.ALLOCATION_WRITE,
             Permission.CONFLICT_READ,

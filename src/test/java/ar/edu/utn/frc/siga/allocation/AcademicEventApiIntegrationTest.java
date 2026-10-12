@@ -104,7 +104,7 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
         IntegrationTestData.SubjectAndCommission sc = testData.materiaYComision();
         CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
                 UniqueEventKind.EXAMEN_FINAL, sc.subjectId(), sc.commissionId(),
-                date, LocalTime.of(10, 0), 60, 20, null);
+                date, LocalTime.of(10, 0), 60, 20, null, null, null, null, null, null);
 
         MvcResult result = mockMvc.perform(post("/v1/events/unique")
                         .contentType(MediaType.APPLICATION_JSON)

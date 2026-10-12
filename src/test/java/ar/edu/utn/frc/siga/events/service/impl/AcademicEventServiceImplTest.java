@@ -554,7 +554,7 @@ class AcademicEventServiceImplTest {
     void createUniqueEventFeliz() {
         CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
                 UniqueEventKind.EXAMEN_FINAL, 1L, 1L, LocalDate.of(2026, 3, 10),
-                LocalTime.of(10, 0), 60, 20, "Examen final de la materia");
+                LocalTime.of(10, 0), 60, 20, "Examen final de la materia", null, null, null, null, null);
         UniqueEvent saved = EventTestData.uniqueEvent(3L, dto.date(), dto.startTime(),
                 Duration.ofMinutes(dto.durationMinutes()));
         when(subjectService.findById(1L)).thenReturn(EventTestData.subjectResponseDto(1L));
@@ -586,7 +586,7 @@ class AcademicEventServiceImplTest {
     void createUniqueEventReferenciaAcademicaInvalidaPropagaExcepcion() {
         CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
                 UniqueEventKind.PARCIAL, null, 1L, LocalDate.of(2026, 3, 10),
-                LocalTime.of(10, 0), 60, 20, null);
+                LocalTime.of(10, 0), 60, 20, null, null, null, null, null, null);
         doThrow(new MissingAcademicReferenceException("subjectId es obligatorio"))
                 .when(eventScheduleValidator).validateAcademicReference(dto.eventType(), dto.subjectId(), dto.commissionId());
 
@@ -600,7 +600,7 @@ class AcademicEventServiceImplTest {
     void createUniqueEventOtroSinMateriaNiComision() {
         CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
                 UniqueEventKind.OTRO, null, null, LocalDate.of(2026, 3, 10),
-                LocalTime.of(10, 0), 60, 20, null);
+                LocalTime.of(10, 0), 60, 20, null, null, null, null, null, null);
         UniqueEvent saved = EventTestData.uniqueEvent(3L, dto.date(), dto.startTime(),
                 Duration.ofMinutes(dto.durationMinutes()));
         when(eventRepository.save(any())).thenReturn(saved);
@@ -618,7 +618,7 @@ class AcademicEventServiceImplTest {
     void createUniqueEventExamenFinalSinCommissionIdPersisteIgual() {
         CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
                 UniqueEventKind.EXAMEN_FINAL, 1L, null, LocalDate.of(2026, 3, 10),
-                LocalTime.of(10, 0), 60, 20, null);
+                LocalTime.of(10, 0), 60, 20, null, null, null, null, null, null);
         UniqueEvent saved = EventTestData.uniqueEvent(3L, dto.date(), dto.startTime(),
                 Duration.ofMinutes(dto.durationMinutes()));
         when(subjectService.findById(1L)).thenReturn(EventTestData.subjectResponseDto(1L));
@@ -637,7 +637,7 @@ class AcademicEventServiceImplTest {
     void createUniqueEventCommissionNoPerteneceASubjectLanzaExcepcion() {
         CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
                 UniqueEventKind.EXAMEN_FINAL, 1L, 2L, LocalDate.of(2026, 3, 10),
-                LocalTime.of(10, 0), 60, 20, null);
+                LocalTime.of(10, 0), 60, 20, null, null, null, null, null, null);
         when(subjectService.findById(1L)).thenReturn(EventTestData.subjectResponseDto(1L));
         when(commissionService.findById(2L)).thenReturn(EventTestData.commissionResponseDto(2L));
         doThrow(new InvalidCommissionForSubjectException("la comisión 2 no pertenece a la materia 1"))
@@ -653,7 +653,7 @@ class AcademicEventServiceImplTest {
     void createUniqueEventCommissionPerteneceASubjectPersiste() {
         CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
                 UniqueEventKind.EXAMEN_FINAL, 1L, 1L, LocalDate.of(2026, 3, 10),
-                LocalTime.of(10, 0), 60, 20, null);
+                LocalTime.of(10, 0), 60, 20, null, null, null, null, null, null);
         UniqueEvent saved = EventTestData.uniqueEvent(3L, dto.date(), dto.startTime(),
                 Duration.ofMinutes(dto.durationMinutes()));
         when(subjectService.findById(1L)).thenReturn(EventTestData.subjectResponseDto(1L));
@@ -878,12 +878,12 @@ class AcademicEventServiceImplTest {
 
     private UniqueEventResponseDto dummyUniqueResponseDto(Long id) {
         return new UniqueEventResponseDto(id, EventType.UNIQUE_EVENT, UniqueEventKind.EXAMEN_FINAL, 20,
-                LocalTime.of(10, 0), 60, LocalDate.of(2026, 3, 10), "evento especial", null, null);
+                LocalTime.of(10, 0), 60, LocalDate.of(2026, 3, 10), "evento especial", null, null, false, false, null, null, null);
     }
 
     private UpdateUniqueEventRequestDto updateDto() {
         return new UpdateUniqueEventRequestDto(
                 UniqueEventKind.PARCIAL, 1L, 1L, LocalDate.of(2026, 3, 15),
-                LocalTime.of(11, 0), 90, 25, "descripcion actualizada");
+                LocalTime.of(11, 0), 90, 25, "descripcion actualizada", null, null, null, null, null);
     }
 }

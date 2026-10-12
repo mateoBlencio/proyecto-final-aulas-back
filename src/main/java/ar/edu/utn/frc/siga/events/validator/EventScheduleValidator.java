@@ -34,7 +34,8 @@ public class EventScheduleValidator {
     }
 
     public void validateAcademicReference(UniqueEventKind eventType, Long subjectId, Long commissionId) {
-        boolean subjectRequired = eventType != UniqueEventKind.OTRO || commissionId != null;
+        boolean subjectOptional = eventType == UniqueEventKind.OTRO || eventType == UniqueEventKind.CONFERENCIA;
+        boolean subjectRequired = !subjectOptional || commissionId != null;
         if (subjectRequired && subjectId == null) {
             throw new MissingAcademicReferenceException(
                     "subjectId es obligatorio para eventType=" + eventType

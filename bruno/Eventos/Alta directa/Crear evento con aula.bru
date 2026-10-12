@@ -1,0 +1,46 @@
+meta {
+  name: Crear evento con aula
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/v1/events/direct
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "draft": {
+      "type": "CONFERENCE",
+      "date": "2026-11-20",
+      "startTime": "10:00:00",
+      "endTime": "12:00:00",
+      "estimated": 80,
+      "classroomCount": 2,
+      "requiresProjector": true,
+      "requiresComputers": false,
+      "description": "Charla de ingeniería en el SUM"
+    },
+    "classroomIds": [52, 53],
+    "suggestionId": null,
+    "reason": "Pedido directo de la Secretaría de Extensión"
+  }
+}
+
+docs {
+  POST /v1/events/direct. Permiso: PERM_EVENT_DIRECT_CREATE (AUXILIAR_AULICO). Responde 201.
+
+  Crea el evento único y asigna las aulas en una sola transacción; si la asignación falla,
+  no queda evento. Devuelve la lista de asignaciones.
+
+  - `classroomIds`: entre 1 y `classroomCount` aulas, sin repetidos.
+  - `suggestionId` (opcional): de `/suggestion`. Las aulas deben ser exactamente las
+    sugeridas, en el mismo orden, y la asignación queda como AUTOMATIC; sin él, MANUAL.
+    410 si expiró, ya se usó o no coincide con el borrador. Un error posterior (400, 409)
+    no consume la sugerencia.
+  - `reason`: obligatorio, hasta 500 caracteres; queda como observación de cada asignación.
+  - 403 si un aula está fuera del edificio del usuario; 409 con `ALLOCATION_CONFLICT` si
+    está ocupada.
+}

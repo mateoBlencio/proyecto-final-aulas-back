@@ -6,9 +6,9 @@ import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
 import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
-import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.roomrequest.direct.DirectEventKinds;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItemAllocation;
@@ -113,14 +113,11 @@ class RoomRequestOccurrenceResolver {
     }
 
     private Long createEventOccurrence(RoomRequestItem item, RoomRequestType type) {
-        UniqueEventKind kind = switch (type) {
-            case PARTIAL_EXAM_OFF_SCHEDULE -> UniqueEventKind.PARCIAL;
-            case FINAL_EXAM -> UniqueEventKind.EXAMEN_FINAL;
-            default -> UniqueEventKind.OTRO;
-        };
-        CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(kind, item.getRequest().getSubjectId(),
-                item.getCommissionId(), item.getDate(), item.getStartTime(),
-                (int) item.getDuration().toMinutes(), item.getEstimated(), item.getObservations());
+        CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(DirectEventKinds.of(type),
+                item.getRequest().getSubjectId(), item.getCommissionId(), item.getDate(), item.getStartTime(),
+                (int) item.getDuration().toMinutes(), item.getEstimated(), item.getObservations(),
+                item.getRequiresProjector(), item.getRequiresComputers(), item.getComputerCount(),
+                item.getRequiredSoftware(), item.getRequiresExamUsers());
         AcademicEventResponseDto event = academicEventService.createUniqueEvent(dto);
         return academicEventService.findOccurrencesByEventId(event.id()).getFirst().id();
     }
