@@ -53,6 +53,7 @@ class AuditOperationCoverageTest {
             Map.entry("RoomRequestExpiryScheduler#expireOverdueItems",
                     "only delegates to RoomRequestExpiryServiceImpl.expireOverdueItems, which carries the annotation"),
             Map.entry("RoomRequestSuggestionStore#onSettingChanged", "only updates the in-memory suggestion cache TTL"),
+            Map.entry("DirectEventSuggestionStore#onSettingChanged", "only updates the in-memory suggestion cache TTL"),
             Map.entry("RefreshTokenServiceImpl#issue", "refresh tokens are not @Audited"),
             Map.entry("RefreshTokenServiceImpl#refresh", "refresh tokens are not @Audited"),
             Map.entry("RefreshTokenServiceImpl#revoke", "refresh tokens are not @Audited"),
