@@ -138,8 +138,8 @@ class RoomRequestOccurrenceResolverTest {
     }
 
     @Test
-    @DisplayName("CONFERENCE: primera vez crea el UniqueEvent kind OTRO")
-    void conference_creaEventoOtro() {
+    @DisplayName("CONFERENCE: primera vez crea el UniqueEvent kind CONFERENCIA")
+    void conference_creaEventoConferencia() {
         LocalDate date = LocalDate.of(2026, 8, 1);
         RoomRequestItem item = RoomRequestItem.builder().id(1L)
                 .request(requestOfType(RoomRequestType.CONFERENCE))
@@ -152,7 +152,7 @@ class RoomRequestOccurrenceResolverTest {
 
         ArgumentCaptor<CreateUniqueEventRequestDto> captor = ArgumentCaptor.forClass(CreateUniqueEventRequestDto.class);
         verify(academicEventService).createUniqueEvent(captor.capture());
-        assertThat(captor.getValue().eventType()).isEqualTo(UniqueEventKind.OTRO);
+        assertThat(captor.getValue().eventType()).isEqualTo(UniqueEventKind.CONFERENCIA);
     }
 
     @Test
@@ -240,6 +240,6 @@ class RoomRequestOccurrenceResolverTest {
 
     private static AcademicEventResponseDto uniqueEvent(Long eventId) {
         return new UniqueEventResponseDto(eventId, EventType.UNIQUE_EVENT, UniqueEventKind.EXAMEN_FINAL, 30,
-                LocalTime.of(9, 0), 90L, LocalDate.of(2026, 7, 1), null, null, null);
+                LocalTime.of(9, 0), 90L, LocalDate.of(2026, 7, 1), null, null, null, false, false, null, null, null);
     }
 }

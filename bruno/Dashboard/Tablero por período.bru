@@ -1,0 +1,52 @@
+meta {
+  name: Tablero por período
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/v1/dashboard/period?type=TERM
+  body: none
+  auth: inherit
+}
+
+params:query {
+  type: TERM
+  ~year: 2026
+  ~semester: 1
+  ~years: 3
+}
+
+docs {
+  GET /v1/dashboard/period. Permiso: PERM_DASHBOARD_READ (SUBSECRETARIA, AUXILIAR_AULICO, CONSULTA).
+
+  type (opcional, por defecto TERM): TERM, ACADEMIC_YEAR o LAST_YEARS. Cualquier otro valor (incluido
+  CURRENT_MONTH, o en minúsculas) da 400. Los parámetros que no corresponden al type se ignoran.
+  El rango va del inicio del período a hoy, inclusive; las asignaciones posteriores a hoy no cuentan.
+
+  TERM: year y semester (1|2) opcionales, van juntos o no va ninguno. Sin ellos devuelve el
+  cuatrimestre en curso o el último que empezó (en receso, diciembre, enero y febrero, completo).
+  Un cuatrimestre pasado viene completo (to = periodEnd, partial = false).
+
+  ACADEMIC_YEAR: year opcional. Sin él, el año académico en curso o el último que empezó. semester = 0.
+
+  LAST_YEARS: years (1 a 10) obligatorio. Suma los años académicos de Y-years+1 a Y, con Y el año
+  académico en curso o el último que empezó. Cada año se mide de su inicio a min(hoy, fin); los días
+  entre un año y el siguiente no cuentan. year y semester vienen null y years trae el valor pedido.
+  Los porcentajes se recalculan desde los absolutos sumados. pending se cuenta al final del día to.
+
+  Las fechas salen del período ANUAL y su receso; lo que falte sale de TermType (1.º cuatrimestre
+  hasta el 31/07, 2.º desde el 01/08, año de 01/03 a 30/11).
+
+  Respuesta 200: mismo formato de campus y buildings que el informe mensual, más type, year, semester,
+  years, periodStart, periodEnd, from, to, partial y excludedDays.
+  roomRequests: resolved y expired dentro de la ventana; pending es lo abierto al final del día to.
+
+  Usuario acotado: restrictedScope = true, el campus es la suma de sus edificios y
+  campus.unallocatedClasses y campus.unassignedBuildingRoomRequests son null.
+
+  Errores (ProblemDetail):
+  - 400: type inválido; solo uno de year o semester; semester fuera de 1|2; years ausente o fuera de
+    1..10 con LAST_YEARS; year a más de 10 años de hoy.
+  - 422: el cuatrimestre o el año pedido todavía no empezó.
+}

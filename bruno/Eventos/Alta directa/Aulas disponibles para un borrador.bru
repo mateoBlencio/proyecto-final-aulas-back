@@ -1,0 +1,32 @@
+meta {
+  name: Aulas disponibles para un borrador
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/events/direct/available-classrooms
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "type": "CONFERENCE",
+    "date": "2026-11-20",
+    "startTime": "10:00:00",
+    "endTime": "12:00:00",
+    "estimated": 80,
+    "classroomCount": 2,
+    "requiresProjector": true,
+    "requiresComputers": false,
+    "description": "Charla de ingeniería en el SUM"
+  }
+}
+
+docs {
+  POST /v1/events/direct/available-classrooms. Permiso: PERM_EVENT_DIRECT_CREATE (AUXILIAR_AULICO).
+
+  Devuelve las aulas del alcance del usuario que cumplen los requisitos del borrador;
+  `available=false` marca las ocupadas en esa fecha y horario. No persiste nada.
+}

@@ -124,7 +124,7 @@ class EventAllocationComposerTest {
 
     private UniqueEventResponseDto uniqueEvent(Long id, Integer enrolled) {
         return new UniqueEventResponseDto(id, EventType.UNIQUE_EVENT, UniqueEventKind.EXAMEN_FINAL, enrolled,
-                LocalTime.of(10, 0), 60, LocalDate.of(2026, 3, 10), "evento especial", null, null);
+                LocalTime.of(10, 0), 60, LocalDate.of(2026, 3, 10), "evento especial", null, null, false, false, null, null, null);
     }
 
     private ClassroomResponseDto classroom(Long id, Integer capacity) {

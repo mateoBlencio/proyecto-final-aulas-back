@@ -21,12 +21,14 @@ public enum SystemRole {
             Permission.RESOURCE_TYPE_READ,
             Permission.ACADEMIC_READ,
             Permission.EVENT_READ,
+            Permission.EVENT_DIRECT_CREATE,
             Permission.ALLOCATION_READ,
             Permission.ALLOCATION_WRITE,
             Permission.CONFLICT_READ,
             Permission.PREVIEW_RUN,
             Permission.ROOM_REQUEST_READ,
             Permission.ROOM_REQUEST_WRITE,
+            Permission.DASHBOARD_READ,
             Permission.USER_READ)),
 
     CONSULTA(EnumSet.of(
@@ -38,7 +40,8 @@ public enum SystemRole {
             Permission.EVENT_READ,
             Permission.ALLOCATION_READ,
             Permission.CONFLICT_READ,
-            Permission.ROOM_REQUEST_READ));
+            Permission.ROOM_REQUEST_READ,
+            Permission.DASHBOARD_READ));
 
     private final Set<Permission> permissions;
 

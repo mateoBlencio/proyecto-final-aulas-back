@@ -34,7 +34,8 @@ class ScopeBypassInventoryTest {
 
     private static final Map<String, Integer> EXPECTED_UNRESTRICTED = Map.of(
             "ar/edu/utn/frc/siga/auth/security/DefaultBuildingScopeResolver.java", 1,
-            "ar/edu/utn/frc/siga/auth/security/SecurityUser.java", 2);
+            "ar/edu/utn/frc/siga/auth/security/SecurityUser.java", 2,
+            "ar/edu/utn/frc/siga/dashboard/service/impl/DashboardSnapshotServiceImpl.java", 2);
 
     @Test
     @DisplayName("SystemScope.run/call sólo aparece en los caminos internos declarados")

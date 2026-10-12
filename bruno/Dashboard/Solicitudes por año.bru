@@ -1,0 +1,32 @@
+meta {
+  name: Solicitudes por año
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/v1/dashboard/room-requests
+  body: none
+  auth: inherit
+}
+
+params:query {
+  years: 5
+}
+
+docs {
+  GET /v1/dashboard/room-requests. Permiso: PERM_DASHBOARD_READ.
+  Unidad: ítem de solicitud. Por año y por edificio:
+  - resolved: ítems RESOLVED por año de fecha_notificacion, al edificio del aula asignada. Un ítem
+    con aulas en dos edificios cuenta una vez en cada edificio y una vez en el campus.
+  - pending: ítems NEW, DERIVED_TO_BUILDING e IN_EVALUATION al momento de la consulta, al edificio
+    derivado. Solo viene en el año en curso; en los demás es null.
+  - expired: ítems CANCELLED por el proceso de vencimiento (decidido_por SISTEMA), por año de
+    fecha_decision. Las canceladas por una persona no cuentan.
+
+  years (1 a 10, por defecto 5): cantidad de años hacia atrás, el actual incluido. Fuera de rango: 400.
+  Solo se devuelven los años con algún conteo distinto de cero; el año en curso va con partial = true.
+
+  unassignedBuilding agrupa los ítems sin edificio derivado. Es null para un usuario acotado, y en
+  ese caso campus es la suma de sus edificios. Sin datos: 200 con years vacío.
+}

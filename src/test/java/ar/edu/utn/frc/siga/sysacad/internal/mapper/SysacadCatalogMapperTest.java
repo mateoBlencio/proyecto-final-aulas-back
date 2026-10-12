@@ -5,19 +5,25 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadAllocationDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadBuildingDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadClassroomDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadCommissionDto;
+import ar.edu.utn.frc.siga.sysacad.api.SysacadHolidayDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSpecialtyDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectCommissionDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectDto;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawBuilding;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawClassroom;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawCommission;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawHoliday;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSpecialty;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSubject;
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -184,5 +190,27 @@ class SysacadCatalogMapperTest {
                 5, "Ingeniería en Sistemas de Información", 2008, 115, "Sistemas de Representación", 30));
 
         assertThat(subjectCommission).isEqualTo(new SysacadSubjectCommissionDto("1H90SR", 115, 30));
+    }
+
+    @Test
+    @DisplayName("toHoliday: parses a yyyyMMdd date")
+    void parsesHolidayDate() {
+        assertThat(mapper.toHoliday(new RawHoliday("20261208", "Inmaculada Concepción")))
+                .isEqualTo(new SysacadHolidayDto(LocalDate.of(2026, 12, 8), "Inmaculada Concepción"));
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"20261332", "2026-12-08"})
+    @DisplayName("toHoliday: returns null for null, empty, out-of-range or wrongly formatted dates")
+    void invalidHolidayDateReturnsNull(String fecha) {
+        assertThat(mapper.toHoliday(new RawHoliday(fecha, "Anything"))).isNull();
+    }
+
+    @Test
+    @DisplayName("toHoliday: trims the description")
+    void trimsHolidayDescription() {
+        assertThat(mapper.toHoliday(new RawHoliday("20261208", "  Inmaculada Concepción   ")).description())
+                .isEqualTo("Inmaculada Concepción");
     }
 }

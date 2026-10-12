@@ -7,7 +7,9 @@ import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.service.ActivationService;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,6 +21,12 @@ public interface AcademicPeriodService extends ActivationService<Long> {
     FindOrCreateResult<AcademicPeriodResponseDto> findOrCreate(Integer year, TermType termType);
 
     List<AcademicPeriodResponseDto> findActive();
+
+    /** Períodos ANUAL activos cuyo receso (inclusive en ambos extremos) se cruza con [from, to]. */
+    List<AcademicPeriodResponseDto> findRecessesBetween(LocalDate from, LocalDate to);
+
+    /** Período ANUAL activo (no eliminado) del año, si existe. */
+    Optional<AcademicPeriodResponseDto> findAnnual(int year);
 
     /**
      * Período(s) en vigencia hoy (año + cuatrimestre en curso). Lectura pura: no re-significa

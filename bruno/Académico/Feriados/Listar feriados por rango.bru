@@ -1,0 +1,22 @@
+meta {
+  name: Listar feriados por rango
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/holidays?from=2026-01-01&to=2026-12-31
+  body: none
+  auth: inherit
+}
+
+params:query {
+  from: 2026-01-01
+  to: 2026-12-31
+}
+
+docs {
+  Feriados con fecha entre from y to (inclusive), ordenados por fecha.
+  Permiso: PERM_ACADEMIC_READ. Respuesta: [{ date, description }].
+  400 si falta un parámetro, tiene formato inválido o to < from.
+}

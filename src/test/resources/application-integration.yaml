@@ -28,6 +28,9 @@ cors:
     - http://localhost:5173
 
 siga:
+  dashboard:
+    snapshot:
+      enabled: false
   audit:
     archive:
       enabled: false

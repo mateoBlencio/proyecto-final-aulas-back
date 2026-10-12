@@ -20,6 +20,7 @@ public enum Permission {
 
     EVENT_READ(ScopeType.GLOBAL),
     EVENT_MANAGE(ScopeType.GLOBAL),
+    EVENT_DIRECT_CREATE(ScopeType.BUILDING),
     OCCURRENCE_RELEASE(ScopeType.GLOBAL),
     OCCURRENCE_REQUEST_ROOM(ScopeType.GLOBAL),
 
@@ -29,6 +30,9 @@ public enum Permission {
     ALLOCATION_HISTORY_READ(ScopeType.GLOBAL),
 
     PREVIEW_RUN(ScopeType.BUILDING),
+
+    DASHBOARD_READ(ScopeType.BUILDING),
+    DASHBOARD_SNAPSHOT_REGENERATE(ScopeType.GLOBAL),
 
     ROOM_REQUEST_READ(ScopeType.GLOBAL),
     ROOM_REQUEST_WRITE(ScopeType.GLOBAL),

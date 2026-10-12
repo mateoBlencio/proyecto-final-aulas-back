@@ -91,7 +91,7 @@ class PreviewEngineTest {
     @DisplayName("generate: UniqueEvent rechazado, auto-preview solo soporta recurrentes")
     void generateRechazaUniqueEvent() {
         UniqueEventResponseDto unique = new UniqueEventResponseDto(3L, EventType.UNIQUE_EVENT,
-                UniqueEventKind.PARCIAL, 20, LocalTime.of(18, 0), 120, LocalDate.of(2026, 3, 10), null, null, null);
+                UniqueEventKind.PARCIAL, 20, LocalTime.of(18, 0), 120, LocalDate.of(2026, 3, 10), null, null, null, false, false, null, null, null);
         when(academicEventService.findByIds(any())).thenReturn(List.of(unique));
 
         assertThatThrownBy(() -> engine.generate(Set.of(3L), 30))
@@ -328,7 +328,7 @@ class PreviewEngineTest {
     @DisplayName("suggest: evento único no lanza y viaja con commissionKey null")
     void suggestEventoUnicoCommissionKeyNull() {
         UniqueEventResponseDto event = new UniqueEventResponseDto(3L, EventType.UNIQUE_EVENT,
-                UniqueEventKind.PARCIAL, 20, LocalTime.of(18, 0), 120, LocalDate.of(2026, 3, 10), null, null, null);
+                UniqueEventKind.PARCIAL, 20, LocalTime.of(18, 0), 120, LocalDate.of(2026, 3, 10), null, null, null, false, false, null, null, null);
         when(academicEventService.findByIds(any())).thenReturn(List.of(event));
         when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5L, 100)));
         when(buildingScopeResolver.scopeFor(Permission.ALLOCATION_WRITE)).thenReturn(BuildingScope.unrestricted());

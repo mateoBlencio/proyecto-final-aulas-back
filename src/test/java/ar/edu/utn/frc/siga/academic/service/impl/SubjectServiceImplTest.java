@@ -336,8 +336,8 @@ class SubjectServiceImplTest {
     }
 
     @Test
-    @DisplayName("syncSubjects: reactiva la materia dada de baja aunque el hash no cambió y la cuenta como afectada")
-    void syncSubjectsReactivatesSoftDeletedSubjectWithSameHash() {
+    @DisplayName("syncSubjects: no reactiva la materia dada de baja que sigue en SysAcad con el mismo hash")
+    void syncSubjectsKeepsSoftDeletedSubjectWithSameHash() {
         StudyPlan syncStudyPlan = syncStudyPlan();
         Subject existing = Subject.builder().id(1L).code(519).name("Análisis Matemático I").term("C")
                 .studyPlan(syncStudyPlan).sysacadHash(Hashes.sha256Hex("Análisis Matemático I", "C")).build();
@@ -348,9 +348,9 @@ class SubjectServiceImplTest {
         int affected = service.syncSubjects(
                 List.of(new SubjectSyncCommand(17, 94, 519, "Análisis Matemático I", "C")));
 
-        assertThat(existing.getDeletedAt()).isNull();
-        verify(subjectRepository).save(existing);
-        assertThat(affected).isEqualTo(1);
+        assertThat(existing.getDeletedAt()).isNotNull();
+        verify(subjectRepository, never()).save(existing);
+        assertThat(affected).isZero();
     }
 
     @Test
