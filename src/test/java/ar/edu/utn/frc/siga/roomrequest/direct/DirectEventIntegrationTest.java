@@ -235,7 +235,7 @@ class DirectEventIntegrationTest extends AbstractIntegrationTest {
         Building building = testData.edificio();
         Classroom plainRoom = testData.aula(building);
         MockMvc auxiliar = auxiliarOf(building);
-        Map<String, Object> draft = draft("CONFERENCE", LocalDate.now().plusDays(39));
+        Map<String, Object> draft = draft("CONFERENCE", LocalDate.now().plusDays(3000 + IntegrationTestData.nextSeq() % 500));
         draft.put("requiresComputers", true);
         draft.put("computerCount", 30);
 
@@ -251,7 +251,7 @@ class DirectEventIntegrationTest extends AbstractIntegrationTest {
         Classroom foreignRoom = testData.aula(testData.edificio());
         testData.recursoDeAula(foreignRoom, testData.tipoRecurso("Cantidad de PC", ResourceValueKind.COUNT), 40);
         MockMvc auxiliar = auxiliarOf(testData.edificio());
-        Map<String, Object> draft = draft("CONFERENCE", LocalDate.now().plusDays(40));
+        Map<String, Object> draft = draft("CONFERENCE", LocalDate.now().plusDays(3000 + IntegrationTestData.nextSeq() % 500));
         draft.put("requiresComputers", true);
         draft.put("computerCount", 30);
 
