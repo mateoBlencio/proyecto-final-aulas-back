@@ -224,7 +224,7 @@ class IngestServiceImplTest {
     void aulaEnEdificioDistintoReportaWarning() {
         stubHappyPath(DataRow.defaultRow());
         ClassroomResponseDto classroomEnOtroEdificio = new ClassroomResponseDto(5L, 105, 40,
-            7L, "Otro Edificio", 1L, "Aula", null);
+            7L, "Otro Edificio", 1L, "Aula", null, true);
         when(classroomService.findByRoomNumberAndBuilding(105, 5L)).thenReturn(classroomEnOtroEdificio);
         MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow().toMultipartFile();
 
@@ -339,7 +339,7 @@ class IngestServiceImplTest {
         when(buildingService.findByName(row.buildingName())).thenReturn(building);
 
         ClassroomResponseDto classroom = new ClassroomResponseDto(5L, (Integer) row.roomNumber(), 40,
-            5L, row.buildingName(), 1L, "Aula", null);
+            5L, row.buildingName(), 1L, "Aula", null, true);
         when(classroomService.findByRoomNumberAndBuilding((Integer) row.roomNumber(), 5L))
             .thenReturn(classroom);
 
@@ -378,7 +378,7 @@ class IngestServiceImplTest {
         when(buildingService.findByName("Edificio Central")).thenReturn(building);
 
         ClassroomResponseDto classroom = new ClassroomResponseDto(buildingId, roomNumber, 40,
-            buildingId, "Edificio Central", 1L, "Aula", null);
+            buildingId, "Edificio Central", 1L, "Aula", null, true);
         when(classroomService.findByRoomNumberAndBuilding(roomNumber, buildingId)).thenReturn(classroom);
 
         RecurringEventResponseDto event = new RecurringEventResponseDto(eventId, EventType.RECURRING, 30,

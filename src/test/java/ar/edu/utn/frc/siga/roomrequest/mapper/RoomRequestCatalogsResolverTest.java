@@ -107,7 +107,7 @@ class RoomRequestCatalogsResolverTest {
     @Test
     @DisplayName("resolve: classroomIds se resuelven una sola vez y alimentan tanto las opciones como las asignadas")
     void resolve_classroomsFeedBothOptionsAndAssigned() {
-        ClassroomResponseDto classroom = new ClassroomResponseDto(101L, 101, 40, 1L, "Edificio A", 1L, "Aula", null);
+        ClassroomResponseDto classroom = new ClassroomResponseDto(101L, 101, 40, 1L, "Edificio A", 1L, "Aula", null, true);
         when(classroomService.findByIdsIncludingDeactivated(Set.of(101L))).thenReturn(List.of(classroom));
         when(catalogMapper.toClassroomOptions(List.of(classroom)))
                 .thenReturn(List.of(new ClassroomOptionDto(101L, 101, "Edificio A")));
@@ -261,7 +261,7 @@ class RoomRequestCatalogsResolverTest {
     }
 
     private static ClassroomResponseDto classroom(Long id, String buildingName) {
-        return new ClassroomResponseDto(id, id.intValue(), 40, 1L, buildingName, 1L, "Aula", null);
+        return new ClassroomResponseDto(id, id.intValue(), 40, 1L, buildingName, 1L, "Aula", null, true);
     }
 
     private static AllocationResponseDto allocation(Long occurrenceId, ClassroomResponseDto classroom) {

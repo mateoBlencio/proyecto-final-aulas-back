@@ -70,9 +70,19 @@ class ClassroomAvailabilityTest {
     }
 
     @Test
-    @DisplayName("un aula con hash y flag apagado es NOT_IN_SYSACAD")
-    void classroomAbsentFromSysacadIsNotInSysacad() {
+    @DisplayName("un aula con hash y flag apagado sigue disponible y no vigente")
+    void classroomAbsentFromSysacadStaysAvailable() {
         Classroom classroom = classroom(building(true, true, HASH), true, false, HASH);
+
+        assertThat(classroom.unavailableReason()).isNull();
+        assertThat(classroom.isAvailable()).isTrue();
+        assertThat(classroom.isCurrentInSysacad()).isFalse();
+    }
+
+    @Test
+    @DisplayName("un aula no vigente en un edificio no vigente es NOT_IN_SYSACAD")
+    void notCurrentClassroomInNotCurrentBuildingIsNotInSysacad() {
+        Classroom classroom = classroom(building(true, false, HASH), true, false, HASH);
 
         assertThat(classroom.unavailableReason()).isEqualTo(UnavailableReason.NOT_IN_SYSACAD);
         assertThat(classroom.isAvailable()).isFalse();

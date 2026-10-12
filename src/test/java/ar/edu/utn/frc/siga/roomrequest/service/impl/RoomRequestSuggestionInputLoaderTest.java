@@ -375,6 +375,6 @@ class RoomRequestSuggestionInputLoaderTest {
     }
 
     private static ClassroomResponseDto room(Long id, int capacity, Long buildingId) {
-        return new ClassroomResponseDto(id, id.intValue(), capacity, buildingId, "Edificio " + buildingId, 1L, "Aula", null);
+        return new ClassroomResponseDto(id, id.intValue(), capacity, buildingId, "Edificio " + buildingId, 1L, "Aula", null, true);
     }
 }

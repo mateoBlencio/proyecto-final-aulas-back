@@ -34,11 +34,11 @@ class AllocationImpactServiceImplTest {
     private AllocationImpactServiceImpl service;
 
     private final ClassroomResponseDto openRoom =
-            new ClassroomResponseDto(1L, 101, 40, 10L, "Central", 1L, "Aula", null);
+            new ClassroomResponseDto(1L, 101, 40, 10L, "Central", 1L, "Aula", null, true);
     private final ClassroomResponseDto subsetRoom =
-            new ClassroomResponseDto(2L, 102, 40, 10L, "Central", 1L, "Aula", null);
+            new ClassroomResponseDto(2L, 102, 40, 10L, "Central", 1L, "Aula", null, true);
     private final ClassroomResponseDto noneRoom =
-            new ClassroomResponseDto(3L, 103, 40, 10L, "Central", 1L, "Aula", null);
+            new ClassroomResponseDto(3L, 103, 40, 10L, "Central", 1L, "Aula", null, true);
 
     private final Map<Long, ClassroomSubjectPermissionDto> permissionByRoom = Map.of(
             1L, new ClassroomSubjectPermissionDto(1L, true, Set.of()),

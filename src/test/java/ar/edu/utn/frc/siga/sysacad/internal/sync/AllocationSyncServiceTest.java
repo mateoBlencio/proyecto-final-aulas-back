@@ -91,7 +91,7 @@ class AllocationSyncServiceTest {
     }
 
     private ClassroomResponseDto classroom(Long id) {
-        return new ClassroomResponseDto(id, 200, 40, 5L, "Edificio", 1L, "Normal", null);
+        return new ClassroomResponseDto(id, 200, 40, 5L, "Edificio", 1L, "Normal", null, true);
     }
 
     private SysacadAllocationDto row(String courseCode, Integer subjectCode, Integer semester,

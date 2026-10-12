@@ -137,7 +137,7 @@ class PreviewEngineTest {
         RecurringEventResponseDto event = recurringEvent(1L);
         when(academicEventService.findByIds(any())).thenReturn(List.of(event));
         when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of());
-        ClassroomResponseDto outOfScope = new ClassroomResponseDto(6L, 6, 100, 9L, "Edificio Ajeno", 1L, "Tipo", null);
+        ClassroomResponseDto outOfScope = new ClassroomResponseDto(6L, 6, 100, 9L, "Edificio Ajeno", 1L, "Tipo", null, true);
         when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5L, 100), outOfScope));
         when(buildingScopeResolver.scopeFor(Permission.PREVIEW_RUN)).thenReturn(BuildingScope.of(Set.of(1L)));
 
@@ -274,7 +274,7 @@ class PreviewEngineTest {
         RecurringEventResponseDto event = recurringEvent(1L);
         when(academicEventService.findByIds(any())).thenReturn(List.of(event));
         ClassroomResponseDto excluded = classroom(5L, 100);
-        ClassroomResponseDto outOfScope = new ClassroomResponseDto(6L, 6, 100, 9L, "Edificio Ajeno", 1L, "Tipo", null);
+        ClassroomResponseDto outOfScope = new ClassroomResponseDto(6L, 6, 100, 9L, "Edificio Ajeno", 1L, "Tipo", null, true);
         ClassroomResponseDto candidate = classroom(7L, 100);
         when(classroomService.findAllAvailable()).thenReturn(List.of(excluded, outOfScope, candidate));
         when(buildingScopeResolver.scopeFor(Permission.ALLOCATION_WRITE)).thenReturn(BuildingScope.of(Set.of(1L)));
@@ -355,6 +355,6 @@ class PreviewEngineTest {
     }
 
     private ClassroomResponseDto classroom(Long id, Integer capacity) {
-        return new ClassroomResponseDto(id, id.intValue(), capacity, 1L, "Edificio 1", 1L, "Tipo", null);
+        return new ClassroomResponseDto(id, id.intValue(), capacity, 1L, "Edificio 1", 1L, "Tipo", null, true);
     }
 }

@@ -229,19 +229,14 @@ class RoomRequestCatalogCascadeIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("aulas: un aula no vigente en SysAcad deja de ofrecerse y reaparece al volver a marcarla vigente")
-    void classroomsCatalog_hidesClassroomNotInSysacad() throws Exception {
+    @DisplayName("aulas: un aula no vigente en SysAcad se sigue ofreciendo")
+    void classroomsCatalog_keepsClassroomNotInSysacad() throws Exception {
         Classroom classroom = testData.aula(testData.edificio());
 
         setClassroomCurrent(classroom.getId(), false);
 
         anonymousMockMvc.perform(get("/v1/room-requests/catalog/classrooms"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].id", not(hasItem(idOf(classroom.getId())))));
-
-        setClassroomCurrent(classroom.getId(), true);
-
-        anonymousMockMvc.perform(get("/v1/room-requests/catalog/classrooms"))
                 .andExpect(jsonPath("$[*].id", hasItem(idOf(classroom.getId()))));
     }
 

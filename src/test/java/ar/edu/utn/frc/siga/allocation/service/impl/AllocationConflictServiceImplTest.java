@@ -364,7 +364,7 @@ class AllocationConflictServiceImplTest {
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         Allocation allocation = allocation(100L, 10L, 5);
         mockOccupancy(List.of(slot), List.of(allocation), List.of(event));
-        ClassroomResponseDto outOfScope = new ClassroomResponseDto(5L, 5, 30, 9L, "Edificio Ajeno", 1L, "Tipo", null);
+        ClassroomResponseDto outOfScope = new ClassroomResponseDto(5L, 5, 30, 9L, "Edificio Ajeno", 1L, "Tipo", null, true);
         when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(outOfScope));
         when(buildingScopeResolver.scopeFor(Permission.CONFLICT_READ)).thenReturn(BuildingScope.of(Set.of(1L)));
 
@@ -384,7 +384,7 @@ class AllocationConflictServiceImplTest {
         Allocation allocA = allocation(100L, 10L, 5);
         Allocation allocB = allocation(101L, 11L, 5);
         mockOccupancy(List.of(slotA, slotB), List.of(allocA, allocB), List.of(eventA, eventB));
-        ClassroomResponseDto outOfScope = new ClassroomResponseDto(5L, 5, 100, 9L, "Edificio Ajeno", 1L, "Tipo", null);
+        ClassroomResponseDto outOfScope = new ClassroomResponseDto(5L, 5, 100, 9L, "Edificio Ajeno", 1L, "Tipo", null, true);
         when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(outOfScope));
         when(buildingScopeResolver.scopeFor(Permission.CONFLICT_READ)).thenReturn(BuildingScope.of(Set.of(1L)));
 
@@ -464,6 +464,6 @@ class AllocationConflictServiceImplTest {
     }
 
     private ClassroomResponseDto classroom(Long id, Integer capacity) {
-        return new ClassroomResponseDto(id, id.intValue(), capacity, 1L, "Edificio 1", 1L, "Tipo", null);
+        return new ClassroomResponseDto(id, id.intValue(), capacity, 1L, "Edificio 1", 1L, "Tipo", null, true);
     }
 }

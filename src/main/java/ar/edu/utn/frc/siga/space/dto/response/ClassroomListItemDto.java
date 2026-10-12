@@ -18,6 +18,7 @@ public record ClassroomListItemDto(
         PermissionMode permissionMode,
         String allowedDisplay,
         List<ClassroomPermissionTargetDto> permissionTargets,
-        UnavailableReason unavailableReason
+        UnavailableReason unavailableReason,
+        boolean currentInSysacad
 ) {
 }

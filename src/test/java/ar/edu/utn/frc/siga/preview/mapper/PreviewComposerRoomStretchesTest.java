@@ -147,6 +147,6 @@ class PreviewComposerRoomStretchesTest {
     }
 
     private static ClassroomResponseDto classroom(long id) {
-        return new ClassroomResponseDto(id, (int) id, 40, 1L, "Edificio", 1L, "Aula común", null);
+        return new ClassroomResponseDto(id, (int) id, 40, 1L, "Edificio", 1L, "Aula común", null, true);
     }
 }

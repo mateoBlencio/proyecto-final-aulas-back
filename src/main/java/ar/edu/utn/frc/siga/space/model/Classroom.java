@@ -85,7 +85,7 @@ public class Classroom extends SoftDeletableEntity {
         if (!building.isActive()) {
             return UnavailableReason.PARENT_DEACTIVATED;
         }
-        return isCurrentInSysacad() && building.isCurrentInSysacad() ? null : UnavailableReason.NOT_IN_SYSACAD;
+        return building.isCurrentInSysacad() ? null : UnavailableReason.NOT_IN_SYSACAD;
     }
 
     public boolean isAvailable() {

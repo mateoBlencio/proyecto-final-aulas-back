@@ -12,6 +12,7 @@ public record ClassroomResponseDto(
         String buildingName,
         Long classroomTypeId,
         String classroomTypeDescription,
-        UnavailableReason unavailableReason
+        UnavailableReason unavailableReason,
+        boolean currentInSysacad
 ) {
 }

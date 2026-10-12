@@ -757,7 +757,7 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     private static ClassroomResponseDto classroom(Long id, Long buildingId, String buildingName) {
-        return new ClassroomResponseDto(id, id.intValue(), 40, buildingId, buildingName, 1L, "Aula común", null);
+        return new ClassroomResponseDto(id, id.intValue(), 40, buildingId, buildingName, 1L, "Aula común", null, true);
     }
 
     private static UserResponseDto auxiliar() {
