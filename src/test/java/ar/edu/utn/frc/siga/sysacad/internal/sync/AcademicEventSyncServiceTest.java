@@ -16,6 +16,8 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
 
+import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadEmptyViewException;
+
 import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.List;
@@ -34,7 +36,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -74,7 +79,7 @@ class AcademicEventSyncServiceTest {
 
     private CommissionResponseDto commission(Long id, String courseCode, int year) {
         return new CommissionResponseDto(id, courseCode,
-                new AcademicPeriodResponseDto(year, TermType.ANUAL.getSemester(), null, null));
+                new AcademicPeriodResponseDto(year, TermType.ANUAL.getSemester(), null, null), null);
     }
 
     private SubjectCommissionResponseDto link(Long subjectId, Long commissionId, int enrolled) {
@@ -302,5 +307,18 @@ class AcademicEventSyncServiceTest {
         service.sync(catalogReader);
 
         verify(syncStateService).recordSuccess(SysacadView.EVENTOS, 5);
+    }
+
+    @Test
+    @DisplayName("sync: con la vista vacía no llama al servicio de dominio y registra el fallo")
+    void syncWithEmptyViewSkipsDomainServiceAndRecordsFailure() {
+        when(catalogReader.findAcademicEvents()).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(SysacadEmptyViewException.class);
+
+        verify(academicEventService, never()).syncRecurringEvents(anyList());
+        verify(academicEventService, never()).markRecurringEventsAbsent(anySet());
+        verify(syncStateService).recordFailure(eq(SysacadView.EVENTOS), anyString());
+        verify(syncStateService, never()).recordSuccess(any(), anyInt());
     }
 }

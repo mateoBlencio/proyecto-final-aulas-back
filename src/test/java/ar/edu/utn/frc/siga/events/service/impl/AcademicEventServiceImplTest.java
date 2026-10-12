@@ -788,7 +788,7 @@ class AcademicEventServiceImplTest {
         when(commissionService.findById(2L)).thenThrow(ResourceNotFoundException.of("Commission", 2L));
         UpdateUniqueEventRequestDto dto = new UpdateUniqueEventRequestDto(
                 UniqueEventKind.PARCIAL, 1L, 2L, LocalDate.of(2026, 3, 15),
-                LocalTime.of(11, 0), 90, 25, "descripcion actualizada");
+                LocalTime.of(11, 0), 90, 25, "descripcion actualizada", null, null, null, null, null);
 
         assertThatThrownBy(() -> service.updateUniqueEvent(3L, dto))
                 .isInstanceOf(ResourceNotFoundException.class);
