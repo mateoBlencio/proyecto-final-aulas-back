@@ -16,6 +16,7 @@ public abstract class SigaAppException extends RuntimeException {
     private final HttpStatus status;
     private final String title;
     private final transient Map<String, Object> properties = new LinkedHashMap<>();
+    private final transient Map<String, String> headers = new LinkedHashMap<>();
 
     protected SigaAppException(HttpStatus status, String title, String detail) {
         super(detail);
@@ -32,6 +33,15 @@ public abstract class SigaAppException extends RuntimeException {
     protected SigaAppException withProperty(String key, Object value) {
         this.properties.put(key, value);
         return this;
+    }
+
+    protected SigaAppException withHeader(String name, String value) {
+        this.headers.put(name, value);
+        return this;
+    }
+
+    public Map<String, String> getHeaders() {
+        return Collections.unmodifiableMap(headers);
     }
 
     public Map<String, Object> getProperties() {

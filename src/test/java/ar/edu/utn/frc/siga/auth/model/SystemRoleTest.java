@@ -32,4 +32,12 @@ class SystemRoleTest {
         assertThat(Permission.DASHBOARD_READ.scopeType()).isEqualTo(ScopeType.BUILDING);
         assertThat(Permission.DASHBOARD_SNAPSHOT_REGENERATE.scopeType()).isEqualTo(ScopeType.GLOBAL);
     }
+
+    @Test
+    @DisplayName("ALLOCATION_HISTORY_READ is granted to SUBSECRETARIA and AUXILIAR_AULICO but not to CONSULTA")
+    void allocationHistoryReadIsGrantedToStaffThatOperatesAllocations() {
+        assertThat(SystemRole.SUBSECRETARIA.permissions()).contains(Permission.ALLOCATION_HISTORY_READ);
+        assertThat(SystemRole.AUXILIAR_AULICO.permissions()).contains(Permission.ALLOCATION_HISTORY_READ);
+        assertThat(SystemRole.CONSULTA.permissions()).doesNotContain(Permission.ALLOCATION_HISTORY_READ);
+    }
 }

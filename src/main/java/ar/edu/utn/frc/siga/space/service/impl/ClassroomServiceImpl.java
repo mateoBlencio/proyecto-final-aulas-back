@@ -79,7 +79,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
         if (classroomRepository.findByRoomNumberAndDeletedAtIsNull(dto.roomNumber()).isPresent()) {
             log.warn("Creación de aula rechazada: roomNumber '{}' ya existe", dto.roomNumber());
-            throw new SpaceDomainException("Classroom roomNumber already exists: " + dto.roomNumber());
+            throw new SpaceDomainException("Ya existe un aula con el número " + dto.roomNumber() + ".");
         }
 
         validateCapacity(dto);
@@ -331,12 +331,7 @@ public class ClassroomServiceImpl implements ClassroomService {
             if (isUpToDate(classroom, hash)) {
                 continue;
             }
-            // `classroomType` es local-owned: el sync nunca lo pisa en un update (§4.3).
-            // Al crear sí se asigna un default (§ constraint NOT NULL), ver resolveDefaultClassroomType().
-            classroom.setCapacity(command.capacity());
-            classroom.setSysacadEnabled(command.enabled());
-            classroom.setSyncedAt(syncedAt);
-            classroom.setSysacadHash(hash);
+            applySysacadFields(classroom, command, hash, syncedAt);
             classroomRepository.save(classroom);
             affected++;
         }
@@ -376,4 +371,11 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     private record ClassroomKey(Long buildingId, Integer roomNumber) {}
+
+    private void applySysacadFields(Classroom classroom, ClassroomSyncCommand command, String hash, Instant syncedAt) {
+        classroom.setCapacity(command.capacity());
+        classroom.setSysacadEnabled(command.enabled());
+        classroom.setSyncedAt(syncedAt);
+        classroom.setSysacadHash(hash);
+    }
 }

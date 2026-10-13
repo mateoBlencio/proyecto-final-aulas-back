@@ -1,0 +1,22 @@
+meta {
+  name: Listar ciclos archivados
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/v1/audit/archive/cycles
+  body: none
+  auth: inherit
+}
+
+docs {
+  Lista los ciclos lectivos cuya auditoría ya está en el schema "archivo", del más reciente
+  al más antiguo. Requiere PERM_AUDIT_READ (solo SUBSECRETARIA).
+
+  Cada item: cycle (ciclo lectivo), from y to (rango de fechas de revisión que cubre; from es
+  null en el primero), archivedAt, occurrenceRows y allocationRows.
+
+  El archivado corre solo con el cron (siga.audit.archive.enabled); no hay endpoint para
+  lanzarlo a mano.
+}

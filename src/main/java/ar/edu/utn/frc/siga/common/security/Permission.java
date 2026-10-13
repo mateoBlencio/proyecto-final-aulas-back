@@ -27,7 +27,7 @@ public enum Permission {
     ALLOCATION_READ(ScopeType.BUILDING),
     ALLOCATION_WRITE(ScopeType.BUILDING),
     CONFLICT_READ(ScopeType.BUILDING),
-    ALLOCATION_HISTORY_READ(ScopeType.GLOBAL),
+    ALLOCATION_HISTORY_READ(ScopeType.BUILDING),
 
     PREVIEW_RUN(ScopeType.BUILDING),
 
@@ -43,7 +43,6 @@ public enum Permission {
     SYSACAD_READ(ScopeType.GLOBAL),
     SYSACAD_SYNC(ScopeType.GLOBAL),
     AUDIT_READ(ScopeType.GLOBAL),
-    AUDIT_ARCHIVE(ScopeType.GLOBAL),
     USER_READ(ScopeType.GLOBAL),
     USER_MANAGE(ScopeType.GLOBAL),
     ROLE_ASSIGN(ScopeType.GLOBAL);

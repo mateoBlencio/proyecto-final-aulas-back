@@ -77,7 +77,7 @@ class ClassroomApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.title").value("Space domain error"))
-                .andExpect(jsonPath("$.detail").value("Classroom roomNumber already exists: " + roomNumber));
+                .andExpect(jsonPath("$.detail").value("Ya existe un aula con el número " + roomNumber + "."));
     }
 
     @Test

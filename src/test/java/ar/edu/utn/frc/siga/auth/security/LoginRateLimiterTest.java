@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.auth.security;
 
 import ar.edu.utn.frc.siga.auth.config.LoginRateLimitProperties;
+import java.time.Duration;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,5 +62,40 @@ class LoginRateLimiterTest {
             rateLimiter.recordFailure(EMAIL, now);
         }
         assertThat(rateLimiter.isRateLimited(EMAIL, now)).isFalse();
+    }
+
+    @Test
+    void retryAfter_shouldBeZero_whenThereAreNoFailures() {
+        assertThat(rateLimiter.retryAfter(EMAIL, now)).isEqualTo(Duration.ZERO);
+    }
+
+    @Test
+    void retryAfter_shouldBeZero_beforeReachingMaxAttempts() {
+        for (int i = 0; i < 4; i++) {
+            rateLimiter.recordFailure(EMAIL, now);
+        }
+        assertThat(rateLimiter.retryAfter(EMAIL, now)).isEqualTo(Duration.ZERO);
+    }
+
+    @Test
+    void retryAfter_shouldBeTheRemainingWindowOfTheOldestFailure_whenBlocked() {
+        for (int i = 0; i < 5; i++) {
+            rateLimiter.recordFailure(EMAIL, now.plusSeconds(i * 60L));
+        }
+        Instant later = now.plusSeconds(5 * 60);
+
+        assertThat(rateLimiter.isRateLimited(EMAIL, later)).isTrue();
+        assertThat(rateLimiter.retryAfter(EMAIL, later)).isEqualTo(Duration.ofMinutes(10));
+    }
+
+    @Test
+    void retryAfter_shouldReachZeroExactlyWhenTheBlockEnds() {
+        for (int i = 0; i < 5; i++) {
+            rateLimiter.recordFailure(EMAIL, now.plusSeconds(i * 60L));
+        }
+        Instant afterOldestExpires = now.plusSeconds(15 * 60 + 1);
+
+        assertThat(rateLimiter.isRateLimited(EMAIL, afterOldestExpires)).isFalse();
+        assertThat(rateLimiter.retryAfter(EMAIL, afterOldestExpires)).isEqualTo(Duration.ZERO);
     }
 }

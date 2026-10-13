@@ -14,6 +14,16 @@ class LoginRateLimitRecord {
         return failures.size() >= maxAttempts;
     }
 
+    synchronized Duration retryAfter(Instant now, Duration window, int maxAttempts) {
+        prune(now, window);
+        int excess = failures.size() - maxAttempts;
+        if (excess < 0) {
+            return Duration.ZERO;
+        }
+        Instant blockingFailure = failures.stream().skip(excess).findFirst().orElse(now);
+        return Duration.between(now, blockingFailure.plus(window));
+    }
+
     synchronized void recordFailure(Instant now, Duration window) {
         prune(now, window);
         failures.addLast(now);

@@ -50,9 +50,10 @@ public class AuthServiceImpl implements AuthService {
             throw new InvalidCredentialsException();
         }
 
-        if (loginRateLimiter.isRateLimited(email, Instant.now())) {
+        Instant now = Instant.now();
+        if (loginRateLimiter.isRateLimited(email, now)) {
             log.warn("Login rechazado por rate limit: email={}, ip={}", email, ip);
-            throw new LoginRateLimitExceededException();
+            throw new LoginRateLimitExceededException(loginRateLimiter.retryAfter(email, now));
         }
 
         SecurityUser securityUser;
