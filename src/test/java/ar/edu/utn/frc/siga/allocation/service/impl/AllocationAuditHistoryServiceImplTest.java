@@ -154,6 +154,6 @@ class AllocationAuditHistoryServiceImplTest {
     }
 
     private static ClassroomResponseDto classroom(Long id, Long buildingId) {
-        return new ClassroomResponseDto(id, 1, 30, buildingId, "Edificio " + buildingId, 1L, "Aula común");
+        return new ClassroomResponseDto(id, 1, 30, buildingId, "Edificio " + buildingId, 1L, "Aula común", null, true);
     }
 }
