@@ -25,6 +25,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -85,7 +86,7 @@ class RoomRequestCandidateResolverTest {
     }
 
     @Test
-    @DisplayName("findAllowedClassrooms: requiresComputers filtra por el mínimo pedido")
+    @DisplayName("findAllowedClassrooms: requiresComputers acepta cualquier aula con al menos 1 PC y expone sus PCs")
     void findAllowedClassrooms_filtraPorComputadoras() {
         LocalDate date = LocalDate.of(2026, 3, 10);
         RoomRequestItem item = RoomRequestItem.builder()
@@ -93,12 +94,14 @@ class RoomRequestCandidateResolverTest {
                 .requiresComputers(true).computerCount(20).build();
         when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
         when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(101L), classroom(102L)));
-        when(classroomService.findIdsWithResourceAtLeast("Cantidad de PC", 20)).thenReturn(Set.of(101L));
+        when(classroomService.findIdsWithResourceAtLeast("Cantidad de PC", 1)).thenReturn(Set.of(101L));
+        when(classroomService.findResourceAmounts("Cantidad de PC", List.of(101L))).thenReturn(Map.of(101L, 35));
         when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of());
 
         List<AllowedClassroomDto> result = resolver.findAllowedClassrooms(1L);
 
         assertThat(result).extracting(AllowedClassroomDto::id).containsExactly(101L);
+        assertThat(result.getFirst().computerCount()).isEqualTo(35);
     }
 
     @Test
@@ -219,7 +222,7 @@ class RoomRequestCandidateResolverTest {
 
         List<CandidateBuildingDto> result = resolver.findCandidateBuildings(1L);
 
-        assertThat(result).containsExactly(new CandidateBuildingDto(1L, "Edificio Central", 2));
+        assertThat(result).containsExactly(new CandidateBuildingDto(1L, "Edificio Central", 2, null));
         verify(userService).findBuildingIdsCoveredByRole(SystemRole.AUXILIAR_AULICO, Set.of(1L));
     }
 
@@ -240,8 +243,63 @@ class RoomRequestCandidateResolverTest {
 
         List<CandidateBuildingDto> result = resolver.findCandidateBuildings(1L);
 
-        assertThat(result).containsExactly(new CandidateBuildingDto(1L, "Edificio Central", 1));
+        assertThat(result).containsExactly(new CandidateBuildingDto(1L, "Edificio Central", 1, null));
         verify(userService).findBuildingIdsCoveredByRole(SystemRole.AUXILIAR_AULICO, Set.of(1L));
+    }
+
+    @Test
+    @DisplayName("findAllowedClassrooms: laboratorio derivado devuelve solo las aulas del edificio derivado")
+    void findAllowedClassrooms_laboratorioDerivado() {
+        LocalDate date = LocalDate.of(2026, 3, 10);
+        RoomRequestItem item = RoomRequestItem.builder()
+                .date(date).startTime(LocalTime.of(10, 0)).duration(Duration.ofMinutes(60))
+                .requiresComputers(true).computerCount(67).derivedBuildingId(1L).build();
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findAllAvailable()).thenReturn(
+                List.of(classroom(101L, 1L, "A"), classroom(301L, 3L, "C")));
+        when(classroomService.findIdsWithResourceAtLeast("Cantidad de PC", 1)).thenReturn(Set.of(101L, 301L));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of());
+
+        assertThat(resolver.findAllowedClassrooms(1L)).extracting(AllowedClassroomDto::id).containsExactly(101L);
+    }
+
+    @Test
+    @DisplayName("findCandidateBuildings: pedido de 67 PCs suma las PCs libres por edificio y ordena los que alcanzan primero")
+    void findCandidateBuildings_sumaPcs() {
+        LocalDate date = LocalDate.of(2026, 3, 10);
+        RoomRequestItem item = RoomRequestItem.builder()
+                .date(date).startTime(LocalTime.of(10, 0)).duration(Duration.ofMinutes(60))
+                .requiresComputers(true).computerCount(67).build();
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(
+                classroom(301L, 3L, "C"), classroom(101L, 1L, "A"), classroom(102L, 1L, "A")));
+        when(classroomService.findIdsWithResourceAtLeast("Cantidad de PC", 1)).thenReturn(Set.of(101L, 102L, 301L));
+        when(classroomService.findResourceAmounts(eq("Cantidad de PC"), any()))
+                .thenReturn(Map.of(101L, 35, 102L, 35, 301L, 20));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of());
+        when(userService.findBuildingIdsCoveredByRole(eq(SystemRole.AUXILIAR_AULICO), any()))
+                .thenReturn(Set.of(1L, 3L));
+
+        assertThat(resolver.findCandidateBuildings(1L)).containsExactly(
+                new CandidateBuildingDto(1L, "A", 2, 70),
+                new CandidateBuildingDto(3L, "C", 1, 20));
+    }
+
+    @Test
+    @DisplayName("findCandidateBuildings: si ningún edificio alcanza las PCs pedidas, va primero el que más suma")
+    void findCandidateBuildings_ningunoAlcanzaOrdenaPorPcs() {
+        LocalDate date = LocalDate.of(2026, 3, 10);
+        RoomRequestItem item = RoomRequestItem.builder()
+                .date(date).startTime(LocalTime.of(10, 0)).duration(Duration.ofMinutes(60))
+                .requiresComputers(true).computerCount(200).build();
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(301L, 3L, "C"), classroom(101L, 1L, "A")));
+        when(classroomService.findIdsWithResourceAtLeast("Cantidad de PC", 1)).thenReturn(Set.of(101L, 301L));
+        when(classroomService.findResourceAmounts(eq("Cantidad de PC"), any())).thenReturn(Map.of(101L, 20, 301L, 50));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of());
+        when(userService.findBuildingIdsCoveredByRole(eq(SystemRole.AUXILIAR_AULICO), any())).thenReturn(Set.of(1L, 3L));
+
+        assertThat(resolver.findCandidateBuildings(1L)).extracting(CandidateBuildingDto::id).containsExactly(3L, 1L);
     }
 
     @Test

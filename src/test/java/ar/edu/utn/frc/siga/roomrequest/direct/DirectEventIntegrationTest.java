@@ -190,6 +190,7 @@ class DirectEventIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("solicitud resuelta con requisitos: el evento_unico que crea los guarda igual")
     void assignRoomRequest_withRequirements_persistsThem() throws Exception {
         Classroom aula = testData.aula(testData.edificio());
+        testData.recursoDeAula(aula, testData.tipoRecurso("Cantidad de PC", ResourceValueKind.COUNT), 30);
         RoomRequest request = testData.solicitudDeAula(RoomRequestType.CONFERENCE, null);
         RoomRequestItem item = RoomRequestItem.builder()
                 .date(LocalDate.now().plusDays(37))

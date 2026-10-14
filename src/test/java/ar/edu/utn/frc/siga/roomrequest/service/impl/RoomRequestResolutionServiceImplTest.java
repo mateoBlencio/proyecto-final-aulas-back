@@ -35,6 +35,7 @@ import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestTransitionValidator;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.BuildingService;
+import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,6 +48,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -86,6 +88,10 @@ class RoomRequestResolutionServiceImplTest {
     private RoomRequestOccurrenceResolver occurrenceResolver;
     @Mock
     private RoomRequestCandidateResolver candidateResolver;
+    @Mock
+    private RoomRequestAttendees attendees;
+    @Mock
+    private ClassroomService classroomService;
 
     @InjectMocks
     private RoomRequestResolutionServiceImpl service;
@@ -192,7 +198,7 @@ class RoomRequestResolutionServiceImplTest {
     @DisplayName("findAllowedClassrooms: delega en RoomRequestCandidateResolver")
     void findAllowedClassrooms_delega() {
         List<AllowedClassroomDto> expected = List.of(
-                new AllowedClassroomDto(101L, 101, 1L, "Edificio Central", 40, true));
+                new AllowedClassroomDto(101L, 101, 1L, "Edificio Central", 40, true, null));
         when(candidateResolver.findAllowedClassrooms(1L)).thenReturn(expected);
 
         assertThat(service.findAllowedClassrooms(1L)).isSameAs(expected);
@@ -201,7 +207,7 @@ class RoomRequestResolutionServiceImplTest {
     @Test
     @DisplayName("findCandidateBuildings: delega en RoomRequestCandidateResolver")
     void findCandidateBuildings_delega() {
-        List<CandidateBuildingDto> expected = List.of(new CandidateBuildingDto(1L, "Edificio Central", 2));
+        List<CandidateBuildingDto> expected = List.of(new CandidateBuildingDto(1L, "Edificio Central", 2, null));
         when(candidateResolver.findCandidateBuildings(1L)).thenReturn(expected);
 
         assertThat(service.findCandidateBuildings(1L)).isSameAs(expected);
@@ -743,6 +749,128 @@ class RoomRequestResolutionServiceImplTest {
         verify(allocationService).reallocate(captor.capture());
         assertThat(captor.getValue().source()).isEqualTo(AllocationSource.MANUAL);
         assertThat(captor.getValue().observation()).isEqualTo("solo hay una disponible");
+    }
+
+    private static RoomRequestItem labItem(int classroomCount, int computerCount) {
+        return RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(classroomCount)
+                .requiresComputers(true).computerCount(computerCount).build();
+    }
+
+    @Test
+    @DisplayName("assign: laboratorio acepta más aulas que classroomCount si suman las PCs, sin motivo")
+    void assign_laboratorioVariasAulasSumanPcs() {
+        RoomRequestItem item = labItem(1, 67);
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findByIds(List.of(101L, 102L)))
+                .thenReturn(List.of(classroom(101L, 1L, "A"), classroom(102L, 1L, "A")));
+        when(candidateResolver.computersByClassroom(List.of(101L, 102L))).thenReturn(Map.of(101L, 35, 102L, 35));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 2, false))
+                .thenReturn(List.of(List.of(9000L), List.of(9001L)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(101L, 102L), null, "aux@frc.utn.edu.ar");
+
+        assertThat(item.getAllocations()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("assign: laboratorio cuyas PCs no alcanzan exige motivo")
+    void assign_laboratorioPcsInsuficientesSinMotivo() {
+        RoomRequestItem item = labItem(1, 67);
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findByIds(List.of(101L))).thenReturn(List.of(classroom(101L, 1L, "A")));
+        when(candidateResolver.computersByClassroom(List.of(101L))).thenReturn(Map.of(101L, 35));
+
+        assertThatThrownBy(() -> service.assign(1L, List.of(101L), null, "aux@frc.utn.edu.ar"))
+                .isInstanceOf(PartialAssignmentReasonRequiredException.class);
+        verifyNoInteractions(allocationService, composer);
+    }
+
+    @Test
+    @DisplayName("assign: laboratorio con aulas de edificios distintos se rechaza")
+    void assign_laboratorioEdificiosDistintos() {
+        RoomRequestItem item = labItem(2, 40);
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findByIds(List.of(101L, 301L)))
+                .thenReturn(List.of(classroom(101L, 1L, "A"), classroom(301L, 3L, "C")));
+
+        assertThatThrownBy(() -> service.assign(1L, List.of(101L, 301L), "motivo", "aux@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestException.class);
+        verifyNoInteractions(allocationService, composer);
+    }
+
+    @Test
+    @DisplayName("assign: laboratorio derivado con un aula de otro edificio se rechaza")
+    void assign_laboratorioFueraDelEdificioDerivado() {
+        RoomRequestItem item = labItem(1, 20);
+        item.deriveTo(1L, "sub@frc.utn.edu.ar", java.time.Instant.now());
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findByIds(List.of(301L))).thenReturn(List.of(classroom(301L, 3L, "C")));
+
+        assertThatThrownBy(() -> service.assign(1L, List.of(301L), "motivo", "aux@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestException.class);
+        verifyNoInteractions(allocationService, composer);
+    }
+
+    @Test
+    @DisplayName("assign: capacidad menor a los asistentes sin motivo se rechaza; con motivo se acepta")
+    void assign_capacidadInsuficienteExigeMotivo() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findByIds(List.of(104L))).thenReturn(List.of(classroom(104L, 1L, "A")));
+        when(attendees.of(item)).thenReturn(Optional.of(80));
+
+        assertThatThrownBy(() -> service.assign(1L, List.of(104L), null, "sub@frc.utn.edu.ar"))
+                .isInstanceOf(PartialAssignmentReasonRequiredException.class);
+        verifyNoInteractions(allocationService, composer);
+    }
+
+    @Test
+    @DisplayName("assign: laboratorio cuyas PCs no alcanzan se acepta con motivo")
+    void assign_laboratorioPcsInsuficientesConMotivo() {
+        RoomRequestItem item = labItem(1, 67);
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findByIds(List.of(101L))).thenReturn(List.of(classroom(101L, 1L, "A")));
+        when(candidateResolver.computersByClassroom(List.of(101L))).thenReturn(Map.of(101L, 35));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 1, false)).thenReturn(List.of(List.of(9000L)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(101L), "turnos", "aux@frc.utn.edu.ar");
+
+        assertThat(item.getDecisionReason()).isEqualTo("turnos");
+    }
+
+    @Test
+    @DisplayName("assign: capacidad menor a los asistentes con motivo se acepta")
+    void assign_capacidadInsuficienteConMotivo() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findByIds(List.of(104L))).thenReturn(List.of(classroom(104L, 1L, "A")));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 1, false)).thenReturn(List.of(List.of(9000L)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(104L), "dos turnos", "sub@frc.utn.edu.ar");
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.IN_EVALUATION);
+    }
+
+    @Test
+    @DisplayName("assign: capacidad suficiente o sin asistentes conocidos no exige motivo")
+    void assign_capacidadSuficienteNoExigeMotivo() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findByIds(List.of(104L))).thenReturn(List.of(classroom(104L, 1L, "A")));
+        when(attendees.of(item)).thenReturn(Optional.of(40));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 1, false)).thenReturn(List.of(List.of(9000L)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(104L), null, "sub@frc.utn.edu.ar");
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.IN_EVALUATION);
     }
 
     private static RoomRequest requestOfType(RoomRequestType type) {

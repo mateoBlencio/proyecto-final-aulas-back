@@ -45,6 +45,12 @@ public interface ClassroomService extends ActivationService<Long> {
     Set<Long> findIdsWithResourceAtLeast(String resourceTypeName, int minQuantity);
 
     /**
+     * Cantidad del recurso ({@code resourceTypeName}, insensible a mayúsculas) por aula. Las aulas sin ese recurso
+     * no aparecen en el mapa.
+     */
+    Map<Long, Integer> findResourceAmounts(String resourceTypeName, Collection<Long> classroomIds);
+
+    /**
      * Resuelve, para cada aula pedida, si habilita el uso por materia: {@code openToAll} cuando el
      * modo de permiso es {@code ALL}, o el conjunto de materias habilitadas cuando es {@code SUBSET}
      * ({@code NONE} devuelve conjunto vacío y {@code openToAll = false}). La semántica

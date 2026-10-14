@@ -35,7 +35,9 @@ import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl.Action
 import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestDeriveEligibilityValidator;
 import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestTransitionValidator;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.BuildingService;
+import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -64,6 +66,8 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
     private final RoomRequestComposer composer;
     private final RoomRequestOccurrenceResolver occurrenceResolver;
     private final RoomRequestCandidateResolver candidateResolver;
+    private final RoomRequestAttendees attendees;
+    private final ClassroomService classroomService;
 
     @Override
     @Transactional
@@ -96,12 +100,32 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         if (ids.isEmpty()) {
             throw new InvalidRoomRequestException("Hay que asignar al menos un aula.");
         }
-        if (ids.size() > item.getClassroomCount()) {
-            throw new InvalidRoomRequestException("No se pueden asignar más aulas de las pedidas.");
-        }
         ItemConsistency.requireDistinct(ids, "un aula");
-        if (ids.size() < item.getClassroomCount() && (reason == null || reason.isBlank())) {
-            throw new PartialAssignmentReasonRequiredException();
+        boolean noReason = reason == null || reason.isBlank();
+        List<ClassroomResponseDto> classrooms = classroomService.findByIds(ids);
+
+        if (Boolean.TRUE.equals(item.getRequiresComputers())) {
+            requireSameBuilding(item, classrooms);
+            int assignedPcs = candidateResolver.computersByClassroom(ids).values().stream()
+                    .mapToInt(Integer::intValue).sum();
+            if (item.getComputerCount() != null && assignedPcs < item.getComputerCount() && noReason) {
+                throw new PartialAssignmentReasonRequiredException("El motivo es obligatorio: las aulas elegidas suman "
+                        + assignedPcs + " de las " + item.getComputerCount() + " computadoras pedidas.");
+            }
+        } else {
+            if (ids.size() > item.getClassroomCount()) {
+                throw new InvalidRoomRequestException("No se pueden asignar más aulas de las pedidas.");
+            }
+            if (ids.size() < item.getClassroomCount() && noReason) {
+                throw new PartialAssignmentReasonRequiredException();
+            }
+        }
+        if (noReason) {
+            int capacity = classrooms.stream().mapToInt(ClassroomResponseDto::capacity).sum();
+            attendees.of(item).filter(n -> capacity < n).ifPresent(n -> {
+                throw new PartialAssignmentReasonRequiredException(
+                        "El motivo es obligatorio: las aulas elegidas no tienen lugar para los " + n + " asistentes.");
+            });
         }
 
         boolean reassigning = !item.getAllocations().isEmpty();
@@ -131,6 +155,16 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         log.info("Pedido de aula asignado: itemId={}, aulas={}, ocurrencias={}",
                 itemId, ids.size(), occurrencesBySlot.stream().mapToInt(List::size).sum());
         return composer.composeItem(item);
+    }
+
+    private void requireSameBuilding(RoomRequestItem item, List<ClassroomResponseDto> classrooms) {
+        if (classrooms.stream().map(ClassroomResponseDto::buildingId).distinct().count() > 1) {
+            throw new InvalidRoomRequestException("Las aulas de un pedido tienen que ser del mismo edificio.");
+        }
+        Long derivedBuildingId = item.getDerivedBuildingId();
+        if (derivedBuildingId != null && classrooms.stream().anyMatch(c -> !derivedBuildingId.equals(c.buildingId()))) {
+            throw new InvalidRoomRequestException("Las aulas tienen que ser del edificio al que se derivó el pedido.");
+        }
     }
 
     @Override

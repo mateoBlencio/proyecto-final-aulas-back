@@ -133,7 +133,7 @@ public class DirectEventServiceImpl implements DirectEventService {
                 suggestionId, status, classroomIds);
         List<AllowedClassroomDto> allowed = suggested.stream()
                 .map(c -> new AllowedClassroomDto(c.id(), c.roomNumber(), c.buildingId(), c.buildingName(),
-                        c.capacity(), true))
+                        c.capacity(), true, null))
                 .toList();
         return new DirectEventSuggestionResponseDto(suggestionId, status, allowed, overcrowdedBy);
     }

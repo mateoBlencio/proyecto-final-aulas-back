@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestRepository;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
+import ar.edu.utn.frc.siga.space.model.ResourceValueKind;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,14 +52,19 @@ class RoomRequestItemAllowedClassroomsApiIntegrationTest extends AbstractIntegra
     }
 
     @Test
-    @DisplayName("requiresComputers con un mínimo imposible de cumplir: lista vacía, 200 (no 404)")
-    void findAllowedClassrooms_noMatches_returnsEmptyList() throws Exception {
+    @DisplayName("requiresComputers: trae los labs con al menos 1 PC aunque ninguno solo cubra el pedido, y no las aulas sin PCs")
+    void findAllowedClassrooms_requiresComputers_traeLosLabsConPcs() throws Exception {
+        Building building = testData.edificio();
+        Classroom lab = testData.aula(building);
+        Classroom sinPcs = testData.aula(building);
+        testData.recursoDeAula(lab, testData.tipoRecurso("Cantidad de PC", ResourceValueKind.COUNT), 35);
         RoomRequestItem item = seedItem(true, false, 999_999);
 
         mockMvc.perform(get("/v1/room-requests/items/" + item.getId() + "/allowed-classrooms"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$[?(@.id == " + lab.getId() + ")].computerCount").value(35))
+                .andExpect(jsonPath("$[?(@.id == " + sinPcs.getId() + ")]").isEmpty());
     }
 
     @Test

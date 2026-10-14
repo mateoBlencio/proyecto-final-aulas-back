@@ -14,4 +14,8 @@ public class PartialAssignmentReasonRequiredException extends SigaAppException {
         super(HttpStatus.BAD_REQUEST, "Partial assignment reason required",
                 "El motivo es obligatorio al asignar menos aulas de las pedidas.");
     }
+
+    public PartialAssignmentReasonRequiredException(String detail) {
+        super(HttpStatus.BAD_REQUEST, "Partial assignment reason required", detail);
+    }
 }

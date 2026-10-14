@@ -282,6 +282,37 @@ class RoomRequestSuggestionServiceImplTest {
                 List.of(), null, List.of(), null, null, null, null, null, null);
     }
 
+    @Test
+    void laboratorioQueNoCubreLasPcsEsPartialConLasPcsQueFaltan() {
+        stubSolver(new OptimizerAllocation("rr-7-0", 10L), new OptimizerAllocation("rr-7-1", 20L));
+        when(inputLoader.load(eq(ITEM_ID), any(), eq(ACTOR))).thenReturn(labInputs(67, java.util.Map.of(10L, 35, 20L, 30)));
+
+        RoomRequestSuggestionResponseDto response = service.suggest(ITEM_ID, null, ACTOR);
+
+        assertThat(response.status()).isEqualTo(SuggestionStatus.PARTIAL);
+        assertThat(response.overcrowdedBy()).isEqualTo(2);
+    }
+
+    @Test
+    void laboratorioQueCubreLasPcsEsSuggested() {
+        stubSolver(new OptimizerAllocation("rr-7-0", 10L), new OptimizerAllocation("rr-7-1", 20L));
+        when(inputLoader.load(eq(ITEM_ID), any(), eq(ACTOR))).thenReturn(labInputs(67, java.util.Map.of(10L, 35, 20L, 35)));
+
+        RoomRequestSuggestionResponseDto response = service.suggest(ITEM_ID, null, ACTOR);
+
+        assertThat(response.status()).isEqualTo(SuggestionStatus.SUGGESTED);
+        assertThat(response.overcrowdedBy()).isZero();
+    }
+
+    private static RoomRequestSuggestionInputLoader.Inputs labInputs(int computers, java.util.Map<Long, Integer> pcs) {
+        List<ClassroomResponseDto> labs = pcs.keySet().stream().sorted().map(id -> room(id, 40)).toList();
+        return new RoomRequestSuggestionInputLoader.Inputs(ITEM_ID, 1L, 2, computers, LocalTime.of(10, 0),
+                LocalTime.of(12, 0), Set.of(LocalDate.of(2030, 1, 1)), Set.of(), labs,
+                labs.stream().map(c -> new ar.edu.utn.frc.siga.optimizer.model.OptimizerRoom(
+                        c.id(), pcs.get(c.id()), c.buildingId())).toList(),
+                List.of(), computers, pcs);
+    }
+
     private static ClassroomResponseDto room(Long id, int capacity) {
         return new ClassroomResponseDto(id, id.intValue(), capacity, 1L, "Edificio", 1L, "Aula", null, true);
     }
@@ -291,6 +322,6 @@ class RoomRequestSuggestionServiceImplTest {
                 LocalTime.of(12, 0), Set.of(LocalDate.of(2030, 1, 1)), Set.of(), rooms,
                 rooms.stream().map(c -> new ar.edu.utn.frc.siga.optimizer.model.OptimizerRoom(
                         c.id(), c.capacity(), c.buildingId())).toList(),
-                List.of());
+                List.of(), null, java.util.Map.of());
     }
 }

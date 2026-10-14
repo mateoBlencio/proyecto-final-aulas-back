@@ -14,6 +14,7 @@ import ar.edu.utn.frc.siga.space.mapper.ClassroomMapper;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
+import ar.edu.utn.frc.siga.space.model.ClassroomResource;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
 import ar.edu.utn.frc.siga.space.model.PermissionMode;
 import ar.edu.utn.frc.siga.space.model.ClassroomPermission;
@@ -127,6 +128,19 @@ public class ClassroomServiceImpl implements ClassroomService {
     public Set<Long> findIdsWithResourceAtLeast(String resourceTypeName, int minQuantity) {
         log.debug("Buscando aulas con recurso: resourceTypeName={}, minQuantity={}", resourceTypeName, minQuantity);
         return classroomResourceRepository.findClassroomIdsWithResourceAtLeast(resourceTypeName, minQuantity);
+    }
+
+    @Override
+    public Map<Long, Integer> findResourceAmounts(String resourceTypeName, Collection<Long> classroomIds) {
+        if (classroomIds == null || classroomIds.isEmpty()) {
+            return Map.of();
+        }
+        return classroomResourceRepository.findByClassroomIdInAndDeletedAtIsNull(classroomIds).stream()
+                .filter(cr -> cr.getResourceType().isActive())
+                .filter(cr -> cr.getResourceType().getName().equalsIgnoreCase(resourceTypeName))
+                .filter(cr -> cr.getQuantity() != null)
+                .collect(Collectors.toMap(cr -> cr.getClassroom().getId(), ClassroomResource::getQuantity,
+                        Integer::sum));
     }
 
     @Override
