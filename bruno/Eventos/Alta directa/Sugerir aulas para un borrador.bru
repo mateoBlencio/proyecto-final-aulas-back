@@ -1,0 +1,37 @@
+meta {
+  name: Sugerir aulas para un borrador
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/v1/events/direct/suggestion
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "draft": {
+      "type": "CONFERENCE",
+      "date": "2026-11-20",
+      "startTime": "10:00:00",
+      "endTime": "12:00:00",
+      "estimated": 80,
+      "classroomCount": 2,
+      "requiresProjector": true,
+      "requiresComputers": false,
+      "description": "Charla de ingeniería en el SUM"
+    },
+    "excludedClassroomIds": []
+  }
+}
+
+docs {
+  POST /v1/events/direct/suggestion. Permiso: PERM_EVENT_DIRECT_CREATE (AUXILIAR_AULICO).
+
+  Corre el solver con el borrador y devuelve las aulas sugeridas con un `suggestionId`.
+  No persiste nada. `status`: `SUGGESTED`, `PARTIAL` (cubre menos aulas que
+  `classroomCount`) o `NO_ROOM_AVAILABLE` (sin `suggestionId`). La sugerencia vive en
+  memoria el TTL de `preview.ttlMinutes`.
+}

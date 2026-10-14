@@ -19,6 +19,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -50,20 +51,11 @@ class RoomRequestCandidateResolver {
         RoomRequestItem item = itemRepository.findById(itemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
 
-        Set<Long> occupiedClassroomIds = occupiedClassroomIds(item);
         List<ClassroomResponseDto> candidates = candidateClassrooms(item).stream()
                 .filter(c -> !(item.getRequiresComputers() && item.getDerivedBuildingId() != null)
                         || item.getDerivedBuildingId().equals(c.buildingId()))
                 .toList();
-        Map<Long, Integer> computersByClassroom = item.getRequiresComputers()
-                ? computersByClassroom(candidates.stream().map(ClassroomResponseDto::id).toList())
-                : Map.of();
-        return candidates.stream()
-                .map(classroom -> new AllowedClassroomDto(classroom.id(), classroom.roomNumber(),
-                        classroom.buildingId(), classroom.buildingName(), classroom.capacity(),
-                        !occupiedClassroomIds.contains(classroom.id()),
-                        computersByClassroom.get(classroom.id())))
-                .toList();
+        return toAllowed(candidates, occupiedClassroomIds(item), item.getRequiresComputers());
     }
 
     @Transactional(readOnly = true)
@@ -111,14 +103,27 @@ class RoomRequestCandidateResolver {
         return result;
     }
 
+    record RoomNeeds(LocalDate date, LocalTime startTime, LocalTime endTime,
+                     boolean requiresComputers, Integer computerCount, boolean requiresProjector) {
+    }
+
+    private static RoomNeeds needsOf(RoomRequestItem item) {
+        return new RoomNeeds(item.getDate(), item.getStartTime(), item.endTime(),
+                item.getRequiresComputers(), item.getComputerCount(), item.getRequiresProjector());
+    }
+
     List<ClassroomResponseDto> candidateClassrooms(RoomRequestItem item) {
+        return candidateClassrooms(needsOf(item));
+    }
+
+    List<ClassroomResponseDto> candidateClassrooms(RoomNeeds needs) {
         List<ClassroomResponseDto> candidates = classroomService.findAllAvailable();
-        if (item.getRequiresComputers()) {
+        if (needs.requiresComputers()) {
             // Las PCs se suman entre las aulas asignadas: cualquier laboratorio sirve como candidato.
             Set<Long> withComputers = classroomService.findIdsWithResourceAtLeast(COMPUTERS_RESOURCE_NAME, 1);
             candidates = candidates.stream().filter(c -> withComputers.contains(c.id())).toList();
         }
-        if (item.getRequiresProjector()) {
+        if (needs.requiresProjector()) {
             Set<Long> withProjector = classroomService.findIdsWithResourceAtLeast(PROJECTOR_RESOURCE_NAME, 1);
             candidates = candidates.stream().filter(c -> withProjector.contains(c.id())).toList();
         }
@@ -129,22 +134,47 @@ class RoomRequestCandidateResolver {
         return classroomService.findResourceAmounts(COMPUTERS_RESOURCE_NAME, classroomIds);
     }
 
+    List<AllowedClassroomDto> findAllowedClassrooms(RoomNeeds needs) {
+        return toAllowed(candidateClassrooms(needs), occupiedClassroomIds(needs), needs.requiresComputers());
+    }
+
     Set<Long> occupiedClassroomIds(RoomRequestItem item) {
-        List<OccurrenceSlotDto> own = item.getDate() == null
-                ? occurrenceResolver.futureSlotsOnDayOfWeek(item) : List.of();
-        Set<LocalDate> dates = item.getDate() != null
-                ? Set.of(item.getDate())
-                : own.stream().map(OccurrenceSlotDto::date).collect(Collectors.toSet());
+        if (item.getDate() != null) {
+            return occupiedClassroomIds(needsOf(item));
+        }
+        List<OccurrenceSlotDto> own = occurrenceResolver.futureSlotsOnDayOfWeek(item);
+        Set<LocalDate> dates = own.stream().map(OccurrenceSlotDto::date).collect(Collectors.toSet());
         Set<Long> ownOccurrenceIds = own.stream().map(OccurrenceSlotDto::occurrenceId).collect(Collectors.toSet());
+        return occupiedClassroomIds(dates, ownOccurrenceIds, item.getStartTime(), item.endTime());
+    }
+
+    Set<Long> occupiedClassroomIds(RoomNeeds needs) {
+        return occupiedClassroomIds(Set.of(needs.date()), Collections.emptySet(), needs.startTime(), needs.endTime());
+    }
+
+    private Set<Long> occupiedClassroomIds(Set<LocalDate> dates, Set<Long> ownOccurrenceIds,
+                                           LocalTime startTime, LocalTime endTime) {
         LocalDate min = Collections.min(dates);
         LocalDate max = Collections.max(dates);
 
         return allocationOccupancyService.findOccupancy(min, max).stream()
                 .filter(slot -> dates.contains(slot.date()))
                 .filter(slot -> !ownOccurrenceIds.contains(slot.occurrenceId()))
-                .filter(slot -> TimeRanges.overlaps(item.getStartTime(), item.endTime(),
-                        slot.startTime(), slot.endTime()))
+                .filter(slot -> TimeRanges.overlaps(startTime, endTime, slot.startTime(), slot.endTime()))
                 .map(OccupiedSlot::classroomId)
                 .collect(Collectors.toSet());
+    }
+
+    private List<AllowedClassroomDto> toAllowed(List<ClassroomResponseDto> candidates,
+                                                Set<Long> occupiedClassroomIds, boolean requiresComputers) {
+        Map<Long, Integer> computersByClassroom = requiresComputers
+                ? computersByClassroom(candidates.stream().map(ClassroomResponseDto::id).toList())
+                : Map.of();
+        return candidates.stream()
+                .map(classroom -> new AllowedClassroomDto(classroom.id(), classroom.roomNumber(),
+                        classroom.buildingId(), classroom.buildingName(), classroom.capacity(),
+                        !occupiedClassroomIds.contains(classroom.id()),
+                        computersByClassroom.get(classroom.id())))
+                .toList();
     }
 }

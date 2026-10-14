@@ -15,6 +15,8 @@ public interface ClassroomMapper {
     @Mapping(target = "buildingName", source = "building.name")
     @Mapping(target = "classroomTypeId", source = "classroomType.id")
     @Mapping(target = "classroomTypeDescription", source = "classroomType.description")
+    @Mapping(target = "unavailableReason", expression = "java(entity.unavailableReason())")
+    @Mapping(target = "currentInSysacad", expression = "java(entity.isCurrentInSysacad())")
     ClassroomResponseDto toDto(Classroom entity);
 
     @Mapping(target = "id", ignore = true)

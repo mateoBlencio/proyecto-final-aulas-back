@@ -20,7 +20,6 @@ import ar.edu.utn.frc.siga.academic.service.command.CommissionSyncCommand;
 import ar.edu.utn.frc.siga.academic.specification.CommissionSpecification;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
-import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.common.util.Maps;
@@ -38,6 +37,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,7 +56,8 @@ public class CommissionServiceImpl implements CommissionService {
 
     @Override
     public CommissionResponseDto findById(Long id) {
-        return commissionMapper.toDto(commissionRepository.findActiveById(id)
+        return commissionMapper.toDto(commissionRepository.findById(id)
+                .filter(Commission::isAvailable)
                 .orElseThrow(() -> ResourceNotFoundException.of("Commission", id)));
     }
 
@@ -75,6 +76,14 @@ public class CommissionServiceImpl implements CommissionService {
     @Override
     public List<CommissionResponseDto> findByIds(Collection<Long> ids) {
         return commissionRepository.findAllById(ids).stream()
+                .filter(Commission::isAvailable)
+                .map(commissionMapper::toDto)
+                .toList();
+    }
+
+    @Override
+    public List<CommissionResponseDto> findByIdsIncludingDeactivated(Collection<Long> ids) {
+        return commissionRepository.findAllById(ids).stream()
                 .map(commissionMapper::toDto)
                 .toList();
     }
@@ -83,7 +92,7 @@ public class CommissionServiceImpl implements CommissionService {
     public Page<CommissionResponseDto> findAll(CommissionFilter filter, Pageable pageable, boolean includeDeactivated) {
         return commissionRepository.findAll(
                         CommissionSpecification.withFilter(filter)
-                                .and(SoftDeleteSpecifications.activeUnless(includeDeactivated)),
+                                .and(includeDeactivated ? Specification.<Commission>unrestricted() : CommissionSpecification.available()),
                         pageable)
                 .map(commissionMapper::toDto);
     }
@@ -93,6 +102,7 @@ public class CommissionServiceImpl implements CommissionService {
             Integer periodSemester) {
         AcademicPeriod period = requirePeriod(periodYear, periodSemester);
         return commissionRepository.findByCourseCodeAndAcademicPeriod(courseCode, period)
+                .filter(Commission::isAvailable)
                 .map(commissionMapper::toDto)
                 .orElseThrow(() -> ResourceNotFoundException.of("Commission",
                         courseCode + "-" + periodYear + "-" + periodSemester));
@@ -105,7 +115,10 @@ public class CommissionServiceImpl implements CommissionService {
 
     @Override
     public CommissionResponseDto findActiveByCourseCode(String courseCode) {
-        List<Commission> active = commissionRepository.findByCourseCodeAndSysacadEnabledTrueAndDeletedAtIsNull(courseCode);
+        List<Commission> active = commissionRepository.findByCourseCodeAndSysacadEnabledTrueAndDeletedAtIsNull(courseCode)
+                .stream()
+                .filter(Commission::isAvailable)
+                .toList();
         if (active.size() > 1) {
             log.warn("Más de una comisión vigente en SysAcad para el curso {}: {} candidatas, no se puede "
                     + "resolver sin ambigüedad", courseCode, active.size());

@@ -51,11 +51,11 @@ class IngestRowBatchProcessorTest {
     }
 
     private IngestRowResolver.ResolvedRefs resolved(Long classroomBuildingId) {
-        SubjectResponseDto subject = new SubjectResponseDto(10L, 100, "Materia", "Anual", null, true);
-        CommissionResponseDto commission = new CommissionResponseDto(20L, "6301", null);
-        BuildingResponseDto building = new BuildingResponseDto(5L, "Edificio Central", true);
+        SubjectResponseDto subject = new SubjectResponseDto(10L, 100, "Materia", "Anual", null, true, null);
+        CommissionResponseDto commission = new CommissionResponseDto(20L, "6301", null, null);
+        BuildingResponseDto building = new BuildingResponseDto(5L, "Edificio Central", true, null);
         ClassroomResponseDto classroom = new ClassroomResponseDto(
-                50L, 105, 40, classroomBuildingId, "Edificio Real", 1L, "Aula");
+                50L, 105, 40, classroomBuildingId, "Edificio Real", 1L, "Aula", null, true);
         CreateRecurringEventRequestDto request = new CreateRecurringEventRequestDto(
                 30, LocalTime.of(18, 0), 90, DayOfWeek.MONDAY, null, null, 10L, 20L);
         return new IngestRowResolver.ResolvedRefs(subject, commission, building, classroom, request);

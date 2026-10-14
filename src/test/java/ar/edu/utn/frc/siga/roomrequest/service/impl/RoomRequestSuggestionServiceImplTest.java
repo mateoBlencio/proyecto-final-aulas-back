@@ -314,7 +314,7 @@ class RoomRequestSuggestionServiceImplTest {
     }
 
     private static ClassroomResponseDto room(Long id, int capacity) {
-        return new ClassroomResponseDto(id, id.intValue(), capacity, 1L, "Edificio", 1L, "Aula");
+        return new ClassroomResponseDto(id, id.intValue(), capacity, 1L, "Edificio", 1L, "Aula", null, true);
     }
 
     private static RoomRequestSuggestionInputLoader.Inputs inputs(int classroomCount, List<ClassroomResponseDto> rooms) {

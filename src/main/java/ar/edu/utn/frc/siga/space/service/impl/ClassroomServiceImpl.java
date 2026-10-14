@@ -6,7 +6,6 @@ import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomListItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
-import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.space.exception.SpaceDomainException;
@@ -81,7 +80,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
         if (classroomRepository.findByRoomNumberAndDeletedAtIsNull(dto.roomNumber()).isPresent()) {
             log.warn("Creación de aula rechazada: roomNumber '{}' ya existe", dto.roomNumber());
-            throw new SpaceDomainException("Classroom roomNumber already exists: " + dto.roomNumber());
+            throw new SpaceDomainException("Ya existe un aula con el número " + dto.roomNumber() + ".");
         }
 
         validateCapacity(dto);
@@ -113,7 +112,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     public List<ClassroomResponseDto> findByIds(Collection<Long> ids) {
         log.debug("Buscando aulas por ids: {}", ids);
         return classroomRepository.findAllById(ids).stream()
-                .filter(Classroom::isActive)
+                .filter(Classroom::isAvailable)
                 .map(classroomMapper::toDto)
                 .toList();
     }
@@ -171,7 +170,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         log.debug("Listando aulas: filter={}, page={}, size={}, includeDeactivated={}",
                 filter, pageable.getPageNumber(), pageable.getPageSize(), includeDeactivated);
         Specification<Classroom> spec = ClassroomSpecification.withFilter(filter)
-                .and(SoftDeleteSpecifications.activeUnless(includeDeactivated));
+                .and(includeDeactivated ? Specification.<Classroom>unrestricted() : ClassroomSpecification.available());
         return classroomListComposer.compose(
                 scopedClassroom.findAll(spec, Permission.CLASSROOM_READ, ClassroomListSort.apply(pageable)));
     }
@@ -244,21 +243,28 @@ public class ClassroomServiceImpl implements ClassroomService {
 
     @Override
     public ClassroomResponseDto findByRoomNumberAndBuilding(Integer roomNumber, Long buildingId) {
-        Building building = findBuildingById(buildingId);
-        return classroomMapper.toDto(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(roomNumber, building)
-                .or(() -> fallbackByRoomNumberOnly(roomNumber, buildingId))
-                .orElseThrow(() -> ResourceNotFoundException.of("Classroom", roomNumber)));
+        Building building = findActiveBuilding(buildingId);
+        Optional<Classroom> inBuilding = classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(roomNumber, building);
+        // Un aula que existe en el edificio pero no está disponible no cae al fallback: asignaría el aula de otro edificio.
+        Optional<Classroom> found = inBuilding.isPresent()
+                ? inBuilding.filter(Classroom::isAvailable)
+                : fallbackByRoomNumberOnly(roomNumber, buildingId);
+        return classroomMapper.toDto(found.orElseThrow(() -> ResourceNotFoundException.of("Classroom", roomNumber)));
     }
 
     @Override
     public Optional<ClassroomResponseDto> findByRoomNumberAndBuildingCode(Integer roomNumber, Integer buildingCode) {
         return buildingRepository.findByBuildingCode(buildingCode)
+                .filter(Building::isAvailable)
                 .flatMap(building -> classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(roomNumber, building))
+                .filter(Classroom::isAvailable)
                 .map(classroomMapper::toDto);
     }
 
     private Optional<Classroom> fallbackByRoomNumberOnly(Integer roomNumber, Long buildingId) {
-        List<Classroom> matches = classroomRepository.findAllByRoomNumberAndDeletedAtIsNull(roomNumber);
+        List<Classroom> matches = classroomRepository.findAllByRoomNumberAndDeletedAtIsNull(roomNumber).stream()
+                .filter(Classroom::isAvailable)
+                .toList();
         if (matches.size() != 1) {
             return Optional.empty();
         }
@@ -266,11 +272,6 @@ public class ClassroomServiceImpl implements ClassroomService {
         log.warn("Aula '{}' no está en el edificio informado (buildingId={}); se usa la única "
                 + "coincidencia por número, en buildingId={}", roomNumber, buildingId, found.getBuilding().getId());
         return Optional.of(found);
-    }
-
-    private Building findBuildingById(Long id) {
-        return buildingRepository.findById(id)
-                .orElseThrow(() -> ResourceNotFoundException.of("Building", id));
     }
 
     private Building findActiveBuilding(Long id) {
@@ -344,12 +345,7 @@ public class ClassroomServiceImpl implements ClassroomService {
             if (isUpToDate(classroom, hash)) {
                 continue;
             }
-            // `classroomType` es local-owned: el sync nunca lo pisa en un update (§4.3).
-            // Al crear sí se asigna un default (§ constraint NOT NULL), ver resolveDefaultClassroomType().
-            classroom.setCapacity(command.capacity());
-            classroom.setSysacadEnabled(command.enabled());
-            classroom.setSyncedAt(syncedAt);
-            classroom.setSysacadHash(hash);
+            applySysacadFields(classroom, command, hash, syncedAt);
             classroomRepository.save(classroom);
             affected++;
         }
@@ -389,4 +385,11 @@ public class ClassroomServiceImpl implements ClassroomService {
     }
 
     private record ClassroomKey(Long buildingId, Integer roomNumber) {}
+
+    private void applySysacadFields(Classroom classroom, ClassroomSyncCommand command, String hash, Instant syncedAt) {
+        classroom.setCapacity(command.capacity());
+        classroom.setSysacadEnabled(command.enabled());
+        classroom.setSyncedAt(syncedAt);
+        classroom.setSysacadHash(hash);
+    }
 }

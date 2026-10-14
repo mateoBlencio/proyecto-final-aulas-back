@@ -44,6 +44,7 @@ public class ClassroomListComposer {
         Map<Long, List<ClassroomResource>> resourcesByClassroom = classroomIds.isEmpty()
                 ? Map.of()
                 : classroomResourceRepository.findByClassroomIdInAndDeletedAtIsNull(classroomIds).stream()
+                        .filter(resource -> resource.getResourceType().isActive())
                         .collect(Collectors.groupingBy(resource -> resource.getClassroom().getId()));
 
         Map<Long, List<ClassroomPermission>> permissionsByClassroom = classroomIds.isEmpty()
@@ -106,7 +107,9 @@ public class ClassroomListComposer {
                 classroom.isActive(),
                 classroom.getPermissionMode(),
                 allowedDisplay(classroom.getPermissionMode(), targetDtos),
-                targetDtos);
+                targetDtos,
+                classroom.unavailableReason(),
+                classroom.isCurrentInSysacad());
     }
 
     private String allowedDisplay(PermissionMode mode, List<ClassroomPermissionTargetDto> targets) {

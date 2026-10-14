@@ -7,6 +7,18 @@
       "source": "github.com/Graphify-Labs/graphify (Apache-2.0, ver LICENSE y NOTICE)"
     },
     {
+      "name": "how",
+      "usedBy": "no-comments, comment-sicko",
+      "source": "github.com/cursor/plugins/tree/main/pstack (MIT, ver LICENSE)",
+      "install": "git checkout origin/develop -- .claude/skills/how"
+    },
+    {
+      "name": "no-comments",
+      "usedBy": "CLAUDE.md (borrar comentarios)",
+      "source": "github.com/cursor/plugins/tree/main/pstack (MIT, ver LICENSE)",
+      "install": "git checkout origin/develop -- .claude/skills/no-comments"
+    },
+    {
       "name": "ponytail",
       "usedBy": "implementer",
       "source": "github.com/DietrichGebert/ponytail (MIT, ver LICENSE)",
@@ -59,6 +71,18 @@
       "usedBy": "test-writer",
       "install": "git checkout origin/develop -- .claude/skills/testing-pyramid",
       "source": "propia (armada con Claude para este repo)"
+    },
+    {
+      "name": "unslop",
+      "usedBy": "implementer, planner",
+      "source": "github.com/cursor/plugins/tree/main/pstack (MIT, ver LICENSE)",
+      "install": "git checkout origin/develop -- .claude/skills/unslop"
+    },
+    {
+      "name": "why",
+      "usedBy": "no-comments, comment-sicko",
+      "source": "github.com/cursor/plugins/tree/main/pstack (MIT, ver LICENSE)",
+      "install": "git checkout origin/develop -- .claude/skills/why"
     }
   ],
   "clis": [

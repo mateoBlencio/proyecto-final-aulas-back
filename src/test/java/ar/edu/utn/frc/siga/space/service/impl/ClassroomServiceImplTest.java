@@ -164,7 +164,7 @@ class ClassroomServiceImplTest {
         ClassroomRequestDto dto = SpaceTestData.classroomRequestDto();
         Classroom mapped = Classroom.builder().roomNumber(101).capacity(40).build();
         Classroom saved = SpaceTestData.classroom().build();
-        ClassroomResponseDto responseDto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
+        ClassroomResponseDto responseDto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal", null, true);
         when(buildingRepository.findActiveById(1L)).thenReturn(Optional.of(building));
         when(classroomTypeService.findById(1L)).thenReturn(type);
         when(classroomRepository.findByRoomNumberAndDeletedAtIsNull(101)).thenReturn(Optional.empty());
@@ -201,7 +201,7 @@ class ClassroomServiceImplTest {
     @DisplayName("findById: devuelve el DTO mapeado cuando el aula existe")
     void findByIdReturnsMappedDto() {
         Classroom classroom = SpaceTestData.classroom().build();
-        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
+        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal", null, true);
         when(classroomRepository.findActiveById(1L)).thenReturn(Optional.of(classroom));
         when(classroomMapper.toDto(classroom)).thenReturn(dto);
 
@@ -223,7 +223,7 @@ class ClassroomServiceImplTest {
     @DisplayName("findAllAvailable: mapea las aulas activas devueltas por el repositorio")
     void findAllAvailableMapsRepositoryResult() {
         Classroom classroom = SpaceTestData.classroom().build();
-        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
+        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal", null, true);
         when(classroomRepository.findAll(ArgumentMatchers.<Specification<Classroom>>any()))
                 .thenReturn(List.of(classroom));
         when(classroomMapper.toDto(classroom)).thenReturn(dto);
@@ -235,7 +235,7 @@ class ClassroomServiceImplTest {
     @DisplayName("findByIds: mapea las aulas encontradas, incluso eliminadas (no filtra)")
     void findByIdsMapsAllFound() {
         Classroom classroom = SpaceTestData.classroom().build();
-        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
+        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal", null, true);
         when(classroomRepository.findAllById(List.of(1L, 99L))).thenReturn(List.of(classroom));
         when(classroomMapper.toDto(classroom)).thenReturn(dto);
 
@@ -248,8 +248,8 @@ class ClassroomServiceImplTest {
         Classroom active = SpaceTestData.classroom().id(1L).build();
         Classroom deactivated = SpaceTestData.classroom().id(2L).build();
         deactivated.deactivate();
-        ClassroomResponseDto activeDto = new ClassroomResponseDto(1L, 101, 40, 1L, "Central", 1L, "Normal");
-        ClassroomResponseDto deactivatedDto = new ClassroomResponseDto(2L, 102, 40, 1L, "Central", 1L, "Normal");
+        ClassroomResponseDto activeDto = new ClassroomResponseDto(1L, 101, 40, 1L, "Central", 1L, "Normal", null, true);
+        ClassroomResponseDto deactivatedDto = new ClassroomResponseDto(2L, 102, 40, 1L, "Central", 1L, "Normal", null, true);
         when(classroomRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(active, deactivated));
         when(classroomMapper.toDto(active)).thenReturn(activeDto);
         lenient().when(classroomMapper.toDto(deactivated)).thenReturn(deactivatedDto);
@@ -261,12 +261,12 @@ class ClassroomServiceImplTest {
     @Test
     @DisplayName("findAll: aplica filtro vía specification y delega el armado del listado en el composer")
     void findAllMapsPagedResult() {
-        ClassroomFilter filter = new ClassroomFilter(101, null, null, null, null);
+        ClassroomFilter filter = new ClassroomFilter(101, null, null, null, null, false);
         Pageable pageable = PageRequest.of(0, 10);
         Classroom classroom = SpaceTestData.classroom().build();
         Page<Classroom> page = new PageImpl<>(List.of(classroom), pageable, 1);
         ClassroomListItemDto item = new ClassroomListItemDto(1L, 101, 1L, "Edificio Central", 1L, "Normal", 40,
-                List.of(), null, true, null, "Todas", List.of());
+                List.of(), null, true, null, "Todas", List.of(), null, true);
         Page<ClassroomListItemDto> composed = new PageImpl<>(List.of(item), pageable, 1);
         when(classroomRepository.findAll(ArgumentMatchers.<Specification<Classroom>>any(), any(Pageable.class)))
                 .thenReturn(page);
@@ -286,7 +286,7 @@ class ClassroomServiceImplTest {
         ClassroomType type = SpaceTestData.classroomType().build();
         ClassroomRequestDto dto = SpaceTestData.classroomRequestDto();
         Classroom saved = SpaceTestData.classroom().build();
-        ClassroomResponseDto responseDto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
+        ClassroomResponseDto responseDto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal", null, true);
         when(classroomRepository.findActiveById(1L)).thenReturn(Optional.of(existing));
         when(buildingRepository.findActiveById(1L)).thenReturn(Optional.of(building));
         when(classroomTypeService.findById(1L)).thenReturn(type);
@@ -407,8 +407,8 @@ class ClassroomServiceImplTest {
     void findByRoomNumberAndBuildingReturnsMappedDto() {
         Building building = SpaceTestData.building().build();
         Classroom existing = SpaceTestData.classroom().build();
-        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
-        when(buildingRepository.findById(1L)).thenReturn(Optional.of(building));
+        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal", null, true);
+        when(buildingRepository.findActiveById(1L)).thenReturn(Optional.of(building));
         when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, building)).thenReturn(Optional.of(existing));
         when(classroomMapper.toDto(existing)).thenReturn(dto);
 
@@ -419,18 +419,12 @@ class ClassroomServiceImplTest {
     }
 
     @Test
-    @DisplayName("findByRoomNumberAndBuilding: no exige edificio activo")
-    void findByRoomNumberAndBuildingDoesNotRequireActiveBuilding() {
-        Building inactive = SpaceTestData.deactivated(SpaceTestData.building().build());
-        Classroom existing = SpaceTestData.classroom().build();
-        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
-        when(buildingRepository.findById(1L)).thenReturn(Optional.of(inactive));
-        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, inactive)).thenReturn(Optional.of(existing));
-        when(classroomMapper.toDto(existing)).thenReturn(dto);
+    @DisplayName("findByRoomNumberAndBuilding: si el edificio está inactivo, lanza ResourceNotFoundException")
+    void findByRoomNumberAndBuildingWithInactiveBuildingThrowsResourceNotFound() {
+        when(buildingRepository.findActiveById(1L)).thenReturn(Optional.empty());
 
-        ClassroomResponseDto result = service.findByRoomNumberAndBuilding(101, 1L);
-
-        assertThat(result).isEqualTo(dto);
+        assertThatThrownBy(() -> service.findByRoomNumberAndBuilding(101, 1L))
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
@@ -438,8 +432,8 @@ class ClassroomServiceImplTest {
     void findByRoomNumberAndBuildingFallsBackToRoomNumberOnly() {
         Building informedBuilding = SpaceTestData.building().id(2L).name("Edif. Ing.Inchaurrondo").build();
         Classroom actual = SpaceTestData.classroom().build();
-        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
-        when(buildingRepository.findById(2L)).thenReturn(Optional.of(informedBuilding));
+        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal", null, true);
+        when(buildingRepository.findActiveById(2L)).thenReturn(Optional.of(informedBuilding));
         when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, informedBuilding)).thenReturn(Optional.empty());
         when(classroomRepository.findAllByRoomNumberAndDeletedAtIsNull(101)).thenReturn(List.of(actual));
         when(classroomMapper.toDto(actual)).thenReturn(dto);
@@ -450,12 +444,52 @@ class ClassroomServiceImplTest {
     }
 
     @Test
+    @DisplayName("findByRoomNumberAndBuilding: si el aula existe en un edificio no vigente en SysAcad, no hace fallback al aula de otro edificio")
+    void findByRoomNumberAndBuildingWithUnavailableClassroomDoesNotFallBack() {
+        Building informedBuilding = SpaceTestData.building().id(2L).name("Edif. Ing.Inchaurrondo")
+                .sysacadHash("hash").sysacadEnabled(false).build();
+        Classroom inNotCurrentBuilding = SpaceTestData.classroom().building(informedBuilding).build();
+        when(buildingRepository.findActiveById(2L)).thenReturn(Optional.of(informedBuilding));
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, informedBuilding)).thenReturn(Optional.of(inNotCurrentBuilding));
+
+        assertThatThrownBy(() -> service.findByRoomNumberAndBuilding(101, 2L))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(classroomRepository, never()).findAllByRoomNumberAndDeletedAtIsNull(any());
+    }
+
+    @Test
+    @DisplayName("findByRoomNumberAndBuilding: un aula no vigente en SysAcad del edificio informado se devuelve")
+    void findByRoomNumberAndBuildingReturnsClassroomNotCurrentInSysacad() {
+        Building informedBuilding = SpaceTestData.building().id(2L).name("Edif. Ing.Inchaurrondo").build();
+        Classroom notCurrent = SpaceTestData.classroom().building(informedBuilding).sysacadHash("hash").sysacadEnabled(false).build();
+        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 2L, "Edif. Ing.Inchaurrondo", 1L, "Normal", null, false);
+        when(buildingRepository.findActiveById(2L)).thenReturn(Optional.of(informedBuilding));
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, informedBuilding)).thenReturn(Optional.of(notCurrent));
+        when(classroomMapper.toDto(notCurrent)).thenReturn(dto);
+
+        assertThat(service.findByRoomNumberAndBuilding(101, 2L)).isEqualTo(dto);
+    }
+
+    @Test
+    @DisplayName("findByRoomNumberAndBuildingCode: un aula no vigente en SysAcad de un edificio vigente se devuelve")
+    void findByRoomNumberAndBuildingCodeReturnsClassroomNotCurrentInSysacad() {
+        Building building = SpaceTestData.building().buildingCode(7).build();
+        Classroom notCurrent = SpaceTestData.classroom().building(building).sysacadHash("hash").sysacadEnabled(false).build();
+        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal", null, false);
+        when(buildingRepository.findByBuildingCode(7)).thenReturn(Optional.of(building));
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, building)).thenReturn(Optional.of(notCurrent));
+        when(classroomMapper.toDto(notCurrent)).thenReturn(dto);
+
+        assertThat(service.findByRoomNumberAndBuildingCode(101, 7)).contains(dto);
+    }
+
+    @Test
     @DisplayName("findByRoomNumberAndBuilding: si el número es ambiguo (más de un aula en catálogo), no adivina y lanza ResourceNotFoundException")
     void findByRoomNumberAndBuildingWithAmbiguousRoomNumberThrowsResourceNotFound() {
         Building informedBuilding = SpaceTestData.building().id(2L).name("Otro edificio").build();
         Classroom other1 = SpaceTestData.classroom().id(10L).build();
         Classroom other2 = SpaceTestData.classroom().id(11L).build();
-        when(buildingRepository.findById(2L)).thenReturn(Optional.of(informedBuilding));
+        when(buildingRepository.findActiveById(2L)).thenReturn(Optional.of(informedBuilding));
         when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(999, informedBuilding)).thenReturn(Optional.empty());
         when(classroomRepository.findAllByRoomNumberAndDeletedAtIsNull(999)).thenReturn(List.of(other1, other2));
 
@@ -468,7 +502,7 @@ class ClassroomServiceImplTest {
     @DisplayName("findByRoomNumberAndBuilding: si el aula no existe en el edificio, lanza ResourceNotFoundException")
     void findByRoomNumberAndBuildingWithMissingClassroomThrowsResourceNotFound() {
         Building building = SpaceTestData.building().build();
-        when(buildingRepository.findById(1L)).thenReturn(Optional.of(building));
+        when(buildingRepository.findActiveById(1L)).thenReturn(Optional.of(building));
         when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, building)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findByRoomNumberAndBuilding(101, 1L))
@@ -479,7 +513,7 @@ class ClassroomServiceImplTest {
     @Test
     @DisplayName("findByRoomNumberAndBuilding: si el edificio no existe, lanza ResourceNotFoundException")
     void findByRoomNumberAndBuildingWithMissingBuildingThrowsResourceNotFound() {
-        when(buildingRepository.findById(1L)).thenReturn(Optional.empty());
+        when(buildingRepository.findActiveById(1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findByRoomNumberAndBuilding(101, 1L))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -491,7 +525,7 @@ class ClassroomServiceImplTest {
     void findByRoomNumberAndBuildingCodeReturnsMappedDto() {
         Building building = SpaceTestData.building().buildingCode(28).build();
         Classroom existing = SpaceTestData.classroom().build();
-        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
+        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal", null, true);
         when(buildingRepository.findByBuildingCode(28)).thenReturn(Optional.of(building));
         when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, building)).thenReturn(Optional.of(existing));
         when(classroomMapper.toDto(existing)).thenReturn(dto);

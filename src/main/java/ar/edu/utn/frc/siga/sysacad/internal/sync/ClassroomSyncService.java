@@ -30,7 +30,7 @@ public class ClassroomSyncService implements SysacadViewSyncer {
     @Override
     public void sync(SysacadCatalogReader catalog) {
         ViewSyncRunner.run(syncStateService, SysacadView.AULAS, "Aulas", log, () -> {
-            List<ClassroomSyncCommand> commands = catalog.findClassrooms().stream()
+            List<ClassroomSyncCommand> commands = ViewSyncRunner.requireRows(catalog.findClassrooms(), SysacadView.AULAS).stream()
                     .map(ClassroomSyncService::toCommand)
                     .toList();
             return classroomService.syncClassrooms(commands);

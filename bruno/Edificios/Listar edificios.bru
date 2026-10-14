@@ -20,4 +20,6 @@ params:query {
 docs {
   Listado paginado. Filtro opcional: name (contiene, case-insensitive). La
   respuesta es { content: [...], page: { size, number, totalElements, totalPages } }.
+  Sin includeDeactivated solo devuelve edificios activos y vigentes en SysAcad.
+  unavailableReason: null, DEACTIVATED o NOT_IN_SYSACAD.
 }

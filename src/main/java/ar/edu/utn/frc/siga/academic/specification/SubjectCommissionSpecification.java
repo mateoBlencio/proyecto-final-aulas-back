@@ -23,4 +23,15 @@ public class SubjectCommissionSpecification {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
     }
+
+    public static Specification<SubjectCommission> available() {
+        return (root, query, cb) -> cb.and(
+                cb.isNull(root.get("deletedAt")),
+                cb.isNull(root.get("subject").get("deletedAt")),
+                cb.isNull(root.get("subject").get("studyPlan").get("deletedAt")),
+                cb.isNull(root.get("commission").get("deletedAt")),
+                cb.or(cb.isTrue(root.get("commission").get("sysacadEnabled")),
+                        cb.isNull(root.get("commission").get("sysacadHash"))),
+                cb.isNull(root.get("commission").get("academicPeriod").get("deletedAt")));
+    }
 }

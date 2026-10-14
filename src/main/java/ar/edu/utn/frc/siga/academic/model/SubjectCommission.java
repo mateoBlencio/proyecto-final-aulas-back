@@ -46,4 +46,8 @@ public class SubjectCommission extends SoftDeletableEntity {
     @Column(name = "es_presencial", nullable = false)
     @Builder.Default
     private Boolean inPerson = true;
+
+    public boolean isAvailable() {
+        return isActive() && subject.isAvailable() && commission.isAvailable();
+    }
 }

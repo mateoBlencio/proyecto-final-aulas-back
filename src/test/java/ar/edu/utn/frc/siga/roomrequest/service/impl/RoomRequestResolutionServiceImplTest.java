@@ -220,7 +220,7 @@ class RoomRequestResolutionServiceImplTest {
     void derive_ok() {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
-        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true));
+        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true, null));
         when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of(auxiliar()));
         when(candidateResolver.occupiedClassroomIds(item)).thenReturn(Set.of());
         when(candidateResolver.candidateClassrooms(item)).thenReturn(List.of(classroom(101L, 1L, "Edificio Central")));
@@ -238,7 +238,7 @@ class RoomRequestResolutionServiceImplTest {
     void derive_resolucionParcial() {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW).classroomCount(2).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
-        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true));
+        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true, null));
         when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of(auxiliar()));
         when(candidateResolver.occupiedClassroomIds(item)).thenReturn(Set.of(102L));
         when(candidateResolver.candidateClassrooms(item)).thenReturn(
@@ -255,7 +255,7 @@ class RoomRequestResolutionServiceImplTest {
     void derive_sinAulasLibres() {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
-        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true));
+        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true, null));
         when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of(auxiliar()));
         when(candidateResolver.occupiedClassroomIds(item)).thenReturn(Set.of(101L));
         when(candidateResolver.candidateClassrooms(item)).thenReturn(List.of(classroom(101L, 1L, "Edificio Central")));
@@ -270,7 +270,7 @@ class RoomRequestResolutionServiceImplTest {
     void derive_sinAuxiliarAsignado() {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
-        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true));
+        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true, null));
         when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.derive(1L, 1L, "subsecretaria@frc.utn.edu.ar"))
@@ -283,7 +283,7 @@ class RoomRequestResolutionServiceImplTest {
     void derive_edificioInactivo() {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
-        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", false));
+        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", false, null));
 
         assertThatThrownBy(() -> service.derive(1L, 1L, "subsecretaria@frc.utn.edu.ar"))
                 .isInstanceOf(InvalidRoomRequestException.class);
@@ -885,7 +885,7 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     private static ClassroomResponseDto classroom(Long id, Long buildingId, String buildingName) {
-        return new ClassroomResponseDto(id, id.intValue(), 40, buildingId, buildingName, 1L, "Aula común");
+        return new ClassroomResponseDto(id, id.intValue(), 40, buildingId, buildingName, 1L, "Aula común", null, true);
     }
 
     private static UserResponseDto auxiliar() {

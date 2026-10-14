@@ -30,7 +30,7 @@ public class BuildingSyncService implements SysacadViewSyncer {
     @Override
     public void sync(SysacadCatalogReader catalog) {
         ViewSyncRunner.run(syncStateService, SysacadView.EDIFICIOS, "Edificios", log, () -> {
-            List<BuildingSyncCommand> commands = catalog.findBuildings().stream()
+            List<BuildingSyncCommand> commands = ViewSyncRunner.requireRows(catalog.findBuildings(), SysacadView.EDIFICIOS).stream()
                     .map(BuildingSyncService::toCommand)
                     .toList();
             return buildingService.syncBuildings(commands);

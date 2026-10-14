@@ -35,7 +35,7 @@ public class CommissionSyncService implements SysacadViewSyncer {
         ViewSyncRunner.run(syncStateService, SysacadView.COMISIONES, "Comisiones", log, () -> {
             Map<EnrollmentKey, SysacadSubjectCommissionDto> enrollments = Maps.byId(
                     catalog.findSubjectCommissions(), EnrollmentKey::of, CommissionSyncService::higherEnrollment);
-            List<CommissionSyncCommand> commands = catalog.findCommissions().stream()
+            List<CommissionSyncCommand> commands = ViewSyncRunner.requireRows(catalog.findCommissions(), SysacadView.COMISIONES).stream()
                     .map(row -> toCommand(row, enrollments))
                     .toList();
             return commissionService.syncCommissions(commands);
