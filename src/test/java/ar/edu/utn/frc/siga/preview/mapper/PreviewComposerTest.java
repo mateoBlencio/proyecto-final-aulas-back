@@ -12,6 +12,8 @@ import ar.edu.utn.frc.siga.optimizer.model.OptimizerRoom;
 import ar.edu.utn.frc.siga.preview.dto.response.MoveConflictDto.ConflictOrigin;
 import ar.edu.utn.frc.siga.preview.dto.response.PreviewItemDto;
 import ar.edu.utn.frc.siga.preview.dto.response.PreviewResponseDto;
+import ar.edu.utn.frc.siga.preview.dto.response.RoomAlternativeDto;
+import ar.edu.utn.frc.siga.preview.dto.response.RoomAlternativeDto.AlternativeReason;
 import ar.edu.utn.frc.siga.preview.dto.response.UnmetRequirementDto;
 import ar.edu.utn.frc.siga.preview.dto.response.UnmetRequirementDto.RequirementSeverity;
 import ar.edu.utn.frc.siga.preview.dto.response.UnmetRequirementDto.RequirementType;
@@ -64,7 +66,7 @@ class PreviewComposerTest {
 
     @BeforeEach
     void setUp() {
-        composer = new PreviewComposer(classroomService, new PreviewValidator());
+        composer = new PreviewComposer(classroomService, new PreviewValidator(), () -> 40);
         when(classroomService.findByIdsIncludingDeactivated(anyCollection())).thenReturn(List.of(
                 classroom(5L, 40), classroom(6L, 40)));
         when(classroomService.findResourceAmounts(anyString(), anyCollection())).thenReturn(Map.of());
@@ -217,6 +219,70 @@ class PreviewComposerTest {
 
         assertThat(response.allocations()).extracting(PreviewItemDto::roomSlot).containsExactly(1, 2);
         assertThat(response.allocations()).extracting(PreviewItemDto::overcrowdedBy).containsExactly(60, 10);
+    }
+
+    @Test
+    @DisplayName("sin resolver de una fecha: alternativas ordenadas por motivo, minutos de solape y sobreocupación, y con advertencias de requisitos")
+    void alternativasOrdenadasPorMotivoSolapeYSobreocupacion() {
+        UniqueEventResponseDto unique = unique(UNIQUE_ID, 30, true, false, null, null, null);
+        LocalTime start = START;
+        List<OccupiedSlot> occupancy = List.of(
+                new OccupiedSlot(5L, DATE, start.minusMinutes(30), start.plusMinutes(20), 91L, 501L),
+                new OccupiedSlot(6L, DATE, start.minusMinutes(30), start.plusMinutes(10), 92L, 502L),
+                new OccupiedSlot(7L, DATE, start.minusMinutes(30), start.plusMinutes(10), 93L, 503L),
+                new OccupiedSlot(8L, DATE, start.minusMinutes(30), start.plusMinutes(90), 94L, 504L));
+        List<OptimizerRoom> rooms = List.of(
+                new OptimizerRoom(5L, 40, 1L), new OptimizerRoom(6L, 40, 1L), new OptimizerRoom(7L, 20, 1L),
+                new OptimizerRoom(8L, 40, 1L), new OptimizerRoom(9L, 40, 1L, false, java.util.Set.of(999L)));
+        when(classroomService.findByIdsIncludingDeactivated(anyCollection())).thenReturn(
+                List.of(classroom(5L, 40), classroom(6L, 40), classroom(7L, 20), classroom(9L, 40)));
+
+        PreviewResponseDto response = composer.compose(result(new OptimizerAllocation("3", null)),
+                List.of(unique), Map.of(new PlanningKey(UNIQUE_ID, 1), List.of(DATE)),
+                Map.of(), Map.of(), rooms, occupancy);
+
+        List<RoomAlternativeDto> alternatives = response.unresolved().getFirst().alternatives();
+        assertThat(alternatives).extracting(a -> a.classroom().id()).containsExactly(6L, 7L, 5L, 9L);
+        assertThat(alternatives).extracting(RoomAlternativeDto::reason).containsExactly(
+                AlternativeReason.OVERLAP, AlternativeReason.OVERLAP, AlternativeReason.OVERLAP,
+                AlternativeReason.SUBJECT_NOT_PERMITTED);
+        assertThat(alternatives).extracting(RoomAlternativeDto::overlapMinutes).containsExactly(10, 10, 20, 0);
+        assertThat(alternatives).extracting(RoomAlternativeDto::overcrowdedBy).containsExactly(0, 10, 0, 0);
+        assertThat(alternatives.getFirst().conflictingEventId()).isEqualTo(92L);
+        assertThat(alternatives.getFirst().unmetRequirements()).containsExactly(
+                new UnmetRequirementDto(RequirementType.PROJECTOR, RequirementSeverity.MINOR));
+    }
+
+    @Test
+    @DisplayName("sin resolver con más de 5 candidatas: corta a 5")
+    void alternativasCortaA5() {
+        UniqueEventResponseDto unique = unique(UNIQUE_ID, 20, false, false, null, null, null);
+        List<OptimizerRoom> rooms = new ArrayList<>();
+        List<OccupiedSlot> occupancy = new ArrayList<>();
+        for (long id = 10; id < 17; id++) {
+            rooms.add(new OptimizerRoom(id, 40, 1L));
+            occupancy.add(new OccupiedSlot(id, DATE, START.minusMinutes(60), START.plusMinutes(id), 80L + id, 600L + id));
+        }
+
+        PreviewResponseDto response = composer.compose(result(new OptimizerAllocation("3", null)),
+                List.of(unique), Map.of(new PlanningKey(UNIQUE_ID, 1), List.of(DATE)),
+                Map.of(), Map.of(), rooms, occupancy);
+
+        assertThat(response.unresolved().getFirst().alternatives())
+                .extracting(RoomAlternativeDto::overlapMinutes).containsExactly(10, 11, 12, 13, 14);
+    }
+
+    @Test
+    @DisplayName("sin resolver con varias fechas: alternativas vacías")
+    void alternativasVaciasConVariasFechas() {
+        RecurringEventResponseDto blocked = recurring(RECURRING_ID);
+
+        PreviewResponseDto response = composer.compose(result(new OptimizerAllocation("1", null)),
+                List.of(blocked), Map.of(new PlanningKey(RECURRING_ID, 1), List.of(DATE, DATE.plusWeeks(1))),
+                Map.of(), Map.of(), List.of(new OptimizerRoom(5L, 40, 1L, false, java.util.Set.of(999L))), List.of());
+
+        assertThat(response.unresolved()).singleElement()
+                .satisfies(item -> assertThat(item.alternatives()).isEmpty());
     }
 
     private List<UnmetRequirementDto> unmetOf(UniqueEventResponseDto unique, int slots, long roomId) {

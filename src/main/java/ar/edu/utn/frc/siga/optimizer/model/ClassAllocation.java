@@ -62,6 +62,15 @@ public class ClassAllocation {
         return classroom.undercrowding(event.enrolled());
     }
 
+    public int getMissingProjector() {
+        return classroom != null && event.needsProjector() && !classroom.hasProjector() ? 1 : 0;
+    }
+
+    public int getMissingComputers() {
+        if (classroom == null) return 0;
+        return Math.max(0, event.computersNeeded() - classroom.computers());
+    }
+
     public boolean conflictsWith(String eventId) {
         return conflictingEventIds.contains(eventId);
     }

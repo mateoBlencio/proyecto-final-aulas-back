@@ -22,6 +22,7 @@ import ar.edu.utn.frc.siga.optimizer.model.OptimizerRoom;
 import ar.edu.utn.frc.siga.optimizer.service.OptimizerService;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomSubjectPermissionDto;
+import ar.edu.utn.frc.siga.space.model.ClassroomResources;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -68,9 +69,9 @@ class PreviewEngine {
         List<ClassroomResponseDto> availableRooms = loadAvailableRooms(Permission.PREVIEW_RUN);
         Map<Long, ClassroomSubjectPermissionDto> permissionsByRoom = classroomService.findSubjectPermissions(
                 availableRooms.stream().map(ClassroomResponseDto::id).toList());
-        List<OptimizerRoom> rooms = availableRooms.stream()
-                .map(c -> toSolverRoom(c, permissionsByRoom.get(c.id())))
-                .toList();
+        List<OptimizerRoom> rooms = toSolverRooms(availableRooms, permissionsByRoom,
+                events.stream().anyMatch(PreviewEngine::requiresProjector),
+                events.stream().anyMatch(PreviewEngine::requiresComputers));
 
         List<OccupiedSlot> occupancyInRange = loadOccupancyInRange(events);
         List<OccupiedSlot> databaseOccupancy = occupancyInRange.stream()
@@ -129,9 +130,8 @@ class PreviewEngine {
 
         Map<Long, ClassroomSubjectPermissionDto> permissionsByRoom = classroomService.findSubjectPermissions(
                 availableRooms.stream().map(ClassroomResponseDto::id).toList());
-        List<OptimizerRoom> rooms = availableRooms.stream()
-                .map(c -> toSolverRoom(c, permissionsByRoom.get(c.id())))
-                .toList();
+        List<OptimizerRoom> rooms = toSolverRooms(availableRooms, permissionsByRoom,
+                requiresProjector(event), requiresComputers(event));
 
         OptimizerEvent optimizerEvent = toSuggestionEvent(eventId, event, slots);
         List<OptimizerOccupancy> occupancy = loadOccupancyForSuggestion(eventId, slots);
@@ -175,8 +175,11 @@ class PreviewEngine {
                 .filter(Objects::nonNull)
                 .max(Integer::compareTo)
                 .orElse(Objects.requireNonNullElse(event.enrolled(), 0));
+        boolean needsProjector = requiresProjector(event);
+        int computersNeeded = event instanceof UniqueEventResponseDto unique
+                ? RoomRequirements.computersNeeded(unique, 1) : 0;
         return new OptimizerEvent(String.valueOf(eventId), commissionKey, enrolled, startTime, endTime,
-                occurrenceDates, subjectIds);
+                occurrenceDates, subjectIds, null, needsProjector, computersNeeded);
     }
 
     private List<OptimizerOccupancy> loadOccupancyForSuggestion(Long eventId, List<OccurrenceSlotDto> slots) {
@@ -198,8 +201,12 @@ class PreviewEngine {
         Set<Long> subjectIds = e.subject() != null ? Set.of(e.subject().id()) : Set.of();
         int enrolledPerRoom = Math.ceilDiv(Objects.requireNonNullElse(e.enrolled(), 0), divisor);
         String groupKey = mirrored ? String.valueOf(e.id()) : null;
+        boolean needsProjector = requiresProjector(e);
+        int computersNeeded = e instanceof UniqueEventResponseDto unique
+                ? RoomRequirements.computersNeeded(unique, divisor) : 0;
         return new OptimizerEvent(key.toPlanningId(), commissionKey, enrolledPerRoom, e.startTime(),
-                e.startTime().plusMinutes(e.durationMinutes()), Set.copyOf(dates), subjectIds, groupKey);
+                e.startTime().plusMinutes(e.durationMinutes()), Set.copyOf(dates), subjectIds, groupKey,
+                needsProjector, computersNeeded);
     }
 
     private List<AcademicEventResponseDto> loadEvents(Set<Long> eventIds) {
@@ -230,10 +237,34 @@ class PreviewEngine {
                 o -> new PlanningKey(o.eventId(), roomSlotByOccurrence.getOrDefault(o.occurrenceId(), 1))));
     }
 
-    private OptimizerRoom toSolverRoom(ClassroomResponseDto c, ClassroomSubjectPermissionDto permission) {
+    private static boolean requiresProjector(AcademicEventResponseDto e) {
+        return e instanceof UniqueEventResponseDto unique && unique.requiresProjector();
+    }
+
+    private static boolean requiresComputers(AcademicEventResponseDto e) {
+        return e instanceof UniqueEventResponseDto unique && RoomRequirements.computersNeeded(unique, 1) > 0;
+    }
+
+    private List<OptimizerRoom> toSolverRooms(List<ClassroomResponseDto> rooms,
+            Map<Long, ClassroomSubjectPermissionDto> permissionsByRoom, boolean loadProjectors,
+            boolean loadComputers) {
+        List<Long> roomIds = rooms.stream().map(ClassroomResponseDto::id).toList();
+        Map<Long, Integer> projectors = loadProjectors
+                ? classroomService.findResourceAmounts(ClassroomResources.PROJECTOR, roomIds) : Map.of();
+        Map<Long, Integer> computers = loadComputers
+                ? classroomService.findResourceAmounts(ClassroomResources.COMPUTERS, roomIds) : Map.of();
+        return rooms.stream()
+                .map(c -> toSolverRoom(c, permissionsByRoom.get(c.id()),
+                        projectors.getOrDefault(c.id(), 0) > 0, computers.getOrDefault(c.id(), 0)))
+                .toList();
+    }
+
+    private OptimizerRoom toSolverRoom(ClassroomResponseDto c, ClassroomSubjectPermissionDto permission,
+            boolean hasProjector, int computers) {
         boolean openToAll = permission == null || permission.openToAll();
         Set<Long> allowedSubjectIds = permission == null ? Set.of() : permission.allowedSubjectIds();
-        return new OptimizerRoom(c.id(), c.capacity(), c.buildingId(), openToAll, allowedSubjectIds);
+        return new OptimizerRoom(c.id(), c.capacity(), c.buildingId(), openToAll, allowedSubjectIds,
+                hasProjector, computers);
     }
 
     private List<OccupiedSlot> loadOccupancyInRange(List<AcademicEventResponseDto> events) {

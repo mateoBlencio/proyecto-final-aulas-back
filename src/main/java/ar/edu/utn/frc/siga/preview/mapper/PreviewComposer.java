@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.preview.mapper;
 
+import ar.edu.utn.frc.siga.allocation.config.AllocationSettings;
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import ar.edu.utn.frc.siga.common.util.Overcrowding;
@@ -8,11 +9,14 @@ import ar.edu.utn.frc.siga.events.dto.response.UniqueEventResponseDto;
 import ar.edu.utn.frc.siga.preview.dto.response.MoveConflictDto;
 import ar.edu.utn.frc.siga.preview.dto.response.PreviewItemDto;
 import ar.edu.utn.frc.siga.preview.dto.response.PreviewResponseDto;
+import ar.edu.utn.frc.siga.preview.dto.response.RoomAlternativeDto;
+import ar.edu.utn.frc.siga.preview.dto.response.RoomAlternativeDto.AlternativeReason;
 import ar.edu.utn.frc.siga.preview.dto.response.RoomStretchDto;
 import ar.edu.utn.frc.siga.preview.dto.response.UnmetRequirementDto;
 import ar.edu.utn.frc.siga.preview.dto.response.UnmetRequirementDto.RequirementSeverity;
 import ar.edu.utn.frc.siga.preview.dto.response.UnmetRequirementDto.RequirementType;
 import ar.edu.utn.frc.siga.preview.service.impl.PlanningKey;
+import ar.edu.utn.frc.siga.preview.service.impl.RoomRequirements;
 import ar.edu.utn.frc.siga.preview.dto.response.UnresolvedAllocationDto;
 import ar.edu.utn.frc.siga.preview.validator.PreviewValidator;
 import ar.edu.utn.frc.siga.preview.validator.PreviewValidator.ResolvedProposal;
@@ -34,15 +38,20 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Component
 @RequiredArgsConstructor
 public class PreviewComposer {
 
+    private static final int MAX_ALTERNATIVES = 5;
+
     private final ClassroomService classroomService;
     private final PreviewValidator previewValidator;
+    private final AllocationSettings allocationSettings;
 
     public PreviewResponseDto compose(OptimizationResult preview, List<AcademicEventResponseDto> events,
                                             Map<PlanningKey, List<LocalDate>> datesByKey,
@@ -69,11 +78,24 @@ public class PreviewComposer {
             }
         }
 
+        Map<Long, OptimizerRoom> roomsById = Maps.byId(rooms, OptimizerRoom::id);
+        List<ResolvedProposal> resolvedProposals = buildResolvedProposals(effectiveRoomByKey, eventsById, datesByKey);
+        Map<PlanningKey, List<AlternativeCandidate>> alternativesByKey = new LinkedHashMap<>();
+        for (PlanningKey key : unresolved) {
+            alternativesByKey.put(key, alternativeCandidates(key, eventsById.get(key.eventId()), datesByKey,
+                    roomsById, divisors.getOrDefault(key, 1), databaseOccupancy, resolvedProposals));
+        }
+
         Set<Long> classroomIds = new LinkedHashSet<>(effectiveRoomByKey.values());
         priorSlotsByKey.values().stream().flatMap(List::stream).map(OccupiedSlot::classroomId).forEach(classroomIds::add);
+        alternativesByKey.values().stream().flatMap(List::stream).map(AlternativeCandidate::classroomId)
+                .forEach(classroomIds::add);
         Map<Long, ClassroomResponseDto> classroomDtoById = Maps.byId(classroomService.findByIdsIncludingDeactivated(classroomIds), ClassroomResponseDto::id);
 
-        Requirements requirements = loadRequirements(resolved, eventsById, effectiveRoomByKey);
+        List<AcademicEventResponseDto> relevantEvents = Stream.concat(resolved.stream(), unresolved.stream())
+                .map(key -> eventsById.get(key.eventId()))
+                .toList();
+        Requirements requirements = loadRequirements(relevantEvents, classroomIds);
 
         List<PreviewItemDto> allocations = resolved.stream()
                 .map(key -> toPreviewItemDto(key, eventsById.get(key.eventId()), datesByKey,
@@ -82,11 +104,11 @@ public class PreviewComposer {
                         divisors.getOrDefault(key, 1), requirements))
                 .toList();
 
-        Set<Long> candidateRoomIds = rooms.stream().map(OptimizerRoom::id).collect(Collectors.toSet());
-        List<ResolvedProposal> resolvedProposals = buildResolvedProposals(effectiveRoomByKey, eventsById, datesByKey);
+        Set<Long> candidateRoomIds = roomsById.keySet();
         List<UnresolvedAllocationDto> unresolvedDtos = unresolved.stream()
                 .map(key -> toUnresolvedAllocationDto(key, eventsById.get(key.eventId()), datesByKey,
-                        candidateRoomIds, databaseOccupancy, resolvedProposals))
+                        candidateRoomIds, databaseOccupancy, resolvedProposals,
+                        alternativesByKey.get(key), classroomDtoById, divisors.getOrDefault(key, 1), requirements))
                 .toList();
 
         return new PreviewResponseDto(preview.previewId(), allocations, unresolvedDtos);
@@ -95,14 +117,11 @@ public class PreviewComposer {
     private record Requirements(Map<Long, Integer> computersByRoom, Map<Long, Integer> projectorsByRoom) {
     }
 
-    private Requirements loadRequirements(List<PlanningKey> resolved, Map<Long, AcademicEventResponseDto> eventsById,
-            Map<PlanningKey, Long> effectiveRoomByKey) {
-        List<UniqueEventResponseDto> uniques = resolved.stream()
-                .map(key -> eventsById.get(key.eventId()))
+    private Requirements loadRequirements(List<AcademicEventResponseDto> events, Set<Long> roomIds) {
+        List<UniqueEventResponseDto> uniques = events.stream()
                 .filter(UniqueEventResponseDto.class::isInstance)
                 .map(UniqueEventResponseDto.class::cast)
                 .toList();
-        Set<Long> roomIds = new LinkedHashSet<>(effectiveRoomByKey.values());
         Map<Long, Integer> computers = uniques.stream().anyMatch(u -> u.requiresComputers() && u.computerCount() != null)
                 ? classroomService.findResourceAmounts(ClassroomResources.COMPUTERS, roomIds) : Map.of();
         Map<Long, Integer> projectors = uniques.stream().anyMatch(UniqueEventResponseDto::requiresProjector)
@@ -121,7 +140,7 @@ public class PreviewComposer {
         }
         if (unique.requiresComputers() && unique.computerCount() != null
                 && requirements.computersByRoom().getOrDefault(classroom.id(), 0)
-                        < Math.ceilDiv(unique.computerCount(), divisor)) {
+                        < RoomRequirements.computersNeeded(unique, divisor)) {
             unmet.add(new UnmetRequirementDto(RequirementType.COMPUTERS, RequirementSeverity.SEVERE));
         }
         if (unique.requiredSoftware() != null && !unique.requiredSoftware().isBlank()) {
@@ -189,14 +208,62 @@ public class PreviewComposer {
         return stretches.size() > 1 ? List.copyOf(stretches) : List.of();
     }
 
+    private record AlternativeCandidate(Long classroomId, AlternativeReason reason, int overlapMinutes,
+                                         Long conflictingEventId, int overcrowdedBy) {
+    }
+
+    // Solo ítems de una fecha: con varias, el solape por aula es una lista de fechas y no hay una cifra para ordenar.
+    private List<AlternativeCandidate> alternativeCandidates(PlanningKey key, AcademicEventResponseDto event,
+            Map<PlanningKey, List<LocalDate>> datesByKey, Map<Long, OptimizerRoom> roomsById, int divisor,
+            List<OccupiedSlot> databaseOccupancy, List<ResolvedProposal> resolvedProposals) {
+        List<LocalDate> dates = datesByKey.getOrDefault(key, List.of());
+        if (event == null || dates.size() != 1) {
+            return List.of();
+        }
+        int enrolledPerRoom = Math.ceilDiv(Objects.requireNonNullElse(event.enrolled(), 0), divisor);
+        Set<Long> subjectIds = event.subject() != null ? Set.of(event.subject().id()) : Set.of();
+        return previewValidator.roomOverlaps(roomsById.keySet(), dates.getFirst(), event.startTime(), endTime(event),
+                        databaseOccupancy, resolvedProposals, allocationSettings.getMaxOverlapMinutes()).stream()
+                .map(overlap -> toAlternativeCandidate(overlap, roomsById.get(overlap.classroomId()),
+                        subjectIds, enrolledPerRoom))
+                .flatMap(Optional::stream)
+                .sorted(Comparator.comparing(AlternativeCandidate::reason)
+                        .thenComparingInt(AlternativeCandidate::overlapMinutes)
+                        .thenComparingInt(AlternativeCandidate::overcrowdedBy))
+                .limit(MAX_ALTERNATIVES)
+                .toList();
+    }
+
+    private static Optional<AlternativeCandidate> toAlternativeCandidate(PreviewValidator.RoomOverlap overlap,
+            OptimizerRoom room, Set<Long> subjectIds, int enrolledPerRoom) {
+        int overcrowdedBy = room.overcrowding(enrolledPerRoom);
+        if (overlap.overlapMinutes() > 0) {
+            return Optional.of(new AlternativeCandidate(room.id(), AlternativeReason.OVERLAP,
+                    overlap.overlapMinutes(), overlap.conflictingEventId(), overcrowdedBy));
+        }
+        // Aula libre que el solver no usó: solo se explica por el permiso de materia.
+        return room.permits(subjectIds) ? Optional.empty()
+                : Optional.of(new AlternativeCandidate(room.id(), AlternativeReason.SUBJECT_NOT_PERMITTED,
+                        0, null, overcrowdedBy));
+    }
+
     private UnresolvedAllocationDto toUnresolvedAllocationDto(PlanningKey key, AcademicEventResponseDto event,
             Map<PlanningKey, List<LocalDate>> datesByKey, Set<Long> candidateRoomIds,
-            List<OccupiedSlot> databaseOccupancy, List<ResolvedProposal> resolvedProposals) {
+            List<OccupiedSlot> databaseOccupancy, List<ResolvedProposal> resolvedProposals,
+            List<AlternativeCandidate> candidates, Map<Long, ClassroomResponseDto> classroomDtoById,
+            int divisor, Requirements requirements) {
         List<LocalDate> dates = datesByKey.getOrDefault(key, List.of());
         List<MoveConflictDto> conflicts = event == null ? List.of()
                 : previewValidator.unresolvedConflicts(candidateRoomIds, Set.copyOf(dates),
                         event.startTime(), endTime(event), databaseOccupancy, resolvedProposals);
-        return new UnresolvedAllocationDto(event, key.roomSlot(), dates, conflicts);
+        List<RoomAlternativeDto> alternatives = candidates.stream()
+                .map(c -> {
+                    ClassroomResponseDto classroom = classroomDtoById.get(c.classroomId());
+                    return new RoomAlternativeDto(classroom, c.reason(), c.overlapMinutes(), c.conflictingEventId(),
+                            c.overcrowdedBy(), unmetRequirements(event, classroom, divisor, requirements));
+                })
+                .toList();
+        return new UnresolvedAllocationDto(event, key.roomSlot(), dates, conflicts, alternatives);
     }
 
     private static LocalTime endTime(AcademicEventResponseDto event) {

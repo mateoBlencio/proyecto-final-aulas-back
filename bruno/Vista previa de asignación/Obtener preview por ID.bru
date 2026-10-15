@@ -21,9 +21,10 @@ docs {
   
   Respuesta: misma forma que el POST — { previewId, allocations: [ { event,
   roomSlot, occurrenceDates, classroom, overcrowdedBy, unchanged, currentRoomStretches,
-  unmetRequirements } ], unresolved: [ { event, roomSlot, dates, conflicts } ] }.
+  unmetRequirements } ], unresolved: [ { event, roomSlot, dates, conflicts, alternatives } ] }.
   roomSlot identifica la clave (evento, aula de espejo) que se envía en el confirm.
   unmetRequirements lista solo advertencias (ver docs de "Generar preview").
   unresolved queda para revisión manual; conflicts explica qué bloquea cada aula
-  candidata (ver docs de "Generar preview").
+  candidata y alternatives propone hasta 5 aulas para asignar a mano (ver docs de
+  "Generar preview").
 }

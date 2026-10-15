@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.allocation.validator.AllocationCandidate;
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
 import ar.edu.utn.frc.siga.common.util.Clashes;
 import ar.edu.utn.frc.siga.common.util.RoomDate;
+import ar.edu.utn.frc.siga.common.util.TimeRanges;
 import ar.edu.utn.frc.siga.common.util.TimeSpan;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.preview.dto.request.PreviewAllocationDto;
@@ -109,6 +110,41 @@ public class PreviewValidator {
             }
         }
         return conflicts;
+    }
+
+    public record RoomOverlap(Long classroomId, int overlapMinutes, Long conflictingEventId) {
+    }
+
+    // Por aula, el peor solape de la fecha contra la base y contra las otras propuestas del preview.
+    // Descarta las que superan maxOverlapMinutes; las libres vuelven con 0 y sin evento.
+    public List<RoomOverlap> roomOverlaps(Set<Long> candidateRoomIds, LocalDate date, LocalTime start, LocalTime end,
+            List<OccupiedSlot> databaseOccupancy, List<ResolvedProposal> resolvedProposals,
+            int maxOverlapMinutes) {
+        List<RoomOverlap> overlaps = new ArrayList<>();
+        for (Long roomId : candidateRoomIds) {
+            RoomOverlap worst = new RoomOverlap(roomId, 0, null);
+            for (OccupiedSlot occupied : databaseOccupancy) {
+                if (roomId.equals(occupied.classroomId()) && date.equals(occupied.date())) {
+                    worst = worse(worst, roomId, start, end, occupied, occupied.eventId());
+                }
+            }
+            for (ResolvedProposal proposal : resolvedProposals) {
+                if (roomId.equals(proposal.classroomId()) && proposal.dates().contains(date)) {
+                    worst = worse(worst, roomId, start, end, proposal, proposal.eventId());
+                }
+            }
+            if (worst.overlapMinutes() <= maxOverlapMinutes) {
+                overlaps.add(worst);
+            }
+        }
+        overlaps.sort(Comparator.comparingInt(RoomOverlap::overlapMinutes).thenComparing(RoomOverlap::classroomId));
+        return overlaps;
+    }
+
+    private static RoomOverlap worse(RoomOverlap current, Long roomId, LocalTime start, LocalTime end,
+            TimeSpan occupant, Long occupantEventId) {
+        int minutes = (int) TimeRanges.overlapMinutes(start, end, occupant.startTime(), occupant.endTime());
+        return minutes > current.overlapMinutes() ? new RoomOverlap(roomId, minutes, occupantEventId) : current;
     }
 
     private List<MoveConflictDto> previewConflicts(Long classroomId, Set<LocalDate> dates,

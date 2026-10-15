@@ -25,6 +25,7 @@ import ar.edu.utn.frc.siga.optimizer.model.OptimizerRoom;
 import ar.edu.utn.frc.siga.optimizer.service.OptimizerService;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomSubjectPermissionDto;
+import ar.edu.utn.frc.siga.space.model.ClassroomResources;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -46,6 +47,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -500,6 +502,73 @@ class PreviewEngineTest {
         assertThat(inputs.databaseOccupancy()).isEmpty();
     }
 
+    @Test
+    @DisplayName("generate: único con proyector y 20 PC en 2 aulas viaja con needsProjector y 10 PC por aula, y las aulas con sus recursos")
+    void generateUnicoConRequisitosYDivisor() {
+        LocalDate date = LocalDate.now().plusDays(5);
+        UniqueEventResponseDto event = uniqueWithRequirements(3L, 40, date, true, true, 20);
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5L, 50), classroom(6L, 50)));
+        when(classroomService.findResourceAmounts(eq(ClassroomResources.PROJECTOR), any())).thenReturn(Map.of(5L, 1));
+        when(classroomService.findResourceAmounts(eq(ClassroomResources.COMPUTERS), any())).thenReturn(Map.of(6L, 12));
+        stubUnique(event, uniqueSlot(30L, 3L, date, 1), uniqueSlot(31L, 3L, date, 2));
+
+        engine.generate(Set.of(3L), 30);
+
+        assertThat(capturedEvents()).hasSize(2).allSatisfy(e -> {
+            assertThat(e.needsProjector()).isTrue();
+            assertThat(e.computersNeeded()).isEqualTo(10);
+        });
+        ArgumentCaptor<List<OptimizerRoom>> roomsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(optimizerService).optimize(any(), roomsCaptor.capture(), any(), anyInt());
+        assertThat(roomsCaptor.getValue()).satisfiesExactly(
+                r -> {
+                    assertThat(r.id()).isEqualTo(5L);
+                    assertThat(r.hasProjector()).isTrue();
+                    assertThat(r.computers()).isZero();
+                },
+                r -> {
+                    assertThat(r.id()).isEqualTo(6L);
+                    assertThat(r.hasProjector()).isFalse();
+                    assertThat(r.computers()).isEqualTo(12);
+                });
+    }
+
+    @Test
+    @DisplayName("generate: sin requisitos en el lote no consulta recursos y el evento viaja con false y 0")
+    void generateSinRequisitosNoConsultaRecursos() {
+        LocalDate date = LocalDate.now().plusDays(5);
+        stubUnique(uniqueEvent(3L, 20, date, null), uniqueSlot(30L, 3L, date, 1));
+
+        engine.generate(Set.of(3L), 30);
+
+        verify(classroomService, never()).findResourceAmounts(any(), any());
+        assertThat(capturedEvents()).singleElement().satisfies(e -> {
+            assertThat(e.needsProjector()).isFalse();
+            assertThat(e.computersNeeded()).isZero();
+        });
+    }
+
+    @Test
+    @DisplayName("suggest: único con proyector y 20 PC viaja con los requisitos completos (divisor 1)")
+    void suggestUnicoConRequisitos() {
+        LocalDate date = LocalDate.of(2026, 3, 2);
+        UniqueEventResponseDto event = uniqueWithRequirements(3L, 20, date, true, true, 20);
+        when(academicEventService.findByIds(any())).thenReturn(List.of(event));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5L, 30)));
+        when(classroomService.findResourceAmounts(eq(ClassroomResources.PROJECTOR), any())).thenReturn(Map.of(5L, 1));
+        when(classroomService.findResourceAmounts(eq(ClassroomResources.COMPUTERS), any())).thenReturn(Map.of(5L, 25));
+        when(buildingScopeResolver.scopeFor(Permission.ALLOCATION_WRITE)).thenReturn(BuildingScope.unrestricted());
+        when(optimizerService.optimize(any(), any(), any(), anyInt()))
+                .thenReturn(new OptimizationResult("prev_x", List.of(new OptimizerAllocation("3", 5L))));
+
+        engine.suggest(3L, List.of(uniqueSlot(30L, 3L, date, 1)), Set.of(), 2);
+
+        assertThat(capturedEvents()).singleElement().satisfies(e -> {
+            assertThat(e.needsProjector()).isTrue();
+            assertThat(e.computersNeeded()).isEqualTo(20);
+        });
+    }
+
     private void stubUnique(UniqueEventResponseDto event, OccurrenceSlotDto... slots) {
         when(academicEventService.findByIds(any())).thenReturn(List.of(event));
         when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of(slots));
@@ -520,6 +589,12 @@ class PreviewEngineTest {
     private UniqueEventResponseDto uniqueEvent(long id, int enrolled, LocalDate date, CommissionResponseDto commission) {
         return new UniqueEventResponseDto(id, EventType.UNIQUE_EVENT, UniqueEventKind.PARCIAL, enrolled,
                 LocalTime.of(18, 0), 120, date, null, null, commission, false, false, null, null, null);
+    }
+
+    private UniqueEventResponseDto uniqueWithRequirements(long id, int enrolled, LocalDate date,
+            boolean projector, boolean computers, Integer computerCount) {
+        return new UniqueEventResponseDto(id, EventType.UNIQUE_EVENT, UniqueEventKind.PARCIAL, enrolled,
+                LocalTime.of(18, 0), 120, date, null, null, null, projector, computers, computerCount, null, null);
     }
 
     private OccurrenceSlotDto uniqueSlot(Long occurrenceId, Long eventId, LocalDate date, int roomSlot) {

@@ -18,6 +18,8 @@ public final class SettingsCatalogFixture {
                 definition("optimizer.weights.sameCommissionDiffRoom", "2000", "0", "1000000"),
                 definition("optimizer.weights.sameCommissionDiffBuilding", "4000", "0", "1000000"),
                 definition("optimizer.weights.sameEventDiffBuilding", "8000", "0", "1000000"),
+                definition("optimizer.weights.missingProjector", "10000", "0", "1000000"),
+                definition("optimizer.weights.missingComputer", "20000", "0", "1000000"),
                 definition("optimizer.weights.unusedCapacity", "1", "0", "1000000"),
                 definition("optimizer.solverSecondsSpentLimit", "300", "1", "3600"),
                 definition("preview.defaultTimeLimitSeconds", "30", "1", "3600"),
