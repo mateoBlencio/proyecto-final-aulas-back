@@ -16,8 +16,15 @@ public record OccurrenceSlotDto(
         LocalTime startTime,
         LocalTime endTime,
         OccurrenceStatus status,
-        Integer enrolled
+        Integer enrolled,
+        Integer roomSlot
 ) implements TimeSpan {
+
+    public OccurrenceSlotDto(Long occurrenceId, Long eventId, LocalDate date, LocalTime startTime,
+                             LocalTime endTime, OccurrenceStatus status, Integer enrolled) {
+        this(occurrenceId, eventId, date, startTime, endTime, status, enrolled, 1);
+    }
+
     public boolean isPast() {
         return LocalDateTime.now().isAfter(date.atTime(startTime));
     }

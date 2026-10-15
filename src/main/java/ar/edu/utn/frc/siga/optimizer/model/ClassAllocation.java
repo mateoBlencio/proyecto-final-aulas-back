@@ -70,6 +70,10 @@ public class ClassAllocation {
         return event.commissionKey();
     }
 
+    public String getGroupKey() {
+        return event.groupKey();
+    }
+
     public Long getBuildingId() {
         return classroom != null ? classroom.buildingId() : null;
     }

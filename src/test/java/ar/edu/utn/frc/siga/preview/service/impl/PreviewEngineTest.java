@@ -15,6 +15,7 @@ import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizationResult;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizerAllocation;
@@ -85,18 +86,6 @@ class PreviewEngineTest {
         when(academicEventService.findByIds(any())).thenReturn(List.of());
 
         assertThatThrownBy(() -> engine.generate(Set.of(99L), 30)).isInstanceOf(ResourceNotFoundException.class);
-    }
-
-    @Test
-    @DisplayName("generate: UniqueEvent rechazado, auto-preview solo soporta recurrentes")
-    void generateRechazaUniqueEvent() {
-        UniqueEventResponseDto unique = new UniqueEventResponseDto(3L, EventType.UNIQUE_EVENT,
-                UniqueEventKind.PARCIAL, 20, LocalTime.of(18, 0), 120, LocalDate.of(2026, 3, 10), null, null, null, false, false, null, null, null);
-        when(academicEventService.findByIds(any())).thenReturn(List.of(unique));
-
-        assertThatThrownBy(() -> engine.generate(Set.of(3L), 30))
-                .isInstanceOf(AllocationConflictException.class)
-                .hasMessageContaining("recurrentes");
     }
 
     @Test
@@ -342,6 +331,200 @@ class PreviewEngineTest {
         ArgumentCaptor<List<OptimizerEvent>> eventsCaptor = ArgumentCaptor.forClass(List.class);
         verify(optimizerService).optimize(eventsCaptor.capture(), any(), any(), anyInt());
         assertThat(eventsCaptor.getValue()).singleElement().extracting(OptimizerEvent::commissionKey).isNull();
+    }
+
+    @Test
+    @DisplayName("generate: único con comisión viaja con endTime = startTime + duración y commissionKey de la comisión")
+    void generateUnicoCalculaEndTimeYCommissionKey() {
+        LocalDate date = LocalDate.now().plusDays(5);
+        UniqueEventResponseDto event = uniqueEvent(3L, 20, date, new CommissionResponseDto(77L, "CUR", null, null));
+        stubUnique(event, uniqueSlot(30L, 3L, date, 1));
+
+        engine.generate(Set.of(3L), 30);
+
+        assertThat(capturedEvents()).singleElement().satisfies(e -> {
+            assertThat(e.planningId()).isEqualTo("3");
+            assertThat(e.startTime()).isEqualTo(LocalTime.of(18, 0));
+            assertThat(e.endTime()).isEqualTo(LocalTime.of(20, 0));
+            assertThat(e.commissionKey()).isEqualTo("77");
+            assertThat(e.enrolled()).isEqualTo(20);
+            assertThat(e.occurrenceDates()).containsExactly(date);
+            assertThat(e.groupKey()).isNull();
+        });
+    }
+
+    @Test
+    @DisplayName("generate: único con 3 roomSlot genera 3 eventos con ids 3, 3:2 y 3:3, enrolled = ceil(total/3) y el mismo groupKey")
+    void generateUnicoConTresRoomSlots() {
+        LocalDate date = LocalDate.now().plusDays(5);
+        UniqueEventResponseDto event = uniqueEvent(3L, 10, date, null);
+        stubUnique(event, uniqueSlot(30L, 3L, date, 1), uniqueSlot(31L, 3L, date, 2), uniqueSlot(32L, 3L, date, 3));
+
+        engine.generate(Set.of(3L), 30);
+
+        List<OptimizerEvent> events = capturedEvents();
+        assertThat(events).extracting(OptimizerEvent::planningId).containsExactly("3", "3:2", "3:3");
+        assertThat(events).extracting(OptimizerEvent::enrolled).containsOnly(4);
+        assertThat(events).extracting(OptimizerEvent::groupKey).containsOnly("3");
+        assertThat(events).allSatisfy(e -> assertThat(e.occurrenceDates()).containsExactly(date));
+    }
+
+    @Test
+    @DisplayName("generate: recurrente sin espejos viaja con planningId = id, groupKey null y enrolled completo")
+    void generateRecurrenteSinEspejosNoCambia() {
+        RecurringEventResponseDto event = recurringEvent(1L);
+        LocalDate d1 = LocalDate.now().plusDays(2);
+        LocalDate d2 = LocalDate.now().plusDays(9);
+        when(academicEventService.findByIds(any())).thenReturn(List.of(event));
+        when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of(slot(10L, 1L, d2), slot(11L, 1L, d1)));
+        stubOptimizer();
+
+        engine.generate(Set.of(1L), 30);
+
+        assertThat(capturedEvents()).singleElement().isEqualTo(new OptimizerEvent(
+                "1", null, 30, LocalTime.of(8, 0), LocalTime.of(9, 30), Set.of(d1, d2), Set.of(), null));
+    }
+
+    @Test
+    @DisplayName("generate: recurrente con espejo parcial divide por clave: el roomSlot 1 sigue completo y el espejo usa n=2")
+    void generateEspejoParcialDivideSegunLaClave() {
+        RecurringEventResponseDto event = recurringEvent(1L);
+        LocalDate d1 = LocalDate.now().plusDays(2);
+        LocalDate d2 = LocalDate.now().plusDays(9);
+        when(academicEventService.findByIds(any())).thenReturn(List.of(event));
+        when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of(
+                slot(10L, 1L, d1), slot(11L, 1L, d2), uniqueSlot(12L, 1L, d1, 2)));
+        stubOptimizer();
+
+        engine.generate(Set.of(1L), 30);
+
+        List<OptimizerEvent> events = capturedEvents();
+        assertThat(events).extracting(OptimizerEvent::planningId).containsExactly("1", "1:2");
+        assertThat(events).extracting(OptimizerEvent::enrolled).containsExactly(30, 15);
+        assertThat(events).extracting(OptimizerEvent::groupKey).containsOnly("1");
+        assertThat(events.get(0).occurrenceDates()).containsExactlyInAnyOrder(d1, d2);
+        assertThat(events.get(1).occurrenceDates()).containsExactly(d1);
+    }
+
+    @Test
+    @DisplayName("generate: ocurrencias ROOM_RELEASED y pasadas quedan fuera de las fechas del solver")
+    void generateExcluyeLiberadasYPasadas() {
+        RecurringEventResponseDto event = recurringEvent(1L);
+        LocalDate pending = LocalDate.now().plusDays(2);
+        LocalDate released = LocalDate.now().plusDays(9);
+        LocalDate past = LocalDate.now().minusDays(7);
+        when(academicEventService.findByIds(any())).thenReturn(List.of(event));
+        when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of(
+                slot(10L, 1L, pending),
+                new OccurrenceSlotDto(11L, 1L, released, LocalTime.of(8, 0), LocalTime.of(9, 30),
+                        OccurrenceStatus.ROOM_RELEASED, 30),
+                slot(12L, 1L, past)));
+        stubOptimizer();
+
+        engine.generate(Set.of(1L), 30);
+
+        assertThat(capturedEvents()).singleElement()
+                .extracting(OptimizerEvent::occurrenceDates).isEqualTo(Set.of(pending));
+    }
+
+    @Test
+    @DisplayName("generate: si todas las ocurrencias están liberadas lanza AllocationConflictException")
+    void generateTodasLiberadasLanza() {
+        RecurringEventResponseDto event = recurringEvent(1L);
+        when(academicEventService.findByIds(any())).thenReturn(List.of(event));
+        when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of(
+                new OccurrenceSlotDto(11L, 1L, LocalDate.now().plusDays(9), LocalTime.of(8, 0), LocalTime.of(9, 30),
+                        OccurrenceStatus.ROOM_RELEASED, 30)));
+
+        assertThatThrownBy(() -> engine.generate(Set.of(1L), 30))
+                .isInstanceOf(AllocationConflictException.class);
+    }
+
+    @Test
+    @DisplayName("loadInputs: con solo recurrentes la ocupación se pide desde startDate (aunque sea pasada) hasta endDate")
+    void loadInputsRangoSoloRecurrentes() {
+        RecurringEventResponseDto event = recurringEvent(1L);
+        when(academicEventService.findByIds(any())).thenReturn(List.of(event));
+        when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of());
+
+        engine.loadInputs(Set.of(1L));
+
+        verify(occupancyService).findOccupancy(LocalDate.of(2026, 1, 5), LocalDate.of(2026, 6, 30));
+    }
+
+    @Test
+    @DisplayName("loadInputs: un único posterior al rango de los recurrentes extiende el fin del rango de ocupación")
+    void loadInputsUnicoPosteriorExtiendeRango() {
+        RecurringEventResponseDto recurring = recurringEvent(1L);
+        UniqueEventResponseDto unique = uniqueEvent(3L, 20, LocalDate.of(2026, 12, 20), null);
+        when(academicEventService.findByIds(any())).thenReturn(List.of(recurring, unique));
+        when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of());
+
+        engine.loadInputs(Set.of(1L, 3L));
+
+        verify(occupancyService).findOccupancy(LocalDate.of(2026, 1, 5), LocalDate.of(2026, 12, 20));
+    }
+
+    @Test
+    @DisplayName("loadInputs: un único anterior al rango de los recurrentes adelanta el inicio del rango de ocupación")
+    void loadInputsUnicoAnteriorExtiendeRango() {
+        RecurringEventResponseDto recurring = recurringEvent(1L);
+        UniqueEventResponseDto unique = uniqueEvent(3L, 20, LocalDate.of(2025, 12, 1), null);
+        when(academicEventService.findByIds(any())).thenReturn(List.of(recurring, unique));
+        when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of());
+
+        engine.loadInputs(Set.of(1L, 3L));
+
+        verify(occupancyService).findOccupancy(LocalDate.of(2025, 12, 1), LocalDate.of(2026, 6, 30));
+    }
+
+    @Test
+    @DisplayName("loadInputs: el aula previa de un único se separa por roomSlot de la ocurrencia ocupada")
+    void loadInputsAulaPreviaPorRoomSlot() {
+        LocalDate date = LocalDate.now().plusDays(5);
+        UniqueEventResponseDto event = uniqueEvent(3L, 20, date, null);
+        when(academicEventService.findByIds(any())).thenReturn(List.of(event));
+        when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of());
+        when(occupancyService.findOccupancy(any(), any())).thenReturn(List.of(
+                new OccupiedSlot(5L, date, LocalTime.of(18, 0), LocalTime.of(20, 0), 3L, 900L, 30L),
+                new OccupiedSlot(6L, date, LocalTime.of(18, 0), LocalTime.of(20, 0), 3L, 901L, 31L)));
+        when(occurrenceService.findSlots(any())).thenReturn(List.of(
+                uniqueSlot(30L, 3L, date, 1), uniqueSlot(31L, 3L, date, 2)));
+
+        PreviewEngine.Inputs inputs = engine.loadInputs(Set.of(3L));
+
+        assertThat(inputs.priorRoomByKey())
+                .containsEntry(new PlanningKey(3L, 1), 5L)
+                .containsEntry(new PlanningKey(3L, 2), 6L)
+                .hasSize(2);
+        assertThat(inputs.databaseOccupancy()).isEmpty();
+    }
+
+    private void stubUnique(UniqueEventResponseDto event, OccurrenceSlotDto... slots) {
+        when(academicEventService.findByIds(any())).thenReturn(List.of(event));
+        when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of(slots));
+        stubOptimizer();
+    }
+
+    private void stubOptimizer() {
+        when(optimizerService.optimize(any(), any(), any(), anyInt()))
+                .thenReturn(new OptimizationResult("prev_x", List.of()));
+    }
+
+    private List<OptimizerEvent> capturedEvents() {
+        ArgumentCaptor<List<OptimizerEvent>> eventsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(optimizerService).optimize(eventsCaptor.capture(), any(), any(), anyInt());
+        return eventsCaptor.getValue();
+    }
+
+    private UniqueEventResponseDto uniqueEvent(long id, int enrolled, LocalDate date, CommissionResponseDto commission) {
+        return new UniqueEventResponseDto(id, EventType.UNIQUE_EVENT, UniqueEventKind.PARCIAL, enrolled,
+                LocalTime.of(18, 0), 120, date, null, null, commission, false, false, null, null, null);
+    }
+
+    private OccurrenceSlotDto uniqueSlot(Long occurrenceId, Long eventId, LocalDate date, int roomSlot) {
+        return new OccurrenceSlotDto(occurrenceId, eventId, date, LocalTime.of(18, 0), LocalTime.of(20, 0),
+                OccurrenceStatus.NEEDS_ROOM, 10, roomSlot);
     }
 
     private OccurrenceSlotDto slot(Long occurrenceId, Long eventId, LocalDate date) {

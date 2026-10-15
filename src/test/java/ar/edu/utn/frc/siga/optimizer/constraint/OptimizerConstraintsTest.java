@@ -20,20 +20,22 @@ class OptimizerConstraintsTest {
             "Minimizar subocupacion",
             "Preferir misma aula por comision",
             "Preferir mismo edificio por comision",
+            "Preferir mismo edificio por evento",
             "Permiso no satisfecho");
 
     private static final Set<SettingKey> EXPECTED_WEIGHT_KEYS = Set.of(
             SettingKey.OPTIMIZER_WEIGHT_OVERCROWDING,
             SettingKey.OPTIMIZER_WEIGHT_UNUSED_CAPACITY,
             SettingKey.OPTIMIZER_WEIGHT_SAME_COMMISSION_DIFF_ROOM,
-            SettingKey.OPTIMIZER_WEIGHT_SAME_COMMISSION_DIFF_BUILDING);
+            SettingKey.OPTIMIZER_WEIGHT_SAME_COMMISSION_DIFF_BUILDING,
+            SettingKey.OPTIMIZER_WEIGHT_SAME_EVENT_DIFF_BUILDING);
 
     @Test
-    @DisplayName("discovers exactly the seven constraints via ServiceLoader")
+    @DisplayName("discovers exactly the eight constraints via ServiceLoader")
     void discoversAllConstraints() {
         List<OptimizerConstraint> constraints = OptimizerConstraints.all();
 
-        assertThat(constraints).hasSize(7);
+        assertThat(constraints).hasSize(8);
     }
 
     @Test
@@ -47,13 +49,13 @@ class OptimizerConstraintsTest {
     }
 
     @Test
-    @DisplayName("exactly the four soft constraints declare a weight key")
+    @DisplayName("exactly the five soft constraints declare a weight key")
     void weightKeysMatchExpected() {
         List<OptimizerConstraint> withWeight = OptimizerConstraints.all().stream()
                 .filter(c -> c.weightKey().isPresent())
                 .toList();
 
-        assertThat(withWeight).hasSize(4);
+        assertThat(withWeight).hasSize(5);
 
         Set<SettingKey> weightKeys = withWeight.stream()
                 .map(c -> c.weightKey().orElseThrow())

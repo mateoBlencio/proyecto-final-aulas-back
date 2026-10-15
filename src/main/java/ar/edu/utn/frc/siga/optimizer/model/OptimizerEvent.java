@@ -10,10 +10,16 @@ import java.util.Set;
 @NamedInterface("api")
 public record OptimizerEvent(String planningId, String commissionKey, int enrolled,
                           LocalTime startTime, LocalTime endTime,
-                          Set<LocalDate> occurrenceDates, Set<Long> subjectIds) implements TimeSpan {
+                          Set<LocalDate> occurrenceDates, Set<Long> subjectIds, String groupKey) implements TimeSpan {
 
     public OptimizerEvent(String planningId, String commissionKey, int enrolled,
                           LocalTime startTime, LocalTime endTime, Set<LocalDate> occurrenceDates) {
-        this(planningId, commissionKey, enrolled, startTime, endTime, occurrenceDates, Set.of());
+        this(planningId, commissionKey, enrolled, startTime, endTime, occurrenceDates, Set.of(), null);
+    }
+
+    public OptimizerEvent(String planningId, String commissionKey, int enrolled,
+                          LocalTime startTime, LocalTime endTime,
+                          Set<LocalDate> occurrenceDates, Set<Long> subjectIds) {
+        this(planningId, commissionKey, enrolled, startTime, endTime, occurrenceDates, subjectIds, null);
     }
 }
