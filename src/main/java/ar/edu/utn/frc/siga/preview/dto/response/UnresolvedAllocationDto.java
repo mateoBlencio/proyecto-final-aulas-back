@@ -9,7 +9,6 @@ public record UnresolvedAllocationDto(
         AcademicEventResponseDto event,
         int roomSlot,
         List<LocalDate> dates,
-        List<MoveConflictDto> conflicts,
-        List<RoomAlternativeDto> alternatives
+        List<MoveConflictDto> conflicts
 ) {
 }

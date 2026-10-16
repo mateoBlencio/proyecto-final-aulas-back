@@ -242,34 +242,4 @@ class PreviewValidatorTest {
     private LocalDate futureDate(int daysFromNow) {
         return LocalDate.now().plusDays(daysFromNow);
     }
-
-    @Test
-    @DisplayName("roomOverlaps: libre, 20 min y 90 min con tope 40 devuelve las dos primeras ordenadas y descarta la tercera")
-    void roomOverlapsDescartaLasQueSuperanElTope() {
-        LocalDate date = LocalDate.of(2026, 3, 2);
-        List<OccupiedSlot> occupancy = List.of(
-                new OccupiedSlot(2L, date, LocalTime.of(7, 0), LocalTime.of(8, 20), 50L, 500L),
-                new OccupiedSlot(3L, date, LocalTime.of(7, 0), LocalTime.of(9, 30), 51L, 501L),
-                new OccupiedSlot(3L, date.plusDays(1), LocalTime.of(8, 0), LocalTime.of(10, 0), 52L, 502L));
-
-        List<PreviewValidator.RoomOverlap> overlaps = validator.roomOverlaps(Set.of(3L, 2L, 1L), date,
-                LocalTime.of(8, 0), LocalTime.of(10, 0), occupancy, List.of(), 40);
-
-        assertThat(overlaps).containsExactly(
-                new PreviewValidator.RoomOverlap(1L, 0, null),
-                new PreviewValidator.RoomOverlap(2L, 20, 50L));
-    }
-
-    @Test
-    @DisplayName("roomOverlaps: el solape contra una propuesta del preview se informa con su evento")
-    void roomOverlapsContraPropuestaDelPreview() {
-        LocalDate date = LocalDate.of(2026, 3, 2);
-        ResolvedProposal proposal = new ResolvedProposal(60L, 1L, List.of(date),
-                LocalTime.of(9, 30), LocalTime.of(11, 0));
-
-        List<PreviewValidator.RoomOverlap> overlaps = validator.roomOverlaps(Set.of(1L), date,
-                LocalTime.of(8, 0), LocalTime.of(10, 0), List.of(), List.of(proposal), 40);
-
-        assertThat(overlaps).containsExactly(new PreviewValidator.RoomOverlap(1L, 30, 60L));
-    }
 }

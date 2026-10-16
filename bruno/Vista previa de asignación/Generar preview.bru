@@ -58,9 +58,6 @@ docs {
     "unresolved": [ { "event": {...}, "roomSlot": 1, "dates": ["2026-08-03", ...], "conflicts": [
       { "date": "2026-08-03", "startTime": "08:00", "endTime": "09:30", "classroomId": 9,
         "conflictingEventId": 42, "origin": "DATABASE" }
-    ], "alternatives": [
-      { "classroom": {...}, "reason": "OVERLAP", "overlapMinutes": 20, "conflictingEventId": 42,
-        "overcrowdedBy": 0, "unmetRequirements": [] }
     ] } ]
   }
 
@@ -97,16 +94,6 @@ docs {
   conflicts vacío = no se pudo determinar el motivo (caso raro, solve subóptimo por
   corte de tiempo).
   
-  unresolved[].alternatives: hasta 5 aulas candidatas para elegir a mano. Solo para ítems
-  de UNA fecha (vacía si tiene varias). Cada una: { classroom, reason, overlapMinutes,
-  conflictingEventId, overcrowdedBy, unmetRequirements }.
-  - reason OVERLAP: el aula está ocupada y el solape (overlapMinutes, el peor de la fecha) no
-    supera allocation.maxOverlapMinutes; conflictingEventId es el evento que lo causa.
-  - reason SUBJECT_NOT_PERMITTED: aula libre que el solver descartó porque la materia no
-    está habilitada; overlapMinutes 0.
-  Orden: reason, overlapMinutes, overcrowdedBy. Una alternativa con solape no pasa el confirm
-  del preview (tolerancia 0): asignarla con POST /v1/allocations (asignación manual).
-
   IMPORTANTE: el timeout del cliente debe superar timeLimitSeconds (el POST queda
   pendiente mientras corre el solver; con timeLimitSeconds=300 puede tardar 5 min).
 }

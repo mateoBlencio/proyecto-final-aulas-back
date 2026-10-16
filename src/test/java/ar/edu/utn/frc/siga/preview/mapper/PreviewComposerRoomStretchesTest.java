@@ -54,7 +54,7 @@ class PreviewComposerRoomStretchesTest {
 
     @BeforeEach
     void setUp() {
-        composer = new PreviewComposer(classroomService, previewValidator, () -> 40);
+        composer = new PreviewComposer(classroomService, previewValidator);
         when(classroomService.findByIdsIncludingDeactivated(anyCollection())).thenReturn(List.of(
                 classroom(3), classroom(12), classroom(20)));
     }
