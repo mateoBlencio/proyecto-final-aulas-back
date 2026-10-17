@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -114,6 +115,41 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.previousClassroom.id").value(aulaA.getId()));
         assertThat(previousClassroomIdOf(item)).isEqualTo(aulaA.getId());
+    }
+
+    @Test
+    @DisplayName("ONE_TIME_ROOM_CHANGE sobre una fecha liberada: la bandeja la muestra y asignar la reactiva con aula y sin motivo")
+    void assign_oneTimeRoomChange_sobreFechaLiberada_laReactiva() throws Exception {
+        Classroom aulaA = testData.aula(testData.edificio());
+        Classroom aulaB = testData.aula(testData.edificio());
+        IntegrationTestData.SubjectAndCommission sc = testData.materiaYComision();
+        LocalDate date = LocalDate.now().plusDays(33);
+        Occurrence occurrence = seedOccurrence(sc, date);
+        allocateDirectly(occurrence.getId(), aulaA.getId());
+        mockMvc.perform(post("/v1/allocations/releases").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"items\":[{\"occurrenceIds\":[" + occurrence.getId() + "]}],"
+                                + "\"reason\":\"VIRTUAL_CLASS\"}"))
+                .andExpect(status().isOk());
+        RoomRequestItem item = seedExistingEventItem(RoomRequestType.ONE_TIME_ROOM_CHANGE,
+                occurrence.getEvent().getId(), sc, date);
+
+        mockMvc.perform(get("/v1/room-requests/items/" + item.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.item.releasedTargetDates[0].date").value(date.toString()))
+                .andExpect(jsonPath("$.item.releasedTargetDates[0].reason").value("VIRTUAL_CLASS"));
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/assign")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(List.of(aulaB.getId()), null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_EVALUATION"));
+
+        Occurrence reactivated = occurrenceRepository.findById(occurrence.getId()).orElseThrow();
+        assertThat(reactivated.getStatus()).isEqualTo(ar.edu.utn.frc.siga.events.model.OccurrenceStatus.NEEDS_ROOM);
+        assertThat(reactivated.getReleaseReason()).isNull();
+        assertThat(reactivated.getPreviousClassroomId()).isEqualTo(aulaA.getId());
+        assertThat(jdbcTemplate.queryForObject("select id_aula from asignacion_aula where id_ocurrencia = ?",
+                Long.class, occurrence.getId())).isEqualTo(aulaB.getId());
     }
 
     private Long previousClassroomIdOf(RoomRequestItem item) {

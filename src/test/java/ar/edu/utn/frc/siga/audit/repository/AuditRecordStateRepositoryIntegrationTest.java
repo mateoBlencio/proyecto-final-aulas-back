@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.audit.service.AuditedEntity;
 import ar.edu.utn.frc.siga.audit.service.AuditedEntityRegistry;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.model.RecurringEvent;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.events.repository.RecurringEventRepository;
@@ -111,8 +112,11 @@ class AuditRecordStateRepositoryIntegrationTest extends AbstractIntegrationTest 
         AuditedEntity occurrence = entity("Occurrence");
         SeededEvent seeded = seedEvent(1);
         Long occurrenceId = seeded.occurrenceIds().getFirst();
-        inTransaction(() -> occurrenceRepository.findById(occurrenceId).orElseThrow()
-                .setStatus(OccurrenceStatus.ROOM_RELEASED));
+        inTransaction(() -> {
+            Occurrence released = occurrenceRepository.findById(occurrenceId).orElseThrow();
+            released.setStatus(OccurrenceStatus.ROOM_RELEASED);
+            released.setReleaseReason(ReleaseReason.OTHER);
+        });
         int revision = lastRevision(occurrence, occurrenceId);
 
         RecordStates states = stateRepository.load(

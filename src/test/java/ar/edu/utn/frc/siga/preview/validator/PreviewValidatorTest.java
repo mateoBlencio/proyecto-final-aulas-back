@@ -236,7 +236,7 @@ class PreviewValidatorTest {
     private AllocationCandidate candidate(Long occurrenceId, Long eventId, LocalDate date, int roomSlot,
             Long classroomId) {
         return new AllocationCandidate(new OccurrenceSlotDto(occurrenceId, eventId, date, LocalTime.of(8, 0),
-                LocalTime.of(9, 30), OccurrenceStatus.NEEDS_ROOM, 30, roomSlot), classroomId);
+                LocalTime.of(9, 30), OccurrenceStatus.NEEDS_ROOM, 30, roomSlot, null, null, null, null), classroomId);
     }
 
     private LocalDate futureDate(int daysFromNow) {

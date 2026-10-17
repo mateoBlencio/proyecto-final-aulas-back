@@ -75,7 +75,7 @@ class AllocationTargetResolverTest {
                 slot(4L, to.plusDays(7))));     // afuera: no entra
 
         Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
-                List.of(rangeItem(from, to)), LocalDate.now());
+                List.of(rangeItem(from, to)), LocalDate.now()).classroomByOccurrence();
 
         assertThat(resolved.keySet()).extracting(OccurrenceSlotDto::occurrenceId)
                 .containsExactly(1L, 2L, 3L);
@@ -91,7 +91,7 @@ class AllocationTargetResolverTest {
                 slot(2L, from.plusMonths(2))));
 
         Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
-                List.of(rangeItem(from, null)), LocalDate.now());
+                List.of(rangeItem(from, null)), LocalDate.now()).classroomByOccurrence();
 
         assertThat(resolved.keySet()).extracting(OccurrenceSlotDto::occurrenceId)
                 .containsExactly(1L, 2L);
@@ -141,7 +141,7 @@ class AllocationTargetResolverTest {
         LocalDate today = LocalDate.now();
         realValidateRange();
         OccurrenceSlotDto yaEmpezo = new OccurrenceSlotDto(
-                1L, EVENT_ID, today, LocalTime.MIN, LocalTime.MIN.plusHours(2), OccurrenceStatus.NEEDS_ROOM, 30);
+                1L, EVENT_ID, today, LocalTime.MIN, LocalTime.MIN.plusHours(2), OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
         when(occurrenceService.findSlotsByEvent(EVENT_ID, today)).thenReturn(List.of(yaEmpezo));
         doThrowConflict(yaEmpezo);
 
@@ -158,7 +158,7 @@ class AllocationTargetResolverTest {
         when(occurrenceService.findSlotsByEvent(EVENT_ID, from)).thenReturn(List.of());
 
         Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
-                List.of(rangeItem(from, from.plusDays(1))), LocalDate.now());
+                List.of(rangeItem(from, from.plusDays(1))), LocalDate.now()).classroomByOccurrence();
 
         assertThat(resolved).isEmpty();
     }
@@ -173,7 +173,7 @@ class AllocationTargetResolverTest {
         when(occurrenceService.findSlotsByEvents(anyCollection())).thenReturn(List.of(s55, s56, s57));
 
         Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
-                List.of(eventItem(55L, 100L), eventItem(56L, 200L), eventItem(57L, 300L)), null);
+                List.of(eventItem(55L, 100L), eventItem(56L, 200L), eventItem(57L, 300L)), null).classroomByOccurrence();
 
         assertThat(resolved).containsExactly(
                 org.assertj.core.api.Assertions.entry(s55, 100L),
@@ -188,12 +188,12 @@ class AllocationTargetResolverTest {
     void eventDescartaPasadasConClamp() {
         LocalDate today = LocalDate.now();
         OccurrenceSlotDto pasada = new OccurrenceSlotDto(
-                1L, 55L, today, LocalTime.MIN, LocalTime.MIN.plusHours(1), OccurrenceStatus.NEEDS_ROOM, 30);
+                1L, 55L, today, LocalTime.MIN, LocalTime.MIN.plusHours(1), OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
         OccurrenceSlotDto futura = slotForEvent(2L, 55L, today.plusDays(10));
         when(occurrenceService.findSlotsByEvents(anyCollection(), any())).thenReturn(List.of(pasada, futura));
 
         Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
-                List.of(eventItem(55L, 100L)), today);
+                List.of(eventItem(55L, 100L)), today).classroomByOccurrence();
 
         assertThat(resolved.keySet()).extracting(OccurrenceSlotDto::occurrenceId).containsExactly(2L);
     }
@@ -218,7 +218,7 @@ class AllocationTargetResolverTest {
         when(occurrenceService.findSlotsByEvents(anyCollection())).thenReturn(List.of(shared));
 
         Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
-                List.of(eventItem(55L, 100L), eventItem(55L, 100L)), null);
+                List.of(eventItem(55L, 100L), eventItem(55L, 100L)), null).classroomByOccurrence();
 
         assertThat(resolved).containsExactly(
                 org.assertj.core.api.Assertions.entry(shared, 100L));
@@ -233,7 +233,7 @@ class AllocationTargetResolverTest {
 
         Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
                 List.of(new AllocationItem(new AllocationTarget.Occurrences(List.of(1L, 2L)), CLASSROOM_ID)),
-                LocalDate.now());
+                LocalDate.now()).classroomByOccurrence();
 
         assertThat(resolved.keySet()).extracting(OccurrenceSlotDto::occurrenceId).containsExactly(1L, 2L);
         verify(occurrenceService, never()).findSlotsByEvents(anyCollection());
@@ -264,13 +264,78 @@ class AllocationTargetResolverTest {
     void resolveAllOccurrencesConPasadaLanza() {
         OccurrenceSlotDto pasada = new OccurrenceSlotDto(
                 1L, EVENT_ID, LocalDate.now().minusDays(1), LocalTime.of(8, 0), LocalTime.of(10, 0),
-                OccurrenceStatus.NEEDS_ROOM, 30);
+                OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
         when(occurrenceService.findSlots(List.of(1L))).thenReturn(List.of(pasada));
         doThrowConflict(pasada);
 
         assertThatThrownBy(() -> resolver.resolveAll(
                 List.of(new AllocationTarget.Occurrences(List.of(1L))), LocalDate.now()))
                 .isInstanceOf(AllocationConflictException.class);
+    }
+
+    // ---------- ocurrencias liberadas (D3 y D9) ----------
+
+    private static OccurrenceSlotDto released(OccurrenceSlotDto o) {
+        return new OccurrenceSlotDto(o.occurrenceId(), o.eventId(), o.date(), o.startTime(), o.endTime(),
+                OccurrenceStatus.ROOM_RELEASED, o.enrolled(), 1, ar.edu.utn.frc.siga.events.model.ReleaseReason.VIRTUAL_CLASS,
+                null, null, null);
+    }
+
+    @Test
+    @DisplayName("target Occurrences: saltea la liberada y la devuelve en skippedReleased, sin fallar")
+    void occurrencesSalteaLiberadas() {
+        OccurrenceSlotDto libre = slotForEvent(1L, EVENT_ID, LocalDate.now().plusDays(5));
+        OccurrenceSlotDto liberada = released(slotForEvent(2L, EVENT_ID, LocalDate.now().plusDays(6)));
+        when(occurrenceService.findSlots(List.of(1L, 2L))).thenReturn(List.of(libre, liberada));
+
+        AllocationTargetResolver.ResolvedAssignments resolved = resolver.resolveClassroomByOccurrence(
+                List.of(new AllocationItem(new AllocationTarget.Occurrences(List.of(1L, 2L)), CLASSROOM_ID)),
+                LocalDate.now());
+
+        assertThat(resolved.classroomByOccurrence().keySet()).containsExactly(libre);
+        assertThat(resolved.skippedReleased()).containsExactly(liberada);
+    }
+
+    @Test
+    @DisplayName("target Event: saltea la liberada y la devuelve en skippedReleased")
+    void eventSalteaLiberadas() {
+        OccurrenceSlotDto libre = slotForEvent(1L, EVENT_ID, LocalDate.now().plusDays(5));
+        OccurrenceSlotDto liberada = released(slotForEvent(2L, EVENT_ID, LocalDate.now().plusDays(12)));
+        when(occurrenceService.findSlotsByEvents(anyCollection(), any())).thenReturn(List.of(libre, liberada));
+
+        AllocationTargetResolver.ResolvedAssignments resolved = resolver.resolveClassroomByOccurrence(
+                List.of(eventItem(EVENT_ID, CLASSROOM_ID)), LocalDate.now());
+
+        assertThat(resolved.classroomByOccurrence().keySet()).containsExactly(libre);
+        assertThat(resolved.skippedReleased()).containsExactly(liberada);
+    }
+
+    @Test
+    @DisplayName("target EventRange: saltea la liberada y la devuelve en skippedReleased")
+    void eventRangeSalteaLiberadas() {
+        LocalDate from = LocalDate.now().plusDays(7);
+        realValidateRange();
+        OccurrenceSlotDto libre = slot(1L, from);
+        OccurrenceSlotDto liberada = released(slot(2L, from.plusDays(7)));
+        when(occurrenceService.findSlotsByEvent(EVENT_ID, from)).thenReturn(List.of(libre, liberada));
+
+        AllocationTargetResolver.ResolvedAssignments resolved = resolver.resolveClassroomByOccurrence(
+                List.of(rangeItem(from, null)), LocalDate.now());
+
+        assertThat(resolved.classroomByOccurrence().keySet()).containsExactly(libre);
+        assertThat(resolved.skippedReleased()).containsExactly(liberada);
+    }
+
+    @Test
+    @DisplayName("resolveAll incluye las liberadas: son el objetivo de deallocate y release")
+    void resolveAllIncluyeLiberadas() {
+        OccurrenceSlotDto liberada = released(slotForEvent(2L, EVENT_ID, LocalDate.now().plusDays(6)));
+        when(occurrenceService.findSlots(List.of(2L))).thenReturn(List.of(liberada));
+
+        List<OccurrenceSlotDto> resolved = resolver.resolveAll(
+                List.of(new AllocationTarget.Occurrences(List.of(2L))), LocalDate.now());
+
+        assertThat(resolved).containsExactly(liberada);
     }
 
     // ---------- helpers ----------
@@ -281,7 +346,7 @@ class AllocationTargetResolverTest {
 
     private static OccurrenceSlotDto slotForEvent(long occurrenceId, long eventId, LocalDate date) {
         return new OccurrenceSlotDto(occurrenceId, eventId, date, LocalTime.of(8, 0), LocalTime.of(10, 0),
-                OccurrenceStatus.NEEDS_ROOM, 30);
+                OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
     }
 
     /** Delega {@code validateRange} al método real: es la regla bajo prueba, no una colaboración. */
@@ -300,6 +365,6 @@ class AllocationTargetResolverTest {
 
     private static OccurrenceSlotDto slot(Long id, LocalDate date) {
         return new OccurrenceSlotDto(id, EVENT_ID, date, LocalTime.of(8, 0), LocalTime.of(10, 0),
-                OccurrenceStatus.NEEDS_ROOM, 30);
+                OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
     }
 }

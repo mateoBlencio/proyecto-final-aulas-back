@@ -26,7 +26,6 @@ class ScopeBypassInventoryTest {
     private static final Path SRC_MAIN = Path.of("src/main/java");
 
     private static final Map<String, Integer> EXPECTED_SYSTEM_SCOPE = Map.of(
-            "ar/edu/utn/frc/siga/allocation/service/impl/OccurrenceVacatedListener.java", 1,
             "ar/edu/utn/frc/siga/ingest/service/impl/IngestServiceImpl.java", 1,
             "ar/edu/utn/frc/siga/notification/internal/service/NotificationRetryScheduler.java", 1,
             "ar/edu/utn/frc/siga/roomrequest/service/impl/RoomRequestCatalogServiceImpl.java", 1,

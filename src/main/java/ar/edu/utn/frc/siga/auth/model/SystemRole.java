@@ -22,6 +22,8 @@ public enum SystemRole {
             Permission.ACADEMIC_READ,
             Permission.EVENT_READ,
             Permission.EVENT_DIRECT_CREATE,
+            Permission.OCCURRENCE_RELEASE,
+            Permission.OCCURRENCE_REQUEST_ROOM,
             Permission.ALLOCATION_READ,
             Permission.ALLOCATION_WRITE,
             Permission.ALLOCATION_HISTORY_READ,

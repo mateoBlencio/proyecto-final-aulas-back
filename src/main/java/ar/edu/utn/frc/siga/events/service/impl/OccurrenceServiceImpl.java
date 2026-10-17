@@ -1,23 +1,27 @@
 package ar.edu.utn.frc.siga.events.service.impl;
 
 import ar.edu.utn.frc.siga.audit.AuditOperation;
-import ar.edu.utn.frc.siga.audit.AuditOperations;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
-import ar.edu.utn.frc.siga.events.model.OccurrenceVacated;
+import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.events.service.command.OccurrenceRelease;
+import ar.edu.utn.frc.siga.common.exception.InvalidSelectionException;
+import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.events.validator.EventScheduleValidator;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -28,7 +32,6 @@ public class OccurrenceServiceImpl implements OccurrenceService {
 
     private final OccurrenceRepository occurrenceRepository;
     private final EventScheduleValidator eventScheduleValidator;
-    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional(readOnly = true)
@@ -124,22 +127,61 @@ public class OccurrenceServiceImpl implements OccurrenceService {
     }
 
     @Override
-    @Transactional
-    @AuditOperation("Liberación de ocurrencia")
-    public void release(Long occurrenceId) {
-        Occurrence occurrence = Finder.orThrow(occurrenceRepository::findById, occurrenceId, "Occurrence");
-        eventScheduleValidator.validateNotPast(occurrence);
-        occurrence.setStatus(OccurrenceStatus.ROOM_RELEASED);
-        eventPublisher.publishEvent(new OccurrenceVacated(occurrenceId, AuditOperations.currentOperationId()));
+    @Transactional(readOnly = true)
+    public List<OccurrenceSlotDto> findMirrors(Collection<Long> principalOccurrenceIds) {
+        if (principalOccurrenceIds.isEmpty()) {
+            return List.of();
+        }
+        return occurrenceRepository.findByMirrorOfOccurrenceIdIn(principalOccurrenceIds).stream()
+                .map(OccurrenceServiceImpl::toSlot).toList();
     }
 
     @Override
     @Transactional
-    @AuditOperation("Pedido de aula para ocurrencia")
-    public void requestRoom(Long occurrenceId) {
-        Occurrence occurrence = Finder.orThrow(occurrenceRepository::findById, occurrenceId, "Occurrence");
-        eventScheduleValidator.validateNotPast(occurrence);
-        occurrence.setStatus(OccurrenceStatus.NEEDS_ROOM);
+    @AuditOperation("Liberación de ocurrencias")
+    public void release(List<OccurrenceRelease> releases, ReleaseReason reason, String note) {
+        if (reason == null) {
+            throw new InvalidSelectionException("El motivo de liberación es obligatorio.");
+        }
+        if (reason == ReleaseReason.OTHER && (note == null || note.isBlank())) {
+            throw new InvalidSelectionException("El motivo OTHER requiere una nota.");
+        }
+        Map<Long, Long> previousClassroomById = new HashMap<>();
+        releases.forEach(r -> previousClassroomById.put(r.occurrenceId(), r.previousClassroomId()));
+        List<Occurrence> occurrences = loadAll(previousClassroomById.keySet());
+        occurrences.forEach(eventScheduleValidator::validateNotPast);
+        for (Occurrence occurrence : occurrences) {
+            occurrence.setStatus(OccurrenceStatus.ROOM_RELEASED);
+            occurrence.setReleaseReason(reason);
+            occurrence.setReleaseNote(note);
+            Long previousClassroomId = previousClassroomById.get(occurrence.getId());
+            if (previousClassroomId != null) {
+                occurrence.setPreviousClassroomId(previousClassroomId);
+            }
+        }
+    }
+
+    @Override
+    @Transactional
+    @AuditOperation("Pedido de aula para ocurrencias")
+    public void requestRoom(Collection<Long> occurrenceIds) {
+        List<Occurrence> occurrences = loadAll(new HashSet<>(occurrenceIds));
+        occurrences.forEach(eventScheduleValidator::validateNotPast);
+        for (Occurrence occurrence : occurrences) {
+            occurrence.setStatus(OccurrenceStatus.NEEDS_ROOM);
+            occurrence.setReleaseReason(null);
+            occurrence.setReleaseNote(null);
+        }
+    }
+
+    private List<Occurrence> loadAll(Set<Long> ids) {
+        List<Occurrence> occurrences = occurrenceRepository.findAllById(ids);
+        if (occurrences.size() != ids.size()) {
+            Set<Long> found = occurrences.stream().map(Occurrence::getId).collect(Collectors.toSet());
+            Long missing = ids.stream().filter(id -> !found.contains(id)).findFirst().orElseThrow();
+            throw ResourceNotFoundException.of("Occurrence", missing);
+        }
+        return occurrences;
     }
 
     private static OccurrenceSlotDto toSlot(Occurrence occurrence) {
@@ -151,6 +193,10 @@ public class OccurrenceServiceImpl implements OccurrenceService {
                 occurrence.endTime(),
                 occurrence.getStatus(),
                 occurrence.getEvent().getEnrolled(),
-                occurrence.getRoomSlot());
+                occurrence.getRoomSlot(),
+                occurrence.getReleaseReason(),
+                occurrence.getReleaseNote(),
+                occurrence.getPreviousClassroomId(),
+                occurrence.getMirrorOfOccurrenceId());
     }
 }

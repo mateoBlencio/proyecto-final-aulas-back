@@ -16,6 +16,7 @@ import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.model.RecurringEvent;
 import ar.edu.utn.frc.siga.events.model.UniqueEvent;
 import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
@@ -24,6 +25,7 @@ import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.events.service.command.OccurrenceRelease;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
@@ -436,7 +438,7 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
         assertThat(occurrences).hasSize(2);
         Long pendingId = occurrences.get(0).getId();
         Long releasedId = occurrences.get(1).getId();
-        occurrenceService.release(releasedId);
+        occurrenceService.release(List.of(new OccurrenceRelease(releasedId, null)), ReleaseReason.VIRTUAL_CLASS, null);
 
         PreviewResponseDto preview = autoPreview(List.of(eventId));
         assertThat(preview.allocations()).singleElement()

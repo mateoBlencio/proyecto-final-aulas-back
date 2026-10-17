@@ -167,7 +167,9 @@ public class PreviewServiceImpl implements PreviewService {
         AllocationTarget target = request.eventId() != null
                 ? new AllocationTarget.EventRange(request.eventId(), request.from(), request.to())
                 : new AllocationTarget.Occurrences(request.occurrenceIds());
-        List<OccurrenceSlotDto> slots = allocationService.resolveOccurrences(target);
+        List<OccurrenceSlotDto> slots = allocationService.resolveOccurrences(target).stream()
+                .filter(o -> o.status() != OccurrenceStatus.ROOM_RELEASED)
+                .toList();
         if (slots.isEmpty()) {
             throw new AllocationConflictException("el target no tiene ocurrencias pendientes de asignación");
         }

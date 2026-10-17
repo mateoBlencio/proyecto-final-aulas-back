@@ -59,7 +59,10 @@ public class EventAuditHistoryServiceImpl implements EventAuditHistoryService {
                 occurrence.getId(),
                 occurrence.getEvent().getId(),
                 occurrence.getDate(),
-                occurrence.getStatus());
+                occurrence.getStatus(),
+                occurrence.getReleaseReason(),
+                occurrence.getReleaseNote(),
+                occurrence.getPreviousClassroomId());
     }
 
     private EventHistorySnapshotDto toEventSnapshot(AcademicEvent event) {

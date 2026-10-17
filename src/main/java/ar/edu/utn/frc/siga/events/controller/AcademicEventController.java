@@ -157,28 +157,4 @@ public class AcademicEventController {
         log.info("Evento único actualizado vía controller: id={}", id);
         return ResponseEntity.ok(response);
     }
-
-    @PostMapping("/occurrences/{occurrenceId}/release")
-    @PreAuthorize("hasAuthority('PERM_OCCURRENCE_RELEASE')")
-    @Operation(summary = "Liberar el aula de una ocurrencia",
-               description = "Marca la ocurrencia como ROOM_RELEASED (libera el aula a propósito, "
-                       + "reasignable en cualquier momento). Rechaza ocurrencias ya pasadas.")
-    public ResponseEntity<Void> release(@PathVariable Long occurrenceId) {
-        log.debug("POST /v1/events/occurrences/{}/release", occurrenceId);
-        occurrenceService.release(occurrenceId);
-        log.info("Ocurrencia liberada: occurrenceId={}", occurrenceId);
-        return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/occurrences/{occurrenceId}/request-room")
-    @PreAuthorize("hasAuthority('PERM_OCCURRENCE_REQUEST_ROOM')")
-    @Operation(summary = "Volver a pedir aula para una ocurrencia",
-               description = "Vuelve a marcar la ocurrencia como necesitada de aula (NEEDS_ROOM). No implica "
-                       + "que se reactive nada: la ocurrencia nunca dejó de dictarse. Rechaza ocurrencias ya pasadas.")
-    public ResponseEntity<Void> requestRoom(@PathVariable Long occurrenceId) {
-        log.debug("POST /v1/events/occurrences/{}/request-room", occurrenceId);
-        occurrenceService.requestRoom(occurrenceId);
-        log.info("Ocurrencia vuelta a marcar como NEEDS_ROOM: occurrenceId={}", occurrenceId);
-        return ResponseEntity.noContent().build();
-    }
 }

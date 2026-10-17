@@ -42,6 +42,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -86,6 +87,8 @@ class RoomRequestResolutionServiceImplTest {
     private RoomRequestComposer composer;
     @Mock
     private RoomRequestOccurrenceResolver occurrenceResolver;
+    @Mock
+    private ar.edu.utn.frc.siga.events.service.OccurrenceService occurrenceService;
     @Mock
     private RoomRequestCandidateResolver candidateResolver;
     @Mock
@@ -647,6 +650,24 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     @Test
+    @DisplayName("assign: revierte solo las principales (no los espejos, que se crean nuevos) a NEEDS_ROOM antes de reallocate")
+    void assign_reactivaOcurrenciasAntesDeReallocate() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(2).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 2, false))
+                .thenReturn(List.of(List.of(9000L, 9001L), List.of(9100L, 9101L)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(104L, 105L), null, "subsecretaria@frc.utn.edu.ar");
+
+        InOrder order = org.mockito.Mockito.inOrder(occurrenceService, allocationService);
+        order.verify(occurrenceService).requestRoom(List.of(9000L, 9001L));
+        order.verify(allocationService).reallocate(any());
+        verify(occurrenceService, never()).requestRoom(List.of(9100L, 9101L));
+    }
+
+    @Test
     @DisplayName("assign: primera vez (NEW, sin allocations) no llama a releaseOldMirrors")
     void assign_primeraVez_noLiberaMirrors() {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
@@ -900,7 +921,7 @@ class RoomRequestResolutionServiceImplTest {
     private static RoomRequestItemResponseDto mockResponse() {
         return new RoomRequestItemResponseDto(1L, 1, RoomRequestStatus.CANCELLED, "subsecretaria@frc.utn.edu.ar",
                 null, "motivo", List.of(), null, null, null, null, null, null, null, 1, false, false, null,
-                false, null, null, List.of(), null, List.of(), null, null, null, null, null, null);
+                false, null, null, List.of(), null, List.of(), null, null, null, null, null, null, List.of());
     }
 
     private static RoomRequestItemDetailDto mockDetail() {

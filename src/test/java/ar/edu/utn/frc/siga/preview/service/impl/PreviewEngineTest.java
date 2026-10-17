@@ -110,7 +110,7 @@ class PreviewEngineTest {
         when(academicEventService.findByIds(any())).thenReturn(List.of(event));
         when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(
                 List.of(new OccurrenceSlotDto(10L, 1L, date, LocalTime.of(8, 0), LocalTime.of(9, 30),
-                        OccurrenceStatus.NEEDS_ROOM, 30)));
+                        OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null)));
         when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5L, 100)));
         when(optimizerService.optimize(any(), any(), any(), anyInt()))
                 .thenReturn(new OptimizationResult("prev_x", List.of()));
@@ -163,7 +163,7 @@ class PreviewEngineTest {
         when(academicEventService.findByIds(any())).thenReturn(List.of(event));
         when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(
                 List.of(new OccurrenceSlotDto(10L, 1L, date, LocalTime.of(8, 0), LocalTime.of(9, 30),
-                        OccurrenceStatus.NEEDS_ROOM, 30)));
+                        OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null)));
         when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5L, 100), classroom(6L, 100)));
         when(classroomService.findSubjectPermissions(any())).thenReturn(Map.of(
                 5L, new ClassroomSubjectPermissionDto(5L, false, Set.of(7L)),
@@ -244,9 +244,9 @@ class PreviewEngineTest {
         LocalDate d2 = LocalDate.of(2026, 3, 9);
         List<OccurrenceSlotDto> slots = List.of(
                 new OccurrenceSlotDto(10L, 1L, d1, LocalTime.of(10, 0), LocalTime.of(12, 0),
-                        OccurrenceStatus.NEEDS_ROOM, 30),
+                        OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null),
                 new OccurrenceSlotDto(11L, 1L, d2, LocalTime.of(11, 0), LocalTime.of(13, 0),
-                        OccurrenceStatus.NEEDS_ROOM, 30));
+                        OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null));
         when(optimizerService.optimize(any(), any(), any(), anyInt()))
                 .thenReturn(new OptimizationResult("prev_x", List.of(new OptimizerAllocation("1", 5L))));
 
@@ -305,7 +305,7 @@ class PreviewEngineTest {
         when(buildingScopeResolver.scopeFor(Permission.ALLOCATION_WRITE)).thenReturn(BuildingScope.unrestricted());
         List<OccurrenceSlotDto> slots = List.of(
                 new OccurrenceSlotDto(10L, 1L, LocalDate.of(2026, 3, 2), LocalTime.of(8, 0), LocalTime.of(9, 30),
-                        OccurrenceStatus.NEEDS_ROOM, 40));
+                        OccurrenceStatus.NEEDS_ROOM, 40, 1, null, null, null, null));
         when(optimizerService.optimize(any(), any(), any(), anyInt()))
                 .thenReturn(new OptimizationResult("prev_x", List.of(new OptimizerAllocation("1", 5L))));
 
@@ -333,6 +333,25 @@ class PreviewEngineTest {
         ArgumentCaptor<List<OptimizerEvent>> eventsCaptor = ArgumentCaptor.forClass(List.class);
         verify(optimizerService).optimize(eventsCaptor.capture(), any(), any(), anyInt());
         assertThat(eventsCaptor.getValue()).singleElement().extracting(OptimizerEvent::commissionKey).isNull();
+    }
+
+    @Test
+    @DisplayName("loadInputs: las fechas liberadas no entran al solver")
+    void loadInputsExcluyeFechasLiberadas() {
+        RecurringEventResponseDto event = recurringEvent(1L);
+        LocalDate libre = LocalDate.now().plusDays(2);
+        LocalDate liberada = libre.plusDays(7);
+        when(academicEventService.findByIds(any())).thenReturn(List.of(event));
+        when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of(
+                slot(10L, 1L, libre),
+                new OccurrenceSlotDto(11L, 1L, liberada, LocalTime.of(8, 0), LocalTime.of(9, 30),
+                        OccurrenceStatus.ROOM_RELEASED, 30, 1,
+                        ar.edu.utn.frc.siga.events.model.ReleaseReason.VIRTUAL_CLASS, null, null, null)));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(5L, 100)));
+
+        PreviewEngine.Inputs inputs = engine.loadInputs(Set.of(1L));
+
+        assertThat(inputs.datesByKey().get(new PlanningKey(1L, 1))).containsExactly(libre);
     }
 
     @Test
@@ -599,12 +618,12 @@ class PreviewEngineTest {
 
     private OccurrenceSlotDto uniqueSlot(Long occurrenceId, Long eventId, LocalDate date, int roomSlot) {
         return new OccurrenceSlotDto(occurrenceId, eventId, date, LocalTime.of(18, 0), LocalTime.of(20, 0),
-                OccurrenceStatus.NEEDS_ROOM, 10, roomSlot);
+                OccurrenceStatus.NEEDS_ROOM, 10, roomSlot, null, null, null, null);
     }
 
     private OccurrenceSlotDto slot(Long occurrenceId, Long eventId, LocalDate date) {
         return new OccurrenceSlotDto(occurrenceId, eventId, date, LocalTime.of(8, 0), LocalTime.of(9, 30),
-                OccurrenceStatus.NEEDS_ROOM, 30);
+                OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
     }
 
     private RecurringEventResponseDto recurringEvent(long id) {

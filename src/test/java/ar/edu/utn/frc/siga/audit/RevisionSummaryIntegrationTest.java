@@ -12,6 +12,7 @@ import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.model.AcademicEvent;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.settings.model.SettingKey;
@@ -176,6 +177,7 @@ class RevisionSummaryIntegrationTest extends AbstractIntegrationTest {
             List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId);
             AcademicEvent event = occurrences.getFirst().getEvent();
             occurrences.get(0).setStatus(OccurrenceStatus.ROOM_RELEASED);
+            occurrences.get(0).setReleaseReason(ReleaseReason.OTHER);
             occurrenceRepository.delete(occurrences.get(1));
             occurrenceRepository.delete(occurrences.get(2));
             for (int offset = 1; offset <= 2; offset++) {
@@ -248,7 +250,7 @@ class RevisionSummaryIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isCreated()).andReturn();
         long allocationId = objectMapper.readTree(created.getResponse().getContentAsString()).get(0).get("id").asLong();
-        mockMvc.perform(post("/v1/events/occurrences/{id}/release", occurrenceId)).andExpect(status().is2xxSuccessful());
+        mockMvc.perform(post("/v1/allocations/releases").contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"items\":[{\"occurrenceIds\":[" + occurrenceId + "]}],\"reason\":\"OTHER\",\"note\":\"test\"}")).andExpect(status().is2xxSuccessful());
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(jdbc.queryForObject(
                 "SELECT count(*) FROM asignacion_aula_aud WHERE id_asignacion = ? AND revtype = 2", Long.class, allocationId))
                 .isEqualTo(1));
@@ -501,7 +503,11 @@ class RevisionSummaryIntegrationTest extends AbstractIntegrationTest {
         Long eventId = createRecurringEvent(140, 1);
         Long occurrenceId = occurrenceRepository.findByEvent_Id(eventId).getFirst().getId();
         new TransactionTemplate(transactionManager).executeWithoutResult(tx ->
-                occurrenceRepository.findById(occurrenceId).orElseThrow().setStatus(OccurrenceStatus.ROOM_RELEASED));
+                {
+                    Occurrence occurrence = occurrenceRepository.findById(occurrenceId).orElseThrow();
+                    occurrence.setStatus(OccurrenceStatus.ROOM_RELEASED);
+                    occurrence.setReleaseReason(ReleaseReason.OTHER);
+                });
         int rev = jdbc.queryForObject("SELECT MAX(rev) FROM ocurrencia_aud WHERE revtype = 1", Integer.class);
 
         JsonNode entry = entryOf(listing(), targetOf(rev));

@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.roomrequest.dto.response.AssignedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.BuildingOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailHeaderDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.ReleasedDateDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemRowDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestResponseDto;
@@ -37,6 +38,7 @@ public interface RoomRequestMapper {
     @Mapping(target = "derivedBuilding", source = "derivedBuilding")
     @Mapping(target = "returnedFromBuilding", source = "returnedFromBuilding")
     @Mapping(target = "enrolled", source = "enrolled")
+    @Mapping(target = "releasedTargetDates", source = "releasedTargetDates")
     @Mapping(target = "endTime", expression = "java(item.endTime())")
     @Mapping(target = "durationMinutes",
              expression = "java(item.getDuration() == null ? null : item.getDuration().toMinutes())")
@@ -48,7 +50,8 @@ public interface RoomRequestMapper {
                                      AssignedClassroomDto previousClassroom,
                                      BuildingOptionDto derivedBuilding,
                                      BuildingOptionDto returnedFromBuilding,
-                                     Integer enrolled);
+                                     Integer enrolled,
+                                     List<ReleasedDateDto> releasedTargetDates);
 
     @Mapping(target = "id", source = "request.id")
     @Mapping(target = "subject", source = "subject")

@@ -2,10 +2,12 @@ package ar.edu.utn.frc.siga.allocation.service;
 
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.ReleasedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
+import ar.edu.utn.frc.siga.allocation.service.command.ReleaseCommand;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 
 import java.time.LocalDate;
@@ -33,6 +35,19 @@ public interface AllocationService {
     List<AllocationResponseDto> reallocate(AllocationCommand command);
 
     List<DeallocatedOccurrenceDto> deallocate(DeallocationCommand command);
+
+    /**
+     * Libera las ocurrencias del lote con motivo: borra sus asignaciones y las pasa a
+     * {@code ROOM_RELEASED} en la misma transacción. Arrastra los espejos de cada ocurrencia con el
+     * mismo motivo. Conserva el aula que tenían como {@code previousClassroomId}.
+     */
+    List<ReleasedOccurrenceDto> release(ReleaseCommand command);
+
+    /**
+     * Revierte la liberación: las ocurrencias liberadas vuelven a {@code NEEDS_ROOM}. No asigna aula
+     * ni recrea espejos. Devuelve los ids revertidos.
+     */
+    List<Long> cancelRelease(DeallocationCommand command);
 
     /**
      * Única puerta para el sync ASIGNACIONES de SysAcad (ver

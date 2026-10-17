@@ -1,0 +1,25 @@
+meta {
+  name: Revertir liberación de ocurrencias
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/v1/allocations/releases
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "items": [
+      { "occurrenceIds": [1041, 1042] },
+      { "eventId": 56, "from": "2026-04-07" }
+    ]
+  }
+}
+
+docs {
+  Devuelve las ocurrencias liberadas a NEEDS_ROOM y limpia motivo y nota. No asigna aula ni recrea espejos.
+  Respuesta 200: lista de ids revertidos.
+}

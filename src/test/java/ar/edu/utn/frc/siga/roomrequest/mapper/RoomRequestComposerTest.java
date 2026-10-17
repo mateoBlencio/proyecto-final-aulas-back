@@ -1,7 +1,9 @@
 package ar.edu.utn.frc.siga.roomrequest.mapper;
 
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
+import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AssignedClassroomDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.ReleasedDateDto;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestCatalogsResolver.ActiveCommissionsKey;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestCatalogsResolver.Catalogs;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
@@ -82,7 +84,7 @@ class RoomRequestComposerTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<CommissionResponseDto>> commissions = ArgumentCaptor.forClass(List.class);
-        verify(mapper).toDto(eq(item), commissions.capture(), any(), any(), any(), any(), any(), any(), any());
+        verify(mapper).toDto(eq(item), commissions.capture(), any(), any(), any(), any(), any(), any(), any(), any());
         assertThat(commissions.getValue()).extracting(CommissionResponseDto::id).containsExactly(7L, 8L);
     }
 
@@ -102,8 +104,24 @@ class RoomRequestComposerTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<AssignedClassroomDto>> assignedClassrooms = ArgumentCaptor.forClass(List.class);
-        verify(mapper).toDto(eq(item), any(), any(), any(), assignedClassrooms.capture(), any(), any(), any(), any());
+        verify(mapper).toDto(eq(item), any(), any(), any(), assignedClassrooms.capture(), any(), any(), any(), any(), any());
         assertThat(assignedClassrooms.getValue()).extracting(AssignedClassroomDto::id).containsExactly(1L);
+    }
+
+    @Test
+    @DisplayName("composeItem pasa al mapper las fechas liberadas que resuelve el catalogsResolver")
+    void composeItem_passesReleasedTargetDatesToMapper() {
+        RoomRequest request = RoomRequest.builder().id(1L).type(RoomRequestType.ONE_TIME_ROOM_CHANGE).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(100L).build();
+        request.addItem(item);
+        List<ReleasedDateDto> released = List.of(new ReleasedDateDto(
+                LocalDate.of(2026, 5, 4), ReleaseReason.VIRTUAL_CLASS));
+        when(catalogsResolver.resolve(any(), any(), any(), any(), any())).thenReturn(emptyCatalogs());
+        when(catalogsResolver.resolveReleasedTargetDatesByItemId(List.of(item))).thenReturn(Map.of(100L, released));
+
+        composer.composeItem(item);
+
+        verify(mapper).toDto(eq(item), any(), any(), any(), any(), any(), any(), any(), any(), eq(released));
     }
 
     private static Catalogs emptyCatalogs() {

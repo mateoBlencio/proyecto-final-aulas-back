@@ -7,7 +7,9 @@ import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.events.service.command.OccurrenceRelease;
 import ar.edu.utn.frc.siga.roomrequest.direct.DirectEventKinds;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
@@ -62,7 +64,9 @@ class RoomRequestOccurrenceResolver {
         allocationService.deallocate(new DeallocationCommand(
                 List.of(new AllocationTarget.Occurrences(oldMirrorOccurrenceIds)),
                 "Reasignación de pedido de aula #" + item.getId()));
-        oldMirrorOccurrenceIds.forEach(occurrenceService::release);
+        occurrenceService.release(
+                oldMirrorOccurrenceIds.stream().map(id -> new OccurrenceRelease(id, null)).toList(),
+                ReleaseReason.MIRROR_RETIRED, "Reasignación de pedido de aula #" + item.getId());
     }
 
     private List<Long> resolveTargetOccurrences(RoomRequestItem item, boolean reassigning) {
@@ -86,6 +90,7 @@ class RoomRequestOccurrenceResolver {
 
     private Long findOccurrenceOnDate(RoomRequestItem item) {
         return occurrenceService.findSlotsByEvent(item.getSourceRecurringEventId(), null).stream()
+                .filter(slot -> slot.mirrorOfOccurrenceId() == null)
                 .filter(slot -> slot.date().equals(item.getDate()))
                 .findFirst()
                 .map(OccurrenceSlotDto::occurrenceId)
@@ -104,6 +109,7 @@ class RoomRequestOccurrenceResolver {
     List<OccurrenceSlotDto> futureSlotsOnDayOfWeek(RoomRequestItem item) {
         List<OccurrenceSlotDto> slots = occurrenceService.findSlotsByEvent(item.getSourceRecurringEventId(), LocalDate.now())
                 .stream()
+                .filter(slot -> slot.mirrorOfOccurrenceId() == null)
                 .filter(slot -> slot.date().getDayOfWeek() == item.getDayOfWeek())
                 .toList();
         if (slots.isEmpty()) {

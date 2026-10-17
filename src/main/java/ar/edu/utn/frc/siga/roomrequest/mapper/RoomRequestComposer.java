@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AssignedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.BuildingOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.ReleasedDateDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailHeaderDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
@@ -66,10 +67,13 @@ public class RoomRequestComposer {
         Map<Long, Integer> enrolledByEventId = catalogsResolver.resolveEnrolledByEventId(collectSourceRecurringEventIds(items));
         Map<Long, List<ClassroomOptionDto>> currentClassroomsByItemId = catalogsResolver.resolveCurrentClassroomsByItemId(items);
 
+        Map<Long, List<ReleasedDateDto>> releasedDatesByItemId = catalogsResolver.resolveReleasedTargetDatesByItemId(items);
+
         List<RoomRequestResponseDto> result = new ArrayList<>(requests.size());
         for (RoomRequest request : requests) {
             result.add(mapper.toDto(request, resolveSubject(request, catalogs),
-                    composeItems(request.getItems(), catalogs, enrolledByEventId, currentClassroomsByItemId)));
+                    composeItems(request.getItems(), catalogs, enrolledByEventId, currentClassroomsByItemId,
+                            releasedDatesByItemId)));
         }
         return result;
     }
@@ -121,7 +125,8 @@ public class RoomRequestComposer {
         Catalogs catalogs = catalogsResolver.resolve(Set.of(), commissionIds, classroomIds, buildingIds, activeCommissionsKeys);
         Map<Long, Integer> enrolledByEventId = catalogsResolver.resolveEnrolledByEventId(collectSourceRecurringEventIds(List.of(item)));
         Map<Long, List<ClassroomOptionDto>> currentClassroomsByItemId = catalogsResolver.resolveCurrentClassroomsByItemId(List.of(item));
-        return composeItems(List.of(item), catalogs, enrolledByEventId, currentClassroomsByItemId).getFirst();
+        return composeItems(List.of(item), catalogs, enrolledByEventId, currentClassroomsByItemId,
+                catalogsResolver.resolveReleasedTargetDatesByItemId(List.of(item))).getFirst();
     }
 
     public RoomRequestItemDetailDto composeDetail(RoomRequestItem item) {
@@ -145,7 +150,8 @@ public class RoomRequestComposer {
 
         RoomRequestItemDetailHeaderDto header = mapper.toDetailHeaderDto(request, resolveSubject(request, catalogs));
         RoomRequestItemResponseDto itemDto =
-                composeItems(List.of(item), catalogs, enrolledByEventId, currentClassroomsByItemId).getFirst();
+                composeItems(List.of(item), catalogs, enrolledByEventId, currentClassroomsByItemId,
+                catalogsResolver.resolveReleasedTargetDatesByItemId(List.of(item))).getFirst();
 
         return new RoomRequestItemDetailDto(header, itemDto);
     }
@@ -211,7 +217,8 @@ public class RoomRequestComposer {
     }
 
     private List<RoomRequestItemResponseDto> composeItems(Collection<RoomRequestItem> items, Catalogs catalogs,
-            Map<Long, Integer> enrolledByEventId, Map<Long, List<ClassroomOptionDto>> currentClassroomsByItemId) {
+            Map<Long, Integer> enrolledByEventId, Map<Long, List<ClassroomOptionDto>> currentClassroomsByItemId,
+            Map<Long, List<ReleasedDateDto>> releasedDatesByItemId) {
         List<RoomRequestItemResponseDto> result = new ArrayList<>(items.size());
         for (RoomRequestItem item : items) {
             Integer enrolled = item.getSourceRecurringEventId() != null
@@ -223,7 +230,8 @@ public class RoomRequestComposer {
                     resolvePreviousClassroom(item, catalogs),
                     resolveBuilding(item.getDerivedBuildingId(), catalogs),
                     resolveBuilding(item.getReturnedFromBuildingId(), catalogs),
-                    enrolled));
+                    enrolled,
+                    releasedDatesByItemId.getOrDefault(item.getId(), List.of())));
         }
         return result;
     }

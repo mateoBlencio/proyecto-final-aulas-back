@@ -451,7 +451,7 @@ class AllocationConflictServiceImplTest {
 
     private OccurrenceSlotDto occurrenceSlot(long id, RecurringEventResponseDto event, LocalDate date) {
         return new OccurrenceSlotDto(id, event.id(), date, event.startTime(), event.endTime(),
-                OccurrenceStatus.NEEDS_ROOM, event.enrolled());
+                OccurrenceStatus.NEEDS_ROOM, event.enrolled(), 1, null, null, null, null);
     }
 
     private Allocation allocation(long id, Long occurrenceId, long classroomId) {

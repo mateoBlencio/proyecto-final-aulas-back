@@ -53,7 +53,8 @@ public class AllocationComposer {
         for (Allocation allocation : allocations) {
             OccurrenceSlotDto slot = slotByOccurrenceId.get(allocation.getOccurrenceId());
             OccurrenceResponseDto occurrence = new OccurrenceResponseDto(
-                    slot.occurrenceId(), slot.eventId(), slot.date(), slot.status(), slot.startTime(), slot.endTime());
+                    slot.occurrenceId(), slot.eventId(), slot.date(), slot.status(), slot.startTime(), slot.endTime(),
+                    slot.releaseReason(), slot.releaseNote(), slot.previousClassroomId());
             AcademicEventResponseDto event = eventDtoById.get(slot.eventId());
             ClassroomResponseDto classroom = classroomsById.get(allocation.getClassroomId());
             result.add(mapper.toDto(allocation, occurrence, event, classroom));

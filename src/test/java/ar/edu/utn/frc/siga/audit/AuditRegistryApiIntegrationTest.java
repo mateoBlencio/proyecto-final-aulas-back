@@ -1029,19 +1029,21 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("liberar una ocurrencia deja un único cambio en status: NEEDS_ROOM a ROOM_RELEASED")
-    void releasingAnOccurrenceShowsOnlyStatusChange() throws Exception {
+    @DisplayName("liberar una ocurrencia deja el cambio de status y el motivo de liberación")
+    void releasingAnOccurrenceShowsStatusAndReasonChange() throws Exception {
         seedRecurringEvent(LocalDate.now().plusDays(60));
         long occurrenceId = jdbcTemplate.queryForObject(
                 "SELECT MAX(id_ocurrencia) FROM ocurrencia_aud WHERE revtype = 0", Long.class);
-        mockMvc.perform(post("/v1/events/occurrences/{id}/release", occurrenceId)).andExpect(status().is2xxSuccessful());
-        String operationId = latestOperationId("Liberación de ocurrencia");
+        mockMvc.perform(post("/v1/allocations/releases").contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"items\":[{\"occurrenceIds\":[" + occurrenceId + "]}],\"reason\":\"OTHER\",\"note\":\"test\"}")).andExpect(status().is2xxSuccessful());
+        String operationId = latestOperationId("Liberación de 1 ocurrencia (OTHER)");
 
         List<JsonNode> items = operationItems(operationId);
 
         assertThat(items).hasSize(1);
         assertThat(items.getFirst().get("entityType").asText()).isEqualTo("Ocurrencia");
-        assertThat(changeSummary(items.getFirst())).containsExactly("status:NEEDS_ROOM:ROOM_RELEASED");
+        assertThat(changeSummary(items.getFirst())).containsExactlyInAnyOrder(
+                "status:NEEDS_ROOM:ROOM_RELEASED", "releaseReason:null:OTHER",
+                "releaseNote:null:test");
     }
 
     @Test
@@ -1183,86 +1185,6 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(entry.get("description").asText()).contains("2 aulas").contains(building.getName());
     }
 
-    /** Operation ids of the release flow: the parent (release) and the child (listener thread). */
-    private record ReleaseChain(String parentId, String childId) {
-    }
-
-    /** Allocates an occurrence, releases it through the API and waits for the async listener to delete the allocation. */
-    private ReleaseChain releaseAllocatedOccurrence(int daysAhead) throws Exception {
-        var sc = testData.materiaYComision();
-        LocalDate date = LocalDate.now().plusDays(daysAhead);
-        var eventDto = new CreateRecurringEventRequestDto(
-                30, LocalTime.of(8, 0), 90, date.getDayOfWeek(), date, date, sc.subjectId(), sc.commissionId());
-        Long eventId = asFixtureUser(() -> academicEventService.createRecurringEvent(eventDto)).id();
-        Long occurrenceId = occurrenceRepository.findByEvent_Id(eventId).getFirst().getId();
-        Long classroomId = testData.aula(testData.edificio()).getId();
-        var body = new AllocationBatchRequestDto(
-                List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, null, null, classroomId)), null);
-        MvcResult created = mockMvc.perform(post("/v1/allocations")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isCreated())
-                .andReturn();
-        long allocationId = objectMapper.readTree(created.getResponse().getContentAsString()).get(0).get("id").asLong();
-
-        mockMvc.perform(post("/v1/events/occurrences/{id}/release", occurrenceId)).andExpect(status().is2xxSuccessful());
-
-        String childSql = "SELECT r.operacion_id FROM revinfo r JOIN asignacion_aula_aud a ON a.rev = r.rev "
-                + "WHERE a.id_asignacion = ? AND a.revtype = 2";
-        await().atMost(Duration.ofSeconds(15)).untilAsserted(() ->
-                assertThat(jdbcTemplate.queryForList(childSql, String.class, allocationId)).hasSize(1));
-        String childId = jdbcTemplate.queryForObject(childSql, String.class, allocationId);
-        String parentId = jdbcTemplate.queryForObject(
-                "SELECT r.operacion_id FROM revinfo r JOIN ocurrencia_aud o ON o.rev = r.rev "
-                        + "WHERE o.id_ocurrencia = ? AND o.revtype = 1 AND r.descripcion = 'Liberación de ocurrencia'",
-                String.class, occurrenceId);
-        return new ReleaseChain(parentId, childId);
-    }
-
-    private void assertReleaseChain(JsonNode chain, ReleaseChain ids) {
-        assertThat(chain.get("truncated").asBoolean()).isFalse();
-        JsonNode entries = chain.get("entries");
-        assertThat(entries).hasSize(2);
-        assertThat(entries.get(0).get("operationId").asText()).isEqualTo(ids.parentId());
-        assertThat(entries.get(0).get("type").asText()).isEqualTo("OPERATION");
-        assertThat(isAbsent(entries.get(0).get("parentOperationId"))).isTrue();
-        assertThat(entries.get(0).get("actorType").asText()).isEqualTo("HUMAN");
-        assertThat(entries.get(1).get("operationId").asText()).isEqualTo(ids.childId());
-        assertThat(entries.get(1).get("parentOperationId").asText()).isEqualTo(ids.parentId());
-        assertThat(entries.get(1).get("actorType").asText()).isEqualTo("SYSTEM");
-        assertThat(entries.get(0).get("revision").asInt()).isLessThan(entries.get(1).get("revision").asInt());
-    }
-
-    @Test
-    @DisplayName("la cadena pedida desde el hijo devuelve padre e hijo, padre primero")
-    void chainFromChildReturnsParentThenChild() throws Exception {
-        ReleaseChain ids = releaseAllocatedOccurrence(61);
-
-        assertReleaseChain(json(mockMvc, get("/v1/audit/operations/{id}/chain", ids.childId())), ids);
-    }
-
-    @Test
-    @DisplayName("la cadena pedida desde el padre devuelve las mismas entradas que desde el hijo")
-    void chainFromParentEqualsChainFromChild() throws Exception {
-        ReleaseChain ids = releaseAllocatedOccurrence(62);
-
-        JsonNode fromParent = json(mockMvc, get("/v1/audit/operations/{id}/chain", ids.parentId()));
-        JsonNode fromChild = json(mockMvc, get("/v1/audit/operations/{id}/chain", ids.childId()));
-
-        assertReleaseChain(fromParent, ids);
-        assertThat(fromParent).isEqualTo(fromChild);
-    }
-
-    @Test
-    @DisplayName("la entrada OPERATION del hijo en el listado trae parentOperationId y la del padre no")
-    void listingShowsParentOperationId() throws Exception {
-        ReleaseChain ids = releaseAllocatedOccurrence(63);
-
-        JsonNode page = json(mockMvc, get("/v1/audit").param("size", "200"));
-
-        assertThat(operationEntry(page, ids.childId()).get("parentOperationId").asText()).isEqualTo(ids.parentId());
-        assertThat(isAbsent(operationEntry(page, ids.parentId()).get("parentOperationId"))).isTrue();
-    }
 
     @Test
     @DisplayName("la cadena de un id inexistente responde 200 con entries vacío y truncated false")
@@ -1354,7 +1276,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
         seedRecurringEvent(LocalDate.now().plusDays(daysAhead));
         long occurrenceId = jdbcTemplate.queryForObject(
                 "SELECT MAX(id_ocurrencia) FROM ocurrencia_aud WHERE revtype = 0", Long.class);
-        mockMvc.perform(post("/v1/events/occurrences/{id}/release", occurrenceId)).andExpect(status().is2xxSuccessful());
+        mockMvc.perform(post("/v1/allocations/releases").contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"items\":[{\"occurrenceIds\":[" + occurrenceId + "]}],\"reason\":\"OTHER\",\"note\":\"test\"}")).andExpect(status().is2xxSuccessful());
         return occurrenceId;
     }
 
@@ -1411,7 +1333,9 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
             assertThat(item.get("changes").isArray()).isTrue();
             assertThat(item.get("changes")).isNotEmpty();
         });
-        assertThat(changeSummary(page.get("content").get(0))).containsExactly("status:NEEDS_ROOM:ROOM_RELEASED");
+        assertThat(changeSummary(page.get("content").get(0))).containsExactlyInAnyOrder(
+                "status:NEEDS_ROOM:ROOM_RELEASED", "releaseReason:null:OTHER",
+                "releaseNote:null:test");
     }
 
     @Test
@@ -1551,7 +1475,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
         Long occurrenceId = seedWeeklyOccurrences(310, 1).getFirst();
         long allocationId = allocate(List.of(occurrenceId), classroom.getId()).getFirst();
 
-        mockMvc.perform(post("/v1/events/occurrences/{id}/release", occurrenceId)).andExpect(status().is2xxSuccessful());
+        mockMvc.perform(post("/v1/allocations/releases").contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"items\":[{\"occurrenceIds\":[" + occurrenceId + "]}],\"reason\":\"OTHER\",\"note\":\"test\"}")).andExpect(status().is2xxSuccessful());
         String deletionSql = "SELECT rev FROM asignacion_aula_aud WHERE id_asignacion = ? AND revtype = 2";
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() ->
                 assertThat(jdbcTemplate.queryForList(deletionSql, Integer.class, allocationId)).hasSize(1));

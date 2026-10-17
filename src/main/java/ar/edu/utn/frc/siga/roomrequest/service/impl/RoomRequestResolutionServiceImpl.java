@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
 import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
@@ -59,6 +60,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
     private final RoomRequestAccessControl accessControl;
     private final RoomRequestDeriveEligibilityValidator deriveEligibilityValidator;
     private final AllocationService allocationService;
+    private final OccurrenceService occurrenceService;
     private final BuildingService buildingService;
     private final UserService userService;
     private final NotificationSender notificationSender;
@@ -141,6 +143,11 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
             allocationService.findClassroomIdByOccurrence(principalOccurrenceId)
                     .ifPresent(item::rememberPreviousClassroom);
         }
+
+        // Reactivar explícitamente las fechas liberadas (D7): sin esto reallocate las saltea y el
+        // pedido quedaría registrando ocurrencias sin asignación. Solo las principales (slot 1): los
+        // espejos se crean nuevos en NEEDS_ROOM, y reactivar uno viejo reviviría una lápida.
+        occurrenceService.requestRoom(occurrencesBySlot.getFirst());
 
         List<AllocationItem> allocationItems = new ArrayList<>();
         for (int i = 0; i < ids.size(); i++) {
