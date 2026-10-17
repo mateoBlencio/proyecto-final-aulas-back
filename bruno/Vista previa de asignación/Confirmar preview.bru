@@ -21,9 +21,10 @@ auth:bearer {
 body:json {
   {
     "allocations": [
-      { "eventId": 1, "classroomId": 9 },
-      { "eventId": 2, "classroomId": 7 },
-      { "eventId": 3, "classroomId": null }
+      { "eventId": 1, "roomSlot": 1, "classroomId": 9 },
+      { "eventId": 1, "roomSlot": 2, "classroomId": 11 },
+      { "eventId": 2, "roomSlot": 1, "classroomId": 7 },
+      { "eventId": 3, "roomSlot": 1, "classroomId": null }
     ]
   }
 }
@@ -37,13 +38,20 @@ docs {
   ajusta aulas en el front → confirm con la lista FINAL.
   
   Body:
-  - allocations: propuesta final { eventId, classroomId }. Debe ser un
-    subconjunto de los eventos del preview, sin duplicados. classroomId puede
-    ser null para un evento que el usuario decide dejar sin resolver.
-  
-  classroomId == null → el evento va a skippedEventIds, no se aplica (queda
+  - allocations: propuesta final { eventId, roomSlot, classroomId }. Debe ser un
+    subconjunto de las claves del preview, sin duplicados. roomSlot identifica
+    cada aula de un evento con espejos (un final repartido en 3 aulas tiene
+    roomSlot 1, 2 y 3). Es opcional y vale 1 si no se envía, así que un evento
+    sin espejos no necesita el campo. classroomId puede ser null para una clave
+    que el usuario decide dejar sin resolver.
+
+  classroomId == null → la clave va a skippedEventIds, no se aplica (queda
   para revisión manual). Si TODOS los items vienen con classroomId null,
   responde 200 con applied vacío y skipped completo (no es un error).
+
+  Cada clave (eventId, roomSlot) se aplica a las ocurrencias NEEDS_ROOM futuras
+  de ese roomSlot al momento del confirm. Las ocurrencias liberadas (ROOM_RELEASED)
+  no se reasignan.
   
   Respuesta 200:
   { "applied": [ { id, source: "AUTOMATIC", createdAt, observation,
@@ -56,8 +64,10 @@ docs {
   
   Errores:
   - 410 Gone: el previewId no existe o expiró (TTL). Generá un preview nuevo.
-  - 409 Conflict: algún eventId del body no pertenece al preview, o hay
-    eventIds duplicados en el body.
+  - 409 Conflict: alguna clave (eventId, roomSlot) del body no pertenece al
+    preview, o hay claves duplicadas en el body.
+  - 409 Conflict (AllocationConflictException): dos roomSlot del mismo evento
+    quedan en la misma aula y fecha.
   - 409 Conflict: un aula del body no existe o no está disponible.
   - 409 Conflict (ReallocationConflictException, con "conflicts"): la propuesta
     genera una superposición nueva — contra una asignación firme de BD, o

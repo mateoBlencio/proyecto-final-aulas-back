@@ -150,6 +150,7 @@ public class OccurrenceServiceImpl implements OccurrenceService {
                 occurrence.startTime(),
                 occurrence.endTime(),
                 occurrence.getStatus(),
-                occurrence.getEvent().getEnrolled());
+                occurrence.getEvent().getEnrolled(),
+                occurrence.getRoomSlot());
     }
 }

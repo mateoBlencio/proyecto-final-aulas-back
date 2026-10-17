@@ -10,6 +10,8 @@ import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.UniqueEventResponseDto;
+import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizerAllocation;
@@ -20,6 +22,7 @@ import ar.edu.utn.frc.siga.optimizer.model.OptimizerRoom;
 import ar.edu.utn.frc.siga.optimizer.service.OptimizerService;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomSubjectPermissionDto;
+import ar.edu.utn.frc.siga.space.model.ClassroomResources;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +33,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -49,10 +53,10 @@ class PreviewEngine {
     private final OptimizerService optimizerService;
     private final BuildingScopeResolver buildingScopeResolver;
 
-    record Inputs(List<RecurringEventResponseDto> events, Map<Long, List<LocalDate>> datesByEvent,
+    record Inputs(List<AcademicEventResponseDto> events, Map<PlanningKey, List<LocalDate>> datesByKey,
                   List<OptimizerRoom> rooms, List<OptimizerOccupancy> occupancy,
-                  List<OccupiedSlot> databaseOccupancy, Map<Long, Long> priorRoomByEvent,
-                  Map<Long, List<OccupiedSlot>> priorSlotsByEvent) {
+                  List<OccupiedSlot> databaseOccupancy, Map<PlanningKey, Long> priorRoomByKey,
+                  Map<PlanningKey, List<OccupiedSlot>> priorSlotsByKey) {
     }
 
     record Suggestion(AcademicEventResponseDto event, ClassroomResponseDto classroom, int overcrowdedBy) {
@@ -60,14 +64,14 @@ class PreviewEngine {
 
     @Transactional(readOnly = true)
     Inputs loadInputs(Set<Long> eventIds) {
-        List<RecurringEventResponseDto> events = loadRecurringEvents(eventIds);
-        Map<Long, List<LocalDate>> datesByEvent = datesByEvent(eventIds);
+        List<AcademicEventResponseDto> events = loadEvents(eventIds);
+        Map<PlanningKey, List<LocalDate>> datesByKey = datesByKey(eventIds);
         List<ClassroomResponseDto> availableRooms = loadAvailableRooms(Permission.PREVIEW_RUN);
         Map<Long, ClassroomSubjectPermissionDto> permissionsByRoom = classroomService.findSubjectPermissions(
                 availableRooms.stream().map(ClassroomResponseDto::id).toList());
-        List<OptimizerRoom> rooms = availableRooms.stream()
-                .map(c -> toSolverRoom(c, permissionsByRoom.get(c.id())))
-                .toList();
+        List<OptimizerRoom> rooms = toSolverRooms(availableRooms, permissionsByRoom,
+                events.stream().anyMatch(PreviewEngine::requiresProjector),
+                events.stream().anyMatch(PreviewEngine::requiresComputers));
 
         List<OccupiedSlot> occupancyInRange = loadOccupancyInRange(events);
         List<OccupiedSlot> databaseOccupancy = occupancyInRange.stream()
@@ -76,21 +80,25 @@ class PreviewEngine {
         List<OccupiedSlot> ownOccupancy = occupancyInRange.stream()
                 .filter(o -> eventIds.contains(o.eventId()))
                 .toList();
-        Map<Long, Long> priorRoomByEvent = ownOccupancy.stream()
-                .collect(Collectors.toMap(OccupiedSlot::eventId, OccupiedSlot::classroomId, (x, y) -> x));
-        Map<Long, List<OccupiedSlot>> priorSlotsByEvent = ownOccupancy.stream()
-                .collect(Collectors.groupingBy(OccupiedSlot::eventId));
+        Map<PlanningKey, List<OccupiedSlot>> priorSlotsByKey = groupByKey(ownOccupancy);
+        Map<PlanningKey, Long> priorRoomByKey = new HashMap<>();
+        priorSlotsByKey.forEach((key, slots) -> priorRoomByKey.put(key, slots.getFirst().classroomId()));
 
         List<OptimizerOccupancy> occupancy = databaseOccupancy.stream().map(this::toOccupancy).toList();
-        return new Inputs(events, datesByEvent, rooms, occupancy, databaseOccupancy, priorRoomByEvent,
-                priorSlotsByEvent);
+        return new Inputs(events, datesByKey, rooms, occupancy, databaseOccupancy, priorRoomByKey,
+                priorSlotsByKey);
     }
 
     OptimizationResult generate(Set<Long> eventIds, int timeLimitSeconds) {
         Inputs inputs = loadInputs(eventIds);
+        Map<PlanningKey, Integer> divisors = PlanningKey.divisors(inputs.datesByKey());
+        Set<Long> mirrored = PlanningKey.mirroredEventIds(inputs.datesByKey().keySet());
         List<OptimizerEvent> optimizerEvents = inputs.events().stream()
-                .map(e -> toSolverEvent(e, inputs.datesByEvent().getOrDefault(e.id(), List.of())))
-                .filter(e -> !e.occurrenceDates().isEmpty())
+                .flatMap(e -> inputs.datesByKey().entrySet().stream()
+                        .filter(entry -> entry.getKey().eventId().equals(e.id()))
+                        .sorted(Map.Entry.comparingByKey())
+                        .map(entry -> toSolverEvent(e, entry.getKey(), entry.getValue(),
+                                divisors.get(entry.getKey()), mirrored.contains(e.id()))))
                 .toList();
         if (optimizerEvents.isEmpty()) {
             throw new AllocationConflictException(
@@ -122,9 +130,8 @@ class PreviewEngine {
 
         Map<Long, ClassroomSubjectPermissionDto> permissionsByRoom = classroomService.findSubjectPermissions(
                 availableRooms.stream().map(ClassroomResponseDto::id).toList());
-        List<OptimizerRoom> rooms = availableRooms.stream()
-                .map(c -> toSolverRoom(c, permissionsByRoom.get(c.id())))
-                .toList();
+        List<OptimizerRoom> rooms = toSolverRooms(availableRooms, permissionsByRoom,
+                requiresProjector(event), requiresComputers(event));
 
         OptimizerEvent optimizerEvent = toSuggestionEvent(eventId, event, slots);
         List<OptimizerOccupancy> occupancy = loadOccupancyForSuggestion(eventId, slots);
@@ -168,8 +175,11 @@ class PreviewEngine {
                 .filter(Objects::nonNull)
                 .max(Integer::compareTo)
                 .orElse(Objects.requireNonNullElse(event.enrolled(), 0));
+        boolean needsProjector = requiresProjector(event);
+        int computersNeeded = event instanceof UniqueEventResponseDto unique
+                ? RoomRequirements.computersNeeded(unique, 1) : 0;
         return new OptimizerEvent(String.valueOf(eventId), commissionKey, enrolled, startTime, endTime,
-                occurrenceDates, subjectIds);
+                occurrenceDates, subjectIds, null, needsProjector, computersNeeded);
     }
 
     private List<OptimizerOccupancy> loadOccupancyForSuggestion(Long eventId, List<OccurrenceSlotDto> slots) {
@@ -181,54 +191,107 @@ class PreviewEngine {
                 .toList();
     }
 
-    private OptimizerEvent toSolverEvent(RecurringEventResponseDto e, List<LocalDate> dates) {
-        String commissionKey = e.commission() != null ? String.valueOf(e.commission().id()) : null;
+    private OptimizerEvent toSolverEvent(AcademicEventResponseDto e, PlanningKey key, List<LocalDate> dates,
+            int divisor, boolean mirrored) {
+        var commission = switch (e) {
+            case RecurringEventResponseDto recurring -> recurring.commission();
+            case UniqueEventResponseDto unique -> unique.commission();
+        };
+        String commissionKey = commission != null ? String.valueOf(commission.id()) : null;
         Set<Long> subjectIds = e.subject() != null ? Set.of(e.subject().id()) : Set.of();
-        return new OptimizerEvent(String.valueOf(e.id()), commissionKey, e.enrolled(),
-                e.startTime(), e.endTime(), Set.copyOf(dates), subjectIds);
+        int enrolledPerRoom = Math.ceilDiv(Objects.requireNonNullElse(e.enrolled(), 0), divisor);
+        String groupKey = mirrored ? String.valueOf(e.id()) : null;
+        boolean needsProjector = requiresProjector(e);
+        int computersNeeded = e instanceof UniqueEventResponseDto unique
+                ? RoomRequirements.computersNeeded(unique, divisor) : 0;
+        return new OptimizerEvent(key.toPlanningId(), commissionKey, enrolledPerRoom, e.startTime(),
+                e.startTime().plusMinutes(e.durationMinutes()), Set.copyOf(dates), subjectIds, groupKey,
+                needsProjector, computersNeeded);
     }
 
-    private List<RecurringEventResponseDto> loadRecurringEvents(Set<Long> eventIds) {
+    private List<AcademicEventResponseDto> loadEvents(Set<Long> eventIds) {
         List<AcademicEventResponseDto> found = academicEventService.findByIds(eventIds);
         if (found.size() != eventIds.size()) {
             throw ResourceNotFoundException.of("AcademicEvent", eventIds);
         }
-        return found.stream().map(e -> {
-            if (!(e instanceof RecurringEventResponseDto recurring)) {
-                throw new AllocationConflictException(
-                        "auto-preview solo soporta eventos recurrentes por ahora (evento " + e.id() + ")");
-            }
-            return recurring;
-        }).toList();
+        return found;
     }
 
-    private Map<Long, List<LocalDate>> datesByEvent(Set<Long> eventIds) {
+    private Map<PlanningKey, List<LocalDate>> datesByKey(Set<Long> eventIds) {
         return occurrenceService.findSlotsByEvents(eventIds, LocalDate.now())
                 .stream()
+                .filter(o -> o.status() == OccurrenceStatus.NEEDS_ROOM && !o.isPast())
                 .collect(Collectors.groupingBy(
-                        OccurrenceSlotDto::eventId,
+                        o -> new PlanningKey(o.eventId(), o.roomSlot()),
                         Collectors.mapping(OccurrenceSlotDto::date,
                                 Collectors.collectingAndThen(Collectors.toCollection(TreeSet::new),
                                         List::copyOf))));
     }
 
-    private OptimizerRoom toSolverRoom(ClassroomResponseDto c, ClassroomSubjectPermissionDto permission) {
-        boolean openToAll = permission == null || permission.openToAll();
-        Set<Long> allowedSubjectIds = permission == null ? Set.of() : permission.allowedSubjectIds();
-        return new OptimizerRoom(c.id(), c.capacity(), c.buildingId(), openToAll, allowedSubjectIds);
+    private Map<PlanningKey, List<OccupiedSlot>> groupByKey(List<OccupiedSlot> ownOccupancy) {
+        Map<Long, Integer> roomSlotByOccurrence = occurrenceService.findSlots(ownOccupancy.stream()
+                        .map(OccupiedSlot::occurrenceId).filter(Objects::nonNull).toList())
+                .stream()
+                .collect(Collectors.toMap(OccurrenceSlotDto::occurrenceId, OccurrenceSlotDto::roomSlot));
+        return ownOccupancy.stream().collect(Collectors.groupingBy(
+                o -> new PlanningKey(o.eventId(), roomSlotByOccurrence.getOrDefault(o.occurrenceId(), 1))));
     }
 
-    private List<OccupiedSlot> loadOccupancyInRange(List<RecurringEventResponseDto> events) {
+    private static boolean requiresProjector(AcademicEventResponseDto e) {
+        return e instanceof UniqueEventResponseDto unique && unique.requiresProjector();
+    }
+
+    private static boolean requiresComputers(AcademicEventResponseDto e) {
+        return e instanceof UniqueEventResponseDto unique && RoomRequirements.computersNeeded(unique, 1) > 0;
+    }
+
+    private List<OptimizerRoom> toSolverRooms(List<ClassroomResponseDto> rooms,
+            Map<Long, ClassroomSubjectPermissionDto> permissionsByRoom, boolean loadProjectors,
+            boolean loadComputers) {
+        List<Long> roomIds = rooms.stream().map(ClassroomResponseDto::id).toList();
+        Map<Long, Integer> projectors = loadProjectors
+                ? classroomService.findResourceAmounts(ClassroomResources.PROJECTOR, roomIds) : Map.of();
+        Map<Long, Integer> computers = loadComputers
+                ? classroomService.findResourceAmounts(ClassroomResources.COMPUTERS, roomIds) : Map.of();
+        return rooms.stream()
+                .map(c -> toSolverRoom(c, permissionsByRoom.get(c.id()),
+                        projectors.getOrDefault(c.id(), 0) > 0, computers.getOrDefault(c.id(), 0)))
+                .toList();
+    }
+
+    private OptimizerRoom toSolverRoom(ClassroomResponseDto c, ClassroomSubjectPermissionDto permission,
+            boolean hasProjector, int computers) {
+        boolean openToAll = permission == null || permission.openToAll();
+        Set<Long> allowedSubjectIds = permission == null ? Set.of() : permission.allowedSubjectIds();
+        return new OptimizerRoom(c.id(), c.capacity(), c.buildingId(), openToAll, allowedSubjectIds,
+                hasProjector, computers);
+    }
+
+    private List<OccupiedSlot> loadOccupancyInRange(List<AcademicEventResponseDto> events) {
         if (events.isEmpty()) {
             return List.of();
         }
-        LocalDate from = events.stream().map(RecurringEventResponseDto::startDate)
+        LocalDate from = events.stream().map(PreviewEngine::rangeStart)
                 .min(Comparator.naturalOrder()).orElseThrow();
-        LocalDate to = events.stream()
-                .map(e -> e.endDate() != null ? e.endDate() : e.startDate().plusYears(1))
+        LocalDate to = events.stream().map(PreviewEngine::rangeEnd)
                 .max(Comparator.naturalOrder()).orElseThrow();
 
         return occupancyService.findOccupancy(from, to);
+    }
+
+    private static LocalDate rangeStart(AcademicEventResponseDto e) {
+        return switch (e) {
+            case RecurringEventResponseDto recurring -> recurring.startDate();
+            case UniqueEventResponseDto unique -> unique.date();
+        };
+    }
+
+    private static LocalDate rangeEnd(AcademicEventResponseDto e) {
+        return switch (e) {
+            case RecurringEventResponseDto recurring ->
+                    recurring.endDate() != null ? recurring.endDate() : recurring.startDate().plusYears(1);
+            case UniqueEventResponseDto unique -> unique.date();
+        };
     }
 
     private OptimizerOccupancy toOccupancy(OccupiedSlot slot) {

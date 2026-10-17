@@ -12,6 +12,7 @@ import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
+import ar.edu.utn.frc.siga.space.model.ClassroomResources;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,9 +35,6 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 class RoomRequestCandidateResolver {
-
-    private static final String COMPUTERS_RESOURCE_NAME = "Cantidad de PC";
-    private static final String PROJECTOR_RESOURCE_NAME = "Proyector";
 
     private final RoomRequestItemRepository itemRepository;
     private final ClassroomService classroomService;
@@ -120,18 +118,18 @@ class RoomRequestCandidateResolver {
         List<ClassroomResponseDto> candidates = classroomService.findAllAvailable();
         if (needs.requiresComputers()) {
             // Las PCs se suman entre las aulas asignadas: cualquier laboratorio sirve como candidato.
-            Set<Long> withComputers = classroomService.findIdsWithResourceAtLeast(COMPUTERS_RESOURCE_NAME, 1);
+            Set<Long> withComputers = classroomService.findIdsWithResourceAtLeast(ClassroomResources.COMPUTERS, 1);
             candidates = candidates.stream().filter(c -> withComputers.contains(c.id())).toList();
         }
         if (needs.requiresProjector()) {
-            Set<Long> withProjector = classroomService.findIdsWithResourceAtLeast(PROJECTOR_RESOURCE_NAME, 1);
+            Set<Long> withProjector = classroomService.findIdsWithResourceAtLeast(ClassroomResources.PROJECTOR, 1);
             candidates = candidates.stream().filter(c -> withProjector.contains(c.id())).toList();
         }
         return candidates;
     }
 
     Map<Long, Integer> computersByClassroom(Collection<Long> classroomIds) {
-        return classroomService.findResourceAmounts(COMPUTERS_RESOURCE_NAME, classroomIds);
+        return classroomService.findResourceAmounts(ClassroomResources.COMPUTERS, classroomIds);
     }
 
     List<AllowedClassroomDto> findAllowedClassrooms(RoomNeeds needs) {
