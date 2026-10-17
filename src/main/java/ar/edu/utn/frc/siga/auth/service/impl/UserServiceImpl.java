@@ -110,7 +110,7 @@ public class UserServiceImpl implements UserService {
         List<UserResponseDto> users = userRepository.findEnabledByRoleCoveringBuilding(role, buildingId).stream()
                 .map(this::toDto)
                 .toList();
-        log.info("Usuarios con rol {} sobre el edificio {}: count={}", role, buildingId, users.size());
+        git add -A && git commit -m "feat(buildingactivity): avisar a auxiliares los movimientos de aula por edificio"log.info("Usuarios con rol {} sobre el edificio {}: count={}", role, buildingId, users.size());
         return users;
     }
 

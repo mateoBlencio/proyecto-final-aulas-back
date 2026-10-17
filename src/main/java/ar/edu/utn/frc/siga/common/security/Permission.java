@@ -29,6 +29,8 @@ public enum Permission {
     CONFLICT_READ(ScopeType.BUILDING),
     ALLOCATION_HISTORY_READ(ScopeType.BUILDING),
 
+    BUILDING_ACTIVITY_READ(ScopeType.BUILDING),
+
     PREVIEW_RUN(ScopeType.BUILDING),
 
     DASHBOARD_READ(ScopeType.BUILDING),
