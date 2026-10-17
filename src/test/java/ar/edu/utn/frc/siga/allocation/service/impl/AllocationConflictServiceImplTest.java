@@ -99,7 +99,7 @@ class AllocationConflictServiceImplTest {
         mockOccupancy(List.of(slot), List.of(allocation), List.of(event));
         when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 30)));
 
-        List<AllocationConflictDto> result = service.findConflicts(Set.of(), from, to, false, PAGEABLE).getContent();
+        List<AllocationConflictDto> result = service.findConflicts(Set.of(), from, to, false, null, null, null, PAGEABLE).getContent();
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst()).isInstanceOf(OvercrowdedConflictDto.class);
@@ -117,7 +117,7 @@ class AllocationConflictServiceImplTest {
         when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 30)));
 
         List<AllocationConflictDto> result =
-                service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, PAGEABLE).getContent();
+                service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, null, null, null, PAGEABLE).getContent();
 
         assertThat(result).hasSize(1);
         OvercrowdedConflictDto overcrowded = (OvercrowdedConflictDto) result.getFirst();
@@ -138,7 +138,7 @@ class AllocationConflictServiceImplTest {
         mockOccupancy(List.of(slot), List.of(allocation), List.of(event));
         when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, null)));
 
-        assertThat(service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, PAGEABLE)).isEmpty();
+        assertThat(service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, null, null, null, PAGEABLE)).isEmpty();
     }
 
     @Test
@@ -152,7 +152,7 @@ class AllocationConflictServiceImplTest {
         mockOccupancy(List.of(slot), List.of(allocation), List.of(event));
         when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 30)));
 
-        assertThat(service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, PAGEABLE)).isEmpty();
+        assertThat(service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, null, null, null, PAGEABLE)).isEmpty();
     }
 
     @Test
@@ -171,7 +171,7 @@ class AllocationConflictServiceImplTest {
         when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 100)));
 
         List<AllocationConflictDto> result =
-                service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, PAGEABLE).getContent();
+                service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, null, null, null, PAGEABLE).getContent();
 
         assertThat(result).hasSize(1);
         OverlapConflictDto overlap = (OverlapConflictDto) result.getFirst();
@@ -196,7 +196,7 @@ class AllocationConflictServiceImplTest {
         mockOccupancy(List.of(slotA, slotB), List.of(allocA, allocB), List.of(eventA, eventB));
         when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 100), classroom(6L, 100)));
 
-        assertThat(service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, PAGEABLE)).isEmpty();
+        assertThat(service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, null, null, null, PAGEABLE)).isEmpty();
     }
 
     @Test
@@ -214,7 +214,7 @@ class AllocationConflictServiceImplTest {
         mockOccupancy(List.of(slotA, slotB), List.of(allocA, allocB), List.of(eventA, eventB));
         when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 100)));
 
-        assertThat(service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, PAGEABLE)).isEmpty();
+        assertThat(service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, null, null, null, PAGEABLE)).isEmpty();
     }
 
     @Test
@@ -240,7 +240,7 @@ class AllocationConflictServiceImplTest {
         when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 100)));
 
         List<AllocationConflictDto> result =
-                service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, PAGEABLE).getContent();
+                service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, null, null, null, PAGEABLE).getContent();
 
         assertThat(result).hasSize(1);
         assertThat(((OverlapConflictDto) result.getFirst()).dates()).containsExactly(date1, date2);
@@ -260,7 +260,7 @@ class AllocationConflictServiceImplTest {
                 5L, new ClassroomSubjectPermissionDto(5L, false, Set.of(99L))));
 
         List<AllocationConflictDto> result =
-                service.findConflicts(Set.of(ConflictType.NOT_PERMITTED), from, to, false, PAGEABLE).getContent();
+                service.findConflicts(Set.of(ConflictType.NOT_PERMITTED), from, to, false, null, null, null, PAGEABLE).getContent();
 
         assertThat(result).hasSize(1);
         NotPermittedConflictDto conflict = (NotPermittedConflictDto) result.getFirst();
@@ -283,7 +283,7 @@ class AllocationConflictServiceImplTest {
         when(classroomService.findSubjectPermissions(any())).thenReturn(Map.of(
                 5L, new ClassroomSubjectPermissionDto(5L, false, Set.of(7L))));
 
-        assertThat(service.findConflicts(Set.of(ConflictType.NOT_PERMITTED), from, to, false, PAGEABLE)).isEmpty();
+        assertThat(service.findConflicts(Set.of(ConflictType.NOT_PERMITTED), from, to, false, null, null, null, PAGEABLE)).isEmpty();
     }
 
     @Test
@@ -299,7 +299,7 @@ class AllocationConflictServiceImplTest {
         when(academicEventService.findByIds(any())).thenReturn(List.of(event));
 
         List<AllocationConflictDto> result =
-                service.findConflicts(Set.of(ConflictType.UNALLOCATED), from, to, false, PAGEABLE).getContent();
+                service.findConflicts(Set.of(ConflictType.UNALLOCATED), from, to, false, null, null, null, PAGEABLE).getContent();
 
         assertThat(result).hasSize(1);
         assertThat(((UnallocatedConflictDto) result.getFirst()).event().id()).isEqualTo(1L);
@@ -316,7 +316,7 @@ class AllocationConflictServiceImplTest {
                 .thenReturn(List.of(slot));
         when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(allocation(100L, 10L, 5)));
 
-        assertThat(service.findConflicts(Set.of(ConflictType.UNALLOCATED), from, to, false, PAGEABLE)).isEmpty();
+        assertThat(service.findConflicts(Set.of(ConflictType.UNALLOCATED), from, to, false, null, null, null, PAGEABLE)).isEmpty();
     }
 
     @Test
@@ -326,7 +326,7 @@ class AllocationConflictServiceImplTest {
         when(academicPeriodService.findActive()).thenReturn(List.of(
                 new AcademicPeriodResponseDto(2026, 2, LocalDate.now().minusDays(10), endDate)));
 
-        service.findConflicts(Set.of(ConflictType.OVERCROWDED), null, null, false, PAGEABLE);
+        service.findConflicts(Set.of(ConflictType.OVERCROWDED), null, null, false, null, null, null, PAGEABLE);
 
         ArgumentCaptor<LocalDate> toCaptor = ArgumentCaptor.forClass(LocalDate.class);
         verify(occupancyReader).loadAllocated(any(), toCaptor.capture());
@@ -338,7 +338,7 @@ class AllocationConflictServiceImplTest {
     void usaFallbackSeisMesesSinPeriodoActivo() {
         LocalDate from = LocalDate.of(2026, 8, 1);
 
-        service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, null, false, PAGEABLE);
+        service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, null, false, null, null, null, PAGEABLE);
 
         ArgumentCaptor<LocalDate> toCaptor = ArgumentCaptor.forClass(LocalDate.class);
         verify(occupancyReader).loadAllocated(eq(from), toCaptor.capture());
@@ -351,7 +351,7 @@ class AllocationConflictServiceImplTest {
         LocalDate from = LocalDate.of(2026, 8, 10);
         LocalDate to = LocalDate.of(2026, 8, 1);
 
-        assertThatThrownBy(() -> service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, PAGEABLE))
+        assertThatThrownBy(() -> service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, null, null, null, PAGEABLE))
                 .isInstanceOf(InvalidDateRangeException.class);
     }
 
@@ -368,7 +368,7 @@ class AllocationConflictServiceImplTest {
         when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(outOfScope));
         when(buildingScopeResolver.scopeFor(Permission.CONFLICT_READ)).thenReturn(BuildingScope.of(Set.of(1L)));
 
-        assertThat(service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, PAGEABLE)).isEmpty();
+        assertThat(service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, null, null, null, PAGEABLE)).isEmpty();
     }
 
     @Test
@@ -388,7 +388,7 @@ class AllocationConflictServiceImplTest {
         when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(outOfScope));
         when(buildingScopeResolver.scopeFor(Permission.CONFLICT_READ)).thenReturn(BuildingScope.of(Set.of(1L)));
 
-        assertThat(service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, PAGEABLE)).isEmpty();
+        assertThat(service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, null, null, null, PAGEABLE)).isEmpty();
     }
 
     @Test
@@ -405,7 +405,7 @@ class AllocationConflictServiceImplTest {
         when(buildingScopeResolver.scopeFor(Permission.CONFLICT_READ)).thenReturn(BuildingScope.of(Set.of(999L)));
 
         List<AllocationConflictDto> result =
-                service.findConflicts(Set.of(ConflictType.UNALLOCATED), from, to, false, PAGEABLE).getContent();
+                service.findConflicts(Set.of(ConflictType.UNALLOCATED), from, to, false, null, null, null, PAGEABLE).getContent();
 
         assertThat(result).hasSize(1);
     }

@@ -256,6 +256,79 @@ class BuildingActivityIntegrationTest extends AbstractIntegrationTest {
         assertThat(lines).anyMatch(l -> l.startsWith(a2.getId() + ">"));
     }
 
+    @Test
+    @DisplayName("sort ordena por cada campo permitido, sin sort es occurredAt desc y un campo invalido da 400")
+    void sortsByAllowedFields() throws Exception {
+        Building building = testData.edificio();
+        MockMvc auxiliary = auxiliaryOf(building);
+        seedActivity(building, "B", "carlos@frc.utn.edu.ar", AllocationSource.MANUAL, "2026-10-10T10:00:00Z", 3);
+        seedActivity(building, "A", "ana.lopez@frc.utn.edu.ar", AllocationSource.AUTOMATIC, "2026-10-10T11:00:00Z", 1);
+        seedActivity(building, "C", "zoe@frc.utn.edu.ar", AllocationSource.MANUAL, "2026-10-10T12:00:00Z", 2);
+
+        assertThat(listBuildingNames(auxiliary, null)).containsExactly("C", "A", "B");
+        assertThat(listBuildingNames(auxiliary, "occurredAt,asc")).containsExactly("B", "A", "C");
+        assertThat(listBuildingNames(auxiliary, "buildingName,asc")).containsExactly("A", "B", "C");
+        assertThat(listBuildingNames(auxiliary, "actor,desc")).containsExactly("C", "B", "A");
+        assertThat(listBuildingNames(auxiliary, "lineCount,desc")).containsExactly("B", "C", "A");
+        assertThat(listBuildingNames(auxiliary, "lineCount,asc")).containsExactly("A", "C", "B");
+
+        auxiliary.perform(get("/v1/building-activity").param("sort", "lines,asc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("lines")));
+    }
+
+    @Test
+    @DisplayName("source, seen y actor filtran y se combinan; el total de la pagina respeta el filtro")
+    void filtersBySourceSeenAndActor() throws Exception {
+        Building building = testData.edificio();
+        MockMvc auxiliary = auxiliaryOf(building);
+        seedActivity(building, "B", "carlos@frc.utn.edu.ar", AllocationSource.MANUAL, "2026-10-10T10:00:00Z", 3);
+        long middleId = seedActivity(building, "A", "Ana.Lopez@frc.utn.edu.ar", AllocationSource.AUTOMATIC,
+                "2026-10-10T11:00:00Z", 1);
+        seedActivity(building, "C", "zoe@frc.utn.edu.ar", AllocationSource.MANUAL, "2026-10-10T12:00:00Z", 2);
+
+        assertThat(listBuildingNames(auxiliary, null, "source", "AUTOMATIC")).containsExactly("A");
+        assertThat(listBuildingNames(auxiliary, null, "actor", "ANA.lo")).containsExactly("A");
+        assertThat(listBuildingNames(auxiliary, null, "actor", "%")).isEmpty();
+        assertThat(listBuildingNames(auxiliary, null, "source", "MANUAL", "actor", "zoe")).containsExactly("C");
+        assertThat(listBuildingNames(auxiliary, null, "seen", "true")).isEmpty();
+        assertThat(listBuildingNames(auxiliary, null, "seen", "false")).containsExactly("C", "A", "B");
+
+        auxiliary.perform(post("/v1/building-activity/seen")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lastSeenId\":" + middleId + "}"))
+                .andExpect(status().isNoContent());
+
+        assertThat(listBuildingNames(auxiliary, null, "seen", "true")).containsExactly("A", "B");
+        assertThat(listBuildingNames(auxiliary, null, "seen", "false")).containsExactly("C");
+        assertThat(listBuildingNames(auxiliary, null, "seen", "true", "source", "MANUAL")).containsExactly("B");
+        auxiliary.perform(get("/v1/building-activity").param("seen", "false").param("size", "1"))
+                .andExpect(jsonPath("$.page.totalElements").value(1));
+    }
+
+    private long seedActivity(Building building, String name, String actor, AllocationSource source, String occurredAt,
+                              int lineCount) {
+        String lines = "[" + String.join(",", java.util.Collections.nCopies(lineCount, "{\"occurrenceId\":1}")) + "]";
+        return jdbcTemplate.queryForObject(
+                "insert into actividad_edificio (id_edificio, nombre_edificio, operacion_id, usuario, origen, ocurrido_en, lineas)"
+                        + " values (?, ?, ?, ?, ?, ?::timestamptz, ?::jsonb) returning id_actividad_edificio",
+                Long.class, building.getId(), name, UUID.randomUUID().toString(), actor, source.name(), occurredAt, lines);
+    }
+
+    private List<String> listBuildingNames(MockMvc client, String sort, String... filters) throws Exception {
+        var request = get("/v1/building-activity");
+        if (sort != null) {
+            request.param("sort", sort);
+        }
+        for (int i = 0; i < filters.length; i += 2) {
+            request.param(filters[i], filters[i + 1]);
+        }
+        String body = client.perform(request).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        List<String> names = new java.util.ArrayList<>();
+        objectMapper.readTree(body).get("content").forEach(n -> names.add(n.at("/building/name").asText()));
+        return names;
+    }
+
     private RoomRequestItem seedFinalExamItem(int classroomCount) {
         RoomRequest request = RoomRequest.builder()
                 .type(RoomRequestType.FINAL_EXAM)

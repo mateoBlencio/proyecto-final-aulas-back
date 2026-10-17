@@ -2,7 +2,10 @@ package ar.edu.utn.frc.siga.allocation.service.impl;
 
 import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
+import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.UniqueEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.NotPermittedConflictDto;
@@ -33,9 +36,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.text.Normalizer;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -66,14 +72,16 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
 
     @Override
     public Page<AllocationConflictDto> findConflicts(Set<ConflictType> types, LocalDate from, LocalDate to,
-                                                       boolean includePast, Pageable pageable) {
+                                                       boolean includePast, String q, DayOfWeek dayOfWeek,
+                                                       String specialty, Pageable pageable) {
         Set<ConflictType> effectiveTypes = (types == null || types.isEmpty())
                 ? EnumSet.allOf(ConflictType.class) : types;
         Range range = resolveRange(from, to);
 
         List<AllocationConflictDto> merged = new ArrayList<>();
         if (effectiveTypes.contains(ConflictType.UNALLOCATED)) {
-            merged.addAll(buildUnallocatedConflicts(range, includePast));
+            UnallocatedConflictComparator.validate(pageable.getSort());
+            merged.addAll(buildUnallocatedConflicts(range, includePast, q, dayOfWeek, specialty, pageable.getSort()));
         }
         if (effectiveTypes.contains(ConflictType.OVERCROWDED)) {
             merged.addAll(buildOvercrowdedConflicts(range, includePast));
@@ -105,14 +113,44 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         return ids;
     }
 
-    private List<UnallocatedConflictDto> buildUnallocatedConflicts(Range range, boolean includePast) {
+    private List<UnallocatedConflictDto> buildUnallocatedConflicts(Range range, boolean includePast, String q,
+                                                                   DayOfWeek dayOfWeek, String specialty, Sort sort) {
         Set<Long> eventIds = unallocatedEventIds(range, includePast);
         Map<Long, AcademicEventResponseDto> eventById = fetchEventsById(eventIds);
         return eventIds.stream()
                 .map(eventById::get)
                 .filter(Objects::nonNull)
                 .map(UnallocatedConflictDto::new)
+                .filter(c -> matches(c.event(), q, dayOfWeek, specialty))
+                .sorted(UnallocatedConflictComparator.of(sort))
                 .toList();
+    }
+
+    private static boolean matches(AcademicEventResponseDto event, String q, DayOfWeek dayOfWeek, String specialty) {
+        if (dayOfWeek != null && UnallocatedConflictComparator.dayOf(event) != dayOfWeek) {
+            return false;
+        }
+        var subject = event.subject();
+        String specialtyName = subject == null ? null : subject.studyPlan().specialty().name();
+        if (specialty != null && !specialty.equals(specialtyName)) {
+            return false;
+        }
+        if (q == null || q.isBlank()) {
+            return true;
+        }
+        String needle = fold(q.strip());
+        CommissionResponseDto commission = switch (event) {
+            case RecurringEventResponseDto r -> r.commission();
+            case UniqueEventResponseDto u -> u.commission();
+        };
+        return fold(subject == null ? null : subject.name()).contains(needle)
+                || fold(specialtyName).contains(needle)
+                || (commission != null && fold(commission.courseCode()).contains(needle));
+    }
+
+    private static String fold(String value) {
+        return value == null ? "" : Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "").toLowerCase();
     }
 
     private List<OvercrowdedConflictDto> buildOvercrowdedConflicts(Range range, boolean includePast) {

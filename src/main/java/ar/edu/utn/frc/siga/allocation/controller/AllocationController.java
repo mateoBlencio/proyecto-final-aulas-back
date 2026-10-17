@@ -44,6 +44,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -117,15 +118,25 @@ public class AllocationController {
                        + "eventos sin aula (UNALLOCATED), aulas con sobrecupo (OVERCROWDED), superposiciones de "
                        + "horario-aula (OVERLAP) y asignaciones en aulas que no habilitan la materia (NOT_PERMITTED). "
                        + "Mismos defaults de rango que antes: 'from' hoy, 'to' fin del período académico activo "
-                       + "(o +6 meses). Excluye ocurrencias ya pasadas salvo 'includePast=true'.")
+                       + "(o +6 meses). Excluye ocurrencias ya pasadas salvo 'includePast=true'. "
+                       + "Solo para UNALLOCATED: 'q' (contiene, sin mayúsculas ni tildes, sobre materia, código de "
+                       + "comisión y especialidad), 'dayOfWeek' (día que dicta el evento; en únicos, el día de su "
+                       + "fecha) y 'specialty' (nombre exacto de la especialidad) filtran antes de paginar. "
+                       + "'sort=campo,asc|desc' acepta subject, dayOfWeek, startTime, enrolled y commissionCode "
+                       + "(otra propiedad da 400); sin sort, orden por id del evento.")
     public ResponseEntity<Page<AllocationConflictDto>> findConflicts(
             @RequestParam(required = false) Set<ConflictType> types,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false, defaultValue = "false") boolean includePast,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) DayOfWeek dayOfWeek,
+            @RequestParam(required = false) String specialty,
             @PageableDefault(size = 20) Pageable pageable) {
-        log.debug("GET /v1/allocations/conflicts: types={}, from={}, to={}, includePast={}", types, from, to, includePast);
-        return ResponseEntity.ok(allocationConflictService.findConflicts(types, from, to, includePast, pageable));
+        log.debug("GET /v1/allocations/conflicts: types={}, from={}, to={}, includePast={}, q={}, dayOfWeek={}, specialty={}",
+                types, from, to, includePast, q, dayOfWeek, specialty);
+        return ResponseEntity.ok(allocationConflictService.findConflicts(
+                types, from, to, includePast, q, dayOfWeek, specialty, pageable));
     }
 
     @PostMapping

@@ -16,11 +16,18 @@ params:query {
   ~buildingId: 3
   ~from: 2026-10-01
   ~to: 2026-10-31
+  ~sort: occurredAt,desc
+  ~source: MANUAL
+  ~seen: false
+  ~actor: lopez
 }
 
 docs {
   GET /v1/building-activity. Permiso: PERM_BUILDING_ACTIVITY_READ (alcance por edificio).
-  Movimientos de aula hechos por Subsecretaría, del más nuevo al más viejo.
+  Movimientos de aula hechos por Subsecretaría.
+  sort=<campo>,<asc|desc>: occurredAt, buildingName, actor, lineCount. Sin sort: occurredAt,desc.
+  Desempate por id desc. Otro campo responde 400. source=MANUAL|AUTOMATIC, seen=true|false
+  (relativo al usuario) y actor (parcial, sin mayúsculas, sobre el email) se combinan con AND.
   from/to (yyyy-MM-dd) filtran por el momento del movimiento. buildingId fuera de
   alcance responde 403. "seen" es true si id <= última marca del usuario o si lo hizo él.
   Las líneas son una foto: el nombre del aula no cambia si se renombra después.
