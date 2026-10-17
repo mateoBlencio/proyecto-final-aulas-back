@@ -153,8 +153,8 @@ class AuditHistoryApiIntegrationTest extends AbstractIntegrationTest {
     void occurrenceHistory_showsStatusTransition() throws Exception {
         Occurrence occurrence = seedOccurrence(LocalDate.now().plusDays(23));
 
-        mockMvc.perform(post("/v1/events/occurrences/{occurrenceId}/release", occurrence.getId()))
-                .andExpect(status().isNoContent());
+        mockMvc.perform(post("/v1/allocations/releases").contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"items\":[{\"occurrenceIds\":[" + occurrence.getId() + "]}],\"reason\":\"OTHER\",\"note\":\"test\"}"))
+                .andExpect(status().isOk());
 
         mockMvc.perform(get("/v1/events/occurrences/{occurrenceId}/history", occurrence.getId()))
                 .andExpect(status().isOk())

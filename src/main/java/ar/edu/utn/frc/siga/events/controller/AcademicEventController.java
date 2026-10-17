@@ -162,43 +162,44 @@ public class AcademicEventController {
         return ResponseEntity.ok(response);
     }
 
-    @Deprecated
-    @PostMapping("/occurrences/{occurrenceId}/release")
-    @PreAuthorize("hasAuthority('PERM_OCCURRENCE_RELEASE')")
-    @Operation(summary = "Liberar el aula de una ocurrencia",
-               deprecated = true,
-               description = "Deprecado: usar POST /v1/allocations/releases, que registra el motivo. "
-                       + "Marca la ocurrencia como ROOM_RELEASED con motivo OTHER (libera el aula a propósito, "
-                       + "reasignable en cualquier momento). Rechaza ocurrencias ya pasadas. Solo para usuarios "
-                       + "con alcance sobre todos los edificios.")
-    public ResponseEntity<Void> release(@PathVariable Long occurrenceId) {
-        log.debug("POST /v1/events/occurrences/{}/release", occurrenceId);
-        requireUnrestricted(Permission.OCCURRENCE_RELEASE);
-        occurrenceService.release(occurrenceId);
-        log.info("Ocurrencia liberada: occurrenceId={}", occurrenceId);
-        return ResponseEntity.noContent().build();
-    }
-
-    @Deprecated
-    @PostMapping("/occurrences/{occurrenceId}/request-room")
-    @PreAuthorize("hasAuthority('PERM_OCCURRENCE_REQUEST_ROOM')")
-    @Operation(summary = "Volver a pedir aula para una ocurrencia",
-               deprecated = true,
-               description = "Deprecado: usar DELETE /v1/allocations/releases. Vuelve a marcar la ocurrencia como necesitada de aula (NEEDS_ROOM). No implica "
-                       + "que se reactive nada: la ocurrencia nunca dejó de dictarse. Rechaza ocurrencias ya pasadas.")
-    public ResponseEntity<Void> requestRoom(@PathVariable Long occurrenceId) {
-        log.debug("POST /v1/events/occurrences/{}/request-room", occurrenceId);
-        requireUnrestricted(Permission.OCCURRENCE_REQUEST_ROOM);
-        occurrenceService.requestRoom(List.of(occurrenceId));
-        log.info("Ocurrencia vuelta a marcar como NEEDS_ROOM: occurrenceId={}", occurrenceId);
-        return ResponseEntity.noContent().build();
-    }
-
-    // Los endpoints deprecados no resuelven el edificio de la ocurrencia: solo los puede usar quien
-    // tiene alcance total. El alcance por edificio vive en /v1/allocations/releases.
-    private void requireUnrestricted(Permission permission) {
-        if (!buildingScopeResolver.scopeFor(permission).isUnrestricted()) {
-            throw new AccessDeniedException("Endpoint deprecado: requiere alcance sobre todos los edificios");
-        }
-    }
+    // OBSOLETO: lo reemplaza POST/DELETE /v1/allocations/releases (con motivo y alcance por edificio). Pendiente de revisión por Matías antes de borrar.
+    // @Deprecated
+    // @PostMapping("/occurrences/{occurrenceId}/release")
+    // @PreAuthorize("hasAuthority('PERM_OCCURRENCE_RELEASE')")
+    // @Operation(summary = "Liberar el aula de una ocurrencia",
+    //            deprecated = true,
+    //            description = "Deprecado: usar POST /v1/allocations/releases, que registra el motivo. "
+    //                    + "Marca la ocurrencia como ROOM_RELEASED con motivo OTHER (libera el aula a propósito, "
+    //                    + "reasignable en cualquier momento). Rechaza ocurrencias ya pasadas. Solo para usuarios "
+    //                    + "con alcance sobre todos los edificios.")
+    // public ResponseEntity<Void> release(@PathVariable Long occurrenceId) {
+    //     log.debug("POST /v1/events/occurrences/{}/release", occurrenceId);
+    //     requireUnrestricted(Permission.OCCURRENCE_RELEASE);
+    //     occurrenceService.release(occurrenceId);
+    //     log.info("Ocurrencia liberada: occurrenceId={}", occurrenceId);
+    //     return ResponseEntity.noContent().build();
+    // }
+    //
+    // @Deprecated
+    // @PostMapping("/occurrences/{occurrenceId}/request-room")
+    // @PreAuthorize("hasAuthority('PERM_OCCURRENCE_REQUEST_ROOM')")
+    // @Operation(summary = "Volver a pedir aula para una ocurrencia",
+    //            deprecated = true,
+    //            description = "Deprecado: usar DELETE /v1/allocations/releases. Vuelve a marcar la ocurrencia como necesitada de aula (NEEDS_ROOM). No implica "
+    //                    + "que se reactive nada: la ocurrencia nunca dejó de dictarse. Rechaza ocurrencias ya pasadas.")
+    // public ResponseEntity<Void> requestRoom(@PathVariable Long occurrenceId) {
+    //     log.debug("POST /v1/events/occurrences/{}/request-room", occurrenceId);
+    //     requireUnrestricted(Permission.OCCURRENCE_REQUEST_ROOM);
+    //     occurrenceService.requestRoom(List.of(occurrenceId));
+    //     log.info("Ocurrencia vuelta a marcar como NEEDS_ROOM: occurrenceId={}", occurrenceId);
+    //     return ResponseEntity.noContent().build();
+    // }
+    //
+    // // Los endpoints deprecados no resuelven el edificio de la ocurrencia: solo los puede usar quien
+    // // tiene alcance total. El alcance por edificio vive en /v1/allocations/releases.
+    // private void requireUnrestricted(Permission permission) {
+    //     if (!buildingScopeResolver.scopeFor(permission).isUnrestricted()) {
+    //         throw new AccessDeniedException("Endpoint deprecado: requiere alcance sobre todos los edificios");
+    //     }
+    // }
 }

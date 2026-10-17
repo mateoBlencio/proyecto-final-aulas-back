@@ -209,37 +209,38 @@ class ReleaseScopeApiIntegrationTest extends AbstractIntegrationTest {
         assertUntouched(s.occurrenceInA());
     }
 
-    @Test
-    @DisplayName("POST /events/occurrences/{id}/release deprecado: 403 al auxiliar con alcance parcial, 204 a SUBSECRETARIA")
-    void deprecatedReleaseRequiresUnrestrictedScope() throws Exception {
-        Scenario s = twoBuildings();
-
-        auxiliaryOf(s.buildingA()).perform(post("/v1/events/occurrences/{id}/release", s.occurrenceInA()))
-                .andExpect(status().isForbidden());
-        assertUntouched(s.occurrenceInA());
-
-        mockMvc.perform(post("/v1/events/occurrences/{id}/release", s.occurrenceInA()))
-                .andExpect(status().isNoContent());
-        assertThat(occurrenceRepository.findById(s.occurrenceInA()).orElseThrow().getStatus())
-                .isEqualTo(OccurrenceStatus.ROOM_RELEASED);
-    }
-
-    @Test
-    @DisplayName("POST /events/occurrences/{id}/request-room deprecado: 403 al auxiliar con alcance parcial, 204 a SUBSECRETARIA")
-    void deprecatedRequestRoomRequiresUnrestrictedScope() throws Exception {
-        Scenario s = twoBuildings();
-        mockMvc.perform(post("/v1/allocations/releases").contentType(MediaType.APPLICATION_JSON)
-                        .content(releaseBody(s.occurrenceInA(), "VIRTUAL_CLASS", null)))
-                .andExpect(status().isOk());
-
-        auxiliaryOf(s.buildingA()).perform(post("/v1/events/occurrences/{id}/request-room", s.occurrenceInA()))
-                .andExpect(status().isForbidden());
-        assertThat(occurrenceRepository.findById(s.occurrenceInA()).orElseThrow().getStatus())
-                .isEqualTo(OccurrenceStatus.ROOM_RELEASED);
-
-        mockMvc.perform(post("/v1/events/occurrences/{id}/request-room", s.occurrenceInA()))
-                .andExpect(status().isNoContent());
-        assertThat(occurrenceRepository.findById(s.occurrenceInA()).orElseThrow().getStatus())
-                .isEqualTo(OccurrenceStatus.NEEDS_ROOM);
-    }
+    // OBSOLETO: prueba del camino viejo, pendiente de revisión por Matías antes de borrar.
+    // @Test
+    // @DisplayName("POST /events/occurrences/{id}/release deprecado: 403 al auxiliar con alcance parcial, 204 a SUBSECRETARIA")
+    // void deprecatedReleaseRequiresUnrestrictedScope() throws Exception {
+    //     Scenario s = twoBuildings();
+    //
+    //     auxiliaryOf(s.buildingA()).perform(post("/v1/events/occurrences/{id}/release", s.occurrenceInA()))
+    //             .andExpect(status().isForbidden());
+    //     assertUntouched(s.occurrenceInA());
+    //
+    //     mockMvc.perform(post("/v1/events/occurrences/{id}/release", s.occurrenceInA()))
+    //             .andExpect(status().isNoContent());
+    //     assertThat(occurrenceRepository.findById(s.occurrenceInA()).orElseThrow().getStatus())
+    //             .isEqualTo(OccurrenceStatus.ROOM_RELEASED);
+    // }
+    //
+    // @Test
+    // @DisplayName("POST /events/occurrences/{id}/request-room deprecado: 403 al auxiliar con alcance parcial, 204 a SUBSECRETARIA")
+    // void deprecatedRequestRoomRequiresUnrestrictedScope() throws Exception {
+    //     Scenario s = twoBuildings();
+    //     mockMvc.perform(post("/v1/allocations/releases").contentType(MediaType.APPLICATION_JSON)
+    //                     .content(releaseBody(s.occurrenceInA(), "VIRTUAL_CLASS", null)))
+    //             .andExpect(status().isOk());
+    //
+    //     auxiliaryOf(s.buildingA()).perform(post("/v1/events/occurrences/{id}/request-room", s.occurrenceInA()))
+    //             .andExpect(status().isForbidden());
+    //     assertThat(occurrenceRepository.findById(s.occurrenceInA()).orElseThrow().getStatus())
+    //             .isEqualTo(OccurrenceStatus.ROOM_RELEASED);
+    //
+    //     mockMvc.perform(post("/v1/events/occurrences/{id}/request-room", s.occurrenceInA()))
+    //             .andExpect(status().isNoContent());
+    //     assertThat(occurrenceRepository.findById(s.occurrenceInA()).orElseThrow().getStatus())
+    //             .isEqualTo(OccurrenceStatus.NEEDS_ROOM);
+    // }
 }

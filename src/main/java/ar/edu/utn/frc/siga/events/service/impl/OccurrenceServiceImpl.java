@@ -180,13 +180,14 @@ public class OccurrenceServiceImpl implements OccurrenceService {
         }
     }
 
-    @Override
-    @Transactional
-    @AuditOperation("Liberación de ocurrencia")
-    public void release(Long occurrenceId) {
-        release(List.of(new OccurrenceRelease(occurrenceId, null)), ReleaseReason.OTHER, DEPRECATED_RELEASE_NOTE);
-        eventPublisher.publishEvent(new OccurrenceVacated(occurrenceId, AuditOperations.currentOperationId()));
-    }
+    // OBSOLETO: lo reemplaza POST/DELETE /v1/allocations/releases (con motivo y alcance por edificio). Pendiente de revisión por Matías antes de borrar.
+    // @Override
+    // @Transactional
+    // @AuditOperation("Liberación de ocurrencia")
+    // public void release(Long occurrenceId) {
+    //     release(List.of(new OccurrenceRelease(occurrenceId, null)), ReleaseReason.OTHER, DEPRECATED_RELEASE_NOTE);
+    //     eventPublisher.publishEvent(new OccurrenceVacated(occurrenceId, AuditOperations.currentOperationId()));
+    // }
 
     private List<Occurrence> loadAll(Set<Long> ids) {
         List<Occurrence> occurrences = occurrenceRepository.findAllById(ids);

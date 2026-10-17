@@ -250,7 +250,7 @@ class RevisionSummaryIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isCreated()).andReturn();
         long allocationId = objectMapper.readTree(created.getResponse().getContentAsString()).get(0).get("id").asLong();
-        mockMvc.perform(post("/v1/events/occurrences/{id}/release", occurrenceId)).andExpect(status().is2xxSuccessful());
+        mockMvc.perform(post("/v1/allocations/releases").contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"items\":[{\"occurrenceIds\":[" + occurrenceId + "]}],\"reason\":\"OTHER\",\"note\":\"test\"}")).andExpect(status().is2xxSuccessful());
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(jdbc.queryForObject(
                 "SELECT count(*) FROM asignacion_aula_aud WHERE id_asignacion = ? AND revtype = 2", Long.class, allocationId))
                 .isEqualTo(1));
