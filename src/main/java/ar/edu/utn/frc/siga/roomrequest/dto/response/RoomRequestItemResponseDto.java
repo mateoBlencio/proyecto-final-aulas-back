@@ -39,5 +39,6 @@ public record RoomRequestItemResponseDto(
         BuildingOptionDto derivedBuilding,
         Instant derivedAt,
         BuildingOptionDto returnedFromBuilding,
-        String returnedReason
+        String returnedReason,
+        List<ReleasedDateDto> releasedTargetDates
 ) {}

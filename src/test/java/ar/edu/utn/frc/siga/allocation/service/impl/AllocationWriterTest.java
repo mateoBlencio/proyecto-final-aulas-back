@@ -136,7 +136,7 @@ class AllocationWriterTest {
 
     private OccurrenceSlotDto occurrenceSlot(long id, long eventId) {
         return new OccurrenceSlotDto(id, eventId, LocalDate.now().plusDays(1), LocalTime.of(8, 0),
-                LocalTime.of(9, 30), OccurrenceStatus.NEEDS_ROOM, 30);
+                LocalTime.of(9, 30), OccurrenceStatus.NEEDS_ROOM, 30, null, null, null, null);
     }
 
     private Allocation allocation(long id, Long occurrenceId, long classroomId, AllocationSource source) {

@@ -141,7 +141,7 @@ abstract class DashboardIntegrationSupport extends AbstractIntegrationTest {
     }
 
     protected void releaseRoom(Long occurrenceId) {
-        jdbc.update("UPDATE ocurrencia SET estado = 'ROOM_RELEASED' WHERE id_ocurrencia = ?", occurrenceId);
+        jdbc.update("UPDATE ocurrencia SET estado = 'ROOM_RELEASED', motivo_liberacion = 'OTHER' WHERE id_ocurrencia = ?", occurrenceId);
     }
 
     protected void deactivateBuilding(Building building) {

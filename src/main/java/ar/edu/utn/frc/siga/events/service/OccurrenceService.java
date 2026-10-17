@@ -2,6 +2,8 @@ package ar.edu.utn.frc.siga.events.service;
 
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.model.ReleaseReason;
+import ar.edu.utn.frc.siga.events.service.command.OccurrenceRelease;
 
 import java.time.LocalDate;
 import java.util.Collection;
@@ -41,7 +43,23 @@ public interface OccurrenceService {
 
     boolean existsOccurrence(Long occurrenceId);
 
-    void release(Long occurrenceId);
+    /** Espejos de las ocurrencias principales indicadas (mismo evento y fecha, otro {@code roomSlot}). */
+    List<OccurrenceSlotDto> findMirrors(Collection<Long> principalOccurrenceIds);
 
-    void requestRoom(Long occurrenceId);
+    /**
+     * Pasa las ocurrencias a {@code ROOM_RELEASED} con motivo, nota y el aula que tenían (la aporta
+     * quien borró la asignación). No toca asignaciones. Rechaza ocurrencias pasadas, motivo nulo y
+     * {@code OTHER} sin nota.
+     */
+    void release(List<OccurrenceRelease> releases, ReleaseReason reason, String note);
+
+    /** Vuelve a {@code NEEDS_ROOM}, limpia motivo y nota y conserva el aula anterior. */
+    void requestRoom(Collection<Long> occurrenceIds);
+
+    /**
+     * Camino de los endpoints deprecados de a uno: libera con motivo {@code OTHER} y publica
+     * {@code OccurrenceVacated} para que {@code allocation} borre la asignación.
+     */
+    @Deprecated
+    void release(Long occurrenceId);
 }

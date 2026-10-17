@@ -280,9 +280,9 @@ class AcademicEventServiceImplTest {
         when(occurrenceRepository.findByEvent_IdInAndDateGreaterThanEqual(List.of(1L), from))
                 .thenReturn(List.of(o1, o2));
         when(occurrenceMapper.toDto(o1)).thenReturn(new OccurrenceResponseDto(11L, 1L, o1.getDate(),
-                OccurrenceStatus.NEEDS_ROOM, LocalTime.of(8, 0), LocalTime.of(9, 30)));
+                OccurrenceStatus.NEEDS_ROOM, LocalTime.of(8, 0), LocalTime.of(9, 30), null, null, null));
         when(occurrenceMapper.toDto(o2)).thenReturn(new OccurrenceResponseDto(12L, 1L, o2.getDate(),
-                OccurrenceStatus.NEEDS_ROOM, LocalTime.of(8, 0), LocalTime.of(9, 30)));
+                OccurrenceStatus.NEEDS_ROOM, LocalTime.of(8, 0), LocalTime.of(9, 30), null, null, null));
 
         List<OccurrenceResponseDto> result = service.findClassOccurrences(1L, 9L, from);
 
@@ -863,7 +863,7 @@ class AcademicEventServiceImplTest {
         when(occurrenceRepository.findByEvent_Id(1L)).thenReturn(List.of(occurrence));
         when(occurrenceMapper.toDto(occurrence)).thenReturn(
                 new OccurrenceResponseDto(10L, 1L, occurrence.getDate(), OccurrenceStatus.NEEDS_ROOM,
-                        LocalTime.of(8, 0), LocalTime.of(9, 30)));
+                        LocalTime.of(8, 0), LocalTime.of(9, 30), null, null, null));
 
         List<OccurrenceResponseDto> result = service.findOccurrencesByEventId(1L);
 

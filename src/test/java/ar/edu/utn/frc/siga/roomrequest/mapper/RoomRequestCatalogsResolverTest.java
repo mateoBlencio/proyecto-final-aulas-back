@@ -12,11 +12,14 @@ import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.model.EventType;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.ReleasedDateDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AssignedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestCatalogsResolver.ActiveCommissionsKey;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestCatalogsResolver.Catalogs;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemAllocationRepository;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemAllocationRepository.ItemAssignedCount;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
@@ -257,7 +260,7 @@ class RoomRequestCatalogsResolverTest {
     }
 
     private static OccurrenceResponseDto occurrence(Long id, Long eventId, LocalDate date) {
-        return new OccurrenceResponseDto(id, eventId, date, OccurrenceStatus.NEEDS_ROOM, null, null);
+        return new OccurrenceResponseDto(id, eventId, date, OccurrenceStatus.NEEDS_ROOM, null, null, null, null, null);
     }
 
     private static ClassroomResponseDto classroom(Long id, String buildingName) {
@@ -267,5 +270,39 @@ class RoomRequestCatalogsResolverTest {
     private static AllocationResponseDto allocation(Long occurrenceId, ClassroomResponseDto classroom) {
         return new AllocationResponseDto(occurrenceId, AllocationSource.MANUAL, null, null,
                 occurrence(occurrenceId, 50L, LocalDate.now()), null, classroom);
+    }
+
+    @Test
+    @DisplayName("resolveReleasedTargetDatesByItemId: cambio puntual toma solo la fecha del pedido; regular toma las futuras del dia; ignora espejos retirados")
+    void resolveReleasedTargetDates_oneTimeAndRegular() {
+        LocalDate friday = LocalDate.now().plusDays(10)
+                .with(java.time.temporal.TemporalAdjusters.nextOrSame(java.time.DayOfWeek.FRIDAY));
+        LocalDate nextFriday = friday.plusWeeks(1);
+        var released = ar.edu.utn.frc.siga.events.model.OccurrenceStatus.ROOM_RELEASED;
+        var needs = ar.edu.utn.frc.siga.events.model.OccurrenceStatus.NEEDS_ROOM;
+        var virtual = ar.edu.utn.frc.siga.events.model.ReleaseReason.VIRTUAL_CLASS;
+        when(academicEventService.findOccurrencesByEventIds(Set.of(55L))).thenReturn(List.of(
+                new OccurrenceResponseDto(1L, 55L, friday, released, java.time.LocalTime.of(8, 0), java.time.LocalTime.of(9, 0), virtual, null, null),
+                new OccurrenceResponseDto(2L, 55L, nextFriday, released, java.time.LocalTime.of(8, 0), java.time.LocalTime.of(9, 0),
+                        ar.edu.utn.frc.siga.events.model.ReleaseReason.CANCELLED, null, null),
+                new OccurrenceResponseDto(3L, 55L, nextFriday.plusWeeks(1), needs, java.time.LocalTime.of(8, 0), java.time.LocalTime.of(9, 0), null, null, null),
+                new OccurrenceResponseDto(4L, 55L, friday, released, java.time.LocalTime.of(8, 0), java.time.LocalTime.of(9, 0),
+                        ar.edu.utn.frc.siga.events.model.ReleaseReason.MIRROR_RETIRED, null, null)));
+        RoomRequestItem oneTime = RoomRequestItem.builder().id(10L).sourceRecurringEventId(55L).date(nextFriday).build();
+        RoomRequest.builder().id(1L).type(RoomRequestType.ONE_TIME_ROOM_CHANGE).build().addItem(oneTime);
+        RoomRequestItem regular = RoomRequestItem.builder().id(11L).sourceRecurringEventId(55L)
+                .dayOfWeek(java.time.DayOfWeek.FRIDAY).build();
+        RoomRequest.builder().id(2L).type(RoomRequestType.REGULAR_ROOM_CHANGE).build().addItem(regular);
+        RoomRequestItem exam = RoomRequestItem.builder().id(12L).build();
+        RoomRequest.builder().id(3L).type(RoomRequestType.FINAL_EXAM).build().addItem(exam);
+
+        var result = resolver.resolveReleasedTargetDatesByItemId(List.of(oneTime, regular, exam));
+
+        assertThat(result.get(10L)).containsExactly(new ReleasedDateDto(nextFriday,
+                ar.edu.utn.frc.siga.events.model.ReleaseReason.CANCELLED));
+        assertThat(result.get(11L)).containsExactly(
+                new ReleasedDateDto(friday, virtual),
+                new ReleasedDateDto(nextFriday, ar.edu.utn.frc.siga.events.model.ReleaseReason.CANCELLED));
+        assertThat(result).doesNotContainKey(12L);
     }
 }

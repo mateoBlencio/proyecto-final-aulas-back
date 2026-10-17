@@ -12,7 +12,9 @@ import ar.edu.utn.frc.siga.events.model.EventType;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.events.service.command.OccurrenceRelease;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
@@ -62,6 +64,21 @@ class RoomRequestOccurrenceResolverTest {
                 .request(requestOfType(RoomRequestType.ONE_TIME_ROOM_CHANGE))
                 .sourceRecurringEventId(50L).date(date).build();
         when(occurrenceService.findSlotsByEvent(50L, null)).thenReturn(List.of(occurrenceSlot(500L, 50L, date)));
+
+        assertThat(resolver.resolveOccurrencesBySlot(item, 1, false)).containsExactly(List.of(500L));
+    }
+
+    @Test
+    @DisplayName("ONE_TIME_ROOM_CHANGE: ignora espejos y lapidas de la misma fecha al resolver la principal")
+    void oneTimeRoomChange_ignoraEspejos() {
+        LocalDate date = LocalDate.of(2026, 3, 12);
+        RoomRequestItem item = RoomRequestItem.builder().id(1L)
+                .request(requestOfType(RoomRequestType.ONE_TIME_ROOM_CHANGE))
+                .sourceRecurringEventId(50L).date(date).build();
+        OccurrenceSlotDto mirror = new OccurrenceSlotDto(499L, 50L, date, LocalTime.of(10, 0), LocalTime.of(11, 0),
+                OccurrenceStatus.ROOM_RELEASED, 30, null, null, null, 500L);
+        when(occurrenceService.findSlotsByEvent(50L, null))
+                .thenReturn(List.of(mirror, occurrenceSlot(500L, 50L, date)));
 
         assertThat(resolver.resolveOccurrencesBySlot(item, 1, false)).containsExactly(List.of(500L));
     }
@@ -127,7 +144,7 @@ class RoomRequestOccurrenceResolverTest {
                 .date(date).startTime(LocalTime.of(9, 0)).duration(Duration.ofMinutes(90)).estimated(30).build();
         when(academicEventService.createUniqueEvent(any())).thenReturn(uniqueEvent(900L));
         when(academicEventService.findOccurrencesByEventId(900L)).thenReturn(List.of(
-                new OccurrenceResponseDto(9000L, 900L, date, OccurrenceStatus.NEEDS_ROOM, LocalTime.of(9, 0), LocalTime.of(10, 30))));
+                new OccurrenceResponseDto(9000L, 900L, date, OccurrenceStatus.NEEDS_ROOM, LocalTime.of(9, 0), LocalTime.of(10, 30), null, null, null)));
 
         List<List<Long>> result = resolver.resolveOccurrencesBySlot(item, 1, false);
 
@@ -146,7 +163,7 @@ class RoomRequestOccurrenceResolverTest {
                 .date(date).startTime(LocalTime.of(18, 0)).duration(Duration.ofMinutes(60)).estimated(80).build();
         when(academicEventService.createUniqueEvent(any())).thenReturn(uniqueEvent(901L));
         when(academicEventService.findOccurrencesByEventId(901L)).thenReturn(List.of(
-                new OccurrenceResponseDto(9001L, 901L, date, OccurrenceStatus.NEEDS_ROOM, LocalTime.of(18, 0), LocalTime.of(19, 0))));
+                new OccurrenceResponseDto(9001L, 901L, date, OccurrenceStatus.NEEDS_ROOM, LocalTime.of(18, 0), LocalTime.of(19, 0), null, null, null)));
 
         resolver.resolveOccurrencesBySlot(item, 1, false);
 
@@ -179,7 +196,7 @@ class RoomRequestOccurrenceResolverTest {
                 .date(date).startTime(LocalTime.of(9, 0)).duration(Duration.ofMinutes(90)).estimated(90).build();
         when(academicEventService.createUniqueEvent(any())).thenReturn(uniqueEvent(900L));
         when(academicEventService.findOccurrencesByEventId(900L)).thenReturn(List.of(
-                new OccurrenceResponseDto(9000L, 900L, date, OccurrenceStatus.NEEDS_ROOM, LocalTime.of(9, 0), LocalTime.of(10, 30))));
+                new OccurrenceResponseDto(9000L, 900L, date, OccurrenceStatus.NEEDS_ROOM, LocalTime.of(9, 0), LocalTime.of(10, 30), null, null, null)));
         when(occurrenceService.createSimultaneous(9000L, 2)).thenReturn(List.of(9001L, 9002L));
 
         List<List<Long>> result = resolver.resolveOccurrencesBySlot(item, 3, false);
@@ -205,9 +222,9 @@ class RoomRequestOccurrenceResolverTest {
         verify(allocationService).deallocate(captor.capture());
         AllocationTarget.Occurrences target = (AllocationTarget.Occurrences) captor.getValue().targets().getFirst();
         assertThat(target.occurrenceIds()).containsExactlyInAnyOrder(9001L, 9002L);
-        verify(occurrenceService).release(9001L);
-        verify(occurrenceService).release(9002L);
-        verify(occurrenceService, never()).release(9000L);
+        verify(occurrenceService).release(
+                List.of(new OccurrenceRelease(9001L, null), new OccurrenceRelease(9002L, null)),
+                ReleaseReason.MIRROR_RETIRED, "Reasignación de pedido de aula #1");
     }
 
     @Test
@@ -235,7 +252,7 @@ class RoomRequestOccurrenceResolverTest {
 
     private static OccurrenceSlotDto occurrenceSlot(Long occurrenceId, Long eventId, LocalDate date) {
         return new OccurrenceSlotDto(occurrenceId, eventId, date, LocalTime.of(10, 0), LocalTime.of(11, 0),
-                OccurrenceStatus.NEEDS_ROOM, 30);
+                OccurrenceStatus.NEEDS_ROOM, 30, null, null, null, null);
     }
 
     private static AcademicEventResponseDto uniqueEvent(Long eventId) {

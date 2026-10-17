@@ -16,6 +16,7 @@ import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import lombok.RequiredArgsConstructor;
 
@@ -26,12 +27,22 @@ class AllocationTargetResolver {
     private final OccurrenceService occurrenceService;
     private final AllocationValidator validator;
 
-    Map<OccurrenceSlotDto, Long> resolveClassroomByOccurrence(List<AllocationItem> items, LocalDate clampFrom) {
+    record ResolvedAssignments(Map<OccurrenceSlotDto, Long> classroomByOccurrence,
+                               List<OccurrenceSlotDto> skippedReleased) {}
+
+    // Una ocurrencia liberada es una decisión humana: ningún camino que escribe asignaciones la pisa
+    // (decisiones D3 y D9). Por eso se saltea sin fallar, sea cual sea la forma del target.
+    ResolvedAssignments resolveClassroomByOccurrence(List<AllocationItem> items, LocalDate clampFrom) {
         Map<Long, List<OccurrenceSlotDto>> slotsByEvent = collectSlotsByEvent(
                 items.stream().map(AllocationItem::target).toList(), clampFrom);
         Map<OccurrenceSlotDto, Long> classroomByOccurrence = new LinkedHashMap<>();
+        Set<OccurrenceSlotDto> skippedReleased = new LinkedHashSet<>();
         for (AllocationItem item : items) {
             for (OccurrenceSlotDto occurrence : resolveApplicable(item.target(), clampFrom, slotsByEvent)) {
+                if (occurrence.status() == OccurrenceStatus.ROOM_RELEASED) {
+                    skippedReleased.add(occurrence);
+                    continue;
+                }
                 Long previous = classroomByOccurrence.putIfAbsent(occurrence, item.classroomId());
                 if (previous != null && !previous.equals(item.classroomId())) {
                     throw new AllocationConflictException(
@@ -39,7 +50,7 @@ class AllocationTargetResolver {
                 }
             }
         }
-        return classroomByOccurrence;
+        return new ResolvedAssignments(classroomByOccurrence, List.copyOf(skippedReleased));
     }
 
     List<OccurrenceSlotDto> resolveAll(List<AllocationTarget> targets, LocalDate clampFrom) {

@@ -2,11 +2,13 @@ package ar.edu.utn.frc.siga.allocation.controller;
 
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocationBatchRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.DeallocationBatchRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.ReleaseBatchRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationHistorySnapshotDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationImpactResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.ReleasedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.UniqueEventAllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationCommandMapper;
 import ar.edu.utn.frc.siga.allocation.mapper.EventAllocationComposer;
@@ -187,6 +189,35 @@ public class AllocationController {
         log.debug("DELETE /v1/allocations: items={}", dto.items().size());
         List<DeallocatedOccurrenceDto> response = allocationService.deallocate(commandMapper.toDeallocationCommand(dto));
         log.info("Desasignación en lote completa: freed={}", response.size());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/releases")
+    @PreAuthorize("hasAuthority('PERM_OCCURRENCE_RELEASE')")
+    @Operation(summary = "Liberar ocurrencias con motivo",
+               description = "Marca las ocurrencias del lote como ROOM_RELEASED con motivo (VIRTUAL_CLASS, "
+                       + "CANCELLED u OTHER, este último con nota obligatoria) y borra sus asignaciones. Cada item "
+                       + "apunta con 'occurrenceIds', 'eventId' (ocurrencias futuras del evento) o 'eventId' + "
+                       + "'from' [+ 'to']. Arrastra las ocurrencias espejo con el mismo motivo. 400 si falta el "
+                       + "motivo, es MIRROR_RETIRED u OTHER sin nota; 403 sin alcance sobre el edificio del aula; "
+                       + "409 si alguna ocurrencia ya pasó. Atómico.")
+    public ResponseEntity<List<ReleasedOccurrenceDto>> release(@Valid @RequestBody ReleaseBatchRequestDto dto) {
+        log.debug("POST /v1/allocations/releases: items={}, reason={}", dto.items().size(), dto.reason());
+        List<ReleasedOccurrenceDto> response = allocationService.release(commandMapper.toReleaseCommand(dto));
+        log.info("Liberación con motivo completa: released={}", response.size());
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/releases")
+    @PreAuthorize("hasAuthority('PERM_OCCURRENCE_REQUEST_ROOM')")
+    @Operation(summary = "Revertir la liberación de ocurrencias",
+               description = "Devuelve las ocurrencias liberadas del lote a NEEDS_ROOM y limpia motivo y nota. "
+                       + "No asigna aula ni recrea espejos. Responde con los ids revertidos. 403 sin alcance "
+                       + "sobre el edificio del aula (actual o anterior); 409 si alguna ocurrencia ya pasó. Atómico.")
+    public ResponseEntity<List<Long>> cancelRelease(@Valid @RequestBody DeallocationBatchRequestDto dto) {
+        log.debug("DELETE /v1/allocations/releases: items={}", dto.items().size());
+        List<Long> response = allocationService.cancelRelease(commandMapper.toDeallocationCommand(dto));
+        log.info("Liberación revertida: reverted={}", response.size());
         return ResponseEntity.ok(response);
     }
 }

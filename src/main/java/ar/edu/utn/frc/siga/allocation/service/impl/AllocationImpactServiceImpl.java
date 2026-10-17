@@ -61,7 +61,7 @@ class AllocationImpactServiceImpl implements AllocationImpactService {
     public AllocationImpactResponseDto analyze(AllocationCommand command) {
         LocalDate clampFrom = command.source() == AllocationSource.IMPORTED ? null : LocalDate.now();
         Map<OccurrenceSlotDto, Long> classroomByOccurrence =
-                targetResolver.resolveClassroomByOccurrence(command.items(), clampFrom);
+                targetResolver.resolveClassroomByOccurrence(command.items(), clampFrom).classroomByOccurrence();
 
         if (classroomByOccurrence.isEmpty()) {
             return EMPTY;

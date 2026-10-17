@@ -33,6 +33,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import ar.edu.utn.frc.siga.allocation.validator.AllocationCandidate;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -209,6 +210,39 @@ class PreviewServiceImplTest {
     }
 
     @Test
+    @DisplayName("confirm: la validacion de solapamiento no ve las ocurrencias liberadas")
+    void confirmNoValidaNiEscribeOcurrenciasLiberadas() {
+        OptimizationResult result = new OptimizationResult("prev_x", List.of(new OptimizerAllocation("1", 5L)));
+        when(previewStore.get("prev_x")).thenReturn(Optional.of(result));
+        OccurrenceSlotDto libre = slot(10L, 1L, LocalDate.now().plusDays(3));
+        OccurrenceSlotDto liberada = new OccurrenceSlotDto(11L, 1L, LocalDate.now().plusDays(10), LocalTime.of(8, 0),
+                LocalTime.of(9, 30), OccurrenceStatus.ROOM_RELEASED, 30,
+                ar.edu.utn.frc.siga.events.model.ReleaseReason.VIRTUAL_CLASS, null, null, null);
+        when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of(libre, liberada));
+        when(allocationService.reallocate(any())).thenReturn(List.of());
+
+        service.confirm("prev_x", new ConfirmPreviewRequestDto(List.of(new PreviewAllocationDto(1L, 5L))));
+
+        ArgumentCaptor<List<AllocationCandidate>> captor = ArgumentCaptor.forClass(List.class);
+        verify(validator).validateNoOverlap(captor.capture(), anyList());
+        assertThat(captor.getValue()).extracting(c -> c.occurrence().occurrenceId()).containsExactly(10L);
+    }
+
+    @Test
+    @DisplayName("suggestReallocation: si todas las ocurrencias estan liberadas no hay nada que sugerir")
+    void suggestReallocationSoloLiberadasLanzaAllocationConflictException() {
+        when(allocationService.resolveOccurrences(any())).thenReturn(List.of(
+                new OccurrenceSlotDto(10L, 1L, LocalDate.of(2026, 3, 2), LocalTime.of(8, 0), LocalTime.of(9, 30),
+                        OccurrenceStatus.ROOM_RELEASED, 30,
+                        ar.edu.utn.frc.siga.events.model.ReleaseReason.CANCELLED, null, null, null)));
+
+        assertThatThrownBy(() -> service.suggestReallocation(
+                new ReallocationSuggestionRequestDto(List.of(10L), null, null, null, null)))
+                .isInstanceOf(AllocationConflictException.class);
+        verifyNoInteractions(previewEngine);
+    }
+
+    @Test
     @DisplayName("suggestReallocation: ocurrencias de dos eventos distintos → InvalidSelectionException")
     void suggestReallocationOcurrenciasDeDosEventosLanzaInvalidSelectionException() {
         when(allocationService.resolveOccurrences(any())).thenReturn(List.of(
@@ -339,6 +373,6 @@ class PreviewServiceImplTest {
 
     private OccurrenceSlotDto slot(Long occurrenceId, Long eventId, LocalDate date) {
         return new OccurrenceSlotDto(occurrenceId, eventId, date, LocalTime.of(8, 0), LocalTime.of(9, 30),
-                OccurrenceStatus.NEEDS_ROOM, 30);
+                OccurrenceStatus.NEEDS_ROOM, 30, null, null, null, null);
     }
 }

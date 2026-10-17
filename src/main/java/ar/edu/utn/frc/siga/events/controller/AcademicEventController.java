@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.events.controller;
 
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
+import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.events.dto.AcademicEventFilter;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
@@ -24,6 +26,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -46,6 +49,7 @@ public class AcademicEventController {
     private final AcademicEventService academicEventService;
     private final EventAuditHistoryService eventAuditHistoryService;
     private final OccurrenceService occurrenceService;
+    private final BuildingScopeResolver buildingScopeResolver;
 
     @GetMapping
     @PreAuthorize("hasAuthority('PERM_EVENT_READ')")
@@ -158,27 +162,43 @@ public class AcademicEventController {
         return ResponseEntity.ok(response);
     }
 
+    @Deprecated
     @PostMapping("/occurrences/{occurrenceId}/release")
     @PreAuthorize("hasAuthority('PERM_OCCURRENCE_RELEASE')")
     @Operation(summary = "Liberar el aula de una ocurrencia",
-               description = "Marca la ocurrencia como ROOM_RELEASED (libera el aula a propósito, "
-                       + "reasignable en cualquier momento). Rechaza ocurrencias ya pasadas.")
+               deprecated = true,
+               description = "Deprecado: usar POST /v1/allocations/releases, que registra el motivo. "
+                       + "Marca la ocurrencia como ROOM_RELEASED con motivo OTHER (libera el aula a propósito, "
+                       + "reasignable en cualquier momento). Rechaza ocurrencias ya pasadas. Solo para usuarios "
+                       + "con alcance sobre todos los edificios.")
     public ResponseEntity<Void> release(@PathVariable Long occurrenceId) {
         log.debug("POST /v1/events/occurrences/{}/release", occurrenceId);
+        requireUnrestricted(Permission.OCCURRENCE_RELEASE);
         occurrenceService.release(occurrenceId);
         log.info("Ocurrencia liberada: occurrenceId={}", occurrenceId);
         return ResponseEntity.noContent().build();
     }
 
+    @Deprecated
     @PostMapping("/occurrences/{occurrenceId}/request-room")
     @PreAuthorize("hasAuthority('PERM_OCCURRENCE_REQUEST_ROOM')")
     @Operation(summary = "Volver a pedir aula para una ocurrencia",
-               description = "Vuelve a marcar la ocurrencia como necesitada de aula (NEEDS_ROOM). No implica "
+               deprecated = true,
+               description = "Deprecado: usar DELETE /v1/allocations/releases. Vuelve a marcar la ocurrencia como necesitada de aula (NEEDS_ROOM). No implica "
                        + "que se reactive nada: la ocurrencia nunca dejó de dictarse. Rechaza ocurrencias ya pasadas.")
     public ResponseEntity<Void> requestRoom(@PathVariable Long occurrenceId) {
         log.debug("POST /v1/events/occurrences/{}/request-room", occurrenceId);
-        occurrenceService.requestRoom(occurrenceId);
+        requireUnrestricted(Permission.OCCURRENCE_REQUEST_ROOM);
+        occurrenceService.requestRoom(List.of(occurrenceId));
         log.info("Ocurrencia vuelta a marcar como NEEDS_ROOM: occurrenceId={}", occurrenceId);
         return ResponseEntity.noContent().build();
+    }
+
+    // Los endpoints deprecados no resuelven el edificio de la ocurrencia: solo los puede usar quien
+    // tiene alcance total. El alcance por edificio vive en /v1/allocations/releases.
+    private void requireUnrestricted(Permission permission) {
+        if (!buildingScopeResolver.scopeFor(permission).isUnrestricted()) {
+            throw new AccessDeniedException("Endpoint deprecado: requiere alcance sobre todos los edificios");
+        }
     }
 }

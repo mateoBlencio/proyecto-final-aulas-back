@@ -1,0 +1,31 @@
+meta {
+  name: Liberar ocurrencias con motivo
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/v1/allocations/releases
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "items": [
+      { "occurrenceIds": [1041, 1042] },
+      { "eventId": 55 },
+      { "eventId": 56, "from": "2026-04-07", "to": "2026-06-30" }
+    ],
+    "reason": "VIRTUAL_CLASS",
+    "note": "Cursado virtual hasta fin de cuatrimestre"
+  }
+}
+
+docs {
+  Marca las ocurrencias como ROOM_RELEASED con motivo (VIRTUAL_CLASS, CANCELLED, OTHER) y borra
+  sus asignaciones. OTHER exige nota. Arrastra los espejos. Atómico.
+
+  Respuesta 200: [ { occurrenceId, eventId, date, freedClassroomId, reason } ].
+  400 motivo faltante, MIRROR_RETIRED u OTHER sin nota; 403 sin alcance sobre el edificio; 409 ocurrencia pasada.
+}

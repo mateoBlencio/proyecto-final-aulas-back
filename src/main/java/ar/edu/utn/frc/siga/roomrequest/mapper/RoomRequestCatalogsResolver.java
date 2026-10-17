@@ -9,11 +9,15 @@ import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
+import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AssignedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.BuildingOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.ReleasedDateDto;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemAllocationRepository;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemAllocationRepository.ItemAssignedCount;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
@@ -47,6 +51,10 @@ class RoomRequestCatalogsResolver {
     private final RoomRequestItemAllocationRepository allocationRepository;
     private final AcademicEventService academicEventService;
     private final AllocationService allocationService;
+
+    private static final Set<RoomRequestType> RELEASE_AWARE_TYPES = Set.of(
+            RoomRequestType.ONE_TIME_ROOM_CHANGE, RoomRequestType.PARTIAL_EXAM_IN_CLASS,
+            RoomRequestType.REGULAR_ROOM_CHANGE);
 
     record ActiveCommissionsKey(Long subjectId, LocalDate date) {
     }
@@ -150,6 +158,44 @@ class RoomRequestCatalogsResolver {
                     .filter(Objects::nonNull)
                     .toList();
             result.put(item.getId(), catalogMapper.toClassroomOptions(classrooms));
+        }
+        return result;
+    }
+
+    /**
+     * Fechas liberadas que el pedido reactivaría al asignarse: la fecha puntual (cambio único o parcial en
+     * clase) o las futuras del día de la semana (cambio regular). Los espejos retirados no cuentan.
+     */
+    Map<Long, List<ReleasedDateDto>> resolveReleasedTargetDatesByItemId(Collection<RoomRequestItem> items) {
+        List<RoomRequestItem> candidates = items.stream()
+                .filter(item -> item.getSourceRecurringEventId() != null)
+                .filter(item -> RELEASE_AWARE_TYPES.contains(item.getRequest().getType()))
+                .toList();
+        if (candidates.isEmpty()) {
+            return Map.of();
+        }
+        Set<Long> eventIds = candidates.stream().map(RoomRequestItem::getSourceRecurringEventId)
+                .collect(Collectors.toSet());
+        Map<Long, List<OccurrenceResponseDto>> releasedByEventId = academicEventService
+                .findOccurrencesByEventIds(eventIds).stream()
+                .filter(o -> o.status() == OccurrenceStatus.ROOM_RELEASED
+                        && o.releaseReason() != ReleaseReason.MIRROR_RETIRED)
+                .collect(Collectors.groupingBy(OccurrenceResponseDto::eventId));
+
+        LocalDate today = LocalDate.now();
+        Map<Long, List<ReleasedDateDto>> result = new LinkedHashMap<>();
+        for (RoomRequestItem item : candidates) {
+            boolean regular = item.getRequest().getType() == RoomRequestType.REGULAR_ROOM_CHANGE;
+            List<ReleasedDateDto> dates = releasedByEventId
+                    .getOrDefault(item.getSourceRecurringEventId(), List.of()).stream()
+                    .filter(o -> regular
+                            ? !o.date().isBefore(today) && o.date().getDayOfWeek() == item.getDayOfWeek()
+                            : o.date().equals(item.getDate()))
+                    .map(o -> new ReleasedDateDto(o.date(), o.releaseReason()))
+                    .distinct()
+                    .sorted(Comparator.comparing(ReleasedDateDto::date))
+                    .toList();
+            result.put(item.getId(), dates);
         }
         return result;
     }

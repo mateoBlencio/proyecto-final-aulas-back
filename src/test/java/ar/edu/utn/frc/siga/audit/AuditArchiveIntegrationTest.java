@@ -139,6 +139,27 @@ class AuditArchiveIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("archiva motivo, nota y aula anterior de una ocurrencia liberada, cada valor en su columna")
+    void archivesReleaseColumnsInTheSameOrder() {
+        long occurrenceId = jdbc.queryForObject(
+                "SELECT min(id_ocurrencia) FROM public.ocurrencia_aud WHERE rev = ?", Long.class, s.r1());
+        jdbc.update("UPDATE public.ocurrencia_aud SET estado = 'ROOM_RELEASED', motivo_liberacion = 'VIRTUAL_CLASS', "
+                + "nota_liberacion = 'Resolucion 123/26', id_aula_anterior = 4242 "
+                + "WHERE id_ocurrencia = ? AND rev = ?", occurrenceId, s.r1());
+
+        archiveAsSystem();
+
+        Map<String, Object> archived = jdbc.queryForMap(
+                "SELECT * FROM archivo.ocurrencia_aud WHERE id_ocurrencia = ? AND rev = ?", occurrenceId, s.r1());
+        assertThat(archived.get("motivo_liberacion")).isEqualTo("VIRTUAL_CLASS");
+        assertThat(archived.get("nota_liberacion")).isEqualTo("Resolucion 123/26");
+        assertThat(((Number) archived.get("id_aula_anterior")).longValue()).isEqualTo(4242L);
+        assertThat(archived.get("estado")).isEqualTo("ROOM_RELEASED");
+        assertThat(count("SELECT count(*) FROM public.ocurrencia_aud WHERE id_ocurrencia = ? AND rev = ?",
+                occurrenceId, s.r1())).isZero();
+    }
+
+    @Test
     @DisplayName("la solicitud de R2 no se archiva: sigue en public.solicitud_aula_aud")
     void requestRowOfTheMixedRevisionStays() {
         archiveAsSystem();

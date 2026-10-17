@@ -1,0 +1,37 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "c=$(jq -r '.tool_input.command // empty'); echo \"$c\" | grep -Eq '(^|[^a-zA-Z])git[[:space:]]+(commit|push|merge|rebase)([^a-zA-Z]|$)' && { echo 'Bloqueado por hook: git commit/push/merge/rebase se corren a mano. Pasá el comando por consola.' >&2; exit 2; }; exit 0"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); [ -n \"$f\" ] || exit 0; b=$(basename \"$f\"); case \"$b\" in .env.example) exit 0 ;; .env|.env.*) echo \"Bloqueado por hook: no editar $b (solo .env.example).\" >&2; exit 2 ;; esac; exit 0"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in *package-info.java) ./mvnw -q test -Dtest=ModularityTests -Duser.timezone=UTC || { echo 'ModularityTests falló tras un cambio estructural.' >&2; exit 2; } ;; *) exit 0 ;; esac",
+            "timeout": 300,
+            "statusMessage": "Verificando fronteras de módulos (ModularityTests)…"
+          }
+        ]
+      }
+    ]
+  }
+}

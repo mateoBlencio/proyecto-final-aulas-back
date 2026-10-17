@@ -1029,8 +1029,8 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("liberar una ocurrencia deja un único cambio en status: NEEDS_ROOM a ROOM_RELEASED")
-    void releasingAnOccurrenceShowsOnlyStatusChange() throws Exception {
+    @DisplayName("liberar una ocurrencia deja el cambio de status y el motivo de liberación")
+    void releasingAnOccurrenceShowsStatusAndReasonChange() throws Exception {
         seedRecurringEvent(LocalDate.now().plusDays(60));
         long occurrenceId = jdbcTemplate.queryForObject(
                 "SELECT MAX(id_ocurrencia) FROM ocurrencia_aud WHERE revtype = 0", Long.class);
@@ -1041,7 +1041,9 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(items).hasSize(1);
         assertThat(items.getFirst().get("entityType").asText()).isEqualTo("Ocurrencia");
-        assertThat(changeSummary(items.getFirst())).containsExactly("status:NEEDS_ROOM:ROOM_RELEASED");
+        assertThat(changeSummary(items.getFirst())).containsExactlyInAnyOrder(
+                "status:NEEDS_ROOM:ROOM_RELEASED", "releaseReason:null:OTHER",
+                "releaseNote:null:Liberada desde endpoint deprecado");
     }
 
     @Test
@@ -1411,7 +1413,9 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
             assertThat(item.get("changes").isArray()).isTrue();
             assertThat(item.get("changes")).isNotEmpty();
         });
-        assertThat(changeSummary(page.get("content").get(0))).containsExactly("status:NEEDS_ROOM:ROOM_RELEASED");
+        assertThat(changeSummary(page.get("content").get(0))).containsExactlyInAnyOrder(
+                "status:NEEDS_ROOM:ROOM_RELEASED", "releaseReason:null:OTHER",
+                "releaseNote:null:Liberada desde endpoint deprecado");
     }
 
     @Test

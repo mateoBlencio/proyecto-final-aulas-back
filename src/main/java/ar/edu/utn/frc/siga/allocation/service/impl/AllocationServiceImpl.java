@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.allocation.service.impl;
 
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.ReleasedOccurrenceDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationComposer;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
@@ -11,6 +12,9 @@ import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
+import ar.edu.utn.frc.siga.allocation.service.command.ReleaseCommand;
+import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.service.command.OccurrenceRelease;
 import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.audit.AuditOperations;
 import ar.edu.utn.frc.siga.common.util.Plurals;
@@ -32,8 +36,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -134,6 +140,55 @@ public class AllocationServiceImpl implements AllocationService {
 
     @Override
     @Transactional
+    @AuditOperation("Liberación de ocurrencias con motivo")
+    public List<ReleasedOccurrenceDto> release(ReleaseCommand command) {
+        Map<Long, OccurrenceSlotDto> byId = new LinkedHashMap<>();
+        List<OccurrenceSlotDto> principals = targetResolver.resolveAll(command.targets(), LocalDate.now());
+        principals.forEach(o -> byId.put(o.occurrenceId(), o));
+        occurrenceService.findMirrors(byId.keySet()).forEach(o -> byId.putIfAbsent(o.occurrenceId(), o));
+        List<OccurrenceSlotDto> occurrences = List.copyOf(byId.values());
+        AuditOperations.describe("Liberación de " + Plurals.count(occurrences.size(), "ocurrencia", "ocurrencias")
+                + " (" + command.reason() + ")");
+        occurrences.forEach(validator::validateNotPast);
+
+        Map<Long, Long> classroomByOccurrence = currentClassroomByOccurrence(occurrences);
+        requireAccessToOwningBuildings(occurrences, classroomByOccurrence);
+
+        writer.delete(occurrences);
+        occurrenceService.release(
+                occurrences.stream()
+                        .map(o -> new OccurrenceRelease(o.occurrenceId(),
+                                classroomByOccurrence.getOrDefault(o.occurrenceId(), o.previousClassroomId())))
+                        .toList(),
+                command.reason(), command.note());
+        log.info("Ocurrencias liberadas: reason={}, count={}", command.reason(), occurrences.size());
+        return occurrences.stream()
+                .map(o -> new ReleasedOccurrenceDto(o.occurrenceId(), o.eventId(), o.date(),
+                        classroomByOccurrence.get(o.occurrenceId()), command.reason()))
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    @AuditOperation("Reversión de liberación de ocurrencias")
+    public List<Long> cancelRelease(DeallocationCommand command) {
+        // Los espejos nunca vuelven a pedir aula solos: los recrea la resolución de un pedido.
+        List<OccurrenceSlotDto> released = targetResolver.resolveAll(command.targets(), LocalDate.now()).stream()
+                .filter(o -> o.status() == OccurrenceStatus.ROOM_RELEASED)
+                .filter(o -> o.mirrorOfOccurrenceId() == null)
+                .toList();
+        AuditOperations.describe("Reversión de liberación de "
+                + Plurals.count(released.size(), "ocurrencia", "ocurrencias"));
+        requireAccessToOwningBuildings(released, currentClassroomByOccurrence(released));
+
+        List<Long> ids = released.stream().map(OccurrenceSlotDto::occurrenceId).toList();
+        occurrenceService.requestRoom(ids);
+        log.info("Liberación revertida: count={}", ids.size());
+        return ids;
+    }
+
+    @Override
+    @Transactional
     @AuditOperation("Sincronización de asignaciones desde SysAcad")
     public int syncFromSysacad(List<AllocationItem> items) {
         AllocationCommand command = new AllocationCommand(items, null, AllocationSource.SYSACAD);
@@ -145,10 +200,11 @@ public class AllocationServiceImpl implements AllocationService {
     }
 
     /** E.g. "Reasignación de 12 aulas, edificio Central" or "..., 3 edificios". */
-    private void describeAllocation(String action, List<ClassroomResponseDto> classrooms) {
+    private void describeAllocation(String action, List<ClassroomResponseDto> classrooms, int skippedReleased) {
         List<String> buildings = classrooms.stream().map(ClassroomResponseDto::buildingName).distinct().toList();
         AuditOperations.describe(action + " de " + Plurals.count(classrooms.size(), "aula", "aulas")
-                + (buildings.size() == 1 ? ", edificio " + buildings.get(0) : ", " + Plurals.count(buildings.size(), "edificio", "edificios")));
+                + (buildings.size() == 1 ? ", edificio " + buildings.get(0) : ", " + Plurals.count(buildings.size(), "edificio", "edificios"))
+                + (skippedReleased > 0 ? ", " + Plurals.count(skippedReleased, "liberada salteada", "liberadas salteadas") : ""));
     }
 
     /** A non-null {@code action} also sets the audit description once the classrooms are validated. */
@@ -157,8 +213,14 @@ public class AllocationServiceImpl implements AllocationService {
         // de año trae ocurrencias ya pasadas, y rechazarlas dejaría esos slots sin asignación (plan §4).
         LocalDate clampFrom = (command.source() == AllocationSource.IMPORTED || command.source() == AllocationSource.SYSACAD)
                 ? null : LocalDate.now();
-        Map<OccurrenceSlotDto, Long> classroomByOccurrence =
+        AllocationTargetResolver.ResolvedAssignments resolved =
                 targetResolver.resolveClassroomByOccurrence(command.items(), clampFrom);
+        Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolved.classroomByOccurrence();
+        List<OccurrenceSlotDto> skipped = resolved.skippedReleased();
+        if (!skipped.isEmpty()) {
+            log.warn("Ocurrencias liberadas salteadas: source={}, count={}, ids={}", command.source(),
+                    skipped.size(), skipped.stream().map(OccurrenceSlotDto::occurrenceId).toList());
+        }
 
         if (classroomByOccurrence.isEmpty()) {
             return classroomByOccurrence;
@@ -169,7 +231,7 @@ public class AllocationServiceImpl implements AllocationService {
         List<ClassroomResponseDto> classrooms = requireAccessToClassrooms(classroomIds);
         validator.validateClassroomsAvailable(classroomIds);
         if (action != null) {
-            describeAllocation(action, classrooms);
+            describeAllocation(action, classrooms, skipped.size());
         }
 
         if (command.source() == AllocationSource.MANUAL || command.source() == AllocationSource.AUTOMATIC) {
@@ -200,6 +262,28 @@ public class AllocationServiceImpl implements AllocationService {
                 .collect(Collectors.toSet());
         buildingScopeResolver.requireAccess(Permission.ALLOCATION_WRITE, buildingIds);
         return classrooms;
+    }
+
+    private Map<Long, Long> currentClassroomByOccurrence(List<OccurrenceSlotDto> occurrences) {
+        if (occurrences.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> occurrenceIds = occurrences.stream().map(OccurrenceSlotDto::occurrenceId).toList();
+        return allocationRepository.findByOccurrenceIdIn(occurrenceIds).stream()
+                .collect(Collectors.toMap(Allocation::getOccurrenceId, Allocation::getClassroomId));
+    }
+
+    /**
+     * Aula asignada o, si no tiene, el aula anterior guardada al liberar. Sin ninguna de las dos no
+     * hay edificio al que validar y la operación pasa.
+     */
+    private void requireAccessToOwningBuildings(List<OccurrenceSlotDto> occurrences,
+            Map<Long, Long> classroomByOccurrence) {
+        Set<Long> classroomIds = occurrences.stream()
+                .map(o -> classroomByOccurrence.getOrDefault(o.occurrenceId(), o.previousClassroomId()))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        requireAccessToClassrooms(classroomIds);
     }
 
     private void requireAccessToCurrentClassrooms(List<OccurrenceSlotDto> occurrences) {

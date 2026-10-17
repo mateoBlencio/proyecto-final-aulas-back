@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
@@ -205,6 +206,7 @@ class PreviewEngine {
     private Map<Long, List<LocalDate>> datesByEvent(Set<Long> eventIds) {
         return occurrenceService.findSlotsByEvents(eventIds, LocalDate.now())
                 .stream()
+                .filter(o -> o.status() != OccurrenceStatus.ROOM_RELEASED)
                 .collect(Collectors.groupingBy(
                         OccurrenceSlotDto::eventId,
                         Collectors.mapping(OccurrenceSlotDto::date,
