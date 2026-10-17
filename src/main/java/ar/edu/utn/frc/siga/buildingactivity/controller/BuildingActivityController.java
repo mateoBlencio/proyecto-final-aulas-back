@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.buildingactivity.controller;
 
+import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.buildingactivity.dto.request.MarkSeenRequestDto;
 import ar.edu.utn.frc.siga.buildingactivity.dto.response.BuildingActivityDto;
 import ar.edu.utn.frc.siga.buildingactivity.dto.response.UnseenCountDto;
@@ -35,14 +36,21 @@ public class BuildingActivityController {
 
     @GetMapping
     @Operation(summary = "Listar movimientos",
-               description = "Del más nuevo al más viejo, dentro de los edificios del usuario. from/to filtran por fecha del movimiento.")
+               description = "Dentro de los edificios del usuario. from/to filtran por fecha del movimiento; source, seen "
+                       + "(relativo al usuario) y actor (parcial, sin distinguir mayúsculas) se combinan con AND. "
+                       + "'sort=campo,asc|desc' acepta occurredAt, buildingName, actor y lineCount (otro campo da 400); "
+                       + "sin sort, occurredAt,desc. Desempate por id desc.")
     public ResponseEntity<Page<BuildingActivityDto>> find(
             Authentication authentication,
             @RequestParam(required = false) Long buildingId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) AllocationSource source,
+            @RequestParam(required = false) Boolean seen,
+            @RequestParam(required = false) String actor,
             @PageableDefault(size = 20) Pageable pageable) {
-        return ResponseEntity.ok(service.find(authentication.getName(), buildingId, from, to, pageable));
+        return ResponseEntity.ok(service.find(authentication.getName(), buildingId, from, to, source, seen, actor,
+                pageable));
     }
 
     @GetMapping("/unseen-count")

@@ -6,11 +6,13 @@ import ar.edu.utn.frc.siga.buildingactivity.model.BuildingActivity;
 import ar.edu.utn.frc.siga.buildingactivity.model.BuildingActivitySeen;
 import ar.edu.utn.frc.siga.buildingactivity.repository.BuildingActivityRepository;
 import ar.edu.utn.frc.siga.buildingactivity.repository.BuildingActivitySeenRepository;
+import ar.edu.utn.frc.siga.common.exception.InvalidSortPropertyException;
 import ar.edu.utn.frc.siga.common.security.BuildingScope;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.Permission;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Root;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -41,6 +44,8 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -67,6 +72,7 @@ class BuildingActivityServiceImplTest {
     private final ObjectMapper objectMapper = JsonMapper.builder().build();
 
     private BuildingActivityServiceImpl service;
+    private BuildingActivitySeen watermarkStub;
 
     @BeforeEach
     void setUp() {
@@ -93,7 +99,7 @@ class BuildingActivityServiceImplTest {
                         activity(5L, "otro@utn.edu.ar"),
                         activity(8L, ME))));
 
-        Page<BuildingActivityDto> page = service.find(ME, null, null, null, PageRequest.of(0, 20));
+        Page<BuildingActivityDto> page = service.find(ME, null, null, null, null, null, null, PageRequest.of(0, 20));
 
         assertThat(page.getContent()).extracting(BuildingActivityDto::id, BuildingActivityDto::seen)
                 .containsExactly(
@@ -111,7 +117,7 @@ class BuildingActivityServiceImplTest {
         when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(activity(1L, "otro@utn.edu.ar"))));
 
-        BuildingActivityDto dto = service.find(ME, null, null, null, PageRequest.of(0, 20)).getContent().getFirst();
+        BuildingActivityDto dto = service.find(ME, null, null, null, null, null, null, PageRequest.of(0, 20)).getContent().getFirst();
 
         assertThat(dto.seen()).isFalse();
         assertThat(dto.building()).isEqualTo(new BuildingActivityDto.BuildingRef(1L, "Central"));
@@ -124,20 +130,122 @@ class BuildingActivityServiceImplTest {
     }
 
     @Test
-    @DisplayName("find: ordena por id descendente y limita el tamano de pagina a 100")
-    void findSortsByIdDescAndCapsPageSize() {
+    @DisplayName("find: limita el tamano de pagina a 100 y no delega el sort al repositorio")
+    void findCapsPageSizeAndLeavesSortToSpecification() {
         stubScope(BuildingScope.unrestricted());
         stubWatermark(0L);
         when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
                 .thenReturn(Page.empty());
 
-        service.find(ME, null, null, null, PageRequest.of(2, 500, Sort.by("buildingName")));
+        service.find(ME, null, null, null, null, null, null, PageRequest.of(2, 500, Sort.by("buildingName")));
 
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
         verify(repository).findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), captor.capture());
         assertThat(captor.getValue().getPageNumber()).isEqualTo(2);
         assertThat(captor.getValue().getPageSize()).isEqualTo(100);
-        assertThat(captor.getValue().getSort()).isEqualTo(Sort.by(Sort.Direction.DESC, "id"));
+        assertThat(captor.getValue().getSort().isSorted()).isFalse();
+    }
+
+    @Test
+    @DisplayName("find: sin sort ordena por occurredAt desc con desempate por id desc")
+    void findDefaultsToOccurredAtDescThenIdDesc() {
+        Fixture fixture = evaluateFind(PageRequest.of(0, 20), null, null, null);
+
+        InOrder order = inOrder(fixture.cb());
+        order.verify(fixture.cb()).desc(fixture.path("occurredAt"));
+        order.verify(fixture.cb()).desc(fixture.path("id"));
+    }
+
+    @Test
+    @DisplayName("find: sort por buildingName asc y por actor desc respetan la direccion y desempatan por id desc")
+    void findHonorsRequestedSort() {
+        Fixture fixture = evaluateFind(PageRequest.of(0, 20, Sort.by(Sort.Order.asc("buildingName"),
+                Sort.Order.desc("actor"))), null, null, null);
+
+        InOrder order = inOrder(fixture.cb());
+        order.verify(fixture.cb()).asc(fixture.path("buildingName"));
+        order.verify(fixture.cb()).desc(fixture.path("actor"));
+        order.verify(fixture.cb()).desc(fixture.path("id"));
+    }
+
+    @Test
+    @DisplayName("find: sort por lineCount ordena por la cantidad de elementos del jsonb")
+    void findSortsByLineCountWithJsonbArrayLength() {
+        Fixture fixture = evaluateFind(PageRequest.of(0, 20, Sort.by("lineCount")), null, null, null);
+
+        verify(fixture.cb()).function("jsonb_array_length", Integer.class, fixture.path("lines"));
+    }
+
+    @Test
+    @DisplayName("find: en la query de conteo no agrega order by")
+    void findDoesNotOrderCountQuery() {
+        stubScope(BuildingScope.unrestricted());
+        stubWatermark(0L);
+        when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
+                .thenReturn(Page.empty());
+        service.find(ME, null, null, null, null, null, null, PageRequest.of(0, 20));
+        CriteriaQuery countQuery = mock(CriteriaQuery.class);
+        when(countQuery.getResultType()).thenReturn(Long.class);
+
+        capturedFindSpec().toPredicate(mock(Root.class), countQuery, mock(CriteriaBuilder.class));
+
+        verify(countQuery, never()).orderBy(ArgumentMatchers.<List<jakarta.persistence.criteria.Order>>any());
+    }
+
+    @Test
+    @DisplayName("find: un campo de sort no permitido da InvalidSortPropertyException y no consulta el repositorio")
+    void findWithInvalidSortThrows() {
+        assertThatThrownBy(() -> service.find(ME, null, null, null, null, null, null,
+                PageRequest.of(0, 20, Sort.by("lines"))))
+                .isInstanceOf(InvalidSortPropertyException.class)
+                .hasMessageContaining("lines")
+                .hasMessageContaining("occurredAt, buildingName, actor, lineCount");
+
+        verifyNoInteractions(repository, seenRepository);
+    }
+
+    @Test
+    @DisplayName("find: source filtra por origen")
+    void findFiltersBySource() {
+        Fixture fixture = evaluateFind(PageRequest.of(0, 20), AllocationSource.AUTOMATIC, null, null);
+
+        verify(fixture.cb()).equal(fixture.path("source"), AllocationSource.AUTOMATIC);
+    }
+
+    @Test
+    @DisplayName("find: seen=true es id <= marca de agua o actor propio; seen=false es la negacion")
+    void findFiltersBySeen() {
+        stubWatermark(5L);
+        Fixture seen = evaluateFind(PageRequest.of(0, 20), null, true, null);
+
+        verify(seen.cb()).lessThanOrEqualTo(seen.path("id"), 5L);
+        verify(seen.cb()).equal(seen.path("actor"), ME);
+        verify(seen.cb(), never()).not(any());
+    }
+
+    @Test
+    @DisplayName("find: seen=false niega la condicion de visto")
+    void findFiltersByUnseen() {
+        stubWatermark(5L);
+        Fixture unseen = evaluateFind(PageRequest.of(0, 20), null, false, null);
+
+        verify(unseen.cb()).not(any());
+    }
+
+    @Test
+    @DisplayName("find: actor busca parcial en minusculas y escapa los comodines")
+    void findFiltersByActorEscapingWildcards() {
+        Fixture fixture = evaluateFind(PageRequest.of(0, 20), null, null, " Ana_%@UTN ");
+
+        verify(fixture.cb()).like(ArgumentMatchers.<Expression<String>>any(), ArgumentMatchers.eq("%ana\\_\\%@utn%"), ArgumentMatchers.eq('\\'));
+    }
+
+    @Test
+    @DisplayName("find: actor en blanco se ignora")
+    void findIgnoresBlankActor() {
+        Fixture fixture = evaluateFind(PageRequest.of(0, 20), null, null, "  ");
+
+        verify(fixture.cb(), never()).like(ArgumentMatchers.<Expression<String>>any(), any(String.class), any(Character.class));
     }
 
     @Test
@@ -146,7 +254,7 @@ class BuildingActivityServiceImplTest {
         org.mockito.Mockito.doThrow(new AccessDeniedException("sin acceso"))
                 .when(buildingScopeResolver).requireAccess(Permission.BUILDING_ACTIVITY_READ, 9L);
 
-        assertThatThrownBy(() -> service.find(ME, 9L, null, null, PageRequest.of(0, 20)))
+        assertThatThrownBy(() -> service.find(ME, 9L, null, null, null, null, null, PageRequest.of(0, 20)))
                 .isInstanceOf(AccessDeniedException.class);
 
         verifyNoInteractions(repository, seenRepository);
@@ -160,7 +268,7 @@ class BuildingActivityServiceImplTest {
         when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
                 .thenReturn(Page.empty());
 
-        service.find(ME, 3L, null, null, PageRequest.of(0, 20));
+        service.find(ME, 3L, null, null, null, null, null, PageRequest.of(0, 20));
 
         verify(buildingScopeResolver).requireAccess(Permission.BUILDING_ACTIVITY_READ, 3L);
         Fixture fixture = evaluate(capturedFindSpec());
@@ -175,7 +283,7 @@ class BuildingActivityServiceImplTest {
         when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
                 .thenReturn(Page.empty());
 
-        service.find(ME, null, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), PageRequest.of(0, 20));
+        service.find(ME, null, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), null, null, null, PageRequest.of(0, 20));
 
         Fixture fixture = evaluate(capturedFindSpec());
         verify(fixture.cb()).greaterThanOrEqualTo(fixture.path("occurredAt"), Instant.parse("2026-10-01T00:00:00Z"));
@@ -250,8 +358,17 @@ class BuildingActivityServiceImplTest {
     }
 
     private void stubWatermark(long watermark) {
-        BuildingActivitySeen seen = new BuildingActivitySeenStub(watermark);
-        when(seenRepository.findById(ME)).thenReturn(Optional.of(seen));
+        watermarkStub = new BuildingActivitySeenStub(watermark);
+        lenient().when(seenRepository.findById(ME)).thenReturn(Optional.of(watermarkStub));
+    }
+
+    private Fixture evaluateFind(Pageable pageable, AllocationSource source, Boolean seen, String actor) {
+        stubScope(BuildingScope.unrestricted());
+        lenient().when(seenRepository.findById(ME)).thenReturn(Optional.ofNullable(watermarkStub));
+        when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
+                .thenReturn(Page.empty());
+        service.find(ME, null, null, null, source, seen, actor, pageable);
+        return evaluate(capturedFindSpec());
     }
 
     private Specification<BuildingActivity> capturedFindSpec() {
