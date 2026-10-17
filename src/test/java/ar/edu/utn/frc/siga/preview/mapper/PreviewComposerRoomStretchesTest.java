@@ -2,12 +2,12 @@ package ar.edu.utn.frc.siga.preview.mapper;
 
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
-import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizationResult;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizerAllocation;
 import ar.edu.utn.frc.siga.preview.dto.response.PreviewItemDto;
 import ar.edu.utn.frc.siga.preview.dto.response.PreviewResponseDto;
 import ar.edu.utn.frc.siga.preview.dto.response.RoomStretchDto;
+import ar.edu.utn.frc.siga.preview.service.impl.PlanningKey;
 import ar.edu.utn.frc.siga.preview.validator.PreviewValidator;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
@@ -42,6 +42,7 @@ import static org.mockito.Mockito.when;
 class PreviewComposerRoomStretchesTest {
 
     private static final long EVENT_ID = 55L;
+    private static final PlanningKey KEY = new PlanningKey(EVENT_ID, 1);
     private static final LocalDate MONDAY = LocalDate.of(2026, 3, 3);
 
     @Mock
@@ -131,10 +132,10 @@ class PreviewComposerRoomStretchesTest {
         OptimizerAllocation proposal = new OptimizerAllocation(String.valueOf(EVENT_ID), 20L);
         PreviewResponseDto response = composer.compose(
                 new OptimizationResult("preview-1", List.of(proposal)),
-                List.<RecurringEventResponseDto>of(),
-                Map.of(EVENT_ID, List.of(MONDAY)),
-                Map.of(EVENT_ID, 3L),
-                ownSlots.isEmpty() ? Map.of() : Map.of(EVENT_ID, ownSlots),
+                List.<AcademicEventResponseDto>of(),
+                Map.of(KEY, List.of(MONDAY)),
+                Map.of(KEY, 3L),
+                ownSlots.isEmpty() ? Map.of() : Map.of(KEY, ownSlots),
                 List.of(),
                 List.of());
 

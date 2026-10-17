@@ -7,7 +7,13 @@ import org.springframework.modulith.NamedInterface;
 
 @NamedInterface("api")
 public record OptimizerRoom(Long id, Integer capacity, Long buildingId,
-                            boolean openToAll, Set<Long> allowedSubjectIds) {
+                            boolean openToAll, Set<Long> allowedSubjectIds,
+                            boolean hasProjector, int computers) {
+
+    public OptimizerRoom(Long id, Integer capacity, Long buildingId,
+                         boolean openToAll, Set<Long> allowedSubjectIds) {
+        this(id, capacity, buildingId, openToAll, allowedSubjectIds, false, 0);
+    }
 
     public OptimizerRoom(Long id, Integer capacity, Long buildingId) {
         this(id, capacity, buildingId, true, Set.of());

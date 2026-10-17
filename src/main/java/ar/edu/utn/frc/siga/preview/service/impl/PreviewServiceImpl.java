@@ -11,6 +11,7 @@ import ar.edu.utn.frc.siga.allocation.validator.AllocationCandidate;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.common.exception.InvalidSelectionException;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.preview.dto.request.ConfirmPreviewRequestDto;
 import ar.edu.utn.frc.siga.preview.dto.request.PreviewAllocationDto;
@@ -34,7 +35,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -76,61 +81,79 @@ public class PreviewServiceImpl implements PreviewService {
     }
 
     private PreviewResponseDto composeForResponse(OptimizationResult preview) {
-        Set<Long> eventIds = preview.allocations().stream()
-                .map(a -> Long.valueOf(a.eventId()))
-                .collect(Collectors.toSet());
-        PreviewEngine.Inputs inputs = previewEngine.loadInputs(eventIds);
-        return previewComposer.compose(preview, inputs.events(), inputs.datesByEvent(), inputs.priorRoomByEvent(),
-                inputs.priorSlotsByEvent(), inputs.rooms(), inputs.databaseOccupancy());
+        PreviewEngine.Inputs inputs = previewEngine.loadInputs(eventIdsOf(previewKeys(preview)));
+        return previewComposer.compose(preview, inputs.events(), inputs.datesByKey(), inputs.priorRoomByKey(),
+                inputs.priorSlotsByKey(), inputs.rooms(), inputs.databaseOccupancy());
     }
 
+    private static Set<PlanningKey> previewKeys(OptimizationResult preview) {
+        return preview.allocations().stream()
+                .map(a -> PlanningKey.parse(a.eventId()))
+                .collect(Collectors.toSet());
+    }
+
+    private static Set<Long> eventIdsOf(Collection<PlanningKey> keys) {
+        return keys.stream().map(PlanningKey::eventId).collect(Collectors.toSet());
+    }
+
+    // Un evento con un roomSlot con aula y otro sin ella figura en skippedEventIds (por el roomSlot
+    // sin aula) y también en lo aplicado (por el otro).
     @Override
     @Transactional
     public ConfirmPreviewResponseDto confirm(String previewId, ConfirmPreviewRequestDto request) {
         OptimizationResult preview = previewStore.get(previewId).orElseThrow(() -> new ExpiredPreviewException(previewId));
-        Set<Long> previewEventIds = preview.allocations().stream()
-                .map(a -> Long.valueOf(a.eventId()))
-                .collect(Collectors.toSet());
 
-        previewValidator.validateNoDuplicateEventIds(request.allocations());
-        previewValidator.validateAllocationsBelongToPreview(request.allocations(), previewEventIds);
+        previewValidator.validateNoDuplicateAllocations(request.allocations());
+        previewValidator.validateAllocationsBelongToPreview(request.allocations(), previewKeys(preview));
 
-        Map<Long, Long> classroomByEvent = new LinkedHashMap<>();
+        Map<PlanningKey, Long> classroomByKey = new LinkedHashMap<>();
         for (PreviewAllocationDto allocation : request.allocations()) {
-            classroomByEvent.put(allocation.eventId(), allocation.classroomId());
+            classroomByKey.put(new PlanningKey(allocation.eventId(), allocation.effectiveRoomSlot()),
+                    allocation.classroomId());
         }
-        List<Long> skippedEventIds = classroomByEvent.entrySet().stream()
+        Set<Long> skippedIds = classroomByKey.entrySet().stream()
                 .filter(entry -> entry.getValue() == null)
-                .map(Map.Entry::getKey)
-                .toList();
-        Set<Long> eventIdsWithClassroom = classroomByEvent.entrySet().stream()
+                .map(entry -> entry.getKey().eventId())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Map<PlanningKey, Long> appliedByKey = classroomByKey.entrySet().stream()
                 .filter(entry -> entry.getValue() != null)
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toSet());
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (x, y) -> x, LinkedHashMap::new));
 
-        if (eventIdsWithClassroom.isEmpty()) {
-            log.info("Confirm sin aulas propuestas: previewId={}, skipped={}", previewId, skippedEventIds.size());
-            return new ConfirmPreviewResponseDto(List.of(), skippedEventIds);
+        if (appliedByKey.isEmpty()) {
+            log.info("Confirm sin aulas propuestas: previewId={}, skipped={}", previewId, skippedIds.size());
+            return new ConfirmPreviewResponseDto(List.of(), List.copyOf(skippedIds));
         }
 
+        Set<Long> eventIdsWithClassroom = eventIdsOf(appliedByKey.keySet());
         PreviewEngine.Inputs inputs = previewEngine.loadInputs(eventIdsWithClassroom);
-        Set<Long> classroomIds = eventIdsWithClassroom.stream().map(classroomByEvent::get).collect(Collectors.toSet());
-        validator.validateClassroomsAvailable(classroomIds);
+        validator.validateClassroomsAvailable(new HashSet<>(appliedByKey.values()));
 
-        List<OccurrenceSlotDto> targetOccurrences = occurrenceService
+        Map<PlanningKey, List<OccurrenceSlotDto>> occurrencesByKey = occurrenceService
                 .findSlotsByEvents(eventIdsWithClassroom, LocalDate.now())
                 .stream()
-                .filter(o -> !o.isPast())
-                .toList();
+                .filter(o -> o.status() == OccurrenceStatus.NEEDS_ROOM && !o.isPast())
+                .collect(Collectors.groupingBy(o -> new PlanningKey(o.eventId(), o.roomSlot())));
 
-        List<AllocationCandidate> candidates = targetOccurrences.stream()
-                .map(o -> new AllocationCandidate(o, classroomByEvent.get(o.eventId())))
-                .toList();
+        List<AllocationCandidate> candidates = new ArrayList<>();
+        List<AllocationItem> items = new ArrayList<>();
+        appliedByKey.forEach((key, classroomId) -> {
+            List<OccurrenceSlotDto> occurrences = occurrencesByKey.getOrDefault(key, List.of());
+            occurrences.forEach(o -> candidates.add(new AllocationCandidate(o, classroomId)));
+            if (occurrences.isEmpty()) {
+                skippedIds.add(key.eventId());
+            } else {
+                items.add(new AllocationItem(new AllocationTarget.Occurrences(
+                        occurrences.stream().map(OccurrenceSlotDto::occurrenceId).toList()), classroomId));
+            }
+        });
+        List<Long> skippedEventIds = List.copyOf(skippedIds);
+        if (items.isEmpty()) {
+            log.info("Confirm sin ocurrencias pendientes: previewId={}, skipped={}", previewId, skippedEventIds.size());
+            return new ConfirmPreviewResponseDto(List.of(), skippedEventIds);
+        }
+        previewValidator.validateNoSiblingRoomClash(candidates);
         validator.validateNoOverlap(candidates, inputs.databaseOccupancy());
 
-        List<AllocationItem> items = eventIdsWithClassroom.stream()
-                .map(eventId -> new AllocationItem(new AllocationTarget.Event(eventId), classroomByEvent.get(eventId)))
-                .toList();
         List<AllocationResponseDto> saved = allocationService.reallocate(AllocationCommand.automatic(items));
         previewStore.remove(previewId);
 

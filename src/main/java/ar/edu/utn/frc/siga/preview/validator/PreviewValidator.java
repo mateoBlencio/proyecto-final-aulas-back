@@ -1,13 +1,16 @@
 package ar.edu.utn.frc.siga.preview.validator;
 
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
+import ar.edu.utn.frc.siga.allocation.validator.AllocationCandidate;
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
 import ar.edu.utn.frc.siga.common.util.Clashes;
 import ar.edu.utn.frc.siga.common.util.RoomDate;
 import ar.edu.utn.frc.siga.common.util.TimeSpan;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.preview.dto.request.PreviewAllocationDto;
 import ar.edu.utn.frc.siga.preview.dto.response.MoveConflictDto;
 import ar.edu.utn.frc.siga.preview.dto.response.MoveConflictDto.ConflictOrigin;
+import ar.edu.utn.frc.siga.preview.service.impl.PlanningKey;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -15,12 +18,13 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Slf4j
 @Component
@@ -34,25 +38,47 @@ public class PreviewValidator {
     }
 
 
-    public void validateNoDuplicateEventIds(List<PreviewAllocationDto> allocations) {
-        List<Long> eventIds = allocations.stream().map(PreviewAllocationDto::eventId).toList();
-        if (new HashSet<>(eventIds).size() != eventIds.size()) {
+    public void validateNoDuplicateAllocations(List<PreviewAllocationDto> allocations) {
+        List<PlanningKey> keys = allocations.stream().map(PreviewValidator::keyOf).toList();
+        if (new HashSet<>(keys).size() != keys.size()) {
             throw new AllocationConflictException("La propuesta final tiene eventos duplicados.");
         }
     }
 
-    public void validateAllocationsBelongToPreview(List<PreviewAllocationDto> allocations, Set<Long> previewEventIds) {
-        Set<Long> foreign = foreignIds(allocations.stream().map(PreviewAllocationDto::eventId), previewEventIds);
+    public void validateAllocationsBelongToPreview(List<PreviewAllocationDto> allocations,
+            Set<PlanningKey> previewKeys) {
+        Set<PlanningKey> foreign = allocations.stream()
+                .map(PreviewValidator::keyOf)
+                .filter(key -> !previewKeys.contains(key))
+                .collect(Collectors.toSet());
         if (!foreign.isEmpty()) {
             throw new AllocationConflictException(
-                    "los eventos " + foreign + " no pertenecen al preview indicado");
+                    "los eventos " + foreign.stream().map(PlanningKey::toPlanningId).sorted().toList()
+                            + " no pertenecen al preview indicado");
         }
     }
 
-    private Set<Long> foreignIds(Stream<Long> ids, Set<Long> previewEventIds) {
-        return ids.filter(id -> !previewEventIds.contains(id)).collect(Collectors.toSet());
+    // internalConflicts ignora los pares del mismo evento, así que dos espejos en la misma aula y fecha
+    // pasarían como válidos.
+    public void validateNoSiblingRoomClash(List<AllocationCandidate> candidates) {
+        Map<List<Object>, Set<Integer>> roomSlotsByRoomDate = new HashMap<>();
+        for (AllocationCandidate candidate : candidates) {
+            OccurrenceSlotDto occurrence = candidate.occurrence();
+            roomSlotsByRoomDate.computeIfAbsent(
+                            List.of(occurrence.eventId(), candidate.classroomId(), occurrence.date()),
+                            k -> new HashSet<>())
+                    .add(occurrence.roomSlot());
+        }
+        boolean clash = roomSlotsByRoomDate.values().stream().anyMatch(slots -> slots.size() > 1);
+        if (clash) {
+            throw new AllocationConflictException(
+                    "dos aulas simultáneas del mismo evento no pueden asignarse a la misma aula en la misma fecha");
+        }
     }
 
+    private static PlanningKey keyOf(PreviewAllocationDto allocation) {
+        return new PlanningKey(allocation.eventId(), allocation.effectiveRoomSlot());
+    }
 
     List<MoveConflictDto> moveDatabaseConflicts(Long destination, Set<LocalDate> movedDates,
             LocalTime movedStart, LocalTime movedEnd, List<OccupiedSlot> databaseOccupancy) {

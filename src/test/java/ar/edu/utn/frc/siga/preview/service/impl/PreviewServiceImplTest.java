@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
+import ar.edu.utn.frc.siga.allocation.validator.AllocationCandidate;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.common.exception.InvalidSelectionException;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
@@ -170,7 +171,7 @@ class PreviewServiceImplTest {
     @DisplayName("confirm: preview inexistente lanza ExpiredPreviewException")
     void confirmPreviewInexistenteLanzaExpirado() {
         when(previewStore.get("prev_missing")).thenReturn(Optional.empty());
-        ConfirmPreviewRequestDto request = new ConfirmPreviewRequestDto(List.of(new PreviewAllocationDto(1L, 5L)));
+        ConfirmPreviewRequestDto request = new ConfirmPreviewRequestDto(List.of(new PreviewAllocationDto(1L, null, 5L)));
 
         assertThatThrownBy(() -> service.confirm("prev_missing", request))
                 .isInstanceOf(ExpiredPreviewException.class);
@@ -181,7 +182,7 @@ class PreviewServiceImplTest {
     void confirmTodasLasAulasNullNoAplicaNada() {
         OptimizationResult result = new OptimizationResult("prev_x", List.of(new OptimizerAllocation("1", null)));
         when(previewStore.get("prev_x")).thenReturn(Optional.of(result));
-        ConfirmPreviewRequestDto request = new ConfirmPreviewRequestDto(List.of(new PreviewAllocationDto(1L, null)));
+        ConfirmPreviewRequestDto request = new ConfirmPreviewRequestDto(List.of(new PreviewAllocationDto(1L, null, null)));
 
         ConfirmPreviewResponseDto response = service.confirm("prev_x", request);
 
@@ -196,9 +197,10 @@ class PreviewServiceImplTest {
     void confirmAplicaYBorraPreview() {
         OptimizationResult result = new OptimizationResult("prev_x", List.of(new OptimizerAllocation("1", 5L)));
         when(previewStore.get("prev_x")).thenReturn(Optional.of(result));
-        when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of());
+        when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(
+                List.of(slot(10L, 1L, LocalDate.now().plusDays(3))));
         when(allocationService.reallocate(any())).thenReturn(List.of());
-        ConfirmPreviewRequestDto request = new ConfirmPreviewRequestDto(List.of(new PreviewAllocationDto(1L, 5L)));
+        ConfirmPreviewRequestDto request = new ConfirmPreviewRequestDto(List.of(new PreviewAllocationDto(1L, null, 5L)));
 
         service.confirm("prev_x", request);
 
@@ -206,6 +208,115 @@ class PreviewServiceImplTest {
         // Confirm sigue en la sobrecarga estricta (margen 0): no puede heredar la tolerancia
         // de la asignación manual y filtrarla al optimizador.
         verify(validator).validateNoOverlap(anyList(), anyList());
+    }
+
+    @Test
+    @DisplayName("confirm: arma un AllocationTarget.Occurrences por (evento, roomSlot) con las ocurrencias de ese roomSlot y nunca usa Event")
+    void confirmArmaOccurrencesPorClave() {
+        LocalDate d1 = LocalDate.now().plusDays(10);
+        LocalDate d2 = LocalDate.now().plusDays(17);
+        stubConfirmPreview(new OptimizerAllocation("5", 10L), new OptimizerAllocation("5:2", 11L));
+        when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of(
+                slotOf(100L, 5L, d1, 1, OccurrenceStatus.NEEDS_ROOM), slotOf(101L, 5L, d2, 1, OccurrenceStatus.NEEDS_ROOM),
+                slotOf(200L, 5L, d1, 2, OccurrenceStatus.NEEDS_ROOM), slotOf(201L, 5L, d2, 2, OccurrenceStatus.NEEDS_ROOM)));
+        when(allocationService.reallocate(any())).thenReturn(List.of());
+
+        service.confirm("prev_x", new ConfirmPreviewRequestDto(List.of(
+                new PreviewAllocationDto(5L, null, 10L), new PreviewAllocationDto(5L, 2, 11L))));
+
+        List<AllocationItem> items = capturedItems();
+        assertThat(items).containsExactlyInAnyOrder(
+                new AllocationItem(new AllocationTarget.Occurrences(List.of(100L, 101L)), 10L),
+                new AllocationItem(new AllocationTarget.Occurrences(List.of(200L, 201L)), 11L));
+        assertThat(items).extracting(AllocationItem::target).noneMatch(AllocationTarget.Event.class::isInstance);
+    }
+
+    @Test
+    @DisplayName("confirm: ignora las ocurrencias ROOM_RELEASED y las pasadas")
+    void confirmIgnoraLiberadasYPasadas() {
+        LocalDate future = LocalDate.now().plusDays(10);
+        stubConfirmPreview(new OptimizerAllocation("5", 10L));
+        when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of(
+                slotOf(100L, 5L, future, 1, OccurrenceStatus.NEEDS_ROOM),
+                slotOf(101L, 5L, future.plusDays(7), 1, OccurrenceStatus.ROOM_RELEASED),
+                slotOf(102L, 5L, LocalDate.now().minusDays(1), 1, OccurrenceStatus.NEEDS_ROOM)));
+        when(allocationService.reallocate(any())).thenReturn(List.of());
+
+        service.confirm("prev_x", new ConfirmPreviewRequestDto(List.of(new PreviewAllocationDto(5L, null, 10L))));
+
+        assertThat(capturedItems()).containsExactly(
+                new AllocationItem(new AllocationTarget.Occurrences(List.of(100L)), 10L));
+    }
+
+    @Test
+    @DisplayName("confirm: un roomSlot sin aula se aplica en los demás y el evento figura en skippedEventIds")
+    void confirmRoomSlotSinAulaFiguraEnSkipped() {
+        LocalDate date = LocalDate.now().plusDays(10);
+        stubConfirmPreview(new OptimizerAllocation("5", 10L), new OptimizerAllocation("5:2", null));
+        when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of(
+                slotOf(100L, 5L, date, 1, OccurrenceStatus.NEEDS_ROOM),
+                slotOf(200L, 5L, date, 2, OccurrenceStatus.NEEDS_ROOM)));
+        when(allocationService.reallocate(any())).thenReturn(List.of());
+
+        ConfirmPreviewResponseDto response = service.confirm("prev_x", new ConfirmPreviewRequestDto(List.of(
+                new PreviewAllocationDto(5L, 1, 10L), new PreviewAllocationDto(5L, 2, null))));
+
+        assertThat(response.skippedEventIds()).containsExactly(5L);
+        assertThat(capturedItems()).containsExactly(
+                new AllocationItem(new AllocationTarget.Occurrences(List.of(100L)), 10L));
+    }
+
+    @Test
+    @DisplayName("confirm: valida choques entre roomSlots hermanos con las ocurrencias que va a asignar")
+    void confirmValidaChoqueEntreHermanos() {
+        LocalDate date = LocalDate.now().plusDays(10);
+        stubConfirmPreview(new OptimizerAllocation("5", 10L), new OptimizerAllocation("5:2", 10L));
+        when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of(
+                slotOf(100L, 5L, date, 1, OccurrenceStatus.NEEDS_ROOM),
+                slotOf(200L, 5L, date, 2, OccurrenceStatus.NEEDS_ROOM)));
+        when(allocationService.reallocate(any())).thenReturn(List.of());
+
+        service.confirm("prev_x", new ConfirmPreviewRequestDto(List.of(
+                new PreviewAllocationDto(5L, 1, 10L), new PreviewAllocationDto(5L, 2, 10L))));
+
+        ArgumentCaptor<List<AllocationCandidate>> candidatesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(previewValidator).validateNoSiblingRoomClash(candidatesCaptor.capture());
+        assertThat(candidatesCaptor.getValue()).extracting(c -> c.occurrence().occurrenceId())
+                .containsExactlyInAnyOrder(100L, 200L);
+        assertThat(candidatesCaptor.getValue()).extracting(AllocationCandidate::classroomId).containsOnly(10L);
+    }
+
+    private void stubConfirmPreview(OptimizerAllocation... allocations) {
+        when(previewStore.get("prev_x")).thenReturn(Optional.of(new OptimizationResult("prev_x", List.of(allocations))));
+    }
+
+    private List<AllocationItem> capturedItems() {
+        ArgumentCaptor<AllocationCommand> commandCaptor = ArgumentCaptor.forClass(AllocationCommand.class);
+        verify(allocationService).reallocate(commandCaptor.capture());
+        assertThat(commandCaptor.getValue().source()).isEqualTo(AllocationSource.AUTOMATIC);
+        return commandCaptor.getValue().items();
+    }
+
+    private OccurrenceSlotDto slotOf(Long occurrenceId, Long eventId, LocalDate date, int roomSlot,
+            OccurrenceStatus status) {
+        return new OccurrenceSlotDto(occurrenceId, eventId, date, LocalTime.of(8, 0), LocalTime.of(9, 30),
+                status, 30, roomSlot);
+    }
+
+    @Test
+    @DisplayName("confirm: clave sin ocurrencias pendientes va a skippedEventIds y no llama a reallocate")
+    void confirmClaveSinOcurrenciasVaASkipped() {
+        OptimizationResult result = new OptimizationResult("prev_x", List.of(new OptimizerAllocation("1", 5L)));
+        when(previewStore.get("prev_x")).thenReturn(Optional.of(result));
+        when(occurrenceService.findSlotsByEvents(any(), any())).thenReturn(List.of());
+        ConfirmPreviewRequestDto request = new ConfirmPreviewRequestDto(List.of(new PreviewAllocationDto(1L, null, 5L)));
+
+        ConfirmPreviewResponseDto response = service.confirm("prev_x", request);
+
+        assertThat(response.applied()).isEmpty();
+        assertThat(response.skippedEventIds()).containsExactly(1L);
+        verify(allocationService, never()).reallocate(any());
+        verify(previewStore, never()).remove(any());
     }
 
     @Test
