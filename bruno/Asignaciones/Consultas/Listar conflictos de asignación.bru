@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/v1/allocations/conflicts?types=UNALLOCATED,OVERCROWDED,OVERLAP,NOT_PERMITTED&from=2026-01-01&to=2026-12-31&includePast=false&page=0&size=20
+  url: {{baseUrl}}/v1/allocations/conflicts?types=UNALLOCATED,OVERCROWDED,OVERLAP,NOT_PERMITTED&from=2026-01-01&to=2026-12-31&includePast=false&q=algebra&dayOfWeek=MONDAY&specialty=Ingeniería en Sistemas de Información&sort=subject,asc&page=0&size=20
   body: none
   auth: inherit
 }
@@ -15,6 +15,10 @@ params:query {
   from: 2026-01-01
   to: 2026-12-31
   includePast: false
+  ~q: algebra
+  ~dayOfWeek: MONDAY
+  ~specialty: Ingeniería en Sistemas de Información
+  ~sort: subject,asc
   page: 0
   size: 20
 }
@@ -33,5 +37,14 @@ docs {
   includePast (default false): excluye ocurrencias ya pasadas salvo que se pida
   explícitamente (auditoría).
   
+  Filtros opcionales, solo para UNALLOCATED (los demás tipos no cambian):
+  q: contiene, sin mayúsculas ni tildes, sobre nombre de materia, código de comisión
+  y nombre de especialidad. dayOfWeek: MONDAY..SATURDAY; en eventos únicos se usa
+  el día de su fecha. specialty: igualdad exacta con el nombre de la especialidad.
+  Se aplican antes de paginar (totalElements = resultado filtrado).
+  sort=campo,asc|desc (repetible): subject, dayOfWeek, startTime, enrolled,
+  commissionCode (sin comisión al final). Otra propiedad -> 400. Sin sort, orden por
+  id del evento; desempate siempre por id.
+
   Paginado estándar (page/size, default size=20).
 }

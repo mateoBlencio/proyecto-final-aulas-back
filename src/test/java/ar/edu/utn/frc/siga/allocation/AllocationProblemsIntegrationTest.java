@@ -244,4 +244,104 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("Invalid date range"));
     }
+
+    private JsonNode unallocatedPage(LocalDate from, LocalDate to, String... params) throws Exception {
+        var request = get("/v1/allocations/conflicts")
+                .param("types", "UNALLOCATED")
+                .param("from", from.toString()).param("to", to.toString());
+        for (int i = 0; i < params.length; i += 2) {
+            request.param(params[i], params[i + 1]);
+        }
+        MvcResult result = mockMvc.perform(request).andExpect(status().isOk()).andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private String specialtyNameOf(Long eventId, LocalDate from, LocalDate to) throws Exception {
+        JsonNode content = unallocatedPage(from, to, "size", "1000").get("content");
+        for (JsonNode node : content) {
+            if (node.get("event").get("id").asLong() == eventId) {
+                return node.get("event").get("subject").get("studyPlan").get("specialty").get("name").asText();
+            }
+        }
+        throw new AssertionError("El evento " + eventId + " no está entre los sin aula");
+    }
+
+    @Test
+    @DisplayName("UNALLOCATED con specialty exacta y dayOfWeek devuelve solo el evento que coincide")
+    void unallocatedConflicts_filterBySpecialtyAndDay() throws Exception {
+        LocalDate from = LocalDate.now().plusDays(60);
+        LocalDate to = LocalDate.now().plusDays(70);
+        LocalDate date = from.plusDays(1);
+        Long eventId = seedOccurrence(testData.materiaYComision(), date, 30).getEvent().getId();
+        String specialty = specialtyNameOf(eventId, from, to);
+
+        JsonNode match = unallocatedPage(from, to, "specialty", specialty, "dayOfWeek", date.getDayOfWeek().name());
+        JsonNode otherDay = unallocatedPage(from, to, "specialty", specialty, "dayOfWeek", date.plusDays(1).getDayOfWeek().name());
+        JsonNode lowercase = unallocatedPage(from, to, "specialty", specialty.toLowerCase());
+
+        assertThat(match.get("page").get("totalElements").asInt()).isEqualTo(1);
+        assertThat(match.get("content").get(0).get("event").get("id").asLong()).isEqualTo(eventId);
+        assertThat(otherDay.get("page").get("totalElements").asInt()).isZero();
+        assertThat(lowercase.get("page").get("totalElements").asInt()).isZero();
+    }
+
+    @Test
+    @DisplayName("UNALLOCATED con q filtra por especialidad sin distinguir mayúsculas")
+    void unallocatedConflicts_filterByQ() throws Exception {
+        LocalDate from = LocalDate.now().plusDays(60);
+        LocalDate to = LocalDate.now().plusDays(70);
+        Long eventId = seedOccurrence(testData.materiaYComision(), from.plusDays(1), 30).getEvent().getId();
+        String specialty = specialtyNameOf(eventId, from, to);
+
+        JsonNode page = unallocatedPage(from, to, "q", specialty.toUpperCase());
+
+        assertThat(page.get("page").get("totalElements").asInt()).isEqualTo(1);
+        assertThat(page.get("content").get(0).get("event").get("id").asLong()).isEqualTo(eventId);
+    }
+
+    @Test
+    @DisplayName("UNALLOCATED con sort y dos páginas consecutivas no repite ni saltea filas")
+    void unallocatedConflicts_consecutivePagesAreDisjointAndOrdered() throws Exception {
+        LocalDate from = LocalDate.now().plusDays(60);
+        LocalDate to = LocalDate.now().plusDays(70);
+        for (int i = 1; i <= 4; i++) {
+            seedOccurrence(testData.materiaYComision(), from.plusDays(i), 30);
+        }
+
+        List<Long> whole = eventIds(unallocatedPage(from, to, "sort", "subject,asc", "page", "0", "size", "4"));
+        List<Long> first = eventIds(unallocatedPage(from, to, "sort", "subject,asc", "page", "0", "size", "2"));
+        List<Long> second = eventIds(unallocatedPage(from, to, "sort", "subject,asc", "page", "1", "size", "2"));
+
+        assertThat(first).hasSize(2).doesNotContainAnyElementsOf(second);
+        assertThat(concat(first, second)).containsExactlyElementsOf(whole);
+    }
+
+    private static List<Long> concat(List<Long> a, List<Long> b) {
+        List<Long> all = new java.util.ArrayList<>(a);
+        all.addAll(b);
+        return all;
+    }
+
+    private static List<Long> eventIds(JsonNode page) {
+        List<Long> ids = new java.util.ArrayList<>();
+        page.get("content").forEach(n -> ids.add(n.get("event").get("id").asLong()));
+        return ids;
+    }
+
+    @Test
+    @DisplayName("GET /v1/allocations/conflicts con UNALLOCATED y sort inválido responde 400")
+    void conflicts_invalidSort_returns400() throws Exception {
+        mockMvc.perform(get("/v1/allocations/conflicts")
+                        .param("types", "UNALLOCATED").param("sort", "id,asc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Invalid sort property"));
+    }
+
+    @Test
+    @DisplayName("Un sort que UNALLOCATED no acepta no da 400 si los tipos pedidos no lo incluyen")
+    void conflicts_sortIgnoredWithoutUnallocated() throws Exception {
+        mockMvc.perform(get("/v1/allocations/conflicts")
+                        .param("types", "OVERLAP").param("sort", "id,asc"))
+                .andExpect(status().isOk());
+    }
 }
