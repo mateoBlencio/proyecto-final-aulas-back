@@ -14,9 +14,9 @@ por Spring Modulith: `ModularityTests.verifyBoundaries()` rompe el build si un
 módulo accede a internals de otro. Lo público de cada módulo se marca con
 `@NamedInterface("api")`; la comunicación entre módulos es por ID plano + DTO a
 través de esa interfaz, nunca compartiendo entidades JPA. `events` y `allocation`
-además se comunican de forma asíncrona: `events` publica `OccurrenceVacated`
-(registro de publicación persistido, entrega al menos una vez) y `allocation` lo
-escucha vía `@ApplicationModuleListener` para desasignar automáticamente.
+además se comunican de forma asíncrona: `allocation` publica `ClassroomMovements`
+(registro de publicación persistido, entrega al menos una vez) y `buildingactivity` lo
+escucha vía `@ApplicationModuleListener` para avisar a los auxiliares.
 
 | Módulo | Depende de | Responsabilidad |
 |---|---|---|

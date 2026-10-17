@@ -1,14 +1,11 @@
 package ar.edu.utn.frc.siga.events.service.impl;
 
-import ar.edu.utn.frc.siga.audit.AuditOperations;
-import ar.edu.utn.frc.siga.audit.internal.AuditOperationAspect;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.events.EventTestData;
 import ar.edu.utn.frc.siga.events.exception.OccurrenceAlreadyPastException;
 import ar.edu.utn.frc.siga.events.model.AcademicEvent;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
-import ar.edu.utn.frc.siga.events.model.OccurrenceVacated;
 import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.service.command.OccurrenceRelease;
 import ar.edu.utn.frc.siga.common.exception.InvalidSelectionException;
@@ -25,21 +22,16 @@ import org.springframework.http.HttpStatus;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.aop.aspectj.annotation.AspectJProxyFactory;
-import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -52,14 +44,12 @@ class OccurrenceServiceImplTest {
     private OccurrenceRepository occurrenceRepository;
     @Mock
     private EventScheduleValidator eventScheduleValidator;
-    @Mock
-    private ApplicationEventPublisher eventPublisher;
 
     private OccurrenceServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new OccurrenceServiceImpl(occurrenceRepository, eventScheduleValidator, eventPublisher);
+        service = new OccurrenceServiceImpl(occurrenceRepository, eventScheduleValidator);
     }
 
     private Occurrence occurrence(Long id, OccurrenceStatus status) {
@@ -86,65 +76,6 @@ class OccurrenceServiceImplTest {
         verify(occurrenceRepository, never()).findAllById(any());
     }
 
-    // OBSOLETO: prueba del camino viejo, pendiente de revisión por Matías antes de borrar.
-    // @Test
-    // @DisplayName("release dentro de una operación activa publica OccurrenceVacated con el id real de esa operación")
-    // void releasePublicaElEventoConLaOperacionEnCurso() {
-    //     Occurrence occurrence = occurrence(10L, OccurrenceStatus.NEEDS_ROOM);
-    //     when(occurrenceRepository.findAllById(java.util.Set.of(10L))).thenReturn(List.of(occurrence));
-    //     AtomicReference<String> operationIdAtPublish = new AtomicReference<>();
-    //     doAnswer(invocation -> {
-    //         operationIdAtPublish.set(AuditOperations.currentOperationId());
-    //         return null;
-    //     }).when(eventPublisher).publishEvent(any(OccurrenceVacated.class));
-    //     AspectJProxyFactory factory = new AspectJProxyFactory(service);
-    //     factory.setProxyTargetClass(true);
-    //     factory.addAspect(new AuditOperationAspect(org.mockito.Mockito.mock(ar.edu.utn.frc.siga.audit.internal.RevisionDescriptionUpdater.class)));
-    //     OccurrenceServiceImpl audited = factory.getProxy();
-    //
-    //     audited.release(10L);
-    //
-    //     ArgumentCaptor<OccurrenceVacated> captor = ArgumentCaptor.forClass(OccurrenceVacated.class);
-    //     verify(eventPublisher).publishEvent(captor.capture());
-    //     assertThat(operationIdAtPublish.get()).isNotNull();
-    //     assertThat(captor.getValue().originOperationId()).isEqualTo(operationIdAtPublish.get());
-    //     assertThat(captor.getValue().occurrenceId()).isEqualTo(10L);
-    //     assertThat(AuditOperations.currentOperationId()).isNull();
-    // }
-    //
-    // @Test
-    // @DisplayName("release: pasa a ROOM_RELEASED y publica OccurrenceVacated")
-    // void releaseCambiaEstadoYPublicaEvento() {
-    //     Occurrence occurrence = occurrence(10L, OccurrenceStatus.NEEDS_ROOM);
-    //     when(occurrenceRepository.findAllById(java.util.Set.of(10L))).thenReturn(List.of(occurrence));
-    //
-    //     service.release(10L);
-    //
-    //     assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.ROOM_RELEASED);
-    //     verify(eventPublisher).publishEvent(eq(new OccurrenceVacated(10L, null)));
-    // }
-    //
-    // @Test
-    // @DisplayName("release: ocurrencia pasada → propaga la excepción del validator y no publica el evento")
-    // void releaseOcurrenciaPasadaNoPublica() {
-    //     Occurrence occurrence = occurrence(10L, OccurrenceStatus.NEEDS_ROOM);
-    //     when(occurrenceRepository.findAllById(java.util.Set.of(10L))).thenReturn(List.of(occurrence));
-    //     doThrow(new OccurrenceAlreadyPastException("ya ocurrió"))
-    //             .when(eventScheduleValidator).validateNotPast(occurrence);
-    //
-    //     assertThatThrownBy(() -> service.release(10L)).isInstanceOf(OccurrenceAlreadyPastException.class);
-    //
-    //     verify(eventPublisher, never()).publishEvent(org.mockito.ArgumentMatchers.any());
-    //     assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM);
-    // }
-    //
-    // @Test
-    // @DisplayName("release: ocurrencia inexistente → ResourceNotFoundException")
-    // void releaseOcurrenciaInexistente() {
-    //     when(occurrenceRepository.findAllById(java.util.Set.of(99L))).thenReturn(List.of());
-    //
-    //     assertThatThrownBy(() -> service.release(99L)).isInstanceOf(ResourceNotFoundException.class);
-    // }
 
     @Test
     @DisplayName("requestRoom: limpia estado, motivo y nota, conserva el aula anterior y no publica eventos")
@@ -161,7 +92,6 @@ class OccurrenceServiceImplTest {
         assertThat(occurrence.getReleaseReason()).isNull();
         assertThat(occurrence.getReleaseNote()).isNull();
         assertThat(occurrence.getPreviousClassroomId()).isEqualTo(7L);
-        verify(eventPublisher, never()).publishEvent(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -195,19 +125,6 @@ class OccurrenceServiceImplTest {
         assertThat(occurrence.getPreviousClassroomId()).isEqualTo(7L);
     }
 
-    // OBSOLETO: prueba del camino viejo, pendiente de revisión por Matías antes de borrar.
-    // @Test
-    // @DisplayName("release deprecado: conserva el aula anterior que la ocurrencia ya tenia")
-    // void releaseDeprecadoConservaAulaAnterior() {
-    //     Occurrence occurrence = occurrence(10L, OccurrenceStatus.NEEDS_ROOM);
-    //     occurrence.setPreviousClassroomId(7L);
-    //     when(occurrenceRepository.findAllById(java.util.Set.of(10L))).thenReturn(List.of(occurrence));
-    //
-    //     service.release(10L);
-    //
-    //     assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.ROOM_RELEASED);
-    //     assertThat(occurrence.getPreviousClassroomId()).isEqualTo(7L);
-    // }
 
     @Test
     @DisplayName("release en lote: motivo nulo -> 400 y no toca ninguna ocurrencia")

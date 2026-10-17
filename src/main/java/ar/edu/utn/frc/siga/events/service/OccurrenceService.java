@@ -55,8 +55,4 @@ public interface OccurrenceService {
 
     /** Vuelve a {@code NEEDS_ROOM}, limpia motivo y nota y conserva el aula anterior. */
     void requestRoom(Collection<Long> occurrenceIds);
-
-    // OBSOLETO: lo reemplaza POST/DELETE /v1/allocations/releases (con motivo y alcance por edificio). Pendiente de revisión por Matías antes de borrar.
-    // @Deprecated
-    // void release(Long occurrenceId);
 }

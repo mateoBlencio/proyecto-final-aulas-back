@@ -54,9 +54,9 @@ Un solo deployable, una sola base de datos, módulos con fronteras vigiladas por
   `@NamedInterface("api")`. Nunca accedas a internals de otro módulo.
 - La comunicación entre módulos es por ID plano + DTO a través de esa interfaz
   pública. **Nunca compartas entidades JPA entre módulos.**
-- `events` → `allocation` es asíncrona: `events` publica `OccurrenceVacated`
-  (registro de publicación persistido, entrega at-least-once) y `allocation`
-  lo escucha con `@ApplicationModuleListener`.
+- `allocation` → `buildingactivity` es asíncrona: `allocation` publica
+  `ClassroomMovements` (registro de publicación persistido, entrega
+  at-least-once) y `buildingactivity` lo escucha con `@ApplicationModuleListener`.
 - Antes de dar por terminado cualquier cambio que toque paquetes o dependencias
   entre módulos, corré `./mvnw test -Dtest=ModularityTests`.
 

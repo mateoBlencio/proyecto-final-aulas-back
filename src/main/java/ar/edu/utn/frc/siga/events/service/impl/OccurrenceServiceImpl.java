@@ -1,11 +1,9 @@
 package ar.edu.utn.frc.siga.events.service.impl;
 
 import ar.edu.utn.frc.siga.audit.AuditOperation;
-import ar.edu.utn.frc.siga.audit.AuditOperations;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
-import ar.edu.utn.frc.siga.events.model.OccurrenceVacated;
 import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
@@ -15,7 +13,6 @@ import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.events.validator.EventScheduleValidator;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,11 +30,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OccurrenceServiceImpl implements OccurrenceService {
 
-    private static final String DEPRECATED_RELEASE_NOTE = "Liberada desde endpoint deprecado";
-
     private final OccurrenceRepository occurrenceRepository;
     private final EventScheduleValidator eventScheduleValidator;
-    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional(readOnly = true)
@@ -179,15 +173,6 @@ public class OccurrenceServiceImpl implements OccurrenceService {
             occurrence.setReleaseNote(null);
         }
     }
-
-    // OBSOLETO: lo reemplaza POST/DELETE /v1/allocations/releases (con motivo y alcance por edificio). Pendiente de revisión por Matías antes de borrar.
-    // @Override
-    // @Transactional
-    // @AuditOperation("Liberación de ocurrencia")
-    // public void release(Long occurrenceId) {
-    //     release(List.of(new OccurrenceRelease(occurrenceId, null)), ReleaseReason.OTHER, DEPRECATED_RELEASE_NOTE);
-    //     eventPublisher.publishEvent(new OccurrenceVacated(occurrenceId, AuditOperations.currentOperationId()));
-    // }
 
     private List<Occurrence> loadAll(Set<Long> ids) {
         List<Occurrence> occurrences = occurrenceRepository.findAllById(ids);

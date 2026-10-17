@@ -222,9 +222,9 @@
 			<artifactId>spring-modulith-starter-core</artifactId>
 		</dependency>
 
-		<!-- Publicación de eventos de aplicación (OccurrenceVacated) con registro persistido
+		<!-- Publicación de eventos de aplicación (ClassroomMovements) con registro persistido
 		     (tabla event_publication, autocreada) para reintento at-least-once vía
-		     @ApplicationModuleListener. Primer uso de este mecanismo en el proyecto. -->
+		     @ApplicationModuleListener. -->
 		<dependency>
 			<groupId>org.springframework.modulith</groupId>
 			<artifactId>spring-modulith-starter-jpa</artifactId>

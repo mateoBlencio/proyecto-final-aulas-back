@@ -102,7 +102,7 @@ class AuditOperationCoverageTest {
     void scanFindsKnownAnnotatedWriters() {
         assertThat(scanComponents()).extracting(Class::getSimpleName)
                 .contains("AcademicEventServiceImpl", "RoomRequestResolutionServiceImpl", "SettingsServiceImpl",
-                        "UserServiceImpl", "OccurrenceVacatedListener", "AcademicPeriodChangedListener",
+                        "UserServiceImpl", "AcademicPeriodChangedListener",
                         "AcademicEventSyncService", "IngestServiceImpl");
     }
 
