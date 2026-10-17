@@ -1574,6 +1574,9 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
         String operationId = jdbcTemplate.queryForObject(
                 "SELECT r.operacion_id FROM revinfo r JOIN asignacion_aula_aud a ON a.rev = r.rev "
                         + "WHERE a.id_asignacion = ? AND a.revtype = 0", String.class, allocationIds.getFirst());
+        // El listener async de buildingactivity también consulta las aulas; esperar a que termine antes de contar.
+        await().atMost(Duration.ofSeconds(10)).until(() -> jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM actividad_edificio WHERE operacion_id = ?", Integer.class, operationId) > 0);
         clearInvocations(classroomService);
 
         JsonNode page = json(mockMvc, get("/v1/audit/operations/{id}", operationId)

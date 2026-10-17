@@ -125,7 +125,7 @@ public class AllocationServiceImpl implements AllocationService {
         occurrences.forEach(validator::validateNotPast);
         requireAccessToCurrentClassrooms(occurrences);
 
-        List<AllocationWriter.DeallocatedOccurrence> deallocated = writer.delete(occurrences);
+        List<AllocationWriter.DeallocatedOccurrence> deallocated = writer.delete(occurrences, command.observation());
         log.info("Asignación liberada: count={}", deallocated.size());
         return deallocated.stream()
                 .map(d -> new DeallocatedOccurrenceDto(d.occurrenceId(), d.classroomId()))

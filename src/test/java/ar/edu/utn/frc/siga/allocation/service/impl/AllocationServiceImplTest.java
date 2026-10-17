@@ -443,13 +443,13 @@ class AllocationServiceImplTest {
         DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(10L))), "obs");
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
         when(targetResolver.resolveAll(command.targets(), null)).thenReturn(List.of(occ));
-        when(writer.delete(List.of(occ))).thenReturn(List.of(new AllocationWriter.DeallocatedOccurrence(10L, 5L)));
+        when(writer.delete(List.of(occ), "obs")).thenReturn(List.of(new AllocationWriter.DeallocatedOccurrence(10L, 5L)));
 
         List<DeallocatedOccurrenceDto> result = service.deallocate(command);
 
         assertThat(result).containsExactly(new DeallocatedOccurrenceDto(10L, 5L));
         verify(validator).validateNotPast(occ);
-        verify(writer).delete(List.of(occ));
+        verify(writer).delete(List.of(occ), "obs");
     }
 
     @Test
@@ -459,7 +459,7 @@ class AllocationServiceImplTest {
         OccurrenceSlotDto occ1 = occurrenceSlot(10L, 1L, futureDate(1));
         OccurrenceSlotDto occ2 = occurrenceSlot(11L, 1L, futureDate(8));
         when(targetResolver.resolveAll(command.targets(), null)).thenReturn(List.of(occ1, occ2));
-        when(writer.delete(List.of(occ1, occ2))).thenReturn(List.of(
+        when(writer.delete(List.of(occ1, occ2), "obs")).thenReturn(List.of(
                 new AllocationWriter.DeallocatedOccurrence(10L, 5L),
                 new AllocationWriter.DeallocatedOccurrence(11L, 6L)));
 
@@ -480,7 +480,7 @@ class AllocationServiceImplTest {
 
         assertThatThrownBy(() -> service.deallocate(command)).isInstanceOf(AllocationConflictException.class);
 
-        verify(writer, never()).delete(any());
+        verify(writer, never()).delete(any(), any());
     }
 
     @Test
@@ -498,7 +498,7 @@ class AllocationServiceImplTest {
 
         assertThatThrownBy(() -> service.deallocate(command)).isInstanceOf(AccessDeniedException.class);
 
-        verify(writer, never()).delete(any());
+        verify(writer, never()).delete(any(), any());
     }
 
     @Test
@@ -506,7 +506,7 @@ class AllocationServiceImplTest {
     void deallocateSinOccurrencesEsNoOp() {
         DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(10L))), "obs");
         when(targetResolver.resolveAll(command.targets(), null)).thenReturn(List.of());
-        when(writer.delete(List.of())).thenReturn(List.of());
+        when(writer.delete(List.of(), "obs")).thenReturn(List.of());
 
         List<DeallocatedOccurrenceDto> result = service.deallocate(command);
 
@@ -843,7 +843,7 @@ class AllocationServiceImplTest {
         DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(10L))), "obs");
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
         when(targetResolver.resolveAll(command.targets(), null)).thenReturn(List.of(occ));
-        when(writer.delete(List.of(occ))).thenAnswer(inv -> {
+        when(writer.delete(List.of(occ), "obs")).thenAnswer(inv -> {
             probe.peek();
             return List.of();
         });
@@ -861,7 +861,7 @@ class AllocationServiceImplTest {
         OccurrenceSlotDto occ1 = occurrenceSlot(10L, 1L, futureDate(1));
         OccurrenceSlotDto occ2 = occurrenceSlot(11L, 1L, futureDate(8));
         when(targetResolver.resolveAll(command.targets(), null)).thenReturn(List.of(occ1, occ2));
-        when(writer.delete(List.of(occ1, occ2))).thenAnswer(inv -> {
+        when(writer.delete(List.of(occ1, occ2), "obs")).thenAnswer(inv -> {
             probe.peek();
             return List.of();
         });
