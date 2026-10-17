@@ -34,6 +34,8 @@ public class EventAllocationComposer {
         return new UniqueEventAllocationResponseDto(
                 event,
                 allocation.occurrence() != null ? allocation.occurrence().status() : null,
+                allocation.occurrence() != null ? allocation.occurrence().releaseReason() : null,
+                allocation.occurrence() != null ? allocation.occurrence().releaseNote() : null,
                 allocation.classroom(),
                 Overcrowding.by(event.enrolled(), allocation.classroom() != null ? allocation.classroom().capacity() : null),
                 allocation.observation());
@@ -68,6 +70,8 @@ public class EventAllocationComposer {
             result.add(new UniqueEventAllocationResponseDto(
                     event,
                     slot != null ? slot.status() : null,
+                    slot != null ? slot.releaseReason() : null,
+                    slot != null ? slot.releaseNote() : null,
                     classroom,
                     Overcrowding.by(event.enrolled(), classroom != null ? classroom.capacity() : null),
                     allocation != null ? allocation.getObservation() : null));

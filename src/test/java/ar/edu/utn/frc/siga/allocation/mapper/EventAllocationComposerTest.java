@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.dto.response.UniqueEventResponseDto;
 import ar.edu.utn.frc.siga.events.model.EventType;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
@@ -112,6 +113,23 @@ class EventAllocationComposerTest {
         assertThat(dto.classroom().id()).isEqualTo(5);
         assertThat(dto.overcrowdedBy()).isEqualTo(10);
         assertThat(dto.observation()).isEqualTo("obs");
+    }
+
+    @Test
+    @DisplayName("composeAll: ocurrencia liberada devuelve motivo y nota")
+    void composeAllOcurrenciaLiberada() {
+        UniqueEventResponseDto event = uniqueEvent(3L, 40);
+        OccurrenceSlotDto slot = new OccurrenceSlotDto(10L, 3L, LocalDate.of(2026, 3, 10),
+                LocalTime.of(10, 0), LocalTime.of(11, 0), OccurrenceStatus.ROOM_RELEASED, 40,
+                ReleaseReason.OTHER, "Paro docente", 5L, null);
+        when(occurrenceService.findSlotsByEvents(any())).thenReturn(List.of(slot));
+
+        UniqueEventAllocationResponseDto dto = composer.composeAll(List.of(event)).getFirst();
+
+        assertThat(dto.status()).isEqualTo(OccurrenceStatus.ROOM_RELEASED);
+        assertThat(dto.releaseReason()).isEqualTo(ReleaseReason.OTHER);
+        assertThat(dto.releaseNote()).isEqualTo("Paro docente");
+        assertThat(dto.classroom()).isNull();
     }
 
     @Test
