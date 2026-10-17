@@ -98,7 +98,7 @@ class EventAllocationComposerTest {
     void composeAllJuntaTodo() {
         UniqueEventResponseDto event = uniqueEvent(3L, 40);
         OccurrenceSlotDto slot = new OccurrenceSlotDto(10L, 3L, LocalDate.of(2026, 3, 10),
-                LocalTime.of(10, 0), LocalTime.of(11, 0), OccurrenceStatus.NEEDS_ROOM, 40, null, null, null, null);
+                LocalTime.of(10, 0), LocalTime.of(11, 0), OccurrenceStatus.NEEDS_ROOM, 40, 1, null, null, null, null);
         Allocation allocation = Allocation.builder()
                 .id(1L).occurrenceId(10L).classroomId(5L).observation("obs").build();
         when(occurrenceService.findSlotsByEvents(any())).thenReturn(List.of(slot));
@@ -120,7 +120,7 @@ class EventAllocationComposerTest {
     void composeAllOcurrenciaLiberada() {
         UniqueEventResponseDto event = uniqueEvent(3L, 40);
         OccurrenceSlotDto slot = new OccurrenceSlotDto(10L, 3L, LocalDate.of(2026, 3, 10),
-                LocalTime.of(10, 0), LocalTime.of(11, 0), OccurrenceStatus.ROOM_RELEASED, 40,
+                LocalTime.of(10, 0), LocalTime.of(11, 0), OccurrenceStatus.ROOM_RELEASED, 40, 1,
                 ReleaseReason.OTHER, "Paro docente", 5L, null);
         when(occurrenceService.findSlotsByEvents(any())).thenReturn(List.of(slot));
 

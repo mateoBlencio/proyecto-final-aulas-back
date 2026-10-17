@@ -129,6 +129,18 @@ siga:
         default-value: "4000"
         min: "0"
         max: "1000000"
+      - key: optimizer.weights.sameEventDiffBuilding
+        default-value: "8000"
+        min: "0"
+        max: "1000000"
+      - key: optimizer.weights.missingProjector
+        default-value: "10000"
+        min: "0"
+        max: "1000000"
+      - key: optimizer.weights.missingComputer
+        default-value: "20000"
+        min: "0"
+        max: "1000000"
       - key: optimizer.weights.unusedCapacity
         default-value: "1"
         min: "0"

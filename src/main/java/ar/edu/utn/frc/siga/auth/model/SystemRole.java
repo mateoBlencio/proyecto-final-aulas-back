@@ -27,6 +27,7 @@ public enum SystemRole {
             Permission.ALLOCATION_READ,
             Permission.ALLOCATION_WRITE,
             Permission.ALLOCATION_HISTORY_READ,
+            Permission.BUILDING_ACTIVITY_READ,
             Permission.CONFLICT_READ,
             Permission.PREVIEW_RUN,
             Permission.ROOM_REQUEST_READ,

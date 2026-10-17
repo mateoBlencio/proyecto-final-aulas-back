@@ -341,7 +341,7 @@ class RoomRequestCandidateResolverTest {
     }
 
     private static OccurrenceSlotDto ownSlot(Long occurrenceId, LocalDate date) {
-        return new OccurrenceSlotDto(occurrenceId, 1L, date, LocalTime.of(19, 55), LocalTime.of(22, 55), null, null, null, null, null, null);
+        return new OccurrenceSlotDto(occurrenceId, 1L, date, LocalTime.of(19, 55), LocalTime.of(22, 55), null, null, 1, null, null, null, null);
     }
 
     private static OccupiedSlot busy(Long classroomId, LocalDate date, String start, String end, Long occurrenceId) {

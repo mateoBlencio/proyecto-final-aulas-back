@@ -131,7 +131,7 @@ public class AllocationServiceImpl implements AllocationService {
         occurrences.forEach(validator::validateNotPast);
         requireAccessToCurrentClassrooms(occurrences);
 
-        List<AllocationWriter.DeallocatedOccurrence> deallocated = writer.delete(occurrences);
+        List<AllocationWriter.DeallocatedOccurrence> deallocated = writer.delete(occurrences, command.observation());
         log.info("Asignación liberada: count={}", deallocated.size());
         return deallocated.stream()
                 .map(d -> new DeallocatedOccurrenceDto(d.occurrenceId(), d.classroomId()))
@@ -154,7 +154,7 @@ public class AllocationServiceImpl implements AllocationService {
         Map<Long, Long> classroomByOccurrence = currentClassroomByOccurrence(occurrences);
         requireAccessToOwningBuildings(occurrences, classroomByOccurrence);
 
-        writer.delete(occurrences);
+        writer.delete(occurrences, command.note());
         occurrenceService.release(
                 occurrences.stream()
                         .map(o -> new OccurrenceRelease(o.occurrenceId(),

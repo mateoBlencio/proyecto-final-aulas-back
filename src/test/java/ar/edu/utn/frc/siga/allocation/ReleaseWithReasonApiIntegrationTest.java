@@ -155,7 +155,7 @@ class ReleaseWithReasonApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/v1/previews/{id}/confirm", preview.previewId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new ConfirmPreviewRequestDto(
-                                List.of(new PreviewAllocationDto(f.eventId(), proposedRoom))))))
+                                List.of(new PreviewAllocationDto(f.eventId(), null, proposedRoom))))))
                 .andExpect(status().isOk());
 
         assertThat(allocationRepository.findByOccurrenceId(f.firstOccurrenceId()).orElseThrow().getClassroomId())

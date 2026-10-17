@@ -76,7 +76,7 @@ class RoomRequestOccurrenceResolverTest {
                 .request(requestOfType(RoomRequestType.ONE_TIME_ROOM_CHANGE))
                 .sourceRecurringEventId(50L).date(date).build();
         OccurrenceSlotDto mirror = new OccurrenceSlotDto(499L, 50L, date, LocalTime.of(10, 0), LocalTime.of(11, 0),
-                OccurrenceStatus.ROOM_RELEASED, 30, null, null, null, 500L);
+                OccurrenceStatus.ROOM_RELEASED, 30, 1, null, null, null, 500L);
         when(occurrenceService.findSlotsByEvent(50L, null))
                 .thenReturn(List.of(mirror, occurrenceSlot(500L, 50L, date)));
 
@@ -252,7 +252,7 @@ class RoomRequestOccurrenceResolverTest {
 
     private static OccurrenceSlotDto occurrenceSlot(Long occurrenceId, Long eventId, LocalDate date) {
         return new OccurrenceSlotDto(occurrenceId, eventId, date, LocalTime.of(10, 0), LocalTime.of(11, 0),
-                OccurrenceStatus.NEEDS_ROOM, 30, null, null, null, null);
+                OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
     }
 
     private static AcademicEventResponseDto uniqueEvent(Long eventId) {

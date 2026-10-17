@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
+import ar.edu.utn.frc.siga.allocation.model.ClassroomMovements.Change;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 
 @Slf4j
 @Component
@@ -24,6 +26,7 @@ class AllocationWriter {
     private static final String SYSACAD_UPDATED_OBSERVATION = "Actualizado por sync de SysAcad";
 
     private final AllocationRepository allocationRepository;
+    private final ClassroomMovementPublisher movementPublisher;
 
     List<Allocation> create(Map<OccurrenceSlotDto, Long> classroomByOccurrence, String observation, AllocationSource source) {
         List<Long> occurrenceIds = classroomByOccurrence.keySet().stream().map(OccurrenceSlotDto::occurrenceId).toList();
@@ -47,10 +50,16 @@ class AllocationWriter {
                 allocationRepository.findByOccurrenceIdIn(occurrenceIds), Allocation::getOccurrenceId);
 
         List<Allocation> saved = new ArrayList<>();
+        List<Change> changes = new ArrayList<>();
         for (Entry<OccurrenceSlotDto, Long> entry : classroomByOccurrence.entrySet()) {
             OccurrenceSlotDto occurrence = entry.getKey();
             Long classroomId = entry.getValue();
             Allocation existing = existingByOccurrence.get(occurrence.occurrenceId());
+            Long fromClassroomId = existing == null ? null : existing.getClassroomId();
+            if (!Objects.equals(fromClassroomId, classroomId)) {
+                changes.add(new Change(occurrence.occurrenceId(), occurrence.eventId(), occurrence.date(),
+                        occurrence.startTime(), occurrence.endTime(), fromClassroomId, classroomId));
+            }
             Allocation allocation;
             if (existing != null) {
                 existing.setClassroomId(classroomId);
@@ -67,6 +76,7 @@ class AllocationWriter {
             }
             saved.add(allocation);
         }
+        movementPublisher.publish(source, observation, changes);
         return saved;
     }
 
@@ -110,12 +120,19 @@ class AllocationWriter {
         return affected;
     }
 
-    List<DeallocatedOccurrence> delete(List<OccurrenceSlotDto> occurrences) {
+    List<DeallocatedOccurrence> delete(List<OccurrenceSlotDto> occurrences, String observation) {
         List<Long> occurrenceIds = occurrences.stream().map(OccurrenceSlotDto::occurrenceId).toList();
         List<Allocation> existing = allocationRepository.findByOccurrenceIdIn(occurrenceIds);
         if (existing.isEmpty()) return List.of();
 
         allocationRepository.deleteAll(existing);
+        Map<Long, OccurrenceSlotDto> slotById = Maps.byId(occurrences, OccurrenceSlotDto::occurrenceId, (a, b) -> a);
+        List<Change> changes = existing.stream().map(a -> {
+            OccurrenceSlotDto slot = slotById.get(a.getOccurrenceId());
+            return new Change(a.getOccurrenceId(), slot.eventId(), slot.date(), slot.startTime(), slot.endTime(),
+                    a.getClassroomId(), null);
+        }).toList();
+        movementPublisher.publish(AllocationSource.MANUAL, observation, changes);
         return existing.stream().map(a -> new DeallocatedOccurrence(a.getOccurrenceId(), a.getClassroomId())).toList();
     }
 

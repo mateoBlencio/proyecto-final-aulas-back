@@ -444,7 +444,7 @@ class AllocationServiceImplTest {
 
     private OccurrenceSlotDto slotWithPreviousClassroom(long id, Long previousClassroomId) {
         return new OccurrenceSlotDto(id, 1L, futureDate(1), LocalTime.of(8, 0), LocalTime.of(9, 30),
-                OccurrenceStatus.ROOM_RELEASED, 30, ReleaseReason.VIRTUAL_CLASS, null, previousClassroomId, null);
+                OccurrenceStatus.ROOM_RELEASED, 30, 1, ReleaseReason.VIRTUAL_CLASS, null, previousClassroomId, null);
     }
 
     private ReleaseCommand releaseCommand(Long... occurrenceIds) {
@@ -465,7 +465,7 @@ class AllocationServiceImplTest {
 
         List<ReleasedOccurrenceDto> result = service.release(command);
 
-        verify(writer).delete(List.of(principal, mirror));
+        verify(writer).delete(eq(List.of(principal, mirror)), any());
         verify(occurrenceService).release(
                 List.of(new OccurrenceRelease(10L, 5L), new OccurrenceRelease(11L, 6L)),
                 ReleaseReason.VIRTUAL_CLASS, "cursado virtual");
@@ -485,7 +485,7 @@ class AllocationServiceImplTest {
 
         service.release(command);
 
-        verify(writer).delete(List.of(principal, mirror));
+        verify(writer).delete(eq(List.of(principal, mirror)), any());
         verify(occurrenceService).release(
                 List.of(new OccurrenceRelease(10L, null), new OccurrenceRelease(11L, null)),
                 ReleaseReason.VIRTUAL_CLASS, "cursado virtual");
@@ -518,7 +518,7 @@ class AllocationServiceImplTest {
         service.release(command);
 
         InOrder inOrder = inOrder(writer, occurrenceService);
-        inOrder.verify(writer).delete(List.of(occ));
+        inOrder.verify(writer).delete(eq(List.of(occ)), any());
         inOrder.verify(occurrenceService).release(anyList(), eq(ReleaseReason.VIRTUAL_CLASS), eq("cursado virtual"));
     }
 
@@ -537,7 +537,7 @@ class AllocationServiceImplTest {
 
         assertThatThrownBy(() -> service.release(command)).isInstanceOf(AccessDeniedException.class);
 
-        verify(writer, never()).delete(any());
+        verify(writer, never()).delete(any(), any());
         verify(occurrenceService, never()).release(any(), any(), any());
     }
 
@@ -597,7 +597,7 @@ class AllocationServiceImplTest {
 
         assertThatThrownBy(() -> service.release(command)).isInstanceOf(AllocationConflictException.class);
 
-        verify(writer, never()).delete(any());
+        verify(writer, never()).delete(any(), any());
         verify(occurrenceService, never()).release(any(), any(), any());
     }
 
@@ -630,7 +630,7 @@ class AllocationServiceImplTest {
 
     private OccurrenceSlotDto releasedSlot(long id, Long mirrorOf) {
         return new OccurrenceSlotDto(id, 1L, futureDate(1), LocalTime.of(8, 0), LocalTime.of(9, 30),
-                OccurrenceStatus.ROOM_RELEASED, 30, null, null, null, mirrorOf);
+                OccurrenceStatus.ROOM_RELEASED, 30, 1, null, null, null, mirrorOf);
     }
 
     // ---------- deallocate ----------
@@ -641,13 +641,13 @@ class AllocationServiceImplTest {
         DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(10L))), "obs");
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
         when(targetResolver.resolveAll(command.targets(), null)).thenReturn(List.of(occ));
-        when(writer.delete(List.of(occ))).thenReturn(List.of(new AllocationWriter.DeallocatedOccurrence(10L, 5L)));
+        when(writer.delete(List.of(occ), "obs")).thenReturn(List.of(new AllocationWriter.DeallocatedOccurrence(10L, 5L)));
 
         List<DeallocatedOccurrenceDto> result = service.deallocate(command);
 
         assertThat(result).containsExactly(new DeallocatedOccurrenceDto(10L, 5L));
         verify(validator).validateNotPast(occ);
-        verify(writer).delete(List.of(occ));
+        verify(writer).delete(List.of(occ), "obs");
     }
 
     @Test
@@ -657,7 +657,7 @@ class AllocationServiceImplTest {
         OccurrenceSlotDto occ1 = occurrenceSlot(10L, 1L, futureDate(1));
         OccurrenceSlotDto occ2 = occurrenceSlot(11L, 1L, futureDate(8));
         when(targetResolver.resolveAll(command.targets(), null)).thenReturn(List.of(occ1, occ2));
-        when(writer.delete(List.of(occ1, occ2))).thenReturn(List.of(
+        when(writer.delete(List.of(occ1, occ2), "obs")).thenReturn(List.of(
                 new AllocationWriter.DeallocatedOccurrence(10L, 5L),
                 new AllocationWriter.DeallocatedOccurrence(11L, 6L)));
 
@@ -678,7 +678,7 @@ class AllocationServiceImplTest {
 
         assertThatThrownBy(() -> service.deallocate(command)).isInstanceOf(AllocationConflictException.class);
 
-        verify(writer, never()).delete(any());
+        verify(writer, never()).delete(any(), any());
     }
 
     @Test
@@ -696,7 +696,7 @@ class AllocationServiceImplTest {
 
         assertThatThrownBy(() -> service.deallocate(command)).isInstanceOf(AccessDeniedException.class);
 
-        verify(writer, never()).delete(any());
+        verify(writer, never()).delete(any(), any());
     }
 
     @Test
@@ -704,7 +704,7 @@ class AllocationServiceImplTest {
     void deallocateSinOccurrencesEsNoOp() {
         DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(10L))), "obs");
         when(targetResolver.resolveAll(command.targets(), null)).thenReturn(List.of());
-        when(writer.delete(List.of())).thenReturn(List.of());
+        when(writer.delete(List.of(), "obs")).thenReturn(List.of());
 
         List<DeallocatedOccurrenceDto> result = service.deallocate(command);
 
@@ -736,7 +736,7 @@ class AllocationServiceImplTest {
         AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5L);
         OccurrenceSlotDto libre = occurrenceSlot(10L, 1L, futureDate(1));
         OccurrenceSlotDto liberada = new OccurrenceSlotDto(11L, 1L, futureDate(8), LocalTime.of(8, 0),
-                LocalTime.of(9, 30), OccurrenceStatus.ROOM_RELEASED, 30,
+                LocalTime.of(9, 30), OccurrenceStatus.ROOM_RELEASED, 30, 1,
                 ar.edu.utn.frc.siga.events.model.ReleaseReason.VIRTUAL_CLASS, null, null, null);
         Map<OccurrenceSlotDto, Long> resolved = mapOf(libre, 5);
         when(targetResolver.resolveClassroomByOccurrence(List.of(item), null))
@@ -1073,7 +1073,7 @@ class AllocationServiceImplTest {
         DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(10L))), "obs");
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
         when(targetResolver.resolveAll(command.targets(), null)).thenReturn(List.of(occ));
-        when(writer.delete(List.of(occ))).thenAnswer(inv -> {
+        when(writer.delete(List.of(occ), "obs")).thenAnswer(inv -> {
             probe.peek();
             return List.of();
         });
@@ -1091,7 +1091,7 @@ class AllocationServiceImplTest {
         OccurrenceSlotDto occ1 = occurrenceSlot(10L, 1L, futureDate(1));
         OccurrenceSlotDto occ2 = occurrenceSlot(11L, 1L, futureDate(8));
         when(targetResolver.resolveAll(command.targets(), null)).thenReturn(List.of(occ1, occ2));
-        when(writer.delete(List.of(occ1, occ2))).thenAnswer(inv -> {
+        when(writer.delete(List.of(occ1, occ2), "obs")).thenAnswer(inv -> {
             probe.peek();
             return List.of();
         });
@@ -1126,7 +1126,7 @@ class AllocationServiceImplTest {
     }
 
     private OccurrenceSlotDto occurrenceSlot(long id, long eventId, LocalDate date) {
-        return new OccurrenceSlotDto(id, eventId, date, LocalTime.of(8, 0), LocalTime.of(9, 30), OccurrenceStatus.NEEDS_ROOM, 30, null, null, null, null);
+        return new OccurrenceSlotDto(id, eventId, date, LocalTime.of(8, 0), LocalTime.of(9, 30), OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
     }
 
     private Allocation allocation(long id, Long occurrenceId, long classroomId, AllocationSource source) {

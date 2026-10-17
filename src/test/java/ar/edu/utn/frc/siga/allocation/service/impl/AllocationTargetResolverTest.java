@@ -141,7 +141,7 @@ class AllocationTargetResolverTest {
         LocalDate today = LocalDate.now();
         realValidateRange();
         OccurrenceSlotDto yaEmpezo = new OccurrenceSlotDto(
-                1L, EVENT_ID, today, LocalTime.MIN, LocalTime.MIN.plusHours(2), OccurrenceStatus.NEEDS_ROOM, 30, null, null, null, null);
+                1L, EVENT_ID, today, LocalTime.MIN, LocalTime.MIN.plusHours(2), OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
         when(occurrenceService.findSlotsByEvent(EVENT_ID, today)).thenReturn(List.of(yaEmpezo));
         doThrowConflict(yaEmpezo);
 
@@ -188,7 +188,7 @@ class AllocationTargetResolverTest {
     void eventDescartaPasadasConClamp() {
         LocalDate today = LocalDate.now();
         OccurrenceSlotDto pasada = new OccurrenceSlotDto(
-                1L, 55L, today, LocalTime.MIN, LocalTime.MIN.plusHours(1), OccurrenceStatus.NEEDS_ROOM, 30, null, null, null, null);
+                1L, 55L, today, LocalTime.MIN, LocalTime.MIN.plusHours(1), OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
         OccurrenceSlotDto futura = slotForEvent(2L, 55L, today.plusDays(10));
         when(occurrenceService.findSlotsByEvents(anyCollection(), any())).thenReturn(List.of(pasada, futura));
 
@@ -264,7 +264,7 @@ class AllocationTargetResolverTest {
     void resolveAllOccurrencesConPasadaLanza() {
         OccurrenceSlotDto pasada = new OccurrenceSlotDto(
                 1L, EVENT_ID, LocalDate.now().minusDays(1), LocalTime.of(8, 0), LocalTime.of(10, 0),
-                OccurrenceStatus.NEEDS_ROOM, 30, null, null, null, null);
+                OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
         when(occurrenceService.findSlots(List.of(1L))).thenReturn(List.of(pasada));
         doThrowConflict(pasada);
 
@@ -277,7 +277,7 @@ class AllocationTargetResolverTest {
 
     private static OccurrenceSlotDto released(OccurrenceSlotDto o) {
         return new OccurrenceSlotDto(o.occurrenceId(), o.eventId(), o.date(), o.startTime(), o.endTime(),
-                OccurrenceStatus.ROOM_RELEASED, o.enrolled(), ar.edu.utn.frc.siga.events.model.ReleaseReason.VIRTUAL_CLASS,
+                OccurrenceStatus.ROOM_RELEASED, o.enrolled(), 1, ar.edu.utn.frc.siga.events.model.ReleaseReason.VIRTUAL_CLASS,
                 null, null, null);
     }
 
@@ -346,7 +346,7 @@ class AllocationTargetResolverTest {
 
     private static OccurrenceSlotDto slotForEvent(long occurrenceId, long eventId, LocalDate date) {
         return new OccurrenceSlotDto(occurrenceId, eventId, date, LocalTime.of(8, 0), LocalTime.of(10, 0),
-                OccurrenceStatus.NEEDS_ROOM, 30, null, null, null, null);
+                OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
     }
 
     /** Delega {@code validateRange} al método real: es la regla bajo prueba, no una colaboración. */
@@ -365,6 +365,6 @@ class AllocationTargetResolverTest {
 
     private static OccurrenceSlotDto slot(Long id, LocalDate date) {
         return new OccurrenceSlotDto(id, EVENT_ID, date, LocalTime.of(8, 0), LocalTime.of(10, 0),
-                OccurrenceStatus.NEEDS_ROOM, 30, null, null, null, null);
+                OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
     }
 }

@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.allocation.service.impl;
 
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
+import ar.edu.utn.frc.siga.allocation.model.ClassroomMovements.Change;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
@@ -24,7 +25,9 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -41,11 +44,14 @@ class AllocationWriterTest {
     @Mock
     private AllocationRepository allocationRepository;
 
+    @Mock
+    private ClassroomMovementPublisher movementPublisher;
+
     private AllocationWriter writer;
 
     @BeforeEach
     void setUp() {
-        writer = new AllocationWriter(allocationRepository);
+        writer = new AllocationWriter(allocationRepository, movementPublisher);
     }
 
     @Test
@@ -134,9 +140,113 @@ class AllocationWriterTest {
         assertThat(foreignAllocation.getClassroomId()).isEqualTo(2L);
     }
 
+    // ---------- aviso de movimientos ----------
+
+    @Test
+    @DisplayName("upsert: aula distinta publica Change(from=anterior, to=nueva) con fecha, horario y evento de la ocurrencia")
+    void upsertPublishesChangeWithPreviousClassroom() {
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 3L);
+        Allocation existing = allocation(100L, 10L, 5L, AllocationSource.MANUAL);
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of(existing));
+
+        writer.upsert(mapOf(occ, 7L), "obra", AllocationSource.MANUAL);
+
+        assertThat(existing.getClassroomId()).isEqualTo(7L);
+        assertThat(publishedChanges(AllocationSource.MANUAL, "obra")).containsExactly(
+                new Change(10L, 3L, occ.date(), occ.startTime(), occ.endTime(), 5L, 7L));
+    }
+
+    @Test
+    @DisplayName("create: ocurrencia sin asignación previa publica Change con from nulo")
+    void createPublishesChangeWithNullFrom() {
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 3L);
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of());
+
+        writer.create(mapOf(occ, 7L), "alta", AllocationSource.MANUAL);
+
+        assertThat(publishedChanges(AllocationSource.MANUAL, "alta")).extracting(Change::fromClassroomId, Change::toClassroomId)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(null, 7L));
+    }
+
+    @Test
+    @DisplayName("upsert: from == to no genera Change; el publisher recibe lista vacia")
+    void upsertWithSameClassroomGeneratesNoChange() {
+        OccurrenceSlotDto same = occurrenceSlot(10L, 3L);
+        OccurrenceSlotDto moved = occurrenceSlot(11L, 3L);
+        Map<OccurrenceSlotDto, Long> batch = new LinkedHashMap<>();
+        batch.put(same, 5L);
+        batch.put(moved, 8L);
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L, 11L))).thenReturn(List.of(
+                allocation(100L, 10L, 5L, AllocationSource.MANUAL), allocation(101L, 11L, 6L, AllocationSource.MANUAL)));
+
+        writer.upsert(batch, "obs", AllocationSource.MANUAL);
+
+        assertThat(publishedChanges(AllocationSource.MANUAL, "obs")).extracting(Change::occurrenceId)
+                .containsExactly(11L);
+    }
+
+    @Test
+    @DisplayName("upsert: todas las ocurrencias con la misma aula publican lista vacia")
+    void upsertWithOnlyUnchangedOccurrencesPublishesEmptyList() {
+        OccurrenceSlotDto same = occurrenceSlot(10L, 3L);
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L)))
+                .thenReturn(List.of(allocation(100L, 10L, 5L, AllocationSource.MANUAL)));
+
+        writer.upsert(mapOf(same, 5L), "obs", AllocationSource.MANUAL);
+
+        assertThat(publishedChanges(AllocationSource.MANUAL, "obs")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("delete: publica Change(from=aula, to=null) con source MANUAL y la observacion")
+    void deletePublishesReleaseAsManual() {
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 3L);
+        Allocation existing = allocation(100L, 10L, 5L, AllocationSource.AUTOMATIC);
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of(existing));
+
+        writer.delete(List.of(occ), "se rompio el proyector");
+
+        verify(allocationRepository).deleteAll(List.of(existing));
+        assertThat(publishedChanges(AllocationSource.MANUAL, "se rompio el proyector")).containsExactly(
+                new Change(10L, 3L, occ.date(), occ.startTime(), occ.endTime(), 5L, null));
+    }
+
+    @Test
+    @DisplayName("delete: sin asignaciones existentes no publica")
+    void deleteWithoutExistingAllocationsDoesNotPublish() {
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of());
+
+        writer.delete(List.of(occurrenceSlot(10L, 3L)), "obs");
+
+        verifyNoInteractions(movementPublisher);
+    }
+
+    @Test
+    @DisplayName("syncFromSysacad: nunca publica movimientos, ni al crear ni al actualizar")
+    void syncFromSysacadDoesNotPublish() {
+        OccurrenceSlotDto created = occurrenceSlot(10L, 1L);
+        OccurrenceSlotDto updated = occurrenceSlot(11L, 1L);
+        Map<OccurrenceSlotDto, Long> batch = new LinkedHashMap<>();
+        batch.put(created, 5L);
+        batch.put(updated, 6L);
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L, 11L)))
+                .thenReturn(List.of(allocation(200L, 11L, 1L, AllocationSource.SYSACAD)));
+
+        assertThat(writer.syncFromSysacad(batch)).isEqualTo(2);
+
+        verifyNoInteractions(movementPublisher);
+    }
+
+    private List<Change> publishedChanges(AllocationSource source, String reason) {
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Change>> captor = ArgumentCaptor.forClass(List.class);
+        verify(movementPublisher).publish(eq(source), eq(reason), captor.capture());
+        return captor.getValue();
+    }
+
     private OccurrenceSlotDto occurrenceSlot(long id, long eventId) {
         return new OccurrenceSlotDto(id, eventId, LocalDate.now().plusDays(1), LocalTime.of(8, 0),
-                LocalTime.of(9, 30), OccurrenceStatus.NEEDS_ROOM, 30, null, null, null, null);
+                LocalTime.of(9, 30), OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
     }
 
     private Allocation allocation(long id, Long occurrenceId, long classroomId, AllocationSource source) {

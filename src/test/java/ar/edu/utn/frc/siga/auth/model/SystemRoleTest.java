@@ -40,4 +40,13 @@ class SystemRoleTest {
         assertThat(SystemRole.AUXILIAR_AULICO.permissions()).contains(Permission.ALLOCATION_HISTORY_READ);
         assertThat(SystemRole.CONSULTA.permissions()).doesNotContain(Permission.ALLOCATION_HISTORY_READ);
     }
+
+    @Test
+    @DisplayName("BUILDING_ACTIVITY_READ is building-scoped and granted to SUBSECRETARIA and AUXILIAR_AULICO but not to CONSULTA")
+    void buildingActivityReadIsGrantedToStaffThatOperatesBuildings() {
+        assertThat(Permission.BUILDING_ACTIVITY_READ.scopeType()).isEqualTo(ScopeType.BUILDING);
+        assertThat(SystemRole.SUBSECRETARIA.permissions()).contains(Permission.BUILDING_ACTIVITY_READ);
+        assertThat(SystemRole.AUXILIAR_AULICO.permissions()).contains(Permission.BUILDING_ACTIVITY_READ);
+        assertThat(SystemRole.CONSULTA.permissions()).doesNotContain(Permission.BUILDING_ACTIVITY_READ);
+    }
 }

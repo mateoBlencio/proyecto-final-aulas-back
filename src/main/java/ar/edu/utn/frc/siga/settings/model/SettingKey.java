@@ -15,6 +15,12 @@ public enum SettingKey {
             "optimizer.weights.sameCommissionDiffRoom", SettingType.INT, RiskLevel.SAFE, "optimizer", null),
     OPTIMIZER_WEIGHT_SAME_COMMISSION_DIFF_BUILDING(
             "optimizer.weights.sameCommissionDiffBuilding", SettingType.INT, RiskLevel.SAFE, "optimizer", null),
+    OPTIMIZER_WEIGHT_SAME_EVENT_DIFF_BUILDING(
+            "optimizer.weights.sameEventDiffBuilding", SettingType.INT, RiskLevel.SAFE, "optimizer", null),
+    OPTIMIZER_WEIGHT_MISSING_PROJECTOR(
+            "optimizer.weights.missingProjector", SettingType.INT, RiskLevel.SAFE, "optimizer", null),
+    OPTIMIZER_WEIGHT_MISSING_COMPUTER(
+            "optimizer.weights.missingComputer", SettingType.INT, RiskLevel.SAFE, "optimizer", null),
     OPTIMIZER_WEIGHT_UNUSED_CAPACITY(
             "optimizer.weights.unusedCapacity", SettingType.INT, RiskLevel.SAFE, "optimizer", null),
     OPTIMIZER_SOLVER_SECONDS_SPENT_LIMIT(

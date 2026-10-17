@@ -1,0 +1,23 @@
+meta {
+  name: Marcar como vistos
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/v1/building-activity/seen
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "lastSeenId": 901
+  }
+}
+
+docs {
+  POST /v1/building-activity/seen. Permiso: PERM_BUILDING_ACTIVITY_READ. 204 sin cuerpo.
+  Marca como visto todo hasta lastSeenId inclusive. Un id menor al ya marcado se ignora
+  (la marca nunca retrocede).
+}

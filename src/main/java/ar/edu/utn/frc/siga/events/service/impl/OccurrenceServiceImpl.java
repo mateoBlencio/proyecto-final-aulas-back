@@ -208,6 +208,7 @@ public class OccurrenceServiceImpl implements OccurrenceService {
                 occurrence.endTime(),
                 occurrence.getStatus(),
                 occurrence.getEvent().getEnrolled(),
+                occurrence.getRoomSlot(),
                 occurrence.getReleaseReason(),
                 occurrence.getReleaseNote(),
                 occurrence.getPreviousClassroomId(),

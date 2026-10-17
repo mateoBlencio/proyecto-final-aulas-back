@@ -16,6 +16,7 @@ import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.model.RecurringEvent;
 import ar.edu.utn.frc.siga.events.model.UniqueEvent;
 import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
@@ -23,6 +24,8 @@ import ar.edu.utn.frc.siga.events.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.events.service.command.OccurrenceRelease;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
@@ -39,6 +42,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,6 +65,8 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
     private AcademicEventRepository eventRepository;
     @Autowired
     private OccurrenceRepository occurrenceRepository;
+    @Autowired
+    private OccurrenceService occurrenceService;
     @Autowired
     private AllocationRepository allocationRepository;
     @Autowired
@@ -218,8 +224,8 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /v1/previews: evento sin ocurrencias pendientes responde 409; UniqueEvent responde 409")
-    void autoPreview_noPendingOccurrences_and_uniqueEvent_return409() throws Exception {
+    @DisplayName("POST /v1/previews: evento sin ocurrencias pendientes responde 409")
+    void autoPreview_noPendingOccurrences_return409() throws Exception {
         LocalDate pastDate = LocalDate.now().minusMonths(2);
         var pastSc = testData.materiaYComision();
         RecurringEvent pastEvent = eventRepository.save(RecurringEvent.builder()
@@ -235,17 +241,6 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
                                 new PreviewRequestDto(List.of(pastEvent.getId()), null, null, 2))))
                 .andExpect(status().isConflict());
 
-        var scUnico = testData.materiaYComision();
-        var uniqueDto = new CreateUniqueEventRequestDto(
-                UniqueEventKind.EXAMEN_FINAL, scUnico.subjectId(), scUnico.commissionId(),
-                LocalDate.now().plusDays(104), START, DURATION, 20, null, null, null, null, null, null);
-        Long uniqueEventId = academicEventService.createUniqueEvent(uniqueDto).id();
-
-        mockMvc.perform(post("/v1/previews")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new PreviewRequestDto(List.of(uniqueEventId), null, null, 2))))
-                .andExpect(status().isConflict());
     }
 
     @Test
@@ -268,7 +263,7 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
         MvcResult confirmResult = mockMvc.perform(post("/v1/previews/{id}/confirm", preview.previewId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new ConfirmPreviewRequestDto(
-                                List.of(new PreviewAllocationDto(eventId, proposedRoom))))))
+                                List.of(new PreviewAllocationDto(eventId, null, proposedRoom))))))
                 .andExpect(status().isOk())
                 .andReturn();
         ConfirmPreviewResponseDto confirmResponse = objectMapper.readValue(
@@ -286,7 +281,7 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/v1/previews/{id}/confirm", preview.previewId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new ConfirmPreviewRequestDto(
-                                List.of(new PreviewAllocationDto(eventId, proposedRoom))))))
+                                List.of(new PreviewAllocationDto(eventId, null, proposedRoom))))))
                 .andExpect(status().isGone());
     }
 
@@ -311,11 +306,152 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/v1/previews/{id}/confirm", preview.previewId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new ConfirmPreviewRequestDto(
-                                List.of(new PreviewAllocationDto(eventId, proposedRoom))))))
+                                List.of(new PreviewAllocationDto(eventId, null, proposedRoom))))))
                 .andExpect(status().isConflict());
 
         assertThat(allocationRepository.findByOccurrenceId(occurrence.getId())).isEmpty();
         assertThat(occurrenceRepository.findById(occurrence.getId()).orElseThrow().getStatus())
                 .isEqualTo(OccurrenceStatus.NEEDS_ROOM);
+    }
+
+    private Long createUniqueEvent(IntegrationTestData.SubjectAndCommission sc, LocalDate date, int enrolled) {
+        var dto = new CreateUniqueEventRequestDto(
+                UniqueEventKind.EXAMEN_FINAL, sc.subjectId(), sc.commissionId(),
+                date, LocalTime.of(15, 0), DURATION, enrolled, null, null, null, null, null, null);
+        return academicEventService.createUniqueEvent(dto).id();
+    }
+
+    private ConfirmPreviewRequestDto confirmBody(Long eventId, PreviewResponseDto preview) {
+        return new ConfirmPreviewRequestDto(preview.allocations().stream()
+                .map(item -> new PreviewAllocationDto(eventId, item.roomSlot(), item.classroom().id()))
+                .toList());
+    }
+
+    @Test
+    @DisplayName("POST /v1/previews con selectAll: un único sin aula ya no responde 409 y recibe propuesta")
+    void autoPreview_selectAllWithUnassignedUniqueEvent_returnsProposal() throws Exception {
+        var sc = testData.materiaYComision();
+        testData.aula(testData.edificio());
+        Long uniqueId = createUniqueEvent(sc, LocalDate.now().plusDays(140), 20);
+
+        MvcResult result = mockMvc.perform(post("/v1/previews")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new PreviewRequestDto(null, true, null, 2))))
+                .andExpect(status().isOk())
+                .andReturn();
+        PreviewResponseDto preview = objectMapper.readValue(
+                result.getResponse().getContentAsString(), PreviewResponseDto.class);
+
+        assertThat(preview.allocations()).filteredOn(item -> item.event().id().equals(uniqueId))
+                .singleElement().satisfies(item -> {
+                    assertThat(item.classroom()).isNotNull();
+                    assertThat(item.roomSlot()).isEqualTo(1);
+                    assertThat(item.occurrenceDates()).containsExactly(LocalDate.now().plusDays(140));
+                });
+    }
+
+    @Test
+    @DisplayName("POST /v1/previews mixto: recurrente y único en el mismo horario reciben propuesta y aulas distintas")
+    void autoPreview_mixedRecurringAndUnique_bothGetDifferentRooms() throws Exception {
+        var building = testData.edificio();
+        testData.aula(building);
+        testData.aula(building);
+        LocalDate date = LocalDate.now().plusDays(141);
+        Long recurringId = createEvent(testData.materiaYComision(), date);
+        var uniqueDto = new CreateUniqueEventRequestDto(
+                UniqueEventKind.OTRO, null, null, date, START, DURATION, 20, null, null, null, null, null, null);
+        Long uniqueId = academicEventService.createUniqueEvent(uniqueDto).id();
+
+        PreviewResponseDto preview = autoPreview(List.of(recurringId, uniqueId));
+
+        assertThat(preview.unresolved()).isEmpty();
+        assertThat(preview.allocations()).extracting(item -> item.event().id())
+                .containsExactlyInAnyOrder(recurringId, uniqueId);
+        assertThat(preview.allocations()).extracting(item -> item.classroom().id()).doesNotHaveDuplicates();
+    }
+
+    @Test
+    @DisplayName("confirm: un único con 2 roomSlot asigna una aula distinta a cada ocurrencia simultánea")
+    void confirm_uniqueEventWithTwoRoomSlots_assignsTwoDifferentRooms() throws Exception {
+        var building = testData.edificio();
+        testData.aula(building);
+        testData.aula(building);
+        Long uniqueId = createUniqueEvent(testData.materiaYComision(), LocalDate.now().plusDays(142), 20);
+        Long principalId = occurrenceOf(uniqueId).getId();
+        Long mirrorId = occurrenceService.createSimultaneous(principalId, 1).getFirst();
+
+        PreviewResponseDto preview = autoPreview(List.of(uniqueId));
+        assertThat(preview.allocations()).extracting(PreviewItemDto::roomSlot).containsExactlyInAnyOrder(1, 2);
+        assertThat(preview.allocations()).extracting(item -> item.classroom().id()).doesNotHaveDuplicates();
+
+        MvcResult confirmResult = mockMvc.perform(post("/v1/previews/{id}/confirm", preview.previewId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(confirmBody(uniqueId, preview))))
+                .andExpect(status().isOk())
+                .andReturn();
+        ConfirmPreviewResponseDto confirmResponse = objectMapper.readValue(
+                confirmResult.getResponse().getContentAsString(), ConfirmPreviewResponseDto.class);
+
+        assertThat(confirmResponse.applied()).hasSize(2);
+        Long roomOfPrincipal = allocationRepository.findByOccurrenceId(principalId).orElseThrow().getClassroomId();
+        Long roomOfMirror = allocationRepository.findByOccurrenceId(mirrorId).orElseThrow().getClassroomId();
+        assertThat(roomOfPrincipal).isNotEqualTo(roomOfMirror);
+        PreviewItemDto slotOne = preview.allocations().stream().filter(i -> i.roomSlot() == 1).findFirst().orElseThrow();
+        PreviewItemDto slotTwo = preview.allocations().stream().filter(i -> i.roomSlot() == 2).findFirst().orElseThrow();
+        assertThat(roomOfPrincipal).isEqualTo(slotOne.classroom().id());
+        assertThat(roomOfMirror).isEqualTo(slotTwo.classroom().id());
+    }
+
+    @Test
+    @DisplayName("confirm: dos roomSlot del mismo evento en la misma aula responde 409 y no persiste nada")
+    void confirm_twoRoomSlotsInSameRoom_returns409AndPersistsNothing() throws Exception {
+        var building = testData.edificio();
+        Classroom room = testData.aula(building);
+        testData.aula(building);
+        Long uniqueId = createUniqueEvent(testData.materiaYComision(), LocalDate.now().plusDays(143), 20);
+        Long principalId = occurrenceOf(uniqueId).getId();
+        Long mirrorId = occurrenceService.createSimultaneous(principalId, 1).getFirst();
+        PreviewResponseDto preview = autoPreview(List.of(uniqueId));
+
+        mockMvc.perform(post("/v1/previews/{id}/confirm", preview.previewId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ConfirmPreviewRequestDto(List.of(
+                                new PreviewAllocationDto(uniqueId, 1, room.getId()),
+                                new PreviewAllocationDto(uniqueId, 2, room.getId()))))))
+                .andExpect(status().isConflict());
+
+        assertThat(allocationRepository.findByOccurrenceId(principalId)).isEmpty();
+        assertThat(allocationRepository.findByOccurrenceId(mirrorId)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("confirm: una ocurrencia ROOM_RELEASED de un recurrente no entra al preview ni se reasigna")
+    void confirm_releasedOccurrence_isNotReassigned() throws Exception {
+        testData.aula(testData.edificio());
+        var sc = testData.materiaYComision();
+        LocalDate first = LocalDate.now().plusDays(144);
+        LocalDate second = first.plusDays(7);
+        Long eventId = academicEventService.createRecurringEvent(new CreateRecurringEventRequestDto(
+                30, START, DURATION, first.getDayOfWeek(), first, second, sc.subjectId(), sc.commissionId())).id();
+        List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId).stream()
+                .sorted(Comparator.comparing(Occurrence::getDate)).toList();
+        assertThat(occurrences).hasSize(2);
+        Long pendingId = occurrences.get(0).getId();
+        Long releasedId = occurrences.get(1).getId();
+        occurrenceService.release(List.of(new OccurrenceRelease(releasedId, null)), ReleaseReason.VIRTUAL_CLASS, null);
+
+        PreviewResponseDto preview = autoPreview(List.of(eventId));
+        assertThat(preview.allocations()).singleElement()
+                .satisfies(item -> assertThat(item.occurrenceDates()).containsExactly(first));
+
+        mockMvc.perform(post("/v1/previews/{id}/confirm", preview.previewId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(confirmBody(eventId, preview))))
+                .andExpect(status().isOk());
+
+        assertThat(allocationRepository.findByOccurrenceId(pendingId)).isPresent();
+        assertThat(allocationRepository.findByOccurrenceId(releasedId)).isEmpty();
+        assertThat(occurrenceRepository.findById(releasedId).orElseThrow().getStatus())
+                .isEqualTo(OccurrenceStatus.ROOM_RELEASED);
     }
 }
