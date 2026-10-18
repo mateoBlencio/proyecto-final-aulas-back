@@ -86,7 +86,7 @@ class DirectEventDraftValidatorTest {
                 new AcademicReferenceValidator(Mockito.mock(SubjectService.class), Mockito.mock(CommissionService.class),
                         Mockito.mock(SubjectCommissionService.class)),
                 classSchedule);
-        when(userService.hasGlobalRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
+        when(userService.hasRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
         DirectEventDraftDto draft = draft(RoomRequestType.PARTIAL_EXAM_IN_CLASS, null, null, null, true, null);
 
         assertThatThrownBy(() -> withRealReferences.validate(draft, SUBSECRETARIA))
@@ -99,7 +99,7 @@ class DirectEventDraftValidatorTest {
     @EnumSource(value = RoomRequestType.class, names = {"FINAL_EXAM", "CONFERENCE"})
     @DisplayName("FINAL_EXAM y CONFERENCE con comisión: 400 y no se resuelve el horario")
     void commissionNotAllowed_isRejected(RoomRequestType type) {
-        when(userService.hasGlobalRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
+        when(userService.hasRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
 
         assertBadRequest(timed(type, 7L), SUBSECRETARIA);
         Mockito.verifyNoInteractions(classSchedule);
@@ -110,7 +110,7 @@ class DirectEventDraftValidatorTest {
     @ValueSource(strings = {"", "   "})
     @DisplayName("OTHER con description nula, vacía o en blanco: 400")
     void otherWithoutDescription_isRejected(String description) {
-        when(userService.hasGlobalRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
+        when(userService.hasRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
 
         assertBadRequest(draft(RoomRequestType.OTHER, null, LocalTime.of(9, 0), LocalTime.of(11, 0), true, description),
                 SUBSECRETARIA);
@@ -119,7 +119,7 @@ class DirectEventDraftValidatorTest {
     @Test
     @DisplayName("hoy con hora de inicio ya pasada: 400")
     void startTimeAlreadyPassed_isRejected() {
-        when(userService.hasGlobalRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
+        when(userService.hasRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
         DirectEventDraftDto draft = new DirectEventDraftDto(RoomRequestType.CONFERENCE, null, null, LocalDate.now(),
                 LocalTime.MIN, LocalTime.MIN.plusHours(1), 30, 1, null, true, 20, null, null, "charla");
 
@@ -129,7 +129,7 @@ class DirectEventDraftValidatorTest {
     @Test
     @DisplayName("fin igual al inicio: 400")
     void endNotAfterStart_isRejected() {
-        when(userService.hasGlobalRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
+        when(userService.hasRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
 
         assertBadRequest(draft(RoomRequestType.CONFERENCE, null, LocalTime.of(9, 0), LocalTime.of(9, 0), true, "charla"),
                 SUBSECRETARIA);
@@ -138,7 +138,7 @@ class DirectEventDraftValidatorTest {
     @Test
     @DisplayName("parcial en clase que manda startTime/endTime: 400 sin consultar el cursado")
     void partialInClassWithTimesInBody_isRejected() {
-        when(userService.hasGlobalRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
+        when(userService.hasRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
 
         assertBadRequest(timed(RoomRequestType.PARTIAL_EXAM_IN_CLASS, 7L), SUBSECRETARIA);
         Mockito.verifyNoInteractions(classSchedule);
@@ -147,7 +147,7 @@ class DirectEventDraftValidatorTest {
     @Test
     @DisplayName("parcial en clase en una fecha sin cursado: propaga el 400 de requireClassDate")
     void partialInClassOnNonClassDate_propagatesRejection() {
-        when(userService.hasGlobalRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
+        when(userService.hasRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
         when(classSchedule.requireClassDate(1L, 7L, FUTURE))
                 .thenThrow(new InvalidRoomRequestException("La comisión 7 no tiene clase el " + FUTURE + "."));
 
@@ -159,7 +159,7 @@ class DirectEventDraftValidatorTest {
     @ValueSource(booleans = false)
     @DisplayName("auxiliar con requiresComputers false o nulo: 400")
     void auxiliarWithoutComputers_isRejected(Boolean requiresComputers) {
-        when(userService.hasGlobalRole(AUXILIAR, SystemRole.SUBSECRETARIA)).thenReturn(false);
+        when(userService.hasRole(AUXILIAR, SystemRole.SUBSECRETARIA)).thenReturn(false);
 
         assertBadRequest(draft(RoomRequestType.CONFERENCE, null, LocalTime.of(9, 0), LocalTime.of(11, 0),
                 requiresComputers, "charla"), AUXILIAR);
@@ -168,8 +168,8 @@ class DirectEventDraftValidatorTest {
     @Test
     @DisplayName("auxiliar con requiresComputers true pasa; subsecretaría sin computadoras también")
     void computersRule_onlyBindsTheAuxiliar() {
-        when(userService.hasGlobalRole(AUXILIAR, SystemRole.SUBSECRETARIA)).thenReturn(false);
-        when(userService.hasGlobalRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
+        when(userService.hasRole(AUXILIAR, SystemRole.SUBSECRETARIA)).thenReturn(false);
+        when(userService.hasRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
         DirectEventDraftDto withPcs = draft(RoomRequestType.CONFERENCE, null, LocalTime.of(9, 0), LocalTime.of(11, 0),
                 true, "charla");
         DirectEventDraftDto withoutPcs = draft(RoomRequestType.CONFERENCE, null, LocalTime.of(9, 0), LocalTime.of(11, 0),
@@ -180,9 +180,20 @@ class DirectEventDraftValidatorTest {
     }
 
     @Test
+    @DisplayName("subsecretaría con alcance de un edificio (sin rol global) crea sin computadoras")
+    void subsecretariaScopedToBuilding_isExemptFromComputersRule() {
+        when(userService.hasGlobalRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(false);
+        when(userService.hasRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
+        DirectEventDraftDto withoutPcs = draft(RoomRequestType.CONFERENCE, null, LocalTime.of(9, 0), LocalTime.of(11, 0),
+                false, "charla");
+
+        assertThatCode(() -> validator.validate(withoutPcs, SUBSECRETARIA)).doesNotThrowAnyException();
+    }
+
+    @Test
     @DisplayName("caso feliz fuera de clase: devuelve el horario del body")
     void validDraft_returnsBodySchedule() {
-        when(userService.hasGlobalRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
+        when(userService.hasRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
 
         ResolvedSchedule schedule = validator.validate(
                 draft(RoomRequestType.FINAL_EXAM, null, LocalTime.of(14, 30), LocalTime.of(17, 0), false, null),
@@ -198,7 +209,7 @@ class DirectEventDraftValidatorTest {
     @Test
     @DisplayName("caso feliz parcial en clase: devuelve el horario del cursado, no el del body")
     void validPartialInClass_returnsClassSchedule() {
-        when(userService.hasGlobalRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
+        when(userService.hasRole(SUBSECRETARIA, SystemRole.SUBSECRETARIA)).thenReturn(true);
         when(classSchedule.requireClassDate(any(), any(), any())).thenReturn(
                 new ClassSlot(5L, DayOfWeek.TUESDAY, LocalTime.of(18, 0), LocalTime.of(20, 0)));
 

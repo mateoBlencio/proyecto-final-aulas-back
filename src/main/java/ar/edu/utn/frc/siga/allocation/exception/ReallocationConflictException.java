@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 
 import java.io.Serial;
 import java.util.List;
+import java.util.Map;
 
 @Getter
 public final class ReallocationConflictException extends SigaAppException {
@@ -16,11 +17,11 @@ public final class ReallocationConflictException extends SigaAppException {
 
     private final transient List<OccurrenceConflictDto> conflicts;
 
-    public ReallocationConflictException(List<OccurrenceConflictDto> conflicts) {
-        super(HttpStatus.CONFLICT, "Reallocation conflict",
-                "No se puede reasignar: " + conflicts.size() + " ocurrencia(s) solapan con asignaciones existentes.");
+    public ReallocationConflictException(List<OccurrenceConflictDto> conflicts, Map<Long, Integer> roomNumbers) {
+        super(HttpStatus.CONFLICT, "Reallocation conflict", ConflictDetail.describe(conflicts, roomNumbers));
         this.conflicts = conflicts;
         withProperty("code", "ALLOCATION_CONFLICT");
         withProperty("conflicts", conflicts);
+        withProperty("classroomIds", ConflictDetail.classroomIds(conflicts));
     }
 }

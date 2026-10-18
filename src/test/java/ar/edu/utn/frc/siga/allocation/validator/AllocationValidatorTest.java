@@ -201,7 +201,68 @@ class AllocationValidatorTest {
                 .isInstanceOf(ReallocationConflictException.class)
                 .satisfies(ex -> assertThat(((ReallocationConflictException) ex).getConflicts()).hasSize(1))
                 .satisfies(ex -> assertThat(((ReallocationConflictException) ex).getProperties())
-                        .containsEntry("code", "ALLOCATION_CONFLICT"));
+                        .containsEntry("code", "ALLOCATION_CONFLICT")
+                        .containsEntry("classroomIds", List.of(5L)));
+    }
+
+    @Test
+    @DisplayName("validateManualOverlap: conflictos en dos aulas informan ambas en classroomIds y el detail nombra los dos numeros")
+    void validateManualOverlapConflictosEnDosAulasInformaAmbas() {
+        LocalDate date = futureDate(1);
+        List<AllocationCandidate> candidates = twoRoomsOverlapping(date, 60);
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(
+                classroomWithNumber(5L, 920), classroomWithNumber(6L, 101)));
+
+        assertThatThrownBy(() -> validator.validateManualOverlap(candidates, "obs"))
+                .isInstanceOf(ReallocationConflictException.class)
+                .satisfies(ex -> {
+                    ReallocationConflictException conflict = (ReallocationConflictException) ex;
+                    assertThat(conflict.getProperties()).containsEntry("classroomIds", List.of(5L, 6L));
+                    assertThat(conflict.getMessage())
+                            .contains("El aula 920 se superpone 60 min con otro evento el "
+                                    + date.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM")) + ".")
+                            .contains("El aula 101 se superpone 60 min");
+                });
+    }
+
+    @Test
+    @DisplayName("validateManualOverlap: solape tolerado en dos aulas informa ambas y pide motivo")
+    void validateManualOverlapToleradoEnDosAulasInformaAmbas() {
+        List<AllocationCandidate> candidates = twoRoomsOverlapping(futureDate(1), 30);
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(
+                classroomWithNumber(5L, 920), classroomWithNumber(6L, 101)));
+
+        assertThatThrownBy(() -> validator.validateManualOverlap(candidates, null))
+                .isInstanceOf(OverlapObservationRequiredException.class)
+                .satisfies(ex -> {
+                    OverlapObservationRequiredException required = (OverlapObservationRequiredException) ex;
+                    assertThat(required.getProperties()).containsEntry("classroomIds", List.of(5L, 6L));
+                    assertThat(required.getMessage())
+                            .contains("El aula 920 se superpone 30 min")
+                            .contains("El aula 101 se superpone 30 min")
+                            .endsWith("Está dentro del margen permitido: indicá un motivo para confirmar.");
+                });
+    }
+
+    @Test
+    @DisplayName("validateManualOverlap: con mas de 3 aulas en conflicto el detail lista 3 y agrega 'y N mas'")
+    void validateManualOverlapConMasDeTresAulasResumeElResto() {
+        LocalDate date = futureDate(1);
+        List<AllocationCandidate> candidates = new java.util.ArrayList<>();
+        for (long room = 1; room <= 5; room++) {
+            candidates.addAll(roomOverlapping(room, date, 60));
+        }
+
+        assertThatThrownBy(() -> validator.validateManualOverlap(candidates, "obs"))
+                .isInstanceOf(ReallocationConflictException.class)
+                .satisfies(ex -> {
+                    ReallocationConflictException conflict = (ReallocationConflictException) ex;
+                    assertThat(conflict.getProperties()).containsEntry("classroomIds", List.of(1L, 2L, 3L, 4L, 5L));
+                    assertThat(conflict.getMessage())
+                            .contains("El aula 3 se superpone")
+                            .doesNotContain("El aula 4 se superpone")
+                            .endsWith("y 2 más.");
+                });
     }
 
     @Test
@@ -421,6 +482,26 @@ class AllocationValidatorTest {
     }
 
     // ---------- helpers ----------
+
+    private List<AllocationCandidate> twoRoomsOverlapping(LocalDate date, int overlapMinutes) {
+        List<AllocationCandidate> candidates = new java.util.ArrayList<>(roomOverlapping(5L, date, overlapMinutes));
+        candidates.addAll(roomOverlapping(6L, date, overlapMinutes));
+        return candidates;
+    }
+
+    // Dos eventos distintos en la misma aula que se pisan overlapMinutes (el primero dura 90 min desde las 08:00).
+    private List<AllocationCandidate> roomOverlapping(long room, LocalDate date, int overlapMinutes) {
+        RecurringEvent first = EventTestData.recurringEvent(room * 10, LocalTime.of(8, 0), Duration.ofMinutes(90));
+        RecurringEvent second = EventTestData.recurringEvent(room * 10 + 1,
+                LocalTime.of(9, 30).minusMinutes(overlapMinutes), Duration.ofMinutes(60));
+        return List.of(
+                new AllocationCandidate(EventTestData.occurrenceSlot(room * 100, first, date, OccurrenceStatus.NEEDS_ROOM), room),
+                new AllocationCandidate(EventTestData.occurrenceSlot(room * 100 + 1, second, date, OccurrenceStatus.NEEDS_ROOM), room));
+    }
+
+    private ClassroomResponseDto classroomWithNumber(Long id, int roomNumber) {
+        return new ClassroomResponseDto(id, roomNumber, 100, 1L, "Edificio 1", 1L, "Tipo", null, true);
+    }
 
     private ClassroomResponseDto classroom(Long id) {
         return new ClassroomResponseDto(id, id.intValue(), 100, 1L, "Edificio 1", 1L, "Tipo", null, true);

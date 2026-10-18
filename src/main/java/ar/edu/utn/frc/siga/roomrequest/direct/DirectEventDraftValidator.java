@@ -50,7 +50,7 @@ public class DirectEventDraftValidator {
     }
 
     private void requireComputersForAuxiliar(DirectEventDraftDto draft, String actor) {
-        if (!Boolean.TRUE.equals(draft.requiresComputers()) && !userService.hasGlobalRole(actor, SystemRole.SUBSECRETARIA)) {
+        if (!Boolean.TRUE.equals(draft.requiresComputers()) && !userService.hasRole(actor, SystemRole.SUBSECRETARIA)) {
             throw new InvalidRoomRequestException("El auxiliar solo puede asignar aulas con computadoras.");
         }
     }

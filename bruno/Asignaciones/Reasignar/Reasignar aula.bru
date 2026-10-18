@@ -39,6 +39,8 @@ docs {
   supera el margen de allocation.maxOverlapMinutes (ver /v1/settings, default
   40 minutos) → 409 con:
   {
+    "classroomIds": [2],   // todas las aulas en conflicto, sin repetir
+    "detail": "El aula 920 se superpone 35 min con otro evento el 21/10.",
     "conflicts": [
       { "occurrenceId", "date", "startTime", "endTime", "classroomId",
         "conflictingEventId", "conflictingAllocationId", "overlapMinutes" }
@@ -47,7 +49,8 @@ docs {
 
   Si el solapamiento entra dentro del margen y falta "observation" (o viene
   vacía) → 400 "Observation required" con:
-  { "overlaps": [ { "occurrenceId", ..., "overlapMinutes" } ] }
+  { "classroomIds": [2], "detail": "El aula 920 se superpone 30 min ... indicá un motivo para confirmar.",
+    "overlaps": [ { "occurrenceId", ..., "overlapMinutes" } ] }
 
   Respuesta 200: List<AllocationResponseDto> con el/los item(s) resultantes.
 }
