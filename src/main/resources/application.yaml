@@ -200,6 +200,7 @@ siga:
   login-ratelimit:
     max-attempts: 5
     max-attempts-per-ip: 200
+    alert-threshold-per-email: 50
     window-minutes: 15
   ratelimit:
     general:

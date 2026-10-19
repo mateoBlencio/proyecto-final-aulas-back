@@ -15,5 +15,8 @@ public class LoginRateLimitProperties {
     // is not set the IP is the reverse proxy's, shared by every user (see TrustedProxiesStartupCheck).
     private int maxAttemptsPerIp = 200;
 
+    // Failures for one email from any IP that trigger a WARN (never a block), to spot distributed brute force
+    private int alertThresholdPerEmail = 50;
+
     private int windowMinutes = 15;
 }

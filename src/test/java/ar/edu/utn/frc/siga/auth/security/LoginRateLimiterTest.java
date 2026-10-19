@@ -131,4 +131,54 @@ class LoginRateLimiterTest {
 
         assertThat(rateLimiter.isRateLimited("other@frc.utn.edu.ar", IP, now)).isTrue();
     }
+
+    @Test
+    void isRateLimited_shouldBlockAnIp_afterFiftyOneDistinctEmails() {
+        for (int i = 0; i < 51; i++) {
+            rateLimiter.recordFailure("user" + i + "@frc.utn.edu.ar", IP, now);
+        }
+
+        assertThat(rateLimiter.isRateLimited("fresh@frc.utn.edu.ar", IP, now)).isTrue();
+        assertThat(rateLimiter.isRateLimited("fresh@frc.utn.edu.ar", "10.0.0.2", now)).isFalse();
+    }
+
+    @Test
+    void isRateLimited_shouldTreatEmailCaseAndSpacesAsTheSameAccount() {
+        for (int i = 0; i < 5; i++) {
+            rateLimiter.recordFailure(i % 2 == 0 ? "ADMIN@frc.utn.edu.ar" : " Admin@frc.utn.edu.ar ", IP, now);
+        }
+
+        assertThat(rateLimiter.isRateLimited(EMAIL, IP, now)).isTrue();
+    }
+
+    @Test
+    void isRateLimited_shouldGroupIpv6AddressesOfTheSame64Prefix() {
+        for (int i = 0; i < 5; i++) {
+            rateLimiter.recordFailure(EMAIL, "2001:db8:1:2::" + (i + 1), now);
+        }
+
+        assertThat(rateLimiter.isRateLimited(EMAIL, "2001:db8:1:2:aaaa:bbbb:cccc:dddd", now)).isTrue();
+        assertThat(rateLimiter.isRateLimited(EMAIL, "2001:db8:1:3::1", now)).isFalse();
+    }
+
+    @Test
+    void emailAlertCounter_shouldWarnAtThresholdWithoutBlocking() {
+        ch.qos.logback.classic.Logger logger =
+                (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(LoginRateLimiter.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> appender =
+                new ch.qos.logback.core.read.ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            for (int i = 0; i < 50; i++) {
+                rateLimiter.recordFailure(EMAIL, "10.1." + (i / 250) + "." + (i % 250 + 1), now);
+            }
+
+            assertThat(appender.list).extracting(e -> e.getFormattedMessage())
+                    .anyMatch(m -> m.contains("fuerza bruta distribuida"));
+            assertThat(rateLimiter.isRateLimited(EMAIL, "10.9.9.9", now)).isFalse();
+        } finally {
+            logger.detachAppender(appender);
+        }
+    }
 }
