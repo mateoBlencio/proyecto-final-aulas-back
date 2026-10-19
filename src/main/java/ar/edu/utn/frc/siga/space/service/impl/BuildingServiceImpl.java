@@ -125,9 +125,13 @@ public class BuildingServiceImpl implements BuildingService {
                 .filter(building -> building.getSysacadHash() != null
                         && Boolean.TRUE.equals(building.getSysacadEnabled())).count();
         Set<Integer> incoming = new HashSet<>();
+        Set<Integer> listed = new HashSet<>();
         int affected = 0;
 
         for (BuildingSyncCommand command : commands) {
+            if (command.buildingCode() != null) {
+                listed.add(command.buildingCode());
+            }
             if (command.buildingCode() == null || command.name() == null || command.name().isBlank()) {
                 log.warn("Edificio de SysAcad ignorado por clave o nombre vacíos: codigo={}", command.buildingCode());
                 continue;
@@ -164,7 +168,8 @@ public class BuildingServiceImpl implements BuildingService {
         }
 
         SyncGuard.requireEnoughValidRows("edificios", incoming.size(), currentRows, minValidPercent);
-        return affected + markAbsent(existing.values(), incoming, syncedAt);
+        // A row Sysacad listed but with an invalid name is not absent: only codes missing from the view are.
+        return affected + markAbsent(existing.values(), listed, syncedAt);
     }
 
     private int markAbsent(Iterable<Building> existing, Set<Integer> incoming, Instant syncedAt) {

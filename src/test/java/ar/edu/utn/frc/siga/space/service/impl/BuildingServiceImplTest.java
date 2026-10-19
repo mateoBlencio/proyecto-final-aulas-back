@@ -256,6 +256,20 @@ class BuildingServiceImplTest {
     }
 
     @Test
+    @DisplayName("syncBuildings: un edificio que Sysacad lista con nombre vacío no se da de baja por ausente")
+    void syncBuildingsDoesNotMarkAbsentWhenRowListedWithBlankName() {
+        Building blankNamed = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));
+        Building ok = sysacadBuilding(1, "Uno", Hashes.sha256Hex("Uno"));
+        when(buildingRepository.findAll()).thenReturn(List.of(blankNamed, ok));
+
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(9, " "), new BuildingSyncCommand(1, "Uno")), 0);
+
+        assertThat(blankNamed.getSysacadEnabled()).isTrue();
+        assertThat(affected).isZero();
+        verify(buildingRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("syncBuildings: inserta el edificio que no existe con columnas de control")
     void syncBuildingsInsertsUnknownBuilding() {
         when(buildingRepository.findAll()).thenReturn(List.of());
