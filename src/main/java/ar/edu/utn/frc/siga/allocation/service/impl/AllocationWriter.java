@@ -84,7 +84,7 @@ class AllocationWriter {
      * Escritura del sync ASIGNACIONES de SysAcad: a diferencia de {@link #create}/{@link #upsert}, no
      * es "todo o nada" por lote — la política de precedencia se decide ocurrencia por ocurrencia (ver
      * .claude/docs/plan-sync-eventos-sysacad.md §4): sin asignación -> crea (source=SYSACAD); con
-     * asignación propia (source=SYSACAD) -> actualiza el aula; con asignación de otro origen (humano o
+     * asignación propia (source=SYSACAD) -> actualiza el aula solo si cambió; con asignación de otro origen (humano o
      * import de Excel) -> no se toca, WARN. Devuelve la cantidad de ocurrencias creadas+actualizadas.
      */
     int syncFromSysacad(Map<OccurrenceSlotDto, Long> classroomByOccurrence) {
@@ -109,6 +109,9 @@ class AllocationWriter {
                         .build());
                 affected++;
             } else if (existing.getSource() == AllocationSource.SYSACAD) {
+                if (classroomId.equals(existing.getClassroomId())) {
+                    continue;
+                }
                 existing.setClassroomId(classroomId);
                 existing.setObservation(SYSACAD_UPDATED_OBSERVATION);
                 affected++;

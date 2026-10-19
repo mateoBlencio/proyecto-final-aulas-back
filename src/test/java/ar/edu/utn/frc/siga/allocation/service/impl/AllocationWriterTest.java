@@ -90,6 +90,24 @@ class AllocationWriterTest {
         verify(allocationRepository, never()).save(existing);
     }
 
+    @Test
+    @DisplayName("ocurrencia con asignación propia en la misma aula → no escribe ni cuenta (segunda corrida idéntica)")
+    void doesNotRewriteWhenSysacadOwnedAllocationHasSameClassroom() {
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L);
+        Map<OccurrenceSlotDto, Long> classroomByOccurrence = mapOf(occ, 5L);
+        Allocation existing = allocation(100L, 10L, 5L, AllocationSource.SYSACAD);
+        existing.setObservation("Recuperado de SysAcad");
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of(existing));
+
+        int first = writer.syncFromSysacad(classroomByOccurrence);
+        int second = writer.syncFromSysacad(classroomByOccurrence);
+
+        assertThat(first).isZero();
+        assertThat(second).isZero();
+        assertThat(existing.getObservation()).isEqualTo("Recuperado de SysAcad");
+        verify(allocationRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
     @ParameterizedTest
     @EnumSource(value = AllocationSource.class, names = {"MANUAL", "IMPORTED", "AUTOMATIC"})
     @DisplayName("ocurrencia con asignación de otro origen (humano o Excel) → no la toca, WARN")
