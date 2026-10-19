@@ -73,7 +73,9 @@ public interface ClassroomService extends ActivationService<Long> {
     /**
      * Sincroniza el lote de aulas provenientes de SysAcad: crea/actualiza por (edificio, número)
      * comparando hash (sin pisar el tipo de aula, local-owned) y marca como no vigentes las ausentes
-     * en la corrida. Devuelve la cantidad de filas afectadas.
+     * en la corrida. Devuelve la cantidad de filas afectadas. Aborta sin dar de baja si las filas válidas
+     * no alcanzan {@code minValidPercent}% de las vigentes (0 desactiva el umbral; cero filas válidas
+     * aborta siempre).
      */
-    int syncClassrooms(List<ClassroomSyncCommand> commands);
+    int syncClassrooms(List<ClassroomSyncCommand> commands, int minValidPercent);
 }

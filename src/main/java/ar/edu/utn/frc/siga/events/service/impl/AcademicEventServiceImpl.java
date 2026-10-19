@@ -33,6 +33,7 @@ import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
+import ar.edu.utn.frc.siga.common.util.SyncGuard;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import ar.edu.utn.frc.siga.common.util.RecurringEventKey;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
@@ -419,10 +420,14 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     @Override
     @Transactional
     @AuditOperation("Baja de eventos ausentes en SysAcad")
-    public int markRecurringEventsAbsent(Collection<Long> presentEventIds) {
+    public int markRecurringEventsAbsent(Collection<Long> presentEventIds, int minValidPercent) {
         Instant now = Instant.now();
         int affected = 0;
-        for (RecurringEvent event : recurringEventRepository.findBySysacadHashIsNotNull()) {
+        List<RecurringEvent> syncOwned = recurringEventRepository.findBySysacadHashIsNotNull();
+        long currentRows = syncOwned.stream()
+                .filter(event -> !Boolean.FALSE.equals(event.getSysacadEnabled())).count();
+        SyncGuard.requireEnoughValidRows("eventos", presentEventIds.size(), currentRows, minValidPercent);
+        for (RecurringEvent event : syncOwned) {
             if (presentEventIds.contains(event.getId()) || Boolean.FALSE.equals(event.getSysacadEnabled())) {
                 continue;
             }

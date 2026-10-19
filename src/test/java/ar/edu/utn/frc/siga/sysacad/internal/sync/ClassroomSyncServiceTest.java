@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadClassroomDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
 import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadEmptyViewException;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,7 +43,7 @@ class ClassroomSyncServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ClassroomSyncService(classroomService, syncStateService);
+        service = new ClassroomSyncService(classroomService, syncStateService, new SysacadProperties());
     }
 
     @Test
@@ -55,13 +56,13 @@ class ClassroomSyncServiceTest {
     @DisplayName("sync: traduce cada fila de SysAcad a un comando y delega el upsert en ClassroomService")
     void syncTranslatesRowsAndDelegatesToService() {
         when(catalogReader.findClassrooms()).thenReturn(List.of(new SysacadClassroomDto(101, 2, true, 70)));
-        when(classroomService.syncClassrooms(anyList())).thenReturn(1);
+        when(classroomService.syncClassrooms(anyList(), eq(50))).thenReturn(1);
 
         service.sync(catalogReader);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<ClassroomSyncCommand>> captor = ArgumentCaptor.forClass(List.class);
-        verify(classroomService).syncClassrooms(captor.capture());
+        verify(classroomService).syncClassrooms(captor.capture(), eq(50));
         assertThat(captor.getValue()).containsExactly(new ClassroomSyncCommand(101, 2, true, 70));
         verify(syncStateService).recordSuccess(SysacadView.AULAS, 1);
     }
@@ -83,7 +84,7 @@ class ClassroomSyncServiceTest {
 
         assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(SysacadEmptyViewException.class);
 
-        verify(classroomService, never()).syncClassrooms(anyList());
+        verify(classroomService, never()).syncClassrooms(anyList(), eq(50));
         verify(syncStateService).recordFailure(eq(SysacadView.AULAS), anyString());
         verify(syncStateService, never()).recordSuccess(any(), anyInt());
     }

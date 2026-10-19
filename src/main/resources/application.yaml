@@ -199,6 +199,7 @@ siga:
     max-retries: 3
     sync:
       cron: "0 0 3 * * SUN"
+      min-valid-rows-percent: 50
   notifications:
     max-attempts: 5
     retry-interval: PT1M

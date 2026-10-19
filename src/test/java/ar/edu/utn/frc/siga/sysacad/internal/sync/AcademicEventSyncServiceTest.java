@@ -15,6 +15,8 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadAcademicEventDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
+import ar.edu.utn.frc.siga.common.exception.SyncAbortedException;
 
 import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadEmptyViewException;
 
@@ -68,7 +70,8 @@ class AcademicEventSyncServiceTest {
     @BeforeEach
     void setUp() {
         service = new AcademicEventSyncService(
-                commissionService, subjectCommissionService, academicEventService, syncStateService);
+                commissionService, subjectCommissionService, academicEventService, syncStateService,
+                new SysacadProperties());
     }
 
     @Test
@@ -135,7 +138,7 @@ class AcademicEventSyncServiceTest {
         assertThat(cmd.startDate()).isEqualTo(TermType.PRIMER_CUATRIMESTRE.startDate(2026));
         assertThat(cmd.endDate()).isEqualTo(TermType.PRIMER_CUATRIMESTRE.endDate(2026));
 
-        verify(academicEventService).markRecurringEventsAbsent(Set.of(100L));
+        verify(academicEventService).markRecurringEventsAbsent(Set.of(100L), 50);
         verify(syncStateService).recordSuccess(SysacadView.EVENTOS, 1);
     }
 
@@ -174,7 +177,7 @@ class AcademicEventSyncServiceTest {
         assertThat(commandsCaptor.getValue()).extracting(SyncRecurringEventCommand::startDate)
                 .containsExactlyInAnyOrder(
                         TermType.PRIMER_CUATRIMESTRE.startDate(2026), TermType.SEGUNDO_CUATRIMESTRE.startDate(2026));
-        verify(academicEventService).markRecurringEventsAbsent(Set.of(100L, 101L));
+        verify(academicEventService).markRecurringEventsAbsent(Set.of(100L, 101L), 50);
         verify(syncStateService).recordSuccess(SysacadView.EVENTOS, 2);
     }
 
@@ -187,13 +190,13 @@ class AcademicEventSyncServiceTest {
         when(commissionService.findActiveByCourseCode("999"))
                 .thenThrow(ResourceNotFoundException.of("Commission", "999"));
 
-        service.sync(catalogReader);
+        assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(SyncAbortedException.class);
 
-        verify(academicEventService).syncRecurringEvents(commandsCaptor.capture());
-        assertThat(commandsCaptor.getValue()).isEmpty();
         verify(subjectCommissionService, never()).findByCommissionAndSubjectCode(any(), any());
-        verify(academicEventService).markRecurringEventsAbsent(Set.of());
-        verify(syncStateService).recordSuccess(SysacadView.EVENTOS, 0);
+        verify(academicEventService, never()).syncRecurringEvents(anyList());
+        verify(academicEventService, never()).markRecurringEventsAbsent(anyCollection(), anyInt());
+        verify(syncStateService).recordFailure(eq(SysacadView.EVENTOS), anyString());
+        verify(syncStateService, never()).recordSuccess(any(), anyInt());
     }
 
     @Test
@@ -206,11 +209,10 @@ class AcademicEventSyncServiceTest {
         when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 77))
                 .thenThrow(ResourceNotFoundException.of("SubjectCommission", "1-77"));
 
-        service.sync(catalogReader);
+        assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(SyncAbortedException.class);
 
-        verify(academicEventService).syncRecurringEvents(commandsCaptor.capture());
-        assertThat(commandsCaptor.getValue()).isEmpty();
-        verify(academicEventService).markRecurringEventsAbsent(Set.of());
+        verify(academicEventService, never()).syncRecurringEvents(anyList());
+        verify(academicEventService, never()).markRecurringEventsAbsent(anyCollection(), anyInt());
     }
 
     @Test
@@ -222,11 +224,10 @@ class AcademicEventSyncServiceTest {
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
         when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
 
-        service.sync(catalogReader);
+        assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(SyncAbortedException.class);
 
-        verify(academicEventService).syncRecurringEvents(commandsCaptor.capture());
-        assertThat(commandsCaptor.getValue()).isEmpty();
-        verify(academicEventService).markRecurringEventsAbsent(Set.of());
+        verify(academicEventService, never()).syncRecurringEvents(anyList());
+        verify(academicEventService, never()).markRecurringEventsAbsent(anyCollection(), anyInt());
     }
 
     @Test
@@ -237,7 +238,7 @@ class AcademicEventSyncServiceTest {
         assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(IllegalStateException.class);
 
         verify(syncStateService).recordFailure(SysacadView.EVENTOS, "SysAcad caído");
-        verify(academicEventService, never()).markRecurringEventsAbsent(anyCollection());
+        verify(academicEventService, never()).markRecurringEventsAbsent(anyCollection(), anyInt());
     }
 
     // ---------- audit description ----------
@@ -252,7 +253,7 @@ class AcademicEventSyncServiceTest {
             AuditDescriptionProbe.stamp();
             return results;
         });
-        when(academicEventService.markRecurringEventsAbsent(anySet())).thenReturn(absent);
+        when(academicEventService.markRecurringEventsAbsent(anySet(), eq(50))).thenReturn(absent);
         AuditDescriptionProbe probe = new AuditDescriptionProbe();
 
         probe.audited(service).sync(catalogReader);
@@ -302,7 +303,7 @@ class AcademicEventSyncServiceTest {
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
         when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
         when(academicEventService.syncRecurringEvents(anyList())).thenReturn(List.of(created(1L), unchanged(2L)));
-        when(academicEventService.markRecurringEventsAbsent(anySet())).thenReturn(3);
+        when(academicEventService.markRecurringEventsAbsent(anySet(), eq(50))).thenReturn(3);
 
         service.sync(catalogReader);
 
@@ -317,7 +318,7 @@ class AcademicEventSyncServiceTest {
         assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(SysacadEmptyViewException.class);
 
         verify(academicEventService, never()).syncRecurringEvents(anyList());
-        verify(academicEventService, never()).markRecurringEventsAbsent(anySet());
+        verify(academicEventService, never()).markRecurringEventsAbsent(anySet(), eq(50));
         verify(syncStateService).recordFailure(eq(SysacadView.EVENTOS), anyString());
         verify(syncStateService, never()).recordSuccess(any(), anyInt());
     }

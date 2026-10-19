@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.security.BuildingScope;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.Permission;
+import ar.edu.utn.frc.siga.common.exception.SyncAbortedException;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.SpaceTestData;
 import ar.edu.utn.frc.siga.space.dto.BuildingFilter;
@@ -198,12 +199,55 @@ class BuildingServiceImplTest {
     }
 
     @Test
+    @DisplayName("syncBuildings: sin ninguna fila válida aborta y no da de baja nada")
+    void syncBuildingsAbortsWithoutValidRows() {
+        Building current = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));
+        when(buildingRepository.findAll()).thenReturn(List.of(current));
+
+        assertThatThrownBy(() -> service.syncBuildings(List.of(new BuildingSyncCommand(null, "Sin código"),
+                new BuildingSyncCommand(5, " ")), 0))
+                .isInstanceOf(SyncAbortedException.class);
+
+        assertThat(current.getSysacadEnabled()).isTrue();
+        verify(buildingRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("syncBuildings: por debajo del umbral de filas válidas aborta y no da de baja nada")
+    void syncBuildingsAbortsBelowThreshold() {
+        Building one = sysacadBuilding(1, "Uno", Hashes.sha256Hex("Uno"));
+        Building two = sysacadBuilding(2, "Dos", Hashes.sha256Hex("Dos"));
+        Building three = sysacadBuilding(3, "Tres", Hashes.sha256Hex("Tres"));
+        Building four = sysacadBuilding(4, "Cuatro", Hashes.sha256Hex("Cuatro"));
+        when(buildingRepository.findAll()).thenReturn(List.of(one, two, three, four));
+
+        assertThatThrownBy(() -> service.syncBuildings(List.of(new BuildingSyncCommand(1, "Uno")), 50))
+                .isInstanceOf(SyncAbortedException.class);
+
+        assertThat(List.of(two, three, four)).allMatch(b -> Boolean.TRUE.equals(b.getSysacadEnabled()));
+        verify(buildingRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("syncBuildings: en el umbral exacto da de baja lo ausente")
+    void syncBuildingsAtThresholdMarksAbsent() {
+        Building one = sysacadBuilding(1, "Uno", Hashes.sha256Hex("Uno"));
+        Building two = sysacadBuilding(2, "Dos", Hashes.sha256Hex("Dos"));
+        when(buildingRepository.findAll()).thenReturn(List.of(one, two));
+
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(1, "Uno")), 50);
+
+        assertThat(two.getSysacadEnabled()).isFalse();
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("syncBuildings: inserta el edificio que no existe con columnas de control")
     void syncBuildingsInsertsUnknownBuilding() {
         when(buildingRepository.findAll()).thenReturn(List.of());
         when(buildingRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(4, "Edif.Malvinas")));
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(4, "Edif.Malvinas")), 0);
 
         ArgumentCaptor<Building> saved = ArgumentCaptor.forClass(Building.class);
         verify(buildingRepository).save(saved.capture());
@@ -221,7 +265,7 @@ class BuildingServiceImplTest {
         Building existing = sysacadBuilding(4, "Malvinas viejo", Hashes.sha256Hex("Malvinas viejo"));
         when(buildingRepository.findAll()).thenReturn(List.of(existing));
 
-        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(4, "Edif.Malvinas")));
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(4, "Edif.Malvinas")), 0);
 
         assertThat(existing.getName()).isEqualTo("Edif.Malvinas");
         assertThat(existing.getSysacadHash()).isEqualTo(Hashes.sha256Hex("Edif.Malvinas"));
@@ -235,7 +279,7 @@ class BuildingServiceImplTest {
         Building existing = sysacadBuilding(4, "Edif.Malvinas", Hashes.sha256Hex("Edif.Malvinas"));
         when(buildingRepository.findAll()).thenReturn(List.of(existing));
 
-        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(4, "Edif.Malvinas")));
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(4, "Edif.Malvinas")), 0);
 
         verify(buildingRepository, never()).save(any());
         assertThat(affected).isZero();
@@ -248,7 +292,7 @@ class BuildingServiceImplTest {
         deactivated.deactivate();
         when(buildingRepository.findAll()).thenReturn(List.of(deactivated));
 
-        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(9, "Almafuerte")));
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(9, "Almafuerte")), 0);
 
         assertThat(deactivated.getDeletedAt()).isNotNull();
         verify(buildingRepository, never()).save(any());
@@ -262,7 +306,7 @@ class BuildingServiceImplTest {
         deactivated.deactivate();
         when(buildingRepository.findAll()).thenReturn(List.of(deactivated));
 
-        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(9, "Almafuerte Sede")));
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(9, "Almafuerte Sede")), 0);
 
         assertThat(deactivated.getName()).isEqualTo("Almafuerte Sede");
         assertThat(deactivated.getDeletedAt()).isNotNull();
@@ -274,9 +318,9 @@ class BuildingServiceImplTest {
     @DisplayName("syncBuildings: el edificio ausente upstream queda no vigente sin tocar deletedAt")
     void syncBuildingsMarksAbsentBuildingAsNotCurrent() {
         Building absent = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));
-        when(buildingRepository.findAll()).thenReturn(List.of(absent));
+        when(buildingRepository.findAll()).thenReturn(List.of(absent, presentBuilding()));
 
-        int affected = service.syncBuildings(List.of());
+        int affected = service.syncBuildings(List.of(PRESENT_COMMAND), 0);
 
         assertThat(absent.getSysacadEnabled()).isFalse();
         assertThat(absent.getDeletedAt()).isNull();
@@ -291,7 +335,7 @@ class BuildingServiceImplTest {
         notCurrent.setSysacadEnabled(false);
         when(buildingRepository.findAll()).thenReturn(List.of(notCurrent));
 
-        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(9, "Almafuerte")));
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(9, "Almafuerte")), 0);
 
         assertThat(notCurrent.getSysacadEnabled()).isTrue();
         assertThat(notCurrent.getDeletedAt()).isNull();
@@ -304,9 +348,9 @@ class BuildingServiceImplTest {
     void syncBuildingsKeepsDeactivatedBuildingDeactivatedWhenAbsent() {
         Building deactivated = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));
         deactivated.deactivate();
-        when(buildingRepository.findAll()).thenReturn(List.of(deactivated));
+        when(buildingRepository.findAll()).thenReturn(List.of(deactivated, presentBuilding()));
 
-        int affected = service.syncBuildings(List.of());
+        int affected = service.syncBuildings(List.of(PRESENT_COMMAND), 0);
 
         assertThat(deactivated.getSysacadEnabled()).isFalse();
         assertThat(deactivated.getDeletedAt()).isNotNull();
@@ -322,7 +366,7 @@ class BuildingServiceImplTest {
         deactivated.setSysacadEnabled(false);
         when(buildingRepository.findAll()).thenReturn(List.of(deactivated));
 
-        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(9, "Almafuerte")));
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(9, "Almafuerte")), 0);
 
         assertThat(deactivated.getSysacadEnabled()).isTrue();
         assertThat(deactivated.getDeletedAt()).isNotNull();
@@ -338,9 +382,9 @@ class BuildingServiceImplTest {
         Building notCurrentDeactivated = sysacadBuilding(10, "Centro", Hashes.sha256Hex("Centro"));
         notCurrentDeactivated.setSysacadEnabled(false);
         notCurrentDeactivated.deactivate();
-        when(buildingRepository.findAll()).thenReturn(List.of(notCurrent, notCurrentDeactivated));
+        when(buildingRepository.findAll()).thenReturn(List.of(notCurrent, notCurrentDeactivated, presentBuilding()));
 
-        int affected = service.syncBuildings(List.of());
+        int affected = service.syncBuildings(List.of(PRESENT_COMMAND), 0);
 
         verify(buildingRepository, never()).save(any());
         assertThat(affected).isZero();
@@ -350,10 +394,10 @@ class BuildingServiceImplTest {
     @DisplayName("syncBuildings: repetir la misma entrada no escribe de nuevo ni cuenta filas afectadas")
     void syncBuildingsIsIdempotentForAbsentBuilding() {
         Building absent = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));
-        when(buildingRepository.findAll()).thenReturn(List.of(absent));
+        when(buildingRepository.findAll()).thenReturn(List.of(absent, presentBuilding()));
 
-        int first = service.syncBuildings(List.of());
-        int second = service.syncBuildings(List.of());
+        int first = service.syncBuildings(List.of(PRESENT_COMMAND), 0);
+        int second = service.syncBuildings(List.of(PRESENT_COMMAND), 0);
 
         assertThat(first).isEqualTo(1);
         assertThat(second).isZero();
@@ -368,8 +412,8 @@ class BuildingServiceImplTest {
         when(buildingRepository.findAll()).thenReturn(List.of(notCurrent));
         List<BuildingSyncCommand> input = List.of(new BuildingSyncCommand(9, "Almafuerte"));
 
-        int first = service.syncBuildings(input);
-        int second = service.syncBuildings(input);
+        int first = service.syncBuildings(input, 0);
+        int second = service.syncBuildings(input, 0);
 
         assertThat(first).isEqualTo(1);
         assertThat(second).isZero();
@@ -380,12 +424,18 @@ class BuildingServiceImplTest {
     @DisplayName("syncBuildings: no toca los edificios sin código SysAcad (creados localmente)")
     void syncBuildingsLeavesBuildingsWithoutSysacadCodeUntouched() {
         Building local = SpaceTestData.building().id(7L).buildingCode(null).build();
-        when(buildingRepository.findAll()).thenReturn(List.of(local));
+        when(buildingRepository.findAll()).thenReturn(List.of(local, presentBuilding()));
 
-        service.syncBuildings(List.of());
+        service.syncBuildings(List.of(PRESENT_COMMAND), 0);
 
         assertThat(local.getDeletedAt()).isNull();
         verify(buildingRepository, never()).save(any());
+    }
+
+    private static final BuildingSyncCommand PRESENT_COMMAND = new BuildingSyncCommand(1, "Presente");
+
+    private static Building presentBuilding() {
+        return sysacadBuilding(1, "Presente", Hashes.sha256Hex("Presente"));
     }
 
     private static Building sysacadBuilding(Integer code, String name, String hash) {

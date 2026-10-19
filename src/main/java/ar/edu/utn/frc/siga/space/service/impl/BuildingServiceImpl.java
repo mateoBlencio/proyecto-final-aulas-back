@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.common.security.BuildingScopedSpecifications;
 import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
+import ar.edu.utn.frc.siga.common.util.SyncGuard;
 import ar.edu.utn.frc.siga.space.dto.BuildingFilter;
 import ar.edu.utn.frc.siga.space.dto.request.BuildingActiveBatchItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
@@ -115,11 +116,13 @@ public class BuildingServiceImpl implements BuildingService {
 
     @Override
     @Transactional
-    public int syncBuildings(List<BuildingSyncCommand> commands) {
+    public int syncBuildings(List<BuildingSyncCommand> commands, int minValidPercent) {
         Instant syncedAt = Instant.now();
         Map<Integer, Building> existing = buildingRepository.findAll().stream()
                 .filter(building -> building.getBuildingCode() != null)
                 .collect(Collectors.toMap(Building::getBuildingCode, Function.identity()));
+        long currentRows = existing.values().stream()
+                .filter(building -> Boolean.TRUE.equals(building.getSysacadEnabled())).count();
         Set<Integer> incoming = new HashSet<>();
         int affected = 0;
 
@@ -155,6 +158,7 @@ public class BuildingServiceImpl implements BuildingService {
             affected++;
         }
 
+        SyncGuard.requireEnoughValidRows("edificios", incoming.size(), currentRows, minValidPercent);
         return affected + markAbsent(existing.values(), incoming, syncedAt);
     }
 

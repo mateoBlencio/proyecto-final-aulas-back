@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadCommissionDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectCommissionDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
 import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadEmptyViewException;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +44,7 @@ class CommissionSyncServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new CommissionSyncService(commissionService, syncStateService);
+        service = new CommissionSyncService(commissionService, syncStateService, new SysacadProperties());
     }
 
     @Test
@@ -59,13 +60,13 @@ class CommissionSyncServiceTest {
         when(catalogReader.findCommissions()).thenReturn(List.of(row));
         when(catalogReader.findSubjectCommissions())
                 .thenReturn(List.of(new SysacadSubjectCommissionDto("101", 55, 30)));
-        when(commissionService.syncCommissions(anyList())).thenReturn(2);
+        when(commissionService.syncCommissions(anyList(), eq(50))).thenReturn(2);
 
         service.sync(catalogReader);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<CommissionSyncCommand>> captor = ArgumentCaptor.forClass(List.class);
-        verify(commissionService).syncCommissions(captor.capture());
+        verify(commissionService).syncCommissions(captor.capture(), eq(50));
         assertThat(captor.getValue()).containsExactly(
                 new CommissionSyncCommand("101", 1, 2024, 55, 2026, 30));
         verify(syncStateService).recordSuccess(SysacadView.COMISIONES, 2);
@@ -80,13 +81,13 @@ class CommissionSyncServiceTest {
                 new SysacadSubjectCommissionDto("101", 55, 12),
                 new SysacadSubjectCommissionDto("101", 55, 30),
                 new SysacadSubjectCommissionDto("101", 55, 7)));
-        when(commissionService.syncCommissions(anyList())).thenReturn(1);
+        when(commissionService.syncCommissions(anyList(), eq(50))).thenReturn(1);
 
         service.sync(catalogReader);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<CommissionSyncCommand>> captor = ArgumentCaptor.forClass(List.class);
-        verify(commissionService).syncCommissions(captor.capture());
+        verify(commissionService).syncCommissions(captor.capture(), eq(50));
         assertThat(captor.getValue()).containsExactly(
                 new CommissionSyncCommand("101", 1, 2024, 55, 2026, 30));
     }
@@ -97,13 +98,13 @@ class CommissionSyncServiceTest {
         SysacadCommissionDto row = new SysacadCommissionDto("101", 1, 2024, 55, 2026, 1);
         when(catalogReader.findCommissions()).thenReturn(List.of(row));
         when(catalogReader.findSubjectCommissions()).thenReturn(List.of());
-        when(commissionService.syncCommissions(anyList())).thenReturn(1);
+        when(commissionService.syncCommissions(anyList(), eq(50))).thenReturn(1);
 
         service.sync(catalogReader);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<CommissionSyncCommand>> captor = ArgumentCaptor.forClass(List.class);
-        verify(commissionService).syncCommissions(captor.capture());
+        verify(commissionService).syncCommissions(captor.capture(), eq(50));
         assertThat(captor.getValue()).containsExactly(
                 new CommissionSyncCommand("101", 1, 2024, 55, 2026, null));
     }
@@ -125,7 +126,7 @@ class CommissionSyncServiceTest {
 
         assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(SysacadEmptyViewException.class);
 
-        verify(commissionService, never()).syncCommissions(anyList());
+        verify(commissionService, never()).syncCommissions(anyList(), eq(50));
         verify(syncStateService).recordFailure(eq(SysacadView.COMISIONES), anyString());
         verify(syncStateService, never()).recordSuccess(any(), anyInt());
     }

@@ -12,6 +12,7 @@ import ar.edu.utn.frc.siga.space.exception.SpaceDomainException;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomListComposer;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomMapper;
 import ar.edu.utn.frc.siga.common.util.Hashes;
+import ar.edu.utn.frc.siga.common.util.SyncGuard;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.model.ClassroomResource;
@@ -297,7 +298,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
     @Override
     @Transactional
-    public int syncClassrooms(List<ClassroomSyncCommand> commands) {
+    public int syncClassrooms(List<ClassroomSyncCommand> commands, int minValidPercent) {
         Instant syncedAt = Instant.now();
         ClassroomType defaultType = null;
         Map<Integer, Building> buildingsByCode = buildingRepository.findAll().stream()
@@ -305,6 +306,8 @@ public class ClassroomServiceImpl implements ClassroomService {
                 .collect(Collectors.toMap(Building::getBuildingCode, Function.identity()));
         Map<ClassroomKey, Classroom> existing = classroomRepository.findAll().stream()
                 .collect(Collectors.toMap(ClassroomServiceImpl::keyOf, Function.identity()));
+        long currentRows = existing.values().stream()
+                .filter(classroom -> Boolean.TRUE.equals(classroom.getSysacadEnabled())).count();
         Set<ClassroomKey> incoming = new HashSet<>();
         int affected = 0;
 
@@ -350,6 +353,7 @@ public class ClassroomServiceImpl implements ClassroomService {
             affected++;
         }
 
+        SyncGuard.requireEnoughValidRows("aulas", incoming.size(), currentRows, minValidPercent);
         return affected + markAbsent(existing.values(), incoming, syncedAt);
     }
 

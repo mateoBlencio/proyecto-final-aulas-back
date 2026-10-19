@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.sysacad.internal.config;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 
 import java.time.Duration;
 
@@ -10,6 +11,8 @@ import java.time.Duration;
 @Setter
 @ConfigurationProperties(prefix = "siga.sysacad")
 public class SysacadProperties {
+
+    private static final int DEFAULT_MIN_VALID_ROWS_PERCENT = 50;
 
     private boolean enabled = false;
 
@@ -23,7 +26,11 @@ public class SysacadProperties {
 
     private int maxRetries = 3;
 
-    private Sync sync = new Sync(null);
+    private Sync sync = new Sync(null, DEFAULT_MIN_VALID_ROWS_PERCENT);
 
-    public record Sync(String cron) {}
+    /**
+     * {@code minValidRowsPercent}: porcentaje mínimo de filas válidas, respecto de lo vigente en SIGA, para
+     * que una vista dé de baja lo ausente. 0 desactiva el umbral (cero filas válidas aborta siempre).
+     */
+    public record Sync(String cron, @DefaultValue("50") int minValidRowsPercent) {}
 }

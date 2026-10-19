@@ -22,6 +22,7 @@ import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
+import ar.edu.utn.frc.siga.common.util.SyncGuard;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import java.time.Instant;
 import java.util.Collection;
@@ -131,7 +132,7 @@ public class CommissionServiceImpl implements CommissionService {
 
     @Override
     @Transactional
-    public int syncCommissions(List<CommissionSyncCommand> commands) {
+    public int syncCommissions(List<CommissionSyncCommand> commands, int minValidPercent) {
         Instant syncedAt = Instant.now();
         Map<CommissionKey, Commission> existingCommissions = commissionRepository.findAll().stream()
                 .collect(Collectors.toMap(CommissionKey::of, Function.identity()));
@@ -141,6 +142,8 @@ public class CommissionServiceImpl implements CommissionService {
         Map<SubjectKey, Subject> existingSubjects = Maps.byId(subjectRepository.findAll(), SubjectKey::of);
         Map<SubjectCommissionId, SubjectCommission> existingLinks =
                 Maps.byId(subjectCommissionRepository.findAll(), SubjectCommission::getId);
+        long currentRows = existingCommissions.values().stream()
+                .filter(commission -> Boolean.TRUE.equals(commission.getSysacadEnabled())).count();
         Set<CommissionKey> incoming = new HashSet<>();
         int affected = 0;
 
@@ -181,6 +184,7 @@ public class CommissionServiceImpl implements CommissionService {
             affected += linkSubjectCommission(existingSubjects, existingLinks, studyPlan, commission, command);
         }
 
+        SyncGuard.requireEnoughValidRows("comisiones", incoming.size(), currentRows, minValidPercent);
         return affected + markAbsent(existingCommissions.values(), incoming, syncedAt);
     }
 

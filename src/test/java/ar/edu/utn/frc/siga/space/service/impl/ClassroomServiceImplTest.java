@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.exception.SyncAbortedException;
 import ar.edu.utn.frc.siga.common.security.BuildingScope;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.Permission;
@@ -567,7 +568,7 @@ class ClassroomServiceImplTest {
         when(classroomTypeRepository.findByDescriptionIgnoreCaseAndDeletedAtIsNull(DEFAULT_CLASSROOM_TYPE)).thenReturn(Optional.of(defaultType));
         when(classroomRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)));
+        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)), 0);
 
         ArgumentCaptor<Classroom> saved = ArgumentCaptor.forClass(Classroom.class);
         verify(classroomRepository).save(saved.capture());
@@ -588,7 +589,7 @@ class ClassroomServiceImplTest {
         when(classroomRepository.findAll()).thenReturn(List.of());
         when(classroomTypeRepository.findByDescriptionIgnoreCaseAndDeletedAtIsNull(DEFAULT_CLASSROOM_TYPE)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70))))
+        assertThatThrownBy(() -> service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)), 0))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(DEFAULT_CLASSROOM_TYPE);
         verify(classroomRepository, never()).save(any());
@@ -603,7 +604,7 @@ class ClassroomServiceImplTest {
         when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
         when(classroomRepository.findAll()).thenReturn(List.of(existing));
 
-        service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, false, 70)));
+        service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, false, 70)), 0);
 
         assertThat(existing.getCapacity()).isEqualTo(70);
         assertThat(existing.getSysacadEnabled()).isFalse();
@@ -618,7 +619,7 @@ class ClassroomServiceImplTest {
         when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
         when(classroomRepository.findAll()).thenReturn(List.of(existing));
 
-        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)));
+        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)), 0);
 
         verify(classroomRepository, never()).save(any());
         assertThat(affected).isZero();
@@ -630,20 +631,37 @@ class ClassroomServiceImplTest {
         when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
         when(classroomRepository.findAll()).thenReturn(List.of());
 
-        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 99, true, 70)));
+        assertThatThrownBy(() -> service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 99, true, 70)), 0))
+                .isInstanceOf(SyncAbortedException.class);
 
         verify(classroomRepository, never()).save(any());
-        assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("syncClassrooms: por debajo del umbral de filas válidas aborta y no da de baja nada")
+    void syncClassroomsAbortsBelowThreshold() {
+        Classroom kept = syncClassroom(101, 70, true, Hashes.sha256Hex(70, true));
+        Classroom other = syncClassroom(102, 70, true, Hashes.sha256Hex(70, true));
+        Classroom another = syncClassroom(103, 70, true, Hashes.sha256Hex(70, true));
+        when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
+        when(classroomRepository.findAll()).thenReturn(List.of(kept, other, another));
+
+        assertThatThrownBy(() -> service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)), 50))
+                .isInstanceOf(SyncAbortedException.class);
+
+        assertThat(List.of(other, another)).allMatch(c -> Boolean.TRUE.equals(c.getSysacadEnabled()));
+        verify(classroomRepository, never()).save(any());
     }
 
     @Test
     @DisplayName("syncClassrooms: el aula ausente upstream queda no vigente en SysAcad, sin borrarse")
     void syncClassroomsMarksAbsentClassroomAsNotCurrent() {
         Classroom absent = syncClassroom(101, 70, true, Hashes.sha256Hex(70, true));
+        Classroom present = syncClassroom(102, 70, true, Hashes.sha256Hex(70, true));
         when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
-        when(classroomRepository.findAll()).thenReturn(List.of(absent));
+        when(classroomRepository.findAll()).thenReturn(List.of(absent, present));
 
-        service.syncClassrooms(List.of());
+        service.syncClassrooms(List.of(new ClassroomSyncCommand(102, 2, true, 70)), 0);
 
         assertThat(absent.getSysacadEnabled()).isFalse();
         verify(classroomRepository).save(absent);
@@ -654,9 +672,10 @@ class ClassroomServiceImplTest {
     void syncClassroomsSkipsAlreadyDisabledAbsentClassroom() {
         Classroom alreadyDisabled = syncClassroom(101, 70, false, Hashes.sha256Hex(70, false));
         when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
-        when(classroomRepository.findAll()).thenReturn(List.of(alreadyDisabled));
+        Classroom present = syncClassroom(102, 70, true, Hashes.sha256Hex(70, true));
+        when(classroomRepository.findAll()).thenReturn(List.of(alreadyDisabled, present));
 
-        int affected = service.syncClassrooms(List.of());
+        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(102, 2, true, 70)), 0);
 
         verify(classroomRepository, never()).save(any());
         assertThat(affected).isZero();

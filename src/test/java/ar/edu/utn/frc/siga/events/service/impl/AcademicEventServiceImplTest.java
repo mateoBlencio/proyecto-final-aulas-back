@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.events.service.impl;
 
+import ar.edu.utn.frc.siga.common.exception.SyncAbortedException;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.events.EventTestData;
@@ -478,7 +479,7 @@ class AcademicEventServiceImplTest {
         when(recurringEventRepository.findBySysacadHashIsNotNull())
                 .thenReturn(List.of(present, absent, alreadyDisabled));
 
-        int affected = service.markRecurringEventsAbsent(Set.of(1L));
+        int affected = service.markRecurringEventsAbsent(Set.of(1L), 0);
 
         assertThat(affected).isEqualTo(1);
         assertThat(absent.getSysacadEnabled()).isFalse();
@@ -492,11 +493,39 @@ class AcademicEventServiceImplTest {
     }
 
     @Test
+    @DisplayName("markRecurringEventsAbsent: por debajo del umbral de presentes aborta y no marca nada")
+    void markRecurringEventsAbsentAbortaBajoUmbral() {
+        RecurringEvent present = existingSyncedEvent(1L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
+        RecurringEvent second = existingSyncedEvent(2L, Duration.ofMinutes(60), Hashes.sha256Hex(60), true);
+        RecurringEvent third = existingSyncedEvent(3L, Duration.ofMinutes(45), Hashes.sha256Hex(45), true);
+        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(present, second, third));
+
+        assertThatThrownBy(() -> service.markRecurringEventsAbsent(Set.of(1L), 50))
+                .isInstanceOf(SyncAbortedException.class);
+
+        assertThat(second.getSysacadEnabled()).isTrue();
+        assertThat(third.getSysacadEnabled()).isTrue();
+        verify(recurringEventRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("markRecurringEventsAbsent: sin presentes aborta aunque el umbral esté desactivado")
+    void markRecurringEventsAbsentAbortaSinPresentes() {
+        RecurringEvent current = existingSyncedEvent(2L, Duration.ofMinutes(60), Hashes.sha256Hex(60), true);
+        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(current));
+
+        assertThatThrownBy(() -> service.markRecurringEventsAbsent(Set.of(), 0))
+                .isInstanceOf(SyncAbortedException.class);
+
+        assertThat(current.getSysacadEnabled()).isTrue();
+    }
+
+    @Test
     @DisplayName("markRecurringEventsAbsent: sin eventos sync-owned, no marca nada")
     void markRecurringEventsAbsentSinSyncOwnedNoHaceNada() {
         when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of());
 
-        int affected = service.markRecurringEventsAbsent(Set.of(1L));
+        int affected = service.markRecurringEventsAbsent(Set.of(1L), 0);
 
         assertThat(affected).isZero();
         verify(recurringEventRepository, never()).save(any());
