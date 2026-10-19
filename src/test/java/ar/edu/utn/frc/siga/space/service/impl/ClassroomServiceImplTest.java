@@ -659,6 +659,23 @@ class ClassroomServiceImplTest {
     }
 
     @Test
+    @DisplayName("syncClassrooms: un aula que Sysacad lista con capacidad inválida no se escribe ni pasa a no vigente")
+    void syncClassroomsDoesNotMarkAbsentWhenListedWithInvalidCapacity() {
+        Classroom badData = syncClassroom(101, 70, true, Hashes.sha256Hex(70, true));
+        Classroom ok = syncClassroom(102, 70, true, Hashes.sha256Hex(70, true));
+        when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
+        when(classroomRepository.findAll()).thenReturn(List.of(badData, ok));
+
+        int affected = service.syncClassrooms(List.of(
+                new ClassroomSyncCommand(101, 2, true, null), new ClassroomSyncCommand(102, 2, true, 70)), 0);
+
+        assertThat(badData.getSysacadCurrent()).isTrue();
+        assertThat(badData.getCapacity()).isEqualTo(70);
+        assertThat(affected).isZero();
+        verify(classroomRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("syncClassrooms: las aulas manuales (sin hash) no cuentan en el denominador del umbral")
     void syncClassroomsThresholdIgnoresManualClassrooms() {
         Classroom synced = syncClassroom(101, 70, true, Hashes.sha256Hex(70, true));

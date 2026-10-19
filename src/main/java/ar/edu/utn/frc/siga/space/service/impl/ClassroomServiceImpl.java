@@ -310,17 +310,13 @@ public class ClassroomServiceImpl implements ClassroomService {
                 .filter(classroom -> classroom.getSysacadHash() != null
                         && Boolean.TRUE.equals(classroom.getSysacadCurrent())).count();
         Set<ClassroomKey> incoming = new HashSet<>();
+        Set<ClassroomKey> listed = new HashSet<>();
         int affected = 0;
 
         for (ClassroomSyncCommand command : commands) {
             if (command.roomNumber() == null || command.buildingCode() == null) {
                 log.warn("Aula de SysAcad ignorada por clave incompleta: aula={}, edificio={}",
                         command.roomNumber(), command.buildingCode());
-                continue;
-            }
-            if (command.capacity() == null || command.capacity() < 0) {
-                log.warn("Aula de SysAcad ignorada por capacidad ausente o negativa: aula={}, edificio={}, capacidad={}",
-                        command.roomNumber(), command.buildingCode(), command.capacity());
                 continue;
             }
             Building building = buildingsByCode.get(command.buildingCode());
@@ -330,7 +326,15 @@ public class ClassroomServiceImpl implements ClassroomService {
             }
 
             ClassroomKey key = new ClassroomKey(building.getId(), command.roomNumber());
+            if (command.capacity() == null || command.capacity() < 0) {
+                // Listed by Sysacad with bad data: not written and not valid, but not absent either.
+                listed.add(key);
+                log.warn("Aula de SysAcad ignorada por capacidad ausente o negativa: aula={}, edificio={}, capacidad={}",
+                        command.roomNumber(), command.buildingCode(), command.capacity());
+                continue;
+            }
             incoming.add(key);
+            listed.add(key);
             String hash = Hashes.sha256Hex(command.capacity(), command.enabled());
             Classroom classroom = existing.get(key);
 
@@ -361,7 +365,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         }
 
         SyncGuard.requireEnoughValidRows("aulas", incoming.size(), currentRows, minValidPercent);
-        return affected + markAbsent(existing.values(), incoming, syncedAt);
+        return affected + markAbsent(existing.values(), listed, syncedAt);
     }
 
     private int markAbsent(Iterable<Classroom> existing, Set<ClassroomKey> incoming, Instant syncedAt) {
