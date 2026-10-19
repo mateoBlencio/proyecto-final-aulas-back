@@ -197,6 +197,7 @@ siga:
     connect-timeout: 5s
     read-timeout: 120s
     max-retries: 3
+    max-response-size: 32MB
     sync:
       cron: "0 0 3 * * SUN"
       min-valid-rows-percent: 50

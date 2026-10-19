@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.sysacad.internal.config;
 
+import ar.edu.utn.frc.siga.sysacad.internal.client.ResponseSizeLimitInterceptor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -30,6 +31,7 @@ public class SysacadConfiguration {
                 .baseUrl(properties.getBaseUrl())
                 .defaultHeader(API_KEY_HEADER, properties.getApiKey())
                 .requestFactory(requestFactory)
+                .requestInterceptor(new ResponseSizeLimitInterceptor(properties.getMaxResponseSize().toBytes()))
                 .build();
     }
 }

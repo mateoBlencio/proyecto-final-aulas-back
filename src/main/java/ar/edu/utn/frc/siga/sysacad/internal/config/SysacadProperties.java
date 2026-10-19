@@ -5,6 +5,8 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
+import org.springframework.util.unit.DataSize;
+
 import java.time.Duration;
 
 @Getter
@@ -25,6 +27,8 @@ public class SysacadProperties {
     private Duration readTimeout = Duration.ofSeconds(30);
 
     private int maxRetries = 3;
+
+    private DataSize maxResponseSize = DataSize.ofMegabytes(32);
 
     private Sync sync = new Sync(null, DEFAULT_MIN_VALID_ROWS_PERCENT);
 

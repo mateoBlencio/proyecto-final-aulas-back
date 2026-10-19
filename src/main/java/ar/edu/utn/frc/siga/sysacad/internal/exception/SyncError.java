@@ -20,6 +20,9 @@ public final class SyncError {
         if (e instanceof RestClientResponseException http) {
             return "UPSTREAM_HTTP_ERROR: SysAcad respondió con estado " + http.getStatusCode().value();
         }
+        if (e instanceof SysacadResponseTooLargeException) {
+            return "RESPONSE_TOO_LARGE: La respuesta de SysAcad supera el tamaño máximo permitido";
+        }
         if (e instanceof SysacadEmptyViewException) {
             return "EMPTY_VIEW: La vista vino vacía";
         }

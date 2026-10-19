@@ -37,6 +37,7 @@ class SyncErrorTest {
         assertThat(SyncError.describe(new SysacadUnavailableException("io /10.0.0.1", null)))
                 .startsWith("CONNECTIVITY:").doesNotContain("10.0.0.1");
         assertThat(SyncError.describe(new SysacadEmptyViewException("AULAS"))).startsWith("EMPTY_VIEW:");
+        assertThat(SyncError.describe(new SysacadResponseTooLargeException(10))).startsWith("RESPONSE_TOO_LARGE:");
         assertThat(SyncError.describe(new SyncAbortedException("llegaron pocas filas")))
                 .isEqualTo("SYNC_ABORTED: llegaron pocas filas");
         assertThat(SyncError.dependencyFailed(SysacadView.EDIFICIOS))
