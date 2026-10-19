@@ -102,6 +102,8 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
                 && Duration.between(token.getRevokedAt(), Instant.now())
                         .compareTo(Duration.ofSeconds(jwtProperties.getRefreshGraceSeconds())) <= 0;
 
+        // Trade-off: within refresh-grace-seconds a reused rotated token still yields a new token, so a thief
+        // replaying a stolen token in that window is not detected; accepted to tolerate network retries.
         if (token.getRevocationReason() == RevocationReason.ROTATION && withinGrace) {
             log.info("Refresh token reutilizado dentro de la ventana de gracia, tratado como reintento de red");
             return new RefreshResult(token.getUser(), doIssue(token.getUser()));
