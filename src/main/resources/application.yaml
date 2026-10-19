@@ -188,6 +188,8 @@ siga:
     environment-mode: PHASE_ASSERT
   jwt:
     secret: ${JWT_SECRET}
+    issuer: ${JWT_ISSUER:siga}
+    audience: ${JWT_AUDIENCE:siga-api}
     access-expiration-minutes: ${JWT_ACCESS_EXPIRATION_MINUTES:20}
     refresh-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS:30}
     refresh-grace-seconds: ${JWT_REFRESH_GRACE_SECONDS:10}

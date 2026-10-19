@@ -2,6 +2,10 @@ package ar.edu.utn.frc.siga.auth.security;
 
 import ar.edu.utn.frc.siga.auth.config.JwtProperties;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -73,5 +77,49 @@ class JwtServiceTest {
     @DisplayName("getAccessExpirationSeconds: convierte los minutos configurados a segundos")
     void getAccessExpirationSecondsConvierte() {
         assertThat(service.getAccessExpirationSeconds()).isEqualTo(20 * 60L);
+    }
+
+    @Test
+    @DisplayName("generateAccessToken: trae iss, aud y un jti distinto en cada token")
+    void traeIssuerAudienceYJti() {
+        Claims first = service.parseClaims(service.generateAccessToken("user@frc.utn.edu.ar"));
+        Claims second = service.parseClaims(service.generateAccessToken("user@frc.utn.edu.ar"));
+
+        assertThat(first.getIssuer()).isEqualTo("siga");
+        assertThat(first.getAudience()).containsExactly("siga-api");
+        assertThat(first.getId()).isNotBlank().isNotEqualTo(second.getId());
+    }
+
+    @Test
+    @DisplayName("isValid: token con otro issuer no es válido")
+    void tokenConOtroIssuerNoEsValido() {
+        JwtProperties other = new JwtProperties();
+        other.setSecret(SECRET);
+        other.setIssuer("otro-servicio");
+
+        assertThat(service.isValid(new JwtService(other).generateAccessToken("user@frc.utn.edu.ar"))).isFalse();
+    }
+
+    @Test
+    @DisplayName("isValid: token con otra audience no es válido")
+    void tokenConOtraAudienceNoEsValido() {
+        JwtProperties other = new JwtProperties();
+        other.setSecret(SECRET);
+        other.setAudience("otra-api");
+
+        assertThat(service.isValid(new JwtService(other).generateAccessToken("user@frc.utn.edu.ar"))).isFalse();
+    }
+
+    @Test
+    @DisplayName("isValid: token firmado con la clave correcta pero sin iss ni aud (emitido antes del cambio) no es válido")
+    void tokenSinIssuerNiAudienceNoEsValido() {
+        String legacy = Jwts.builder()
+                .subject("user@frc.utn.edu.ar")
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + 60_000))
+                .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)))
+                .compact();
+
+        assertThat(service.isValid(legacy)).isFalse();
     }
 }
