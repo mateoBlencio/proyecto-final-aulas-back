@@ -307,7 +307,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         Map<ClassroomKey, Classroom> existing = classroomRepository.findAll().stream()
                 .collect(Collectors.toMap(ClassroomServiceImpl::keyOf, Function.identity()));
         long currentRows = existing.values().stream()
-                .filter(classroom -> Boolean.TRUE.equals(classroom.getSysacadEnabled())).count();
+                .filter(classroom -> Boolean.TRUE.equals(classroom.getSysacadCurrent())).count();
         Set<ClassroomKey> incoming = new HashSet<>();
         int affected = 0;
 
@@ -338,6 +338,7 @@ public class ClassroomServiceImpl implements ClassroomService {
                         .classroomType(defaultType)
                         .capacity(command.capacity())
                         .sysacadEnabled(command.enabled())
+                        .sysacadCurrent(true)
                         .syncedAt(syncedAt)
                         .sysacadHash(hash)
                         .build());
@@ -345,7 +346,7 @@ public class ClassroomServiceImpl implements ClassroomService {
                 affected++;
                 continue;
             }
-            if (isUpToDate(classroom, hash)) {
+            if (isUpToDate(classroom, hash, command.enabled())) {
                 continue;
             }
             applySysacadFields(classroom, command, hash, syncedAt);
@@ -360,10 +361,10 @@ public class ClassroomServiceImpl implements ClassroomService {
     private int markAbsent(Iterable<Classroom> existing, Set<ClassroomKey> incoming, Instant syncedAt) {
         int affected = 0;
         for (Classroom classroom : existing) {
-            if (incoming.contains(keyOf(classroom)) || Boolean.FALSE.equals(classroom.getSysacadEnabled())) {
+            if (incoming.contains(keyOf(classroom)) || Boolean.FALSE.equals(classroom.getSysacadCurrent())) {
                 continue;
             }
-            classroom.setSysacadEnabled(false);
+            classroom.setSysacadCurrent(false);
             classroom.setSyncedAt(syncedAt);
             classroomRepository.save(classroom);
             affected++;
@@ -384,8 +385,9 @@ public class ClassroomServiceImpl implements ClassroomService {
         return new ClassroomKey(classroom.getBuilding().getId(), classroom.getRoomNumber());
     }
 
-    private static boolean isUpToDate(Classroom classroom, String hash) {
-        return hash.equals(classroom.getSysacadHash()) && Boolean.TRUE.equals(classroom.getSysacadEnabled());
+    private static boolean isUpToDate(Classroom classroom, String hash, boolean enabled) {
+        return hash.equals(classroom.getSysacadHash()) && Boolean.TRUE.equals(classroom.getSysacadCurrent())
+                && Boolean.valueOf(enabled).equals(classroom.getSysacadEnabled());
     }
 
     private record ClassroomKey(Long buildingId, Integer roomNumber) {}
@@ -393,6 +395,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     private void applySysacadFields(Classroom classroom, ClassroomSyncCommand command, String hash, Instant syncedAt) {
         classroom.setCapacity(command.capacity());
         classroom.setSysacadEnabled(command.enabled());
+        classroom.setSysacadCurrent(true);
         classroom.setSyncedAt(syncedAt);
         classroom.setSysacadHash(hash);
     }

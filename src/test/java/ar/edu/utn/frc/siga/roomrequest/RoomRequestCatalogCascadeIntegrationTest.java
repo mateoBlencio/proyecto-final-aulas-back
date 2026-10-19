@@ -87,7 +87,8 @@ class RoomRequestCatalogCascadeIntegrationTest extends AbstractIntegrationTest {
 
     private void setClassroomCurrent(Long id, boolean current) {
         Classroom classroom = classroomRepository.findById(id).orElseThrow();
-        classroom.setSysacadEnabled(current);
+        classroom.setSysacadEnabled(true);
+        classroom.setSysacadCurrent(current);
         if (!current) {
             classroom.setSysacadHash("hash-" + id);
             notCurrentClassroomIds.add(id);

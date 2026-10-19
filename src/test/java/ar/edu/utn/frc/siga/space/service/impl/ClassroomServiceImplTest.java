@@ -462,7 +462,7 @@ class ClassroomServiceImplTest {
     @DisplayName("findByRoomNumberAndBuilding: un aula no vigente en SysAcad del edificio informado se devuelve")
     void findByRoomNumberAndBuildingReturnsClassroomNotCurrentInSysacad() {
         Building informedBuilding = SpaceTestData.building().id(2L).name("Edif. Ing.Inchaurrondo").build();
-        Classroom notCurrent = SpaceTestData.classroom().building(informedBuilding).sysacadHash("hash").sysacadEnabled(false).build();
+        Classroom notCurrent = SpaceTestData.classroom().building(informedBuilding).sysacadHash("hash").sysacadEnabled(true).sysacadCurrent(false).build();
         ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 2L, "Edif. Ing.Inchaurrondo", 1L, "Normal", null, false);
         when(buildingRepository.findActiveById(2L)).thenReturn(Optional.of(informedBuilding));
         when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, informedBuilding)).thenReturn(Optional.of(notCurrent));
@@ -475,7 +475,7 @@ class ClassroomServiceImplTest {
     @DisplayName("findByRoomNumberAndBuildingCode: un aula no vigente en SysAcad de un edificio vigente se devuelve")
     void findByRoomNumberAndBuildingCodeReturnsClassroomNotCurrentInSysacad() {
         Building building = SpaceTestData.building().buildingCode(7).build();
-        Classroom notCurrent = SpaceTestData.classroom().building(building).sysacadHash("hash").sysacadEnabled(false).build();
+        Classroom notCurrent = SpaceTestData.classroom().building(building).sysacadHash("hash").sysacadEnabled(true).sysacadCurrent(false).build();
         ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal", null, false);
         when(buildingRepository.findByBuildingCode(7)).thenReturn(Optional.of(building));
         when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, building)).thenReturn(Optional.of(notCurrent));
@@ -608,6 +608,7 @@ class ClassroomServiceImplTest {
 
         assertThat(existing.getCapacity()).isEqualTo(70);
         assertThat(existing.getSysacadEnabled()).isFalse();
+        assertThat(existing.getSysacadCurrent()).isTrue();
         assertThat(existing.getClassroomType()).isSameAs(type);
         verify(classroomRepository).save(existing);
     }
@@ -663,22 +664,54 @@ class ClassroomServiceImplTest {
 
         service.syncClassrooms(List.of(new ClassroomSyncCommand(102, 2, true, 70)), 0);
 
-        assertThat(absent.getSysacadEnabled()).isFalse();
+        assertThat(absent.getSysacadCurrent()).isFalse();
+        assertThat(absent.getSysacadEnabled()).as("la ausencia no toca el flag S/N de Sysacad").isTrue();
+        assertThat(absent.isAvailable()).as("ausente no excluye el aula").isTrue();
         verify(classroomRepository).save(absent);
     }
 
     @Test
-    @DisplayName("syncClassrooms: no vuelve a guardar un aula ausente que ya estaba deshabilitada")
-    void syncClassroomsSkipsAlreadyDisabledAbsentClassroom() {
-        Classroom alreadyDisabled = syncClassroom(101, 70, false, Hashes.sha256Hex(70, false));
-        when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
+    @DisplayName("syncClassrooms: no vuelve a guardar un aula ausente que ya estaba marcada no vigente")
+    void syncClassroomsSkipsAlreadyAbsentClassroom() {
+        Classroom alreadyAbsent = syncClassroom(101, 70, true, Hashes.sha256Hex(70, true));
+        alreadyAbsent.setSysacadCurrent(false);
         Classroom present = syncClassroom(102, 70, true, Hashes.sha256Hex(70, true));
-        when(classroomRepository.findAll()).thenReturn(List.of(alreadyDisabled, present));
+        when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
+        when(classroomRepository.findAll()).thenReturn(List.of(alreadyAbsent, present));
 
         int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(102, 2, true, 70)), 0);
 
         verify(classroomRepository, never()).save(any());
         assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("syncClassrooms: un aula con habilitada = N ya sincronizada no se reescribe en cada corrida")
+    void syncClassroomsDoesNotRewriteDisabledClassroom() {
+        Classroom disabled = syncClassroom(101, 70, false, Hashes.sha256Hex(70, false));
+        when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
+        when(classroomRepository.findAll()).thenReturn(List.of(disabled));
+
+        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, false, 70)), 0);
+
+        verify(classroomRepository, never()).save(any());
+        assertThat(affected).isZero();
+        assertThat(disabled.getSysacadEnabled()).isFalse();
+    }
+
+    @Test
+    @DisplayName("syncClassrooms: un aula ausente que reaparece vuelve a vigente")
+    void syncClassroomsRestoresCurrentFlagWhenClassroomReappears() {
+        Classroom absent = syncClassroom(101, 70, true, Hashes.sha256Hex(70, true));
+        absent.setSysacadCurrent(false);
+        when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
+        when(classroomRepository.findAll()).thenReturn(List.of(absent));
+
+        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)), 0);
+
+        assertThat(absent.getSysacadCurrent()).isTrue();
+        assertThat(affected).isEqualTo(1);
+        verify(classroomRepository).save(absent);
     }
 
     @Test

@@ -65,6 +65,7 @@ class SpaceSoftDeleteCascadeIntegrationTest extends AbstractIntegrationTest {
         });
         notCurrentClassrooms.forEach(classroom -> {
             Classroom fresh = classroomRepository.findById(classroom.getId()).orElseThrow();
+            fresh.setSysacadCurrent(true);
             fresh.setSysacadEnabled(true);
             classroomRepository.save(fresh);
         });
@@ -80,7 +81,8 @@ class SpaceSoftDeleteCascadeIntegrationTest extends AbstractIntegrationTest {
     }
 
     private Classroom markNotCurrent(Classroom classroom) {
-        classroom.setSysacadEnabled(false);
+        classroom.setSysacadCurrent(false);
+        classroom.setSysacadEnabled(true);
         classroom.setSysacadHash("hash-" + classroom.getId());
         notCurrentClassrooms.add(classroom);
         return classroomRepository.save(classroom);
@@ -88,7 +90,7 @@ class SpaceSoftDeleteCascadeIntegrationTest extends AbstractIntegrationTest {
 
     private Classroom markCurrent(Classroom classroom) {
         Classroom fresh = classroomRepository.findById(classroom.getId()).orElseThrow();
-        fresh.setSysacadEnabled(true);
+        fresh.setSysacadCurrent(true);
         return classroomRepository.save(fresh);
     }
 
@@ -252,6 +254,27 @@ class SpaceSoftDeleteCascadeIntegrationTest extends AbstractIntegrationTest {
         markCurrent(classroom);
 
         listClassrooms(building, false)
+                .andExpect(jsonPath("$.content[?(@.id==" + id + ")].currentInSysacad", contains(true)));
+    }
+
+    @Test
+    @DisplayName("un aula con habilitada = N en SysAcad no se ofrece ni valida como candidata y se lista con DISABLED_IN_SYSACAD")
+    void classroomDisabledInSysacad_isNotOffered() throws Exception {
+        Building building = testData.edificio();
+        Classroom classroom = testData.aula(building);
+        Long id = classroom.getId();
+
+        classroom.setSysacadEnabled(false);
+        classroom.setSysacadHash("hash-" + id);
+        notCurrentClassrooms.add(classroom);
+        classroomRepository.save(classroom);
+
+        assertThat(availableIds()).doesNotContain(id);
+        assertThat(classroomService.findByIds(List.of(id))).isEmpty();
+        listClassrooms(building, true)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.id==" + id + ")].unavailableReason",
+                        contains(UnavailableReason.DISABLED_IN_SYSACAD.name())))
                 .andExpect(jsonPath("$.content[?(@.id==" + id + ")].currentInSysacad", contains(true)));
     }
 

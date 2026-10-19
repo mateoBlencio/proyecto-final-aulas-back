@@ -44,9 +44,15 @@ public class Classroom extends SoftDeletableEntity {
     @Column(name = "capacidad", nullable = false)
     private Integer capacity;
 
+    /** Flag "habilitada" (S/N) que informa Sysacad. Solo se escribe desde una fila de la vista, nunca por ausencia. */
     @Builder.Default
     @Column(name = "habilitada_sysacad", nullable = false)
     private Boolean sysacadEnabled = false;
+
+    /** {@code false} si el aula dejó de aparecer en la vista de Sysacad. No la saca de las candidatas. */
+    @Builder.Default
+    @Column(name = "vigente_sysacad", nullable = false)
+    private Boolean sysacadCurrent = true;
 
     @Column(name = "sincronizado_en")
     private Instant syncedAt;
@@ -75,6 +81,11 @@ public class Classroom extends SoftDeletableEntity {
     private String observations;
 
     public boolean isCurrentInSysacad() {
+        return Boolean.TRUE.equals(sysacadCurrent) || sysacadHash == null;
+    }
+
+    /** Solo "habilitada = N" excluye el aula; las cargadas a mano (hash nulo) no dependen del flag. */
+    public boolean isEnabledInSysacad() {
         return Boolean.TRUE.equals(sysacadEnabled) || sysacadHash == null;
     }
 
@@ -85,7 +96,10 @@ public class Classroom extends SoftDeletableEntity {
         if (!building.isActive()) {
             return UnavailableReason.PARENT_DEACTIVATED;
         }
-        return building.isCurrentInSysacad() ? null : UnavailableReason.NOT_IN_SYSACAD;
+        if (!building.isCurrentInSysacad()) {
+            return UnavailableReason.NOT_IN_SYSACAD;
+        }
+        return isEnabledInSysacad() ? null : UnavailableReason.DISABLED_IN_SYSACAD;
     }
 
     public boolean isAvailable() {
