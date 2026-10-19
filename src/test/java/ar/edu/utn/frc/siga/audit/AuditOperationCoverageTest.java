@@ -58,6 +58,7 @@ class AuditOperationCoverageTest {
             Map.entry("RefreshTokenServiceImpl#refresh", "refresh tokens are not @Audited"),
             Map.entry("RefreshTokenServiceImpl#revoke", "refresh tokens are not @Audited"),
             Map.entry("RefreshTokenServiceImpl#revokeAllByUserId", "refresh tokens are not @Audited"),
+            Map.entry("RefreshTokenServiceImpl#purgeExpired", "refresh tokens are not @Audited"),
             Map.entry("AuditArchiveScheduler#archive",
                     "only delegates to AuditArchiveServiceImpl.archive, which carries the annotation"),
             Map.entry("AuditArchiveRepository#archiveBatch",
