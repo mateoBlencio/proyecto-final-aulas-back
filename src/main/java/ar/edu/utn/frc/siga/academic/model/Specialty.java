@@ -32,7 +32,7 @@ public class Specialty extends TimestampedEntity {
     @Column(name = "codigo_especialidad", unique = true, nullable = false)
     private Integer specialtyCode;
 
-    @Column(name = "nombre")
+    @Column(name = "nombre", nullable = false)
     private String name;
 
     @Column(name = "abreviatura")
