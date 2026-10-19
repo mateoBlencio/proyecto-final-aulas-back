@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RefreshTokenServiceImpl implements RefreshTokenService {
 
     private static final int RAW_TOKEN_BYTES = 32;
+    private static final Duration PURGE_RETENTION = Duration.ofDays(30);
 
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtProperties jwtProperties;
@@ -128,6 +129,12 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Transactional
     public void revokeAllByUserId(Long userId) {
         refreshTokenRepository.revokeAllByUserId(userId, Instant.now());
+    }
+
+    @Override
+    @Transactional
+    public int purgeExpired() {
+        return refreshTokenRepository.deleteExpiredBefore(Instant.now().minus(PURGE_RETENTION));
     }
 
     private String generateRawToken() {

@@ -191,6 +191,7 @@ siga:
     access-expiration-minutes: ${JWT_ACCESS_EXPIRATION_MINUTES:20}
     refresh-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS:30}
     refresh-grace-seconds: ${JWT_REFRESH_GRACE_SECONDS:10}
+    refresh-purge-cron: "0 30 3 * * SUN"
   auth:
     allowed-email-domain: ${AUTH_ALLOWED_EMAIL_DOMAIN:frc.utn.edu.ar}
   login-ratelimit:
