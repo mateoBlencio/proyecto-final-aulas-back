@@ -27,6 +27,9 @@
 		<mapstruct.version>1.6.3</mapstruct.version>
 		<jjwt.version>0.12.7</jjwt.version>
 		<bucket4j.version>8.19.0</bucket4j.version>
+		<tomcat.version>11.0.25</tomcat.version>
+		<jackson-2-bom.version>2.21.7</jackson-2-bom.version>
+		<jackson-bom.version>3.1.7</jackson-bom.version>
 	</properties>
 
 	<dependencyManagement>
