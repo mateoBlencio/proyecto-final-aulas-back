@@ -431,6 +431,8 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         Instant now = Instant.now();
         int affected = 0;
         List<RecurringEvent> syncOwned = recurringEventRepository.findBySysacadHashIsNotNull();
+        // Events of unresolvedCommissionIds still count in currentRows. What syncRecurringEvents already wrote
+        // before an abort here stays written (the guard only prevents deactivations).
         long currentRows = syncOwned.stream()
                 .filter(event -> !Boolean.FALSE.equals(event.getSysacadEnabled())).count();
         SyncGuard.requireEnoughValidRows("eventos", presentEventIds.size(), currentRows, minValidPercent);
