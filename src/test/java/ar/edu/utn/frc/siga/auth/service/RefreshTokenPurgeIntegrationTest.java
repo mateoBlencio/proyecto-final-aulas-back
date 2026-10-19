@@ -32,6 +32,9 @@ class RefreshTokenPurgeIntegrationTest extends AbstractIntegrationTest {
 
     @AfterEach
     void cleanUp() {
+        if (user == null || user.getId() == null) {
+            return;
+        }
         jdbc.update("delete from refresh_token where id_usuario = ?", user.getId());
         jdbc.update("delete from usuario where id_usuario = ?", user.getId());
     }
