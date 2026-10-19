@@ -11,5 +11,8 @@ public class LoginRateLimitProperties {
 
     private int maxAttempts = 5;
 
+    // Failures allowed per client IP across all emails within the window
+    private int maxAttemptsPerIp = 50;
+
     private int windowMinutes = 15;
 }

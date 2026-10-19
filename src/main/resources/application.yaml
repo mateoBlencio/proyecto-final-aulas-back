@@ -189,6 +189,7 @@ siga:
     allowed-email-domain: ${AUTH_ALLOWED_EMAIL_DOMAIN:frc.utn.edu.ar}
   login-ratelimit:
     max-attempts: 5
+    max-attempts-per-ip: 50
     window-minutes: 15
   ratelimit:
     general:

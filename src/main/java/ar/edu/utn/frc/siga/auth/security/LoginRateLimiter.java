@@ -19,31 +19,53 @@ public class LoginRateLimiter {
             .maximumSize(10_000)
             .build();
 
-    public boolean isRateLimited(String email, Instant now) {
-        LoginRateLimitRecord record = records.getIfPresent(email);
-        if (record == null) {
-            return false;
-        }
-        return record.isRateLimited(now, Duration.ofMinutes(properties.getWindowMinutes()), properties.getMaxAttempts());
+    // Two counters: email+ip (so a third party cannot lock someone else's account from another
+    // address) and ip alone with a higher cap (so one address cannot spray many emails).
+    private static String emailKey(String email, String ip) {
+        return "e:" + email + "|" + ip;
     }
 
-    public Duration retryAfter(String email, Instant now) {
-        LoginRateLimitRecord record = records.getIfPresent(email);
-        if (record == null) {
-            return Duration.ZERO;
-        }
-        return record.retryAfter(now, Duration.ofMinutes(properties.getWindowMinutes()), properties.getMaxAttempts());
+    private static String ipKey(String ip) {
+        return "i:" + ip;
     }
 
-    public void recordFailure(String email, Instant now) {
-        LoginRateLimitRecord record = records.get(email, k -> new LoginRateLimitRecord());
-        record.recordFailure(now, Duration.ofMinutes(properties.getWindowMinutes()));
+    public boolean isRateLimited(String email, String ip, Instant now) {
+        return limited(emailKey(email, ip), properties.getMaxAttempts(), now)
+                || limited(ipKey(ip), properties.getMaxAttemptsPerIp(), now);
     }
 
-    public void recordSuccess(String email) {
-        LoginRateLimitRecord record = records.getIfPresent(email);
+    public Duration retryAfter(String email, String ip, Instant now) {
+        Duration byEmail = retry(emailKey(email, ip), properties.getMaxAttempts(), now);
+        Duration byIp = retry(ipKey(ip), properties.getMaxAttemptsPerIp(), now);
+        return byEmail.compareTo(byIp) >= 0 ? byEmail : byIp;
+    }
+
+    public void recordFailure(String email, String ip, Instant now) {
+        Duration window = window();
+        records.get(emailKey(email, ip), k -> new LoginRateLimitRecord()).recordFailure(now, window);
+        records.get(ipKey(ip), k -> new LoginRateLimitRecord()).recordFailure(now, window);
+    }
+
+    // Only the email+ip counter resets: a success must not clear the ip counter, otherwise an
+    // attacker with their own valid account could reset it between guesses.
+    public void recordSuccess(String email, String ip) {
+        LoginRateLimitRecord record = records.getIfPresent(emailKey(email, ip));
         if (record != null) {
             record.reset();
         }
+    }
+
+    private boolean limited(String key, int max, Instant now) {
+        LoginRateLimitRecord record = records.getIfPresent(key);
+        return record != null && record.isRateLimited(now, window(), max);
+    }
+
+    private Duration retry(String key, int max, Instant now) {
+        LoginRateLimitRecord record = records.getIfPresent(key);
+        return record == null ? Duration.ZERO : record.retryAfter(now, window(), max);
+    }
+
+    private Duration window() {
+        return Duration.ofMinutes(properties.getWindowMinutes());
     }
 }

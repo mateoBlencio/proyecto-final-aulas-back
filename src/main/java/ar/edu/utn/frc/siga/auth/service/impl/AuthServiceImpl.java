@@ -52,9 +52,9 @@ public class AuthServiceImpl implements AuthService {
         }
 
         Instant now = Instant.now();
-        if (loginRateLimiter.isRateLimited(email, now)) {
+        if (loginRateLimiter.isRateLimited(email, ip, now)) {
             log.warn("Login rechazado por rate limit: email={}, ip={}", email, ip);
-            throw new LoginRateLimitExceededException(loginRateLimiter.retryAfter(email, now));
+            throw new LoginRateLimitExceededException(loginRateLimiter.retryAfter(email, ip, now));
         }
 
         SecurityUser securityUser;
@@ -63,12 +63,12 @@ public class AuthServiceImpl implements AuthService {
                     new UsernamePasswordAuthenticationToken(email, request.password()));
             securityUser = (SecurityUser) authentication.getPrincipal();
         } catch (AuthenticationException e) {
-            loginRateLimiter.recordFailure(email, Instant.now());
+            loginRateLimiter.recordFailure(email, ip, Instant.now());
             log.warn("Login fallido: email={}, ip={}", email, ip);
             throw new InvalidCredentialsException();
         }
 
-        loginRateLimiter.recordSuccess(email);
+        loginRateLimiter.recordSuccess(email, ip);
         log.info("Login exitoso: email={}, ip={}", email, ip);
 
         User user = userRepository.findByEmailAndEnabledTrue(email)
