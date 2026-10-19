@@ -42,6 +42,15 @@ class SysacadCatalogMapperTest {
     }
 
     @Test
+    @DisplayName("toBuilding: reemplaza CR/LF y otros caracteres de control para que no forjen líneas de log")
+    void quitaCaracteresDeControl() {
+        SysacadBuildingDto building = mapper.toBuilding(new RawBuilding(2, "Edif.\r\nCentral\t"));
+
+        assertThat(building.name()).doesNotContain("\r").doesNotContain("\n").doesNotContain("\t")
+                .isEqualTo("Edif.  Central");
+    }
+
+    @Test
     @DisplayName("toClassroom: 'S' habilitada, cualquier otro valor no")
     void traduceHabilitada() {
         assertThat(mapper.toClassroom(new RawClassroom(101, 2, "S", 40)))

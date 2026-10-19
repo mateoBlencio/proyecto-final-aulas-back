@@ -183,7 +183,8 @@ public class SysacadCatalogMapper {
         }
     }
 
+    /** Quita espacios y caracteres de control (CR/LF): los valores de Sysacad terminan en logs y en la base. */
     private static String trim(String value) {
-        return value == null ? null : value.trim();
+        return value == null ? null : value.replaceAll("\\p{Cntrl}", " ").trim();
     }
 }
