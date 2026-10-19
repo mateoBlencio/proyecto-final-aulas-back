@@ -308,6 +308,25 @@ class CommissionServiceImplTest {
     }
 
     @Test
+    @DisplayName("syncCommissions: un curso con varias materias no reescribe la comisión en una segunda corrida igual")
+    void syncCommissionsDoesNotRewriteMultiSubjectCommission() {
+        AcademicPeriod period = annualPeriod();
+        Commission existing = Commission.builder().id(1L).courseCode("101").academicPeriod(period)
+                .sysacadEnabled(true).sysacadHash(Hashes.sha256Hex("101", period.getId())).build();
+        when(commissionRepository.findAll()).thenReturn(List.of(existing));
+        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any(), any())).thenReturn(Optional.empty());
+        when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
+                .thenReturn(Optional.of(period));
+
+        int affected = service.syncCommissions(List.of(
+                new CommissionSyncCommand("101", 1, 2024, 55, 2026, null),
+                new CommissionSyncCommand("101", 1, 2024, 56, 2026, null)), 0);
+
+        assertThat(affected).isZero();
+        verify(commissionRepository, never()).save(any(Commission.class));
+    }
+
+    @Test
     @DisplayName("syncCommissions: sin ninguna fila válida aborta y no da de baja las vigentes")
     void syncCommissionsAbortsWithoutValidRows() {
         Commission current = Commission.builder().id(1L).courseCode("101").academicPeriod(annualPeriod())
