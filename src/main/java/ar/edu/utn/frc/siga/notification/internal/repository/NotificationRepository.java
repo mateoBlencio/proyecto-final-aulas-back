@@ -17,9 +17,10 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     long countByIdempotencyKey(String idempotencyKey);
 
+    // Hibernate stores Instant as UTC wall-clock in timestamp columns, so now() must be shifted to UTC too
     @Query(
             value = "SELECT id_notificacion FROM notificacion "
-                    + "WHERE estado = 'PENDING' AND proximo_intento <= now() "
+                    + "WHERE estado = 'PENDING' AND proximo_intento <= (now() AT TIME ZONE 'UTC') "
                     + "ORDER BY proximo_intento FOR UPDATE SKIP LOCKED LIMIT :limit",
             nativeQuery = true)
     List<Long> findDueForRetry(@Param("limit") int limit);

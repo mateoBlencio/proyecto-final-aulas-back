@@ -62,7 +62,8 @@ SPRING_PROFILES_ACTIVE=dev-local ./mvnw spring-boot:run
 - Context-path `/api`, endpoints bajo `/v1` (p. ej. `GET /api/v1/buildings`).
 - Swagger UI habilitado solo en dev/dev-local/test: `/api/swagger-ui.html`.
 - Autenticación JWT: `POST /auth/login`, `/auth/refresh`, `/auth/logout`.
-- Colección [Bruno](https://www.usebruno.com/) en [bruno/](bruno/) (entorno `local`).
+- Colección [Bruno](https://www.usebruno.com/) en [bruno/](bruno/) (entorno `local`). Los entornos `develop` y `test`
+  leen la URL de `bruno/.env` (`DEV_BASE_URL`, `TEST_BASE_URL`; ver `bruno/.env.example`).
   Al agregar o cambiar un endpoint, actualizar la colección.
 
 ## Testing
@@ -97,4 +98,4 @@ SPRING_PROFILES_ACTIVE=dev-local ./mvnw spring-boot:run
 - Código en inglés (nombres de clases/métodos); comentarios, mensajes y
   documentación en español.
 - Lombok en todo el proyecto; DTOs como records; MapStruct con `componentModel = SPRING`.
-- Zona horaria fija UTC (plugin de Boot y Surefire corren con `-Duser.timezone=UTC`).
+- Zona horaria America/Argentina/Buenos_Aires: `main` la fija en la JVM; el plugin de Boot y Surefire usan la propiedad `app.timezone` del pom, y los `@Scheduled` con cron declaran `zone`.

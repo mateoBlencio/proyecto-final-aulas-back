@@ -81,8 +81,7 @@ services:
         max-size: "10m"
         max-file: "3"
     ports:
-      - "8026:8025"
-      - "1026:1025"
+      - "127.0.0.1:8026:8025"
     deploy:
       resources:
         limits:

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Uso: scripts/dev-snapshot.sh {refresh|run}.
-# refresh necesita DEV_SNAPSHOT_ADMIN_USER en el .env de la raiz del repo.
+# refresh necesita DEV_SNAPSHOT_ADMIN_USER y DEV_SNAPSHOT_ADMIN_HOST en el .env de la raiz del repo.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 [ -f .env ] && { set -a; source .env; set +a; }
 
-ADMIN_HOST="100.90.179.1"
+ADMIN_HOST="${DEV_SNAPSHOT_ADMIN_HOST:-}"
 ADMIN_PORT="5432"
 ADMIN_DB="${DEV_SNAPSHOT_ADMIN_DB:-database_dev}"
 CONTAINER=dev-snapshot-db-container
@@ -33,6 +33,10 @@ cmd_refresh() {
         exit 1
     fi
     local admin_user="$DEV_SNAPSHOT_ADMIN_USER"
+    if [ -z "$ADMIN_HOST" ]; then
+        echo "Falta DEV_SNAPSHOT_ADMIN_HOST (host de la base de dev) en el .env de la raíz del repo." >&2
+        exit 1
+    fi
 
     local pg16_bin
     pg16_bin="$(find_pg16_bin)"

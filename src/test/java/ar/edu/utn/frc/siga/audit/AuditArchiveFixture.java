@@ -139,8 +139,8 @@ final class AuditArchiveFixture {
     void allocations(int rev, long firstId, int count) {
         for (int i = 0; i < count; i++) {
             jdbc.update("INSERT INTO asignacion_aula_aud (id_asignacion, rev, revtype, id_ocurrencia, id_aula, origen, "
-                            + "fecha_creacion, observaciones) VALUES (?, ?, ?, ?, ?, 'MANUAL', ?, ?)",
-                    firstId + i, rev, ADD, 9000 + i, 7 + i, LocalDateTime.of(2001, 5, 10, 9, i), "obs " + i);
+                            + "observaciones) VALUES (?, ?, ?, ?, ?, 'MANUAL', ?)",
+                    firstId + i, rev, ADD, 9000 + i, 7 + i, "obs " + i);
         }
         summary(rev, "asignacion_aula_aud", count);
     }
