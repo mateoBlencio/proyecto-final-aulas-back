@@ -317,6 +317,11 @@ public class ClassroomServiceImpl implements ClassroomService {
                         command.roomNumber(), command.buildingCode());
                 continue;
             }
+            if (command.capacity() == null || command.capacity() < 0) {
+                log.warn("Aula de SysAcad ignorada por capacidad ausente o negativa: aula={}, edificio={}, capacidad={}",
+                        command.roomNumber(), command.buildingCode(), command.capacity());
+                continue;
+            }
             Building building = buildingsByCode.get(command.buildingCode());
             if (building == null) {
                 log.warn("Aula de SysAcad ignorada: no existe el edificio con codigo={}", command.buildingCode());
