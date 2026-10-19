@@ -109,6 +109,6 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
 
         AuditOperations.describe("Sincronización de eventos desde SysAcad: " + Plurals.count(created, "alta", "altas")
                 + ", " + Plurals.count(updated, "cambio", "cambios") + ", " + Plurals.count(absent, "baja", "bajas"));
-        return presentEventIds.size() + absent;
+        return (int) (created + updated) + absent;
     }
 }

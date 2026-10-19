@@ -338,7 +338,7 @@ class AcademicEventSyncServiceTest {
     }
 
     @Test
-    @DisplayName("sync: el valor de retorno sigue siendo presentes más bajas, no cambia por la descripción")
+    @DisplayName("sync: filas afectadas = altas + cambios + bajas; los eventos sin cambios no cuentan")
     void syncReturnValueUnchangedByDescription() {
         SysacadAcademicEventDto row = new SysacadAcademicEventDto(
                 "101", 55, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
@@ -350,7 +350,7 @@ class AcademicEventSyncServiceTest {
 
         service.sync(catalogReader);
 
-        verify(syncStateService).recordSuccess(SysacadView.EVENTOS, 5);
+        verify(syncStateService).recordSuccess(SysacadView.EVENTOS, 4);
     }
 
     @Test

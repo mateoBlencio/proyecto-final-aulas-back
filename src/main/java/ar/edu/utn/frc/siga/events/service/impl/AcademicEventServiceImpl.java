@@ -268,8 +268,13 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         Partition partition = partitionByKey(commands, AcademicEventServiceImpl::keyOf,
                 cmd -> buildRecurringEvent(cmd, now),
                 (existing, cmd) -> {
+                    boolean enrolledChanged = !Objects.equals(existing.getEnrolled(), cmd.enrolled());
+                    boolean durationChanged = reconcileDuration(existing, cmd.durationMinutes());
+                    boolean reenabled = !Boolean.TRUE.equals(existing.getSysacadEnabled());
+                    if (!enrolledChanged && !durationChanged && !reenabled) {
+                        return;
+                    }
                     existing.setEnrolled(cmd.enrolled());
-                    reconcileDuration(existing, cmd.durationMinutes());
                     existing.setSyncedAt(now);
                     existing.setSysacadEnabled(true);
                     if (existing.getId() != null) {
@@ -284,11 +289,12 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         List<UpsertRecurringEventResult> results = new ArrayList<>(commands.size());
         for (int i = 0; i < commands.size(); i++) {
             boolean wasCreated = partition.createdFlags()[i];
-            results.add(new UpsertRecurringEventResult(partition.resolved().get(i).getId(), wasCreated, !wasCreated));
+            RecurringEvent event = partition.resolved().get(i);
+            results.add(new UpsertRecurringEventResult(event.getId(), wasCreated, updated.contains(event)));
         }
 
         log.info("Sync EVENTOS de SysAcad: {} eventos recurrentes creados, {} actualizados",
-                partition.created().size(), commands.size() - partition.created().size());
+                partition.created().size(), updated.size());
         return results;
     }
 
