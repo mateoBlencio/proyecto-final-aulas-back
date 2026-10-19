@@ -17,7 +17,11 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
 
+import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -150,5 +154,36 @@ class SysacadClientTest {
         server.expect(requestTo(URL)).andRespond(withSuccess(TWO_ROWS, MediaType.APPLICATION_JSON));
 
         assertThat(exact.fetchRows("Edificios", ViewQuery.none(), TYPE)).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("cuerpo chunked (sin Content-Length) mayor al tope contra un servidor HTTP real: se corta con SysacadResponseTooLargeException")
+    void rejectsOversizedChunkedBodyWithoutContentLength() throws Exception {
+        HttpServer http = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        http.createContext("/", exchange -> {
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, 0); // 0 = chunked transfer encoding
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write("{\"rows\":[".getBytes());
+                byte[] row = "{\"Edificio\":1,\"EdificioNombre\":\"A\"},".getBytes();
+                for (int i = 0; i < 50; i++) {
+                    out.write(row);
+                }
+                out.write("{\"Edificio\":2}]}".getBytes());
+            }
+        });
+        http.start();
+        try {
+            RestClient restClient = RestClient.builder()
+                    .baseUrl("http://127.0.0.1:" + http.getAddress().getPort())
+                    .requestInterceptor(new ResponseSizeLimitInterceptor(500))
+                    .build();
+            SysacadClient real = new SysacadClient(restClient, 0, sleeps::add);
+
+            assertThatThrownBy(() -> real.fetchRows("Edificios", ViewQuery.none(), TYPE))
+                    .isInstanceOf(SysacadResponseTooLargeException.class);
+        } finally {
+            http.stop(0);
+        }
     }
 }
