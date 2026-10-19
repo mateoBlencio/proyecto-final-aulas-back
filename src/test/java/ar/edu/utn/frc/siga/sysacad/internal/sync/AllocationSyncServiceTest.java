@@ -49,6 +49,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -121,6 +122,8 @@ class AllocationSyncServiceTest {
         verify(commissionService, never()).findActiveByCourseCode(any());
         verify(classroomService, never()).findByRoomNumberAndBuildingCode(any(), any());
         verify(allocationService).syncFromSysacad(List.of());
+        // La asignación previa de ese evento se conserva: el sync no tiene camino de baja ni de liberación.
+        verifyNoMoreInteractions(allocationService);
         verify(syncStateService).recordSuccess(SysacadView.ASIGNACIONES, 0);
     }
 
