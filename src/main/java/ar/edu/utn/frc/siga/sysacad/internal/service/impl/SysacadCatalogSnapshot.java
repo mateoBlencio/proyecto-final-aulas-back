@@ -147,14 +147,32 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
             case "A" -> TermType.ANUAL.getLabel();
             case "1" -> TermType.PRIMER_CUATRIMESTRE.getLabel();
             case "2" -> TermType.SEGUNDO_CUATRIMESTRE.getLabel();
+            case "C" -> singleSemester(withoutZero(facts.commissionSemesters()));
             default -> semesterFromCommissions(facts.commissionSemesters());
         };
     }
 
+    /**
+     * Sin MateriaDictado, HorarioCuatrimestre = 0 es dictado anual y se trata igual que en eventos
+     * ({@code SysacadCommissionResolver.termTypes}: cubre ambos cuatrimestres). Un 0 en cualquier fila deja
+     * la materia Anual, también si el resto es 1 o 2 (el horario anual ya cubre ambos). Sin 0, un solo
+     * cuatrimestre da ese; los dos distintos quedan null.
+     */
     private static String semesterFromCommissions(Set<Integer> semesters) {
+        if (semesters.contains(0)) {
+            return TermType.ANUAL.getLabel();
+        }
+        return singleSemester(withoutZero(semesters));
+    }
+
+    private static Set<Integer> withoutZero(Set<Integer> semesters) {
         Set<Integer> cuatrimestrales = new HashSet<>(semesters);
         cuatrimestrales.remove(null);
         cuatrimestrales.remove(0);
+        return cuatrimestrales;
+    }
+
+    private static String singleSemester(Set<Integer> cuatrimestrales) {
         if (cuatrimestrales.size() == 1) {
             return TermType.fromSemester(cuatrimestrales.iterator().next()).map(TermType::getLabel).orElse(null);
         }
