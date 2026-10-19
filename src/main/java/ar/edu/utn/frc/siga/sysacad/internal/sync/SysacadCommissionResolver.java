@@ -12,11 +12,6 @@ import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 
-/**
- * Resuelve la comisión vigente y su link materia-comisión para las filas de SysAcad, con caché por
- * corrida de sync (una instancia por {@code sync()}). Concentra la resolución que EVENTOS y ASIGNACIONES
- * hacían de forma idéntica, junto con las dos cachés que antes cada syncer declaraba a mano.
- */
 @Slf4j
 final class SysacadCommissionResolver {
 
@@ -31,10 +26,6 @@ final class SysacadCommissionResolver {
         this.subjectCommissionService = subjectCommissionService;
     }
 
-    /**
-     * Devuelve vacío (y ya logueó el WARN correspondiente) si falta la comisión vigente o el link, así el
-     * syncer solo hace {@code if (resolved.isEmpty()) continue;}.
-     */
     Optional<ResolvedLink> resolve(String courseCode, Integer subjectCode, Integer specialtyCode,
             Integer studyPlanCode) {
         Optional<CommissionResponseDto> commission = resolveCommission(courseCode);

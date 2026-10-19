@@ -12,7 +12,7 @@ import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
-/** Corta la lectura de una respuesta que supera {@code maxBytes}, antes de cargarla entera en memoria. */
+/** Aborts reading a response larger than {@code maxBytes}, before loading it fully into memory. */
 public class ResponseSizeLimitInterceptor implements ClientHttpRequestInterceptor {
 
     private final long maxBytes;

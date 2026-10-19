@@ -153,10 +153,10 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
     }
 
     /**
-     * Sin MateriaDictado, HorarioCuatrimestre = 0 es dictado anual y se trata igual que en eventos
-     * ({@code SysacadCommissionResolver.termTypes}: cubre ambos cuatrimestres). Un 0 en cualquier fila deja
-     * la materia Anual, también si el resto es 1 o 2 (el horario anual ya cubre ambos). Sin 0, un solo
-     * cuatrimestre da ese; los dos distintos quedan null.
+     * Without MateriaDictado, HorarioCuatrimestre = 0 means annual and is treated like in events
+     * ({@code SysacadCommissionResolver.termTypes}: it covers both semesters). A 0 in any row makes the subject
+     * annual, even when the rest is 1 or 2 (the annual schedule already covers both). Without a 0, a single
+     * semester gives that semester; two different ones stay null.
      */
     private static String semesterFromCommissions(Set<Integer> semesters) {
         if (semesters.contains(0)) {

@@ -122,7 +122,7 @@ class AllocationSyncServiceTest {
         verify(commissionService, never()).findActiveByCourseCode(any());
         verify(classroomService, never()).findByRoomNumberAndBuildingCode(any(), any());
         verify(allocationService).syncFromSysacad(List.of());
-        // La asignación previa de ese evento se conserva: el sync no tiene camino de baja ni de liberación.
+        // The previous allocation of that event is kept: the sync has no deactivation or release path.
         verifyNoMoreInteractions(allocationService);
         verify(syncStateService).recordSuccess(SysacadView.ASIGNACIONES, 0);
     }

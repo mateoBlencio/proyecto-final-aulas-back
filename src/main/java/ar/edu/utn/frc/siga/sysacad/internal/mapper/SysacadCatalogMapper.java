@@ -57,7 +57,6 @@ public class SysacadCatalogMapper {
                 trim(raw.abreviatura()));
     }
 
-    /** Devuelve null (y loguea) si la fecha viene nula, vacía o inválida. */
     public SysacadHolidayDto toHoliday(RawHoliday raw) {
         String text = trim(raw.fecha());
         if (text == null || text.isEmpty()) {
@@ -183,7 +182,7 @@ public class SysacadCatalogMapper {
         }
     }
 
-    /** Quita espacios y caracteres de control (CR/LF): los valores de Sysacad terminan en logs y en la base. */
+    /** Strips spaces and control characters (CR/LF): Sysacad values end up in logs and in the database. */
     private static String trim(String value) {
         return value == null ? null : value.replaceAll("\\p{Cntrl}", " ").trim();
     }

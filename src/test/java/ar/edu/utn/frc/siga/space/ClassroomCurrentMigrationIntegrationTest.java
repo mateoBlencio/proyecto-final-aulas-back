@@ -14,7 +14,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** V41 en su propia base: Flyway migra a V40, el test siembra aulas y después migra a la última. */
+/** V41 on its own database: Flyway migrates to V40, the test seeds classrooms and then migrates to the latest. */
 @Testcontainers(disabledWithoutDocker = true)
 @DisplayName("V41 vigente_sysacad en aula (integración)")
 class ClassroomCurrentMigrationIntegrationTest {

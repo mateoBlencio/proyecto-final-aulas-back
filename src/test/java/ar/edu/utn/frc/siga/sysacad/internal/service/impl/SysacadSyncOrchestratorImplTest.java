@@ -147,7 +147,7 @@ class SysacadSyncOrchestratorImplTest {
 
         SysacadResyncOutcome outcome = orchestrator.resyncAll();
 
-        // AULAS se saltea por EDIFICIOS, y MATERIAS y COMISIONES por ESPECIALIDADES: todas por conexión.
+        // AULAS is skipped because of EDIFICIOS, and MATERIAS and COMISIONES because of ESPECIALIDADES: all by connectivity.
         assertThat(outcome).isEqualTo(SysacadResyncOutcome.CONNECTIVITY_FAILURE);
     }
 

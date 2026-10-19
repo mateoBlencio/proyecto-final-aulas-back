@@ -43,8 +43,8 @@ public class SysacadProperties {
     private Sync sync = new Sync(null, DEFAULT_MIN_VALID_ROWS_PERCENT);
 
     /**
-     * {@code minValidRowsPercent}: porcentaje mínimo de filas válidas, respecto de lo vigente en SIGA, para
-     * que una vista dé de baja lo ausente. 0 desactiva el umbral (cero filas válidas aborta siempre).
+     * {@code minValidRowsPercent}: minimum percentage of valid rows, relative to what is active in SIGA, for a
+     * view to deactivate what is absent. 0 disables the threshold (zero valid rows always aborts).
      */
     public record Sync(String cron, @DefaultValue("50") @Min(0) @Max(100) int minValidRowsPercent) {}
 }

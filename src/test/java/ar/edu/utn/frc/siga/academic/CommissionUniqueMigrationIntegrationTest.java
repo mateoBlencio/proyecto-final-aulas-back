@@ -15,7 +15,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** V40 en bases propias: Flyway migra a V28, el test siembra comisiones y después migra a la última. */
+/** V40 on dedicated databases: Flyway migrates to V28, the test seeds commissions and then migrates to the latest. */
 @Testcontainers(disabledWithoutDocker = true)
 @DisplayName("V40 UNIQUE de comision (integración)")
 class CommissionUniqueMigrationIntegrationTest {

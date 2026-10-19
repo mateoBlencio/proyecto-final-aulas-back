@@ -1,7 +1,7 @@
--- La clave natural de la comisión es (codigo_curso, id_periodo_academico): el sync de Comisiones y el
--- resolver de EVENTOS/ASIGNACIONES la usan como única. Si ya hay duplicados la migración se detiene con un
--- mensaje claro en vez de fusionar o borrar filas: hay que resolverlos a mano (las comisiones tienen
--- materias, eventos y solicitudes colgando).
+-- The natural key of a commission is (codigo_curso, id_periodo_academico): the Comisiones sync and the
+-- EVENTOS/ASIGNACIONES resolver treat it as unique. If duplicates already exist the migration stops with a
+-- clear message instead of merging or deleting rows: they must be resolved by hand (commissions have
+-- subjects, events and requests hanging from them).
 DO $$
 DECLARE
     duplicates integer;

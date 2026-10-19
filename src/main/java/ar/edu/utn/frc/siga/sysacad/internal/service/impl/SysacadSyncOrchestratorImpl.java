@@ -25,7 +25,7 @@ import org.springframework.stereotype.Service;
 @ConditionalOnProperty(prefix = "siga.sysacad", name = "enabled", havingValue = "true")
 public class SysacadSyncOrchestratorImpl implements SysacadSyncOrchestrator {
 
-    /** Vistas que deben haber sincronizado bien en la corrida para que la clave pueda correr. */
+    /** Views that must have synced correctly in this run for the key view to run. */
     private static final Map<SysacadView, Set<SysacadView>> DEPENDENCIES = Map.of(
             SysacadView.AULAS, EnumSet.of(SysacadView.EDIFICIOS),
             SysacadView.MATERIAS, EnumSet.of(SysacadView.ESPECIALIDADES),

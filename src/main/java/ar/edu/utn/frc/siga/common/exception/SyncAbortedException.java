@@ -2,7 +2,7 @@ package ar.edu.utn.frc.siga.common.exception;
 
 import java.io.Serial;
 
-/** Se aborta un sync contra un origen externo porque los datos no son confiables para dar de baja. */
+/** An external sync is aborted because the incoming data is not reliable enough to deactivate anything. */
 public class SyncAbortedException extends RuntimeException {
 
     @Serial

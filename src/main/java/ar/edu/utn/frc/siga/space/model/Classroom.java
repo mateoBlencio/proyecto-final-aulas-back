@@ -44,12 +44,12 @@ public class Classroom extends SoftDeletableEntity {
     @Column(name = "capacidad", nullable = false)
     private Integer capacity;
 
-    /** Flag "habilitada" (S/N) que informa Sysacad. Solo se escribe desde una fila de la vista, nunca por ausencia. */
+    /** Sysacad's "habilitada" (S/N) flag. Written only from a view row, never because of absence. */
     @Builder.Default
     @Column(name = "habilitada_sysacad", nullable = false)
     private Boolean sysacadEnabled = false;
 
-    /** {@code false} si el aula dejó de aparecer en la vista de Sysacad. No la saca de las candidatas. */
+    /** {@code false} when the classroom stopped appearing in the Sysacad view. Does not remove it from the candidates. */
     @Builder.Default
     @Column(name = "vigente_sysacad", nullable = false)
     private Boolean sysacadCurrent = true;
@@ -84,7 +84,7 @@ public class Classroom extends SoftDeletableEntity {
         return Boolean.TRUE.equals(sysacadCurrent) || sysacadHash == null;
     }
 
-    /** Solo "habilitada = N" excluye el aula; las cargadas a mano (hash nulo) no dependen del flag. */
+    /** Only "habilitada = N" excludes the classroom; manually created ones (null hash) do not depend on the flag. */
     public boolean isEnabledInSysacad() {
         return Boolean.TRUE.equals(sysacadEnabled) || sysacadHash == null;
     }

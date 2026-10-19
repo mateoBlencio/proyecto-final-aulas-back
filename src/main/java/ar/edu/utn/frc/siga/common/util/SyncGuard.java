@@ -4,13 +4,13 @@ import ar.edu.utn.frc.siga.common.exception.SyncAbortedException;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-/** Guarda previa a dar de baja lo ausente en un sync: evita bajas masivas ante un origen degradado. */
+/** Guard run before deactivating whatever is absent in a sync: prevents mass deactivation from a degraded source. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class SyncGuard {
 
     /**
-     * Aborta si no llegó ninguna fila válida, o si llegaron menos que {@code minValidPercent}% de las
-     * filas hoy vigentes. {@code minValidPercent = 0} desactiva solo el umbral; cero filas válidas aborta siempre.
+     * Aborts if no valid row arrived, or if fewer than {@code minValidPercent}% of the currently active rows
+     * arrived. {@code minValidPercent = 0} disables only the percentage; zero valid rows always aborts.
      */
     public static void requireEnoughValidRows(String entity, long validRows, long currentRows, int minValidPercent) {
         if (validRows == 0) {

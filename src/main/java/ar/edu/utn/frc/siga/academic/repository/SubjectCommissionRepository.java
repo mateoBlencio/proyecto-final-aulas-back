@@ -24,8 +24,8 @@ public interface SubjectCommissionRepository
     @EntityGraph(attributePaths = {"commission", "commission.academicPeriod"})
     List<SubjectCommission> findBySubject_Id(Long subjectId);
 
-    // Una comisión puede quedar linkeada a dos materias con el mismo código bajo planes distintos: el
-    // service desambigua por especialidad y plan.
+    // A commission can be linked to two subjects with the same code under different study plans: the
+    // service disambiguates by specialty and study plan.
     @EntityGraph(attributePaths = {"commission", "commission.academicPeriod"})
     List<SubjectCommission> findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(
             Long commissionId, Integer subjectCode);

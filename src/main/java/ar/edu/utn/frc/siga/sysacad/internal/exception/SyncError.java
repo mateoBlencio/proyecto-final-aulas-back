@@ -7,8 +7,8 @@ import lombok.NoArgsConstructor;
 import org.springframework.web.client.RestClientResponseException;
 
 /**
- * Texto del último error de una vista: código + mensaje propio, sin el mensaje crudo de la excepción
- * (puede traer SQL, clases internas o el cuerpo de la respuesta de Sysacad). El detalle va al log.
+ * Last-error text of a view: a code plus our own message, never the raw exception message (it may carry SQL,
+ * internal class names or the Sysacad response body). The detail goes to the log.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class SyncError {

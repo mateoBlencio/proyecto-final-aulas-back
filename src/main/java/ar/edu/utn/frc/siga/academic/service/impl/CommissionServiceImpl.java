@@ -158,7 +158,7 @@ public class CommissionServiceImpl implements CommissionService {
             AcademicPeriod period = findOrCreatePeriod(periodsByYear, command.academicYear());
             CommissionKey rowKey = new CommissionKey(command.courseCode(), period.getId());
             incoming.add(rowKey);
-            // La clave es (curso, período) y Horarios trae una fila por materia: el hash no puede incluirla.
+            // The key is (course, period) and Horarios has one row per subject: the hash cannot include the subject.
             String hash = Hashes.sha256Hex(command.courseCode(), period.getId());
             Commission commission = existingCommissions.get(rowKey);
 
