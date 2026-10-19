@@ -15,7 +15,9 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -196,5 +198,64 @@ class SysacadSyncOrchestratorImplTest {
         orchestrator.resyncAll();
 
         verify(buildings, times(2)).sync(any());
+    }
+
+    private Map<SysacadView, SysacadViewSyncer> allSyncers() {
+        Map<SysacadView, SysacadViewSyncer> all = new EnumMap<>(SysacadView.class);
+        for (SysacadView view : SysacadView.values()) {
+            SysacadViewSyncer syncer = mock(SysacadViewSyncer.class);
+            when(syncer.view()).thenReturn(view);
+            all.put(view, syncer);
+        }
+        return all;
+    }
+
+    private SysacadSyncOrchestratorImpl orchestratorOf(Map<SysacadView, SysacadViewSyncer> all) {
+        return new SysacadSyncOrchestratorImpl(List.copyOf(all.values()), snapshotFactory, syncStateService);
+    }
+
+    @Test
+    @DisplayName("Si falla COMISIONES se saltea EVENTOS (y por propagación ASIGNACIONES); FERIADOS corre")
+    void resyncAll_skipsEventsWhenCommissionsFail() {
+        Map<SysacadView, SysacadViewSyncer> all = allSyncers();
+        doThrow(new IllegalStateException("dato inválido")).when(all.get(SysacadView.COMISIONES)).sync(any());
+
+        orchestratorOf(all).resyncAll();
+
+        verify(all.get(SysacadView.EVENTOS), never()).sync(any());
+        verify(all.get(SysacadView.ASIGNACIONES), never()).sync(any());
+        verify(all.get(SysacadView.FERIADOS)).sync(any());
+        verify(syncStateService).recordFailure(eq(SysacadView.EVENTOS), startsWith("DEPENDENCY_FAILED"));
+    }
+
+    @Test
+    @DisplayName("ASIGNACIONES depende de EVENTOS y de AULAS: falla de cualquiera de las dos la saltea")
+    void resyncAll_skipsAllocationsWhenEventsOrClassroomsFail() {
+        Map<SysacadView, SysacadViewSyncer> onEvents = allSyncers();
+        doThrow(new IllegalStateException("x")).when(onEvents.get(SysacadView.EVENTOS)).sync(any());
+        orchestratorOf(onEvents).resyncAll();
+        verify(onEvents.get(SysacadView.ASIGNACIONES), never()).sync(any());
+        verify(onEvents.get(SysacadView.AULAS)).sync(any());
+
+        Map<SysacadView, SysacadViewSyncer> onClassrooms = allSyncers();
+        doThrow(new IllegalStateException("x")).when(onClassrooms.get(SysacadView.AULAS)).sync(any());
+        orchestratorOf(onClassrooms).resyncAll();
+        verify(onClassrooms.get(SysacadView.ASIGNACIONES), never()).sync(any());
+        verify(onClassrooms.get(SysacadView.EVENTOS)).sync(any());
+    }
+
+    @Test
+    @DisplayName("Propagación transitiva: falla EDIFICIOS, se saltea AULAS y por eso también ASIGNACIONES")
+    void resyncAll_skipPropagatesTransitively() {
+        Map<SysacadView, SysacadViewSyncer> all = allSyncers();
+        doThrow(new IllegalStateException("x")).when(all.get(SysacadView.EDIFICIOS)).sync(any());
+
+        orchestratorOf(all).resyncAll();
+
+        verify(all.get(SysacadView.AULAS), never()).sync(any());
+        verify(all.get(SysacadView.ASIGNACIONES), never()).sync(any());
+        verify(syncStateService).recordFailure(eq(SysacadView.ASIGNACIONES), startsWith("DEPENDENCY_FAILED"));
+        // EVENTOS no depende de EDIFICIOS ni de AULAS: corre igual.
+        verify(all.get(SysacadView.EVENTOS)).sync(any());
     }
 }
