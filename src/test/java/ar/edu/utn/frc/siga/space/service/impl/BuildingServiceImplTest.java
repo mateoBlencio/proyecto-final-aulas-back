@@ -260,6 +260,21 @@ class BuildingServiceImplTest {
     }
 
     @Test
+    @DisplayName("syncBuildings: dos filas con el mismo código y distinto nombre: gana la primera y cuenta una sola escritura")
+    void syncBuildingsFirstRowWinsWhenCodeRepeats() {
+        when(buildingRepository.findAll()).thenReturn(List.of());
+        when(buildingRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        int affected = service.syncBuildings(List.of(
+                new BuildingSyncCommand(1, "Edif. Central"), new BuildingSyncCommand(1, "Edif. Central (otro)")), 0);
+
+        ArgumentCaptor<Building> saved = ArgumentCaptor.forClass(Building.class);
+        verify(buildingRepository, times(1)).save(saved.capture());
+        assertThat(saved.getValue().getName()).isEqualTo("Edif. Central");
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("syncBuildings: actualiza el nombre del edificio existente cuando cambió upstream")
     void syncBuildingsUpdatesRenamedBuilding() {
         Building existing = sysacadBuilding(4, "Malvinas viejo", Hashes.sha256Hex("Malvinas viejo"));

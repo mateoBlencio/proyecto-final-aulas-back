@@ -131,7 +131,11 @@ public class BuildingServiceImpl implements BuildingService {
                 log.warn("Edificio de SysAcad ignorado por clave o nombre vacíos: codigo={}", command.buildingCode());
                 continue;
             }
-            incoming.add(command.buildingCode());
+            if (!incoming.add(command.buildingCode())) {
+                log.warn("Edificio de SysAcad repetido en la vista: se conserva la primera fila, codigo={}",
+                        command.buildingCode());
+                continue;
+            }
             String hash = Hashes.sha256Hex(command.name());
             Building building = existing.get(command.buildingCode());
 
