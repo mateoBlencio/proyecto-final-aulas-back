@@ -2,15 +2,30 @@
 -- column DEFAULT pointed to an unused <seq>1 sequence: a plain SQL insert got id 1 and hit the primary key.
 ALTER TABLE asignacion_aula ALTER COLUMN id_asignacion SET DEFAULT nextval('asignacion_aula_id_asignacion_seq');
 ALTER SEQUENCE asignacion_aula_id_asignacion_seq OWNED BY asignacion_aula.id_asignacion;
-DROP SEQUENCE asignacion_aula_id_asignacion_seq1;
+-- Never move the live sequence backwards: take the highest of the real max id and both sequences.
+SELECT setval('asignacion_aula_id_asignacion_seq', GREATEST(
+    (SELECT COALESCE(max(id_asignacion), 1) FROM asignacion_aula),
+    (SELECT COALESCE(last_value, 1) FROM pg_sequences WHERE schemaname = 'public' AND sequencename = 'asignacion_aula_id_asignacion_seq1'),
+    (SELECT COALESCE(last_value, 1) FROM pg_sequences WHERE schemaname = 'public' AND sequencename = 'asignacion_aula_id_asignacion_seq')));
+DROP SEQUENCE IF EXISTS asignacion_aula_id_asignacion_seq1;
 
 ALTER TABLE evento_academico ALTER COLUMN id_evento_academico SET DEFAULT nextval('evento_academico_id_evento_academico_seq');
 ALTER SEQUENCE evento_academico_id_evento_academico_seq OWNED BY evento_academico.id_evento_academico;
-DROP SEQUENCE evento_academico_id_evento_academico_seq1;
+-- Never move the live sequence backwards: take the highest of the real max id and both sequences.
+SELECT setval('evento_academico_id_evento_academico_seq', GREATEST(
+    (SELECT COALESCE(max(id_evento_academico), 1) FROM evento_academico),
+    (SELECT COALESCE(last_value, 1) FROM pg_sequences WHERE schemaname = 'public' AND sequencename = 'evento_academico_id_evento_academico_seq1'),
+    (SELECT COALESCE(last_value, 1) FROM pg_sequences WHERE schemaname = 'public' AND sequencename = 'evento_academico_id_evento_academico_seq')));
+DROP SEQUENCE IF EXISTS evento_academico_id_evento_academico_seq1;
 
 ALTER TABLE ocurrencia ALTER COLUMN id_ocurrencia SET DEFAULT nextval('ocurrencia_id_ocurrencia_seq');
 ALTER SEQUENCE ocurrencia_id_ocurrencia_seq OWNED BY ocurrencia.id_ocurrencia;
-DROP SEQUENCE ocurrencia_id_ocurrencia_seq1;
+-- Never move the live sequence backwards: take the highest of the real max id and both sequences.
+SELECT setval('ocurrencia_id_ocurrencia_seq', GREATEST(
+    (SELECT COALESCE(max(id_ocurrencia), 1) FROM ocurrencia),
+    (SELECT COALESCE(last_value, 1) FROM pg_sequences WHERE schemaname = 'public' AND sequencename = 'ocurrencia_id_ocurrencia_seq1'),
+    (SELECT COALESCE(last_value, 1) FROM pg_sequences WHERE schemaname = 'public' AND sequencename = 'ocurrencia_id_ocurrencia_seq')));
+DROP SEQUENCE IF EXISTS ocurrencia_id_ocurrencia_seq1;
 
 -- Orphan sequences from the baseline: their tables use IDENTITY or the <seq>1 default and no entity names them.
 DROP SEQUENCE IF EXISTS aula_id_aula_seq;
