@@ -111,6 +111,8 @@ public class SysacadCatalogMapper {
         return new SysacadAcademicEventDto(
                 curso,
                 raw.materia(),
+                raw.especialidad(),
+                raw.plan(),
                 dayOfWeek,
                 startTime,
                 raw.duracion(),
@@ -131,6 +133,8 @@ public class SysacadCatalogMapper {
         return new SysacadAllocationDto(
                 curso,
                 raw.materia(),
+                raw.especialidad(),
+                raw.plan(),
                 dayOfWeek,
                 startTime,
                 raw.duracion(),

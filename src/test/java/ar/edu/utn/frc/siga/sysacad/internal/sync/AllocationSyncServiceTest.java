@@ -100,7 +100,8 @@ class AllocationSyncServiceTest {
     private SysacadAllocationDto row(String courseCode, Integer subjectCode, Integer semester,
             Integer roomNumber, Integer buildingCode) {
         return new SysacadAllocationDto(
-                courseCode, subjectCode, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, semester, roomNumber, buildingCode);
+                courseCode, subjectCode, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, semester, roomNumber,
+                buildingCode);
     }
 
     private SysacadRecurringEventRefDto eventRef(Long eventId, Long subjectId, Long commissionId,
@@ -132,7 +133,7 @@ class AllocationSyncServiceTest {
 
         service.sync(catalogReader);
 
-        verify(subjectCommissionService, never()).findByCommissionAndSubjectCode(any(), any());
+        verify(subjectCommissionService, never()).findByCommissionAndSubjectCode(any(), any(), any(), any());
         verify(classroomService, never()).findByRoomNumberAndBuildingCode(any(), any());
         verify(allocationService).syncFromSysacad(List.of());
     }
@@ -142,7 +143,7 @@ class AllocationSyncServiceTest {
     void syncSkipsRowWhenClassroomUnresolved() {
         when(catalogReader.findAllocations()).thenReturn(List.of(row("101", 55, 1, 200, 5)));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
-        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 1, 2024)).thenReturn(link(9L, 1L, 30));
         when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.empty());
 
         service.sync(catalogReader);
@@ -155,7 +156,7 @@ class AllocationSyncServiceTest {
     void syncFetchesRecurringEventIndexOnce() {
         when(catalogReader.findAllocations()).thenReturn(List.of(row("101", 55, 1, 200, 5)));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
-        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 1, 2024)).thenReturn(link(9L, 1L, 30));
         when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
         when(academicEventService.findSysacadRecurringEvents())
                 .thenReturn(List.of(eventRef(100L, 9L, 1L, TermType.PRIMER_CUATRIMESTRE, 2026)));
@@ -171,7 +172,7 @@ class AllocationSyncServiceTest {
     void syncSkipsRowWhenEventNotFound() {
         when(catalogReader.findAllocations()).thenReturn(List.of(row("101", 55, 1, 200, 5)));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
-        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 1, 2024)).thenReturn(link(9L, 1L, 30));
         when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
         when(academicEventService.findSysacadRecurringEvents()).thenReturn(List.of());
 
@@ -197,7 +198,7 @@ class AllocationSyncServiceTest {
     void syncBuildsItemAndDelegatesOnce() {
         when(catalogReader.findAllocations()).thenReturn(List.of(row("101", 55, 1, 200, 5)));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
-        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 1, 2024)).thenReturn(link(9L, 1L, 30));
         when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
         when(academicEventService.findSysacadRecurringEvents())
                 .thenReturn(List.of(eventRef(100L, 9L, 1L, TermType.PRIMER_CUATRIMESTRE, 2026)));
@@ -217,7 +218,7 @@ class AllocationSyncServiceTest {
     void syncResolvesBothSemestersFromIndex() {
         when(catalogReader.findAllocations()).thenReturn(List.of(row("101", 55, 0, 200, 5)));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
-        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 1, 2024)).thenReturn(link(9L, 1L, 30));
         when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
         when(academicEventService.findSysacadRecurringEvents()).thenReturn(List.of(
                 eventRef(100L, 9L, 1L, TermType.PRIMER_CUATRIMESTRE, 2026),
@@ -240,11 +241,11 @@ class AllocationSyncServiceTest {
     void syncKeepsFirstRoomWhenSameEventHasTwoRooms() {
         SysacadAllocationDto rowA = row("101", 55, 1, 200, 5);
         SysacadAllocationDto rowB = row("101", 55, 1, 201, 6);
-        SysacadAllocationDto otherEvent = new SysacadAllocationDto("101", 55, DayOfWeek.TUESDAY, LocalTime.of(8, 0),
+        SysacadAllocationDto otherEvent = new SysacadAllocationDto("101", 55, 1, 2024, DayOfWeek.TUESDAY, LocalTime.of(8, 0),
                 90, 1, 201, 6);
         when(catalogReader.findAllocations()).thenReturn(List.of(rowA, rowB, otherEvent));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
-        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 1, 2024)).thenReturn(link(9L, 1L, 30));
         when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
         when(classroomService.findByRoomNumberAndBuildingCode(201, 6)).thenReturn(Optional.of(classroom(51L)));
         when(academicEventService.findSysacadRecurringEvents()).thenReturn(List.of(
@@ -277,7 +278,7 @@ class AllocationSyncServiceTest {
     void syncToleratesDuplicateEventsInIndex() {
         when(catalogReader.findAllocations()).thenReturn(List.of(row("101", 55, 1, 200, 5)));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
-        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 1, 2024)).thenReturn(link(9L, 1L, 30));
         when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
         when(academicEventService.findSysacadRecurringEvents()).thenReturn(List.of(
                 eventRef(100L, 9L, 1L, TermType.PRIMER_CUATRIMESTRE, 2026),
@@ -297,7 +298,7 @@ class AllocationSyncServiceTest {
         SysacadAllocationDto duplicated = row("101", 55, 1, 200, 5);
         when(catalogReader.findAllocations()).thenReturn(List.of(duplicated, duplicated));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
-        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 1, 2024)).thenReturn(link(9L, 1L, 30));
         when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
         when(academicEventService.findSysacadRecurringEvents())
                 .thenReturn(List.of(eventRef(100L, 9L, 1L, TermType.PRIMER_CUATRIMESTRE, 2026)));
@@ -319,9 +320,9 @@ class AllocationSyncServiceTest {
         when(catalogReader.findAllocations()).thenReturn(List.of(rowA, rowB));
 
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
-        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 1, 2024)).thenReturn(link(9L, 1L, 30));
         when(commissionService.findActiveByCourseCode("102")).thenReturn(commission(2L, "102", 2026));
-        when(subjectCommissionService.findByCommissionAndSubjectCode(2L, 66)).thenReturn(link(10L, 2L, 25));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(2L, 66, 1, 2024)).thenReturn(link(10L, 2L, 25));
         when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
         when(academicEventService.findSysacadRecurringEvents()).thenReturn(List.of(
                 eventRef(100L, 9L, 1L, TermType.PRIMER_CUATRIMESTRE, 2026),

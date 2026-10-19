@@ -6,6 +6,8 @@ import java.time.LocalTime;
 public record SysacadAllocationDto(
         String courseCode,
         Integer subjectCode,
+        Integer specialtyCode,
+        Integer studyPlanCode,
         DayOfWeek dayOfWeek,
         LocalTime startTime,
         Integer durationMinutes,

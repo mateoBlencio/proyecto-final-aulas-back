@@ -105,7 +105,7 @@ class SysacadCatalogMapperTest {
                 5, "Ingeniería en Sistemas de Información", 2008, 115, "Sistemas de Representación", 0));
 
         assertThat(allocation).isEqualTo(new SysacadAllocationDto(
-                "1H90SR", 115, DayOfWeek.TUESDAY, LocalTime.of(10, 30), 135, 0, 805, 15));
+                "1H90SR", 115, 5, 2008, DayOfWeek.TUESDAY, LocalTime.of(10, 30), 135, 0, 805, 15));
     }
 
     @Test
@@ -148,7 +148,7 @@ class SysacadCatalogMapperTest {
                 5, "Ingeniería en Sistemas de Información", 2008, 115, "Sistemas de Representación", 30));
 
         assertThat(event).isEqualTo(new SysacadAcademicEventDto(
-                "1H90SR", 115, DayOfWeek.TUESDAY, LocalTime.of(10, 30), 135, 0));
+                "1H90SR", 115, 5, 2008, DayOfWeek.TUESDAY, LocalTime.of(10, 30), 135, 0));
     }
 
     @Test

@@ -60,7 +60,8 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
 
         for (SysacadAcademicEventDto row : ViewSyncRunner.requireRows(catalog.findAcademicEvents(), SysacadView.EVENTOS)) {
             Optional<SysacadCommissionResolver.ResolvedLink> resolved =
-                    resolver.resolve(row.courseCode(), row.subjectCode());
+                    resolver.resolve(row.courseCode(), row.subjectCode(), row.specialtyCode(),
+                            row.studyPlanCode());
             if (resolved.isEmpty()) {
                 resolver.resolveCommission(row.courseCode())
                         .ifPresent(commission -> unresolvedCommissionIds.add(commission.id()));

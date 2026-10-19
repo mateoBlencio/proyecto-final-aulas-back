@@ -76,7 +76,8 @@ public class AllocationSyncService implements SysacadViewSyncer {
             }
 
             Optional<SysacadCommissionResolver.ResolvedLink> resolved =
-                    resolver.resolve(row.courseCode(), row.subjectCode());
+                    resolver.resolve(row.courseCode(), row.subjectCode(), row.specialtyCode(),
+                            row.studyPlanCode());
             if (resolved.isEmpty()) {
                 continue;
             }
