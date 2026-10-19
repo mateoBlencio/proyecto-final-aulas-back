@@ -11,8 +11,9 @@ public class LoginRateLimitProperties {
 
     private int maxAttempts = 5;
 
-    // Failures allowed per client IP across all emails within the window
-    private int maxAttemptsPerIp = 50;
+    // Failures allowed per client IP across all emails within the window. High default: if TRUSTED_PROXIES
+    // is not set the IP is the reverse proxy's, shared by every user (see TrustedProxiesStartupCheck).
+    private int maxAttemptsPerIp = 200;
 
     private int windowMinutes = 15;
 }

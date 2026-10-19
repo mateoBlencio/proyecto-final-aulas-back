@@ -76,6 +76,7 @@ server:
   tomcat:
     remoteip:
       # Regex of the reverse proxy IP(s). Empty by default: no proxy is trusted and the header is ignored.
+      # Setting it in dev, test and prod is a mandatory deploy step (see TrustedProxiesStartupCheck).
       internal-proxies: ${TRUSTED_PROXIES:}
 
 springdoc:
@@ -198,7 +199,7 @@ siga:
     allowed-email-domain: ${AUTH_ALLOWED_EMAIL_DOMAIN:frc.utn.edu.ar}
   login-ratelimit:
     max-attempts: 5
-    max-attempts-per-ip: 50
+    max-attempts-per-ip: 200
     window-minutes: 15
   ratelimit:
     general:

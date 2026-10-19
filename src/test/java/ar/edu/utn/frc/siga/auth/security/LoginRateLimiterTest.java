@@ -20,6 +20,7 @@ class LoginRateLimiterTest {
     void setUp() {
         LoginRateLimitProperties properties = new LoginRateLimitProperties();
         properties.setMaxAttempts(5);
+        properties.setMaxAttemptsPerIp(50);
         properties.setWindowMinutes(15);
         rateLimiter = new LoginRateLimiter(properties);
         now = Instant.parse("2026-01-01T00:00:00Z");
