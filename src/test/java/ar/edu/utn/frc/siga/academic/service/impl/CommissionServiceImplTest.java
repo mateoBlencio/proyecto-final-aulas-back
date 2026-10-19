@@ -188,6 +188,17 @@ class CommissionServiceImplTest {
     }
 
     @Test
+    @DisplayName("findActiveIdsByCourseCode: devuelve los ids de todas las comisiones vigentes del curso, también si son ambiguas")
+    void findActiveIdsByCourseCodeReturnsAllActive() {
+        Commission first = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).sysacadEnabled(true).build();
+        Commission second = Commission.builder().id(4L).courseCode("K1001").academicPeriod(period).sysacadEnabled(true).build();
+        when(commissionRepository.findByCourseCodeAndSysacadEnabledTrueAndDeletedAtIsNull("K1001"))
+                .thenReturn(List.of(first, second));
+
+        assertThat(service.findActiveIdsByCourseCode("K1001")).containsExactly(3L, 4L);
+    }
+
+    @Test
     @DisplayName("find: si el período de la comisión está inhabilitado, lanza ResourceNotFoundException sin mapear")
     void findWithCommissionOfInactivePeriodThrowsResourceNotFound() {
         AcademicPeriod inactivePeriod = AcademicPeriod.builder().id(1L).year(2026).semester(1).build();

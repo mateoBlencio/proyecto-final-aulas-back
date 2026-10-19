@@ -37,7 +37,7 @@ final class SysacadCommissionResolver {
         return link.map(l -> new ResolvedLink(commission.get(), l));
     }
 
-    Optional<CommissionResponseDto> resolveCommission(String courseCode) {
+    private Optional<CommissionResponseDto> resolveCommission(String courseCode) {
         return commissionCache.computeIfAbsent(courseCode, code -> {
             try {
                 return Optional.of(commissionService.findActiveByCourseCode(code));

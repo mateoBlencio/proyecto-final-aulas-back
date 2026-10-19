@@ -131,6 +131,14 @@ public class CommissionServiceImpl implements CommissionService {
     }
 
     @Override
+    public List<Long> findActiveIdsByCourseCode(String courseCode) {
+        return commissionRepository.findByCourseCodeAndSysacadEnabledTrueAndDeletedAtIsNull(courseCode).stream()
+                .filter(Commission::isAvailable)
+                .map(Commission::getId)
+                .toList();
+    }
+
+    @Override
     @Transactional
     public int syncCommissions(List<CommissionSyncCommand> commands, int minValidPercent) {
         Instant syncedAt = Instant.now();
