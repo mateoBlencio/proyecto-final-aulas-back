@@ -9,11 +9,10 @@ spring:
       file: compose-snapshot.yaml
   flyway:
     enabled: true
-    # dev real tiene una fila huerfana en flyway_schema_history (una migracion de "notification"
-    # que se corrio sin commitear y se reviertio en el codigo, ver CLAUDE.md). El dump la trae
-    # pegada; sin esto Flyway rechaza el arranque con "applied migration not resolved locally".
-    # "future" cubre migraciones de otras ramas ya aplicadas en dev que todavia no estan en esta.
-    ignore-migration-patterns: "*:missing,*:future"
+    # The dev dump carries the V23 row (daily dashboard tables) in flyway_schema_history, a
+    # migration that was reverted in code. Without this Flyway refuses to start with
+    # "applied migration not resolved locally". Remove once dev ran `flyway repair`.
+    ignore-migration-patterns: "*:missing"
 
 springdoc:
   swagger-ui:
