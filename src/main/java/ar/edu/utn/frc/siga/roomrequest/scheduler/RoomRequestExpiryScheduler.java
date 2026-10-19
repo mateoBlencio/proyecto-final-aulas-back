@@ -13,7 +13,7 @@ public class RoomRequestExpiryScheduler {
 
     private final RoomRequestExpiryService expiryService;
 
-    @Scheduled(cron = "${siga.room-requests.expiry.cron}")
+    @Scheduled(cron = "${siga.room-requests.expiry.cron}", zone = "America/Argentina/Buenos_Aires")
     public void expireOverdueItems() {
         log.info("Cron de vencimiento de pedidos de aula disparado");
         expiryService.expireOverdueItems();

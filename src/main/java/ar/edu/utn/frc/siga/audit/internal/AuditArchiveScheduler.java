@@ -17,7 +17,7 @@ public class AuditArchiveScheduler {
 
     private final AuditArchiveService archiveService;
 
-    @Scheduled(cron = "${siga.audit.archive.cron}")
+    @Scheduled(cron = "${siga.audit.archive.cron}", zone = "America/Argentina/Buenos_Aires")
     public void archive() {
         log.info("Cron de archivado de auditoría disparado");
         archiveService.archive(LocalDate.now());

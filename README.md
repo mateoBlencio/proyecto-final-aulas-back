@@ -98,4 +98,4 @@ SPRING_PROFILES_ACTIVE=dev-local ./mvnw spring-boot:run
 - Código en inglés (nombres de clases/métodos); comentarios, mensajes y
   documentación en español.
 - Lombok en todo el proyecto; DTOs como records; MapStruct con `componentModel = SPRING`.
-- Zona horaria fija UTC (plugin de Boot y Surefire corren con `-Duser.timezone=UTC`).
+- Zona horaria America/Argentina/Buenos_Aires: `main` la fija en la JVM; el plugin de Boot y Surefire usan la propiedad `app.timezone` del pom, y los `@Scheduled` con cron declaran `zone`.
