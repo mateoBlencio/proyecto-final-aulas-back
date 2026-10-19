@@ -42,6 +42,7 @@ import org.slf4j.LoggerFactory;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -234,27 +235,60 @@ class AllocationSyncServiceTest {
     }
 
     @Test
-    @DisplayName("sync: N filas que comparten el mismo evento del índice → todas resuelven al mismo Event")
-    void syncResolvesMultipleRowsSharingOneEvent() {
+    @DisplayName("sync: dos filas con el mismo evento y aulas distintas → conserva la primera aula, saltea la otra "
+            + "con WARN y no aborta la vista")
+    void syncKeepsFirstRoomWhenSameEventHasTwoRooms() {
         SysacadAllocationDto rowA = row("101", 55, 1, 200, 5);
         SysacadAllocationDto rowB = row("101", 55, 1, 201, 6);
-        when(catalogReader.findAllocations()).thenReturn(List.of(rowA, rowB));
+        SysacadAllocationDto otherEvent = new SysacadAllocationDto("101", 55, DayOfWeek.TUESDAY, LocalTime.of(8, 0),
+                90, 1, 201, 6);
+        when(catalogReader.findAllocations()).thenReturn(List.of(rowA, rowB, otherEvent));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
         when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
         when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
         when(classroomService.findByRoomNumberAndBuildingCode(201, 6)).thenReturn(Optional.of(classroom(51L)));
-        when(academicEventService.findSysacadRecurringEvents())
-                .thenReturn(List.of(eventRef(100L, 9L, 1L, TermType.PRIMER_CUATRIMESTRE, 2026)));
+        when(academicEventService.findSysacadRecurringEvents()).thenReturn(List.of(
+                eventRef(100L, 9L, 1L, TermType.PRIMER_CUATRIMESTRE, 2026),
+                new SysacadRecurringEventRefDto(101L, 9L, 1L, DayOfWeek.TUESDAY, LocalTime.of(8, 0),
+                        TermType.PRIMER_CUATRIMESTRE.startDate(2026), TermType.PRIMER_CUATRIMESTRE.endDate(2026))));
 
-        service.sync(catalogReader);
+        Logger logger = (Logger) LoggerFactory.getLogger(AllocationSyncService.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            service.sync(catalogReader);
+        } finally {
+            logger.detachAppender(appender);
+        }
 
-        verify(academicEventService, times(1)).findSysacadRecurringEvents();
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<AllocationItem>> captor = ArgumentCaptor.forClass(List.class);
         verify(allocationService).syncFromSysacad(captor.capture());
-        assertThat(captor.getValue()).containsExactlyInAnyOrder(
+        assertThat(captor.getValue()).containsExactly(
                 new AllocationItem(new AllocationTarget.Event(100L), 50L),
-                new AllocationItem(new AllocationTarget.Event(100L), 51L));
+                new AllocationItem(new AllocationTarget.Event(101L), 51L));
+        assertThat(appender.list).anyMatch(event -> event.getFormattedMessage().contains("otra aula"));
+        verify(syncStateService).recordSuccess(eq(SysacadView.ASIGNACIONES), anyInt());
+    }
+
+    @Test
+    @DisplayName("sync: eventos duplicados en el índice (misma clave) no rompen la corrida y usan el primero")
+    void syncToleratesDuplicateEventsInIndex() {
+        when(catalogReader.findAllocations()).thenReturn(List.of(row("101", 55, 1, 200, 5)));
+        when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
+        when(academicEventService.findSysacadRecurringEvents()).thenReturn(List.of(
+                eventRef(100L, 9L, 1L, TermType.PRIMER_CUATRIMESTRE, 2026),
+                eventRef(150L, 9L, 1L, TermType.PRIMER_CUATRIMESTRE, 2026)));
+
+        service.sync(catalogReader);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<AllocationItem>> captor = ArgumentCaptor.forClass(List.class);
+        verify(allocationService).syncFromSysacad(captor.capture());
+        assertThat(captor.getValue()).containsExactly(new AllocationItem(new AllocationTarget.Event(100L), 50L));
     }
 
     @Test
