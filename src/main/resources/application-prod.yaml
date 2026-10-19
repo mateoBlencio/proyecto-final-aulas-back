@@ -10,8 +10,11 @@ cors:
 
 logging:
   level:
-    root: ERROR
-    ar.edu.utn.frc.siga: WARN
+    root: WARN
+    ar.edu.utn.frc.siga: INFO
+  structured:
+    format:
+      console: ecs
 
 siga:
   audit:

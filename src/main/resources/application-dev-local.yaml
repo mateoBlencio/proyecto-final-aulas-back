@@ -48,7 +48,8 @@ cors:
 
 siga:
   jwt:
-    secret: dev-local-fixed-secret-not-for-prod-0123456789abcdef
+    # Random per run unless JWT_SECRET is set (tokens do not survive restarts); no secret is versioned
+    secret: ${JWT_SECRET:${random.uuid}${random.uuid}}
   sysacad:
     enabled: false
     api-key: dev-local-unused

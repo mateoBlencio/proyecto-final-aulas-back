@@ -36,6 +36,7 @@ spring:
       hibernate:
         jdbc:
           batch_size: 50
+        default_batch_fetch_size: 50
         order_inserts: true
         order_updates: true
       org:
@@ -81,6 +82,10 @@ springdoc:
     path: /v3/api-docs
 
 management:
+  health:
+    # An external SMTP outage must not turn the aggregate health (HEALTHCHECK, deploy) DOWN
+    mail:
+      enabled: false
   endpoints:
     web:
       exposure:
