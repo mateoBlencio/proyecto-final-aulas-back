@@ -164,7 +164,9 @@ public class AllocationController {
                        + "y 'eventId' + 'from' sin 'to' es un cambio PERMANENTE desde esa fecha hasta que termine "
                        + "el dictado. Ambos bordes son inclusive y 'from' no puede ser anterior a hoy (400). "
                        + "409 si algún aula no existe/no está disponible, si hay solapamiento de horario con otra "
-                       + "asignación, o si una ocurrencia del rango ya ocurrió. Atómico: si una sola fecha del "
+                       + "asignación, o si una ocurrencia del rango ya ocurrió. En el 409 y en el 400 por "
+                       + "superposición dentro del margen, 'classroomIds' lista todas las aulas en conflicto y "
+                       + "'detail' explica el motivo. Atómico: si una sola fecha del "
                        + "rango falla, no se aplica ningún cambio.")
     public ResponseEntity<List<AllocationResponseDto>> reallocate(@Valid @RequestBody AllocationBatchRequestDto dto) {
         log.debug("PUT /v1/allocations: items={}", dto.items().size());

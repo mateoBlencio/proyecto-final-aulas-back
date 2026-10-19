@@ -246,7 +246,7 @@ class AllocationServiceImplTest {
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
         Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
         when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(assignments(resolved));
-        doThrow(new ReallocationConflictException(List.of())).when(validator).validateManualOverlap(anyList(), any());
+        doThrow(new ReallocationConflictException(List.of(), java.util.Map.of())).when(validator).validateManualOverlap(anyList(), any());
 
         assertThatThrownBy(() -> service.allocate(command)).isInstanceOf(ReallocationConflictException.class);
 
@@ -363,7 +363,7 @@ class AllocationServiceImplTest {
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
         Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
         when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(assignments(resolved));
-        doThrow(new ReallocationConflictException(List.of())).when(validator).validateManualOverlap(anyList(), any());
+        doThrow(new ReallocationConflictException(List.of(), java.util.Map.of())).when(validator).validateManualOverlap(anyList(), any());
 
         assertThatThrownBy(() -> service.reallocate(command)).isInstanceOf(ReallocationConflictException.class);
 

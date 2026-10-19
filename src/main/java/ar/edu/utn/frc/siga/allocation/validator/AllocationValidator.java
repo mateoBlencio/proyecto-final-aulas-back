@@ -46,7 +46,7 @@ public class AllocationValidator {
         OverlapReview overlaps = reviewManualOverlaps(candidates);
         throwIfAny(overlaps.blocking());
         if (!overlaps.tolerated().isEmpty() && (observation == null || observation.isBlank())) {
-            throw new OverlapObservationRequiredException(overlaps.tolerated());
+            throw new OverlapObservationRequiredException(overlaps.tolerated(), roomNumbers(overlaps.tolerated()));
         }
     }
 
@@ -88,10 +88,17 @@ public class AllocationValidator {
                 .toList();
     }
 
-    private static void throwIfAny(List<OccurrenceConflictDto> conflicts) {
+    private void throwIfAny(List<OccurrenceConflictDto> conflicts) {
         if (!conflicts.isEmpty()) {
-            throw new ReallocationConflictException(conflicts);
+            throw new ReallocationConflictException(conflicts, roomNumbers(conflicts));
         }
+    }
+
+    private Map<Long, Integer> roomNumbers(List<OccurrenceConflictDto> conflicts) {
+        Set<Long> ids = conflicts.stream().map(OccurrenceConflictDto::classroomId).collect(Collectors.toSet());
+        return classroomService.findByIdsIncludingDeactivated(ids).stream()
+                .filter(c -> c.roomNumber() != null)
+                .collect(Collectors.toMap(ClassroomResponseDto::id, ClassroomResponseDto::roomNumber));
     }
 
     List<OccurrenceConflictDto> databaseConflicts(List<AllocationCandidate> candidates, List<OccupiedSlot> occupancy) {

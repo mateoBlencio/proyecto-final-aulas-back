@@ -138,7 +138,9 @@ public class RoomRequestController {
     @Operation(summary = "Asignar aula(s) a un pedido",
                description = "Asigna una o más aulas y deja el pedido en IN_EVALUATION. Admite "
                        + "resolución parcial (menos aulas que classroomCount, con motivo obligatorio) "
-                       + "y reasignación mientras el pedido no fue notificado.")
+                       + "y reasignación mientras el pedido no fue notificado. Si alguna aula se superpone con otra "
+                       + "asignación, el 409 (o el 400 si el solape entra en el margen y falta motivo) trae "
+                       + "'classroomIds' con todas las aulas en conflicto.")
     public ResponseEntity<RoomRequestItemResponseDto> assignItem(@PathVariable Long id,
                                                                   @Valid @RequestBody AssignRoomRequestItemDto dto,
                                                                   Principal principal) {
