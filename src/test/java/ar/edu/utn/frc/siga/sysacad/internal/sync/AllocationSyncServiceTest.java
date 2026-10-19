@@ -354,6 +354,37 @@ class AllocationSyncServiceTest {
     }
 
     @Test
+    @DisplayName("sync: una franja con una sola fila no genera aviso de solapamiento")
+    void syncDoesNotWarnOverlapForSingleRowSlot() {
+        SysacadAllocationDto rowA = row("101", 55, 1, 200, 5);
+        SysacadAllocationDto otherSlot = new SysacadAllocationDto("102", 66, 1, 2024, DayOfWeek.MONDAY,
+                LocalTime.of(10, 0), 90, 1, 200, 5);
+        when(catalogReader.findAllocations()).thenReturn(List.of(rowA, otherSlot));
+        when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 1, 2024)).thenReturn(link(9L, 1L, 30));
+        when(commissionService.findActiveByCourseCode("102")).thenReturn(commission(2L, "102", 2026));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(2L, 66, 1, 2024)).thenReturn(link(10L, 2L, 25));
+        when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
+        when(academicEventService.findSysacadRecurringEvents()).thenReturn(List.of(
+                eventRef(100L, 9L, 1L, TermType.PRIMER_CUATRIMESTRE, 2026),
+                new SysacadRecurringEventRefDto(200L, 10L, 2L, DayOfWeek.MONDAY, LocalTime.of(10, 0),
+                        TermType.PRIMER_CUATRIMESTRE.startDate(2026), TermType.PRIMER_CUATRIMESTRE.endDate(2026))));
+
+        Logger logger = (Logger) LoggerFactory.getLogger(AllocationSyncService.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            service.sync(catalogReader);
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        assertThat(appender.list).noneMatch(event -> event.getFormattedMessage().contains("Solapamiento"));
+        verify(allocationService).syncFromSysacad(anyList());
+    }
+
+    @Test
     @DisplayName("sync: si falla, registra el error y propaga la excepción, sin llamar a syncFromSysacad")
     void syncRecordsFailureAndRethrows() {
         when(catalogReader.findAllocations()).thenThrow(new IllegalStateException("SysAcad caído"));
