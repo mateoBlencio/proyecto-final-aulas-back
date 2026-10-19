@@ -307,7 +307,8 @@ public class ClassroomServiceImpl implements ClassroomService {
         Map<ClassroomKey, Classroom> existing = classroomRepository.findAll().stream()
                 .collect(Collectors.toMap(ClassroomServiceImpl::keyOf, Function.identity()));
         long currentRows = existing.values().stream()
-                .filter(classroom -> Boolean.TRUE.equals(classroom.getSysacadCurrent())).count();
+                .filter(classroom -> classroom.getSysacadHash() != null
+                        && Boolean.TRUE.equals(classroom.getSysacadCurrent())).count();
         Set<ClassroomKey> incoming = new HashSet<>();
         int affected = 0;
 
@@ -366,7 +367,8 @@ public class ClassroomServiceImpl implements ClassroomService {
     private int markAbsent(Iterable<Classroom> existing, Set<ClassroomKey> incoming, Instant syncedAt) {
         int affected = 0;
         for (Classroom classroom : existing) {
-            if (incoming.contains(keyOf(classroom)) || Boolean.FALSE.equals(classroom.getSysacadCurrent())) {
+            if (classroom.getSysacadHash() == null || incoming.contains(keyOf(classroom))
+                    || Boolean.FALSE.equals(classroom.getSysacadCurrent())) {
                 continue;
             }
             classroom.setSysacadCurrent(false);

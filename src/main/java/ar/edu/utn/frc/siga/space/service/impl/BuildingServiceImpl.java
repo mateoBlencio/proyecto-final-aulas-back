@@ -122,7 +122,8 @@ public class BuildingServiceImpl implements BuildingService {
                 .filter(building -> building.getBuildingCode() != null)
                 .collect(Collectors.toMap(Building::getBuildingCode, Function.identity()));
         long currentRows = existing.values().stream()
-                .filter(building -> Boolean.TRUE.equals(building.getSysacadEnabled())).count();
+                .filter(building -> building.getSysacadHash() != null
+                        && Boolean.TRUE.equals(building.getSysacadEnabled())).count();
         Set<Integer> incoming = new HashSet<>();
         int affected = 0;
 
@@ -169,7 +170,8 @@ public class BuildingServiceImpl implements BuildingService {
     private int markAbsent(Iterable<Building> existing, Set<Integer> incoming, Instant syncedAt) {
         int affected = 0;
         for (Building building : existing) {
-            if (incoming.contains(building.getBuildingCode()) || Boolean.FALSE.equals(building.getSysacadEnabled())) {
+            if (building.getSysacadHash() == null || incoming.contains(building.getBuildingCode())
+                    || Boolean.FALSE.equals(building.getSysacadEnabled())) {
                 continue;
             }
             building.setSysacadEnabled(false);

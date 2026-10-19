@@ -242,6 +242,20 @@ class BuildingServiceImplTest {
     }
 
     @Test
+    @DisplayName("syncBuildings: los edificios manuales (sin hash) no cuentan en el denominador del umbral")
+    void syncBuildingsThresholdIgnoresManualBuildings() {
+        Building synced = sysacadBuilding(1, "Uno", Hashes.sha256Hex("Uno"));
+        Building manual1 = SpaceTestData.building().id(20L).buildingCode(20).sysacadHash(null).build();
+        Building manual2 = SpaceTestData.building().id(21L).buildingCode(21).sysacadHash(null).build();
+        Building manual3 = SpaceTestData.building().id(22L).buildingCode(22).sysacadHash(null).build();
+        when(buildingRepository.findAll()).thenReturn(List.of(synced, manual1, manual2, manual3));
+
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(1, "Uno")), 100);
+
+        assertThat(affected).isZero();
+    }
+
+    @Test
     @DisplayName("syncBuildings: inserta el edificio que no existe con columnas de control")
     void syncBuildingsInsertsUnknownBuilding() {
         when(buildingRepository.findAll()).thenReturn(List.of());

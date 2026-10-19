@@ -151,7 +151,8 @@ public class CommissionServiceImpl implements CommissionService {
         Map<SubjectCommissionId, SubjectCommission> existingLinks =
                 Maps.byId(subjectCommissionRepository.findAll(), SubjectCommission::getId);
         long currentRows = existingCommissions.values().stream()
-                .filter(commission -> Boolean.TRUE.equals(commission.getSysacadEnabled())).count();
+                .filter(commission -> commission.getSysacadHash() != null
+                        && Boolean.TRUE.equals(commission.getSysacadEnabled())).count();
         Set<CommissionKey> incoming = new HashSet<>();
         int affected = 0;
 
@@ -271,7 +272,7 @@ public class CommissionServiceImpl implements CommissionService {
     private int markAbsent(Iterable<Commission> existing, Set<CommissionKey> incoming, Instant syncedAt) {
         int affected = 0;
         for (Commission commission : existing) {
-            if (incoming.contains(CommissionKey.of(commission))
+            if (commission.getSysacadHash() == null || incoming.contains(CommissionKey.of(commission))
                     || Boolean.FALSE.equals(commission.getSysacadEnabled())) {
                 continue;
             }

@@ -659,6 +659,21 @@ class ClassroomServiceImplTest {
     }
 
     @Test
+    @DisplayName("syncClassrooms: las aulas manuales (sin hash) no cuentan en el denominador del umbral")
+    void syncClassroomsThresholdIgnoresManualClassrooms() {
+        Classroom synced = syncClassroom(101, 70, true, Hashes.sha256Hex(70, true));
+        Classroom manual1 = syncClassroom(201, 30, true, null);
+        Classroom manual2 = syncClassroom(202, 30, true, null);
+        Classroom manual3 = syncClassroom(203, 30, true, null);
+        when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
+        when(classroomRepository.findAll()).thenReturn(List.of(synced, manual1, manual2, manual3));
+
+        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)), 100);
+
+        assertThat(affected).isZero();
+    }
+
+    @Test
     @DisplayName("syncClassrooms: por debajo del umbral de filas válidas aborta y no da de baja nada")
     void syncClassroomsAbortsBelowThreshold() {
         Classroom kept = syncClassroom(101, 70, true, Hashes.sha256Hex(70, true));
