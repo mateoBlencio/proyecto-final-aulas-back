@@ -34,7 +34,7 @@ public class SysacadCatalogMapper {
 
     private static final DateTimeFormatter HOLIDAY_DATE =
             DateTimeFormatter.ofPattern("uuuuMMdd").withResolverStyle(ResolverStyle.STRICT);
-    private static final String YES = "S";
+    private static final String NO = "N";
     private static final int MIN_ISO_DAY = DayOfWeek.MONDAY.getValue();
     private static final int MAX_ISO_DAY = DayOfWeek.SUNDAY.getValue();
 
@@ -46,7 +46,7 @@ public class SysacadCatalogMapper {
         return new SysacadClassroomDto(
                 raw.aula(),
                 raw.edificio(),
-                YES.equalsIgnoreCase(trim(raw.habilitada())),
+                !NO.equalsIgnoreCase(trim(raw.habilitada())),
                 raw.capacidad());
     }
 

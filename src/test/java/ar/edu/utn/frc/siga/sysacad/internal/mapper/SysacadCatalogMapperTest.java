@@ -51,7 +51,7 @@ class SysacadCatalogMapperTest {
     }
 
     @Test
-    @DisplayName("toClassroom: 'S' habilitada, cualquier otro valor no")
+    @DisplayName("toClassroom: solo 'N' es no habilitada")
     void traduceHabilitada() {
         assertThat(mapper.toClassroom(new RawClassroom(101, 2, "S", 40)))
                 .isEqualTo(new SysacadClassroomDto(101, 2, true, 40));
@@ -60,9 +60,12 @@ class SysacadCatalogMapperTest {
     }
 
     @Test
-    @DisplayName("toClassroom: habilitada nula se toma como no habilitada")
-    void habilitadaNulaEsFalse() {
-        assertThat(mapper.toClassroom(new RawClassroom(101, 2, null, 40)).isEnabled()).isFalse();
+    @DisplayName("toClassroom: habilitada nula, en blanco o con un valor raro se toma como habilitada")
+    void habilitadaDesconocidaEsTrue() {
+        assertThat(mapper.toClassroom(new RawClassroom(101, 2, null, 40)).isEnabled()).isTrue();
+        assertThat(mapper.toClassroom(new RawClassroom(101, 2, "  ", 40)).isEnabled()).isTrue();
+        assertThat(mapper.toClassroom(new RawClassroom(101, 2, "X", 40)).isEnabled()).isTrue();
+        assertThat(mapper.toClassroom(new RawClassroom(101, 2, " n ", 40)).isEnabled()).isFalse();
     }
 
     @Test
