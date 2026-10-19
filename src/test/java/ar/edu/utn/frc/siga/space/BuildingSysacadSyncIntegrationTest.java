@@ -59,7 +59,8 @@ class BuildingSysacadSyncIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("un edificio activo ausente upstream queda no vigente pero sigue activo (eliminado_en nulo)")
     void activeBuildingAbsentUpstreamStaysActive() {
         int code = 800_000 + (int) (System.nanoTime() % 100_000);
-        Long id = buildingRepository.save(Building.builder().name("Edificio-Ausente-" + code).buildingCode(code).build()).getId();
+        Long id = buildingRepository.save(Building.builder().name("Edificio-Ausente-" + code).buildingCode(code)
+                .sysacadHash("hash-previo").build()).getId();
 
         asFixtureUser(() -> buildingService.syncBuildings(List.of(new BuildingSyncCommand(code + 1, "Otro-" + code)), 0));
 
