@@ -420,7 +420,8 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     @Override
     @Transactional
     @AuditOperation("Baja de eventos ausentes en SysAcad")
-    public int markRecurringEventsAbsent(Collection<Long> presentEventIds, int minValidPercent) {
+    public int markRecurringEventsAbsent(Collection<Long> presentEventIds, Collection<Long> unresolvedCommissionIds,
+            int minValidPercent) {
         Instant now = Instant.now();
         int affected = 0;
         List<RecurringEvent> syncOwned = recurringEventRepository.findBySysacadHashIsNotNull();
@@ -428,7 +429,8 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 .filter(event -> !Boolean.FALSE.equals(event.getSysacadEnabled())).count();
         SyncGuard.requireEnoughValidRows("eventos", presentEventIds.size(), currentRows, minValidPercent);
         for (RecurringEvent event : syncOwned) {
-            if (presentEventIds.contains(event.getId()) || Boolean.FALSE.equals(event.getSysacadEnabled())) {
+            if (presentEventIds.contains(event.getId()) || Boolean.FALSE.equals(event.getSysacadEnabled())
+                    || unresolvedCommissionIds.contains(event.getCommissionId())) {
                 continue;
             }
             event.setSysacadEnabled(false);

@@ -18,6 +18,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -69,6 +71,6 @@ class SpecialtySyncServiceTest {
 
         assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(IllegalStateException.class);
 
-        verify(syncStateService).recordFailure(SysacadView.ESPECIALIDADES, "SysAcad caído");
+        verify(syncStateService).recordFailure(eq(SysacadView.ESPECIALIDADES), startsWith("INTERNAL_ERROR"));
     }
 }

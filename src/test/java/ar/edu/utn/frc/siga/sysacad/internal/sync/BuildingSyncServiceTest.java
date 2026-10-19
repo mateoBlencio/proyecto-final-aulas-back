@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -74,7 +75,7 @@ class BuildingSyncServiceTest {
 
         assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(IllegalStateException.class);
 
-        verify(syncStateService).recordFailure(SysacadView.EDIFICIOS, "SysAcad caído");
+        verify(syncStateService).recordFailure(eq(SysacadView.EDIFICIOS), startsWith("INTERNAL_ERROR"));
     }
 
     @Test

@@ -71,12 +71,15 @@ public interface AcademicEventService {
 
     /**
      * Marca {@code sysacadEnabled=false} en los eventos recurrentes "sync-owned" (con
-     * {@code sysacadHash} no nulo) que no aparecieron en la corrida actual del sync. No destructivo:
+     * {@code sysacadHash} no nulo) que no aparecieron en la corrida actual del sync. Los eventos de las
+     * comisiones en {@code unresolvedCommissionIds} (filas que Sysacad listó pero el sync no pudo resolver
+     * por causas locales) no se marcan: no se sabe si Sysacad los dejó de listar. No destructivo:
      * nunca borra el evento, sus ocurrencias ni sus asignaciones. Devuelve la cantidad marcada. Aborta sin
      * marcar nada si los eventos presentes no alcanzan {@code minValidPercent}% de los vigentes (0 desactiva
      * el umbral; cero presentes aborta siempre).
      */
-    int markRecurringEventsAbsent(Collection<Long> presentEventIds, int minValidPercent);
+    int markRecurringEventsAbsent(Collection<Long> presentEventIds, Collection<Long> unresolvedCommissionIds,
+            int minValidPercent);
 
     /**
      * Ubica (sin crear) el {@code RecurringEvent} ya creado por el sync EVENTOS, por su clave natural

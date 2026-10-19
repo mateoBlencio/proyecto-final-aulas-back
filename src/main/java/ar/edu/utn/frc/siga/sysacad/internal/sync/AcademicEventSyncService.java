@@ -19,6 +19,7 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadViewSyncer;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -55,11 +56,14 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
     private int doSync(SysacadCatalogReader catalog) {
         SysacadCommissionResolver resolver = new SysacadCommissionResolver(commissionService, subjectCommissionService);
         List<SyncRecurringEventCommand> commands = new ArrayList<>();
+        Set<Long> unresolvedCommissionIds = new HashSet<>();
 
         for (SysacadAcademicEventDto row : ViewSyncRunner.requireRows(catalog.findAcademicEvents(), SysacadView.EVENTOS)) {
             Optional<SysacadCommissionResolver.ResolvedLink> resolved =
                     resolver.resolve(row.courseCode(), row.subjectCode());
             if (resolved.isEmpty()) {
+                resolver.resolveCommission(row.courseCode())
+                        .ifPresent(commission -> unresolvedCommissionIds.add(commission.id()));
                 continue;
             }
             CommissionResponseDto commission = resolved.get().commission();
@@ -67,12 +71,17 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
             if (row.durationMinutes() == null) {
                 log.warn("DURACION nula para curso={} materia={}: fila de evento salteada",
                         row.courseCode(), row.subjectCode());
+                unresolvedCommissionIds.add(commission.id());
                 continue;
             }
 
             int year = commission.academicPeriod().year();
-            for (TermType termType : SysacadCommissionResolver.termTypes(
-                    row.semester(), row.courseCode(), row.subjectCode())) {
+            List<TermType> termTypes = SysacadCommissionResolver.termTypes(
+                    row.semester(), row.courseCode(), row.subjectCode());
+            if (termTypes.isEmpty()) {
+                unresolvedCommissionIds.add(commission.id());
+            }
+            for (TermType termType : termTypes) {
                 commands.add(new SyncRecurringEventCommand(
                         link.subjectId(),
                         commission.id(),
@@ -95,7 +104,8 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
                 .collect(Collectors.toSet());
         long created = results.stream().filter(UpsertRecurringEventResult::created).count();
         long updated = results.stream().filter(UpsertRecurringEventResult::updated).count();
-        int absent = academicEventService.markRecurringEventsAbsent(presentEventIds, properties.getSync().minValidRowsPercent());
+        int absent = academicEventService.markRecurringEventsAbsent(presentEventIds, unresolvedCommissionIds,
+                properties.getSync().minValidRowsPercent());
 
         AuditOperations.describe("Sincronización de eventos desde SysAcad: " + Plurals.count(created, "alta", "altas")
                 + ", " + Plurals.count(updated, "cambio", "cambios") + ", " + Plurals.count(absent, "baja", "bajas"));

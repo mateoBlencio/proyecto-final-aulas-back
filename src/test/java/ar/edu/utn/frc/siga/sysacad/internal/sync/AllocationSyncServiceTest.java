@@ -45,6 +45,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
+import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -320,7 +322,7 @@ class AllocationSyncServiceTest {
 
         assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(IllegalStateException.class);
 
-        verify(syncStateService).recordFailure(SysacadView.ASIGNACIONES, "SysAcad caído");
+        verify(syncStateService).recordFailure(eq(SysacadView.ASIGNACIONES), startsWith("INTERNAL_ERROR"));
         verify(allocationService, never()).syncFromSysacad(any());
     }
 }
