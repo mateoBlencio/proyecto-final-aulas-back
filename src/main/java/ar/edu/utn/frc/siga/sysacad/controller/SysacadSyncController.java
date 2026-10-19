@@ -40,7 +40,7 @@ public class SysacadSyncController {
                        + "207 si al menos una falló por datos, 503 si no se pudo establecer conexión con SysAcad "
                        + "(red/VPN caída). Si una vista falla, las que dependen de ella se saltean y quedan con "
                        + "lastError DEPENDENCY_FAILED. lastError es un código más un mensaje propio, sin el detalle "
-                       + "interno. Si ya hay un resync en curso, el disparo se ignora y devuelve 200 con "
+                       + "interno. Conviene dispararlo justo después de un deploy que migre aulas (V41). Si ya hay un resync en curso, el disparo se ignora y devuelve 200 con "
                        + "el estado previo.")
     public ResponseEntity<List<SysacadSyncStateDto>> resyncAll() {
         log.info("POST /v1/sysacad/sync: resync manual de todas las vistas");

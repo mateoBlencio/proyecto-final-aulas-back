@@ -1,6 +1,7 @@
 -- habilitada_sysacad mixed two things: Sysacad's S/N flag and "the classroom stopped being listed". Now
 -- habilitada_sysacad is only the S/N flag (only "N" removes the classroom from the candidates) and
 -- vigente_sysacad says the last sync listed it (absent does not remove the classroom).
+-- After deploying, trigger POST /sysacad/sync right away so the flags get their real values.
 ALTER TABLE aula ADD COLUMN vigente_sysacad boolean NOT NULL DEFAULT true;
 
 -- Synced rows with habilitada_sysacad = false were either "N" or absent and cannot be told apart. They are
