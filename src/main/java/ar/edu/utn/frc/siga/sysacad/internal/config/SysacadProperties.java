@@ -23,16 +23,7 @@ public class SysacadProperties {
 
     private int maxRetries = 3;
 
-    private Sync sync = new Sync(null, null, null, null, null, null, null, null);
+    private Sync sync = new Sync(null);
 
-    public record Sync(
-            String buildings,
-            String classrooms,
-            String specialties,
-            String subjects,
-            String commissions,
-            String events,
-            String allocations,
-            String holidays
-    ) {}
+    public record Sync(String cron) {}
 }

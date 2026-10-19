@@ -89,17 +89,6 @@ class SysacadSyncOrchestratorImplTest {
     }
 
     @Test
-    @DisplayName("sync(view) arma un snapshot nuevo por cada invocación")
-    void sync_buildsOneSnapshotPerInvocation() {
-        orchestrator.sync(SysacadView.EDIFICIOS);
-        orchestrator.sync(SysacadView.AULAS);
-
-        verify(snapshotFactory, times(2)).newSnapshot();
-        verify(buildings).sync(snapshot);
-        verify(classrooms).sync(snapshot);
-    }
-
-    @Test
     @DisplayName("Una vista que falla no frena el resync de las siguientes")
     void resyncAll_continuesAfterFailedView() {
         doThrow(new IllegalStateException("SysAcad no responde")).when(buildings).sync(any());
@@ -180,5 +169,14 @@ class SysacadSyncOrchestratorImplTest {
         verify(specialties, times(1)).sync(any());
         verify(subjects, times(1)).sync(any());
         verify(commissions, times(1)).sync(any());
+    }
+
+    @Test
+    @DisplayName("Terminado un resync, un disparo posterior vuelve a correr")
+    void resyncAll_releasesGuardWhenFinished() {
+        orchestrator.resyncAll();
+        orchestrator.resyncAll();
+
+        verify(buildings, times(2)).sync(any());
     }
 }

@@ -29,11 +29,6 @@ public class SysacadSyncOrchestratorImpl implements SysacadSyncOrchestrator {
         this.snapshotFactory = snapshotFactory;
     }
 
-    @Override
-    public void sync(SysacadView view) {
-        sync(view, snapshotFactory.newSnapshot());
-    }
-
     private void sync(SysacadView view, SysacadCatalogReader snapshot) {
         SysacadViewSyncer syncer = syncersByView.get(view);
         if (syncer == null) {
