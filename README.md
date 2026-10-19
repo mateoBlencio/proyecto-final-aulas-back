@@ -62,7 +62,8 @@ SPRING_PROFILES_ACTIVE=dev-local ./mvnw spring-boot:run
 - Context-path `/api`, endpoints bajo `/v1` (p. ej. `GET /api/v1/buildings`).
 - Swagger UI habilitado solo en dev/dev-local/test: `/api/swagger-ui.html`.
 - Autenticación JWT: `POST /auth/login`, `/auth/refresh`, `/auth/logout`.
-- Colección [Bruno](https://www.usebruno.com/) en [bruno/](bruno/) (entorno `local`).
+- Colección [Bruno](https://www.usebruno.com/) en [bruno/](bruno/) (entorno `local`). Los entornos `develop` y `test`
+  leen la URL de `bruno/.env` (`DEV_BASE_URL`, `TEST_BASE_URL`; ver `bruno/.env.example`).
   Al agregar o cambiar un endpoint, actualizar la colección.
 
 ## Testing
