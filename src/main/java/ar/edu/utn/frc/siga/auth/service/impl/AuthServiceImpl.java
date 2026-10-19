@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.auth.dto.request.LoginRequest;
 import ar.edu.utn.frc.siga.auth.dto.request.RefreshTokenRequest;
 import ar.edu.utn.frc.siga.auth.dto.response.TokenResponse;
 import ar.edu.utn.frc.siga.auth.exception.InvalidCredentialsException;
+import ar.edu.utn.frc.siga.auth.exception.InvalidRefreshTokenException;
 import ar.edu.utn.frc.siga.auth.exception.LoginRateLimitExceededException;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
@@ -76,8 +77,9 @@ public class AuthServiceImpl implements AuthService {
         return buildTokenResponse(user, refreshTokenService.issue(user));
     }
 
+    // noRollbackFor: this transaction wraps RefreshTokenService.refresh, so it must not roll back either
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = InvalidRefreshTokenException.class)
     public TokenResponse refresh(RefreshTokenRequest request) {
         RefreshResult result = refreshTokenService.refresh(request.refreshToken());
         log.info("Refresh exitoso: email={}", result.user().getEmail());

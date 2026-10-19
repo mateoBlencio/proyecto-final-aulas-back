@@ -54,8 +54,9 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         return new IssuedRefreshToken(rawToken, expirationSeconds);
     }
 
+    // noRollbackFor: the cascade revocation must persist even though the exception follows it
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = InvalidRefreshTokenException.class)
     public RefreshResult refresh(String rawToken) {
         String tokenHash = hash(rawToken);
         RefreshToken token = refreshTokenRepository.findByTokenHash(tokenHash)
