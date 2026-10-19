@@ -1,5 +1,9 @@
 package ar.edu.utn.frc.siga.sysacad.internal.mapper;
 
+import org.slf4j.LoggerFactory;
+import ch.qos.logback.core.read.ListAppender;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.classic.Logger;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadAcademicEventDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadAllocationDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadBuildingDto;
@@ -48,6 +52,32 @@ class SysacadCatalogMapperTest {
 
         assertThat(building.name()).doesNotContain("\r").doesNotContain("\n").doesNotContain("\t")
                 .isEqualTo("Edif.  Central");
+    }
+
+    @Test
+    @DisplayName("toBuilding: también reemplaza NEL, U+2028 y U+2029")
+    void quitaSeparadoresUnicodeDeLinea() {
+        SysacadBuildingDto building = mapper.toBuilding(new RawBuilding(2, "A\u0085B\u2028C\u2029D"));
+
+        assertThat(building.name()).isEqualTo("A B C D");
+    }
+
+    @Test
+    @DisplayName("toHoliday: la fecha inválida con CR/LF se loguea saneada, sin forjar líneas de log")
+    void feriadoConSaltosDeLineaSeLoguaSaneado() {
+        Logger logger = (Logger) LoggerFactory.getLogger(SysacadCatalogMapper.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            assertThat(mapper.toHoliday(new RawHoliday("2026\r\n1208\r\nFORGED", "x"))).isNull();
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        assertThat(appender.list).hasSize(1);
+        assertThat(appender.list.getFirst().getFormattedMessage()).doesNotContain("\r").doesNotContain("\n")
+                .contains("2026  1208  FORGED");
     }
 
     @Test
