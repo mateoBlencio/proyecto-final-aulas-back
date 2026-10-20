@@ -179,7 +179,7 @@ siga:
         default-value: "true"
   optimizer:
     parallel-solver-count: AUTO
-    environment-mode: PHASE_ASSERT
+    environment-mode: NO_ASSERT
   jwt:
     secret: ${JWT_SECRET}
     access-expiration-minutes: ${JWT_ACCESS_EXPIRATION_MINUTES:20}

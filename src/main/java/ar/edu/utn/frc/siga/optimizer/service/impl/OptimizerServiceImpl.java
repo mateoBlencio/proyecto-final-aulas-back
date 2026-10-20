@@ -138,7 +138,7 @@ public class OptimizerServiceImpl implements OptimizerService {
         } catch (ExecutionException e) {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
             log.error("Job del solver {} falló", jobId, cause);
-            throw new SchedulingException("Error during optimization: " + cause.getMessage(), cause);
+            throw new SchedulingException("Error durante la optimización.", cause);
         }
     }
 
