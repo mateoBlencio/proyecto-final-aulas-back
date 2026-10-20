@@ -78,10 +78,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         buildingScopeResolver.requireAccess(Permission.CLASSROOM_CREATE, building.getId());
         ClassroomType classroomType = classroomTypeService.findById(dto.classroomTypeId());
 
-        if (classroomRepository.findByRoomNumberAndDeletedAtIsNull(dto.roomNumber()).isPresent()) {
-            log.warn("Creación de aula rechazada: roomNumber '{}' ya existe", dto.roomNumber());
-            throw new SpaceDomainException("Ya existe un aula con el número " + dto.roomNumber() + ".");
-        }
+        requireRoomNumberFree(dto.roomNumber(), building, null);
 
         validateCapacity(dto);
 
@@ -187,6 +184,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         }
         ClassroomType classroomType = classroomTypeService.findById(dto.classroomTypeId());
 
+        requireRoomNumberFree(dto.roomNumber(), building, entity.getId());
         validateCapacity(dto);
 
         classroomMapper.updateEntity(entity, dto);
@@ -231,7 +229,19 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Transactional
     public void activate(Long id) {
         Classroom classroom = scopedClassroom.requireAnyInScope(id, Permission.CLASSROOM_ACTIVATE);
+        requireRoomNumberFree(classroom.getRoomNumber(), classroom.getBuilding(), classroom.getId());
         classroomRepository.restore(classroom);
+    }
+
+    /** Rejects the operation if another active classroom already uses (building, roomNumber). */
+    private void requireRoomNumberFree(Integer roomNumber, Building building, Long excludeId) {
+        boolean taken = classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(roomNumber, building)
+                .filter(other -> !other.getId().equals(excludeId))
+                .isPresent();
+        if (taken) {
+            log.warn("Operación sobre aula rechazada: roomNumber '{}' ya existe en el edificio {}", roomNumber, building.getId());
+            throw new SpaceDomainException("Ya existe un aula con el número " + roomNumber + " en el edificio.");
+        }
     }
 
     @Override
@@ -303,8 +313,9 @@ public class ClassroomServiceImpl implements ClassroomService {
         Map<Integer, Building> buildingsByCode = buildingRepository.findAll().stream()
                 .filter(building -> building.getBuildingCode() != null)
                 .collect(Collectors.toMap(Building::getBuildingCode, Function.identity()));
-        Map<ClassroomKey, Classroom> existing = classroomRepository.findAll().stream()
-                .collect(Collectors.toMap(ClassroomServiceImpl::keyOf, Function.identity()));
+        // Agrupa por clave: V43 permite una fila borrada y una activa con el mismo (edificio, numero)
+        Map<ClassroomKey, List<Classroom>> existing = classroomRepository.findAll().stream()
+                .collect(Collectors.groupingBy(ClassroomServiceImpl::keyOf));
         Set<ClassroomKey> incoming = new HashSet<>();
         int affected = 0;
 
@@ -323,9 +334,9 @@ public class ClassroomServiceImpl implements ClassroomService {
             ClassroomKey key = new ClassroomKey(building.getId(), command.roomNumber());
             incoming.add(key);
             String hash = Hashes.sha256Hex(command.capacity(), command.enabled());
-            Classroom classroom = existing.get(key);
+            List<Classroom> rows = existing.get(key);
 
-            if (classroom == null) {
+            if (rows == null) {
                 if (defaultType == null) {
                     defaultType = resolveDefaultClassroomType();
                 }
@@ -338,19 +349,21 @@ public class ClassroomServiceImpl implements ClassroomService {
                         .syncedAt(syncedAt)
                         .sysacadHash(hash)
                         .build());
-                existing.put(key, saved);
+                existing.put(key, List.of(saved));
                 affected++;
                 continue;
             }
-            if (isUpToDate(classroom, hash)) {
-                continue;
+            for (Classroom classroom : rows) {
+                if (isUpToDate(classroom, hash)) {
+                    continue;
+                }
+                applySysacadFields(classroom, command, hash, syncedAt);
+                classroomRepository.save(classroom);
+                affected++;
             }
-            applySysacadFields(classroom, command, hash, syncedAt);
-            classroomRepository.save(classroom);
-            affected++;
         }
 
-        return affected + markAbsent(existing.values(), incoming, syncedAt);
+        return affected + markAbsent(existing.values().stream().flatMap(List::stream).toList(), incoming, syncedAt);
     }
 
     private int markAbsent(Iterable<Classroom> existing, Set<ClassroomKey> incoming, Instant syncedAt) {

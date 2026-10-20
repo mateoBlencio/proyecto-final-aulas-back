@@ -10,8 +10,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ClassroomRepository extends SoftDeletableRepository<Classroom, Long> {
 
-    Optional<Classroom> findByRoomNumberAndDeletedAtIsNull(Integer roomNumber);
-
     List<Classroom> findAllByRoomNumberAndDeletedAtIsNull(Integer roomNumber);
 
     Optional<Classroom> findByRoomNumberAndBuildingAndDeletedAtIsNull(Integer roomNumber, Building building);
