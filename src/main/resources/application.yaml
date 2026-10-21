@@ -202,16 +202,10 @@ siga:
     connect-timeout: 5s
     read-timeout: 120s
     max-retries: 3
+    max-response-size: 32MB
     sync:
-
-      buildings: "0 0 3 * * SUN"
-      classrooms: "0 0 3 * * SUN"
-      specialties: "0 0 3 * * SUN"
-      events: "0 0 3 * * SUN"
-      allocations: "0 0 3 * * SUN"
-      subjects: "0 0 3 * * SUN"
-      commissions: "0 0 3 * * SUN"
-      holidays: "0 0 3 * * SUN"
+      cron: "0 0 3 * * SUN"
+      min-valid-rows-percent: 50
   notifications:
     max-attempts: 5
     retry-interval: PT1M

@@ -15,6 +15,8 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadAcademicEventDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
+import ar.edu.utn.frc.siga.common.exception.SyncAbortedException;
 
 import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadEmptyViewException;
 
@@ -43,6 +45,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -68,7 +71,8 @@ class AcademicEventSyncServiceTest {
     @BeforeEach
     void setUp() {
         service = new AcademicEventSyncService(
-                commissionService, subjectCommissionService, academicEventService, syncStateService);
+                commissionService, subjectCommissionService, academicEventService, syncStateService,
+                new SysacadProperties());
     }
 
     @Test
@@ -94,12 +98,12 @@ class AcademicEventSyncServiceTest {
     @DisplayName("sync: arma los commands y llama a syncRecurringEvents una sola vez, sin importar cuántas filas")
     void syncCallsBulkOnce() {
         SysacadAcademicEventDto monday = new SysacadAcademicEventDto(
-                "101", 55, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
+                "101", 55, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
         SysacadAcademicEventDto thursday = new SysacadAcademicEventDto(
-                "101", 55, DayOfWeek.THURSDAY, LocalTime.of(8, 0), 90, 1);
+                "101", 55, 1, 2024, DayOfWeek.THURSDAY, LocalTime.of(8, 0), 90, 1);
         when(catalogReader.findAcademicEvents()).thenReturn(List.of(monday, thursday));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
-        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 1, 2024)).thenReturn(link(9L, 1L, 30));
         when(academicEventService.syncRecurringEvents(anyList()))
                 .thenReturn(List.of(created(100L), created(101L)));
 
@@ -108,17 +112,17 @@ class AcademicEventSyncServiceTest {
         verify(academicEventService, times(1)).syncRecurringEvents(commandsCaptor.capture());
         assertThat(commandsCaptor.getValue()).hasSize(2);
         verify(commissionService, times(1)).findActiveByCourseCode("101");
-        verify(subjectCommissionService, times(1)).findByCommissionAndSubjectCode(1L, 55);
+        verify(subjectCommissionService, times(1)).findByCommissionAndSubjectCode(1L, 55, 1, 2024);
     }
 
     @Test
     @DisplayName("sync: HorarioCuatrimestre=1 → un solo command, con las fechas del 1er cuatrimestre")
     void syncMapsFirstSemesterToSingleCommand() {
         SysacadAcademicEventDto row = new SysacadAcademicEventDto(
-                "101", 55, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
+                "101", 55, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
         when(catalogReader.findAcademicEvents()).thenReturn(List.of(row));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
-        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 1, 2024)).thenReturn(link(9L, 1L, 30));
         when(academicEventService.syncRecurringEvents(anyList())).thenReturn(List.of(created(100L)));
 
         service.sync(catalogReader);
@@ -135,7 +139,7 @@ class AcademicEventSyncServiceTest {
         assertThat(cmd.startDate()).isEqualTo(TermType.PRIMER_CUATRIMESTRE.startDate(2026));
         assertThat(cmd.endDate()).isEqualTo(TermType.PRIMER_CUATRIMESTRE.endDate(2026));
 
-        verify(academicEventService).markRecurringEventsAbsent(Set.of(100L));
+        verify(academicEventService).markRecurringEventsAbsent(Set.of(100L), Set.of(), 50);
         verify(syncStateService).recordSuccess(SysacadView.EVENTOS, 1);
     }
 
@@ -143,10 +147,10 @@ class AcademicEventSyncServiceTest {
     @DisplayName("sync: HorarioCuatrimestre=2 → un solo command, con las fechas del 2do cuatrimestre")
     void syncMapsSecondSemesterToSingleCommand() {
         SysacadAcademicEventDto row = new SysacadAcademicEventDto(
-                "101", 55, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 2);
+                "101", 55, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 2);
         when(catalogReader.findAcademicEvents()).thenReturn(List.of(row));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
-        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 1, 2024)).thenReturn(link(9L, 1L, 30));
         when(academicEventService.syncRecurringEvents(anyList())).thenReturn(List.of(created(101L)));
 
         service.sync(catalogReader);
@@ -161,10 +165,10 @@ class AcademicEventSyncServiceTest {
     @DisplayName("sync: HorarioCuatrimestre=0 (\"ambos cuatrimestres\") → emite DOS commands, uno por cuatrimestre")
     void syncMapsBothSemestersToTwoCommands() {
         SysacadAcademicEventDto row = new SysacadAcademicEventDto(
-                "101", 55, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 0);
+                "101", 55, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 0);
         when(catalogReader.findAcademicEvents()).thenReturn(List.of(row));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
-        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 1, 2024)).thenReturn(link(9L, 1L, 30));
         when(academicEventService.syncRecurringEvents(anyList()))
                 .thenReturn(List.of(created(100L), created(101L)));
 
@@ -174,7 +178,7 @@ class AcademicEventSyncServiceTest {
         assertThat(commandsCaptor.getValue()).extracting(SyncRecurringEventCommand::startDate)
                 .containsExactlyInAnyOrder(
                         TermType.PRIMER_CUATRIMESTRE.startDate(2026), TermType.SEGUNDO_CUATRIMESTRE.startDate(2026));
-        verify(academicEventService).markRecurringEventsAbsent(Set.of(100L, 101L));
+        verify(academicEventService).markRecurringEventsAbsent(Set.of(100L, 101L), Set.of(), 50);
         verify(syncStateService).recordSuccess(SysacadView.EVENTOS, 2);
     }
 
@@ -182,51 +186,128 @@ class AcademicEventSyncServiceTest {
     @DisplayName("sync: no se resuelve una comisión vigente para el curso → saltea la fila con WARN, command no emitido")
     void syncSkipsRowWhenCommissionUnresolved() {
         SysacadAcademicEventDto row = new SysacadAcademicEventDto(
-                "999", 55, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
+                "999", 55, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
         when(catalogReader.findAcademicEvents()).thenReturn(List.of(row));
         when(commissionService.findActiveByCourseCode("999"))
                 .thenThrow(ResourceNotFoundException.of("Commission", "999"));
 
-        service.sync(catalogReader);
+        assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(SyncAbortedException.class);
 
-        verify(academicEventService).syncRecurringEvents(commandsCaptor.capture());
-        assertThat(commandsCaptor.getValue()).isEmpty();
-        verify(subjectCommissionService, never()).findByCommissionAndSubjectCode(any(), any());
-        verify(academicEventService).markRecurringEventsAbsent(Set.of());
-        verify(syncStateService).recordSuccess(SysacadView.EVENTOS, 0);
+        verify(subjectCommissionService, never()).findByCommissionAndSubjectCode(any(), any(), any(), any());
+        verify(academicEventService, never()).syncRecurringEvents(anyList());
+        verify(academicEventService, never()).markRecurringEventsAbsent(anyCollection(), anyCollection(), anyInt());
+        verify(syncStateService).recordFailure(eq(SysacadView.EVENTOS), anyString());
+        verify(syncStateService, never()).recordSuccess(any(), anyInt());
     }
 
     @Test
     @DisplayName("sync: no se resuelve el link materia-comisión → saltea la fila con WARN, command no emitido")
     void syncSkipsRowWhenLinkUnresolved() {
         SysacadAcademicEventDto row = new SysacadAcademicEventDto(
-                "101", 77, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
+                "101", 77, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
         when(catalogReader.findAcademicEvents()).thenReturn(List.of(row));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
-        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 77))
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 77, 1, 2024))
                 .thenThrow(ResourceNotFoundException.of("SubjectCommission", "1-77"));
 
-        service.sync(catalogReader);
+        assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(SyncAbortedException.class);
 
-        verify(academicEventService).syncRecurringEvents(commandsCaptor.capture());
-        assertThat(commandsCaptor.getValue()).isEmpty();
-        verify(academicEventService).markRecurringEventsAbsent(Set.of());
+        verify(academicEventService, never()).syncRecurringEvents(anyList());
+        verify(academicEventService, never()).markRecurringEventsAbsent(anyCollection(), anyCollection(), anyInt());
     }
 
     @Test
     @DisplayName("sync: DURACION nula → saltea la fila con WARN, command no emitido")
     void syncSkipsRowWhenDurationMissing() {
         SysacadAcademicEventDto row = new SysacadAcademicEventDto(
-                "101", 55, DayOfWeek.MONDAY, LocalTime.of(8, 0), null, 1);
+                "101", 55, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(8, 0), null, 1);
         when(catalogReader.findAcademicEvents()).thenReturn(List.of(row));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
-        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 1, 2024)).thenReturn(link(9L, 1L, 30));
+
+        assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(SyncAbortedException.class);
+
+        verify(academicEventService, never()).syncRecurringEvents(anyList());
+        verify(academicEventService, never()).markRecurringEventsAbsent(anyCollection(), anyCollection(), anyInt());
+    }
+
+    @Test
+    @DisplayName("sync: pasa la especialidad y el plan de la fila al resolver el link materia-comisión")
+    void syncResolvesLinkWithSpecialtyAndStudyPlanOfTheRow() {
+        SysacadAcademicEventDto row = new SysacadAcademicEventDto(
+                "101", 55, 7, 2023, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
+        when(catalogReader.findAcademicEvents()).thenReturn(List.of(row));
+        when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 7, 2023)).thenReturn(link(9L, 1L, 30));
+        when(academicEventService.syncRecurringEvents(anyList())).thenReturn(List.of(created(100L)));
 
         service.sync(catalogReader);
 
         verify(academicEventService).syncRecurringEvents(commandsCaptor.capture());
-        assertThat(commandsCaptor.getValue()).isEmpty();
-        verify(academicEventService).markRecurringEventsAbsent(Set.of());
+        assertThat(commandsCaptor.getValue()).extracting(SyncRecurringEventCommand::subjectId).containsExactly(9L);
+    }
+
+    @Test
+    @DisplayName("sync: una fila con comisión resuelta pero sin link protege esa comisión de la baja por ausencia")
+    void syncProtectsCommissionOfSkippedRowFromAbsentMarking() {
+        SysacadAcademicEventDto unlinked = new SysacadAcademicEventDto(
+                "101", 77, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
+        SysacadAcademicEventDto healthy = new SysacadAcademicEventDto(
+                "202", 55, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(10, 0), 90, 1);
+        when(catalogReader.findAcademicEvents()).thenReturn(List.of(unlinked, healthy));
+        when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
+        when(commissionService.findActiveByCourseCode("202")).thenReturn(commission(2L, "202", 2026));
+        when(commissionService.findActiveIdsByCourseCode("101")).thenReturn(List.of(1L));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 77, 1, 2024))
+                .thenThrow(ResourceNotFoundException.of("SubjectCommission", "1-77"));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(2L, 55, 1, 2024)).thenReturn(link(9L, 2L, 30));
+        when(academicEventService.syncRecurringEvents(anyList())).thenReturn(List.of(created(100L)));
+
+        service.sync(catalogReader);
+
+        verify(academicEventService).markRecurringEventsAbsent(Set.of(100L), Set.of(1L), 50);
+    }
+
+    @Test
+    @DisplayName("sync: curso ambiguo (dos comisiones vigentes) protege los eventos de todas ellas de la baja por ausencia")
+    void syncProtectsAllActiveCommissionsOfAmbiguousCourse() {
+        SysacadAcademicEventDto ambiguous = new SysacadAcademicEventDto(
+                "101", 55, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
+        SysacadAcademicEventDto healthy = new SysacadAcademicEventDto(
+                "202", 55, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(10, 0), 90, 1);
+        when(catalogReader.findAcademicEvents()).thenReturn(List.of(ambiguous, healthy));
+        when(commissionService.findActiveByCourseCode("101"))
+                .thenThrow(ResourceNotFoundException.of("Commission", "101"));
+        when(commissionService.findActiveIdsByCourseCode("101")).thenReturn(List.of(7L, 8L));
+        when(commissionService.findActiveByCourseCode("202")).thenReturn(commission(2L, "202", 2026));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(2L, 55, 1, 2024)).thenReturn(link(9L, 2L, 30));
+        when(academicEventService.syncRecurringEvents(anyList())).thenReturn(List.of(created(100L)));
+
+        service.sync(catalogReader);
+
+        verify(academicEventService).markRecurringEventsAbsent(Set.of(100L), Set.of(7L, 8L), 50);
+    }
+
+    @Test
+    @DisplayName("sync: DURACION nula o cuatrimestre inválido también protegen la comisión; una resuelta sana no")
+    void syncProtectsCommissionOfRowsWithoutDurationOrTerm() {
+        SysacadAcademicEventDto noDuration = new SysacadAcademicEventDto(
+                "101", 55, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(8, 0), null, 1);
+        SysacadAcademicEventDto badTerm = new SysacadAcademicEventDto(
+                "303", 55, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 9);
+        SysacadAcademicEventDto healthy = new SysacadAcademicEventDto(
+                "202", 55, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(10, 0), 90, 1);
+        when(catalogReader.findAcademicEvents()).thenReturn(List.of(noDuration, badTerm, healthy));
+        when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
+        when(commissionService.findActiveByCourseCode("303")).thenReturn(commission(3L, "303", 2026));
+        when(commissionService.findActiveByCourseCode("202")).thenReturn(commission(2L, "202", 2026));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(any(), eq(55), any(), any()))
+                .thenAnswer(invocation -> link(9L, invocation.getArgument(0), 30));
+        when(academicEventService.syncRecurringEvents(anyList())).thenReturn(List.of(created(100L)));
+
+        service.sync(catalogReader);
+
+        verify(academicEventService).markRecurringEventsAbsent(Set.of(100L), Set.of(1L, 3L), 50);
     }
 
     @Test
@@ -236,23 +317,23 @@ class AcademicEventSyncServiceTest {
 
         assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(IllegalStateException.class);
 
-        verify(syncStateService).recordFailure(SysacadView.EVENTOS, "SysAcad caído");
-        verify(academicEventService, never()).markRecurringEventsAbsent(anyCollection());
+        verify(syncStateService).recordFailure(eq(SysacadView.EVENTOS), startsWith("INTERNAL_ERROR"));
+        verify(academicEventService, never()).markRecurringEventsAbsent(anyCollection(), anyCollection(), anyInt());
     }
 
     // ---------- audit description ----------
 
     private String syncAndReadDescription(List<UpsertRecurringEventResult> results, int absent) {
         SysacadAcademicEventDto row = new SysacadAcademicEventDto(
-                "101", 55, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
+                "101", 55, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
         when(catalogReader.findAcademicEvents()).thenReturn(List.of(row));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
-        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 1, 2024)).thenReturn(link(9L, 1L, 30));
         when(academicEventService.syncRecurringEvents(anyList())).thenAnswer(inv -> {
             AuditDescriptionProbe.stamp();
             return results;
         });
-        when(academicEventService.markRecurringEventsAbsent(anySet())).thenReturn(absent);
+        when(academicEventService.markRecurringEventsAbsent(anySet(), anySet(), eq(50))).thenReturn(absent);
         AuditDescriptionProbe probe = new AuditDescriptionProbe();
 
         probe.audited(service).sync(catalogReader);
@@ -294,19 +375,19 @@ class AcademicEventSyncServiceTest {
     }
 
     @Test
-    @DisplayName("sync: el valor de retorno sigue siendo presentes más bajas, no cambia por la descripción")
+    @DisplayName("sync: filas afectadas = altas + cambios + bajas; los eventos sin cambios no cuentan")
     void syncReturnValueUnchangedByDescription() {
         SysacadAcademicEventDto row = new SysacadAcademicEventDto(
-                "101", 55, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
+                "101", 55, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
         when(catalogReader.findAcademicEvents()).thenReturn(List.of(row));
         when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
-        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55)).thenReturn(link(9L, 1L, 30));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 1, 2024)).thenReturn(link(9L, 1L, 30));
         when(academicEventService.syncRecurringEvents(anyList())).thenReturn(List.of(created(1L), unchanged(2L)));
-        when(academicEventService.markRecurringEventsAbsent(anySet())).thenReturn(3);
+        when(academicEventService.markRecurringEventsAbsent(anySet(), anySet(), eq(50))).thenReturn(3);
 
         service.sync(catalogReader);
 
-        verify(syncStateService).recordSuccess(SysacadView.EVENTOS, 5);
+        verify(syncStateService).recordSuccess(SysacadView.EVENTOS, 4);
     }
 
     @Test
@@ -317,7 +398,7 @@ class AcademicEventSyncServiceTest {
         assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(SysacadEmptyViewException.class);
 
         verify(academicEventService, never()).syncRecurringEvents(anyList());
-        verify(academicEventService, never()).markRecurringEventsAbsent(anySet());
+        verify(academicEventService, never()).markRecurringEventsAbsent(anySet(), anySet(), eq(50));
         verify(syncStateService).recordFailure(eq(SysacadView.EVENTOS), anyString());
         verify(syncStateService, never()).recordSuccess(any(), anyInt());
     }

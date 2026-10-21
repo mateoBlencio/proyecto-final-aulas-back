@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.common.security.BuildingScopedSpecifications;
 import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
+import ar.edu.utn.frc.siga.common.util.SyncGuard;
 import ar.edu.utn.frc.siga.space.dto.BuildingFilter;
 import ar.edu.utn.frc.siga.space.dto.request.BuildingActiveBatchItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
@@ -115,20 +116,31 @@ public class BuildingServiceImpl implements BuildingService {
 
     @Override
     @Transactional
-    public int syncBuildings(List<BuildingSyncCommand> commands) {
+    public int syncBuildings(List<BuildingSyncCommand> commands, int minValidPercent) {
         Instant syncedAt = Instant.now();
         Map<Integer, Building> existing = buildingRepository.findAll().stream()
                 .filter(building -> building.getBuildingCode() != null)
                 .collect(Collectors.toMap(Building::getBuildingCode, Function.identity()));
+        long currentRows = existing.values().stream()
+                .filter(building -> building.getSysacadHash() != null
+                        && Boolean.TRUE.equals(building.getSysacadEnabled())).count();
         Set<Integer> incoming = new HashSet<>();
+        Set<Integer> listed = new HashSet<>();
         int affected = 0;
 
         for (BuildingSyncCommand command : commands) {
+            if (command.buildingCode() != null) {
+                listed.add(command.buildingCode());
+            }
             if (command.buildingCode() == null || command.name() == null || command.name().isBlank()) {
                 log.warn("Edificio de SysAcad ignorado por clave o nombre vacíos: codigo={}", command.buildingCode());
                 continue;
             }
-            incoming.add(command.buildingCode());
+            if (!incoming.add(command.buildingCode())) {
+                log.warn("Edificio de SysAcad repetido en la vista: se conserva la primera fila, codigo={}",
+                        command.buildingCode());
+                continue;
+            }
             String hash = Hashes.sha256Hex(command.name());
             Building building = existing.get(command.buildingCode());
 
@@ -155,13 +167,16 @@ public class BuildingServiceImpl implements BuildingService {
             affected++;
         }
 
-        return affected + markAbsent(existing.values(), incoming, syncedAt);
+        SyncGuard.requireEnoughValidRows("edificios", incoming.size(), currentRows, minValidPercent);
+        // A row Sysacad listed but with an invalid name is not absent: only codes missing from the view are.
+        return affected + markAbsent(existing.values(), listed, syncedAt);
     }
 
     private int markAbsent(Iterable<Building> existing, Set<Integer> incoming, Instant syncedAt) {
         int affected = 0;
         for (Building building : existing) {
-            if (incoming.contains(building.getBuildingCode()) || Boolean.FALSE.equals(building.getSysacadEnabled())) {
+            if (building.getSysacadHash() == null || incoming.contains(building.getBuildingCode())
+                    || Boolean.FALSE.equals(building.getSysacadEnabled())) {
                 continue;
             }
             building.setSysacadEnabled(false);

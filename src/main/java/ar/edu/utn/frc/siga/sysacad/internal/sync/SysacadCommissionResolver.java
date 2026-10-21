@@ -12,11 +12,6 @@ import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 
-/**
- * Resuelve la comisión vigente y su link materia-comisión para las filas de SysAcad, con caché por
- * corrida de sync (una instancia por {@code sync()}). Concentra la resolución que EVENTOS y ASIGNACIONES
- * hacían de forma idéntica, junto con las dos cachés que antes cada syncer declaraba a mano.
- */
 @Slf4j
 final class SysacadCommissionResolver {
 
@@ -31,16 +26,14 @@ final class SysacadCommissionResolver {
         this.subjectCommissionService = subjectCommissionService;
     }
 
-    /**
-     * Devuelve vacío (y ya logueó el WARN correspondiente) si falta la comisión vigente o el link, así el
-     * syncer solo hace {@code if (resolved.isEmpty()) continue;}.
-     */
-    Optional<ResolvedLink> resolve(String courseCode, Integer subjectCode) {
+    Optional<ResolvedLink> resolve(String courseCode, Integer subjectCode, Integer specialtyCode,
+            Integer studyPlanCode) {
         Optional<CommissionResponseDto> commission = resolveCommission(courseCode);
         if (commission.isEmpty()) {
             return Optional.empty();
         }
-        Optional<SubjectCommissionResponseDto> link = resolveLink(commission.get().id(), subjectCode);
+        Optional<SubjectCommissionResponseDto> link = resolveLink(
+                new LinkKey(commission.get().id(), subjectCode, specialtyCode, studyPlanCode));
         return link.map(l -> new ResolvedLink(commission.get(), l));
     }
 
@@ -55,14 +48,15 @@ final class SysacadCommissionResolver {
         });
     }
 
-    private Optional<SubjectCommissionResponseDto> resolveLink(Long commissionId, Integer subjectCode) {
-        return linkCache.computeIfAbsent(new LinkKey(commissionId, subjectCode), key -> {
+    private Optional<SubjectCommissionResponseDto> resolveLink(LinkKey linkKey) {
+        return linkCache.computeIfAbsent(linkKey, key -> {
             try {
                 return Optional.of(subjectCommissionService.findByCommissionAndSubjectCode(
-                        key.commissionId(), key.subjectCode()));
+                        key.commissionId(), key.subjectCode(), key.specialtyCode(), key.studyPlanCode()));
             } catch (ResourceNotFoundException e) {
-                log.warn("No se pudo resolver el link materia-comisión: comisión={}, materia={}: fila salteada",
-                        key.commissionId(), key.subjectCode());
+                log.warn("No se pudo resolver el link materia-comisión: comisión={}, materia={}, especialidad={}, "
+                                + "plan={}: fila salteada",
+                        key.commissionId(), key.subjectCode(), key.specialtyCode(), key.studyPlanCode());
                 return Optional.empty();
             }
         });
@@ -85,7 +79,7 @@ final class SysacadCommissionResolver {
                 });
     }
 
-    record LinkKey(Long commissionId, Integer subjectCode) {
+    record LinkKey(Long commissionId, Integer subjectCode, Integer specialtyCode, Integer studyPlanCode) {
     }
 
     record ResolvedLink(CommissionResponseDto commission, SubjectCommissionResponseDto link) {

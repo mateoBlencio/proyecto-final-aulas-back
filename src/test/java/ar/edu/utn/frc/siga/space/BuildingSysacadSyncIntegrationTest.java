@@ -38,18 +38,18 @@ class BuildingSysacadSyncIntegrationTest extends AbstractIntegrationTest {
         var deletedAt = buildingRepository.findById(id).orElseThrow().getDeletedAt();
         assertThat(deletedAt).isNotNull();
 
-        asFixtureUser(() -> buildingService.syncBuildings(List.of(new BuildingSyncCommand(code, "Renombrado-" + code))));
+        asFixtureUser(() -> buildingService.syncBuildings(List.of(new BuildingSyncCommand(code, "Renombrado-" + code)), 0));
         Building afterPresent = buildingRepository.findById(id).orElseThrow();
         assertThat(afterPresent.getDeletedAt()).isEqualTo(deletedAt);
         assertThat(afterPresent.getSysacadEnabled()).isTrue();
         assertThat(afterPresent.getName()).isEqualTo("Renombrado-" + code);
 
-        asFixtureUser(() -> buildingService.syncBuildings(List.of(new BuildingSyncCommand(code + 1, "Otro-" + code))));
+        asFixtureUser(() -> buildingService.syncBuildings(List.of(new BuildingSyncCommand(code + 1, "Otro-" + code)), 0));
         Building afterAbsent = buildingRepository.findById(id).orElseThrow();
         assertThat(afterAbsent.getDeletedAt()).isEqualTo(deletedAt);
         assertThat(afterAbsent.getSysacadEnabled()).isFalse();
 
-        asFixtureUser(() -> buildingService.syncBuildings(List.of(new BuildingSyncCommand(code, "Renombrado-" + code))));
+        asFixtureUser(() -> buildingService.syncBuildings(List.of(new BuildingSyncCommand(code, "Renombrado-" + code)), 0));
         Building afterReappear = buildingRepository.findById(id).orElseThrow();
         assertThat(afterReappear.getDeletedAt()).isEqualTo(deletedAt);
         assertThat(afterReappear.getSysacadEnabled()).isTrue();
@@ -59,9 +59,10 @@ class BuildingSysacadSyncIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("un edificio activo ausente upstream queda no vigente pero sigue activo (eliminado_en nulo)")
     void activeBuildingAbsentUpstreamStaysActive() {
         int code = 800_000 + (int) (System.nanoTime() % 100_000);
-        Long id = buildingRepository.save(Building.builder().name("Edificio-Ausente-" + code).buildingCode(code).build()).getId();
+        Long id = buildingRepository.save(Building.builder().name("Edificio-Ausente-" + code).buildingCode(code)
+                .sysacadHash("hash-previo").build()).getId();
 
-        asFixtureUser(() -> buildingService.syncBuildings(List.of(new BuildingSyncCommand(code + 1, "Otro-" + code))));
+        asFixtureUser(() -> buildingService.syncBuildings(List.of(new BuildingSyncCommand(code + 1, "Otro-" + code)), 0));
 
         Building after = buildingRepository.findById(id).orElseThrow();
         assertThat(after.getSysacadEnabled()).isFalse();

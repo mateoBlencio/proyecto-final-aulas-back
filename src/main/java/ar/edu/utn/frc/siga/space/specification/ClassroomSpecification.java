@@ -29,7 +29,7 @@ public class ClassroomSpecification {
                 predicates.add(cb.lessThanOrEqualTo(root.get("capacity"), filter.capacityMax()));
             }
             if (filter.notInSysacad()) {
-                predicates.add(cb.isFalse(root.get("sysacadEnabled")));
+                predicates.add(cb.isFalse(root.get("sysacadCurrent")));
                 predicates.add(cb.isNotNull(root.get("sysacadHash")));
             }
 
@@ -42,6 +42,7 @@ public class ClassroomSpecification {
                 cb.isNull(root.get("deletedAt")),
                 cb.isNull(root.get("building").get("deletedAt")),
                 cb.or(cb.isTrue(root.get("building").get("sysacadEnabled")),
-                        cb.isNull(root.get("building").get("sysacadHash"))));
+                        cb.isNull(root.get("building").get("sysacadHash"))),
+                cb.or(cb.isTrue(root.get("sysacadEnabled")), cb.isNull(root.get("sysacadHash"))));
     }
 }

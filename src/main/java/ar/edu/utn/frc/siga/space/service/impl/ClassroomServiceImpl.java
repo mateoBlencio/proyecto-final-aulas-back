@@ -12,6 +12,7 @@ import ar.edu.utn.frc.siga.space.exception.SpaceDomainException;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomListComposer;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomMapper;
 import ar.edu.utn.frc.siga.common.util.Hashes;
+import ar.edu.utn.frc.siga.common.util.SyncGuard;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.model.ClassroomResource;
@@ -297,7 +298,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
     @Override
     @Transactional
-    public int syncClassrooms(List<ClassroomSyncCommand> commands) {
+    public int syncClassrooms(List<ClassroomSyncCommand> commands, int minValidPercent) {
         Instant syncedAt = Instant.now();
         ClassroomType defaultType = null;
         Map<Integer, Building> buildingsByCode = buildingRepository.findAll().stream()
@@ -305,7 +306,11 @@ public class ClassroomServiceImpl implements ClassroomService {
                 .collect(Collectors.toMap(Building::getBuildingCode, Function.identity()));
         Map<ClassroomKey, Classroom> existing = classroomRepository.findAll().stream()
                 .collect(Collectors.toMap(ClassroomServiceImpl::keyOf, Function.identity()));
+        long currentRows = existing.values().stream()
+                .filter(classroom -> classroom.getSysacadHash() != null
+                        && Boolean.TRUE.equals(classroom.getSysacadCurrent())).count();
         Set<ClassroomKey> incoming = new HashSet<>();
+        Set<ClassroomKey> listed = new HashSet<>();
         int affected = 0;
 
         for (ClassroomSyncCommand command : commands) {
@@ -321,7 +326,15 @@ public class ClassroomServiceImpl implements ClassroomService {
             }
 
             ClassroomKey key = new ClassroomKey(building.getId(), command.roomNumber());
+            if (command.capacity() == null || command.capacity() < 0) {
+                // Listed by Sysacad with bad data: not written and not valid, but not absent either.
+                listed.add(key);
+                log.warn("Aula de SysAcad ignorada por capacidad ausente o negativa: aula={}, edificio={}, capacidad={}",
+                        command.roomNumber(), command.buildingCode(), command.capacity());
+                continue;
+            }
             incoming.add(key);
+            listed.add(key);
             String hash = Hashes.sha256Hex(command.capacity(), command.enabled());
             Classroom classroom = existing.get(key);
 
@@ -335,6 +348,7 @@ public class ClassroomServiceImpl implements ClassroomService {
                         .classroomType(defaultType)
                         .capacity(command.capacity())
                         .sysacadEnabled(command.enabled())
+                        .sysacadCurrent(true)
                         .syncedAt(syncedAt)
                         .sysacadHash(hash)
                         .build());
@@ -342,7 +356,7 @@ public class ClassroomServiceImpl implements ClassroomService {
                 affected++;
                 continue;
             }
-            if (isUpToDate(classroom, hash)) {
+            if (isUpToDate(classroom, hash, command.enabled())) {
                 continue;
             }
             applySysacadFields(classroom, command, hash, syncedAt);
@@ -350,16 +364,18 @@ public class ClassroomServiceImpl implements ClassroomService {
             affected++;
         }
 
-        return affected + markAbsent(existing.values(), incoming, syncedAt);
+        SyncGuard.requireEnoughValidRows("aulas", incoming.size(), currentRows, minValidPercent);
+        return affected + markAbsent(existing.values(), listed, syncedAt);
     }
 
     private int markAbsent(Iterable<Classroom> existing, Set<ClassroomKey> incoming, Instant syncedAt) {
         int affected = 0;
         for (Classroom classroom : existing) {
-            if (incoming.contains(keyOf(classroom)) || Boolean.FALSE.equals(classroom.getSysacadEnabled())) {
+            if (classroom.getSysacadHash() == null || incoming.contains(keyOf(classroom))
+                    || Boolean.FALSE.equals(classroom.getSysacadCurrent())) {
                 continue;
             }
-            classroom.setSysacadEnabled(false);
+            classroom.setSysacadCurrent(false);
             classroom.setSyncedAt(syncedAt);
             classroomRepository.save(classroom);
             affected++;
@@ -380,8 +396,9 @@ public class ClassroomServiceImpl implements ClassroomService {
         return new ClassroomKey(classroom.getBuilding().getId(), classroom.getRoomNumber());
     }
 
-    private static boolean isUpToDate(Classroom classroom, String hash) {
-        return hash.equals(classroom.getSysacadHash()) && Boolean.TRUE.equals(classroom.getSysacadEnabled());
+    private static boolean isUpToDate(Classroom classroom, String hash, boolean enabled) {
+        return hash.equals(classroom.getSysacadHash()) && Boolean.TRUE.equals(classroom.getSysacadCurrent())
+                && Boolean.valueOf(enabled).equals(classroom.getSysacadEnabled());
     }
 
     private record ClassroomKey(Long buildingId, Integer roomNumber) {}
@@ -389,6 +406,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     private void applySysacadFields(Classroom classroom, ClassroomSyncCommand command, String hash, Instant syncedAt) {
         classroom.setCapacity(command.capacity());
         classroom.setSysacadEnabled(command.enabled());
+        classroom.setSysacadCurrent(true);
         classroom.setSyncedAt(syncedAt);
         classroom.setSysacadHash(hash);
     }

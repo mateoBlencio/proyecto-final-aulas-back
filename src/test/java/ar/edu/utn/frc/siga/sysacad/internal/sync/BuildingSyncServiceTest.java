@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadBuildingDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
 import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadEmptyViewException;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -42,7 +44,7 @@ class BuildingSyncServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new BuildingSyncService(buildingService, syncStateService);
+        service = new BuildingSyncService(buildingService, syncStateService, new SysacadProperties());
     }
 
     @Test
@@ -55,13 +57,13 @@ class BuildingSyncServiceTest {
     @DisplayName("sync: traduce cada fila de SysAcad a un comando y delega el upsert en BuildingService")
     void syncTranslatesRowsAndDelegatesToService() {
         when(catalogReader.findBuildings()).thenReturn(List.of(new SysacadBuildingDto(4, "Edif.Malvinas")));
-        when(buildingService.syncBuildings(anyList())).thenReturn(1);
+        when(buildingService.syncBuildings(anyList(), eq(50))).thenReturn(1);
 
         service.sync(catalogReader);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<BuildingSyncCommand>> captor = ArgumentCaptor.forClass(List.class);
-        verify(buildingService).syncBuildings(captor.capture());
+        verify(buildingService).syncBuildings(captor.capture(), eq(50));
         assertThat(captor.getValue()).containsExactly(new BuildingSyncCommand(4, "Edif.Malvinas"));
         verify(syncStateService).recordSuccess(SysacadView.EDIFICIOS, 1);
     }
@@ -73,7 +75,7 @@ class BuildingSyncServiceTest {
 
         assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(IllegalStateException.class);
 
-        verify(syncStateService).recordFailure(SysacadView.EDIFICIOS, "SysAcad caído");
+        verify(syncStateService).recordFailure(eq(SysacadView.EDIFICIOS), startsWith("INTERNAL_ERROR"));
     }
 
     @Test
@@ -83,7 +85,7 @@ class BuildingSyncServiceTest {
 
         assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(SysacadEmptyViewException.class);
 
-        verify(buildingService, never()).syncBuildings(anyList());
+        verify(buildingService, never()).syncBuildings(anyList(), eq(50));
         verify(syncStateService).recordFailure(eq(SysacadView.EDIFICIOS), anyString());
         verify(syncStateService, never()).recordSuccess(any(), anyInt());
     }

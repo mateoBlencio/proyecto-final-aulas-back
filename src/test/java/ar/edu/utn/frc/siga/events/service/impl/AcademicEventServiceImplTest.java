@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.events.service.impl;
 
+import ar.edu.utn.frc.siga.common.exception.SyncAbortedException;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.events.EventTestData;
@@ -348,6 +349,20 @@ class AcademicEventServiceImplTest {
     }
 
     @Test
+    @DisplayName("syncRecurringEvent: un evento no vigente que reaparece vuelve a vigente y se escribe aunque no cambien los datos")
+    void syncRecurringEventReactivaEventoNoVigente() {
+        RecurringEvent notCurrent = existingSyncedEvent(7L, Duration.ofMinutes(90), Hashes.sha256Hex(90), false);
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of(notCurrent));
+
+        UpsertRecurringEventResult result = service.syncRecurringEvent(syncCommand(90, 30));
+
+        assertThat(result.updated()).isTrue();
+        assertThat(notCurrent.getSysacadEnabled()).isTrue();
+        assertThat(notCurrent.getSyncedAt()).isNotNull();
+        assertThat(savedRecurringEvents()).containsExactly(notCurrent);
+    }
+
+    @Test
     @DisplayName("syncRecurringEvent: duration sin drift (nadie la tocó desde el último sync) y cambió en SysAcad → se pisa y se actualiza el hash")
     void syncRecurringEventPisaDurationSinDrift() {
         SyncRecurringEventCommand cmd = syncCommand(120, 30);
@@ -364,7 +379,7 @@ class AcademicEventServiceImplTest {
     @Test
     @DisplayName("syncRecurringEvent: duration editada a mano fuera del sync (drift) y el valor entrante difiere → NO se pisa, la edición manual se preserva")
     void syncRecurringEventNoPisaDurationConDrift() {
-        SyncRecurringEventCommand cmd = syncCommand(120, 30);
+        SyncRecurringEventCommand cmd = syncCommand(120, 45);
         RecurringEvent existing = existingSyncedEvent(7L, Duration.ofMinutes(100), Hashes.sha256Hex(90), true);
         when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of(existing));
 
@@ -373,12 +388,12 @@ class AcademicEventServiceImplTest {
         assertThat(result.updated()).isTrue();
         assertThat(existing.getDuration()).isEqualTo(Duration.ofMinutes(100));
         assertThat(existing.getSysacadHash()).isEqualTo(Hashes.sha256Hex(90));
-        assertThat(existing.getEnrolled()).isEqualTo(30);
+        assertThat(existing.getEnrolled()).isEqualTo(45);
         assertThat(savedRecurringEvents()).containsExactly(existing);
     }
 
     @Test
-    @DisplayName("syncRecurringEvent: primer resync inmediato tras la creación por sync no lee drift falso (sysacadHash ya quedó seteado al crear)")
+    @DisplayName("syncRecurringEvent: resync idéntico (mismos inscriptos y duración) no escribe, no toca syncedAt y devuelve updated=false")
     void syncRecurringEventPrimerResyncNoFalsoDrift() {
         SyncRecurringEventCommand cmd = syncCommand(90, 30);
         RecurringEvent justCreated = existingSyncedEvent(9L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
@@ -386,10 +401,11 @@ class AcademicEventServiceImplTest {
 
         UpsertRecurringEventResult result = service.syncRecurringEvent(cmd);
 
-        assertThat(result.updated()).isTrue();
+        assertThat(result).isEqualTo(new UpsertRecurringEventResult(9L, false, false));
         assertThat(justCreated.getDuration()).isEqualTo(Duration.ofMinutes(90));
         assertThat(justCreated.getSysacadHash()).isEqualTo(Hashes.sha256Hex(90));
-        assertThat(savedRecurringEvents()).containsExactly(justCreated);
+        assertThat(justCreated.getSyncedAt()).isNull();
+        assertThat(savedRecurringEvents()).isEmpty();
     }
 
     @Test
@@ -425,7 +441,7 @@ class AcademicEventServiceImplTest {
 
         assertThat(results).hasSize(2);
         assertThat(results.get(0)).isEqualTo(new UpsertRecurringEventResult(3L, true, false));
-        assertThat(results.get(1)).isEqualTo(new UpsertRecurringEventResult(3L, false, true));
+        assertThat(results.get(1)).isEqualTo(new UpsertRecurringEventResult(3L, false, false));
     }
 
     @Test
@@ -478,7 +494,7 @@ class AcademicEventServiceImplTest {
         when(recurringEventRepository.findBySysacadHashIsNotNull())
                 .thenReturn(List.of(present, absent, alreadyDisabled));
 
-        int affected = service.markRecurringEventsAbsent(Set.of(1L));
+        int affected = service.markRecurringEventsAbsent(Set.of(1L), Set.of(), 0);
 
         assertThat(affected).isEqualTo(1);
         assertThat(absent.getSysacadEnabled()).isFalse();
@@ -492,11 +508,56 @@ class AcademicEventServiceImplTest {
     }
 
     @Test
+    @DisplayName("markRecurringEventsAbsent: no marca ausentes los eventos de una comisión que el sync no pudo resolver")
+    void markRecurringEventsAbsentRespetaComisionesNoResueltas() {
+        RecurringEvent present = existingSyncedEvent(1L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
+        RecurringEvent ofUnresolved = existingSyncedEvent(2L, Duration.ofMinutes(60), Hashes.sha256Hex(60), true);
+        ReflectionTestUtils.setField(ofUnresolved, "commissionId", 7L);
+        RecurringEvent absent = existingSyncedEvent(3L, Duration.ofMinutes(45), Hashes.sha256Hex(45), true);
+        when(recurringEventRepository.findBySysacadHashIsNotNull())
+                .thenReturn(List.of(present, ofUnresolved, absent));
+
+        int affected = service.markRecurringEventsAbsent(Set.of(1L), Set.of(7L), 0);
+
+        assertThat(affected).isEqualTo(1);
+        assertThat(ofUnresolved.getSysacadEnabled()).isTrue();
+        assertThat(absent.getSysacadEnabled()).isFalse();
+    }
+
+    @Test
+    @DisplayName("markRecurringEventsAbsent: por debajo del umbral de presentes aborta y no marca nada")
+    void markRecurringEventsAbsentAbortaBajoUmbral() {
+        RecurringEvent present = existingSyncedEvent(1L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
+        RecurringEvent second = existingSyncedEvent(2L, Duration.ofMinutes(60), Hashes.sha256Hex(60), true);
+        RecurringEvent third = existingSyncedEvent(3L, Duration.ofMinutes(45), Hashes.sha256Hex(45), true);
+        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(present, second, third));
+
+        assertThatThrownBy(() -> service.markRecurringEventsAbsent(Set.of(1L), Set.of(), 50))
+                .isInstanceOf(SyncAbortedException.class);
+
+        assertThat(second.getSysacadEnabled()).isTrue();
+        assertThat(third.getSysacadEnabled()).isTrue();
+        verify(recurringEventRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("markRecurringEventsAbsent: sin presentes aborta aunque el umbral esté desactivado")
+    void markRecurringEventsAbsentAbortaSinPresentes() {
+        RecurringEvent current = existingSyncedEvent(2L, Duration.ofMinutes(60), Hashes.sha256Hex(60), true);
+        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(current));
+
+        assertThatThrownBy(() -> service.markRecurringEventsAbsent(Set.of(), Set.of(), 0))
+                .isInstanceOf(SyncAbortedException.class);
+
+        assertThat(current.getSysacadEnabled()).isTrue();
+    }
+
+    @Test
     @DisplayName("markRecurringEventsAbsent: sin eventos sync-owned, no marca nada")
     void markRecurringEventsAbsentSinSyncOwnedNoHaceNada() {
         when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of());
 
-        int affected = service.markRecurringEventsAbsent(Set.of(1L));
+        int affected = service.markRecurringEventsAbsent(Set.of(1L), Set.of(), 0);
 
         assertThat(affected).isZero();
         verify(recurringEventRepository, never()).save(any());

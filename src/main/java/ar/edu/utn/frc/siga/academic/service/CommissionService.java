@@ -37,10 +37,15 @@ public interface CommissionService extends ActivationService<Long> {
      */
     CommissionResponseDto findActiveByCourseCode(String courseCode);
 
+    /** Ids de todas las comisiones vigentes en SysAcad de ese curso (vacío si no hay; más de uno si es ambiguo). */
+    List<Long> findActiveIdsByCourseCode(String courseCode);
+
     /**
      * Sincroniza el lote de comisiones provenientes de SysAcad: crea/actualiza cada comisión (bajo
      * su período anual), enlaza materia-comisión con los inscriptos entrantes y marca como no
-     * vigentes las comisiones ausentes en la corrida. Devuelve la cantidad de filas afectadas.
+     * vigentes las comisiones ausentes en la corrida. Devuelve la cantidad de filas afectadas. Aborta sin
+     * dar de baja si las filas válidas no alcanzan {@code minValidPercent}% de las vigentes (0 desactiva
+     * el umbral; cero filas válidas aborta siempre).
      */
-    int syncCommissions(List<CommissionSyncCommand> commands);
+    int syncCommissions(List<CommissionSyncCommand> commands, int minValidPercent);
 }

@@ -107,6 +107,30 @@ class AllocationSyncFromSysacadIntegrationTest extends AbstractIntegrationTest {
         assertThat(sysacadAllocation.getObservation()).isEqualTo("Actualizado por sync de SysAcad");
     }
 
+    @Test
+    @DisplayName("una asignación SYSACAD se conserva cuando el evento deja de venir en el lote (clase pasada al aula centinela o fila desaparecida)")
+    void syncFromSysacadKeepsAllocationWhenEventIsNoLongerInBatch() {
+        IntegrationTestData.SubjectAndCommission sc = testData.materiaYComision();
+        Building building = testData.edificio();
+        Classroom classroom = testData.aula(building);
+        LocalDate monday = LocalDate.now().plusYears(2).with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY));
+        Long vanishedEventId = testData.eventoRecurrente(sc.subjectId(), sc.commissionId(), DayOfWeek.MONDAY,
+                LocalTime.of(18, 0), 90, monday, monday, 30);
+        Long otherEventId = testData.eventoRecurrente(sc.subjectId(), sc.commissionId(), DayOfWeek.TUESDAY,
+                LocalTime.of(18, 0), 90, monday, monday.plusWeeks(1), 30);
+        Long occurrenceId = occurrenceRepository.findByEvent_Id(vanishedEventId).getFirst().getId();
+        SystemScope.call(() -> allocationService.syncFromSysacad(
+                List.of(new AllocationItem(new AllocationTarget.Event(vanishedEventId), classroom.getId()))));
+        assertThat(allocationByOccurrence(occurrenceId).getSource()).isEqualTo(AllocationSource.SYSACAD);
+
+        SystemScope.call(() -> allocationService.syncFromSysacad(
+                List.of(new AllocationItem(new AllocationTarget.Event(otherEventId), classroom.getId()))));
+
+        Allocation kept = allocationByOccurrence(occurrenceId);
+        assertThat(kept.getSource()).isEqualTo(AllocationSource.SYSACAD);
+        assertThat(kept.getClassroomId()).isEqualTo(classroom.getId());
+    }
+
     private Allocation allocationByOccurrence(Long occurrenceId) {
         Optional<Allocation> allocation = allocationRepository.findByOccurrenceId(occurrenceId);
         assertThat(allocation).as("asignación para la ocurrencia " + occurrenceId).isPresent();
