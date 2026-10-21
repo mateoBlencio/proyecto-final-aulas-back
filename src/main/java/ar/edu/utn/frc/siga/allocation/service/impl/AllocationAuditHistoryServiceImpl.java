@@ -64,23 +64,21 @@ public class AllocationAuditHistoryServiceImpl implements AllocationAuditHistory
                 .map(ClassroomResponseDto::id)
                 .collect(Collectors.toSet());
 
-        Map<Long, Long> lastClassroomByAllocation = new HashMap<>();
-        boolean previousRevisionInScope = false;
+        Map<Object, Long> lastClassroomByAllocation = new HashMap<>();
         List<RevisionDto<AllocationHistorySnapshotDto>> visible = new ArrayList<>();
         for (RevisionDto<AllocationHistorySnapshotDto> revision : revisions) {
             AllocationHistorySnapshotDto snapshot = revision.snapshot();
             boolean inScope;
             if (snapshot == null) {
-                inScope = previousRevisionInScope;
+                inScope = classroomsInScope.contains(lastClassroomByAllocation.get(revision.entityId()));
             } else {
-                Long previousClassroom = lastClassroomByAllocation.put(snapshot.id(), snapshot.classroomId());
+                Long previousClassroom = lastClassroomByAllocation.put(revision.entityId(), snapshot.classroomId());
                 inScope = classroomsInScope.contains(snapshot.classroomId())
                         || (previousClassroom != null && classroomsInScope.contains(previousClassroom));
             }
             if (inScope) {
                 visible.add(revision);
             }
-            previousRevisionInScope = snapshot != null && classroomsInScope.contains(snapshot.classroomId());
         }
         return visible;
     }

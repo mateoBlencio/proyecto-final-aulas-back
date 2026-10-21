@@ -74,7 +74,8 @@ public class RevisionReaderImpl implements RevisionReader {
                             revision.getFechaRevision(),
                             revision.getUsuario(),
                             toKind(revisionType),
-                            revisionType == RevisionType.DEL ? null : toSnapshot.apply(entity));
+                            revisionType == RevisionType.DEL ? null : toSnapshot.apply(entity),
+                            entityManager.getEntityManagerFactory().getPersistenceUnitUtil().getIdentifier(entity));
                 })
                 .toList();
     }
