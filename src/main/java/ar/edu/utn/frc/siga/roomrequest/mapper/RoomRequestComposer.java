@@ -19,6 +19,7 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItemAllocation;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
+import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl.Action;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -79,7 +80,8 @@ public class RoomRequestComposer {
     }
 
     /** La fila es el ítem, no la solicitud: la cabecera se resuelve una sola vez por {@code request.id} aunque varios ítems compartan página. */
-    public List<RoomRequestItemRowDto> composeRows(Collection<RoomRequestItem> items) {
+    public List<RoomRequestItemRowDto> composeRows(Collection<RoomRequestItem> items,
+            Map<Long, List<Action>> allowedActionsByItemId) {
         Set<Long> subjectIds = new LinkedHashSet<>();
         Set<Long> commissionIds = new LinkedHashSet<>();
         Set<Long> buildingIds = new LinkedHashSet<>();
@@ -105,7 +107,8 @@ public class RoomRequestComposer {
 
             result.add(mapper.toRowDto(item, header, resolveCommissions(item, catalogs),
                     derivedBuilding != null ? derivedBuilding.name() : null,
-                    assignedCountByItemId.getOrDefault(item.getId(), 0)));
+                    assignedCountByItemId.getOrDefault(item.getId(), 0),
+                    allowedActionsByItemId.getOrDefault(item.getId(), List.of())));
         }
         return result;
     }
@@ -130,6 +133,10 @@ public class RoomRequestComposer {
     }
 
     public RoomRequestItemDetailDto composeDetail(RoomRequestItem item) {
+        return composeDetail(item, List.of());
+    }
+
+    public RoomRequestItemDetailDto composeDetail(RoomRequestItem item, List<Action> allowedActions) {
         Set<Long> subjectIds = new LinkedHashSet<>();
         Set<Long> commissionIds = new LinkedHashSet<>();
         Set<Long> classroomIds = new LinkedHashSet<>();
@@ -153,7 +160,7 @@ public class RoomRequestComposer {
                 composeItems(List.of(item), catalogs, enrolledByEventId, currentClassroomsByItemId,
                 catalogsResolver.resolveReleasedTargetDatesByItemId(List.of(item))).getFirst();
 
-        return new RoomRequestItemDetailDto(header, itemDto);
+        return new RoomRequestItemDetailDto(header, itemDto, allowedActions);
     }
 
     private void collectSubjectId(RoomRequest request, Set<Long> subjectIds) {

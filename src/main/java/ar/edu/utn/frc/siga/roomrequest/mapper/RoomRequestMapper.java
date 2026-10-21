@@ -17,6 +17,7 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl;
 import java.util.List;
 
 @Mapper(config = CentralMapperConfig.class)
@@ -72,7 +73,8 @@ public interface RoomRequestMapper {
                                    RoomRequestRowHeaderDto requestHeader,
                                    List<CommissionResponseDto> commissions,
                                    String derivedBuildingName,
-                                   Integer assignedClassroomCount);
+                                   Integer assignedClassroomCount,
+                                   List<RoomRequestAccessControl.Action> allowedActions);
 
     @Mapping(target = "id", source = "request.id")
     @Mapping(target = "itemCount", expression = "java(request.getItems().size())")

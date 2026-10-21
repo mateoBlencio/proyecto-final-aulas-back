@@ -8,6 +8,8 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -19,19 +21,35 @@ public class RoomRequestAccessControl {
 
     private final UserService userService;
 
-    public void authorize(RoomRequestItem item, String actorEmail, Action action) {
-        if (userService.hasRole(actorEmail, SystemRole.SUBSECRETARIA)) {
-            if (!subsecretariaAllows(item, action)) {
-                throw new RoomRequestForbiddenException(action.name());
-            }
-            return;
+    /** Roles del usuario relevantes para las acciones sobre ítems; se resuelve una vez y se evalúa por ítem. */
+    public record Actor(boolean subsecretaria, boolean globalAuxiliar, Set<Long> auxiliarBuildingIds) {
+        boolean ownsBuilding(Long buildingId) {
+            return globalAuxiliar || (buildingId != null && auxiliarBuildingIds.contains(buildingId));
         }
+    }
 
-        boolean ownsBuilding = userService.hasGlobalRole(actorEmail, SystemRole.AUXILIAR_AULICO)
-                || (item.getDerivedBuildingId() != null
-                        && userService.findBuildingIdsForRole(actorEmail, SystemRole.AUXILIAR_AULICO)
-                                .contains(item.getDerivedBuildingId()));
-        if (!auxiliarAllows(item, action, ownsBuilding)) {
+    public Actor resolveActor(String actorEmail) {
+        if (userService.hasRole(actorEmail, SystemRole.SUBSECRETARIA)) {
+            return new Actor(true, false, Set.of());
+        }
+        if (userService.hasGlobalRole(actorEmail, SystemRole.AUXILIAR_AULICO)) {
+            return new Actor(false, true, Set.of());
+        }
+        return new Actor(false, false, userService.findBuildingIdsForRole(actorEmail, SystemRole.AUXILIAR_AULICO));
+    }
+
+    public boolean allows(RoomRequestItem item, Actor actor, Action action) {
+        return actor.subsecretaria()
+                ? subsecretariaAllows(item, action)
+                : auxiliarAllows(item, action, actor.ownsBuilding(item.getDerivedBuildingId()));
+    }
+
+    public List<Action> allowedActions(RoomRequestItem item, Actor actor) {
+        return Arrays.stream(Action.values()).filter(action -> allows(item, actor, action)).toList();
+    }
+
+    public void authorize(RoomRequestItem item, String actorEmail, Action action) {
+        if (!allows(item, resolveActor(actorEmail), action)) {
             throw new RoomRequestForbiddenException(action.name());
         }
     }
