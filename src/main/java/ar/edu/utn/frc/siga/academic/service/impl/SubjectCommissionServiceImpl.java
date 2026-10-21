@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.academic.dto.SubjectCommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SubjectCommissionMapper;
 import ar.edu.utn.frc.siga.academic.model.Commission;
+import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
@@ -14,6 +15,8 @@ import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
 import ar.edu.utn.frc.siga.academic.specification.SubjectCommissionSpecification;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.Finder;
+import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -70,12 +73,27 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
     }
 
     @Override
-    public SubjectCommissionResponseDto findByCommissionAndSubjectCode(Long commissionId, Integer subjectCode) {
-        return subjectCommissionRepository
-                .findFirstByCommission_IdAndSubject_CodeAndDeletedAtIsNullOrderBySubject_IdAsc(commissionId, subjectCode)
-                .map(subjectCommissionMapper::toDto)
-                .orElseThrow(() -> ResourceNotFoundException.of("SubjectCommission",
-                        commissionId + "-" + subjectCode));
+    public SubjectCommissionResponseDto findByCommissionAndSubjectCode(Long commissionId, Integer subjectCode,
+            Integer specialtyCode, Integer studyPlanCode) {
+        List<SubjectCommission> candidates = subjectCommissionRepository
+                .findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(commissionId, subjectCode);
+        List<SubjectCommission> exact = candidates.stream()
+                .filter(link -> isOfStudyPlan(link.getSubject().getStudyPlan(), specialtyCode, studyPlanCode))
+                .toList();
+        List<SubjectCommission> chosen = exact.isEmpty() ? candidates : exact;
+        if (chosen.size() == 1) {
+            return subjectCommissionMapper.toDto(chosen.getFirst());
+        }
+        if (chosen.size() > 1) {
+            log.warn("Más de una materia con código {} en la comisión {} y ninguna coincide con especialidad={}, "
+                    + "plan={}: no se resuelve el link", subjectCode, commissionId, specialtyCode, studyPlanCode);
+        }
+        throw ResourceNotFoundException.of("SubjectCommission", commissionId + "-" + subjectCode);
+    }
+
+    private static boolean isOfStudyPlan(StudyPlan studyPlan, Integer specialtyCode, Integer studyPlanCode) {
+        return Objects.equals(studyPlan.getPlanCode(), studyPlanCode)
+                && Objects.equals(studyPlan.getSpecialty().getSpecialtyCode(), specialtyCode);
     }
 
     @Override

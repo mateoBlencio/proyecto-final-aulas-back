@@ -254,7 +254,7 @@ class ClassroomRoomNumberPerBuildingIntegrationTest extends AbstractIntegrationT
         long rowsBefore = classroomRepository.count();
 
         int affected = classroomService.syncClassrooms(
-                List.of(new ClassroomSyncCommand(roomNumber, building.getBuildingCode(), true, 70)));
+                List.of(new ClassroomSyncCommand(roomNumber, building.getBuildingCode(), true, 70)), 0);
 
         assertThat(affected).isGreaterThanOrEqualTo(2);
         assertThat(classroomRepository.count()).isEqualTo(rowsBefore);

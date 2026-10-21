@@ -60,12 +60,8 @@ public class SecurityUser implements UserDetails {
         if (assignment.getScopeType() == ScopeType.GLOBAL) {
             return BuildingScope.unrestricted();
         }
+        // chk_usuario_rol_alcance guarantees a BUILDING assignment always has a building
         Long scopeId = assignment.getScopeId();
-        if (scopeId == null) {
-            // Dato inconsistente (fila vieja / insert manual): un alcance BUILDING sin edificio
-            // no habilita nada. Antes reventaba con NPE en Set.of(null) y tumbaba el login.
-            return BuildingScope.denied();
-        }
         return BuildingScope.of(Set.of(scopeId));
     }
 

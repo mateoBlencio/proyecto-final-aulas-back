@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SubjectCommissionMapper;
 import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
 import ar.edu.utn.frc.siga.academic.model.Commission;
+import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
@@ -97,28 +98,69 @@ class SubjectCommissionServiceImplTest {
                 .hasMessage("Subject not found with id: 99");
     }
 
+    private SubjectCommission linkOf(long subjectId, int specialtyCode, int planCode) {
+        Subject other = Subject.builder().id(subjectId).code(101).name("Algoritmos")
+                .studyPlan(StudyPlan.builder().id(subjectId).planCode(planCode)
+                        .specialty(Specialty.builder().id(subjectId).specialtyCode(specialtyCode).build())
+                        .build())
+                .build();
+        return SubjectCommission.builder().subject(other).commission(commission).enrolledCount(30).build();
+    }
+
     @Test
-    @DisplayName("findByCommissionAndSubjectCode: si existe la relación, devuelve el DTO mapeado")
-    void findByCommissionAndSubjectCodeWithExistingRelationReturnsMappedDto() {
-        SubjectCommission existing = SubjectCommission.builder().subject(subject).commission(commission)
-                .enrolledCount(30).build();
+    @DisplayName("findByCommissionAndSubjectCode: con una sola candidata que coincide en especialidad y plan, devuelve su DTO")
+    void findByCommissionAndSubjectCodeWithExactMatchReturnsMappedDto() {
+        SubjectCommission existing = linkOf(1L, 5, 2008);
         SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, 2L, null, 30, true);
-        when(subjectCommissionRepository.findFirstByCommission_IdAndSubject_CodeAndDeletedAtIsNullOrderBySubject_IdAsc(2L, 101))
-                .thenReturn(Optional.of(existing));
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(2L, 101))
+                .thenReturn(List.of(existing));
         when(subjectCommissionMapper.toDto(existing)).thenReturn(dto);
 
-        SubjectCommissionResponseDto result = service.findByCommissionAndSubjectCode(2L, 101);
+        assertThat(service.findByCommissionAndSubjectCode(2L, 101, 5, 2008)).isEqualTo(dto);
+    }
 
-        assertThat(result).isEqualTo(dto);
+    @Test
+    @DisplayName("findByCommissionAndSubjectCode: con dos materias de igual código elige la de la especialidad y plan pedidos, no la de menor id")
+    void findByCommissionAndSubjectCodeDisambiguatesByStudyPlan() {
+        SubjectCommission lowerId = linkOf(1L, 5, 2008);
+        SubjectCommission wanted = linkOf(2L, 7, 2023);
+        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(2L, 2L, null, 30, true);
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(2L, 101))
+                .thenReturn(List.of(lowerId, wanted));
+        when(subjectCommissionMapper.toDto(wanted)).thenReturn(dto);
+
+        assertThat(service.findByCommissionAndSubjectCode(2L, 101, 7, 2023)).isEqualTo(dto);
+    }
+
+    @Test
+    @DisplayName("findByCommissionAndSubjectCode: una sola candidata sin coincidencia exacta se usa igual")
+    void findByCommissionAndSubjectCodeFallsBackToSingleCandidate() {
+        SubjectCommission only = linkOf(1L, 5, 2008);
+        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, 2L, null, 30, true);
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(2L, 101))
+                .thenReturn(List.of(only));
+        when(subjectCommissionMapper.toDto(only)).thenReturn(dto);
+
+        assertThat(service.findByCommissionAndSubjectCode(2L, 101, 9, 1999)).isEqualTo(dto);
+    }
+
+    @Test
+    @DisplayName("findByCommissionAndSubjectCode: dos candidatas y ninguna coincide con especialidad y plan → ResourceNotFoundException")
+    void findByCommissionAndSubjectCodeAmbiguousThrows() {
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(2L, 101))
+                .thenReturn(List.of(linkOf(1L, 5, 2008), linkOf(2L, 7, 2023)));
+
+        assertThatThrownBy(() -> service.findByCommissionAndSubjectCode(2L, 101, 9, 1999))
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
     @DisplayName("findByCommissionAndSubjectCode: si no existe la relación, lanza ResourceNotFoundException")
     void findByCommissionAndSubjectCodeWithoutExistingRelationThrowsResourceNotFound() {
-        when(subjectCommissionRepository.findFirstByCommission_IdAndSubject_CodeAndDeletedAtIsNullOrderBySubject_IdAsc(2L, 101))
-                .thenReturn(Optional.empty());
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(2L, 101))
+                .thenReturn(List.of());
 
-        assertThatThrownBy(() -> service.findByCommissionAndSubjectCode(2L, 101))
+        assertThatThrownBy(() -> service.findByCommissionAndSubjectCode(2L, 101, 5, 2008))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 

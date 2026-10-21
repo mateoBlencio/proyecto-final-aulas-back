@@ -33,6 +33,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -79,7 +80,7 @@ class AuthServiceImplTest {
     void loginFeliz() {
         LoginRequest request = loginRequest("user@frc.utn.edu.ar");
         when(authDomainProperties.isAllowedEmail("user@frc.utn.edu.ar")).thenReturn(true);
-        when(loginRateLimiter.isRateLimited(any(), any())).thenReturn(false);
+        when(loginRateLimiter.isRateLimited(any(), any(), any())).thenReturn(false);
         SecurityUser securityUser = SecurityUser.fromUser(user("user@frc.utn.edu.ar"));
         Authentication authentication = new UsernamePasswordAuthenticationToken(securityUser, null);
         when(authenticationManager.authenticate(any())).thenReturn(authentication);
@@ -94,8 +95,8 @@ class AuthServiceImplTest {
         assertThat(result.getAccessToken()).isEqualTo("access-token");
         assertThat(result.getRefreshToken()).isEqualTo("raw-token");
         assertThat(result.getEmail()).isEqualTo("user@frc.utn.edu.ar");
-        verify(loginRateLimiter).recordSuccess("user@frc.utn.edu.ar");
-        verify(loginRateLimiter, never()).recordFailure(any(), any());
+        verify(loginRateLimiter).recordSuccess(eq("user@frc.utn.edu.ar"), any());
+        verify(loginRateLimiter, never()).recordFailure(any(), any(), any());
     }
 
     @Test
@@ -106,7 +107,7 @@ class AuthServiceImplTest {
         assertThatThrownBy(() -> service.login(loginRequest("ajeno@gmail.com"), httpRequest))
                 .isInstanceOf(InvalidCredentialsException.class);
 
-        verify(loginRateLimiter, never()).isRateLimited(any(), any());
+        verify(loginRateLimiter, never()).isRateLimited(any(), any(), any());
         verify(authenticationManager, never()).authenticate(any());
     }
 
@@ -114,8 +115,8 @@ class AuthServiceImplTest {
     @DisplayName("login: rate limit excedido → LoginRateLimitExceededException, no autentica")
     void loginRateLimitExcedido() {
         when(authDomainProperties.isAllowedEmail(any())).thenReturn(true);
-        when(loginRateLimiter.isRateLimited(any(), any())).thenReturn(true);
-        when(loginRateLimiter.retryAfter(any(), any())).thenReturn(Duration.ofSeconds(90));
+        when(loginRateLimiter.isRateLimited(any(), any(), any())).thenReturn(true);
+        when(loginRateLimiter.retryAfter(any(), any(), any())).thenReturn(Duration.ofSeconds(90));
 
         assertThatThrownBy(() -> service.login(loginRequest("user@frc.utn.edu.ar"), httpRequest))
                 .isInstanceOfSatisfying(LoginRateLimitExceededException.class,
@@ -128,21 +129,21 @@ class AuthServiceImplTest {
     @DisplayName("login: credenciales inválidas → InvalidCredentialsException y registra el fallo")
     void loginCredencialesInvalidas() {
         when(authDomainProperties.isAllowedEmail(any())).thenReturn(true);
-        when(loginRateLimiter.isRateLimited(any(), any())).thenReturn(false);
+        when(loginRateLimiter.isRateLimited(any(), any(), any())).thenReturn(false);
         when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("mal"));
 
         assertThatThrownBy(() -> service.login(loginRequest("user@frc.utn.edu.ar"), httpRequest))
                 .isInstanceOf(InvalidCredentialsException.class);
 
-        verify(loginRateLimiter).recordFailure(any(), any());
-        verify(loginRateLimiter, never()).recordSuccess(any());
+        verify(loginRateLimiter).recordFailure(any(), any(), any());
+        verify(loginRateLimiter, never()).recordSuccess(any(), any());
     }
 
     @Test
     @DisplayName("login: autenticación ok pero usuario deshabilitado/eliminado → InvalidCredentialsException")
     void loginUsuarioDeshabilitado() {
         when(authDomainProperties.isAllowedEmail(any())).thenReturn(true);
-        when(loginRateLimiter.isRateLimited(any(), any())).thenReturn(false);
+        when(loginRateLimiter.isRateLimited(any(), any(), any())).thenReturn(false);
         SecurityUser securityUser = SecurityUser.fromUser(user("user@frc.utn.edu.ar"));
         when(authenticationManager.authenticate(any()))
                 .thenReturn(new UsernamePasswordAuthenticationToken(securityUser, null));

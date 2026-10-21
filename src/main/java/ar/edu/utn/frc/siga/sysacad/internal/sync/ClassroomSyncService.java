@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadClassroomDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadViewSyncer;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,7 @@ public class ClassroomSyncService implements SysacadViewSyncer {
 
     private final ClassroomService classroomService;
     private final SysacadSyncStateService syncStateService;
+    private final SysacadProperties properties;
 
     @Override
     public SysacadView view() {
@@ -33,7 +35,7 @@ public class ClassroomSyncService implements SysacadViewSyncer {
             List<ClassroomSyncCommand> commands = ViewSyncRunner.requireRows(catalog.findClassrooms(), SysacadView.AULAS).stream()
                     .map(ClassroomSyncService::toCommand)
                     .toList();
-            return classroomService.syncClassrooms(commands);
+            return classroomService.syncClassrooms(commands, properties.getSync().minValidRowsPercent());
         });
     }
 

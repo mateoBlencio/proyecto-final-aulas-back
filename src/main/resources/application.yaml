@@ -70,7 +70,14 @@ spring:
 server:
   servlet:
     context-path: /api
-  forward-headers-strategy: framework
+  # native: Tomcat's RemoteIpValve, which only honors X-Forwarded-For when the direct peer matches
+  # internal-proxies. "framework" trusted the header from anyone (leftmost entry, client-controlled).
+  forward-headers-strategy: native
+  tomcat:
+    remoteip:
+      # Regex of the reverse proxy IP(s). Empty by default: no proxy is trusted and the header is ignored.
+      # Setting it in dev, test and prod is a mandatory deploy step (see TrustedProxiesStartupCheck).
+      internal-proxies: ${TRUSTED_PROXIES:}
 
 springdoc:
   swagger-ui:
@@ -182,13 +189,18 @@ siga:
     environment-mode: NO_ASSERT
   jwt:
     secret: ${JWT_SECRET}
+    issuer: ${JWT_ISSUER:siga}
+    audience: ${JWT_AUDIENCE:siga-api}
     access-expiration-minutes: ${JWT_ACCESS_EXPIRATION_MINUTES:20}
     refresh-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS:30}
     refresh-grace-seconds: ${JWT_REFRESH_GRACE_SECONDS:10}
+    refresh-purge-cron: "0 30 3 * * SUN"
   auth:
     allowed-email-domain: ${AUTH_ALLOWED_EMAIL_DOMAIN:frc.utn.edu.ar}
   login-ratelimit:
     max-attempts: 5
+    max-attempts-per-ip: 200
+    alert-threshold-per-email: 50
     window-minutes: 15
   ratelimit:
     general:
@@ -202,16 +214,10 @@ siga:
     connect-timeout: 5s
     read-timeout: 120s
     max-retries: 3
+    max-response-size: 32MB
     sync:
-
-      buildings: "0 0 3 * * SUN"
-      classrooms: "0 0 3 * * SUN"
-      specialties: "0 0 3 * * SUN"
-      events: "0 0 3 * * SUN"
-      allocations: "0 0 3 * * SUN"
-      subjects: "0 0 3 * * SUN"
-      commissions: "0 0 3 * * SUN"
-      holidays: "0 0 3 * * SUN"
+      cron: "0 0 3 * * SUN"
+      min-valid-rows-percent: 50
   notifications:
     max-attempts: 5
     retry-interval: PT1M

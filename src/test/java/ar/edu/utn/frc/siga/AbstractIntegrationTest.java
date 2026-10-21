@@ -11,6 +11,8 @@ import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import ar.edu.utn.frc.siga.auth.security.JwtService;
 import ar.edu.utn.frc.siga.auth.security.SecurityUser;
 import ar.edu.utn.frc.siga.common.security.ScopeType;
+import java.util.List;
+import java.util.Objects;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -103,7 +105,15 @@ public abstract class AbstractIntegrationTest {
             return userRepository.save(created);
         });
 
-        if (user.getRoleAssignments().isEmpty()) {
+        // Los usuarios persisten entre clases: si la asignación guardada difiere de la pedida, se reemplaza.
+        List<RoleAssignment> existing = roleAssignmentRepository.findAllByUserId(user.getId());
+        boolean matches = existing.size() == 1
+                && existing.get(0).getRole() == systemRole
+                && existing.get(0).getScopeType() == scopeType
+                && Objects.equals(existing.get(0).getScopeId(), scopeId);
+        if (!matches) {
+            roleAssignmentRepository.deleteAll(existing);
+            roleAssignmentRepository.flush();
             roleAssignmentRepository.save(RoleAssignment.builder()
                     .user(user)
                     .role(systemRole)

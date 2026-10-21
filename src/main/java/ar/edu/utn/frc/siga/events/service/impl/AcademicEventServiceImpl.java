@@ -33,6 +33,7 @@ import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
+import ar.edu.utn.frc.siga.common.util.SyncGuard;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import ar.edu.utn.frc.siga.common.util.RecurringEventKey;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
@@ -267,8 +268,13 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         Partition partition = partitionByKey(commands, AcademicEventServiceImpl::keyOf,
                 cmd -> buildRecurringEvent(cmd, now),
                 (existing, cmd) -> {
+                    boolean enrolledChanged = !Objects.equals(existing.getEnrolled(), cmd.enrolled());
+                    boolean durationChanged = reconcileDuration(existing, cmd.durationMinutes());
+                    boolean reenabled = !Boolean.TRUE.equals(existing.getSysacadEnabled());
+                    if (!enrolledChanged && !durationChanged && !reenabled) {
+                        return;
+                    }
                     existing.setEnrolled(cmd.enrolled());
-                    reconcileDuration(existing, cmd.durationMinutes());
                     existing.setSyncedAt(now);
                     existing.setSysacadEnabled(true);
                     if (existing.getId() != null) {
@@ -283,11 +289,12 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         List<UpsertRecurringEventResult> results = new ArrayList<>(commands.size());
         for (int i = 0; i < commands.size(); i++) {
             boolean wasCreated = partition.createdFlags()[i];
-            results.add(new UpsertRecurringEventResult(partition.resolved().get(i).getId(), wasCreated, !wasCreated));
+            RecurringEvent event = partition.resolved().get(i);
+            results.add(new UpsertRecurringEventResult(event.getId(), wasCreated, updated.contains(event)));
         }
 
         log.info("Sync EVENTOS de SysAcad: {} eventos recurrentes creados, {} actualizados",
-                partition.created().size(), commands.size() - partition.created().size());
+                partition.created().size(), updated.size());
         return results;
     }
 
@@ -419,11 +426,19 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     @Override
     @Transactional
     @AuditOperation("Baja de eventos ausentes en SysAcad")
-    public int markRecurringEventsAbsent(Collection<Long> presentEventIds) {
+    public int markRecurringEventsAbsent(Collection<Long> presentEventIds, Collection<Long> unresolvedCommissionIds,
+            int minValidPercent) {
         Instant now = Instant.now();
         int affected = 0;
-        for (RecurringEvent event : recurringEventRepository.findBySysacadHashIsNotNull()) {
-            if (presentEventIds.contains(event.getId()) || Boolean.FALSE.equals(event.getSysacadEnabled())) {
+        List<RecurringEvent> syncOwned = recurringEventRepository.findBySysacadHashIsNotNull();
+        // Events of unresolvedCommissionIds still count in currentRows. What syncRecurringEvents already wrote
+        // before an abort here stays written (the guard only prevents deactivations).
+        long currentRows = syncOwned.stream()
+                .filter(event -> !Boolean.FALSE.equals(event.getSysacadEnabled())).count();
+        SyncGuard.requireEnoughValidRows("eventos", presentEventIds.size(), currentRows, minValidPercent);
+        for (RecurringEvent event : syncOwned) {
+            if (presentEventIds.contains(event.getId()) || Boolean.FALSE.equals(event.getSysacadEnabled())
+                    || unresolvedCommissionIds.contains(event.getCommissionId())) {
                 continue;
             }
             event.setSysacadEnabled(false);

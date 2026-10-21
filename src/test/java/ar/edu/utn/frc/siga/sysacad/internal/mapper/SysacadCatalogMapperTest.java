@@ -1,5 +1,9 @@
 package ar.edu.utn.frc.siga.sysacad.internal.mapper;
 
+import org.slf4j.LoggerFactory;
+import ch.qos.logback.core.read.ListAppender;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.classic.Logger;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadAcademicEventDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadAllocationDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadBuildingDto;
@@ -42,7 +46,42 @@ class SysacadCatalogMapperTest {
     }
 
     @Test
-    @DisplayName("toClassroom: 'S' habilitada, cualquier otro valor no")
+    @DisplayName("toBuilding: reemplaza CR/LF y otros caracteres de control para que no forjen líneas de log")
+    void quitaCaracteresDeControl() {
+        SysacadBuildingDto building = mapper.toBuilding(new RawBuilding(2, "Edif.\r\nCentral\t"));
+
+        assertThat(building.name()).doesNotContain("\r").doesNotContain("\n").doesNotContain("\t")
+                .isEqualTo("Edif.  Central");
+    }
+
+    @Test
+    @DisplayName("toBuilding: también reemplaza NEL, U+2028 y U+2029")
+    void quitaSeparadoresUnicodeDeLinea() {
+        SysacadBuildingDto building = mapper.toBuilding(new RawBuilding(2, "A\u0085B\u2028C\u2029D"));
+
+        assertThat(building.name()).isEqualTo("A B C D");
+    }
+
+    @Test
+    @DisplayName("toHoliday: la fecha inválida con CR/LF se loguea saneada, sin forjar líneas de log")
+    void feriadoConSaltosDeLineaSeLoguaSaneado() {
+        Logger logger = (Logger) LoggerFactory.getLogger(SysacadCatalogMapper.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            assertThat(mapper.toHoliday(new RawHoliday("2026\r\n1208\r\nFORGED", "x"))).isNull();
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        assertThat(appender.list).hasSize(1);
+        assertThat(appender.list.getFirst().getFormattedMessage()).doesNotContain("\r").doesNotContain("\n")
+                .contains("2026  1208  FORGED");
+    }
+
+    @Test
+    @DisplayName("toClassroom: solo 'N' es no habilitada")
     void traduceHabilitada() {
         assertThat(mapper.toClassroom(new RawClassroom(101, 2, "S", 40)))
                 .isEqualTo(new SysacadClassroomDto(101, 2, true, 40));
@@ -51,9 +90,12 @@ class SysacadCatalogMapperTest {
     }
 
     @Test
-    @DisplayName("toClassroom: habilitada nula se toma como no habilitada")
-    void habilitadaNulaEsFalse() {
-        assertThat(mapper.toClassroom(new RawClassroom(101, 2, null, 40)).isEnabled()).isFalse();
+    @DisplayName("toClassroom: habilitada nula, en blanco o con un valor raro se toma como habilitada")
+    void habilitadaDesconocidaEsTrue() {
+        assertThat(mapper.toClassroom(new RawClassroom(101, 2, null, 40)).isEnabled()).isTrue();
+        assertThat(mapper.toClassroom(new RawClassroom(101, 2, "  ", 40)).isEnabled()).isTrue();
+        assertThat(mapper.toClassroom(new RawClassroom(101, 2, "X", 40)).isEnabled()).isTrue();
+        assertThat(mapper.toClassroom(new RawClassroom(101, 2, " n ", 40)).isEnabled()).isFalse();
     }
 
     @Test
@@ -105,7 +147,7 @@ class SysacadCatalogMapperTest {
                 5, "Ingeniería en Sistemas de Información", 2008, 115, "Sistemas de Representación", 0));
 
         assertThat(allocation).isEqualTo(new SysacadAllocationDto(
-                "1H90SR", 115, DayOfWeek.TUESDAY, LocalTime.of(10, 30), 135, 0, 805, 15));
+                "1H90SR", 115, 5, 2008, DayOfWeek.TUESDAY, LocalTime.of(10, 30), 135, 0, 805, 15));
     }
 
     @Test
@@ -148,7 +190,7 @@ class SysacadCatalogMapperTest {
                 5, "Ingeniería en Sistemas de Información", 2008, 115, "Sistemas de Representación", 30));
 
         assertThat(event).isEqualTo(new SysacadAcademicEventDto(
-                "1H90SR", 115, DayOfWeek.TUESDAY, LocalTime.of(10, 30), 135, 0));
+                "1H90SR", 115, 5, 2008, DayOfWeek.TUESDAY, LocalTime.of(10, 30), 135, 0));
     }
 
     @Test
