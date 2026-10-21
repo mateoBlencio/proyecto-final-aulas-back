@@ -440,6 +440,56 @@ class AllocationServiceImplTest {
         order.verify(validator).validateManualOverlap(anyList(), any());
     }
 
+    // ---------- reallocateExisting ----------
+
+    @Test
+    @DisplayName("reallocateExisting: ocurrencia sin asignación previa → 409 con su id y writer.upsert nunca se llama")
+    void reallocateExistingWithoutAllocationThrowsAndDoesNotWrite() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occurrenceSlot(10L, 1L, futureDate(1)), 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(assignments(resolved));
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.reallocateExisting(command))
+                .isInstanceOf(AllocationConflictException.class)
+                .hasMessageContaining("[10]");
+
+        verify(writer, never()).upsert(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("reallocateExisting: ocurrencia con asignación previa → upsert")
+    void reallocateExistingWithAllocationUpserts() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occurrenceSlot(10L, 1L, futureDate(1)), 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(assignments(resolved));
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L)))
+                .thenReturn(List.of(allocation(900L, 10L, 9, AllocationSource.MANUAL)));
+        Allocation saved = allocation(900L, 10L, 5, AllocationSource.MANUAL);
+        when(writer.upsert(resolved, "obs", AllocationSource.MANUAL)).thenReturn(List.of(saved));
+        when(composer.composeAll(List.of(saved))).thenReturn(List.of(dummyResponseDto()));
+
+        assertThat(service.reallocateExisting(command)).hasSize(1);
+
+        verify(writer).upsert(resolved, "obs", AllocationSource.MANUAL);
+    }
+
+    @Test
+    @DisplayName("reallocate: ocurrencia sin asignación previa sí hace upsert (ingest, preview y roomrequest dependen de eso)")
+    void reallocateWithoutPreviousAllocationStillUpserts() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occurrenceSlot(10L, 1L, futureDate(1)), 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(assignments(resolved));
+        when(writer.upsert(resolved, "obs", AllocationSource.MANUAL)).thenReturn(List.of());
+
+        service.reallocate(command);
+
+        verify(writer).upsert(resolved, "obs", AllocationSource.MANUAL);
+    }
+
     // ---------- release ----------
 
     private OccurrenceSlotDto slotWithPreviousClassroom(long id, Long previousClassroomId) {

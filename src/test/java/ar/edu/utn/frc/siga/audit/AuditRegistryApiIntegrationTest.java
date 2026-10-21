@@ -1169,6 +1169,14 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
         var building = testData.edificio();
         Long classroomA = testData.aula(building).getId();
         Long classroomB = testData.aula(building).getId();
+        Long classroomInitial = testData.aula(building).getId();
+        var initial = new AllocationBatchRequestDto(List.of(
+                new AllocationItemRequestDto(List.of(occurrences.get(0).getId(), occurrences.get(1).getId()),
+                        null, null, null, classroomInitial)), null);
+        mockMvc.perform(post("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(initial)))
+                .andExpect(status().isCreated());
         var body = new AllocationBatchRequestDto(List.of(
                 new AllocationItemRequestDto(List.of(occurrences.get(0).getId()), null, null, null, classroomA),
                 new AllocationItemRequestDto(List.of(occurrences.get(1).getId()), null, null, null, classroomB)), null);

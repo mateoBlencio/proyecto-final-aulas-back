@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ReleasedOccurrenceDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationComposer;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
@@ -121,6 +122,20 @@ public class AllocationServiceImpl implements AllocationService {
     public List<AllocationResponseDto> reallocate(AllocationCommand command) {
         AllocationTargetResolver.ResolvedAssignments resolved = resolve(command);
         Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolved.classroomByOccurrence();
+        List<ClassroomResponseDto> classrooms = lockAndValidate(command, classroomByOccurrence);
+        describeAllocation("Reasignación", classrooms, resolved.skippedReleased().size());
+        List<Allocation> saved = writer.upsert(classroomByOccurrence, command.observation(), command.source());
+        log.info("Asignación actualizada: source={}, count={}", command.source(), saved.size());
+        return composer.composeAll(saved);
+    }
+
+    @Override
+    @Transactional
+    @AuditOperation("Reasignación de aulas en lote")
+    public List<AllocationResponseDto> reallocateExisting(AllocationCommand command) {
+        AllocationTargetResolver.ResolvedAssignments resolved = resolve(command);
+        Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolved.classroomByOccurrence();
+        requirePreviousAllocation(classroomByOccurrence.keySet());
         List<ClassroomResponseDto> classrooms = lockAndValidate(command, classroomByOccurrence);
         describeAllocation("Reasignación", classrooms, resolved.skippedReleased().size());
         List<Allocation> saved = writer.upsert(classroomByOccurrence, command.observation(), command.source());
@@ -268,6 +283,19 @@ public class AllocationServiceImpl implements AllocationService {
                 .collect(Collectors.toSet());
         buildingScopeResolver.requireAccess(Permission.ALLOCATION_WRITE, buildingIds);
         return classrooms;
+    }
+
+    private void requirePreviousAllocation(Collection<OccurrenceSlotDto> occurrences) {
+        Map<Long, Long> current = currentClassroomByOccurrence(List.copyOf(occurrences));
+        List<Long> missing = occurrences.stream()
+                .map(OccurrenceSlotDto::occurrenceId)
+                .filter(id -> !current.containsKey(id))
+                .sorted()
+                .toList();
+        if (!missing.isEmpty()) {
+            throw new AllocationConflictException("Las ocurrencias " + missing
+                    + " no tienen aula asignada: para asignarlas usá POST /v1/allocations.");
+        }
     }
 
     private Map<Long, Long> currentClassroomByOccurrence(List<OccurrenceSlotDto> occurrences) {

@@ -21,8 +21,8 @@ body:json {
 
 docs {
   Cambia el aula de TODAS las ocurrencias aplicables de un evento en un solo
-  item usando "eventId" en vez de "occurrenceIds" (source = MANUAL, modo
-  upsert: crea la asignación si no existía, o actualiza si ya existía).
+  item usando "eventId" en vez de "occurrenceIds" (source = MANUAL). Solo mueve
+  ocurrencias que ya tienen aula: 409 si alguna no la tiene (para asignar, POST).
 
   A diferencia de un item con "occurrenceIds" explícitas (que falla con 409
   si alguna de las ocurrencias indicadas ya pasó), un item con "eventId" NO

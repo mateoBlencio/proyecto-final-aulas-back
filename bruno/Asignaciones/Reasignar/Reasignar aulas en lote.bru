@@ -21,8 +21,8 @@ body:json {
 }
 
 docs {
-  Asigna/reasigna aula de varios items en un solo lote (source = MANUAL, modo
-  upsert: crea la asignación si no existía, o actualiza si ya existía).
+  Reasigna aula de varios items en un solo lote (source = MANUAL). Solo mueve
+  ocurrencias que ya tienen aula: 409 si alguna no la tiene (para asignar, POST).
 
   Cada item es EITHER "occurrenceIds" (lista explícita de ids de ocurrencia)
   OR "eventId" (todas las ocurrencias aplicables del evento desde la primera

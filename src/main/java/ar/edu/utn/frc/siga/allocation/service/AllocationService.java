@@ -34,6 +34,13 @@ public interface AllocationService {
 
     List<AllocationResponseDto> reallocate(AllocationCommand command);
 
+    /**
+     * Moves occurrences that already have a classroom. Rejects the whole batch with 409 if an
+     * occurrence has no allocation. Used by PUT /v1/allocations; callers that may also create
+     * allocations use reallocate.
+     */
+    List<AllocationResponseDto> reallocateExisting(AllocationCommand command);
+
     List<DeallocatedOccurrenceDto> deallocate(DeallocationCommand command);
 
     /**
