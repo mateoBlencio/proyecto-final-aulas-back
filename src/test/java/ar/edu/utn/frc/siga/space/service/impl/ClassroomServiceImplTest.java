@@ -289,7 +289,7 @@ class ClassroomServiceImplTest {
         Classroom classroom = SpaceTestData.classroom().build();
         Page<Classroom> page = new PageImpl<>(List.of(classroom), pageable, 1);
         ClassroomListItemDto item = new ClassroomListItemDto(1L, 101, 1L, "Edificio Central", 1L, "Normal", 40,
-                List.of(), null, true, null, "Todas", List.of(), null, true);
+                List.of(), null, true, null, "Todas", List.of(), null, true, false, false, false);
         Page<ClassroomListItemDto> composed = new PageImpl<>(List.of(item), pageable, 1);
         when(classroomRepository.findAll(ArgumentMatchers.<Specification<Classroom>>any(), any(Pageable.class)))
                 .thenReturn(page);

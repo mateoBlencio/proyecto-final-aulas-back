@@ -928,6 +928,6 @@ class RoomRequestResolutionServiceImplTest {
         RoomRequestItemDetailHeaderDto header = new RoomRequestItemDetailHeaderDto(1L, RoomRequestType.FINAL_EXAM,
                 ar.edu.utn.frc.siga.roomrequest.model.AcademicScope.GRADO, "Ada Lovelace", "ada@frc.utn.edu.ar",
                 "351-1234567", null, null, 1);
-        return new RoomRequestItemDetailDto(header, mockResponse());
+        return new RoomRequestItemDetailDto(header, mockResponse(), List.of());
     }
 }

@@ -64,4 +64,9 @@ docs {
   derivedBuildingName/derivedAt, wasReturned, assignedClassroomCount (0 si nada
   asignado) y partiallyResolved — todos calculados por el back, no hace falta
   derivarlos en el front.
+
+  Cada fila trae allowedActions: subconjunto de ASSIGN | DERIVE | RETURN | CANCEL |
+  NOTIFY que el usuario autenticado puede ejecutar sobre ese pedido segun rol,
+  estado y edificio derivado. Es una pista de UI: el back valida igual en cada
+  endpoint.
 }

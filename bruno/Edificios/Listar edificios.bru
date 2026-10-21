@@ -22,4 +22,8 @@ docs {
   respuesta es { content: [...], page: { size, number, totalElements, totalPages } }.
   Sin includeDeactivated solo devuelve edificios activos y vigentes en SysAcad.
   unavailableReason: null, DEACTIVATED o NOT_IN_SYSACAD.
+  Pistas de UI por edificio (el back valida igual en cada endpoint):
+  - canActivate: puede activar/desactivar edificios (permiso global).
+  - canCreateClassroom: puede crear aulas en el edificio segun su alcance; false
+    si el edificio esta desactivado.
 }
