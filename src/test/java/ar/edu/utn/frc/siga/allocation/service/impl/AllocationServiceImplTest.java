@@ -477,6 +477,25 @@ class AllocationServiceImplTest {
     }
 
     @Test
+    @DisplayName("reallocateExisting: sin acceso al edificio del aula actual → AccessDenied y writer.upsert nunca se llama")
+    void reallocateExistingWithoutAccessToCurrentBuildingThrows() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occurrenceSlot(10L, 1L, futureDate(1)), 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(assignments(resolved));
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L)))
+                .thenReturn(List.of(allocation(900L, 10L, 9, AllocationSource.MANUAL)));
+        when(classroomService.findByIdsIncludingDeactivated(Set.of(9L)))
+                .thenReturn(List.of(classroomIn(9L, 2L, "Edificio B")));
+        doThrow(new AccessDeniedException("sin acceso")).when(buildingScopeResolver)
+                .requireAccess(Permission.ALLOCATION_WRITE, Set.of(2L));
+
+        assertThatThrownBy(() -> service.reallocateExisting(command)).isInstanceOf(AccessDeniedException.class);
+
+        verify(writer, never()).upsert(any(), any(), any());
+    }
+
+    @Test
     @DisplayName("reallocate: ocurrencia sin asignación previa sí hace upsert (ingest, preview y roomrequest dependen de eso)")
     void reallocateWithoutPreviousAllocationStillUpserts() {
         AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);

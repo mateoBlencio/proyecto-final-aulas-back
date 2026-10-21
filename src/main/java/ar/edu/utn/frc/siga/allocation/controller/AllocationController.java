@@ -163,6 +163,7 @@ public class AllocationController {
                        + "(las ocurrencias de afuera del rango conservan su aula, así que la clase 'vuelve' sola), "
                        + "y 'eventId' + 'from' sin 'to' es un cambio PERMANENTE desde esa fecha hasta que termine "
                        + "el dictado. Ambos bordes son inclusive y 'from' no puede ser anterior a hoy (400). "
+                       + "403 si el aula actual o la de destino es de un edificio fuera de su alcance. "
                        + "409 si alguna ocurrencia del lote no tiene aula asignada (para asignar se usa POST), "
                        + "si algún aula no existe/no está disponible, si hay solapamiento de horario con otra "
                        + "asignación, o si una ocurrencia del rango ya ocurrió. En el 409 y en el 400 por "

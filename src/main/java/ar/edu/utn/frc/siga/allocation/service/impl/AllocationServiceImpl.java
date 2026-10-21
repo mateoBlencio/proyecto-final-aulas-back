@@ -135,7 +135,8 @@ public class AllocationServiceImpl implements AllocationService {
     public List<AllocationResponseDto> reallocateExisting(AllocationCommand command) {
         AllocationTargetResolver.ResolvedAssignments resolved = resolve(command);
         Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolved.classroomByOccurrence();
-        requirePreviousAllocation(classroomByOccurrence.keySet());
+        Map<Long, Long> current = requirePreviousAllocation(classroomByOccurrence.keySet());
+        requireAccessToClassrooms(Set.copyOf(current.values()));
         List<ClassroomResponseDto> classrooms = lockAndValidate(command, classroomByOccurrence);
         describeAllocation("Reasignación", classrooms, resolved.skippedReleased().size());
         List<Allocation> saved = writer.upsert(classroomByOccurrence, command.observation(), command.source());
@@ -285,7 +286,7 @@ public class AllocationServiceImpl implements AllocationService {
         return classrooms;
     }
 
-    private void requirePreviousAllocation(Collection<OccurrenceSlotDto> occurrences) {
+    private Map<Long, Long> requirePreviousAllocation(Collection<OccurrenceSlotDto> occurrences) {
         Map<Long, Long> current = currentClassroomByOccurrence(List.copyOf(occurrences));
         List<Long> missing = occurrences.stream()
                 .map(OccurrenceSlotDto::occurrenceId)
@@ -296,6 +297,7 @@ public class AllocationServiceImpl implements AllocationService {
             throw new AllocationConflictException("Las ocurrencias " + missing
                     + " no tienen aula asignada: para asignarlas usá POST /v1/allocations.");
         }
+        return current;
     }
 
     private Map<Long, Long> currentClassroomByOccurrence(List<OccurrenceSlotDto> occurrences) {
