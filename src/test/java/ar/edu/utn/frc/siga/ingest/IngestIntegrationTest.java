@@ -123,7 +123,7 @@ class IngestIntegrationTest extends AbstractIntegrationTest {
                         .file(ExcelTestWorkbooks.validTemplate().withDataRow(row).toMultipartFile(filename)))
                 .andExpect(status().isOk());
 
-        Classroom classroom = classroomRepository.findByRoomNumberAndDeletedAtIsNull((Integer) row.roomNumber()).orElseThrow();
+        Classroom classroom = classroomRepository.findAllByRoomNumberAndDeletedAtIsNull((Integer) row.roomNumber()).getFirst();
         List<String> descriptions = jdbcTemplate.queryForList(
                 "SELECT DISTINCT r.descripcion FROM revinfo r JOIN asignacion_aula_aud a ON a.rev = r.rev "
                         + "WHERE a.id_aula = ?", String.class, classroom.getId());
@@ -155,7 +155,7 @@ class IngestIntegrationTest extends AbstractIntegrationTest {
         assertThat(eventRepository.count()).isEqualTo(eventsBefore);
         assertThat(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester())).isPresent();
 
-        Classroom classroom1 = classroomRepository.findByRoomNumberAndDeletedAtIsNull((Integer) row1.roomNumber()).orElseThrow();
+        Classroom classroom1 = classroomRepository.findAllByRoomNumberAndDeletedAtIsNull((Integer) row1.roomNumber()).getFirst();
         assertThat(classroom1.getCapacity()).isEqualTo(row1.enrolledCount());
 
         Long eventId1 = jdbcTemplate.queryForObject(

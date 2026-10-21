@@ -21,12 +21,16 @@ import org.mockito.Answers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import ar.edu.utn.frc.siga.optimizer.exception.SchedulingException;
+import java.util.concurrent.ExecutionException;
+
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -212,6 +216,29 @@ class OptimizerServiceImplTest {
             OptimizationResult result = service.optimize(List.of(), List.of(), List.of(), 5);
 
             assertThat(result.previewId()).startsWith("prev_");
+        }
+    }
+
+    @Nested
+    @DisplayName("falla del solver (vía optimize)")
+    class SolverFailure {
+
+        @Test
+        @DisplayName("SchedulingException lleva un mensaje fijo y conserva la causa sin exponer su mensaje")
+        @SuppressWarnings("unchecked")
+        void solverFailureDoesNotLeakCauseMessage() throws Exception {
+            SolverJobBuilder<ScheduleSolution> builder = mock(SolverJobBuilder.class, Answers.RETURNS_SELF);
+            SolverJob<ScheduleSolution> job = mock(SolverJob.class);
+            when(solverManager.solveBuilder()).thenReturn(builder);
+            when(builder.run()).thenReturn(job);
+            IllegalStateException cause = new IllegalStateException("internal detail: constraint X rule Y");
+            when(job.getFinalBestSolution()).thenThrow(new ExecutionException(cause));
+
+            assertThatThrownBy(() -> service.optimize(List.of(), List.of(), List.of(), 5))
+                    .isInstanceOf(SchedulingException.class)
+                    .hasMessage("Error durante la optimización.")
+                    .hasMessageNotContaining("internal detail")
+                    .hasCause(cause);
         }
     }
 }
