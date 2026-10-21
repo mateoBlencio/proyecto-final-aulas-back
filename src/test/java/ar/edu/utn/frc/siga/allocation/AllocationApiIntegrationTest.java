@@ -637,6 +637,42 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("POST /v1/allocations con alcance en el edificio A sobre un aula del edificio B responde 403 y no asigna")
+    void allocate_scopedToOtherBuilding_returns403() throws Exception {
+        var sc = testData.materiaYComision();
+        var edificioA = testData.edificio();
+        Classroom aulaB = testData.aula(testData.edificio());
+        Occurrence occurrence = seedOccurrence(sc, LocalDate.now().plusDays(18));
+        MockMvc auxiliar = mockMvcAsScoped("aux-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar",
+                SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, edificioA.getId());
+
+        auxiliar.perform(post("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(byOccurrence(occurrence.getId(), aulaB.getId()))))
+                .andExpect(status().isForbidden());
+
+        assertThat(allocationRepository.findByOccurrenceIdIn(List.of(occurrence.getId()))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("POST /v1/allocations con alcance en el edificio A sobre un aula del edificio A responde 201")
+    void allocate_scopedToSameBuilding_returns201() throws Exception {
+        var sc = testData.materiaYComision();
+        var edificioA = testData.edificio();
+        Classroom aulaA = testData.aula(edificioA);
+        Occurrence occurrence = seedOccurrence(sc, LocalDate.now().plusDays(19));
+        MockMvc auxiliar = mockMvcAsScoped("aux-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar",
+                SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, edificioA.getId());
+
+        auxiliar.perform(post("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(byOccurrence(occurrence.getId(), aulaA.getId()))))
+                .andExpect(status().isCreated());
+
+        assertThat(classroomOf(occurrence.getId())).isEqualTo(aulaA.getId());
+    }
+
+    @Test
     @DisplayName("La secuencia de asignacion_aula incrementa de a 50, igual que allocationSize de la entidad")
     void allocationSequence_incrementsBy50() {
         Long increment = jdbcTemplate.queryForObject(
