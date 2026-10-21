@@ -38,7 +38,7 @@ class AcademicPeriodUpdateApiIntegrationTest extends AbstractIntegrationTest {
         testData.periodoAcademico(year, TermType.PRIMER_CUATRIMESTRE);
         testData.periodoAcademico(year, TermType.SEGUNDO_CUATRIMESTRE);
 
-        auxiliarMockMvc = mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
+        auxiliarMockMvc = mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar");
     }
 
     private Long periodId(TermType termType) {

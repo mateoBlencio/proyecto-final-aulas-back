@@ -106,6 +106,22 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.errors.password").exists());
     }
 
+    @Test
+    @DisplayName("POST /v1/users con initialRole AUXILIAR_AULICO/GLOBAL responde 400 y no crea el usuario")
+    void create_initialRoleWithDisallowedScope_returns400AndRollsBack() throws Exception {
+        String email = uniqueEmail();
+
+        mockMvc.perform(post("/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","password":"supersegura","firstName":"Nombre","lastName":"Apellido",
+                                 "initialRole":{"role":"AUXILIAR_AULICO","scopeType":"GLOBAL","scopeId":null}}
+                                """.formatted(email)))
+                .andExpect(status().isBadRequest());
+
+        assertThat(userRepository.existsByEmail(email)).isFalse();
+    }
+
     // ---- enabled / disabled ----
 
     @Test
@@ -141,7 +157,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("GET /v1/users es accesible para AUXILIAR_AULICO (200)")
     void findEnabled_asAuxiliar_returns200() throws Exception {
-        mockMvcAs("aux." + System.nanoTime() + "@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO)
+        mockMvcAsAuxiliar("aux." + System.nanoTime() + "@frc.utn.edu.ar")
                 .perform(get("/v1/users"))
                 .andExpect(status().isOk());
     }
@@ -149,7 +165,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("GET /v1/users/disabled está prohibido para AUXILIAR_AULICO (403)")
     void findDisabled_asAuxiliar_returns403() throws Exception {
-        mockMvcAs("aux." + System.nanoTime() + "@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO)
+        mockMvcAsAuxiliar("aux." + System.nanoTime() + "@frc.utn.edu.ar")
                 .perform(get("/v1/users/disabled"))
                 .andExpect(status().isForbidden());
     }
@@ -157,7 +173,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("POST /v1/users está prohibido para AUXILIAR_AULICO (403)")
     void create_asAuxiliar_returns403() throws Exception {
-        mockMvcAs("aux." + System.nanoTime() + "@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO)
+        mockMvcAsAuxiliar("aux." + System.nanoTime() + "@frc.utn.edu.ar")
                 .perform(post("/v1/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createBody(uniqueEmail(), "supersegura")))

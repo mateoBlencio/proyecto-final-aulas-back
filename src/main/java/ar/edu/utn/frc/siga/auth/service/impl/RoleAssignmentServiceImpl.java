@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.auth.dto.response.RoleAssignmentDto;
 import ar.edu.utn.frc.siga.auth.exception.RoleDomainException;
 import ar.edu.utn.frc.siga.auth.mapper.RoleAssignmentComposer;
 import ar.edu.utn.frc.siga.auth.model.RoleAssignment;
+import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.RoleAssignmentRepository;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
@@ -40,6 +41,7 @@ public class RoleAssignmentServiceImpl implements RoleAssignmentService {
                 userId, dto.role(), dto.scopeType(), dto.scopeId());
 
         User user = findUser(userId);
+        validateRoleScope(dto.role(), dto.scopeType());
         validateScope(dto.scopeType(), dto.scopeId());
         validateNotDuplicate(userId, dto);
 
@@ -79,6 +81,12 @@ public class RoleAssignmentServiceImpl implements RoleAssignmentService {
 
         roleAssignmentRepository.delete(assignment);
         log.info("Asignación revocada: id={}, userId={}", assignmentId, userId);
+    }
+
+    private void validateRoleScope(SystemRole role, ScopeType scopeType) {
+        if (!role.allowsScope(scopeType)) {
+            throw new RoleDomainException("Role " + role + " does not allow " + scopeType + " scope");
+        }
     }
 
     private void validateScope(ScopeType scopeType, Long scopeId) {

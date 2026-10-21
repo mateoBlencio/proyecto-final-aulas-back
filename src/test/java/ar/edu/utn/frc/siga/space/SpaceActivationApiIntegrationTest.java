@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
+import ar.edu.utn.frc.siga.common.security.ScopeType;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
@@ -15,7 +16,6 @@ import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 import java.util.function.BooleanSupplier;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,13 +38,6 @@ class SpaceActivationApiIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private ClassroomTypeRepository classroomTypeRepository;
 
-    private MockMvc auxiliarMockMvc;
-
-    @BeforeEach
-    void setUpAuxiliarMockMvc() {
-        auxiliarMockMvc = mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
-    }
-
     @Test
     @DisplayName("Building: PUT/DELETE /v1/buildings/{id}/activation (204, idempotente, 404, 403)")
     void building_activationLifecycle() throws Exception {
@@ -54,18 +47,23 @@ class SpaceActivationApiIntegrationTest extends AbstractIntegrationTest {
                 "/v1/buildings/" + id + "/activation",
                 "/v1/buildings/999999999/activation",
                 () -> buildingRepository.findActiveById(id).isPresent(),
+                mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar"),
                 true);
     }
 
     @Test
     @DisplayName("Classroom: PUT/DELETE /v1/classrooms/{id}/activation (204, idempotente, 404, 403)")
     void classroom_activationLifecycle() throws Exception {
-        Classroom classroom = testData.aula(testData.edificio());
+        Building building = testData.edificio();
+        Classroom classroom = testData.aula(building);
+        MockMvc auxiliarOfBuilding = mockMvcAsScoped("auxiliar@frc.utn.edu.ar",
+                SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, building.getId());
         long id = classroom.getId();
         assertActivationLifecycle(
                 "/v1/classrooms/" + id + "/activation",
                 "/v1/classrooms/999999999/activation",
                 () -> classroomRepository.findActiveById(id).isPresent(),
+                auxiliarOfBuilding,
                 false);
     }
 
@@ -79,11 +77,12 @@ class SpaceActivationApiIntegrationTest extends AbstractIntegrationTest {
                 "/v1/classroom-types/" + id + "/activation",
                 "/v1/classroom-types/999999999/activation",
                 () -> classroomTypeRepository.findActiveById(id).isPresent(),
+                mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar"),
                 true);
     }
 
     private void assertActivationLifecycle(String activationPath, String missingPath, BooleanSupplier active,
-            boolean auxiliarForbidden) throws Exception {
+            MockMvc auxiliarMockMvc, boolean auxiliarForbidden) throws Exception {
         assertThat(active.getAsBoolean()).isTrue();
 
         mockMvc.perform(delete(activationPath)).andExpect(status().isNoContent());

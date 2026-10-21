@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.auth.model;
 
 import ar.edu.utn.frc.siga.common.security.Permission;
+import ar.edu.utn.frc.siga.common.security.ScopeType;
 import java.util.EnumSet;
 import java.util.Set;
 import org.springframework.modulith.NamedInterface;
@@ -55,5 +56,13 @@ public enum SystemRole {
 
     public Set<Permission> permissions() {
         return permissions;
+    }
+
+    public boolean allowsScope(ScopeType scopeType) {
+        return switch (this) {
+            case SUBSECRETARIA -> scopeType == ScopeType.GLOBAL;
+            case AUXILIAR_AULICO -> scopeType == ScopeType.BUILDING;
+            case CONSULTA -> true;
+        };
     }
 }

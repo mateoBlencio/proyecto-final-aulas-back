@@ -147,7 +147,7 @@ class SettingsApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("Un AUXILIAR_AULICO no puede modificar configuración (403)")
     void put_asAuxiliar_isForbidden() throws Exception {
-        MockMvc auxiliarMockMvc = mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
+        MockMvc auxiliarMockMvc = mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar");
 
         auxiliarMockMvc.perform(put("/v1/settings/{key}", "optimizer.weights.overcrowding")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -187,7 +187,7 @@ class SettingsApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("Un AUXILIAR_AULICO no puede mover el margen de solape (403): solo Subsecretaría")
     void put_allocationMaxOverlapMinutes_asAuxiliar_isForbidden() throws Exception {
-        MockMvc auxiliarMockMvc = mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
+        MockMvc auxiliarMockMvc = mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar");
 
         auxiliarMockMvc.perform(put("/v1/settings/{key}", "allocation.maxOverlapMinutes")
                         .contentType(MediaType.APPLICATION_JSON)
