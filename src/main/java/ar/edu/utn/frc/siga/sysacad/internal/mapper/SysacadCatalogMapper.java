@@ -23,6 +23,12 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
+import java.util.Collection;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -38,11 +44,16 @@ public class SysacadCatalogMapper {
     private static final String NO = "N";
     // ASCII control chars plus NEL and the Unicode line/paragraph separators, which also split log lines.
     private static final Pattern CONTROL_CHARS = Pattern.compile("[\\p{Cntrl}\\u0085\\u2028\\u2029]");
+    private static final Pattern COURSE_CODE_INVALID_CHARS = Pattern.compile("[^A-Za-z0-9-]");
+    /** Length of comision.codigo_curso. */
+    private static final int MAX_COURSE_CODE_LENGTH = 255;
+    private static final int MAX_LOGGED_LENGTH = 50;
+    private static final Pattern WHITESPACE_RUN = Pattern.compile("\\s+");
     private static final int MIN_ISO_DAY = DayOfWeek.MONDAY.getValue();
     private static final int MAX_ISO_DAY = DayOfWeek.SUNDAY.getValue();
 
     public SysacadBuildingDto toBuilding(RawBuilding raw) {
-        return new SysacadBuildingDto(raw.edificio(), trim(raw.edificioNombre()));
+        return new SysacadBuildingDto(raw.edificio(), cleanText(raw.edificioNombre()));
     }
 
     public SysacadClassroomDto toClassroom(RawClassroom raw) {
@@ -56,8 +67,8 @@ public class SysacadCatalogMapper {
     public SysacadSpecialtyDto toSpecialty(RawSpecialty raw) {
         return new SysacadSpecialtyDto(
                 raw.especialid(),
-                trim(raw.asEspecialidadNombre()),
-                trim(raw.abreviatura()));
+                cleanText(raw.asEspecialidadNombre()),
+                cleanText(raw.abreviatura()));
     }
 
     public SysacadHolidayDto toHoliday(RawHoliday raw) {
@@ -74,9 +85,16 @@ public class SysacadCatalogMapper {
         }
     }
 
+    /** Returns null (row skipped) when the course code is empty or too long after normalization. */
     public SysacadCommissionDto toCommission(RawCommission raw) {
+        String curso = normalizeCourseCode(raw.curso());
+        if (curso == null) {
+            log.warn("Código de curso inválido tras normalizar ('{}') para comisión materia={}: fila salteada",
+                    forLog(raw.curso()), raw.materia());
+            return null;
+        }
         return new SysacadCommissionDto(
-                trim(raw.curso()),
+                curso,
                 raw.especialid(),
                 raw.plan(),
                 raw.materia(),
@@ -89,19 +107,31 @@ public class SysacadCatalogMapper {
                 raw.especialid(),
                 raw.plan(),
                 raw.materia(),
-                trim(raw.materiaNombre()),
+                cleanText(raw.materiaNombre()),
                 term);
     }
 
+    /** Returns null (row skipped) when the course code is empty or too long after normalization. */
     public SysacadSubjectCommissionDto toSubjectCommission(RawSchedule raw) {
+        String curso = normalizeCourseCode(raw.curso());
+        if (curso == null) {
+            log.warn("Código de curso inválido tras normalizar ('{}') para materia={}: fila salteada",
+                    forLog(raw.curso()), raw.materia());
+            return null;
+        }
         return new SysacadSubjectCommissionDto(
-                trim(raw.curso()),
+                curso,
                 raw.materia(),
                 raw.inscriptos());
     }
 
     public SysacadAcademicEventDto toAcademicEvent(RawSchedule raw) {
-        String curso = trim(raw.curso());
+        String curso = normalizeCourseCode(raw.curso());
+        if (curso == null) {
+            log.warn("Código de curso inválido tras normalizar ('{}') para materia={}: fila salteada",
+                    forLog(raw.curso()), raw.materia());
+            return null;
+        }
         DayOfWeek dayOfWeek = parseDayOfWeek(raw.dia(), curso, raw.materia());
         if (dayOfWeek == null) {
             return null;
@@ -122,7 +152,12 @@ public class SysacadCatalogMapper {
     }
 
     public SysacadAllocationDto toAllocation(RawSchedule raw) {
-        String curso = trim(raw.curso());
+        String curso = normalizeCourseCode(raw.curso());
+        if (curso == null) {
+            log.warn("Código de curso inválido tras normalizar ('{}') para materia={}: fila salteada",
+                    forLog(raw.curso()), raw.materia());
+            return null;
+        }
         DayOfWeek dayOfWeek = parseDayOfWeek(raw.dia(), curso, raw.materia());
         if (dayOfWeek == null) {
             return null;
@@ -185,8 +220,48 @@ public class SysacadCatalogMapper {
         }
     }
 
+    /** Removes everything except [A-Za-z0-9-] and uppercases; null when nothing is left or it exceeds the column. */
+    static String normalizeCourseCode(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = COURSE_CODE_INVALID_CHARS.matcher(value).replaceAll("").toUpperCase(Locale.ROOT);
+        return normalized.isEmpty() || normalized.length() > MAX_COURSE_CODE_LENGTH ? null : normalized;
+    }
+
+    /** Trims and collapses runs of whitespace into a single space; punctuation is kept. */
+    static String cleanText(String value) {
+        return value == null ? null : WHITESPACE_RUN.matcher(trim(value)).replaceAll(" ");
+    }
+
     /** Strips spaces and control characters (CR/LF): Sysacad values end up in logs and in the database. */
     private static String trim(String value) {
         return value == null ? null : CONTROL_CHARS.matcher(value).replaceAll(" ").trim();
+    }
+
+    /** Sanitized and bounded form of a raw Sysacad value, safe to print in a log line. */
+    private static String forLog(String value) {
+        String clean = trim(value);
+        return clean != null && clean.length() > MAX_LOGGED_LENGTH ? clean.substring(0, MAX_LOGGED_LENGTH) + "..." : clean;
+    }
+
+    /**
+     * Warns about raw course codes that differ but normalize to the same value (e.g. "1K1" and "1 K1"): they
+     * end up as one commission. The rows are kept; the warning leaves the evidence.
+     */
+    public void warnCourseCodeCollisions(Collection<String> rawCodes) {
+        Map<String, Set<String>> rawByNormalized = new TreeMap<>();
+        for (String raw : rawCodes) {
+            String normalized = normalizeCourseCode(raw);
+            if (normalized != null) {
+                rawByNormalized.computeIfAbsent(normalized, k -> new TreeSet<>()).add(trim(raw));
+            }
+        }
+        rawByNormalized.forEach((normalized, raws) -> {
+            if (raws.size() > 1) {
+                log.warn("Códigos de curso distintos normalizan a '{}': {}", normalized,
+                        raws.stream().map(SysacadCatalogMapper::forLog).toList());
+            }
+        });
     }
 }

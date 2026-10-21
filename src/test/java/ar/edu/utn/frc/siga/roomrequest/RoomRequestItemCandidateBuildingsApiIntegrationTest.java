@@ -66,9 +66,8 @@ class RoomRequestItemCandidateBuildingsApiIntegrationTest extends AbstractIntegr
     }
 
     // El caso "edificio sin auxiliar asignado no aparece" no es testeable acá de forma confiable:
-    // otros *ApiIntegrationTest del módulo autentican como AUXILIAR_AULICO con mockMvcAs(...), que
-    // crea el fixture con scope GLOBAL -- cubre todos los edificios para el resto de la corrida de
-    // la suite. Queda cubierto por RoomRequestResolutionServiceImplTest.findCandidateBuildings_sinAuxiliarAsignado
+    // el estado de la base persiste durante toda la corrida de la suite y otros tests dejan auxiliares
+    // asignados a edificios propios, que pueden coincidir con los candidatos. Queda cubierto por RoomRequestResolutionServiceImplTest.findCandidateBuildings_sinAuxiliarAsignado
     // (unit, con userService mockeado).
 
     @Test

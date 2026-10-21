@@ -6,6 +6,8 @@ import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.common.security.ScopeType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 @DisplayName("SystemRole - dashboard permissions")
 class SystemRoleTest {
@@ -48,5 +50,19 @@ class SystemRoleTest {
         assertThat(SystemRole.SUBSECRETARIA.permissions()).contains(Permission.BUILDING_ACTIVITY_READ);
         assertThat(SystemRole.AUXILIAR_AULICO.permissions()).contains(Permission.BUILDING_ACTIVITY_READ);
         assertThat(SystemRole.CONSULTA.permissions()).doesNotContain(Permission.BUILDING_ACTIVITY_READ);
+    }
+
+    @ParameterizedTest(name = "{0} + {1} -> {2}")
+    @CsvSource({
+            "SUBSECRETARIA, GLOBAL, true",
+            "SUBSECRETARIA, BUILDING, false",
+            "AUXILIAR_AULICO, GLOBAL, false",
+            "AUXILIAR_AULICO, BUILDING, true",
+            "CONSULTA, GLOBAL, true",
+            "CONSULTA, BUILDING, true"
+    })
+    @DisplayName("allowsScope: SUBSECRETARIA solo GLOBAL, AUXILIAR_AULICO solo BUILDING, CONSULTA ambos")
+    void allowsScope(SystemRole role, ScopeType scopeType, boolean expected) {
+        assertThat(role.allowsScope(scopeType)).isEqualTo(expected);
     }
 }

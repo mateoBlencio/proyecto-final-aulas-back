@@ -34,7 +34,7 @@ class ClassroomListApiIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUpAuxiliar() {
-        auxiliarMockMvc = mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
+        auxiliarMockMvc = mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar");
     }
 
     @Test

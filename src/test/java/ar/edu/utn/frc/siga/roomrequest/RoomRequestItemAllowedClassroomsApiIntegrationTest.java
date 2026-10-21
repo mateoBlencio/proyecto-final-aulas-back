@@ -87,7 +87,7 @@ class RoomRequestItemAllowedClassroomsApiIntegrationTest extends AbstractIntegra
         anonymousMockMvc.perform(get("/v1/room-requests/items/" + item.getId() + "/allowed-classrooms"))
                 .andExpect(status().isUnauthorized());
 
-        mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO)
+        mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar")
                 .perform(get("/v1/room-requests/items/" + item.getId() + "/allowed-classrooms"))
                 .andExpect(status().isOk());
     }

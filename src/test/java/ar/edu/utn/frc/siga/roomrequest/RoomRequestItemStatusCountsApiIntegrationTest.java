@@ -141,7 +141,7 @@ class RoomRequestItemStatusCountsApiIntegrationTest extends AbstractIntegrationT
         anonymousMockMvc.perform(get("/v1/room-requests/items/status-counts"))
                 .andExpect(status().isUnauthorized());
 
-        mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO)
+        mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar")
                 .perform(get("/v1/room-requests/items/status-counts"))
                 .andExpect(status().isOk());
     }
