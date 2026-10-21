@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
+import ar.edu.utn.frc.siga.dashboard.model.DashboardRules;
 import ar.edu.utn.frc.siga.dashboard.model.DashboardSnapshot;
 import ar.edu.utn.frc.siga.dashboard.repository.DashboardSnapshotRepository;
 import ar.edu.utn.frc.siga.dashboard.service.DashboardSnapshotService;
@@ -80,8 +81,8 @@ class DashboardSnapshotIntegrationTest extends DashboardIntegrationSupport {
         assertThat(rows.stream().filter(r -> r.getBuildingId() == null)).hasSize(1);
         assertThat(campus.getGeneratedBy()).isEqualTo("SISTEMA");
         JsonNode json = objectMapper.readTree(campus.getPayload());
-        assertThat(json.get("schemaVersion").asInt()).isEqualTo(1);
-        assertThat(json.get("rulesVersion").asInt()).isEqualTo(1);
+        assertThat(json.get("schemaVersion").asInt()).isEqualTo(DashboardRules.SCHEMA_VERSION);
+        assertThat(json.get("rulesVersion").asInt()).isEqualTo(DashboardRules.RULES_VERSION);
         assertThat(json.get("month").asText()).isEqualTo("2020-03");
         LocalTime hoursStart = LocalTime.parse(json.get("parameters").get("hoursStart").asText());
         LocalTime hoursEnd = LocalTime.parse(json.get("parameters").get("hoursEnd").asText());
