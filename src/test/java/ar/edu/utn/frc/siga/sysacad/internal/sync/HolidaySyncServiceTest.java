@@ -19,6 +19,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -72,6 +74,6 @@ class HolidaySyncServiceTest {
 
         assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(IllegalStateException.class);
 
-        verify(syncStateService).recordFailure(SysacadView.FERIADOS, "no valid rows");
+        verify(syncStateService).recordFailure(eq(SysacadView.FERIADOS), startsWith("INTERNAL_ERROR"));
     }
 }

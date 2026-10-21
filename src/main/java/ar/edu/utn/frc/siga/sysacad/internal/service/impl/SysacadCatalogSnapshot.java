@@ -147,14 +147,32 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
             case "A" -> TermType.ANUAL.getLabel();
             case "1" -> TermType.PRIMER_CUATRIMESTRE.getLabel();
             case "2" -> TermType.SEGUNDO_CUATRIMESTRE.getLabel();
+            case "C" -> singleSemester(withoutZero(facts.commissionSemesters()));
             default -> semesterFromCommissions(facts.commissionSemesters());
         };
     }
 
+    /**
+     * Without MateriaDictado, HorarioCuatrimestre = 0 means annual and is treated like in events
+     * ({@code SysacadCommissionResolver.termTypes}: it covers both semesters). A 0 in any row makes the subject
+     * annual, even when the rest is 1 or 2 (the annual schedule already covers both). Without a 0, a single
+     * semester gives that semester; two different ones stay null.
+     */
     private static String semesterFromCommissions(Set<Integer> semesters) {
+        if (semesters.contains(0)) {
+            return TermType.ANUAL.getLabel();
+        }
+        return singleSemester(withoutZero(semesters));
+    }
+
+    private static Set<Integer> withoutZero(Set<Integer> semesters) {
         Set<Integer> cuatrimestrales = new HashSet<>(semesters);
         cuatrimestrales.remove(null);
         cuatrimestrales.remove(0);
+        return cuatrimestrales;
+    }
+
+    private static String singleSemester(Set<Integer> cuatrimestrales) {
         if (cuatrimestrales.size() == 1) {
             return TermType.fromSemester(cuatrimestrales.iterator().next()).map(TermType::getLabel).orElse(null);
         }

@@ -24,11 +24,9 @@ public interface SubjectCommissionRepository
     @EntityGraph(attributePaths = {"commission", "commission.academicPeriod"})
     List<SubjectCommission> findBySubject_Id(Long subjectId);
 
-    // TEMPORAL/defensivo: {@code findFirst...} en vez de un único resultado porque una comisión puede
-    // quedar linkeada a dos materias con el mismo código bajo planes distintos (ambigüedad de datos de
-    // SysAcad, ver sync de Comisiones). Se toma el de menor id_materia de forma determinística para no
-    // romper EVENTOS/ASIGNACIONES. Revisar cuando se resuelva el link por plan de la comisión.
+    // A commission can be linked to two subjects with the same code under different study plans: the
+    // service disambiguates by specialty and study plan.
     @EntityGraph(attributePaths = {"commission", "commission.academicPeriod"})
-    Optional<SubjectCommission> findFirstByCommission_IdAndSubject_CodeAndDeletedAtIsNullOrderBySubject_IdAsc(
+    List<SubjectCommission> findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(
             Long commissionId, Integer subjectCode);
 }

@@ -33,21 +33,21 @@ class ClassroomSoftDeleteIntegrationTest extends AbstractIntegrationTest {
     private ClassroomService classroomService;
 
     @Test
-    @DisplayName("un aula borrada desaparece de findByRoomNumberAndDeletedAtIsNull y del listado paginado")
+    @DisplayName("un aula borrada desaparece de findByRoomNumberAndBuildingAndDeletedAtIsNull y del listado paginado")
     void softDeletedClassroom_isHiddenFromActiveFindersAndListEndpoint() throws Exception {
         Building building = testData.edificio();
         Classroom classroom = testData.aula(building);
         Long id = classroom.getId();
         Integer roomNumber = classroom.getRoomNumber();
 
-        assertThat(classroomRepository.findByRoomNumberAndDeletedAtIsNull(roomNumber)).isPresent();
+        assertThat(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(roomNumber, building)).isPresent();
         mockMvc.perform(get("/v1/classrooms").param("buildingId", String.valueOf(building.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[*].id", hasItem(id.intValue())));
 
         mockMvc.perform(delete("/v1/classrooms/" + id)).andExpect(status().isNoContent());
 
-        assertThat(classroomRepository.findByRoomNumberAndDeletedAtIsNull(roomNumber)).isEmpty();
+        assertThat(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(roomNumber, building)).isEmpty();
         assertThat(classroomRepository.findAllByRoomNumberAndDeletedAtIsNull(roomNumber)).isEmpty();
         mockMvc.perform(get("/v1/classrooms").param("buildingId", String.valueOf(building.getId())))
                 .andExpect(status().isOk())
@@ -69,7 +69,7 @@ class ClassroomSoftDeleteIntegrationTest extends AbstractIntegrationTest {
 
         classroomRepository.restore(deleted);
 
-        assertThat(classroomRepository.findByRoomNumberAndDeletedAtIsNull(roomNumber)).isPresent();
+        assertThat(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(roomNumber, building)).isPresent();
         Classroom restored = classroomRepository.findById(id).orElseThrow();
         assertThat(restored.isActive()).isTrue();
         mockMvc.perform(get("/v1/classrooms").param("buildingId", String.valueOf(building.getId())))

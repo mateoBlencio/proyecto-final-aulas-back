@@ -10,6 +10,7 @@ import java.security.Key;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
@@ -26,6 +27,9 @@ public class JwtService {
         Instant expiration = now.plus(Duration.ofMinutes(jwtProperties.getAccessExpirationMinutes()));
 
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
+                .issuer(jwtProperties.getIssuer())
+                .audience().add(jwtProperties.getAudience()).and()
                 .subject(email)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiration))
@@ -40,6 +44,8 @@ public class JwtService {
     public Claims parseClaims(String token) {
         return Jwts.parser()
                 .verifyWith((javax.crypto.SecretKey) signingKey())
+                .requireIssuer(jwtProperties.getIssuer())
+                .requireAudience(jwtProperties.getAudience())
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();

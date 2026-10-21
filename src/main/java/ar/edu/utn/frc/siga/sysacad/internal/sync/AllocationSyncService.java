@@ -24,7 +24,6 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -64,10 +63,12 @@ public class AllocationSyncService implements SysacadViewSyncer {
         SysacadCommissionResolver resolver = new SysacadCommissionResolver(commissionService, subjectCommissionService);
         Map<ClassroomKey, Optional<ClassroomResponseDto>> classroomCache = new HashMap<>();
         Map<OverlapKey, List<OverlapEntry>> overlapsBySlot = new LinkedHashMap<>();
-        Set<AllocationItem> items = new LinkedHashSet<>();
+        Map<Long, Long> classroomIdByEvent = new LinkedHashMap<>();
+        int conflictingRooms = 0;
 
         Map<RecurringEventKey, Long> eventIdsByKey = academicEventService.findSysacadRecurringEvents().stream()
-                .collect(Collectors.toMap(AllocationSyncService::keyOf, SysacadRecurringEventRefDto::eventId));
+                .collect(Collectors.toMap(AllocationSyncService::keyOf, SysacadRecurringEventRefDto::eventId,
+                        (first, ignored) -> first));
 
         for (SysacadAllocationDto row : catalog.findAllocations()) {
             if (isSentinel(row)) {
@@ -75,7 +76,8 @@ public class AllocationSyncService implements SysacadViewSyncer {
             }
 
             Optional<SysacadCommissionResolver.ResolvedLink> resolved =
-                    resolver.resolve(row.courseCode(), row.subjectCode());
+                    resolver.resolve(row.courseCode(), row.subjectCode(), row.specialtyCode(),
+                            row.studyPlanCode());
             if (resolved.isEmpty()) {
                 continue;
             }
@@ -103,14 +105,31 @@ public class AllocationSyncService implements SysacadViewSyncer {
                     continue;
                 }
 
+                Long classroomId = classroom.get().id();
+                Long assignedClassroomId = classroomIdByEvent.putIfAbsent(eventId, classroomId);
+                if (assignedClassroomId != null && !assignedClassroomId.equals(classroomId)) {
+                    conflictingRooms++;
+                    log.warn("Fila de Horarios con el mismo evento y otra aula: curso={}, materia={}, dia={}, hora={}, "
+                                    + "cuatrimestre={}, aula={}, edificio={}: se conserva la primera aula y se saltea la fila",
+                            row.courseCode(), row.subjectCode(), row.dayOfWeek(), row.startTime(), termType,
+                            row.roomNumber(), row.buildingCode());
+                    continue;
+                }
+
                 recordOverlap(overlapsBySlot, row, termType, eventId);
-                items.add(new AllocationItem(new AllocationTarget.Event(eventId), classroom.get().id()));
             }
         }
 
         warnOverlaps(overlapsBySlot);
+        if (conflictingRooms > 0) {
+            log.warn("Sync de asignaciones: {} filas salteadas por asignar el mismo evento a más de un aula",
+                    conflictingRooms);
+        }
 
-        return SystemScope.call(() -> allocationService.syncFromSysacad(List.copyOf(items)));
+        List<AllocationItem> items = classroomIdByEvent.entrySet().stream()
+                .map(entry -> new AllocationItem(new AllocationTarget.Event(entry.getKey()), entry.getValue()))
+                .toList();
+        return SystemScope.call(() -> allocationService.syncFromSysacad(items));
     }
 
     private static boolean isSentinel(SysacadAllocationDto row) {

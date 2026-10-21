@@ -32,6 +32,8 @@ public interface BuildingService extends ActivationService<Long> {
     /**
      * Sincroniza el lote de edificios provenientes de SysAcad: crea/actualiza por código comparando
      * hash y marca (soft-delete) los ausentes en la corrida. Devuelve la cantidad de filas afectadas.
+     * Aborta sin dar de baja si las filas válidas no alcanzan {@code minValidPercent}% de los vigentes
+     * (0 desactiva el umbral; cero filas válidas aborta siempre).
      */
-    int syncBuildings(List<BuildingSyncCommand> commands);
+    int syncBuildings(List<BuildingSyncCommand> commands, int minValidPercent);
 }

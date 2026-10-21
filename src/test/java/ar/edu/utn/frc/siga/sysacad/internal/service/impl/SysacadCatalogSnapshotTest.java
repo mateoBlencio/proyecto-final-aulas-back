@@ -89,6 +89,44 @@ class SysacadCatalogSnapshotTest {
     }
 
     @Test
+    @DisplayName("findSubjects: sin MateriaDictado y HorarioCuatrimestre 0 en todas las filas es Anual (igual que en eventos)")
+    void findSubjectsSinDictadoConCeroEsAnual() {
+        List<SysacadSubjectDto> subjects = snapshot(
+                List.of(new RawSubject(17, 94, 519, "Análisis Matemático I")),
+                List.of(scheduleRow(17, 94, 519, null, 0), scheduleRow(17, 94, 519, null, 0))).findSubjects();
+
+        assertThat(subjects).containsExactly(new SysacadSubjectDto(17, 94, 519, "Análisis Matemático I", "Anual"));
+    }
+
+    @Test
+    @DisplayName("findSubjects: sin MateriaDictado, la mezcla {0,1} y {0,2} es Anual porque el 0 ya cubre ambos cuatrimestres")
+    void findSubjectsSinDictadoConCeroMasCuatrimestreEsAnual() {
+        List<SysacadSubjectDto> zeroAndFirst = snapshot(
+                List.of(new RawSubject(17, 94, 519, "Análisis Matemático I")),
+                List.of(scheduleRow(17, 94, 519, null, 0), scheduleRow(17, 94, 519, null, 1))).findSubjects();
+        List<SysacadSubjectDto> zeroAndSecond = snapshot(
+                List.of(new RawSubject(17, 94, 519, "Análisis Matemático I")),
+                List.of(scheduleRow(17, 94, 519, null, 0), scheduleRow(17, 94, 519, null, 2))).findSubjects();
+
+        assertThat(zeroAndFirst).extracting(SysacadSubjectDto::term).containsExactly("Anual");
+        assertThat(zeroAndSecond).extracting(SysacadSubjectDto::term).containsExactly("Anual");
+    }
+
+    @Test
+    @DisplayName("findSubjects: sin MateriaDictado y un solo cuatrimestre sin 0 toma ese cuatrimestre; los dos, null")
+    void findSubjectsSinDictadoSinCero() {
+        List<SysacadSubjectDto> single = snapshot(
+                List.of(new RawSubject(17, 94, 519, "Análisis Matemático I")),
+                List.of(scheduleRow(17, 94, 519, null, 2))).findSubjects();
+        List<SysacadSubjectDto> both = snapshot(
+                List.of(new RawSubject(17, 94, 519, "Análisis Matemático I")),
+                List.of(scheduleRow(17, 94, 519, null, 1), scheduleRow(17, 94, 519, null, 2))).findSubjects();
+
+        assertThat(single).extracting(SysacadSubjectDto::term).containsExactly("2 Cuat.");
+        assertThat(both).extracting(SysacadSubjectDto::term).containsExactly((String) null);
+    }
+
+    @Test
     @DisplayName("findSubjects: MateriaDictado 'C' dictada en ambos cuatrimestres deja term null sin loguear conflicto")
     void findSubjectsMateriaCuatrimestralAmbosSemestres() {
         Logger logger = (Logger) LoggerFactory.getLogger(SysacadCatalogSnapshot.class);

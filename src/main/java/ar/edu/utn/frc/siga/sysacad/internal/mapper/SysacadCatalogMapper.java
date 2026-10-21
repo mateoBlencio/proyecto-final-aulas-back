@@ -23,6 +23,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
+import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -34,7 +35,9 @@ public class SysacadCatalogMapper {
 
     private static final DateTimeFormatter HOLIDAY_DATE =
             DateTimeFormatter.ofPattern("uuuuMMdd").withResolverStyle(ResolverStyle.STRICT);
-    private static final String YES = "S";
+    private static final String NO = "N";
+    // ASCII control chars plus NEL and the Unicode line/paragraph separators, which also split log lines.
+    private static final Pattern CONTROL_CHARS = Pattern.compile("[\\p{Cntrl}\\u0085\\u2028\\u2029]");
     private static final int MIN_ISO_DAY = DayOfWeek.MONDAY.getValue();
     private static final int MAX_ISO_DAY = DayOfWeek.SUNDAY.getValue();
 
@@ -46,7 +49,7 @@ public class SysacadCatalogMapper {
         return new SysacadClassroomDto(
                 raw.aula(),
                 raw.edificio(),
-                YES.equalsIgnoreCase(trim(raw.habilitada())),
+                !NO.equalsIgnoreCase(trim(raw.habilitada())),
                 raw.capacidad());
     }
 
@@ -57,7 +60,6 @@ public class SysacadCatalogMapper {
                 trim(raw.abreviatura()));
     }
 
-    /** Devuelve null (y loguea) si la fecha viene nula, vacía o inválida. */
     public SysacadHolidayDto toHoliday(RawHoliday raw) {
         String text = trim(raw.fecha());
         if (text == null || text.isEmpty()) {
@@ -67,7 +69,7 @@ public class SysacadCatalogMapper {
         try {
             return new SysacadHolidayDto(LocalDate.parse(text, HOLIDAY_DATE), trim(raw.descripcion()));
         } catch (DateTimeParseException e) {
-            log.warn("Feriado de SysAcad ignorado por fecha inválida: {}", raw.fecha());
+            log.warn("Feriado de SysAcad ignorado por fecha inválida: {}", text);
             return null;
         }
     }
@@ -111,6 +113,8 @@ public class SysacadCatalogMapper {
         return new SysacadAcademicEventDto(
                 curso,
                 raw.materia(),
+                raw.especialidad(),
+                raw.plan(),
                 dayOfWeek,
                 startTime,
                 raw.duracion(),
@@ -131,6 +135,8 @@ public class SysacadCatalogMapper {
         return new SysacadAllocationDto(
                 curso,
                 raw.materia(),
+                raw.especialidad(),
+                raw.plan(),
                 dayOfWeek,
                 startTime,
                 raw.duracion(),
@@ -179,7 +185,8 @@ public class SysacadCatalogMapper {
         }
     }
 
+    /** Strips spaces and control characters (CR/LF): Sysacad values end up in logs and in the database. */
     private static String trim(String value) {
-        return value == null ? null : value.trim();
+        return value == null ? null : CONTROL_CHARS.matcher(value).replaceAll(" ").trim();
     }
 }

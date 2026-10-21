@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.common.exception.SyncAbortedException;
 import ar.edu.utn.frc.siga.academic.dto.CommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.CommissionMapper;
@@ -187,6 +188,17 @@ class CommissionServiceImplTest {
     }
 
     @Test
+    @DisplayName("findActiveIdsByCourseCode: devuelve los ids de todas las comisiones vigentes del curso, también si son ambiguas")
+    void findActiveIdsByCourseCodeReturnsAllActive() {
+        Commission first = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).sysacadEnabled(true).build();
+        Commission second = Commission.builder().id(4L).courseCode("K1001").academicPeriod(period).sysacadEnabled(true).build();
+        when(commissionRepository.findByCourseCodeAndSysacadEnabledTrueAndDeletedAtIsNull("K1001"))
+                .thenReturn(List.of(first, second));
+
+        assertThat(service.findActiveIdsByCourseCode("K1001")).containsExactly(3L, 4L);
+    }
+
+    @Test
     @DisplayName("find: si el período de la comisión está inhabilitado, lanza ResourceNotFoundException sin mapear")
     void findWithCommissionOfInactivePeriodThrowsResourceNotFound() {
         AcademicPeriod inactivePeriod = AcademicPeriod.builder().id(1L).year(2026).semester(1).build();
@@ -296,7 +308,7 @@ class CommissionServiceImplTest {
                 .thenReturn(Optional.of(annualPeriod));
         when(commissionRepository.save(any(Commission.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        int affected = service.syncCommissions(List.of(command));
+        int affected = service.syncCommissions(List.of(command), 0);
 
         assertThat(affected).isEqualTo(1);
         verify(academicPeriodRepository).findByYearAndSemester(2026, TermType.ANUAL.getSemester());
@@ -304,6 +316,62 @@ class CommissionServiceImplTest {
                 Boolean.TRUE.equals(commission.getSysacadEnabled())
                         && "101".equals(commission.getCourseCode())
                         && annualPeriod.equals(commission.getAcademicPeriod())));
+    }
+
+    @Test
+    @DisplayName("syncCommissions: un curso con varias materias no reescribe la comisión en una segunda corrida igual")
+    void syncCommissionsDoesNotRewriteMultiSubjectCommission() {
+        AcademicPeriod period = annualPeriod();
+        Commission existing = Commission.builder().id(1L).courseCode("101").academicPeriod(period)
+                .sysacadEnabled(true).sysacadHash(Hashes.sha256Hex("101", period.getId())).build();
+        when(commissionRepository.findAll()).thenReturn(List.of(existing));
+        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any(), any())).thenReturn(Optional.empty());
+        when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
+                .thenReturn(Optional.of(period));
+
+        int affected = service.syncCommissions(List.of(
+                new CommissionSyncCommand("101", 1, 2024, 55, 2026, null),
+                new CommissionSyncCommand("101", 1, 2024, 56, 2026, null)), 0);
+
+        assertThat(affected).isZero();
+        verify(commissionRepository, never()).save(any(Commission.class));
+    }
+
+    @Test
+    @DisplayName("syncCommissions: sin ninguna fila válida aborta y no da de baja las vigentes")
+    void syncCommissionsAbortsWithoutValidRows() {
+        Commission current = Commission.builder().id(1L).courseCode("101").academicPeriod(annualPeriod())
+                .sysacadEnabled(true).build();
+        when(commissionRepository.findAll()).thenReturn(List.of(current));
+
+        assertThatThrownBy(() -> service.syncCommissions(
+                List.of(new CommissionSyncCommand(null, 1, 2024, 55, 2026, null)), 0))
+                .isInstanceOf(SyncAbortedException.class);
+
+        assertThat(current.getSysacadEnabled()).isTrue();
+        verify(commissionRepository, never()).save(any(Commission.class));
+    }
+
+    @Test
+    @DisplayName("syncCommissions: por debajo del umbral de filas válidas aborta y no da de baja nada")
+    void syncCommissionsAbortsBelowThreshold() {
+        AcademicPeriod period = annualPeriod();
+        Commission kept = Commission.builder().id(1L).courseCode("101").academicPeriod(period)
+                .sysacadEnabled(true).sysacadHash("h").build();
+        Commission second = Commission.builder().id(2L).courseCode("102").academicPeriod(period)
+                .sysacadEnabled(true).sysacadHash("h").build();
+        Commission third = Commission.builder().id(3L).courseCode("103").academicPeriod(period)
+                .sysacadEnabled(true).sysacadHash("h").build();
+        when(commissionRepository.findAll()).thenReturn(List.of(kept, second, third));
+        when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
+                .thenReturn(Optional.of(period));
+
+        assertThatThrownBy(() -> service.syncCommissions(
+                List.of(new CommissionSyncCommand("101", null, null, null, 2026, null)), 50))
+                .isInstanceOf(SyncAbortedException.class);
+
+        assertThat(second.getSysacadEnabled()).isTrue();
+        assertThat(third.getSysacadEnabled()).isTrue();
     }
 
     @Test
@@ -318,7 +386,7 @@ class CommissionServiceImplTest {
                 .thenReturn(Optional.of(annualPeriod));
         when(commissionRepository.save(any(Commission.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        service.syncCommissions(List.of(command));
+        service.syncCommissions(List.of(command), 0);
 
         verify(studyPlanResolver).findOrCreate(eq(1), eq(2024), any(), any());
     }
@@ -335,7 +403,7 @@ class CommissionServiceImplTest {
                 .thenReturn(Optional.of(annualPeriod));
         when(commissionRepository.save(any(Commission.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        service.syncCommissions(List.of(command));
+        service.syncCommissions(List.of(command), 0);
 
         verify(commissionRepository).save(any(Commission.class));
     }
@@ -356,7 +424,7 @@ class CommissionServiceImplTest {
                 .thenReturn(Optional.of(annualPeriod));
         when(commissionRepository.save(any(Commission.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        int affected = service.syncCommissions(List.of(command));
+        int affected = service.syncCommissions(List.of(command), 0);
 
         ArgumentCaptor<SubjectCommission> saved = ArgumentCaptor.forClass(SubjectCommission.class);
         verify(subjectCommissionRepository).save(saved.capture());
@@ -385,7 +453,7 @@ class CommissionServiceImplTest {
         when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
                 .thenReturn(Optional.of(annualPeriod));
 
-        service.syncCommissions(List.of(command));
+        service.syncCommissions(List.of(command), 0);
 
         assertThat(existingLink.getEnrolledCount()).isEqualTo(30);
         verify(subjectCommissionRepository).save(existingLink);
@@ -405,7 +473,7 @@ class CommissionServiceImplTest {
                 .thenReturn(Optional.of(annualPeriod));
         when(commissionRepository.save(any(Commission.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        service.syncCommissions(List.of(command));
+        service.syncCommissions(List.of(command), 0);
 
         verify(subjectCommissionRepository, never()).save(any());
         verify(commissionRepository).save(any(Commission.class));
@@ -427,7 +495,7 @@ class CommissionServiceImplTest {
                 .thenReturn(Optional.of(annualPeriod));
         when(commissionRepository.save(any(Commission.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        service.syncCommissions(List.of(command));
+        service.syncCommissions(List.of(command), 0);
 
         ArgumentCaptor<SubjectCommission> saved = ArgumentCaptor.forClass(SubjectCommission.class);
         verify(subjectCommissionRepository).save(saved.capture());
@@ -454,7 +522,7 @@ class CommissionServiceImplTest {
         when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
                 .thenReturn(Optional.of(annualPeriod));
 
-        service.syncCommissions(List.of(command));
+        service.syncCommissions(List.of(command), 0);
 
         assertThat(provisionalLink.getEnrolledCount()).isEqualTo(30);
         verify(subjectCommissionRepository).save(provisionalLink);
@@ -480,7 +548,7 @@ class CommissionServiceImplTest {
         when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
                 .thenReturn(Optional.of(annualPeriod));
 
-        service.syncCommissions(List.of(command));
+        service.syncCommissions(List.of(command), 0);
 
         assertThat(existingLink.getEnrolledCount()).isEqualTo(20);
         verify(subjectCommissionRepository, never()).save(existingLink);
