@@ -16,6 +16,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DisplayName("DefaultBuildingScopeResolver")
@@ -59,6 +60,18 @@ class DefaultBuildingScopeResolverTest {
         assertThat(resolver.canAccess(Permission.CLASSROOM_READ, 7L)).isFalse();
         assertThatThrownBy(() -> resolver.requireAccess(Permission.CLASSROOM_READ, 7L))
                 .isInstanceOf(AccessDeniedException.class);
+        assertThatNoException().isThrownBy(() -> resolver.requireAccess(Permission.CLASSROOM_READ, 5L));
+    }
+
+    @Test
+    @DisplayName("requireAccess en lote: permite si todos los edificios están en el alcance")
+    void requireAccessLoteDentroDelAlcance() {
+        User user = User.builder().id(1L).email("aux@frc.utn.edu.ar").enabled(true)
+                .roleAssignments(List.of(assignment(SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, 5L)))
+                .build();
+        authenticateAs(user);
+
+        assertThatNoException().isThrownBy(() -> resolver.requireAccess(Permission.ALLOCATION_WRITE, List.of(5L)));
     }
 
     @Test

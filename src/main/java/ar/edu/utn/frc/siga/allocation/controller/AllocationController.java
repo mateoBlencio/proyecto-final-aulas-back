@@ -161,20 +161,22 @@ public class AllocationController {
     @PutMapping
     @PreAuthorize("hasAuthority('PERM_ALLOCATION_WRITE')")
     @Operation(summary = "Reasignar aulas en lote",
-               description = "Cambia el aula de cada item del lote (upsert: crea la asignación si no existía). "
+               description = "Cambia el aula de cada item del lote. Solo mueve ocurrencias que ya tienen aula. "
                        + "Además de las formas puntual ('occurrenceIds') y evento completo ('eventId'), acepta "
                        + "mover un evento por rango de fechas: 'eventId' + 'from' + 'to' es un cambio TEMPORAL "
                        + "(las ocurrencias de afuera del rango conservan su aula, así que la clase 'vuelve' sola), "
                        + "y 'eventId' + 'from' sin 'to' es un cambio PERMANENTE desde esa fecha hasta que termine "
                        + "el dictado. Ambos bordes son inclusive y 'from' no puede ser anterior a hoy (400). "
-                       + "409 si algún aula no existe/no está disponible, si hay solapamiento de horario con otra "
+                       + "403 si el aula actual o la de destino es de un edificio fuera de su alcance. "
+                       + "409 si alguna ocurrencia del lote no tiene aula asignada (para asignar se usa POST), "
+                       + "si algún aula no existe/no está disponible, si hay solapamiento de horario con otra "
                        + "asignación, o si una ocurrencia del rango ya ocurrió. En el 409 y en el 400 por "
                        + "superposición dentro del margen, 'classroomIds' lista todas las aulas en conflicto y "
                        + "'detail' explica el motivo. Atómico: si una sola fecha del "
                        + "rango falla, no se aplica ningún cambio.")
     public ResponseEntity<List<AllocationResponseDto>> reallocate(@Valid @RequestBody AllocationBatchRequestDto dto) {
         log.debug("PUT /v1/allocations: items={}", dto.items().size());
-        List<AllocationResponseDto> response = allocationService.reallocate(commandMapper.toManualCommand(dto));
+        List<AllocationResponseDto> response = allocationService.reallocateExisting(commandMapper.toManualCommand(dto));
         log.info("Reasignación en lote completa: allocated={}", response.size());
         return ResponseEntity.ok(response);
     }

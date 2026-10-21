@@ -39,7 +39,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** Sugerencia automática de aula para reasignación (día puntual o rango) y su confirmación. */
@@ -137,15 +136,6 @@ class ReallocationSuggestionIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated());
     }
 
-    private void reallocatePut(Long occurrenceId, Long classroomId) throws Exception {
-        var dto = new AllocationBatchRequestDto(
-                List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, null, null, classroomId)), null);
-        mockMvc.perform(put("/v1/allocations")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(dto)))
-                .andExpect(status().isOk());
-    }
-
     @Test
     @DisplayName("rango con dos aulas, una ocupada por otro evento en una fecha: sugiere la libre; el confirm persiste todo el rango con source AUTOMATIC")
     void suggestOverRange_oneRoomOccupiedOnOneDate_suggestsFreeRoom_confirmPersistsAutomatic() throws Exception {
@@ -183,8 +173,8 @@ class ReallocationSuggestionIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("sin regresión del flujo manual: PUT /v1/allocations con el mismo target deja source MANUAL")
-    void manualPut_stillPersistsWithSourceManual() throws Exception {
+    @DisplayName("sin regresión del flujo manual: POST /v1/allocations con el mismo target deja source MANUAL")
+    void manualPost_stillPersistsWithSourceManual() throws Exception {
         var sc = testData.materiaYComision();
         var edificio = testData.edificio();
         Classroom room = testData.aula(edificio);
@@ -193,7 +183,7 @@ class ReallocationSuggestionIntegrationTest extends AbstractIntegrationTest {
         Long eventId = createEvent(sc, date);
         Occurrence occurrence = occurrenceOf(eventId);
 
-        reallocatePut(occurrence.getId(), room.getId());
+        allocateOk(occurrence.getId(), room.getId());
 
         Allocation persisted = allocationRepository.findByOccurrenceId(occurrence.getId()).orElseThrow();
         assertThat(persisted.getClassroomId()).isEqualTo(room.getId());

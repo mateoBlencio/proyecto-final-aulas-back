@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ReleasedOccurrenceDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationComposer;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
@@ -106,7 +107,10 @@ public class AllocationServiceImpl implements AllocationService {
     @Transactional
     @AuditOperation("Asignación de aulas en lote")
     public List<AllocationResponseDto> allocate(AllocationCommand command) {
-        Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolveAndValidate(command, "Asignación");
+        AllocationTargetResolver.ResolvedAssignments resolved = resolve(command);
+        Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolved.classroomByOccurrence();
+        List<ClassroomResponseDto> classrooms = lockAndValidate(command, classroomByOccurrence);
+        describeAllocation("Asignación", classrooms, resolved.skippedReleased().size());
         List<Allocation> saved = writer.create(classroomByOccurrence, command.observation(), command.source());
         log.info("Asignación creada: source={}, count={}", command.source(), saved.size());
         return composer.composeAll(saved);
@@ -116,7 +120,25 @@ public class AllocationServiceImpl implements AllocationService {
     @Transactional
     @AuditOperation("Reasignación de aulas en lote")
     public List<AllocationResponseDto> reallocate(AllocationCommand command) {
-        Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolveAndValidate(command, "Reasignación");
+        AllocationTargetResolver.ResolvedAssignments resolved = resolve(command);
+        Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolved.classroomByOccurrence();
+        List<ClassroomResponseDto> classrooms = lockAndValidate(command, classroomByOccurrence);
+        describeAllocation("Reasignación", classrooms, resolved.skippedReleased().size());
+        List<Allocation> saved = writer.upsert(classroomByOccurrence, command.observation(), command.source());
+        log.info("Asignación actualizada: source={}, count={}", command.source(), saved.size());
+        return composer.composeAll(saved);
+    }
+
+    @Override
+    @Transactional
+    @AuditOperation("Reasignación de aulas en lote")
+    public List<AllocationResponseDto> reallocateExisting(AllocationCommand command) {
+        AllocationTargetResolver.ResolvedAssignments resolved = resolve(command);
+        Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolved.classroomByOccurrence();
+        Map<Long, Long> current = requirePreviousAllocation(classroomByOccurrence.keySet());
+        requireAccessToClassrooms(Set.copyOf(current.values()));
+        List<ClassroomResponseDto> classrooms = lockAndValidate(command, classroomByOccurrence);
+        describeAllocation("Reasignación", classrooms, resolved.skippedReleased().size());
         List<Allocation> saved = writer.upsert(classroomByOccurrence, command.observation(), command.source());
         log.info("Asignación actualizada: source={}, count={}", command.source(), saved.size());
         return composer.composeAll(saved);
@@ -192,7 +214,8 @@ public class AllocationServiceImpl implements AllocationService {
     @AuditOperation("Sincronización de asignaciones desde SysAcad")
     public int syncFromSysacad(List<AllocationItem> items) {
         AllocationCommand command = new AllocationCommand(items, null, AllocationSource.SYSACAD);
-        Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolveAndValidate(command, null);
+        Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolve(command).classroomByOccurrence();
+        lockAndValidate(command, classroomByOccurrence);
         int affected = writer.syncFromSysacad(classroomByOccurrence);
         AuditOperations.describe("Sincronización de asignaciones desde SysAcad: " + Plurals.count(affected, "afectada", "afectadas"));
         log.info("Sync de SysAcad: asignaciones afectadas={}", affected);
@@ -201,38 +224,38 @@ public class AllocationServiceImpl implements AllocationService {
 
     /** E.g. "Reasignación de 12 aulas, edificio Central" or "..., 3 edificios". */
     private void describeAllocation(String action, List<ClassroomResponseDto> classrooms, int skippedReleased) {
+        if (classrooms.isEmpty()) {
+            return;
+        }
         List<String> buildings = classrooms.stream().map(ClassroomResponseDto::buildingName).distinct().toList();
         AuditOperations.describe(action + " de " + Plurals.count(classrooms.size(), "aula", "aulas")
                 + (buildings.size() == 1 ? ", edificio " + buildings.get(0) : ", " + Plurals.count(buildings.size(), "edificio", "edificios"))
                 + (skippedReleased > 0 ? ", " + Plurals.count(skippedReleased, "liberada salteada", "liberadas salteadas") : ""));
     }
 
-    /** A non-null {@code action} also sets the audit description once the classrooms are validated. */
-    private Map<OccurrenceSlotDto, Long> resolveAndValidate(AllocationCommand command, String action) {
-        // IMPORTED (ingest Excel) y SYSACAD no clampean: el primer sync/import de una comisión a mitad
-        // de año trae ocurrencias ya pasadas, y rechazarlas dejaría esos slots sin asignación (plan §4).
-        LocalDate clampFrom = (command.source() == AllocationSource.IMPORTED || command.source() == AllocationSource.SYSACAD)
-                ? null : LocalDate.now();
+    private AllocationTargetResolver.ResolvedAssignments resolve(AllocationCommand command) {
+        LocalDate clampFrom = command.source().allowsPastOccurrences() ? null : LocalDate.now();
         AllocationTargetResolver.ResolvedAssignments resolved =
                 targetResolver.resolveClassroomByOccurrence(command.items(), clampFrom);
-        Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolved.classroomByOccurrence();
         List<OccurrenceSlotDto> skipped = resolved.skippedReleased();
         if (!skipped.isEmpty()) {
             log.warn("Ocurrencias liberadas salteadas: source={}, count={}, ids={}", command.source(),
                     skipped.size(), skipped.stream().map(OccurrenceSlotDto::occurrenceId).toList());
         }
+        return resolved;
+    }
 
+    /** Locks and validates the target classrooms; returns them (empty if there is nothing to allocate). */
+    private List<ClassroomResponseDto> lockAndValidate(AllocationCommand command,
+            Map<OccurrenceSlotDto, Long> classroomByOccurrence) {
         if (classroomByOccurrence.isEmpty()) {
-            return classroomByOccurrence;
+            return List.of();
         }
 
         Set<Long> classroomIds = Set.copyOf(classroomByOccurrence.values());
         classroomLock.lock(classroomIds);
         List<ClassroomResponseDto> classrooms = requireAccessToClassrooms(classroomIds);
         validator.validateClassroomsAvailable(classroomIds);
-        if (action != null) {
-            describeAllocation(action, classrooms, skipped.size());
-        }
 
         if (command.source() == AllocationSource.MANUAL || command.source() == AllocationSource.AUTOMATIC) {
             List<AllocationCandidate> candidates = classroomByOccurrence.entrySet().stream()
@@ -244,8 +267,7 @@ public class AllocationServiceImpl implements AllocationService {
                 validator.validateStrictOverlap(candidates);
             }
         }
-
-        return classroomByOccurrence;
+        return classrooms;
     }
 
     private Allocation findAllocation(Long id) {
@@ -262,6 +284,20 @@ public class AllocationServiceImpl implements AllocationService {
                 .collect(Collectors.toSet());
         buildingScopeResolver.requireAccess(Permission.ALLOCATION_WRITE, buildingIds);
         return classrooms;
+    }
+
+    private Map<Long, Long> requirePreviousAllocation(Collection<OccurrenceSlotDto> occurrences) {
+        Map<Long, Long> current = currentClassroomByOccurrence(List.copyOf(occurrences));
+        List<Long> missing = occurrences.stream()
+                .map(OccurrenceSlotDto::occurrenceId)
+                .filter(id -> !current.containsKey(id))
+                .sorted()
+                .toList();
+        if (!missing.isEmpty()) {
+            throw new AllocationConflictException("Las ocurrencias " + missing
+                    + " no tienen aula asignada: para asignarlas usá POST /v1/allocations.");
+        }
+        return current;
     }
 
     private Map<Long, Long> currentClassroomByOccurrence(List<OccurrenceSlotDto> occurrences) {

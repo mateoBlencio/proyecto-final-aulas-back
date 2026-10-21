@@ -65,8 +65,8 @@ class AllocationAuditHistoryServiceImplTest {
     @DisplayName("alcance irrestricto: devuelve todas las revisiones sin consultar aulas")
     void alcanceIrrestricto() {
         List<RevisionDto<AllocationHistorySnapshotDto>> all = List.of(
-                revision(1, RevisionKind.CREATED, snapshot(1L, ROOM_IN_B)),
-                revision(2, RevisionKind.DELETED, null));
+                revision(1, RevisionKind.CREATED, 1L, snapshot(1L, ROOM_IN_B)),
+                revision(2, RevisionKind.DELETED, 1L, null));
         givenRevisions(all);
         when(buildingScopeResolver.scopeFor(Permission.ALLOCATION_HISTORY_READ)).thenReturn(BuildingScope.unrestricted());
 
@@ -79,9 +79,9 @@ class AllocationAuditHistoryServiceImplTest {
     @DisplayName("alcance por edificio: oculta las revisiones de asignaciones que nunca tuvieron un aula de su edificio")
     void ocultaAsignacionesAjenas() {
         givenRevisions(List.of(
-                revision(1, RevisionKind.CREATED, snapshot(1L, ROOM_IN_A)),
-                revision(2, RevisionKind.CREATED, snapshot(2L, ROOM_IN_B)),
-                revision(3, RevisionKind.MODIFIED, snapshot(2L, OTHER_ROOM_IN_B))));
+                revision(1, RevisionKind.CREATED, 1L, snapshot(1L, ROOM_IN_A)),
+                revision(2, RevisionKind.CREATED, 2L, snapshot(2L, ROOM_IN_B)),
+                revision(3, RevisionKind.MODIFIED, 2L, snapshot(2L, OTHER_ROOM_IN_B))));
         givenScopeOnBuildingA();
 
         List<Integer> visible = revisionNumbers(service.findAllocationHistory(EVENT_ID));
@@ -93,9 +93,9 @@ class AllocationAuditHistoryServiceImplTest {
     @DisplayName("alcance por edificio: un cambio de aula se ve si el aula previa o la nueva es de su edificio")
     void cambioDeAulaConUnExtremoEnSuEdificio() {
         givenRevisions(List.of(
-                revision(1, RevisionKind.CREATED, snapshot(1L, ROOM_IN_B)),
-                revision(2, RevisionKind.MODIFIED, snapshot(1L, ROOM_IN_A)),
-                revision(3, RevisionKind.MODIFIED, snapshot(1L, ROOM_IN_B))));
+                revision(1, RevisionKind.CREATED, 1L, snapshot(1L, ROOM_IN_B)),
+                revision(2, RevisionKind.MODIFIED, 1L, snapshot(1L, ROOM_IN_A)),
+                revision(3, RevisionKind.MODIFIED, 1L, snapshot(1L, ROOM_IN_B))));
         givenScopeOnBuildingA();
 
         List<Integer> visible = revisionNumbers(service.findAllocationHistory(EVENT_ID));
@@ -107,8 +107,8 @@ class AllocationAuditHistoryServiceImplTest {
     @DisplayName("alcance por edificio: la baja se ve si la revisión anterior era un aula de su edificio")
     void bajaDespuesDeAulaPropia() {
         givenRevisions(List.of(
-                revision(1, RevisionKind.CREATED, snapshot(1L, ROOM_IN_A)),
-                revision(2, RevisionKind.DELETED, null)));
+                revision(1, RevisionKind.CREATED, 1L, snapshot(1L, ROOM_IN_A)),
+                revision(2, RevisionKind.DELETED, 1L, null)));
         givenScopeOnBuildingA();
 
         assertThat(revisionNumbers(service.findAllocationHistory(EVENT_ID))).containsExactly(1, 2);
@@ -118,11 +118,35 @@ class AllocationAuditHistoryServiceImplTest {
     @DisplayName("alcance por edificio: la baja de una asignación ajena queda oculta")
     void bajaDespuesDeAulaAjena() {
         givenRevisions(List.of(
-                revision(1, RevisionKind.CREATED, snapshot(1L, ROOM_IN_B)),
-                revision(2, RevisionKind.DELETED, null)));
+                revision(1, RevisionKind.CREATED, 1L, snapshot(1L, ROOM_IN_B)),
+                revision(2, RevisionKind.DELETED, 1L, null)));
         givenScopeOnBuildingA();
 
         assertThat(service.findAllocationHistory(EVENT_ID)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("alcance por edificio: la baja de una asignación ajena no hereda la visibilidad de otra asignación intercalada")
+    void bajaAjenaNoHeredaVisibilidadDeOtraAsignacion() {
+        givenRevisions(List.of(
+                revision(1, RevisionKind.CREATED, 1L, snapshot(1L, ROOM_IN_B)),
+                revision(2, RevisionKind.CREATED, 2L, snapshot(2L, ROOM_IN_A)),
+                revision(3, RevisionKind.DELETED, 1L, null)));
+        givenScopeOnBuildingA();
+
+        assertThat(revisionNumbers(service.findAllocationHistory(EVENT_ID))).containsExactly(2);
+    }
+
+    @Test
+    @DisplayName("alcance por edificio: la baja de una asignación propia se ve aunque haya otra ajena intercalada")
+    void bajaPropiaSeVeConAjenaIntercalada() {
+        givenRevisions(List.of(
+                revision(1, RevisionKind.CREATED, 1L, snapshot(1L, ROOM_IN_A)),
+                revision(2, RevisionKind.CREATED, 2L, snapshot(2L, ROOM_IN_B)),
+                revision(3, RevisionKind.DELETED, 1L, null)));
+        givenScopeOnBuildingA();
+
+        assertThat(revisionNumbers(service.findAllocationHistory(EVENT_ID))).containsExactly(1, 3);
     }
 
     private void givenScopeOnBuildingA() {
@@ -145,8 +169,9 @@ class AllocationAuditHistoryServiceImplTest {
     }
 
     private static RevisionDto<AllocationHistorySnapshotDto> revision(
-            int number, RevisionKind kind, AllocationHistorySnapshotDto snapshot) {
-        return new RevisionDto<>(number, LocalDateTime.of(2026, 10, 12, 10, number), "user@frc.utn.edu.ar", kind, snapshot);
+            int number, RevisionKind kind, Long allocationId, AllocationHistorySnapshotDto snapshot) {
+        return new RevisionDto<>(number, LocalDateTime.of(2026, 10, 12, 10, number), "user@frc.utn.edu.ar", kind,
+                snapshot, allocationId);
     }
 
     private static AllocationHistorySnapshotDto snapshot(Long allocationId, Long classroomId) {
