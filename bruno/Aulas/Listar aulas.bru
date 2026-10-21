@@ -30,4 +30,13 @@ docs {
   tiene baja propia; PARENT_DEACTIVATED si lo oculta la baja de su edificio;
   NOT_IN_SYSACAD si SysAcad dejo de traer su edificio.
   currentInSysacad=false es el aviso de que SysAcad dejo de traer el aula.
+  Cada elemento trae pistas de UI calculadas con el alcance del usuario (el back
+  valida igual en cada endpoint):
+  - canUpdate: puede editar el aula; false si esta desactivada.
+  - canActivate: puede activar/desactivar el aula (solo alcance, vale tambien para
+    aulas desactivadas).
+  - canAllocate: puede asignar eventos al aula; false si unavailableReason != null.
+  Los permissionTargets (permisos por materia) traen ademas de name:
+  specialtyName, specialtyAbbreviation, specialtyCode y studyPlanCode (null si el
+  target no es SUBJECT o la materia ya no existe).
 }

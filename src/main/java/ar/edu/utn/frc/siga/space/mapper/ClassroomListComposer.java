@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.space.mapper;
 
+import ar.edu.utn.frc.siga.common.security.BuildingScope;
+import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomListItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomPermissionTargetDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResourceDto;
@@ -9,6 +11,7 @@ import ar.edu.utn.frc.siga.space.model.ClassroomResource;
 import ar.edu.utn.frc.siga.space.model.PermissionMode;
 import ar.edu.utn.frc.siga.space.model.PermissionTargetKind;
 import ar.edu.utn.frc.siga.space.permission.PermissionTargetResolvers;
+import ar.edu.utn.frc.siga.space.permission.TargetInfo;
 import ar.edu.utn.frc.siga.space.repository.ClassroomPermissionRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomResourceRepository;
 import java.util.Collection;
@@ -33,6 +36,7 @@ public class ClassroomListComposer {
     private final ClassroomResourceRepository classroomResourceRepository;
     private final ClassroomPermissionRepository classroomPermissionRepository;
     private final PermissionTargetResolvers permissionTargetResolvers;
+    private final SpaceActionFlags actionFlags;
 
     public ClassroomListItemDto compose(Classroom classroom) {
         return compose(new PageImpl<>(List.of(classroom))).getContent().getFirst();
@@ -52,17 +56,22 @@ public class ClassroomListComposer {
                 : classroomPermissionRepository.findByClassroomIdInAndDeletedAtIsNull(classroomIds).stream()
                         .collect(Collectors.groupingBy(permission -> permission.getClassroom().getId()));
 
-        Map<PermissionTargetKind, Map<Long, String>> namesByKind =
+        Map<PermissionTargetKind, Map<Long, TargetInfo>> namesByKind =
                 resolveTargetNames(permissionsByClassroom.values());
+
+        BuildingScope updateScope = actionFlags.userScope(Permission.CLASSROOM_UPDATE);
+        BuildingScope activateScope = actionFlags.userScope(Permission.CLASSROOM_ACTIVATE);
+        BuildingScope allocateScope = actionFlags.userScope(Permission.ALLOCATION_WRITE);
 
         return classrooms.map(classroom -> toDto(
                 classroom,
                 resourcesByClassroom.getOrDefault(classroom.getId(), List.of()),
                 permissionsByClassroom.getOrDefault(classroom.getId(), List.of()),
-                namesByKind));
+                namesByKind,
+                updateScope, activateScope, allocateScope));
     }
 
-    private Map<PermissionTargetKind, Map<Long, String>> resolveTargetNames(
+    private Map<PermissionTargetKind, Map<Long, TargetInfo>> resolveTargetNames(
             Collection<List<ClassroomPermission>> permissionLists) {
         Map<PermissionTargetKind, Set<Long>> idsByKind = permissionLists.stream()
                 .flatMap(List::stream)
@@ -71,13 +80,16 @@ public class ClassroomListComposer {
 
         return idsByKind.entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey,
-                        entry -> permissionTargetResolvers.resolveNames(entry.getKey(), entry.getValue())));
+                        entry -> permissionTargetResolvers.resolve(entry.getKey(), entry.getValue())));
     }
 
     private ClassroomListItemDto toDto(Classroom classroom,
                                        List<ClassroomResource> resources,
                                        List<ClassroomPermission> permissions,
-                                       Map<PermissionTargetKind, Map<Long, String>> namesByKind) {
+                                       Map<PermissionTargetKind, Map<Long, TargetInfo>> namesByKind,
+                                       BuildingScope updateScope,
+                                       BuildingScope activateScope,
+                                       BuildingScope allocateScope) {
         List<ClassroomResourceDto> resourceDtos = resources.stream()
                 .map(resource -> new ClassroomResourceDto(
                         resource.getResourceType().getId(),
@@ -87,11 +99,7 @@ public class ClassroomListComposer {
                 .toList();
 
         List<ClassroomPermissionTargetDto> targetDtos = permissions.stream()
-                .map(permission -> new ClassroomPermissionTargetDto(
-                        permission.getTargetKind(),
-                        permission.getTargetId(),
-                        namesByKind.getOrDefault(permission.getTargetKind(), Map.of())
-                                .get(permission.getTargetId())))
+                .map(permission -> toTargetDto(permission, namesByKind))
                 .toList();
 
         return new ClassroomListItemDto(
@@ -109,7 +117,22 @@ public class ClassroomListComposer {
                 allowedDisplay(classroom.getPermissionMode(), targetDtos),
                 targetDtos,
                 classroom.unavailableReason(),
-                classroom.isCurrentInSysacad());
+                classroom.isCurrentInSysacad(),
+                classroom.isActive() && updateScope.allows(classroom.getBuilding().getId()),
+                activateScope.allows(classroom.getBuilding().getId()),
+                classroom.isAvailable() && allocateScope.allows(classroom.getBuilding().getId()));
+    }
+
+    private ClassroomPermissionTargetDto toTargetDto(
+            ClassroomPermission permission, Map<PermissionTargetKind, Map<Long, TargetInfo>> infoByKind) {
+        TargetInfo info = infoByKind.getOrDefault(permission.getTargetKind(), Map.of()).get(permission.getTargetId());
+        if (info == null) {
+            return new ClassroomPermissionTargetDto(
+                    permission.getTargetKind(), permission.getTargetId(), null, null, null, null, null);
+        }
+        return new ClassroomPermissionTargetDto(
+                permission.getTargetKind(), permission.getTargetId(), info.name(),
+                info.specialtyName(), info.specialtyAbbreviation(), info.specialtyCode(), info.studyPlanCode());
     }
 
     private String allowedDisplay(PermissionMode mode, List<ClassroomPermissionTargetDto> targets) {

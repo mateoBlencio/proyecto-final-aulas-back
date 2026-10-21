@@ -18,11 +18,11 @@ public class PermissionTargetResolvers {
                 .collect(Collectors.toMap(PermissionTargetResolver::kind, Function.identity()));
     }
 
-    public Map<Long, String> resolveNames(PermissionTargetKind kind, Collection<Long> targetIds) {
+    public Map<Long, TargetInfo> resolve(PermissionTargetKind kind, Collection<Long> targetIds) {
         PermissionTargetResolver resolver = byKind.get(kind);
         if (resolver == null) {
             throw new IllegalStateException("No PermissionTargetResolver registered for kind " + kind);
         }
-        return resolver.resolveNames(targetIds);
+        return resolver.resolve(targetIds);
     }
 }

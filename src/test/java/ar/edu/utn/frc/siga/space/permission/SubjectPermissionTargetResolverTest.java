@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
+import ar.edu.utn.frc.siga.academic.dto.response.StudyPlanResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.space.model.PermissionTargetKind;
@@ -29,22 +31,80 @@ class SubjectPermissionTargetResolverTest {
                 .isEqualTo(PermissionTargetKind.SUBJECT);
     }
 
+    private SubjectPermissionTargetResolver resolver() {
+        return new SubjectPermissionTargetResolver(subjectService);
+    }
+
     @Test
-    @DisplayName("resolveNames: resuelve id -> nombre en batch")
-    void resolveNamesBatch() {
+    @DisplayName("resolve: materia con plan y especialidad completos arma el TargetInfo entero")
+    void resolveFullSubject() {
+        StudyPlanResponseDto plan = new StudyPlanResponseDto(
+                10L, 2023, new SpecialtyResponseDto(5, "Ingeniería en Sistemas", "ISI"), true);
+        when(subjectService.findByIdsIncludingDeactivated(Set.of(1L))).thenReturn(List.of(
+                new SubjectResponseDto(1L, 100, "Análisis Matemático", "ANUAL", plan, true, null)));
+
+        assertThat(resolver().resolve(Set.of(1L))).containsOnlyKeys(1L)
+                .containsEntry(1L, new TargetInfo(
+                        "Análisis Matemático", "Ingeniería en Sistemas", "ISI", 5, 2023));
+    }
+
+    @Test
+    @DisplayName("resolve: resuelve varias materias en una sola consulta")
+    void resolveBatch() {
         when(subjectService.findByIdsIncludingDeactivated(Set.of(1L, 2L))).thenReturn(List.of(
                 new SubjectResponseDto(1L, 100, "Análisis Matemático", "ANUAL", null, true, null),
                 new SubjectResponseDto(2L, 200, "Física I", "ANUAL", null, true, null)));
 
-        assertThat(new SubjectPermissionTargetResolver(subjectService).resolveNames(Set.of(1L, 2L)))
-                .containsEntry(1L, "Análisis Matemático")
-                .containsEntry(2L, "Física I");
+        assertThat(resolver().resolve(Set.of(1L, 2L)))
+                .containsEntry(1L, TargetInfo.ofName("Análisis Matemático"))
+                .containsEntry(2L, TargetInfo.ofName("Física I"));
     }
 
     @Test
-    @DisplayName("resolveNames: colección vacía no llama al service")
-    void resolveNamesEmptySkipsService() {
-        assertThat(new SubjectPermissionTargetResolver(subjectService).resolveNames(Set.of())).isEmpty();
+    @DisplayName("resolve: studyPlan null deja los datos de especialidad y plan en null")
+    void resolveNullStudyPlan() {
+        when(subjectService.findByIdsIncludingDeactivated(Set.of(1L))).thenReturn(List.of(
+                new SubjectResponseDto(1L, 100, "Física I", "ANUAL", null, true, null)));
+
+        assertThat(resolver().resolve(Set.of(1L))).containsEntry(1L, TargetInfo.ofName("Física I"));
+    }
+
+    @Test
+    @DisplayName("resolve: specialty null conserva el código de plan y deja la especialidad en null")
+    void resolveNullSpecialty() {
+        StudyPlanResponseDto plan = new StudyPlanResponseDto(10L, 2023, null, true);
+        when(subjectService.findByIdsIncludingDeactivated(Set.of(1L))).thenReturn(List.of(
+                new SubjectResponseDto(1L, 100, "Física I", "ANUAL", plan, true, null)));
+
+        assertThat(resolver().resolve(Set.of(1L)))
+                .containsEntry(1L, new TargetInfo("Física I", null, null, null, 2023));
+    }
+
+    @Test
+    @DisplayName("resolve: materia desactivada se resuelve igual")
+    void resolveDeactivatedSubject() {
+        StudyPlanResponseDto plan = new StudyPlanResponseDto(
+                10L, 2023, new SpecialtyResponseDto(5, "Ingeniería en Sistemas", "ISI"), true);
+        when(subjectService.findByIdsIncludingDeactivated(Set.of(1L))).thenReturn(List.of(
+                new SubjectResponseDto(1L, 100, "Física I", "ANUAL", plan, false, null)));
+
+        assertThat(resolver().resolve(Set.of(1L)).get(1L))
+                .isEqualTo(new TargetInfo("Física I", "Ingeniería en Sistemas", "ISI", 5, 2023));
+    }
+
+    @Test
+    @DisplayName("resolve: id inexistente queda ausente del mapa")
+    void resolveMissingIdAbsent() {
+        when(subjectService.findByIdsIncludingDeactivated(Set.of(1L, 99L))).thenReturn(List.of(
+                new SubjectResponseDto(1L, 100, "Física I", "ANUAL", null, true, null)));
+
+        assertThat(resolver().resolve(Set.of(1L, 99L))).containsOnlyKeys(1L).doesNotContainKey(99L);
+    }
+
+    @Test
+    @DisplayName("resolve: colección vacía no llama al service")
+    void resolveEmptySkipsService() {
+        assertThat(resolver().resolve(Set.of())).isEmpty();
         verifyNoInteractions(subjectService);
     }
 }
