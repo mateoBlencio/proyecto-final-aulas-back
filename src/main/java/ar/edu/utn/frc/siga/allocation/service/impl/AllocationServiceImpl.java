@@ -209,10 +209,7 @@ public class AllocationServiceImpl implements AllocationService {
 
     /** A non-null {@code action} also sets the audit description once the classrooms are validated. */
     private Map<OccurrenceSlotDto, Long> resolveAndValidate(AllocationCommand command, String action) {
-        // IMPORTED (ingest Excel) y SYSACAD no clampean: el primer sync/import de una comisión a mitad
-        // de año trae ocurrencias ya pasadas, y rechazarlas dejaría esos slots sin asignación (plan §4).
-        LocalDate clampFrom = (command.source() == AllocationSource.IMPORTED || command.source() == AllocationSource.SYSACAD)
-                ? null : LocalDate.now();
+        LocalDate clampFrom = command.source().allowsPastOccurrences() ? null : LocalDate.now();
         AllocationTargetResolver.ResolvedAssignments resolved =
                 targetResolver.resolveClassroomByOccurrence(command.items(), clampFrom);
         Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolved.classroomByOccurrence();
