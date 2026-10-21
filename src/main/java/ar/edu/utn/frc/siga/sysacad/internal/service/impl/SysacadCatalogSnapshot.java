@@ -90,7 +90,9 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
 
     @Override
     public List<SysacadCommissionDto> findCommissions() {
-        return commissionsRaw.get().stream().map(mapper::toCommission).filter(Objects::nonNull).toList();
+        List<RawCommission> rows = commissionsRaw.get();
+        mapper.warnCourseCodeCollisions(rows.stream().map(RawCommission::curso).toList());
+        return rows.stream().map(mapper::toCommission).filter(Objects::nonNull).toList();
     }
 
     @Override

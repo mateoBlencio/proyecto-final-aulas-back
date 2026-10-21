@@ -288,6 +288,67 @@ class SysacadCatalogMapperTest {
     }
 
     @Test
+    @DisplayName("normalizeCourseCode: más de 255 caracteres devuelve null, 255 se conserva")
+    void codigoDeCursoDemasiadoLargoEsNull() {
+        assertThat(SysacadCatalogMapper.normalizeCourseCode("A".repeat(255))).hasSize(255);
+        assertThat(SysacadCatalogMapper.normalizeCourseCode("A".repeat(256))).isNull();
+    }
+
+    @Test
+    @DisplayName("toCommission: el curso inválido con CR/LF se loguea saneado y acotado, sin forjar líneas de log")
+    void cursoInvalidoSeLoguaSaneado() {
+        Logger logger = (Logger) LoggerFactory.getLogger(SysacadCatalogMapper.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            assertThat(mapper.toCommission(new RawCommission(".\r\n.\r\n" + "/".repeat(100), 17, 94, 519, 2026, 10)))
+                    .isNull();
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        assertThat(appender.list).hasSize(1);
+        String message = appender.list.getFirst().getFormattedMessage();
+        assertThat(message).doesNotContain("\r").doesNotContain("\n").contains("('.  .  ///").endsWith("materia=519: fila salteada");
+        assertThat(message).contains("...");
+    }
+
+    @Test
+    @DisplayName("warnCourseCodeCollisions: avisa una vez por código normalizado con orígenes distintos")
+    void avisaColisionDeCodigos() {
+        Logger logger = (Logger) LoggerFactory.getLogger(SysacadCatalogMapper.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            mapper.warnCourseCodeCollisions(java.util.List.of("1K1", "1 K1", "1K1", "2K1", "...", "5D1", "5D1."));
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        assertThat(appender.list).extracting(ILoggingEvent::getFormattedMessage).containsExactly(
+                "Códigos de curso distintos normalizan a '1K1': [1 K1, 1K1]",
+                "Códigos de curso distintos normalizan a '5D1': [5D1, 5D1.]");
+    }
+
+    @Test
+    @DisplayName("warnCourseCodeCollisions: sin colisiones no loguea")
+    void sinColisionNoLoguea() {
+        Logger logger = (Logger) LoggerFactory.getLogger(SysacadCatalogMapper.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            mapper.warnCourseCodeCollisions(java.util.List.of("1K1", "1K1", "2K1"));
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        assertThat(appender.list).isEmpty();
+    }
+
+    @Test
     @DisplayName("toCommission: normaliza '5D1.' a '5D1' y ' 3k1 ' a '3K1'")
     void toCommissionNormalizaCodigo() {
         assertThat(mapper.toCommission(new RawCommission("5D1.", 17, 94, 519, 2026, 10)).courseCode())

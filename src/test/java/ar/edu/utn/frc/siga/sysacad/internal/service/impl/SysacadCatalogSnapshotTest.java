@@ -261,4 +261,28 @@ class SysacadCatalogSnapshotTest {
         assertThat(snapshot.findAllocations()).extracting(SysacadAllocationDto::courseCode)
                 .containsExactly("5D1");
     }
+
+    @Test
+    @DisplayName("findCommissions: avisa los códigos distintos que normalizan al mismo y conserva las filas")
+    void findCommissionsAvisaColisiones() {
+        Logger logger = (Logger) LoggerFactory.getLogger(SysacadCatalogMapper.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        List<SysacadCommissionDto> commissions;
+        try {
+            commissions = new SysacadCatalogSnapshot(
+                    Lazy.of(List::of), Lazy.of(List::of), Lazy.of(List::of),
+                    Lazy.of(() -> List.of(
+                            new RawCommission("1K1", 17, 94, 519, 2026, 10),
+                            new RawCommission("1 K1", 17, 94, 519, 2026, 10))),
+                    Lazy.of(List::of), Lazy.of(List::of), Lazy.of(List::of), mapper).findCommissions();
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        assertThat(commissions).hasSize(2);
+        assertThat(appender.list).extracting(ILoggingEvent::getFormattedMessage)
+                .containsExactly("Códigos de curso distintos normalizan a '1K1': [1 K1, 1K1]");
+    }
 }
