@@ -1,11 +1,13 @@
 package ar.edu.utn.frc.siga.dashboard.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 import ar.edu.utn.frc.siga.dashboard.model.AllocationCategory;
 import ar.edu.utn.frc.siga.dashboard.model.AllocationUnitRow;
 import ar.edu.utn.frc.siga.dashboard.model.BuildingRoomsRow;
 import ar.edu.utn.frc.siga.dashboard.model.CalculationInput;
+import ar.edu.utn.frc.siga.dashboard.model.ClassifiedAllocation;
 import ar.edu.utn.frc.siga.dashboard.model.DashboardParameters;
 import ar.edu.utn.frc.siga.dashboard.model.ScopeMetrics;
 import java.time.LocalDate;
@@ -13,6 +15,7 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 class DashboardCalculatorTest {
@@ -34,6 +37,11 @@ class DashboardCalculatorTest {
         return new CalculationInput(days, buildings, List.of(units), PARAMS);
     }
 
+    private static Map<Long, AllocationCategory> categories(List<AllocationUnitRow> units) {
+        return DashboardCalculator.classify(units, PARAMS).entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().category()));
+    }
+
     private static final List<BuildingRoomsRow> ONE_BUILDING = List.of(new BuildingRoomsRow(1L, 2, "Central", 3));
 
     @Test
@@ -41,7 +49,7 @@ class DashboardCalculatorTest {
         var a = unit(1, 10, 1, MONDAY, 100, 10, 0, 60, 20, 30);
         var b = unit(2, 10, 1, MONDAY, 200, 10, 19, 60, 20, 30); // 41 min overlap
 
-        Map<Long, AllocationCategory> result = DashboardCalculator.classify(List.of(a, b), PARAMS);
+        Map<Long, AllocationCategory> result = categories(List.of(a, b));
 
         assertThat(result).containsEntry(1L, AllocationCategory.OVERLAP).containsEntry(2L, AllocationCategory.OVERLAP);
     }
@@ -51,17 +59,17 @@ class DashboardCalculatorTest {
         var a = unit(1, 10, 1, MONDAY, 100, 10, 0, 60, 20, 30);
         var b = unit(2, 10, 1, MONDAY, 200, 10, 20, 60, 20, 30); // 40 min overlap
 
-        Map<Long, AllocationCategory> result = DashboardCalculator.classify(List.of(a, b), PARAMS);
+        Map<Long, AllocationCategory> result = categories(List.of(a, b));
 
         assertThat(result.values()).containsOnly(AllocationCategory.ADEQUATE);
     }
 
     @Test
     void overlapBetweenOccurrencesOfSameEventIsNotOverlap() {
-        var a = unit(1, 10, 1, MONDAY, 100, 10, 0, 120, 20, 30);
-        var b = unit(2, 10, 1, MONDAY, 100, 11, 0, 120, 20, 30); // 60 min overlap, same event
+        var a = unit(1, 10, 1, MONDAY, 100, 10, 0, 120, 40, 30);
+        var b = unit(2, 10, 1, MONDAY, 100, 11, 0, 120, 40, 30); // 60 min overlap, same event
 
-        Map<Long, AllocationCategory> result = DashboardCalculator.classify(List.of(a, b), PARAMS);
+        Map<Long, AllocationCategory> result = categories(List.of(a, b));
 
         assertThat(result.values()).containsOnly(AllocationCategory.ADEQUATE);
     }
@@ -71,7 +79,7 @@ class DashboardCalculatorTest {
         var a = unit(1, 10, 1, MONDAY, 100, 10, 0, 120, 99, 30);
         var b = unit(2, 10, 1, MONDAY, 200, 11, 0, 120, 10, 30);
 
-        Map<Long, AllocationCategory> result = DashboardCalculator.classify(List.of(a, b), PARAMS);
+        Map<Long, AllocationCategory> result = categories(List.of(a, b));
 
         assertThat(result).containsEntry(1L, AllocationCategory.OVERLAP);
     }
@@ -82,7 +90,7 @@ class DashboardCalculatorTest {
         var b = unit(2, 11, 1, MONDAY, 200, 10, 0, 60, 20, 30);
         var c = unit(3, 10, 1, TUESDAY, 300, 10, 0, 60, 20, 30);
 
-        Map<Long, AllocationCategory> result = DashboardCalculator.classify(List.of(a, b, c), PARAMS);
+        Map<Long, AllocationCategory> result = categories(List.of(a, b, c));
 
         assertThat(result.values()).containsOnly(AllocationCategory.ADEQUATE);
     }
@@ -94,7 +102,7 @@ class DashboardCalculatorTest {
         var under = unit(3, 12, 1, MONDAY, 3, 8, 0, 30, 14, 30);
         var half = unit(4, 13, 1, MONDAY, 4, 8, 0, 30, 15, 30);
 
-        Map<Long, AllocationCategory> result = DashboardCalculator.classify(List.of(over, exact, under, half), PARAMS);
+        Map<Long, AllocationCategory> result = categories(List.of(over, exact, under, half));
 
         assertThat(result)
                 .containsEntry(1L, AllocationCategory.OVERCROWDED)
@@ -108,7 +116,7 @@ class DashboardCalculatorTest {
         var empty = unit(1, 10, 1, MONDAY, 1, 8, 0, 30, 0, 0);
         var one = unit(2, 11, 1, MONDAY, 2, 8, 0, 30, 1, 0);
 
-        Map<Long, AllocationCategory> result = DashboardCalculator.classify(List.of(empty, one), PARAMS);
+        Map<Long, AllocationCategory> result = categories(List.of(empty, one));
 
         assertThat(result)
                 .containsEntry(1L, AllocationCategory.ADEQUATE)
@@ -119,7 +127,7 @@ class DashboardCalculatorTest {
     void nullCapacityIsAdequate() {
         var u = unit(1, 10, 1, MONDAY, 1, 8, 0, 30, 500, null);
 
-        assertThat(DashboardCalculator.classify(List.of(u), PARAMS)).containsEntry(1L, AllocationCategory.ADEQUATE);
+        assertThat(categories(List.of(u))).containsEntry(1L, AllocationCategory.ADEQUATE);
     }
 
     @Test
@@ -233,5 +241,106 @@ class DashboardCalculatorTest {
 
         assertThat(result).containsOnlyKeys(1L);
         assertThat(result.get(1L).categories().total()).isZero();
+    }
+
+    @Test
+    void singleRoomAllocationHasFullWeight() {
+        var u = unit(1, 10, 1, MONDAY, 1, 8, 0, 30, 20, 30);
+
+        ClassifiedAllocation result = DashboardCalculator.classify(List.of(u), PARAMS).get(1L);
+
+        assertThat(result.category()).isEqualTo(AllocationCategory.ADEQUATE);
+        assertThat(result.weight()).isEqualTo(1.0);
+    }
+
+    @Test
+    void groupOvercrowdedAgainstSummedCapacityCountsOnceInTotal() {
+        var a = unit(1, 10, 1, MONDAY, 100, 8, 0, 60, 129, 70);
+        var b = unit(2, 11, 1, MONDAY, 100, 8, 0, 60, 129, 25);
+
+        Map<Long, ClassifiedAllocation> result = DashboardCalculator.classify(List.of(a, b), PARAMS);
+        ScopeMetrics metrics = DashboardCalculator.calculate(input(Set.of(MONDAY), ONE_BUILDING, a, b)).get(1L);
+
+        assertThat(result.values()).allSatisfy(c -> {
+            assertThat(c.category()).isEqualTo(AllocationCategory.OVERCROWDED);
+            assertThat(c.weight()).isEqualTo(0.5);
+        });
+        assertThat(metrics.categories().overcrowded()).isCloseTo(1.0, within(1e-9));
+        assertThat(metrics.categories().total()).isCloseTo(1.0, within(1e-9));
+    }
+
+    @Test
+    void groupWithinSummedCapacityIsAdequate() {
+        var a = unit(1, 10, 1, MONDAY, 100, 8, 0, 60, 80, 70);
+        var b = unit(2, 11, 1, MONDAY, 100, 8, 0, 60, 80, 30);
+
+        assertThat(categories(List.of(a, b))).containsEntry(1L, AllocationCategory.ADEQUATE)
+                .containsEntry(2L, AllocationCategory.ADEQUATE);
+    }
+
+    @Test
+    void groupEnrolledEqualToSummedCapacityIsAdequate() {
+        var a = unit(1, 10, 1, MONDAY, 100, 8, 0, 60, 100, 70);
+        var b = unit(2, 11, 1, MONDAY, 100, 8, 0, 60, 100, 30);
+
+        assertThat(categories(List.of(a, b)).values()).containsOnly(AllocationCategory.ADEQUATE);
+    }
+
+    @Test
+    void groupBelowThresholdOfSummedCapacityIsUnderused() {
+        var a = unit(1, 10, 1, MONDAY, 100, 8, 0, 60, 49, 70);
+        var b = unit(2, 11, 1, MONDAY, 100, 8, 0, 60, 49, 30);
+
+        assertThat(categories(List.of(a, b)).values()).containsOnly(AllocationCategory.UNDERUSED);
+    }
+
+    @Test
+    void groupWithUnknownCapacityIsAdequate() {
+        var a = unit(1, 10, 1, MONDAY, 100, 8, 0, 60, 500, 70);
+        var b = unit(2, 11, 1, MONDAY, 100, 8, 0, 60, 500, null);
+
+        assertThat(categories(List.of(a, b)).values()).containsOnly(AllocationCategory.ADEQUATE);
+    }
+
+    @Test
+    void sameEventOnDifferentDatesAreSeparateGroups() {
+        var a = unit(1, 10, 1, MONDAY, 100, 8, 0, 60, 40, 70);
+        var b = unit(2, 10, 1, TUESDAY, 100, 8, 0, 60, 40, 70);
+        var c = unit(3, 11, 1, TUESDAY, 100, 8, 0, 60, 40, 70);
+
+        Map<Long, ClassifiedAllocation> result = DashboardCalculator.classify(List.of(a, b, c), PARAMS);
+
+        assertThat(result.get(1L).weight()).isEqualTo(1.0);
+        assertThat(result.get(2L).weight()).isEqualTo(0.5);
+        assertThat(result.get(3L).weight()).isEqualTo(0.5);
+    }
+
+    @Test
+    void groupInTwoBuildingsSplitsHalfPerBuildingAndAddsUpToOneOnCampus() {
+        var buildings = List.of(new BuildingRoomsRow(1L, 2, "Central", 3), new BuildingRoomsRow(2L, 4, "Malvinas", 2));
+        var a = unit(1, 10, 1, MONDAY, 100, 8, 0, 60, 129, 70);
+        var b = unit(2, 20, 2, MONDAY, 100, 8, 0, 60, 129, 25);
+
+        Map<Long, ScopeMetrics> byBuilding = DashboardCalculator.calculate(input(Set.of(MONDAY), buildings, a, b));
+        ScopeMetrics campus = DashboardCalculator.sum(byBuilding.values(), PARAMS);
+
+        assertThat(byBuilding.get(1L).categories().overcrowded()).isCloseTo(0.5, within(1e-9));
+        assertThat(byBuilding.get(2L).categories().overcrowded()).isCloseTo(0.5, within(1e-9));
+        assertThat(campus.categories().overcrowded()).isCloseTo(1.0, within(1e-9));
+        assertThat(campus.categories().total()).isCloseTo(1.0, within(1e-9));
+    }
+
+    @Test
+    void oneOverlappingUnitMakesWholeGroupOverlap() {
+        var a = unit(1, 10, 1, MONDAY, 100, 10, 0, 60, 20, 70);
+        var b = unit(2, 11, 1, MONDAY, 100, 10, 0, 60, 20, 30);
+        var other = unit(3, 11, 1, MONDAY, 200, 10, 0, 60, 10, 30);
+
+        Map<Long, ClassifiedAllocation> result = DashboardCalculator.classify(List.of(a, b, other), PARAMS);
+
+        assertThat(result.get(1L).category()).isEqualTo(AllocationCategory.OVERLAP);
+        assertThat(result.get(2L).category()).isEqualTo(AllocationCategory.OVERLAP);
+        assertThat(result.get(3L).category()).isEqualTo(AllocationCategory.OVERLAP);
+        assertThat(result.get(1L).weight()).isEqualTo(0.5);
     }
 }

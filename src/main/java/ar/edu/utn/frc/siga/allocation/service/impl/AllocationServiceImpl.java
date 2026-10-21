@@ -1,6 +1,8 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
+import ar.edu.utn.frc.siga.allocation.dto.response.AllocationGroupDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.AllocationSiblingDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ReleasedOccurrenceDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
@@ -68,7 +70,7 @@ public class AllocationServiceImpl implements AllocationService {
         if (dto.classroom() != null && !scope.allows(dto.classroom().buildingId())) {
             throw ResourceNotFoundException.of("Allocation", allocationId);
         }
-        return dto;
+        return withVisibleSiblings(dto, scope);
     }
 
     @Override
@@ -85,7 +87,20 @@ public class AllocationServiceImpl implements AllocationService {
         BuildingScope scope = buildingScopeResolver.scopeFor(Permission.ALLOCATION_READ);
         return composer.composeAll(allocationRepository.findByOccurrenceIdIn(occurrenceIds)).stream()
                 .filter(dto -> dto.classroom() == null || scope.allows(dto.classroom().buildingId()))
+                .map(dto -> withVisibleSiblings(dto, scope))
                 .toList();
+    }
+
+    private static AllocationResponseDto withVisibleSiblings(AllocationResponseDto dto, BuildingScope scope) {
+        AllocationGroupDto group = dto.group();
+        if (group == null) {
+            return dto;
+        }
+        List<AllocationSiblingDto> visible = group.siblings().stream()
+                .filter(s -> scope.allows(s.buildingId()))
+                .toList();
+        return new AllocationResponseDto(dto.id(), dto.source(), dto.createdAt(), dto.observation(),
+                dto.occurrence(), dto.event(), dto.classroom(), group.withSiblings(visible));
     }
 
     @Override

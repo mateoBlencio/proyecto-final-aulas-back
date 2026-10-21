@@ -269,7 +269,7 @@ class RoomRequestCatalogsResolverTest {
 
     private static AllocationResponseDto allocation(Long occurrenceId, ClassroomResponseDto classroom) {
         return new AllocationResponseDto(occurrenceId, AllocationSource.MANUAL, null, null,
-                occurrence(occurrenceId, 50L, LocalDate.now()), null, classroom);
+                occurrence(occurrenceId, 50L, LocalDate.now()), null, classroom, null);
     }
 
     @Test

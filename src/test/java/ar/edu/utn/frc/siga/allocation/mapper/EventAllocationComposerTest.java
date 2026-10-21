@@ -58,7 +58,7 @@ class EventAllocationComposerTest {
         UniqueEventResponseDto event = uniqueEvent(3L, 40);
         ClassroomResponseDto classroom = classroom(5L, 30);
         AllocationResponseDto allocation = new AllocationResponseDto(
-                1L, AllocationSource.MANUAL, null, "obs", null, null, classroom);
+                1L, AllocationSource.MANUAL, null, "obs", null, null, classroom, null);
 
         UniqueEventAllocationResponseDto result = composer.compose(event, allocation);
 
@@ -72,7 +72,7 @@ class EventAllocationComposerTest {
     void composeSinAula() {
         UniqueEventResponseDto event = uniqueEvent(3L, 40);
         AllocationResponseDto allocation = new AllocationResponseDto(
-                1L, AllocationSource.MANUAL, null, null, null, null, null);
+                1L, AllocationSource.MANUAL, null, null, null, null, null, null);
 
         UniqueEventAllocationResponseDto result = composer.compose(event, allocation);
 

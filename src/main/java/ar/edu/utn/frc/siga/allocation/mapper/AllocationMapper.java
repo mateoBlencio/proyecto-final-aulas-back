@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.allocation.mapper;
 
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.AllocationGroupDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.common.mapper.CentralMapperConfig;
@@ -16,6 +17,7 @@ public interface AllocationMapper {
     @Mapping(target = "occurrence", source = "occurrence")
     @Mapping(target = "event", source = "event")
     @Mapping(target = "classroom", source = "classroom")
+    @Mapping(target = "group", source = "group")
     AllocationResponseDto toDto(Allocation allocation, OccurrenceResponseDto occurrence,
-            AcademicEventResponseDto event, ClassroomResponseDto classroom);
+            AcademicEventResponseDto event, ClassroomResponseDto classroom, AllocationGroupDto group);
 }
