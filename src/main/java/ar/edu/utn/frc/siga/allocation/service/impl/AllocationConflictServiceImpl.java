@@ -83,14 +83,17 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
             UnallocatedConflictComparator.validate(pageable.getSort());
             merged.addAll(buildUnallocatedConflicts(range, includePast, q, dayOfWeek, specialty, pageable.getSort()));
         }
-        if (effectiveTypes.contains(ConflictType.OVERCROWDED)) {
-            merged.addAll(buildOvercrowdedConflicts(range, includePast));
-        }
-        if (effectiveTypes.contains(ConflictType.OVERLAP)) {
-            merged.addAll(buildOverlapConflicts(range, includePast));
-        }
-        if (effectiveTypes.contains(ConflictType.NOT_PERMITTED)) {
-            merged.addAll(buildNotPermittedConflicts(range, includePast));
+        if (effectiveTypes.stream().anyMatch(t -> t != ConflictType.UNALLOCATED)) {
+            List<OccupiedSlot> occupancy = readOccupancy(range, includePast);
+            if (effectiveTypes.contains(ConflictType.OVERCROWDED)) {
+                merged.addAll(buildOvercrowdedConflicts(occupancy));
+            }
+            if (effectiveTypes.contains(ConflictType.OVERLAP)) {
+                merged.addAll(buildOverlapConflicts(occupancy));
+            }
+            if (effectiveTypes.contains(ConflictType.NOT_PERMITTED)) {
+                merged.addAll(buildNotPermittedConflicts(occupancy));
+            }
         }
 
         BuildingScope scope = buildingScopeResolver.scopeFor(Permission.CONFLICT_READ);
@@ -153,15 +156,18 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
                 .replaceAll("\\p{M}", "").toLowerCase();
     }
 
-    private List<OvercrowdedConflictDto> buildOvercrowdedConflicts(Range range, boolean includePast) {
-        List<OccupiedSlot> occupancy = readOccupancy(range, includePast);
-
-        Map<EventRoomKey, EventRoomAcc> overcrowdAccs = new LinkedHashMap<>();
+    private static Map<EventRoomKey, EventRoomAcc> groupByEventRoom(List<OccupiedSlot> occupancy) {
+        Map<EventRoomKey, EventRoomAcc> accs = new LinkedHashMap<>();
         for (OccupiedSlot slot : occupancy) {
-            overcrowdAccs.computeIfAbsent(new EventRoomKey(slot.eventId(), slot.classroomId()),
+            accs.computeIfAbsent(new EventRoomKey(slot.eventId(), slot.classroomId()),
                             k -> new EventRoomAcc(slot.eventId(), slot.classroomId()))
                     .dates.add(slot.date());
         }
+        return accs;
+    }
+
+    private List<OvercrowdedConflictDto> buildOvercrowdedConflicts(List<OccupiedSlot> occupancy) {
+        Map<EventRoomKey, EventRoomAcc> overcrowdAccs = groupByEventRoom(occupancy);
 
         Set<Long> eventIds = new LinkedHashSet<>();
         Set<Long> classroomIds = new LinkedHashSet<>();
@@ -173,8 +179,7 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         return buildOvercrowded(overcrowdAccs, fetchEventsById(eventIds), fetchClassroomsById(classroomIds));
     }
 
-    private List<OverlapConflictDto> buildOverlapConflicts(Range range, boolean includePast) {
-        List<OccupiedSlot> occupancy = readOccupancy(range, includePast);
+    private List<OverlapConflictDto> buildOverlapConflicts(List<OccupiedSlot> occupancy) {
         Map<OverlapKey, OverlapAcc> overlapAccs = computeOverlaps(occupancy);
 
         Set<Long> eventIds = new LinkedHashSet<>();
@@ -188,15 +193,8 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         return buildOverlaps(overlapAccs, fetchEventsById(eventIds), fetchClassroomsById(classroomIds));
     }
 
-    private List<NotPermittedConflictDto> buildNotPermittedConflicts(Range range, boolean includePast) {
-        List<OccupiedSlot> occupancy = readOccupancy(range, includePast);
-
-        Map<EventRoomKey, EventRoomAcc> accs = new LinkedHashMap<>();
-        for (OccupiedSlot slot : occupancy) {
-            accs.computeIfAbsent(new EventRoomKey(slot.eventId(), slot.classroomId()),
-                            k -> new EventRoomAcc(slot.eventId(), slot.classroomId()))
-                    .dates.add(slot.date());
-        }
+    private List<NotPermittedConflictDto> buildNotPermittedConflicts(List<OccupiedSlot> occupancy) {
+        Map<EventRoomKey, EventRoomAcc> accs = groupByEventRoom(occupancy);
         if (accs.isEmpty()) {
             return List.of();
         }
