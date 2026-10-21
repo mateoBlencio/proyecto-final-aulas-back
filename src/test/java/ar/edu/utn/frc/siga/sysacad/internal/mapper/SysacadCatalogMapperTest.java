@@ -271,6 +271,8 @@ class SysacadCatalogMapperTest {
             "EIG-VW|EIG-VW",
             "5d1|5D1",
             "'5 D 1'|5D1",
+            "'3 K 1'|3K1",
+            "'1\tK\n1'|1K1",
             "5D1/|5D1",
             "-|-"})
     void normalizaCodigoDeCurso(String raw, String expected) {

@@ -35,7 +35,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * "5D1" and "5D1."); only the HTTP fetchers are mocked.
  */
 @DisplayName("Sync de SysAcad con códigos de curso sucios (integración)")
-@TestPropertySource(properties = "siga.sysacad.enabled=true")
+@TestPropertySource(properties = {
+        "siga.sysacad.enabled=true",
+        // The shared database keeps commissions from other test classes; without this the sync aborts
+        // on the minimum-valid-rows check.
+        "siga.sysacad.sync.min-valid-rows-percent=0"})
 class SysacadDirtyCourseCodeSyncIntegrationTest extends AbstractIntegrationTest {
 
     private static final int SPECIALTY = 9901;
