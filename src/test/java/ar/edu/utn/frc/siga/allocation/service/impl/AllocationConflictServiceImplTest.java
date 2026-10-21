@@ -50,6 +50,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -317,6 +319,22 @@ class AllocationConflictServiceImplTest {
         when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(allocation(100L, 10L, 5)));
 
         assertThat(service.findConflicts(Set.of(ConflictType.UNALLOCATED), from, to, false, null, null, null, PAGEABLE)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Sin types lee la ocupación una sola vez para los tres tipos que la usan")
+    void withoutTypesReadsOccupancyOnce() {
+        service.findConflicts(null, futureDate(0), futureDate(30), false, null, null, null, PAGEABLE);
+
+        verify(occupancyReader, times(1)).loadAllocated(any(), any());
+    }
+
+    @Test
+    @DisplayName("Solo UNALLOCATED no lee la ocupación")
+    void onlyUnallocatedDoesNotReadOccupancy() {
+        service.findConflicts(Set.of(ConflictType.UNALLOCATED), futureDate(0), futureDate(30), false, null, null, null, PAGEABLE);
+
+        verify(occupancyReader, never()).loadAllocated(any(), any());
     }
 
     @Test

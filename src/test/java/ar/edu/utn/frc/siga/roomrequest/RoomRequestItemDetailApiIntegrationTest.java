@@ -91,7 +91,7 @@ class RoomRequestItemDetailApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("sin token: 401; con AUXILIAR_AULICO de alcance GLOBAL: 200 (cubre cualquier edificio)")
+    @DisplayName("sin token: 401")
     void authenticationAndAuthorization() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
         RoomRequest request = testData.solicitudDeAula(RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, academic.subjectId());
@@ -104,10 +104,6 @@ class RoomRequestItemDetailApiIntegrationTest extends AbstractIntegrationTest {
                 .build();
         anonymousMockMvc.perform(get("/v1/room-requests/items/" + item.getId()))
                 .andExpect(status().isUnauthorized());
-
-        mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO)
-                .perform(get("/v1/room-requests/items/" + item.getId()))
-                .andExpect(status().isOk());
     }
 
     @Test

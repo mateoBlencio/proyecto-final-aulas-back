@@ -150,7 +150,7 @@ class AllocationImpactServiceImpl implements AllocationImpactService {
                                 typeByEventId.get(c.conflictingEventId()),
                                 c.conflictingOccurrenceId(),
                                 c.conflictingAllocationId()),
-                        freeRoomsAt(c, occupancy, movingOccurrenceIds, candidates,
+                        freeRoomsAfterApplying(c, occupancy, movingOccurrenceIds, candidates,
                                 permittedRooms(availableRooms, permissionByRoom,
                                         subjectByOccurrenceId.get(c.occurrenceId())))))
                 .toList();
@@ -196,13 +196,12 @@ class AllocationImpactServiceImpl implements AllocationImpactService {
                         (x, y) -> x));
     }
 
-    // Libres DESPUÉS de aplicar el pedido: las ocurrencias que se mueven liberan su aula vieja,
-    // y las aulas que el propio pedido ocupa cuentan como tomadas.
-    private List<ClassroomResponseDto> freeRoomsAt(OccurrenceConflictDto conflict,
-                                                   List<OccupiedSlot> occupancy,
-                                                   Set<Long> movingOccurrenceIds,
-                                                   List<AllocationCandidate> candidates,
-                                                   List<ClassroomResponseDto> availableRooms) {
+    // Rooms the moving occurrences leave count as free; rooms the batch itself takes count as taken.
+    private List<ClassroomResponseDto> freeRoomsAfterApplying(OccurrenceConflictDto conflict,
+                                                             List<OccupiedSlot> occupancy,
+                                                             Set<Long> movingOccurrenceIds,
+                                                             List<AllocationCandidate> candidates,
+                                                             List<ClassroomResponseDto> availableRooms) {
         Set<Long> taken = new HashSet<>();
 
         for (OccupiedSlot slot : occupancy) {

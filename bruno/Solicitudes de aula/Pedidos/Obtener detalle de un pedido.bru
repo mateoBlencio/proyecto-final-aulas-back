@@ -54,5 +54,9 @@ docs {
     aula(s) que tiene hoy esa comisión según el cursado (no depende de que este
     pedido se haya resuelto). null en el mismo caso que enrolled.
 
+  allowedActions: subconjunto de ASSIGN | DERIVE | RETURN | CANCEL | NOTIFY que el
+  usuario autenticado puede ejecutar sobre el pedido (rol, estado y edificio
+  derivado). Pista de UI: el back valida igual en cada endpoint.
+
   404 si el id no existe.
 }

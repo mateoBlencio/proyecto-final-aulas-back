@@ -34,7 +34,9 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @Import(IntegrationTestData.class)
@@ -108,6 +110,32 @@ class ReleaseWithReasonApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(reverted.getReleaseReason()).isNull();
         assertThat(reverted.getReleaseNote()).isNull();
         assertThat(reverted.getPreviousClassroomId()).isEqualTo(f.original().getId());
+    }
+
+    @Test
+    @DisplayName("GET /v1/allocations/releases agrupa por evento con la lista de fechas liberadas y filtra por motivo")
+    void listReleased() throws Exception {
+        Fixture f = eventWithSecondOccurrenceReleased();
+        LocalDate from = LocalDate.now().plusYears(2).minusDays(7);
+        LocalDate to = from.plusMonths(2);
+        String ofEvent = "$.content[?(@.event.id==" + f.eventId() + ")]";
+
+        mockMvc.perform(get("/v1/allocations/releases").param("from", from.toString()).param("to", to.toString())
+                        .param("reason", "VIRTUAL_CLASS").param("sort", "subject,asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(ofEvent + ".reason").value("VIRTUAL_CLASS"))
+                .andExpect(jsonPath(ofEvent + ".note").value("cursado virtual"))
+                .andExpect(jsonPath(ofEvent + ".previousClassroom.id").value(f.original().getId().intValue()))
+                .andExpect(jsonPath(ofEvent + ".dates.length()").value(1))
+                .andExpect(jsonPath(ofEvent + ".dates[0].occurrenceId").value(f.releasedOccurrenceId().intValue()));
+
+        mockMvc.perform(get("/v1/allocations/releases").param("from", from.toString()).param("to", to.toString())
+                        .param("reason", "CANCELLED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(ofEvent).isEmpty());
+
+        mockMvc.perform(get("/v1/allocations/releases").param("sort", "inexistente,asc"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

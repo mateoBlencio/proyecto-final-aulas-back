@@ -1,0 +1,39 @@
+meta {
+  name: Listar ocurrencias liberadas
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/v1/allocations/releases?reason=VIRTUAL_CLASS&from=2026-01-01&to=2026-12-31&q=algebra&dayOfWeek=MONDAY&specialty=Ingeniería en Sistemas de Información&sort=subject,asc&page=0&size=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~reason: VIRTUAL_CLASS
+  from: 2026-01-01
+  to: 2026-12-31
+  ~q: algebra
+  ~dayOfWeek: MONDAY
+  ~specialty: Ingeniería en Sistemas de Información
+  ~sort: subject,asc
+  page: 0
+  size: 20
+}
+
+docs {
+  Ocurrencias en estado ROOM_RELEASED agrupadas por evento (mismo motivo, nota y aula
+  anterior), paginadas. Cada fila trae event, reason, note, previousClassroom (null si
+  nunca tuvo aula) y dates: lista de {occurrenceId, date}, una entrada por ocurrencia.
+  Requiere PERM_CONFLICT_READ.
+
+  reason: VIRTUAL_CLASS, CANCELLED, MIRROR_RETIRED u OTHER.
+  Rango por defecto: from=hoy, to=fin del período académico activo (o from + 6 meses).
+  'to' anterior a 'from' -> 400.
+  q: contiene, sin mayúsculas ni tildes, sobre materia, código de comisión y
+  especialidad. dayOfWeek: día de la fecha de la ocurrencia. specialty: igualdad exacta.
+  sort=campo,asc|desc: subject, dayOfWeek, startTime, enrolled, commissionCode (otra
+  propiedad -> 400). Sin sort, orden por id del evento.
+  Con alcance por edificio, solo se ven las liberadas cuya aula anterior está en el alcance.
+}

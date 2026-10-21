@@ -23,6 +23,7 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestRepository;
 import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl;
+import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl.Action;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,7 @@ import org.springframework.data.jpa.domain.Specification;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -121,12 +123,16 @@ class RoomRequestServiceImplTest {
         RoomRequestItem item = RoomRequestItem.builder().id(5L).build();
         RoomRequestItemRowDto row = new RoomRequestItemRowDto(
                 5L, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, List.of(Action.ASSIGN));
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         when(itemRepository.findAll(ArgumentMatchers.<Specification<RoomRequestItem>>any(), pageableCaptor.capture()))
                 .thenAnswer(invocation -> new PageImpl<>(List.of(item), pageableCaptor.getValue(), 1));
-        when(composer.composeRows(List.of(item))).thenReturn(List.of(row));
+        RoomRequestAccessControl.Actor actor = new RoomRequestAccessControl.Actor(true, false, Set.of());
+        when(accessControl.resolveActor("subsecretaria@frc.utn.edu.ar")).thenReturn(actor);
+        when(accessControl.allowedActions(item, actor)).thenReturn(List.of(Action.ASSIGN));
+        Map<Long, List<Action>> expectedActions = Map.of(5L, List.of(Action.ASSIGN));
+        when(composer.composeRows(List.of(item), expectedActions)).thenReturn(List.of(row));
 
         Page<RoomRequestItemRowDto> result = service.findItems(filter, requested, "subsecretaria@frc.utn.edu.ar");
 
@@ -135,6 +141,8 @@ class RoomRequestServiceImplTest {
                 .containsExactly("startTime", "id");
         assertThat(result.getContent()).containsExactly(row);
         assertThat(result.getTotalElements()).isEqualTo(1);
+        verify(composer).composeRows(List.of(item), expectedActions);
+        verify(accessControl, times(1)).resolveActor("subsecretaria@frc.utn.edu.ar");
     }
 
     @Test
@@ -170,12 +178,15 @@ class RoomRequestServiceImplTest {
     }
 
     @Test
-    @DisplayName("findItemById: delega en el repositorio y en el composer")
+    @DisplayName("findItemById: delega en el repositorio y compone el detalle con las acciones permitidas")
     void findItemByIdDelegatesToRepositoryAndComposer() {
         RoomRequestItem item = RoomRequestItem.builder().id(5L).build();
-        RoomRequestItemDetailDto detail = new RoomRequestItemDetailDto(null, null);
+        RoomRequestItemDetailDto detail = new RoomRequestItemDetailDto(null, null, List.of(Action.CANCEL));
+        RoomRequestAccessControl.Actor actor = new RoomRequestAccessControl.Actor(true, false, Set.of());
         when(itemRepository.findWithRequestById(5L)).thenReturn(Optional.of(item));
-        when(composer.composeDetail(item)).thenReturn(detail);
+        when(accessControl.resolveActor("subsecretaria@frc.utn.edu.ar")).thenReturn(actor);
+        when(accessControl.allowedActions(item, actor)).thenReturn(List.of(Action.CANCEL));
+        when(composer.composeDetail(item, List.of(Action.CANCEL))).thenReturn(detail);
 
         RoomRequestItemDetailDto result = service.findItemById(5L, "subsecretaria@frc.utn.edu.ar");
 

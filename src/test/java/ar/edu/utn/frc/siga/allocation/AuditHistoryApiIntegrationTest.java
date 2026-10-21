@@ -124,7 +124,8 @@ class AuditHistoryApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$[1].kind").value("MODIFIED"))
                 .andExpect(jsonPath("$[1].snapshot.classroomId").value(aulaB.getId()))
                 .andExpect(jsonPath("$[2].kind").value("DELETED"))
-                .andExpect(jsonPath("$[2].snapshot").doesNotExist());
+                .andExpect(jsonPath("$[2].snapshot").doesNotExist())
+                .andExpect(jsonPath("$[2].entityId").doesNotExist());
     }
 
     @Test

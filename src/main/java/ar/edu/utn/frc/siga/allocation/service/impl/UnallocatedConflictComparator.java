@@ -17,9 +17,6 @@ final class UnallocatedConflictComparator {
 
     static final Set<String> SORTABLE = Set.of("subject", "dayOfWeek", "startTime", "enrolled", "commissionCode");
 
-    private static final Comparator<UnallocatedConflictDto> BY_EVENT_ID =
-            Comparator.comparing(c -> c.event().id());
-
     private UnallocatedConflictComparator() {
     }
 
@@ -32,12 +29,17 @@ final class UnallocatedConflictComparator {
     }
 
     static Comparator<UnallocatedConflictDto> of(Sort sort) {
-        Comparator<UnallocatedConflictDto> result = null;
+        return of(sort, UnallocatedConflictDto::event);
+    }
+
+    static <T> Comparator<T> of(Sort sort, Function<T, AcademicEventResponseDto> eventOf) {
+        Comparator<T> byEventId = Comparator.comparing(c -> eventOf.apply(c).id());
+        Comparator<T> result = null;
         for (Sort.Order order : sort) {
-            Comparator<UnallocatedConflictDto> next = byProperty(order.getProperty(), order.isAscending());
+            Comparator<T> next = byProperty(order.getProperty(), order.isAscending(), eventOf);
             result = result == null ? next : result.thenComparing(next);
         }
-        return result == null ? BY_EVENT_ID : result.thenComparing(BY_EVENT_ID);
+        return result == null ? byEventId : result.thenComparing(byEventId);
     }
 
     static DayOfWeek dayOf(AcademicEventResponseDto event) {
@@ -47,28 +49,29 @@ final class UnallocatedConflictComparator {
         };
     }
 
-    private static Comparator<UnallocatedConflictDto> byProperty(String property, boolean asc) {
+    private static <T> Comparator<T> byProperty(String property, boolean asc,
+                                                Function<T, AcademicEventResponseDto> eventOf) {
         return switch (property) {
-            case "subject" -> direct(c -> c.event().subject() == null ? "" : c.event().subject().name().toLowerCase(), asc);
+            case "subject" -> direct(c -> eventOf.apply(c).subject() == null
+                    ? "" : eventOf.apply(c).subject().name().toLowerCase(), asc);
             case "dayOfWeek" -> {
-                Comparator<UnallocatedConflictDto> day = direct(c -> dayOf(c.event()), asc);
-                Comparator<UnallocatedConflictDto> date = direct(c -> uniqueDate(c.event()), asc);
+                Comparator<T> day = direct(c -> dayOf(eventOf.apply(c)), asc);
+                Comparator<T> date = direct(c -> uniqueDate(eventOf.apply(c)), asc);
                 yield day.thenComparing(date);
             }
-            case "startTime" -> direct(c -> c.event().startTime(), asc);
-            case "enrolled" -> direct(c -> c.event().enrolled() == null ? 0 : c.event().enrolled(), asc);
+            case "startTime" -> direct(c -> eventOf.apply(c).startTime(), asc);
+            case "enrolled" -> direct(c -> eventOf.apply(c).enrolled() == null ? 0 : eventOf.apply(c).enrolled(), asc);
             case "commissionCode" -> {
                 Comparator<String> nullsLast = Comparator.nullsLast(asc
                         ? Comparator.<String>naturalOrder() : Comparator.<String>reverseOrder());
-                yield Comparator.comparing(c -> commissionCode(c.event()), nullsLast);
+                yield Comparator.comparing(c -> commissionCode(eventOf.apply(c)), nullsLast);
             }
             default -> throw new InvalidSortPropertyException(property, SORTABLE);
         };
     }
 
-    private static <K extends Comparable<? super K>> Comparator<UnallocatedConflictDto> direct(
-            Function<UnallocatedConflictDto, K> key, boolean asc) {
-        Comparator<UnallocatedConflictDto> cmp = Comparator.comparing(key);
+    private static <T, K extends Comparable<? super K>> Comparator<T> direct(Function<T, K> key, boolean asc) {
+        Comparator<T> cmp = Comparator.comparing(key);
         return asc ? cmp : cmp.reversed();
     }
 

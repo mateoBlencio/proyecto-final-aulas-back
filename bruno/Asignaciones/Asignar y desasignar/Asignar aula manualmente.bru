@@ -22,7 +22,7 @@ body:json {
 docs {
   Asigna aula en lote (source = MANUAL). Crea asignaciones nuevas (strict-create):
   falla si algún item del lote ya tiene una ocurrencia con asignación existente.
-  Para upsert (crear o actualizar según corresponda) ver PUT /v1/allocations.
+  Para mover ocurrencias que ya tienen aula ver PUT /v1/allocations.
 
   Cada item de "items" es EITHER "occurrenceIds" (lista explícita de ids de
   ocurrencia) OR "eventId" (todas las ocurrencias aplicables del evento desde

@@ -155,7 +155,7 @@ class RoomRequestSuggestionIntegrationTest extends AbstractIntegrationTest {
         MockMvc anonymous = MockMvcBuilders.webAppContextSetup(webApplicationContext)
                 .apply(springSecurity())
                 .build();
-        MockMvc auxiliar = mockMvcAs("auxiliar-sugerencias@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
+        MockMvc auxiliar = mockMvcAsAuxiliar("auxiliar-sugerencias@frc.utn.edu.ar");
 
         anonymous.perform(post(suggestionUrl(item))).andExpect(status().isUnauthorized());
         anonymous.perform(post(suggestionUrl(item) + "/sug_x/confirm")).andExpect(status().isUnauthorized());

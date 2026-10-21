@@ -15,6 +15,8 @@ import ar.edu.utn.frc.siga.allocation.mapper.EventAllocationComposer;
 import ar.edu.utn.frc.siga.audit.dto.response.RevisionDto;
 import ar.edu.utn.frc.siga.allocation.service.AllocationAuditHistoryService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationConflictService;
+import ar.edu.utn.frc.siga.allocation.service.ReleasedOccurrenceQueryService;
+import ar.edu.utn.frc.siga.allocation.dto.response.ReleasedOccurrenceItemDto;
 import ar.edu.utn.frc.siga.allocation.service.AllocationImpactService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.model.ConflictType;
@@ -44,6 +46,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.List;
@@ -65,6 +68,7 @@ public class AllocationController {
     private final EventAllocationComposer eventAllocationComposer;
     private final AcademicEventService academicEventService;
     private final BuildingScopeResolver buildingScopeResolver;
+    private final ReleasedOccurrenceQueryService releasedOccurrenceQueryService;
 
     @GetMapping
     @Operation(summary = "Listar asignaciones por fecha",
@@ -157,20 +161,22 @@ public class AllocationController {
     @PutMapping
     @PreAuthorize("hasAuthority('PERM_ALLOCATION_WRITE')")
     @Operation(summary = "Reasignar aulas en lote",
-               description = "Cambia el aula de cada item del lote (upsert: crea la asignación si no existía). "
+               description = "Cambia el aula de cada item del lote. Solo mueve ocurrencias que ya tienen aula. "
                        + "Además de las formas puntual ('occurrenceIds') y evento completo ('eventId'), acepta "
                        + "mover un evento por rango de fechas: 'eventId' + 'from' + 'to' es un cambio TEMPORAL "
                        + "(las ocurrencias de afuera del rango conservan su aula, así que la clase 'vuelve' sola), "
                        + "y 'eventId' + 'from' sin 'to' es un cambio PERMANENTE desde esa fecha hasta que termine "
                        + "el dictado. Ambos bordes son inclusive y 'from' no puede ser anterior a hoy (400). "
-                       + "409 si algún aula no existe/no está disponible, si hay solapamiento de horario con otra "
+                       + "403 si el aula actual o la de destino es de un edificio fuera de su alcance. "
+                       + "409 si alguna ocurrencia del lote no tiene aula asignada (para asignar se usa POST), "
+                       + "si algún aula no existe/no está disponible, si hay solapamiento de horario con otra "
                        + "asignación, o si una ocurrencia del rango ya ocurrió. En el 409 y en el 400 por "
                        + "superposición dentro del margen, 'classroomIds' lista todas las aulas en conflicto y "
                        + "'detail' explica el motivo. Atómico: si una sola fecha del "
                        + "rango falla, no se aplica ningún cambio.")
     public ResponseEntity<List<AllocationResponseDto>> reallocate(@Valid @RequestBody AllocationBatchRequestDto dto) {
         log.debug("PUT /v1/allocations: items={}", dto.items().size());
-        List<AllocationResponseDto> response = allocationService.reallocate(commandMapper.toManualCommand(dto));
+        List<AllocationResponseDto> response = allocationService.reallocateExisting(commandMapper.toManualCommand(dto));
         log.info("Reasignación en lote completa: allocated={}", response.size());
         return ResponseEntity.ok(response);
     }
@@ -219,6 +225,34 @@ public class AllocationController {
         List<ReleasedOccurrenceDto> response = allocationService.release(commandMapper.toReleaseCommand(dto));
         log.info("Liberación con motivo completa: released={}", response.size());
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/releases")
+    @PreAuthorize("hasAuthority('PERM_CONFLICT_READ')")
+    @Operation(summary = "Listar ocurrencias liberadas",
+               description = "Devuelve, paginadas, las ocurrencias en estado ROOM_RELEASED con su evento, motivo, "
+                       + "nota y aula anterior. Filtros opcionales: 'reason', rango 'from'/'to' (mismos defaults "
+                       + "que /conflicts: 'from' hoy, 'to' fin del período académico activo o +6 meses), "
+                       + "'q' (contiene, sin mayúsculas ni tildes, sobre materia, código de comisión y "
+                       + "especialidad), 'dayOfWeek' (día de la fecha de la ocurrencia) y 'specialty' (nombre "
+                       + "exacto). Una fila por evento, motivo, nota y aula anterior, con la lista 'dates' "
+                       + "(occurrenceId + fecha) de sus ocurrencias liberadas. 'sort=campo,asc|desc' acepta "
+                       + "subject, dayOfWeek, startTime, enrolled y commissionCode (otra propiedad da 400); sin "
+                       + "sort, orden por id del evento. Si el usuario tiene alcance "
+                       + "por edificio, solo ve las liberadas cuya aula anterior está en su alcance (las "
+                       + "que nunca tuvieron aula se ven siempre).")
+    public ResponseEntity<Page<ReleasedOccurrenceItemDto>> findReleased(
+            @RequestParam(required = false) ReleaseReason reason,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) DayOfWeek dayOfWeek,
+            @RequestParam(required = false) String specialty,
+            @PageableDefault(size = 20) Pageable pageable) {
+        log.debug("GET /v1/allocations/releases: reason={}, from={}, to={}, q={}, dayOfWeek={}, specialty={}",
+                reason, from, to, q, dayOfWeek, specialty);
+        return ResponseEntity.ok(releasedOccurrenceQueryService.findReleased(
+                reason, from, to, q, dayOfWeek, specialty, pageable));
     }
 
     @DeleteMapping("/releases")

@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -26,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -74,9 +77,11 @@ class RoleAssignmentServiceImplTest {
     void assignGlobalWithScopeIdThrows() {
         when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "u@frc.utn.edu.ar")));
 
-        AssignRoleRequestDto dto = new AssignRoleRequestDto(ROLE, ScopeType.GLOBAL, 5L);
+        AssignRoleRequestDto dto = new AssignRoleRequestDto(SystemRole.CONSULTA, ScopeType.GLOBAL, 5L);
 
-        assertThatThrownBy(() -> service.assign(1L, dto, OTHER_EMAIL)).isInstanceOf(RoleDomainException.class);
+        assertThatThrownBy(() -> service.assign(1L, dto, OTHER_EMAIL))
+                .isInstanceOf(RoleDomainException.class)
+                .hasMessage("scopeId must be null for GLOBAL scope");
 
         verify(roleAssignmentRepository, never()).save(any());
     }
@@ -130,6 +135,68 @@ class RoleAssignmentServiceImplTest {
 
         assertThat(result).isEqualTo(expected);
         verify(roleAssignmentRepository).save(any(RoleAssignment.class));
+    }
+
+    @Test
+    @DisplayName("assign: SUBSECRETARIA con alcance BUILDING → RoleDomainException, sin consultar edificio ni guardar")
+    void assignSubsecretariaWithBuildingScopeThrows() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "u@frc.utn.edu.ar")));
+
+        AssignRoleRequestDto dto = new AssignRoleRequestDto(SystemRole.SUBSECRETARIA, ScopeType.BUILDING, 5L);
+
+        assertThatThrownBy(() -> service.assign(1L, dto, OTHER_EMAIL))
+                .isInstanceOf(RoleDomainException.class)
+                .hasMessageContaining("SUBSECRETARIA");
+
+        verify(roleAssignmentRepository, never()).save(any());
+        verifyNoInteractions(buildingService);
+    }
+
+    @Test
+    @DisplayName("assign: AUXILIAR_AULICO con alcance GLOBAL → RoleDomainException, sin guardar")
+    void assignAuxiliarWithGlobalScopeThrows() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "u@frc.utn.edu.ar")));
+
+        AssignRoleRequestDto dto = new AssignRoleRequestDto(SystemRole.AUXILIAR_AULICO, ScopeType.GLOBAL, null);
+
+        assertThatThrownBy(() -> service.assign(1L, dto, OTHER_EMAIL))
+                .isInstanceOf(RoleDomainException.class)
+                .hasMessageContaining("AUXILIAR_AULICO");
+
+        verify(roleAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("assign: AUXILIAR_AULICO en otro edificio que el ya asignado → guarda con scopeId 5")
+    void assignAuxiliarInSecondBuildingSaves() {
+        User u = user(1L, "u@frc.utn.edu.ar");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(u));
+        when(buildingService.findById(5L)).thenReturn(new BuildingResponseDto(5L, "Edificio 5", true, null));
+        RoleAssignment existing = RoleAssignment.builder().id(10L).user(u).role(ROLE)
+                .scopeType(ScopeType.BUILDING).scopeId(6L).build();
+        when(roleAssignmentRepository.findAllByUserId(1L)).thenReturn(List.of(existing));
+        when(roleAssignmentRepository.save(any(RoleAssignment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.assign(1L, new AssignRoleRequestDto(ROLE, ScopeType.BUILDING, 5L), OTHER_EMAIL);
+
+        ArgumentCaptor<RoleAssignment> captor = ArgumentCaptor.forClass(RoleAssignment.class);
+        verify(roleAssignmentRepository).save(captor.capture());
+        assertThat(captor.getValue().getScopeId()).isEqualTo(5L);
+    }
+
+    @Test
+    @DisplayName("assign: CONSULTA acepta alcance GLOBAL y BUILDING")
+    void assignConsultaAcceptsBothScopes() {
+        User u = user(1L, "u@frc.utn.edu.ar");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(u));
+        when(buildingService.findById(5L)).thenReturn(new BuildingResponseDto(5L, "Edificio 5", true, null));
+        when(roleAssignmentRepository.findAllByUserId(1L)).thenReturn(List.of());
+        when(roleAssignmentRepository.save(any(RoleAssignment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.assign(1L, new AssignRoleRequestDto(SystemRole.CONSULTA, ScopeType.GLOBAL, null), OTHER_EMAIL);
+        service.assign(1L, new AssignRoleRequestDto(SystemRole.CONSULTA, ScopeType.BUILDING, 5L), OTHER_EMAIL);
+
+        verify(roleAssignmentRepository, times(2)).save(any(RoleAssignment.class));
     }
 
     @Test

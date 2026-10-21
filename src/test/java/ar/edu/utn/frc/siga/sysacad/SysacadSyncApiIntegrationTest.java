@@ -86,6 +86,6 @@ class SysacadSyncApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     private MockMvc auxiliarMockMvc() {
-        return mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
+        return mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar");
     }
 }

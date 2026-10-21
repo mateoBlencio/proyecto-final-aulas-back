@@ -161,7 +161,7 @@ class DashboardRegenerationApiIntegrationTest extends DashboardIntegrationSuppor
         mockMvc.perform(post("/v1/dashboard/reports/2020-04/regeneration")
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isNotFound());
-        mockMvcAs("aux-dashboard@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO)
+        mockMvcAsAuxiliar("aux-dashboard@frc.utn.edu.ar")
                 .perform(post("/v1/dashboard/reports/2020-03/regeneration")
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isForbidden());

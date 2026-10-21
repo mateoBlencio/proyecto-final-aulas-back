@@ -2,10 +2,7 @@ package ar.edu.utn.frc.siga.allocation.service.impl;
 
 import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
-import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
-import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
-import ar.edu.utn.frc.siga.events.dto.response.UniqueEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.NotPermittedConflictDto;
@@ -40,7 +37,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.text.Normalizer;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -83,14 +79,17 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
             UnallocatedConflictComparator.validate(pageable.getSort());
             merged.addAll(buildUnallocatedConflicts(range, includePast, q, dayOfWeek, specialty, pageable.getSort()));
         }
-        if (effectiveTypes.contains(ConflictType.OVERCROWDED)) {
-            merged.addAll(buildOvercrowdedConflicts(range, includePast));
-        }
-        if (effectiveTypes.contains(ConflictType.OVERLAP)) {
-            merged.addAll(buildOverlapConflicts(range, includePast));
-        }
-        if (effectiveTypes.contains(ConflictType.NOT_PERMITTED)) {
-            merged.addAll(buildNotPermittedConflicts(range, includePast));
+        if (effectiveTypes.stream().anyMatch(t -> t != ConflictType.UNALLOCATED)) {
+            List<OccupiedSlot> occupancy = readOccupancy(range, includePast);
+            if (effectiveTypes.contains(ConflictType.OVERCROWDED)) {
+                merged.addAll(buildOvercrowdedConflicts(occupancy));
+            }
+            if (effectiveTypes.contains(ConflictType.OVERLAP)) {
+                merged.addAll(buildOverlapConflicts(occupancy));
+            }
+            if (effectiveTypes.contains(ConflictType.NOT_PERMITTED)) {
+                merged.addAll(buildNotPermittedConflicts(occupancy));
+            }
         }
 
         BuildingScope scope = buildingScopeResolver.scopeFor(Permission.CONFLICT_READ);
@@ -136,41 +135,22 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
                 .map(eventById::get)
                 .filter(Objects::nonNull)
                 .map(UnallocatedConflictDto::new)
-                .filter(c -> matches(c.event(), q, dayOfWeek, specialty))
+                .filter(c -> AcademicEventMatcher.matches(c.event(), q, dayOfWeek, specialty))
                 .sorted(UnallocatedConflictComparator.of(sort))
                 .toList();
     }
 
-    private static boolean matches(AcademicEventResponseDto event, String q, DayOfWeek dayOfWeek, String specialty) {
-        if (dayOfWeek != null && UnallocatedConflictComparator.dayOf(event) != dayOfWeek) {
-            return false;
+    private static Map<EventRoomKey, EventRoomAcc> groupByEventRoom(List<OccupiedSlot> occupancy) {
+        Map<EventRoomKey, EventRoomAcc> accs = new LinkedHashMap<>();
+        for (OccupiedSlot slot : occupancy) {
+            accs.computeIfAbsent(new EventRoomKey(slot.eventId(), slot.classroomId()),
+                            k -> new EventRoomAcc(slot.eventId(), slot.classroomId()))
+                    .dates.add(slot.date());
         }
-        var subject = event.subject();
-        String specialtyName = subject == null ? null : subject.studyPlan().specialty().name();
-        if (specialty != null && !specialty.equals(specialtyName)) {
-            return false;
-        }
-        if (q == null || q.isBlank()) {
-            return true;
-        }
-        String needle = fold(q.strip());
-        CommissionResponseDto commission = switch (event) {
-            case RecurringEventResponseDto r -> r.commission();
-            case UniqueEventResponseDto u -> u.commission();
-        };
-        return fold(subject == null ? null : subject.name()).contains(needle)
-                || fold(specialtyName).contains(needle)
-                || (commission != null && fold(commission.courseCode()).contains(needle));
+        return accs;
     }
 
-    private static String fold(String value) {
-        return value == null ? "" : Normalizer.normalize(value, Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "").toLowerCase();
-    }
-
-    private List<OvercrowdedConflictDto> buildOvercrowdedConflicts(Range range, boolean includePast) {
-        List<OccupiedSlot> occupancy = readOccupancy(range, includePast);
-
+    private List<OvercrowdedConflictDto> buildOvercrowdedConflicts(List<OccupiedSlot> occupancy) {
         Map<EventDate, Set<Long>> roomsByEventDate = new LinkedHashMap<>();
         for (OccupiedSlot slot : occupancy) {
             roomsByEventDate.computeIfAbsent(new EventDate(slot.eventId(), slot.date()), k -> new TreeSet<>())
@@ -194,8 +174,7 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         return buildOvercrowded(groupAccs, fetchEventsById(eventIds), fetchClassroomsById(classroomIds));
     }
 
-    private List<OverlapConflictDto> buildOverlapConflicts(Range range, boolean includePast) {
-        List<OccupiedSlot> occupancy = readOccupancy(range, includePast);
+    private List<OverlapConflictDto> buildOverlapConflicts(List<OccupiedSlot> occupancy) {
         Map<OverlapKey, OverlapAcc> overlapAccs = computeOverlaps(occupancy);
 
         Set<Long> eventIds = new LinkedHashSet<>();
@@ -209,15 +188,8 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         return buildOverlaps(overlapAccs, fetchEventsById(eventIds), fetchClassroomsById(classroomIds));
     }
 
-    private List<NotPermittedConflictDto> buildNotPermittedConflicts(Range range, boolean includePast) {
-        List<OccupiedSlot> occupancy = readOccupancy(range, includePast);
-
-        Map<EventRoomKey, EventRoomAcc> accs = new LinkedHashMap<>();
-        for (OccupiedSlot slot : occupancy) {
-            accs.computeIfAbsent(new EventRoomKey(slot.eventId(), slot.classroomId()),
-                            k -> new EventRoomAcc(slot.eventId(), slot.classroomId()))
-                    .dates.add(slot.date());
-        }
+    private List<NotPermittedConflictDto> buildNotPermittedConflicts(List<OccupiedSlot> occupancy) {
+        Map<EventRoomKey, EventRoomAcc> accs = groupByEventRoom(occupancy);
         if (accs.isEmpty()) {
             return List.of();
         }

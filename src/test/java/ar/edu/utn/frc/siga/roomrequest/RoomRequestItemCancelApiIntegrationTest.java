@@ -121,7 +121,7 @@ class RoomRequestItemCancelApiIntegrationTest extends AbstractIntegrationTest {
                         .content("{\"reason\":\"motivo\"}"))
                 .andExpect(status().isUnauthorized());
 
-        mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO)
+        mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar")
                 .perform(post("/v1/room-requests/items/" + pendingParaAuxiliar.getId() + "/cancel")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"motivo\"}"))

@@ -11,6 +11,8 @@ import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import ar.edu.utn.frc.siga.auth.security.JwtService;
 import ar.edu.utn.frc.siga.auth.security.SecurityUser;
 import ar.edu.utn.frc.siga.common.security.ScopeType;
+import ar.edu.utn.frc.siga.space.model.Building;
+import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -48,6 +50,9 @@ public abstract class AbstractIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private BuildingRepository buildingRepository;
+
     protected MockMvc mockMvc;
 
     @BeforeEach
@@ -80,7 +85,19 @@ public abstract class AbstractIntegrationTest {
     }
 
     protected MockMvc mockMvcAs(String email, SystemRole systemRole) {
+        if (systemRole == SystemRole.AUXILIAR_AULICO) {
+            throw new IllegalArgumentException(
+                    "AUXILIAR_AULICO must be BUILDING-scoped (chk_usuario_rol_alcance_por_rol): "
+                            + "use mockMvcAsScoped or mockMvcAsAuxiliar");
+        }
         return mockMvcAsScoped(email, systemRole, ScopeType.GLOBAL, null);
+    }
+
+    /** AUXILIAR_AULICO scoped to a freshly created building, for tests that do not depend on which building. */
+    protected MockMvc mockMvcAsAuxiliar(String email) {
+        Building building = buildingRepository.save(
+                Building.builder().name("Edificio-Aux-" + System.nanoTime()).build());
+        return mockMvcAsScoped(email, SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, building.getId());
     }
 
     protected MockMvc mockMvcAsScoped(String email, SystemRole systemRole, ScopeType scopeType, Long scopeId) {

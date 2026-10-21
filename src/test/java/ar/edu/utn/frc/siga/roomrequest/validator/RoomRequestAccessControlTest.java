@@ -12,7 +12,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Optional;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -233,6 +236,92 @@ class RoomRequestAccessControlTest {
                 .isInstanceOf(RoomRequestForbiddenException.class);
         assertThatThrownBy(() -> accessControl.authorizeRead(item(RoomRequestStatus.NEW, null), AUXILIAR_EMAIL))
                 .isInstanceOf(RoomRequestForbiddenException.class);
+    }
+
+    // ---------- allowedActions ----------
+
+    @Test
+    @DisplayName("allowedActions: subsecretaría en NEW devuelve exactamente [ASSIGN, DERIVE, CANCEL]")
+    void allowedActionsSubsecretariaEnNew() {
+        asSubsecretaria();
+        RoomRequestAccessControl.Actor actor = accessControl.resolveActor(SUBSECRETARIA_EMAIL);
+
+        assertThat(accessControl.allowedActions(item(RoomRequestStatus.NEW, null), actor))
+                .containsExactly(Action.ASSIGN, Action.DERIVE, Action.CANCEL);
+    }
+
+    @Test
+    @DisplayName("allowedActions: subsecretaría en IN_EVALUATION con edificio derivado devuelve solo [CANCEL]")
+    void allowedActionsSubsecretariaEnEvaluacionConEdificio() {
+        asSubsecretaria();
+        RoomRequestAccessControl.Actor actor = accessControl.resolveActor(SUBSECRETARIA_EMAIL);
+
+        assertThat(accessControl.allowedActions(item(RoomRequestStatus.IN_EVALUATION, SU_BUILDING), actor))
+                .containsExactly(Action.CANCEL);
+    }
+
+    @Test
+    @DisplayName("allowedActions: auxiliar del edificio 1 en DERIVED_TO_BUILDING: [ASSIGN, RETURN, CANCEL] si es el 1, vacío si es el 2")
+    void allowedActionsAuxiliarSegunEdificio() {
+        asAuxiliar(SU_BUILDING);
+        RoomRequestAccessControl.Actor actor = accessControl.resolveActor(AUXILIAR_EMAIL);
+
+        assertThat(accessControl.allowedActions(item(RoomRequestStatus.DERIVED_TO_BUILDING, SU_BUILDING), actor))
+                .containsExactly(Action.ASSIGN, Action.RETURN, Action.CANCEL);
+        assertThat(accessControl.allowedActions(item(RoomRequestStatus.DERIVED_TO_BUILDING, OTRO_BUILDING), actor))
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("allowedActions: un rol sin SUBSECRETARIA ni AUXILIAR_AULICO (CONSULTA) no puede nada")
+    void allowedActionsOtroRolVacio() {
+        String consultaEmail = "consulta@frc.utn.edu.ar";
+        asOtroRol(consultaEmail);
+        RoomRequestAccessControl.Actor actor = accessControl.resolveActor(consultaEmail);
+
+        assertThat(accessControl.allowedActions(item(RoomRequestStatus.IN_EVALUATION, SU_BUILDING), actor)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("allowedActions y authorize coinciden para cada estado, acción, perfil y edificio derivado")
+    void allowedActionsCoincideConAuthorize() {
+        String consultaEmail = "consulta@frc.utn.edu.ar";
+        Map<String, Runnable> perfiles = new LinkedHashMap<>();
+        perfiles.put(SUBSECRETARIA_EMAIL, this::asSubsecretaria);
+        perfiles.put(AUXILIAR_EMAIL + "#edificio1", () -> asAuxiliar(SU_BUILDING));
+        perfiles.put(AUXILIAR_EMAIL + "#global", this::asAuxiliarGlobal);
+        perfiles.put(consultaEmail, () -> asOtroRol(consultaEmail));
+
+        int combinaciones = 0;
+        for (Map.Entry<String, Runnable> perfil : perfiles.entrySet()) {
+            perfil.getValue().run();
+            String email = perfil.getKey().startsWith(AUXILIAR_EMAIL) ? AUXILIAR_EMAIL : perfil.getKey();
+            RoomRequestAccessControl.Actor actor = accessControl.resolveActor(email);
+            for (RoomRequestStatus status : RoomRequestStatus.values()) {
+                for (Long derivedBuildingId : Arrays.asList(null, SU_BUILDING, OTRO_BUILDING)) {
+                    RoomRequestItem item = item(status, derivedBuildingId);
+                    List<Action> allowed = accessControl.allowedActions(item, actor);
+                    for (Action action : Action.values()) {
+                        boolean authorizes = authorizes(item, email, action);
+                        assertThat(allowed.contains(action))
+                                .as("perfil=%s estado=%s edificio=%s acción=%s",
+                                        perfil.getKey(), status, derivedBuildingId, action)
+                                .isEqualTo(authorizes);
+                        combinaciones++;
+                    }
+                }
+            }
+        }
+        assertThat(combinaciones).isEqualTo(4 * RoomRequestStatus.values().length * 3 * Action.values().length);
+    }
+
+    private boolean authorizes(RoomRequestItem item, String email, Action action) {
+        try {
+            accessControl.authorize(item, email, action);
+            return true;
+        } catch (RoomRequestForbiddenException e) {
+            return false;
+        }
     }
 
     private void assertAllowed(RoomRequestItem item, String email, Action... actions) {
