@@ -7,10 +7,10 @@ import java.util.List;
 public final class DashboardRules {
 
     /** Version of the classification and universe rules; stored in every snapshot. */
-    public static final int RULES_VERSION = 1;
+    public static final int RULES_VERSION = 2;
 
     /** Version of the snapshot JSON layout. */
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
 
     /** Fixed order for the breakdown by allocation origin. */
     public static final List<String> SOURCES = List.of("MANUAL", "AUTOMATIC", "IMPORTED", "SYSACAD");
@@ -20,6 +20,13 @@ public final class DashboardRules {
 
     /** Percentage with one decimal (HALF_UP), or null when the total is zero. */
     public static Double percent(long part, long total) {
+        if (total == 0) {
+            return null;
+        }
+        return round1(100.0 * part / total);
+    }
+
+    public static Double percent(double part, double total) {
         if (total == 0) {
             return null;
         }

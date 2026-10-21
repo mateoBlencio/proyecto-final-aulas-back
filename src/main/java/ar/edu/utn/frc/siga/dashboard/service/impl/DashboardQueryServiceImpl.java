@@ -22,6 +22,7 @@ import ar.edu.utn.frc.siga.dashboard.model.AllocationUnitRow;
 import ar.edu.utn.frc.siga.dashboard.model.Availability;
 import ar.edu.utn.frc.siga.dashboard.model.BuildingRoomsRow;
 import ar.edu.utn.frc.siga.dashboard.model.CategoryCounts;
+import ar.edu.utn.frc.siga.dashboard.model.DashboardRules;
 import ar.edu.utn.frc.siga.dashboard.model.DashboardPeriodType;
 import ar.edu.utn.frc.siga.dashboard.model.PeriodMetrics;
 import ar.edu.utn.frc.siga.dashboard.model.PendingItemRow;
@@ -197,7 +198,7 @@ public class DashboardQueryServiceImpl implements DashboardQueryService {
                 .filter(item -> expiresWithin(item, now)).count();
         CategoryCounts categories = window.campus().categories();
         return new DashboardBadgesResponseDto(awaiting, expiring, window.unallocated(),
-                categories.overlap() + categories.overcrowded());
+                (long) Math.ceil(DashboardRules.round1(categories.overlap() + categories.overcrowded())));
     }
 
     /**

@@ -1,6 +1,8 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
+import ar.edu.utn.frc.siga.allocation.dto.response.AllocationGroupDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.AllocationSiblingDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ReleasedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.service.command.ReleaseCommand;
@@ -901,6 +903,40 @@ class AllocationServiceImplTest {
     }
 
     @Test
+    @DisplayName("findById: usuario acotado ve la capacidad completa del grupo y solo las hermanas de su alcance")
+    void findByIdFiltraHermanasPorAlcance() {
+        Allocation alloc = allocation(1L, 10L, 5, AllocationSource.MANUAL);
+        when(allocationRepository.findById(1L)).thenReturn(Optional.of(alloc));
+        when(composer.compose(alloc)).thenReturn(responseDtoWithGroup());
+        when(buildingScopeResolver.scopeFor(Permission.ALLOCATION_READ)).thenReturn(BuildingScope.of(Set.of(1L)));
+
+        AllocationResponseDto result = service.findById(1L);
+
+        assertThat(result.group().roomCount()).isEqualTo(3);
+        assertThat(result.group().capacity()).isEqualTo(120);
+        assertThat(result.group().siblings()).extracting(AllocationSiblingDto::allocationId).containsExactly(2L);
+    }
+
+    @Test
+    @DisplayName("findByDate: usuario acotado ve la capacidad completa del grupo y solo las hermanas de su alcance")
+    void findByDateFiltraHermanasPorAlcance() {
+        LocalDate date = futureDate(1);
+        Allocation alloc = allocation(1L, 10L, 5, AllocationSource.MANUAL);
+        when(occurrenceService.findSlotsByDate(date)).thenReturn(List.of(occurrenceSlot(10L, 1L, date)));
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of(alloc));
+        when(composer.composeAll(List.of(alloc))).thenReturn(List.of(responseDtoWithGroup()));
+        when(buildingScopeResolver.scopeFor(Permission.ALLOCATION_READ)).thenReturn(BuildingScope.of(Set.of(1L)));
+
+        List<AllocationResponseDto> result = service.findByDate(date);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().group().roomCount()).isEqualTo(3);
+        assertThat(result.getFirst().group().capacity()).isEqualTo(120);
+        assertThat(result.getFirst().group().siblings()).extracting(AllocationSiblingDto::allocationId)
+                .containsExactly(2L);
+    }
+
+    @Test
     @DisplayName("findByOccurrenceIds: sin ids, no consulta el repositorio y devuelve vacío")
     void findByOccurrenceIdsSinIds() {
         List<AllocationResponseDto> result = service.findByOccurrenceIds(List.of());
@@ -1139,11 +1175,19 @@ class AllocationServiceImplTest {
     }
 
     private AllocationResponseDto dummyResponseDto() {
-        return new AllocationResponseDto(1L, AllocationSource.MANUAL, Instant.now(), null, null, null, null);
+        return new AllocationResponseDto(1L, AllocationSource.MANUAL, Instant.now(), null, null, null, null, null);
     }
 
     private AllocationResponseDto responseDtoWithClassroom(ClassroomResponseDto classroom) {
-        return new AllocationResponseDto(1L, AllocationSource.MANUAL, Instant.now(), null, null, null, classroom);
+        return new AllocationResponseDto(1L, AllocationSource.MANUAL, Instant.now(), null, null, null, classroom, null);
+    }
+
+    private AllocationResponseDto responseDtoWithGroup() {
+        ClassroomResponseDto own = classroomIn(5L, 1L, "Edificio 1");
+        AllocationGroupDto group = new AllocationGroupDto(3, 120, List.of(
+                new AllocationSiblingDto(2L, 6L, 106, 1L, "Edificio 1", 40),
+                new AllocationSiblingDto(3L, 7L, 107, 9L, "Edificio Ajeno", 40)));
+        return new AllocationResponseDto(1L, AllocationSource.MANUAL, Instant.now(), null, null, null, own, group);
     }
 
     private Map<OccurrenceSlotDto, Long> mapOf(OccurrenceSlotDto occ, long classroomId) {
