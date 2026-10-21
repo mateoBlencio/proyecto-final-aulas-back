@@ -637,6 +637,16 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("La secuencia de asignacion_aula incrementa de a 50, igual que allocationSize de la entidad")
+    void allocationSequence_incrementsBy50() {
+        Long increment = jdbcTemplate.queryForObject(
+                "select increment_by from pg_sequences where sequencename = 'asignacion_aula_id_asignacion_seq'",
+                Long.class);
+
+        assertThat(increment).isEqualTo(50L);
+    }
+
+    @Test
     @DisplayName("Envers audita el agregado: crear evento y asignar deja filas en las tablas _aud tras el commit real")
     void envers_auditsAggregateAfterRealCommit() throws Exception {
         var sc = testData.materiaYComision();
