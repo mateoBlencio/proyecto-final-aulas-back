@@ -1,6 +1,12 @@
 {
   "skills": [
     {
+      "name": "audit-standards",
+      "usedBy": "security-reviewer, diff-reviewer, test-writer, auditorías completas (hilo principal)",
+      "install": "git checkout origin/develop -- .claude/skills/audit-standards",
+      "source": "propia (armada con Claude para este repo, a partir de las fuentes que cita)"
+    },
+    {
       "name": "graphify",
       "usedBy": "CLAUDE.md (graphify), frontend-docs-writer",
       "install": "git checkout origin/develop -- .claude/skills/graphify",
