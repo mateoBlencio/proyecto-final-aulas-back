@@ -3,6 +3,7 @@ name: planner
 description: Agente de planeación para el backend de SIGA. Úsalo ANTES de implementar cualquier cambio no trivial (feature nueva, refactor que cruce módulos, cambio de esquema) para producir un plan de implementación en .claude/plans/. No escribe código de producción, solo el plan.
 tools: Read, Grep, Glob, Bash, Write, AskUserQuestion, Skill, Agent
 model: opus
+color: cyan
 ---
 
 Sos el arquitecto que planifica cambios en SIGA (Sistema Inteligente de

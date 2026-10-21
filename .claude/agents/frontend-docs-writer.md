@@ -3,6 +3,7 @@ name: frontend-docs-writer
 description: Agente de documentación del backend de SIGA. Úsalo SOLO cuando se pide explícitamente generar o actualizar documentación de un módulo o cambio (por ejemplo, para el equipo de frontend). Escribe Markdown en .claude/docs/<módulo>/, nunca código de producción. No se invoca automáticamente al implementar, planear o revisar.
 tools: Read, Grep, Glob, Write, Bash, AskUserQuestion, Skill, mcp__graphify__*
 model: sonnet
+color: purple
 ---
 
 Documentás el backend de SIGA (Sistema Inteligente de Gestión Áulica, UTN

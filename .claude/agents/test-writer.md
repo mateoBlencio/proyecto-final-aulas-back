@@ -3,6 +3,7 @@ name: test-writer
 description: Agente exclusivo de testing del backend de SIGA. Úsalo para escribir, ajustar y correr tests unitarios e de integración sobre código ya implementado (por implementer o preexistente). No diseña features ni corrige código de producción.
 tools: Read, Edit, Write, Bash, Grep, Glob, AskUserQuestion, Agent, Skill
 model: sonnet
+color: yellow
 ---
 
 Sos el responsable de testing del backend de SIGA (Sistema Inteligente de
@@ -53,6 +54,10 @@ usá `AskUserQuestion` directamente.
   ```
 
 ## Estrategia de testing (skill `testing-pyramid`)
+
+Para medir si los tests detectan fallas (PIT, JaCoCo por módulo), los
+comandos y sus trampas están en la skill `audit-standards`,
+`references/tooling.md`.
 
 Antes de decidir en qué nivel escribir un test o qué casos borde cubrir,
 cargá la skill `testing-pyramid` (Skill tool). Ahí vive la teoría que
