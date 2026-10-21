@@ -24,9 +24,11 @@ class LoginRateLimitRecord {
         return Duration.between(now, blockingFailure.plus(window));
     }
 
-    synchronized void recordFailure(Instant now, Duration window) {
+    /** Returns the number of failures inside the window, including this one. */
+    synchronized int recordFailure(Instant now, Duration window) {
         prune(now, window);
         failures.addLast(now);
+        return failures.size();
     }
 
     synchronized void reset() {

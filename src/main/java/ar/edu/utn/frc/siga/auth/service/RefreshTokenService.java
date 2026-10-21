@@ -12,6 +12,9 @@ public interface RefreshTokenService {
 
     void revokeAllByUserId(Long userId);
 
+    /** Deletes tokens that expired more than the retention period ago; returns how many. */
+    int purgeExpired();
+
     record IssuedRefreshToken(String rawToken, long expiresInSeconds) {
     }
 

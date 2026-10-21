@@ -32,4 +32,8 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
             + "r.revocationReason = ar.edu.utn.frc.siga.auth.model.RevocationReason.LOGOUT "
             + "where r.tokenHash = :tokenHash and r.revoked = false")
     int revokeByTokenHash(@Param("tokenHash") String tokenHash, @Param("revokedAt") Instant revokedAt);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("delete from RefreshToken r where r.expiresAt < :cutoff")
+    int deleteExpiredBefore(@Param("cutoff") Instant cutoff);
 }

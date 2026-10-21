@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.auth.dto.request.LoginRequest;
 import ar.edu.utn.frc.siga.auth.dto.request.RefreshTokenRequest;
 import ar.edu.utn.frc.siga.auth.dto.response.TokenResponse;
 import ar.edu.utn.frc.siga.auth.exception.InvalidCredentialsException;
+import ar.edu.utn.frc.siga.auth.exception.InvalidRefreshTokenException;
 import ar.edu.utn.frc.siga.auth.exception.LoginRateLimitExceededException;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
@@ -51,9 +52,9 @@ public class AuthServiceImpl implements AuthService {
         }
 
         Instant now = Instant.now();
-        if (loginRateLimiter.isRateLimited(email, now)) {
+        if (loginRateLimiter.isRateLimited(email, ip, now)) {
             log.warn("Login rechazado por rate limit: email={}, ip={}", email, ip);
-            throw new LoginRateLimitExceededException(loginRateLimiter.retryAfter(email, now));
+            throw new LoginRateLimitExceededException(loginRateLimiter.retryAfter(email, ip, now));
         }
 
         SecurityUser securityUser;
@@ -62,12 +63,12 @@ public class AuthServiceImpl implements AuthService {
                     new UsernamePasswordAuthenticationToken(email, request.password()));
             securityUser = (SecurityUser) authentication.getPrincipal();
         } catch (AuthenticationException e) {
-            loginRateLimiter.recordFailure(email, Instant.now());
+            loginRateLimiter.recordFailure(email, ip, Instant.now());
             log.warn("Login fallido: email={}, ip={}", email, ip);
             throw new InvalidCredentialsException();
         }
 
-        loginRateLimiter.recordSuccess(email);
+        loginRateLimiter.recordSuccess(email, ip);
         log.info("Login exitoso: email={}, ip={}", email, ip);
 
         User user = userRepository.findByEmailAndEnabledTrue(email)
@@ -76,8 +77,9 @@ public class AuthServiceImpl implements AuthService {
         return buildTokenResponse(user, refreshTokenService.issue(user));
     }
 
+    // noRollbackFor: this transaction wraps RefreshTokenService.refresh, so it must not roll back either
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = InvalidRefreshTokenException.class)
     public TokenResponse refresh(RefreshTokenRequest request) {
         RefreshResult result = refreshTokenService.refresh(request.refreshToken());
         log.info("Refresh exitoso: email={}", result.user().getEmail());
