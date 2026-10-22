@@ -10,8 +10,10 @@ import org.mapstruct.Mapping;
 public interface SubjectCommissionMapper {
 
     @Mapping(target = "subjectId", source = "subject.id")
+    @Mapping(target = "subject", source = "subject")
     @Mapping(target = "commissionId", source = "commission.id")
     @Mapping(target = "commission", source = "commission")
     @Mapping(target = "enabled", expression = "java(subjectCommission.isActive())")
+    @Mapping(target = "unavailableReason", expression = "java(subjectCommission.unavailableReason())")
     SubjectCommissionResponseDto toDto(SubjectCommission subjectCommission);
 }

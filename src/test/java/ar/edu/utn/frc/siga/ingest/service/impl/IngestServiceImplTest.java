@@ -330,8 +330,8 @@ class IngestServiceImplTest {
         when(commissionService.findByCourseAndPeriod(row.courseCode(), 2026, 0))
             .thenReturn(commission);
 
-        SubjectCommissionResponseDto subjectCommission = new SubjectCommissionResponseDto(10L, 20L,
-            commission, row.enrolledCount(), true);
+        SubjectCommissionResponseDto subjectCommission = new SubjectCommissionResponseDto(10L, null, 20L,
+            commission, row.enrolledCount(), true, true);
         when(subjectCommissionService.findBySubjectAndCommission(10L, 20L))
             .thenReturn(subjectCommission);
 
@@ -370,7 +370,7 @@ class IngestServiceImplTest {
             .thenReturn(commission);
 
         SubjectCommissionResponseDto subjectCommission =
-            new SubjectCommissionResponseDto(subjectId, commissionId, commission, 30, true);
+            new SubjectCommissionResponseDto(subjectId, null, commissionId, commission, 30, true, true);
         when(subjectCommissionService.findBySubjectAndCommission(subjectId, commissionId))
             .thenReturn(subjectCommission);
 
@@ -395,7 +395,7 @@ class IngestServiceImplTest {
         SubjectResponseDto subject = new SubjectResponseDto(21L, 101, "Álgebra", "Anual", plan, true, null);
         when(subjectService.findByCodeAndStudyPlan(101, 1, 1)).thenReturn(subject);
 
-        SubjectCommissionResponseDto subjectCommission = new SubjectCommissionResponseDto(21L, 30L, null, 30, true);
+        SubjectCommissionResponseDto subjectCommission = new SubjectCommissionResponseDto(21L, null, 30L, null, 30, true, true);
         when(subjectCommissionService.findBySubjectAndCommission(21L, 30L))
             .thenReturn(subjectCommission);
     }

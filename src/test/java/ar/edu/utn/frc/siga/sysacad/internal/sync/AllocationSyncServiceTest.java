@@ -91,7 +91,7 @@ class AllocationSyncServiceTest {
     }
 
     private SubjectCommissionResponseDto link(Long subjectId, Long commissionId, int enrolled) {
-        return new SubjectCommissionResponseDto(subjectId, commissionId, null, enrolled, true);
+        return new SubjectCommissionResponseDto(subjectId, null, commissionId, null, enrolled, true, true);
     }
 
     private ClassroomResponseDto classroom(Long id) {

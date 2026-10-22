@@ -9,6 +9,12 @@ import org.springframework.data.jpa.domain.Specification;
 
 public class StudyPlanSpecification {
 
+    public static Specification<StudyPlan> available() {
+        return (root, query, cb) -> cb.and(
+                cb.isNull(root.get("deletedAt")),
+                cb.isNull(root.get("specialty").get("deletedAt")));
+    }
+
     public static Specification<StudyPlan> withFilter(StudyPlanFilter filter) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();

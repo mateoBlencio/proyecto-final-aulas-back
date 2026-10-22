@@ -9,6 +9,8 @@ import ar.edu.utn.frc.siga.academic.service.SpecialtyService;
 import ar.edu.utn.frc.siga.academic.service.command.SpecialtySyncCommand;
 import ar.edu.utn.frc.siga.academic.specification.SpecialtySpecification;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
+import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import java.time.Instant;
 import java.util.HashSet;
@@ -34,9 +36,24 @@ public class SpecialtyServiceImpl implements SpecialtyService {
     private final SpecialtyMapper specialtyMapper;
 
     @Override
-    public Page<SpecialtyResponseDto> findAll(SpecialtyFilter filter, Pageable pageable) {
-        return specialtyRepository.findAll(SpecialtySpecification.withFilter(filter), pageable)
+    public Page<SpecialtyResponseDto> findAll(SpecialtyFilter filter, Pageable pageable, boolean includeDeactivated) {
+        return specialtyRepository.findAll(
+                        SpecialtySpecification.withFilter(filter)
+                                .and(SoftDeleteSpecifications.activeUnless(includeDeactivated)),
+                        pageable)
                 .map(specialtyMapper::toDto);
+    }
+
+    @Override
+    @Transactional
+    public void activate(Long id) {
+        specialtyRepository.restore(Finder.orThrow(specialtyRepository::findById, id, "Specialty"));
+    }
+
+    @Override
+    @Transactional
+    public void deactivate(Long id) {
+        specialtyRepository.softDelete(Finder.orThrow(specialtyRepository::findById, id, "Specialty"));
     }
 
     @Override
@@ -51,8 +68,7 @@ public class SpecialtyServiceImpl implements SpecialtyService {
                 .orElseThrow(() -> ResourceNotFoundException.of("Specialty", specialtyCode)));
     }
 
-    // `especialidad` no tiene flag de vigencia: SysAcad es la única fuente y no hay
-    // registro local a preservar, así que el sync es un upsert simple por código.
+    // El sync es un upsert simple por código y nunca reactiva: la baja manual es de la facultad.
     @Override
     @Transactional
     public int syncSpecialties(List<SpecialtySyncCommand> commands) {

@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.academic.model;
 
 import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
+import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
@@ -47,7 +48,22 @@ public class SubjectCommission extends SoftDeletableEntity {
     @Builder.Default
     private Boolean inPerson = true;
 
+    public UnavailableReason unavailableReason() {
+        if (!isActive()) {
+            return UnavailableReason.DEACTIVATED;
+        }
+        if (!subject.isAvailable()) {
+            return UnavailableReason.PARENT_DEACTIVATED;
+        }
+        UnavailableReason commissionReason = commission.unavailableReason();
+        if (commissionReason == null) {
+            return null;
+        }
+        return commissionReason == UnavailableReason.NOT_IN_SYSACAD
+                ? UnavailableReason.NOT_IN_SYSACAD : UnavailableReason.PARENT_DEACTIVATED;
+    }
+
     public boolean isAvailable() {
-        return isActive() && subject.isAvailable() && commission.isAvailable();
+        return unavailableReason() == null;
     }
 }

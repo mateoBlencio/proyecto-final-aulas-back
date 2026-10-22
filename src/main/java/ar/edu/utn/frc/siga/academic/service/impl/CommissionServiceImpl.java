@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.academic.service.impl;
 
 import ar.edu.utn.frc.siga.academic.dto.CommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
+import ar.edu.utn.frc.siga.academic.dto.response.SpecialtySummaryDto;
 import ar.edu.utn.frc.siga.academic.mapper.CommissionMapper;
 import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
 import ar.edu.utn.frc.siga.academic.model.Commission;
@@ -28,6 +29,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -57,9 +59,10 @@ public class CommissionServiceImpl implements CommissionService {
 
     @Override
     public CommissionResponseDto findById(Long id) {
-        return commissionMapper.toDto(commissionRepository.findById(id)
+        Commission commission = commissionRepository.findById(id)
                 .filter(Commission::isAvailable)
-                .orElseThrow(() -> ResourceNotFoundException.of("Commission", id)));
+                .orElseThrow(() -> ResourceNotFoundException.of("Commission", id));
+        return withSpecialties(List.of(commission)).get(0);
     }
 
     @Override
@@ -91,11 +94,30 @@ public class CommissionServiceImpl implements CommissionService {
 
     @Override
     public Page<CommissionResponseDto> findAll(CommissionFilter filter, Pageable pageable, boolean includeDeactivated) {
-        return commissionRepository.findAll(
-                        CommissionSpecification.withFilter(filter)
-                                .and(includeDeactivated ? Specification.<Commission>unrestricted() : CommissionSpecification.available()),
-                        pageable)
-                .map(commissionMapper::toDto);
+        Page<Commission> page = commissionRepository.findAll(
+                CommissionSpecification.withFilter(filter)
+                        .and(includeDeactivated ? Specification.<Commission>unrestricted() : CommissionSpecification.available()),
+                pageable);
+        Iterator<CommissionResponseDto> enriched = withSpecialties(page.getContent()).iterator();
+        return page.map(commission -> enriched.next());
+    }
+
+    // One query for the whole page. A commission can offer subjects of several specialties, so the
+    // response carries the distinct list instead of repeating the commission once per specialty.
+    private List<CommissionResponseDto> withSpecialties(List<Commission> commissions) {
+        List<Long> ids = commissions.stream().map(Commission::getId).toList();
+        Map<Long, List<SpecialtySummaryDto>> byCommission = ids.isEmpty() ? Map.of()
+                : subjectCommissionRepository.findSpecialtiesByCommissionIds(ids).stream()
+                        .collect(Collectors.groupingBy(row -> (Long) row[0],
+                                Collectors.mapping(row -> new SpecialtySummaryDto((Integer) row[1], (String) row[2]),
+                                        Collectors.toList())));
+        return commissions.stream()
+                .map(commission -> {
+                    CommissionResponseDto dto = commissionMapper.toDto(commission);
+                    return new CommissionResponseDto(dto.id(), dto.courseCode(), dto.academicPeriod(),
+                            dto.unavailableReason(), byCommission.getOrDefault(commission.getId(), List.of()));
+                })
+                .toList();
     }
 
     @Override

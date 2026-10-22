@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.academic.service;
 import ar.edu.utn.frc.siga.academic.dto.SpecialtyFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
 import ar.edu.utn.frc.siga.academic.service.command.SpecialtySyncCommand;
+import ar.edu.utn.frc.siga.common.service.ActivationService;
 
 import java.util.List;
 
@@ -11,9 +12,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.modulith.NamedInterface;
 
 @NamedInterface("api")
-public interface SpecialtyService {
+public interface SpecialtyService extends ActivationService<Long> {
 
-    Page<SpecialtyResponseDto> findAll(SpecialtyFilter filter, Pageable pageable);
+    Page<SpecialtyResponseDto> findAll(SpecialtyFilter filter, Pageable pageable, boolean includeDeactivated);
 
     SpecialtyResponseDto findById(Long id);
 

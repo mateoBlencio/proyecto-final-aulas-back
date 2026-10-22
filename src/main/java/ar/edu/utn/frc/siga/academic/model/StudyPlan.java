@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.academic.model;
 
 import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
+import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -50,4 +51,15 @@ public class StudyPlan extends SoftDeletableEntity {
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
+
+    public UnavailableReason unavailableReason() {
+        if (!isActive()) {
+            return UnavailableReason.DEACTIVATED;
+        }
+        return specialty.isActive() ? null : UnavailableReason.PARENT_DEACTIVATED;
+    }
+
+    public boolean isAvailable() {
+        return unavailableReason() == null;
+    }
 }

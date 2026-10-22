@@ -20,6 +20,7 @@ import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -166,6 +167,19 @@ class AcademicSpecificationsTest {
         }
 
         @Test
+        void availableOcultaMateriasDeUnaEspecialidadDadaDeBaja() {
+            sistemas.deactivate();
+            specialtyRepository.save(sistemas);
+
+            var result = subjectRepository.findAll(
+                    SubjectSpecification.withFilter(new SubjectFilter(null, null, 99017, null))
+                            .and(SubjectSpecification.available()),
+                    Pageable.unpaged());
+
+            assertThat(result).isEmpty();
+        }
+
+        @Test
         void activeUnlessOcultaLasDesactivadasSalvoQueSePidanExplicitamente() {
             Subject analisis = subjectRepository.findById(analisisId).orElseThrow();
             analisis.deactivate();
@@ -191,7 +205,7 @@ class AcademicSpecificationsTest {
         @Test
         void filtraPorCourseCodeParcial() {
             var result = commissionRepository.findAll(
-                    CommissionSpecification.withFilter(new CommissionFilter("zzk10", null))
+                    CommissionSpecification.withFilter(new CommissionFilter("zzk10", null, null, null))
                             .and(SoftDeleteSpecifications.activeUnless(false)),
                     Pageable.unpaged());
             assertThat(result).extracting(Commission::getId).containsExactly(commissionK1Id);
@@ -200,10 +214,61 @@ class AcademicSpecificationsTest {
         @Test
         void filtraPorAcademicPeriodId() {
             var result = commissionRepository.findAll(
-                    CommissionSpecification.withFilter(new CommissionFilter(null, period2099s2Id))
+                    CommissionSpecification.withFilter(new CommissionFilter(null, period2099s2Id, null, null))
                             .and(SoftDeleteSpecifications.activeUnless(false)),
                     Pageable.unpaged());
             assertThat(result).extracting(Commission::getId).containsExactly(commissionK2Id);
+        }
+
+        @Test
+        void filtraPorSpecialtyCodeViaMateriasOfrecidas() {
+            var result = commissionRepository.findAll(
+                    CommissionSpecification.withFilter(new CommissionFilter(null, null, 99017, null))
+                            .and(SoftDeleteSpecifications.activeUnless(false)),
+                    Pageable.unpaged());
+            assertThat(result).extracting(Commission::getId)
+                    .containsExactlyInAnyOrder(commissionK1Id, commissionK2Id);
+        }
+
+        @Test
+        void filtraPorSubjectId() {
+            var result = commissionRepository.findAll(
+                    CommissionSpecification.withFilter(new CommissionFilter(null, null, null, analisisId))
+                            .and(SoftDeleteSpecifications.activeUnless(false)),
+                    Pageable.unpaged());
+            assertThat(result).extracting(Commission::getId).containsExactly(commissionK1Id);
+        }
+
+        @Test
+        void specialtyCodeYSubjectIdSeCombinanConAnd() {
+            var result = commissionRepository.findAll(
+                    CommissionSpecification.withFilter(new CommissionFilter(null, null, 99005, analisisId))
+                            .and(SoftDeleteSpecifications.activeUnless(false)),
+                    Pageable.unpaged());
+            assertThat(result).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("Especialidades de una comisión")
+    class CommissionSpecialties {
+        @Test
+        void devuelveLaEspecialidadDeLaMateriaVinculada() {
+            var rows = subjectCommissionRepository.findSpecialtiesByCommissionIds(List.of(commissionK1Id));
+            assertThat(rows).hasSize(1);
+            assertThat(rows.get(0)[0]).isEqualTo(commissionK1Id);
+            assertThat(rows.get(0)[1]).isEqualTo(99017);
+            assertThat(rows.get(0)[2]).isEqualTo("ZZ Sistemas");
+        }
+
+        @Test
+        void ignoraVinculosDadosDeBaja() {
+            SubjectCommission link = subjectCommissionRepository
+                    .findById(new SubjectCommissionId(analisisId, commissionK1Id)).orElseThrow();
+            subjectCommissionRepository.softDelete(link);
+
+            assertThat(subjectCommissionRepository.findSpecialtiesByCommissionIds(List.of(commissionK1Id)))
+                    .isEmpty();
         }
     }
 

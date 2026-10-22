@@ -122,7 +122,7 @@ class EventScheduleValidatorTest {
     @DisplayName("validateCommissionBelongsToSubject: commissionId sí pertenece a subjectId → no lanza")
     void validateCommissionBelongsToSubjectPertenece() {
         when(subjectCommissionService.findBySubjectAndCommission(1L, 1L))
-                .thenReturn(new SubjectCommissionResponseDto(1L, 1L, null, 30, true));
+                .thenReturn(new SubjectCommissionResponseDto(1L, null, 1L, null, 30, true, true));
 
         assertThatCode(() -> validator.validateCommissionBelongsToSubject(1L, 1L))
                 .doesNotThrowAnyException();

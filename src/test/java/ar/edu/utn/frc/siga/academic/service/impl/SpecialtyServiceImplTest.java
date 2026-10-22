@@ -52,10 +52,24 @@ class SpecialtyServiceImplTest {
                 .thenReturn(new PageImpl<>(List.of(specialty)));
         when(specialtyMapper.toDto(specialty)).thenReturn(dto);
 
-        var result = service.findAll(new SpecialtyFilter(17, null, null), PageRequest.of(0, 20));
+        var result = service.findAll(new SpecialtyFilter(17, null, null), PageRequest.of(0, 20), false);
 
         assertThat(result.getContent()).containsExactly(dto);
         assertThat(result.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("deactivate/activate: baja y alta manual guardan la entidad")
+    void deactivateAndActivateToggleSoftDelete() {
+        Specialty specialty = Specialty.builder().id(1L).specialtyCode(17).name("Sistemas").build();
+        when(specialtyRepository.findById(1L)).thenReturn(java.util.Optional.of(specialty));
+        when(specialtyRepository.softDelete(specialty)).thenCallRealMethod();
+        when(specialtyRepository.restore(specialty)).thenCallRealMethod();
+
+        service.deactivate(1L);
+        assertThat(specialty.isActive()).isFalse();
+        service.activate(1L);
+        assertThat(specialty.isActive()).isTrue();
     }
 
     @Test
