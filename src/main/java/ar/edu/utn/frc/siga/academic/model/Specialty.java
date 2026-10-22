@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.academic.model;
 
-import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
+import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
+import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -22,7 +23,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Specialty extends TimestampedEntity {
+public class Specialty extends SoftDeletableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -47,4 +48,12 @@ public class Specialty extends TimestampedEntity {
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
+
+    public UnavailableReason unavailableReason() {
+        return isActive() ? null : UnavailableReason.DEACTIVATED;
+    }
+
+    public boolean isAvailable() {
+        return unavailableReason() == null;
+    }
 }

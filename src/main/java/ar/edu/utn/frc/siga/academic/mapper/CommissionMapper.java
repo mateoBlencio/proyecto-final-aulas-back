@@ -10,5 +10,6 @@ import org.mapstruct.Mapping;
 public interface CommissionMapper {
 
     @Mapping(target = "unavailableReason", expression = "java(commission.unavailableReason())")
+    @Mapping(target = "specialties", ignore = true)
     CommissionResponseDto toDto(Commission commission);
 }

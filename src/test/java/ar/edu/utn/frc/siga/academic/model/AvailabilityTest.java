@@ -9,8 +9,20 @@ import org.junit.jupiter.api.Test;
 @DisplayName("isAvailable: la baja de un padre oculta al hijo sin modificarlo")
 class AvailabilityTest {
 
+    private static Specialty specialty(boolean active) {
+        Specialty specialty = Specialty.builder().id(1L).build();
+        if (!active) {
+            specialty.deactivate();
+        }
+        return specialty;
+    }
+
     private static StudyPlan plan(boolean active) {
-        StudyPlan plan = StudyPlan.builder().id(1L).build();
+        return plan(specialty(true), active);
+    }
+
+    private static StudyPlan plan(Specialty specialty, boolean active) {
+        StudyPlan plan = StudyPlan.builder().id(1L).specialty(specialty).build();
         if (!active) {
             plan.deactivate();
         }
@@ -165,6 +177,44 @@ class AvailabilityTest {
                 .isEqualTo(UnavailableReason.DEACTIVATED);
     }
 
+    @Test
+    @DisplayName("Specialty: la baja manual da DEACTIVATED y no tiene padre")
+    void specialty() {
+        assertThat(specialty(true).unavailableReason()).isNull();
+        assertThat(specialty(false).unavailableReason()).isEqualTo(UnavailableReason.DEACTIVATED);
+    }
+
+    @Test
+    @DisplayName("StudyPlan: la baja de la especialidad da PARENT_DEACTIVATED; la propia gana")
+    void studyPlan() {
+        assertThat(plan(specialty(true), true).unavailableReason()).isNull();
+        assertThat(plan(specialty(false), true).unavailableReason()).isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
+        assertThat(plan(specialty(false), false).unavailableReason()).isEqualTo(UnavailableReason.DEACTIVATED);
+        assertThat(plan(specialty(false), true).isActive()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Subject: la baja de la especialidad llega a la materia como PARENT_DEACTIVATED")
+    void subjectUnderDeactivatedSpecialty() {
+        Subject subject = subject(plan(specialty(false), true), true);
+        assertThat(subject.unavailableReason()).isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
+        assertThat(subject.isActive()).isTrue();
+    }
+
+    @Test
+    @DisplayName("SubjectCommission: razón propia, de la materia o de la comisión")
+    void subjectCommissionReason() {
+        Subject subject = subject(plan(true), true);
+        Commission commission = commission(period(true), true);
+        assertThat(link(subject, commission, true).unavailableReason()).isNull();
+        assertThat(link(subject, commission, false).unavailableReason()).isEqualTo(UnavailableReason.DEACTIVATED);
+        assertThat(link(subject(plan(true), false), commission, true).unavailableReason())
+                .isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
+        assertThat(link(subject, commission(period(false), true), true).unavailableReason())
+                .isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
+        assertThat(link(subject, commission(period(true), true, false, "h"), true).unavailableReason())
+                .isEqualTo(UnavailableReason.NOT_IN_SYSACAD);
+    }
 
     private static SubjectCommission link(Subject subject, Commission commission, boolean active) {
         SubjectCommission link = SubjectCommission.builder().subject(subject).commission(commission).build();

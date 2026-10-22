@@ -44,7 +44,7 @@ public class RoomRequestCatalogServiceImpl implements RoomRequestCatalogService 
     public List<SpecialtyOptionDto> findSpecialties(boolean onlyWithSubjects) {
         return mapper.toSpecialtyOptions(
                 specialtyService.findAll(new SpecialtyFilter(null, null, onlyWithSubjects ? true : null),
-                        Pageable.unpaged()).getContent());
+                        Pageable.unpaged(), false).getContent());
     }
 
     @Override

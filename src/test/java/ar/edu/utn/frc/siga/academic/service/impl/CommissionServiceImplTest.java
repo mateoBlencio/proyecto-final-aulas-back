@@ -73,7 +73,7 @@ class CommissionServiceImplTest {
     @DisplayName("findById: devuelve el DTO mapeado cuando la comisión existe")
     void findByIdReturnsMappedDto() {
         Commission commission = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build();
-        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null, null);
+        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null, null, List.of());
         when(commissionRepository.findById(3L)).thenReturn(Optional.of(commission));
         when(commissionMapper.toDto(commission)).thenReturn(dto);
 
@@ -147,7 +147,7 @@ class CommissionServiceImplTest {
     @DisplayName("findAll: devuelve la página de comisiones mapeadas según el Specification")
     void findAllMapsAllCommissions() {
         Commission commission = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build();
-        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null, null);
+        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null, null, List.of());
         when(commissionRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(commission)));
         when(commissionMapper.toDto(commission)).thenReturn(dto);
@@ -162,8 +162,8 @@ class CommissionServiceImplTest {
         Commission active = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build();
         Commission inactive = Commission.builder().id(4L).courseCode("K1002").academicPeriod(period).build();
         inactive.deactivate();
-        CommissionResponseDto activeDto = new CommissionResponseDto(3L, "K1001", null, null);
-        CommissionResponseDto inactiveDto = new CommissionResponseDto(4L, "K1002", null, null);
+        CommissionResponseDto activeDto = new CommissionResponseDto(3L, "K1001", null, null, List.of());
+        CommissionResponseDto inactiveDto = new CommissionResponseDto(4L, "K1002", null, null, List.of());
         when(commissionRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(active, inactive)));
         when(commissionMapper.toDto(active)).thenReturn(activeDto);

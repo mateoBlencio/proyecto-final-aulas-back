@@ -34,6 +34,7 @@ public class SubjectSpecification {
     public static Specification<Subject> available() {
         return (root, query, cb) -> cb.and(
                 cb.isNull(root.get("deletedAt")),
-                cb.isNull(root.get("studyPlan").get("deletedAt")));
+                cb.isNull(root.get("studyPlan").get("deletedAt")),
+                cb.isNull(root.get("studyPlan").get("specialty").get("deletedAt")));
     }
 }

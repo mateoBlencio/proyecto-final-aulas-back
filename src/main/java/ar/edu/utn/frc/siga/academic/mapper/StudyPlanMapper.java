@@ -10,5 +10,6 @@ import org.mapstruct.Mapping;
 public interface StudyPlanMapper {
 
     @Mapping(target = "enabled", expression = "java(studyPlan.isActive())")
+    @Mapping(target = "unavailableReason", expression = "java(studyPlan.unavailableReason())")
     StudyPlanResponseDto toDto(StudyPlan studyPlan);
 }

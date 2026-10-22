@@ -50,7 +50,7 @@ class SubjectCommissionServiceImplTest {
     private SubjectCommissionServiceImpl service;
 
     private final Subject subject = Subject.builder().id(1L).code(101).name("Algoritmos")
-            .studyPlan(StudyPlan.builder().id(1L).build()).build();
+            .studyPlan(StudyPlan.builder().id(1L).specialty(Specialty.builder().id(1L).build()).build()).build();
     private final Commission commission = Commission.builder().id(2L).courseCode("K1001")
             .academicPeriod(AcademicPeriod.builder().id(1L).build()).build();
 
@@ -100,7 +100,7 @@ class SubjectCommissionServiceImplTest {
 
     private SubjectCommission linkOf(long subjectId, int specialtyCode, int planCode) {
         Subject other = Subject.builder().id(subjectId).code(101).name("Algoritmos")
-                .studyPlan(StudyPlan.builder().id(subjectId).planCode(planCode)
+                .studyPlan(StudyPlan.builder().id(subjectId).planCode(planCode).specialty(Specialty.builder().id(1L).build())
                         .specialty(Specialty.builder().id(subjectId).specialtyCode(specialtyCode).build())
                         .build())
                 .build();

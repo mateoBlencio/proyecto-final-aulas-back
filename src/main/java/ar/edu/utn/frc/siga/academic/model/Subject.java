@@ -62,7 +62,7 @@ public class Subject extends SoftDeletableEntity {
         if (!isActive()) {
             return UnavailableReason.DEACTIVATED;
         }
-        return studyPlan.isActive() ? null : UnavailableReason.PARENT_DEACTIVATED;
+        return studyPlan.isAvailable() ? null : UnavailableReason.PARENT_DEACTIVATED;
     }
 
     public boolean isAvailable() {
