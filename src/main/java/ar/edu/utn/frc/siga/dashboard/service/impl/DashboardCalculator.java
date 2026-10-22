@@ -8,8 +8,10 @@ import ar.edu.utn.frc.siga.dashboard.model.AllocationUnitRow;
 import ar.edu.utn.frc.siga.dashboard.model.BuildingRoomsRow;
 import ar.edu.utn.frc.siga.dashboard.model.CalculationInput;
 import ar.edu.utn.frc.siga.dashboard.model.CategoryCounts;
+import ar.edu.utn.frc.siga.dashboard.model.ClassifiedAllocation;
 import ar.edu.utn.frc.siga.dashboard.model.DashboardParameters;
 import ar.edu.utn.frc.siga.dashboard.model.ScopeMetrics;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -26,8 +28,12 @@ public final class DashboardCalculator {
     private DashboardCalculator() {
     }
 
-    /** Category of each allocation id. Units on unavailable days must be filtered out beforehand. */
-    public static Map<Long, AllocationCategory> classify(List<AllocationUnitRow> units, DashboardParameters params) {
+    /**
+     * Category and weight of each allocation id. The unit is the group (same event and date): one
+     * overlapping room makes the whole group OVERLAP, otherwise it is compared against the summed
+     * capacity. Units on unavailable days must be filtered out beforehand.
+     */
+    public static Map<Long, ClassifiedAllocation> classify(List<AllocationUnitRow> units, DashboardParameters params) {
         Set<Long> overlapping = new HashSet<>();
         Clashes.within(units,
                 u -> List.of(new RoomDate(u.classroomId(), u.date())),
@@ -40,21 +46,39 @@ public final class DashboardCalculator {
                     return key;
                 });
 
-        Map<Long, AllocationCategory> result = new HashMap<>();
+        Map<EventDate, List<AllocationUnitRow>> groups = new LinkedHashMap<>();
         for (AllocationUnitRow unit : units) {
-            result.put(unit.allocationId(), overlapping.contains(unit.allocationId())
+            groups.computeIfAbsent(new EventDate(unit.eventId(), unit.date()), k -> new ArrayList<>()).add(unit);
+        }
+
+        Map<Long, ClassifiedAllocation> result = new HashMap<>();
+        for (List<AllocationUnitRow> group : groups.values()) {
+            AllocationCategory category = group.stream().anyMatch(u -> overlapping.contains(u.allocationId()))
                     ? AllocationCategory.OVERLAP
-                    : classifyByCapacity(unit, params.underusedThresholdPercent()));
+                    : classifyByCapacity(group, params.underusedThresholdPercent());
+            ClassifiedAllocation classified = new ClassifiedAllocation(category, 1.0 / group.size());
+            group.forEach(u -> result.put(u.allocationId(), classified));
         }
         return result;
     }
 
-    private static AllocationCategory classifyByCapacity(AllocationUnitRow unit, int thresholdPercent) {
-        Integer capacity = unit.capacity();
-        if (capacity != null && unit.enrolled() > capacity) {
+    private record EventDate(Long eventId, LocalDate date) {
+    }
+
+    private static AllocationCategory classifyByCapacity(List<AllocationUnitRow> group, int thresholdPercent) {
+        int enrolled = group.getFirst().enrolled();
+        Integer capacity = 0;
+        for (AllocationUnitRow unit : group) {
+            if (unit.capacity() == null) {
+                capacity = null;
+                break;
+            }
+            capacity += unit.capacity();
+        }
+        if (capacity != null && enrolled > capacity) {
             return AllocationCategory.OVERCROWDED;
         }
-        if (capacity != null && (long) unit.enrolled() * 100 < (long) thresholdPercent * capacity) {
+        if (capacity != null && (long) enrolled * 100 < (long) thresholdPercent * capacity) {
             return AllocationCategory.UNDERUSED;
         }
         return AllocationCategory.ADEQUATE;
@@ -70,7 +94,7 @@ public final class DashboardCalculator {
         List<AllocationUnitRow> units = input.units().stream()
                 .filter(u -> input.availableDays().contains(u.date()))
                 .toList();
-        Map<Long, AllocationCategory> categories = classify(units, params);
+        Map<Long, ClassifiedAllocation> classified = classify(units, params);
 
         Map<Long, ScopeMetrics> result = new LinkedHashMap<>();
         for (BuildingRoomsRow building : input.buildings()) {
@@ -83,10 +107,11 @@ public final class DashboardCalculator {
             if (!result.containsKey(unit.buildingId())) {
                 continue;
             }
-            AllocationCategory category = categories.get(unit.allocationId());
-            counts.merge(unit.buildingId(), CategoryCounts.ZERO.with(category), CategoryCounts::plus);
+            ClassifiedAllocation c = classified.get(unit.allocationId());
+            CategoryCounts share = CategoryCounts.ZERO.with(c.category(), c.weight());
+            counts.merge(unit.buildingId(), share, CategoryCounts::plus);
             bySource.computeIfAbsent(unit.buildingId(), k -> new LinkedHashMap<>())
-                    .merge(unit.source(), CategoryCounts.ZERO.with(category), CategoryCounts::plus);
+                    .merge(unit.source(), share, CategoryCounts::plus);
         }
 
         Map<Long, long[]> occupiedBySlot = new HashMap<>();

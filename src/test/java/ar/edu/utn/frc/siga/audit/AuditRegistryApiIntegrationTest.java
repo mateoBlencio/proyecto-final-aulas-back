@@ -733,7 +733,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("un AUXILIAR_AULICO no puede consultar el detalle de revisión ni de operación (403)")
     void drillDownsForbiddenWithoutSubsecretariaRole() throws Exception {
-        MockMvc auxMockMvc = mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
+        MockMvc auxMockMvc = mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar");
 
         auxMockMvc.perform(get("/v1/audit/revisions/{revision}", 1)).andExpect(status().isForbidden());
         auxMockMvc.perform(get("/v1/audit/operations/{operationId}", "x")).andExpect(status().isForbidden());
@@ -779,7 +779,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("un AUXILIAR_AULICO no puede consultar el registro (403)")
     void forbiddenWithoutSubsecretariaRole() throws Exception {
-        MockMvc auxMockMvc = mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
+        MockMvc auxMockMvc = mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar");
 
         auxMockMvc.perform(get("/v1/audit"))
                 .andExpect(status().isForbidden());
@@ -867,7 +867,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("GET /v1/audit/export sin PERM_AUDIT_READ responde 403")
     void exportForbiddenWithoutAuditRead() throws Exception {
-        MockMvc auxMockMvc = mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
+        MockMvc auxMockMvc = mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar");
 
         auxMockMvc.perform(get(EXPORT)).andExpect(status().isForbidden());
     }
@@ -926,7 +926,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("un AUXILIAR_AULICO no puede consultar el catálogo de tipos de entidad (403)")
     void entityTypesForbiddenWithoutSubsecretariaRole() throws Exception {
-        MockMvc auxMockMvc = mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
+        MockMvc auxMockMvc = mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar");
 
         auxMockMvc.perform(get("/v1/audit/entity-types"))
                 .andExpect(status().isForbidden());
@@ -1206,7 +1206,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("la cadena sin PERM_AUDIT_READ responde 403")
     void chainForbiddenWithoutAuditPermission() throws Exception {
-        MockMvc auxMockMvc = mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
+        MockMvc auxMockMvc = mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar");
 
         auxMockMvc.perform(get("/v1/audit/operations/{id}/chain", "x")).andExpect(status().isForbidden());
     }
@@ -1373,7 +1373,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("un AUXILIAR_AULICO, sin PERM_AUDIT_READ, recibe 403")
     void entityHistory_forbiddenWithoutAuditPermission() throws Exception {
-        MockMvc auxMockMvc = mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
+        MockMvc auxMockMvc = mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar");
 
         auxMockMvc.perform(get(ENTITY_HISTORY, "Ocurrencia", 1)).andExpect(status().isForbidden());
     }

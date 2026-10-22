@@ -22,6 +22,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl;
 import java.util.List;
 
 import org.springframework.test.util.ReflectionTestUtils;
@@ -169,7 +170,7 @@ class RoomRequestMapperTest {
                 .requiresComputers(true)
                 .build();
 
-        RoomRequestItemRowDto dto = mapper.toRowDto(itemWithComputers, null, List.of(), null, 1);
+        RoomRequestItemRowDto dto = mapper.toRowDto(itemWithComputers, null, List.of(), null, 1, List.of());
 
         assertThat(dto.requiresSpecialAssignment()).isTrue();
         assertThat(dto.wasReturned()).isFalse();
@@ -182,7 +183,7 @@ class RoomRequestMapperTest {
     void rowDtoWithoutSpecialRequirementsIsFalse() {
         RoomRequestItem plain = RoomRequestItem.builder().id(5L).position(1).classroomCount(1).build();
 
-        RoomRequestItemRowDto dto = mapper.toRowDto(plain, null, List.of(), null, 1);
+        RoomRequestItemRowDto dto = mapper.toRowDto(plain, null, List.of(), null, 1, List.of());
 
         assertThat(dto.requiresSpecialAssignment()).isFalse();
         assertThat(dto.partiallyResolved()).isFalse();
@@ -195,10 +196,23 @@ class RoomRequestMapperTest {
                 .id(5L).position(1).classroomCount(1).returnedFromBuildingId(9L)
                 .build();
 
-        RoomRequestItemRowDto dto = mapper.toRowDto(returned, null, List.of(), null, 0);
+        RoomRequestItemRowDto dto = mapper.toRowDto(returned, null, List.of(), null, 0, List.of());
 
         assertThat(dto.wasReturned()).isTrue();
         assertThat(dto.partiallyResolved()).isFalse();
+    }
+
+    @Test
+    @DisplayName("toRowDto: allowedActions pasa tal cual a la fila")
+    void rowDtoPassesAllowedActionsThrough() {
+        RoomRequestItem item = RoomRequestItem.builder().id(5L).position(1).classroomCount(1).build();
+        List<RoomRequestAccessControl.Action> actions =
+                List.of(RoomRequestAccessControl.Action.ASSIGN, RoomRequestAccessControl.Action.CANCEL);
+
+        RoomRequestItemRowDto dto = mapper.toRowDto(item, null, List.of(), null, 0, actions);
+
+        assertThat(dto.allowedActions()).containsExactly(
+                RoomRequestAccessControl.Action.ASSIGN, RoomRequestAccessControl.Action.CANCEL);
     }
 
     private static RoomRequest requestEntity() {

@@ -34,7 +34,7 @@ class ClassroomListApiIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUpAuxiliar() {
-        auxiliarMockMvc = mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO);
+        auxiliarMockMvc = mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar");
     }
 
     @Test
@@ -99,7 +99,11 @@ class ClassroomListApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.content[0].permissionMode").value("SUBSET"))
                 .andExpect(jsonPath("$.content[0].allowedDisplay").value("Materia-IT"))
                 .andExpect(jsonPath("$.content[0].permissionTargets[0].targetId").value(sc.subjectId().intValue()))
-                .andExpect(jsonPath("$.content[0].permissionTargets[0].name").value("Materia-IT"));
+                .andExpect(jsonPath("$.content[0].permissionTargets[0].name").value("Materia-IT"))
+                .andExpect(jsonPath("$.content[0].permissionTargets[0].specialtyName")
+                        .value(org.hamcrest.Matchers.startsWith("Especialidad-")))
+                .andExpect(jsonPath("$.content[0].permissionTargets[0].specialtyCode").isNumber())
+                .andExpect(jsonPath("$.content[0].permissionTargets[0].studyPlanCode").isNumber());
     }
 
     @Test

@@ -63,8 +63,7 @@ public class DashboardReadRepository {
                 JOIN aula c ON c.id_aula = a.id_aula AND c.eliminado_en IS NULL
                 JOIN edificio b ON b.id_edificio = c.id_edificio AND b.eliminado_en IS NULL
                 WHERE o.fecha BETWEEN :from AND :to
-                  AND (:unrestricted OR b.id_edificio IN (:buildingIds))
-                """, scopeParams(scope).addValue("from", from).addValue("to", to),
+                """, new MapSqlParameterSource().addValue("from", from).addValue("to", to),
                 (rs, i) -> toUnit(rs));
     }
 

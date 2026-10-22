@@ -227,18 +227,36 @@ class RbacApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.content").isEmpty());
     }
 
+    @Test
+    @DisplayName("POST role-assignments: SUBSECRETARIA con BUILDING o AUXILIAR_AULICO con GLOBAL: 400 y no se guarda nada")
+    void assign_roleWithDisallowedScope_returnsBadRequestAndPersistsNothing() throws Exception {
+        Building building = testData.edificio();
+        Long subsecretariaUserId = createPlainUser(uniqueEmail("subsec-building"));
+        Long auxiliarUserId = createPlainUser(uniqueEmail("aux-global"));
+
+        mockMvc.perform(post("/v1/users/{id}/role-assignments", subsecretariaUserId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignRoleBody("SUBSECRETARIA", ScopeType.BUILDING, building.getId())))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/v1/users/{id}/role-assignments", auxiliarUserId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignRoleBody("AUXILIAR_AULICO", ScopeType.GLOBAL, null)))
+                .andExpect(status().isBadRequest());
+
+        assertThat(roleAssignmentRepository.findAllByUserId(subsecretariaUserId)).isEmpty();
+        assertThat(roleAssignmentRepository.findAllByUserId(auxiliarUserId)).isEmpty();
+    }
+
     // ---- listado por rol y edificio ----
 
     @Test
-    @DisplayName("GET /v1/users/with-role: trae los AUXILIAR_AULICO acotados al edificio y los GLOBAL, no los de otro edificio ni otros roles")
-    void findByRoleForBuilding_returnsScopedAndGlobalAuxiliaries() throws Exception {
+    @DisplayName("GET /v1/users/with-role: trae los AUXILIAR_AULICO acotados al edificio, no los de otro edificio ni otros roles")
+    void findByRoleForBuilding_returnsOnlyScopedAuxiliaries() throws Exception {
         Building target = testData.edificio();
         Building other = testData.edificio();
 
         String scopedEmail = uniqueEmail("aux-scoped");
         mockMvcAsScoped(scopedEmail, SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, target.getId());
-        String globalEmail = uniqueEmail("aux-global");
-        mockMvcAsScoped(globalEmail, SystemRole.AUXILIAR_AULICO, ScopeType.GLOBAL, null);
         String otherBuildingEmail = uniqueEmail("aux-other");
         mockMvcAsScoped(otherBuildingEmail, SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, other.getId());
         String consultaEmail = uniqueEmail("consulta-scoped");
@@ -249,7 +267,6 @@ class RbacApiIntegrationTest extends AbstractIntegrationTest {
                         .param("buildingId", String.valueOf(target.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.email == '" + scopedEmail + "')]").isNotEmpty())
-                .andExpect(jsonPath("$[?(@.email == '" + globalEmail + "')]").isNotEmpty())
                 .andExpect(jsonPath("$[?(@.email == '" + otherBuildingEmail + "')]").isEmpty())
                 .andExpect(jsonPath("$[?(@.email == '" + consultaEmail + "')]").isEmpty());
     }

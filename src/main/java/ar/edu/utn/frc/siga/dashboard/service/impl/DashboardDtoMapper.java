@@ -30,8 +30,10 @@ final class DashboardDtoMapper {
     }
 
     static AllocationStatusResponseDto allocationStatus(CategoryCounts c) {
-        long total = c.total();
-        return new AllocationStatusResponseDto(c.overlap(), c.overcrowded(), c.underused(), c.adequate(), total,
+        double total = c.total();
+        return new AllocationStatusResponseDto(DashboardRules.round1(c.overlap()),
+                DashboardRules.round1(c.overcrowded()), DashboardRules.round1(c.underused()),
+                DashboardRules.round1(c.adequate()), DashboardRules.round1(total),
                 DashboardRules.percent(c.overlap(), total), DashboardRules.percent(c.overcrowded(), total),
                 DashboardRules.percent(c.underused(), total), DashboardRules.percent(c.adequate(), total));
     }

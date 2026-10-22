@@ -1,10 +1,11 @@
 package ar.edu.utn.frc.siga.dashboard.model;
 
-public record CategoryCounts(long overlap, long overcrowded, long underused, long adequate) {
+/** Counts per category; a multi-room group contributes a fraction (1/roomCount) per allocation. */
+public record CategoryCounts(double overlap, double overcrowded, double underused, double adequate) {
 
     public static final CategoryCounts ZERO = new CategoryCounts(0, 0, 0, 0);
 
-    public long total() {
+    public double total() {
         return overlap + overcrowded + underused + adequate;
     }
 
@@ -13,12 +14,12 @@ public record CategoryCounts(long overlap, long overcrowded, long underused, lon
                 underused + other.underused, adequate + other.adequate);
     }
 
-    public CategoryCounts with(AllocationCategory category) {
+    public CategoryCounts with(AllocationCategory category, double weight) {
         return plus(switch (category) {
-            case OVERLAP -> new CategoryCounts(1, 0, 0, 0);
-            case OVERCROWDED -> new CategoryCounts(0, 1, 0, 0);
-            case UNDERUSED -> new CategoryCounts(0, 0, 1, 0);
-            case ADEQUATE -> new CategoryCounts(0, 0, 0, 1);
+            case OVERLAP -> new CategoryCounts(weight, 0, 0, 0);
+            case OVERCROWDED -> new CategoryCounts(0, weight, 0, 0);
+            case UNDERUSED -> new CategoryCounts(0, 0, weight, 0);
+            case ADEQUATE -> new CategoryCounts(0, 0, 0, weight);
         });
     }
 }

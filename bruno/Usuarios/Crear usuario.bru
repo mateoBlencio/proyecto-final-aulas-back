@@ -17,7 +17,7 @@ body:json {
     "firstName": "Nombre",
     "lastName": "Apellido",
     "initialRole": {
-      "roleId": 2,
+      "role": "AUXILIAR_AULICO",
       "scopeType": "BUILDING",
       "scopeId": 1
     }
@@ -30,4 +30,8 @@ docs {
   el usuario queda sin ninguna asignación de rol, para asignársela después vía
   POST /v1/users/{id}/role-assignments. Si se incluye, "scopeType" es GLOBAL o
   BUILDING; "scopeId" va null para GLOBAL y el id de edificio para BUILDING.
+  Regla de alcance por rol: SUBSECRETARIA solo admite GLOBAL; AUXILIAR_AULICO
+  solo BUILDING (una asignación por edificio); CONSULTA admite GLOBAL o
+  BUILDING. Un rol con alcance no permitido responde 400.
+  Si initialRole es inválido responde 400 y el usuario no se crea.
 }

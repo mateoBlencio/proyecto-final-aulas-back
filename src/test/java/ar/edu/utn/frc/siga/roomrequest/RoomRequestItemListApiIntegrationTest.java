@@ -313,7 +313,7 @@ class RoomRequestItemListApiIntegrationTest extends AbstractIntegrationTest {
         anonymousMockMvc.perform(get("/v1/room-requests/items"))
                 .andExpect(status().isUnauthorized());
 
-        mockMvcAs("auxiliar@frc.utn.edu.ar", SystemRole.AUXILIAR_AULICO)
+        mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar")
                 .perform(get("/v1/room-requests/items"))
                 .andExpect(status().isOk());
     }

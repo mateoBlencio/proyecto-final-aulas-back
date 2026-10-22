@@ -17,6 +17,7 @@ public record AllocationResponseDto(
         String observation,
         OccurrenceResponseDto occurrence,
         AcademicEventResponseDto event,
-        ClassroomResponseDto classroom
+        ClassroomResponseDto classroom,
+        AllocationGroupDto group
 ) {
 }

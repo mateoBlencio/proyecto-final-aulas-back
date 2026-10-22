@@ -32,6 +32,11 @@ docs {
   NOT_PERMITTED: asignación en un aula que no habilita la materia del evento; el
   subtipo trae event, classroom, subjectId y las fechas afectadas.
   
+  OVERCROWDED: la unidad es el grupo (mismo evento y fecha). Una comisión en varias
+  aulas genera un solo conflicto con "capacity" = suma de las capacidades. "classrooms"
+  lista las aulas del grupo que el usuario ve; "classroom" es la primera de ellas. Un
+  mismo evento con distinta cantidad de aulas según la fecha genera conflictos separados.
+  
   Rango por defecto: from=hoy, to=fin del período académico activo (o from + 6 meses
   si no hay uno con fecha de fin). 'to' anterior a 'from' → 400.
   includePast (default false): excluye ocurrencias ya pasadas salvo que se pida

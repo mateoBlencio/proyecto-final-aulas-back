@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import ar.edu.utn.frc.siga.dashboard.model.DashboardRules;
 import ar.edu.utn.frc.siga.dashboard.service.DashboardSnapshotService;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
@@ -64,7 +65,7 @@ class DashboardTrendAndReportApiIntegrationTest extends DashboardIntegrationSupp
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.month").value("2020-03"))
                 .andExpect(jsonPath("$.generatedBy").value("SISTEMA"))
-                .andExpect(jsonPath("$.schemaVersion").value(1))
+                .andExpect(jsonPath("$.schemaVersion").value(DashboardRules.SCHEMA_VERSION))
                 .andReturn().getResponse().getContentAsString();
         String second = mockMvc.perform(get("/v1/dashboard/reports/2020-03"))
                 .andReturn().getResponse().getContentAsString();

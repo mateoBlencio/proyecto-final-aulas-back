@@ -29,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -72,8 +73,12 @@ public class RoomRequestServiceImpl implements RoomRequestService {
         RoomRequestItemFilter scoped = scoped(filter, actorEmail);
         Page<RoomRequestItem> page = itemRepository.findAll(
                 RoomRequestItemSpecification.withFilter(scoped), RoomRequestItemSort.apply(pageable));
+        RoomRequestAccessControl.Actor actor = accessControl.resolveActor(actorEmail);
+        Map<Long, List<RoomRequestAccessControl.Action>> allowedActionsByItemId = new HashMap<>();
+        page.getContent().forEach(item ->
+                allowedActionsByItemId.put(item.getId(), accessControl.allowedActions(item, actor)));
         Page<RoomRequestItemRowDto> result =
-                new PageImpl<>(composer.composeRows(page.getContent()), page.getPageable(), page.getTotalElements());
+                new PageImpl<>(composer.composeRows(page.getContent(), allowedActionsByItemId), page.getPageable(), page.getTotalElements());
         log.info("Pedidos de aula listados: total={}", result.getTotalElements());
         return result;
     }
@@ -106,6 +111,7 @@ public class RoomRequestServiceImpl implements RoomRequestService {
         RoomRequestItem item = itemRepository.findWithRequestById(itemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
         accessControl.authorizeRead(item, actorEmail);
-        return composer.composeDetail(item);
+        return composer.composeDetail(item,
+                accessControl.allowedActions(item, accessControl.resolveActor(actorEmail)));
     }
 }

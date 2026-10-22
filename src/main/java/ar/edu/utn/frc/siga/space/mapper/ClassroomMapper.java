@@ -8,7 +8,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
-@Mapper(config = CentralMapperConfig.class)
+@Mapper(config = CentralMapperConfig.class, uses = SpaceActionFlags.class)
 public interface ClassroomMapper {
 
     @Mapping(target = "buildingId", source = "building.id")
@@ -17,6 +17,9 @@ public interface ClassroomMapper {
     @Mapping(target = "classroomTypeDescription", source = "classroomType.description")
     @Mapping(target = "unavailableReason", expression = "java(entity.unavailableReason())")
     @Mapping(target = "currentInSysacad", expression = "java(entity.isCurrentInSysacad())")
+    @Mapping(target = "canUpdate", source = ".", qualifiedByName = "canUpdateClassroom")
+    @Mapping(target = "canActivate", source = "building.id", qualifiedByName = "canActivateClassroom")
+    @Mapping(target = "canAllocate", source = ".", qualifiedByName = "canAllocateClassroom")
     ClassroomResponseDto toDto(Classroom entity);
 
     @Mapping(target = "id", ignore = true)
