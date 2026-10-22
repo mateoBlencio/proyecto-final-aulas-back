@@ -5,6 +5,8 @@ import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SpecialtyMapper;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
+import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
+import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.academic.service.SpecialtyService;
 import ar.edu.utn.frc.siga.academic.service.command.SpecialtySyncCommand;
 import ar.edu.utn.frc.siga.academic.specification.SpecialtySpecification;
@@ -33,15 +35,46 @@ import org.springframework.transaction.annotation.Transactional;
 public class SpecialtyServiceImpl implements SpecialtyService {
 
     private final SpecialtyRepository specialtyRepository;
+    private final SubjectCommissionRepository subjectCommissionRepository;
+    private final SubjectRepository subjectRepository;
     private final SpecialtyMapper specialtyMapper;
 
     @Override
     public Page<SpecialtyResponseDto> findAll(SpecialtyFilter filter, Pageable pageable, boolean includeDeactivated) {
-        return specialtyRepository.findAll(
-                        SpecialtySpecification.withFilter(filter)
-                                .and(SoftDeleteSpecifications.activeUnless(includeDeactivated)),
-                        pageable)
-                .map(specialtyMapper::toDto);
+        Page<Specialty> page = specialtyRepository.findAll(
+                SpecialtySpecification.withFilter(filter)
+                        .and(SoftDeleteSpecifications.activeUnless(includeDeactivated)),
+                pageable);
+        Map<Long, Integer> commissions = commissionCounts(page.getContent(), filter, includeDeactivated);
+        Map<Long, Integer> subjects = subjectCounts(page.getContent(), filter, includeDeactivated);
+        return page.map(specialty -> SpecialtyResponseDto.withCounts(specialtyMapper.toDto(specialty),
+                commissions.getOrDefault(specialty.getId(), 0), subjects.getOrDefault(specialty.getId(), 0)));
+    }
+
+    // One grouped query per count for the whole page, so the list never costs one count per specialty.
+    private Map<Long, Integer> subjectCounts(List<Specialty> specialties, SpecialtyFilter filter,
+            boolean includeDeactivated) {
+        if (specialties.isEmpty()) {
+            return Map.of();
+        }
+        String pattern = filter.subjectName() == null ? "%" : "%" + filter.subjectName().toLowerCase() + "%";
+        return subjectRepository.countSubjectsBySpecialtyIds(
+                        specialties.stream().map(Specialty::getId).toList(), filter.subjectCode(), pattern,
+                        filter.studyPlanId(), includeDeactivated).stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> ((Long) row[1]).intValue()));
+    }
+
+    private Map<Long, Integer> commissionCounts(List<Specialty> specialties, SpecialtyFilter filter,
+            boolean includeDeactivated) {
+        if (specialties.isEmpty()) {
+            return Map.of();
+        }
+        String pattern = filter.commissionCourseCode() == null ? "%"
+                : "%" + filter.commissionCourseCode().toLowerCase() + "%";
+        return subjectCommissionRepository.countCommissionsBySpecialtyIds(
+                        specialties.stream().map(Specialty::getId).toList(), pattern,
+                        filter.commissionAcademicPeriodId(), includeDeactivated).stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> ((Long) row[1]).intValue()));
     }
 
     @Override

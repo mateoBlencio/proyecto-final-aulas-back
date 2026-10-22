@@ -32,6 +32,30 @@ public interface SubjectCommissionRepository
             """)
     List<Object[]> findSpecialtiesByCommissionIds(Collection<Long> commissionIds);
 
+    // Same criteria as GET /commissions?specialtyCode=: one row per specialty, counting each commission once
+    // even when it offers several subjects of that specialty. courseCodePattern is a lowercase LIKE pattern.
+    @Query("""
+            select sp.id, count(distinct c.id)
+            from SubjectCommission sc
+            join sc.subject s
+            join s.studyPlan p
+            join p.specialty sp
+            join sc.commission c
+            join c.academicPeriod ap
+            where sp.id in :specialtyIds
+              and sc.deletedAt is null
+              and s.deletedAt is null
+              and lower(c.courseCode) like :courseCodePattern
+              and (:academicPeriodId is null or ap.id = :academicPeriodId)
+              and (:includeDeactivated = true
+                   or (c.deletedAt is null
+                       and (c.sysacadEnabled = true or c.sysacadHash is null)
+                       and ap.deletedAt is null))
+            group by sp.id
+            """)
+    List<Object[]> countCommissionsBySpecialtyIds(Collection<Long> specialtyIds, String courseCodePattern,
+            Long academicPeriodId, boolean includeDeactivated);
+
     @Override
     @EntityGraph(attributePaths = {"commission", "commission.academicPeriod"})
     List<SubjectCommission> findAll();

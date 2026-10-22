@@ -25,6 +25,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
@@ -246,6 +249,109 @@ class AcademicSpecificationsTest {
                             .and(SoftDeleteSpecifications.activeUnless(false)),
                     Pageable.unpaged());
             assertThat(result).isEmpty();
+        }
+
+        @Test
+        void withoutSpecialtyDevuelveSoloComisionesSinMateriaActivaOfrecida() {
+            AcademicPeriod period = academicPeriodRepository.findById(period2099s1Id).orElseThrow();
+            Commission huerfana = commissionRepository.save(Commission.builder()
+                    .courseCode("ZZK3003").academicPeriod(period).sysacadEnabled(true).build());
+            Commission soloBaja = commissionRepository.save(Commission.builder()
+                    .courseCode("ZZK4004").academicPeriod(period).sysacadEnabled(true).build());
+            Subject analisis = subjectRepository.findById(analisisId).orElseThrow();
+            SubjectCommission link = subjectCommissionRepository.save(SubjectCommission.builder()
+                    .id(new SubjectCommissionId(analisisId, soloBaja.getId()))
+                    .subject(analisis).commission(soloBaja).enrolledCount(10).build());
+            subjectCommissionRepository.softDelete(link);
+
+            var result = commissionRepository.findAll(
+                    CommissionSpecification.withFilter(
+                                    new CommissionFilter(null, null, null, null, true))
+                            .and(SoftDeleteSpecifications.activeUnless(false)),
+                    Pageable.unpaged());
+
+            assertThat(result).extracting(Commission::getId)
+                    .contains(huerfana.getId(), soloBaja.getId())
+                    .doesNotContain(commissionK1Id, commissionK2Id);
+        }
+    }
+
+    @Nested
+    @DisplayName("Conteo de comisiones por especialidad")
+    class CommissionCountBySpecialty {
+        private Map<Long, Long> count(String pattern, Long periodId, boolean includeDeactivated) {
+            return subjectCommissionRepository.countCommissionsBySpecialtyIds(
+                            List.of(sistemas.getId(), civil.getId()), pattern, periodId, includeDeactivated)
+                    .stream().collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
+        }
+
+        @Test
+        void cuentaCadaComisionUnaVezAunqueOfrezcaVariasMateriasDeLaEspecialidad() {
+            Commission k1 = commissionRepository.findById(commissionK1Id).orElseThrow();
+            Subject fisica = subjectRepository.findById(fisicaId).orElseThrow();
+            subjectCommissionRepository.save(SubjectCommission.builder()
+                    .id(new SubjectCommissionId(fisicaId, commissionK1Id))
+                    .subject(fisica).commission(k1).enrolledCount(5).build());
+
+            assertThat(count("%", null, false)).containsEntry(sistemas.getId(), 2L)
+                    .doesNotContainKey(civil.getId());
+        }
+
+        @Test
+        void respetaLosFiltrosDeCursoYPeriodo() {
+            assertThat(count("%zzk10%", null, false)).containsEntry(sistemas.getId(), 1L);
+            assertThat(count("%", period2099s2Id, false)).containsEntry(sistemas.getId(), 1L);
+            assertThat(count("%zzk10%", period2099s2Id, false)).isEmpty();
+        }
+
+        @Test
+        void excluyeComisionesDadasDeBajaSalvoIncludeDeactivated() {
+            commissionRepository.softDelete(commissionRepository.findById(commissionK1Id).orElseThrow());
+
+            assertThat(count("%", null, false)).containsEntry(sistemas.getId(), 1L);
+            assertThat(count("%", null, true)).containsEntry(sistemas.getId(), 2L);
+        }
+
+        @Test
+        void ignoraMateriaComisionDadaDeBaja() {
+            subjectCommissionRepository.softDelete(subjectCommissionRepository
+                    .findById(new SubjectCommissionId(analisisId, commissionK1Id)).orElseThrow());
+
+            assertThat(count("%", null, true)).containsEntry(sistemas.getId(), 1L);
+        }
+    }
+
+    @Nested
+    @DisplayName("Conteo de materias por especialidad")
+    class SubjectCountBySpecialty {
+        private Map<Long, Long> count(Integer code, String pattern, Long planId, boolean includeDeactivated) {
+            return subjectRepository.countSubjectsBySpecialtyIds(
+                            List.of(sistemas.getId(), civil.getId()), code, pattern, planId, includeDeactivated)
+                    .stream().collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
+        }
+
+        @Test
+        void excluyeMateriasDeUnPlanDadoDeBajaSalvoIncludeDeactivated() {
+            assertThat(count(null, "%", null, false)).containsEntry(sistemas.getId(), 2L)
+                    .doesNotContainKey(civil.getId());
+            assertThat(count(null, "%", null, true)).containsEntry(sistemas.getId(), 2L)
+                    .containsEntry(civil.getId(), 1L);
+        }
+
+        @Test
+        void respetaLosFiltrosDeCodigoNombreYPlan() {
+            assertThat(count(99019, "%", null, false)).containsEntry(sistemas.getId(), 1L);
+            assertThat(count(null, "%física%", null, false)).containsEntry(sistemas.getId(), 1L);
+            assertThat(count(null, "%", plan2023Id, false)).containsEntry(sistemas.getId(), 1L);
+            assertThat(count(99019, "%", plan2023Id, false)).isEmpty();
+        }
+
+        @Test
+        void noCuentaMateriasDadasDeBajaSalvoIncludeDeactivated() {
+            subjectRepository.softDelete(subjectRepository.findById(analisisId).orElseThrow());
+
+            assertThat(count(null, "%", null, false)).containsEntry(sistemas.getId(), 1L);
+            assertThat(count(null, "%", null, true)).containsEntry(sistemas.getId(), 2L);
         }
     }
 

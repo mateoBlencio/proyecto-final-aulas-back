@@ -35,18 +35,31 @@ public class SpecialtyController {
     @Operation(summary = "Listar especialidades",
                description = "Listado paginado con filtros opcionales por código y nombre (contiene, "
                        + "case-insensitive). Con hasSubjects=true solo devuelve especialidades con alguna materia "
-                       + "vigente. Por defecto solo devuelve las activas; con includeDeactivated=true incluye también "
+                       + "vigente. Cada especialidad trae commissionCount: cantidad de comisiones con alguna materia-comisión "
+                       + "activa de esa especialidad, con los mismos criterios que GET /commissions?specialtyCode= "
+                       + "(commissionCourseCode y commissionAcademicPeriodId acotan el conteo). subjectCount: cantidad de "
+                       + "materias de la especialidad, con los mismos criterios que GET /subjects?specialtyCode= "
+                       + "(subjectCode, subjectName y studyPlanId acotan el conteo). Por defecto solo devuelve las activas; con includeDeactivated=true incluye también "
                        + "las desactivadas.")
     public ResponseEntity<Page<SpecialtyResponseDto>> findAll(
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
             @RequestParam(required = false) Integer specialtyCode,
             @RequestParam(required = false) String name,
             @RequestParam(required = false) Boolean hasSubjects,
+            @RequestParam(required = false) String commissionCourseCode,
+            @RequestParam(required = false) Long commissionAcademicPeriodId,
+            @RequestParam(required = false) Integer subjectCode,
+            @RequestParam(required = false) String subjectName,
+            @RequestParam(required = false) Long studyPlanId,
             @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
-        log.debug("GET /v1/specialties?specialtyCode={}&name={}&hasSubjects={}&includeDeactivated={}",
-                specialtyCode, name, hasSubjects, includeDeactivated);
-        return ResponseEntity.ok(
-                specialtyService.findAll(new SpecialtyFilter(specialtyCode, name, hasSubjects), pageable, includeDeactivated));
+        log.debug("GET /v1/specialties?specialtyCode={}&name={}&hasSubjects={}&commissionCourseCode={}"
+                        + "&commissionAcademicPeriodId={}&subjectCode={}&subjectName={}&studyPlanId={}"
+                        + "&includeDeactivated={}",
+                specialtyCode, name, hasSubjects, commissionCourseCode, commissionAcademicPeriodId, subjectCode,
+                subjectName, studyPlanId, includeDeactivated);
+        SpecialtyFilter filter = new SpecialtyFilter(specialtyCode, name, hasSubjects, commissionCourseCode,
+                commissionAcademicPeriodId, subjectCode, subjectName, studyPlanId);
+        return ResponseEntity.ok(specialtyService.findAll(filter, pageable, includeDeactivated));
     }
 
     @GetMapping("/{id}")

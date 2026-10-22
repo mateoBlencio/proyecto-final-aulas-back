@@ -40,6 +40,15 @@ public class CommissionSpecification {
                         .where(offeredPredicates.toArray(new Predicate[0]));
                 predicates.add(cb.exists(offered));
             }
+            if (Boolean.TRUE.equals(filter.withoutSpecialty())) {
+                Subquery<Long> offered = query.subquery(Long.class);
+                var subjectCommission = offered.from(SubjectCommission.class);
+                offered.select(subjectCommission.get("id").get("commissionId"))
+                        .where(cb.equal(subjectCommission.get("id").get("commissionId"), root.get("id")),
+                                cb.isNull(subjectCommission.get("deletedAt")),
+                                cb.isNull(subjectCommission.get("subject").get("deletedAt")));
+                predicates.add(cb.not(cb.exists(offered)));
+            }
 
             return cb.and(predicates.toArray(new Predicate[0]));
         };

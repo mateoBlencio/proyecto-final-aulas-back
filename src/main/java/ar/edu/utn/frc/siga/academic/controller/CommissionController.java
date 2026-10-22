@@ -35,7 +35,8 @@ public class CommissionController {
     @Operation(summary = "Listar comisiones",
                description = "Listado paginado con filtros opcionales por código de curso (contiene, "
                        + "case-insensitive), período académico, código de especialidad y materia (solo comisiones "
-                       + "ofrecidas por alguna materia que cumpla). Por defecto solo devuelve las activas; "
+                       + "ofrecidas por alguna materia que cumpla). Con withoutSpecialty=true devuelve solo las comisiones que no "
+                       + "ofrece ninguna materia activa. Por defecto solo devuelve las activas; "
                        + "con includeDeactivated=true incluye también las desactivadas.")
     public ResponseEntity<Page<CommissionResponseDto>> findAll(
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
@@ -43,10 +44,13 @@ public class CommissionController {
             @RequestParam(required = false) Long academicPeriodId,
             @RequestParam(required = false) Integer specialtyCode,
             @RequestParam(required = false) Long subjectId,
+            @RequestParam(required = false) Boolean withoutSpecialty,
             @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
         log.debug("GET /v1/commissions?courseCode={}&academicPeriodId={}&specialtyCode={}&subjectId={}"
-                + "&includeDeactivated={}", courseCode, academicPeriodId, specialtyCode, subjectId, includeDeactivated);
-        CommissionFilter filter = new CommissionFilter(courseCode, academicPeriodId, specialtyCode, subjectId);
+                        + "&withoutSpecialty={}&includeDeactivated={}",
+                courseCode, academicPeriodId, specialtyCode, subjectId, withoutSpecialty, includeDeactivated);
+        CommissionFilter filter = new CommissionFilter(
+                courseCode, academicPeriodId, specialtyCode, subjectId, withoutSpecialty);
         return ResponseEntity.ok(commissionService.findAll(filter, pageable, includeDeactivated));
     }
 

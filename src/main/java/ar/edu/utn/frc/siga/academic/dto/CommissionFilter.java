@@ -4,6 +4,10 @@ public record CommissionFilter(
         String courseCode,
         Long academicPeriodId,
         Integer specialtyCode,
-        Long subjectId
+        Long subjectId,
+        Boolean withoutSpecialty
 ) {
+    public CommissionFilter(String courseCode, Long academicPeriodId, Integer specialtyCode, Long subjectId) {
+        this(courseCode, academicPeriodId, specialtyCode, subjectId, null);
+    }
 }
