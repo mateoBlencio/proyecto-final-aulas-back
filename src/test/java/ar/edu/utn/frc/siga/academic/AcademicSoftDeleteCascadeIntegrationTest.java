@@ -79,7 +79,7 @@ class AcademicSoftDeleteCascadeIntegrationTest extends AbstractIntegrationTest {
     }
 
     private UnavailableReason reasonOf(Long commissionId, Long periodId) {
-        return commissionService.findAll(new CommissionFilter(null, periodId), ALL, true).getContent().stream()
+        return commissionService.findAll(new CommissionFilter(null, periodId, null, null), ALL, true).getContent().stream()
                 .filter(dto -> dto.id().equals(commissionId))
                 .findFirst().orElseThrow().unavailableReason();
     }
@@ -99,7 +99,7 @@ class AcademicSoftDeleteCascadeIntegrationTest extends AbstractIntegrationTest {
     }
 
     private List<Long> commissionIds(boolean includeDeactivated, Long periodId) {
-        return commissionService.findAll(new CommissionFilter(null, periodId), ALL, includeDeactivated)
+        return commissionService.findAll(new CommissionFilter(null, periodId, null, null), ALL, includeDeactivated)
                 .getContent().stream().map(CommissionResponseDto::id).toList();
     }
 

@@ -32,14 +32,16 @@ public class SpecialtyController {
     @GetMapping
     @Operation(summary = "Listar especialidades",
                description = "Listado paginado con filtros opcionales por código y nombre (contiene, "
-                       + "case-insensitive).")
+                       + "case-insensitive). Con hasSubjects=true solo devuelve especialidades con alguna materia "
+                       + "vigente.")
     public ResponseEntity<Page<SpecialtyResponseDto>> findAll(
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
             @RequestParam(required = false) Integer specialtyCode,
-            @RequestParam(required = false) String name) {
-        log.debug("GET /v1/specialties?specialtyCode={}&name={}", specialtyCode, name);
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) Boolean hasSubjects) {
+        log.debug("GET /v1/specialties?specialtyCode={}&name={}&hasSubjects={}", specialtyCode, name, hasSubjects);
         return ResponseEntity.ok(
-                specialtyService.findAll(new SpecialtyFilter(specialtyCode, name, null), pageable));
+                specialtyService.findAll(new SpecialtyFilter(specialtyCode, name, hasSubjects), pageable));
     }
 
     @GetMapping("/{id}")

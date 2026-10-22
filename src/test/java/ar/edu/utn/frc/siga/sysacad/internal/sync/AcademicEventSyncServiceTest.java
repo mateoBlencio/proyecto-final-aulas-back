@@ -87,7 +87,7 @@ class AcademicEventSyncServiceTest {
     }
 
     private SubjectCommissionResponseDto link(Long subjectId, Long commissionId, int enrolled) {
-        return new SubjectCommissionResponseDto(subjectId, commissionId, null, enrolled, true);
+        return new SubjectCommissionResponseDto(subjectId, null, commissionId, null, enrolled, true, true);
     }
 
     private UpsertRecurringEventResult created(long eventId) {

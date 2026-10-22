@@ -191,7 +191,7 @@ class AcademicSpecificationsTest {
         @Test
         void filtraPorCourseCodeParcial() {
             var result = commissionRepository.findAll(
-                    CommissionSpecification.withFilter(new CommissionFilter("zzk10", null))
+                    CommissionSpecification.withFilter(new CommissionFilter("zzk10", null, null, null))
                             .and(SoftDeleteSpecifications.activeUnless(false)),
                     Pageable.unpaged());
             assertThat(result).extracting(Commission::getId).containsExactly(commissionK1Id);
@@ -200,10 +200,38 @@ class AcademicSpecificationsTest {
         @Test
         void filtraPorAcademicPeriodId() {
             var result = commissionRepository.findAll(
-                    CommissionSpecification.withFilter(new CommissionFilter(null, period2099s2Id))
+                    CommissionSpecification.withFilter(new CommissionFilter(null, period2099s2Id, null, null))
                             .and(SoftDeleteSpecifications.activeUnless(false)),
                     Pageable.unpaged());
             assertThat(result).extracting(Commission::getId).containsExactly(commissionK2Id);
+        }
+
+        @Test
+        void filtraPorSpecialtyCodeViaMateriasOfrecidas() {
+            var result = commissionRepository.findAll(
+                    CommissionSpecification.withFilter(new CommissionFilter(null, null, 99017, null))
+                            .and(SoftDeleteSpecifications.activeUnless(false)),
+                    Pageable.unpaged());
+            assertThat(result).extracting(Commission::getId)
+                    .containsExactlyInAnyOrder(commissionK1Id, commissionK2Id);
+        }
+
+        @Test
+        void filtraPorSubjectId() {
+            var result = commissionRepository.findAll(
+                    CommissionSpecification.withFilter(new CommissionFilter(null, null, null, analisisId))
+                            .and(SoftDeleteSpecifications.activeUnless(false)),
+                    Pageable.unpaged());
+            assertThat(result).extracting(Commission::getId).containsExactly(commissionK1Id);
+        }
+
+        @Test
+        void specialtyCodeYSubjectIdSeCombinanConAnd() {
+            var result = commissionRepository.findAll(
+                    CommissionSpecification.withFilter(new CommissionFilter(null, null, 99005, analisisId))
+                            .and(SoftDeleteSpecifications.activeUnless(false)),
+                    Pageable.unpaged());
+            assertThat(result).isEmpty();
         }
     }
 

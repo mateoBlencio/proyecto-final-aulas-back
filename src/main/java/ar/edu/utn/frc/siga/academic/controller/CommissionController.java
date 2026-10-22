@@ -34,16 +34,19 @@ public class CommissionController {
     @GetMapping
     @Operation(summary = "Listar comisiones",
                description = "Listado paginado con filtros opcionales por código de curso (contiene, "
-                       + "case-insensitive) y período académico. Por defecto solo devuelve las activas; "
+                       + "case-insensitive), período académico, código de especialidad y materia (solo comisiones "
+                       + "ofrecidas por alguna materia que cumpla). Por defecto solo devuelve las activas; "
                        + "con includeDeactivated=true incluye también las desactivadas.")
     public ResponseEntity<Page<CommissionResponseDto>> findAll(
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
             @RequestParam(required = false) String courseCode,
             @RequestParam(required = false) Long academicPeriodId,
+            @RequestParam(required = false) Integer specialtyCode,
+            @RequestParam(required = false) Long subjectId,
             @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
-        log.debug("GET /v1/commissions?courseCode={}&academicPeriodId={}&includeDeactivated={}",
-                courseCode, academicPeriodId, includeDeactivated);
-        CommissionFilter filter = new CommissionFilter(courseCode, academicPeriodId);
+        log.debug("GET /v1/commissions?courseCode={}&academicPeriodId={}&specialtyCode={}&subjectId={}"
+                + "&includeDeactivated={}", courseCode, academicPeriodId, specialtyCode, subjectId, includeDeactivated);
+        CommissionFilter filter = new CommissionFilter(courseCode, academicPeriodId, specialtyCode, subjectId);
         return ResponseEntity.ok(commissionService.findAll(filter, pageable, includeDeactivated));
     }
 

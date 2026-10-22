@@ -152,7 +152,7 @@ class CommissionServiceImplTest {
                 .thenReturn(new PageImpl<>(List.of(commission)));
         when(commissionMapper.toDto(commission)).thenReturn(dto);
 
-        assertThat(service.findAll(new CommissionFilter(null, null), Pageable.unpaged(), false).getContent())
+        assertThat(service.findAll(new CommissionFilter(null, null, null, null), Pageable.unpaged(), false).getContent())
                 .containsExactly(dto);
     }
 
@@ -169,7 +169,7 @@ class CommissionServiceImplTest {
         when(commissionMapper.toDto(active)).thenReturn(activeDto);
         when(commissionMapper.toDto(inactive)).thenReturn(inactiveDto);
 
-        assertThat(service.findAll(new CommissionFilter(null, null), Pageable.unpaged(), true).getContent())
+        assertThat(service.findAll(new CommissionFilter(null, null, null, null), Pageable.unpaged(), true).getContent())
                 .containsExactly(activeDto, inactiveDto);
     }
 
