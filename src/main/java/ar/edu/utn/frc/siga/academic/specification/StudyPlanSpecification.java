@@ -26,12 +26,13 @@ public class StudyPlanSpecification {
             if (filter.specialtyCode() != null) {
                 predicates.add(cb.equal(root.get("specialty").get("specialtyCode"), filter.specialtyCode()));
             }
-            Predicate search = FuzzySearch.allTokens(cb, filter.q(), token -> FuzzySearch.matches(cb,
-                    FuzzySearch.text(cb, root.get("planCode"), root.get("specialty").get("name"),
-                            root.get("specialty").get("abbreviation")),
-                    token));
+            var ranks = FuzzySearch.ranks(filter.q(), token -> FuzzySearch.greatest(cb,
+                    FuzzySearch.rank(cb, FuzzySearch.text(cb, root.get("planCode")), token),
+                    FuzzySearch.rank(cb, CatalogSearch.specialtyText(cb, root.get("specialty")), token)));
+            Predicate search = FuzzySearch.matchesAll(cb, ranks);
             if (search != null) {
                 predicates.add(search);
+                FuzzySearch.orderByRelevance(query, cb, ranks, root.get("id"));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

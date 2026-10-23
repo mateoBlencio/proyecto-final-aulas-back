@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.academic.controller;
 import ar.edu.utn.frc.siga.academic.dto.StudyPlanFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.StudyPlanResponseDto;
 import ar.edu.utn.frc.siga.academic.service.StudyPlanService;
+import ar.edu.utn.frc.siga.common.search.FuzzySearch;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +46,7 @@ public class StudyPlanController {
         log.debug("GET /v1/study-plans?planCode={}&specialtyCode={}&includeDeactivated={}&q={}",
                 planCode, specialtyCode, includeDeactivated, q);
         StudyPlanFilter filter = new StudyPlanFilter(planCode, specialtyCode, q);
-        return ResponseEntity.ok(studyPlanService.findAll(filter, pageable, includeDeactivated));
+        return ResponseEntity.ok(studyPlanService.findAll(filter, FuzzySearch.relevanceUnlessSorted(pageable, q, Sort.by(Sort.Direction.ASC, "id")), includeDeactivated));
     }
 
     @GetMapping("/{id}")

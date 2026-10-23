@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.academic.controller;
 import ar.edu.utn.frc.siga.academic.dto.SpecialtyFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
 import ar.edu.utn.frc.siga.academic.service.SpecialtyService;
+import ar.edu.utn.frc.siga.common.search.FuzzySearch;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -60,7 +61,7 @@ public class SpecialtyController {
                 subjectName, studyPlanId, includeDeactivated);
         SpecialtyFilter filter = new SpecialtyFilter(specialtyCode, name, hasSubjects, commissionCourseCode,
                 commissionAcademicPeriodId, subjectCode, subjectName, studyPlanId, q);
-        return ResponseEntity.ok(specialtyService.findAll(filter, pageable, includeDeactivated));
+        return ResponseEntity.ok(specialtyService.findAll(filter, FuzzySearch.relevanceUnlessSorted(pageable, q, Sort.by(Sort.Direction.ASC, "id")), includeDeactivated));
     }
 
     @GetMapping("/{id}")

@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomListItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.search.FuzzySearch;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.space.exception.SpaceDomainException;
@@ -37,6 +38,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -169,8 +171,10 @@ public class ClassroomServiceImpl implements ClassroomService {
                 filter, pageable.getPageNumber(), pageable.getPageSize(), includeDeactivated);
         Specification<Classroom> spec = ClassroomSpecification.withFilter(filter)
                 .and(includeDeactivated ? Specification.<Classroom>unrestricted() : ClassroomSpecification.available());
-        return classroomListComposer.compose(
-                scopedClassroom.findAll(spec, Permission.CLASSROOM_READ, ClassroomListSort.apply(pageable)));
+        Pageable byRelevance = FuzzySearch.relevanceUnlessSorted(pageable, filter.q(),
+                Sort.by(Sort.Direction.ASC, "id"));
+        Pageable effective = byRelevance.getSort().isSorted() ? ClassroomListSort.apply(pageable) : byRelevance;
+        return classroomListComposer.compose(scopedClassroom.findAll(spec, Permission.CLASSROOM_READ, effective));
     }
 
     @Override

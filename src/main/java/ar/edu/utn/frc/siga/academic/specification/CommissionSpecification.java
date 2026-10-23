@@ -65,30 +65,12 @@ public class CommissionSpecification {
                                                 .get("deletedAt"))));
                 predicates.add(cb.not(cb.exists(offered)));
             }
-            Predicate search = FuzzySearch.allTokens(cb, filter.q(), token -> {
-                Subquery<Long> specialtyMatch = query.subquery(Long.class);
-                var subjectCommission = specialtyMatch.from(SubjectCommission.class);
-                var specialty = subjectCommission.get("subject").get("studyPlan").get("specialty");
-                List<Predicate> specialtyPredicates = new ArrayList<>();
-                specialtyPredicates.add(cb.equal(subjectCommission.get("id").get("commissionId"), root.get("id")));
-                specialtyPredicates.add(cb.isNull(subjectCommission.get("deletedAt")));
-                specialtyPredicates.add(cb.isNull(subjectCommission.get("subject").get("deletedAt")));
-                if (!includeDeactivated) {
-                    specialtyPredicates.add(cb.isNull(subjectCommission.get("subject").get("studyPlan").get("deletedAt")));
-                    specialtyPredicates.add(cb.isNull(specialty.get("deletedAt")));
-                }
-                specialtyPredicates.add(FuzzySearch.matches(cb, specialty.get("name"), token));
-                specialtyMatch.select(subjectCommission.get("id").get("commissionId"))
-                        .where(specialtyPredicates.toArray(new Predicate[0]));
-                var period = root.get("academicPeriod");
-                return cb.or(
-                        FuzzySearch.matches(cb,
-                                FuzzySearch.text(cb, root.get("courseCode"), period.get("year"), period.get("semester")),
-                                token),
-                        cb.exists(specialtyMatch));
-            });
+            var ranks = FuzzySearch.ranks(filter.q(), token -> CatalogSearch.commissionRank(cb, query, root,
+                    null, filter.specialtyCode(), token, includeDeactivated));
+            Predicate search = FuzzySearch.matchesAll(cb, ranks);
             if (search != null) {
                 predicates.add(search);
+                FuzzySearch.orderByRelevance(query, cb, ranks, root.get("id"));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

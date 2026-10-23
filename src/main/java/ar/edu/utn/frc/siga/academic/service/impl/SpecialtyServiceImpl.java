@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.academic.dto.SpecialtyFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SpecialtyMapper;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
+import ar.edu.utn.frc.siga.academic.repository.CommissionCountSearch;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
@@ -12,6 +13,7 @@ import ar.edu.utn.frc.siga.academic.service.command.SpecialtySyncCommand;
 import ar.edu.utn.frc.siga.academic.specification.SpecialtySpecification;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
+import ar.edu.utn.frc.siga.common.search.FuzzySearch;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import java.time.Instant;
@@ -37,12 +39,13 @@ public class SpecialtyServiceImpl implements SpecialtyService {
     private final SpecialtyRepository specialtyRepository;
     private final SubjectCommissionRepository subjectCommissionRepository;
     private final SubjectRepository subjectRepository;
+    private final CommissionCountSearch commissionCountSearch;
     private final SpecialtyMapper specialtyMapper;
 
     @Override
     public Page<SpecialtyResponseDto> findAll(SpecialtyFilter filter, Pageable pageable, boolean includeDeactivated) {
         Page<Specialty> page = specialtyRepository.findAll(
-                SpecialtySpecification.withFilter(filter)
+                SpecialtySpecification.withFilter(filter, includeDeactivated)
                         .and(SoftDeleteSpecifications.activeUnless(includeDeactivated)),
                 pageable);
         Map<Long, Integer> commissions = commissionCounts(page.getContent(), filter, includeDeactivated);
@@ -71,9 +74,13 @@ public class SpecialtyServiceImpl implements SpecialtyService {
         }
         String pattern = filter.commissionCourseCode() == null ? "%"
                 : "%" + filter.commissionCourseCode().toLowerCase() + "%";
-        return subjectCommissionRepository.countCommissionsBySpecialtyIds(
-                        specialties.stream().map(Specialty::getId).toList(), pattern,
-                        filter.commissionAcademicPeriodId(), includeDeactivated).stream()
+        List<Long> ids = specialties.stream().map(Specialty::getId).toList();
+        List<Object[]> rows = FuzzySearch.tokens(filter.q()).isEmpty()
+                ? subjectCommissionRepository.countCommissionsBySpecialtyIds(ids, pattern,
+                        filter.commissionAcademicPeriodId(), includeDeactivated)
+                : commissionCountSearch.countBySpecialtyIds(ids, pattern, filter.commissionAcademicPeriodId(),
+                        filter.q(), includeDeactivated);
+        return rows.stream()
                 .collect(Collectors.toMap(row -> (Long) row[0], row -> ((Long) row[1]).intValue()));
     }
 

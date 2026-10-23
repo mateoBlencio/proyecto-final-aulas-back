@@ -39,20 +39,19 @@ public class ClassroomSpecification {
             if (!FuzzySearch.tokens(filter.q()).isEmpty()) {
                 var building = root.join("building", JoinType.LEFT);
                 var type = root.join("classroomType", JoinType.LEFT);
-                predicates.add(FuzzySearch.allTokens(cb, filter.q(), token -> {
-                    Subquery<Long> resourceMatch = query.subquery(Long.class);
-                    var resource = resourceMatch.from(ClassroomResource.class);
-                    resourceMatch.select(resource.get("id"))
-                            .where(cb.equal(resource.get("classroom"), root),
-                                    cb.isNull(resource.get("deletedAt")),
-                                    FuzzySearch.matches(cb, resource.get("resourceType").get("name"), token));
-                    return cb.or(
-                            FuzzySearch.matches(cb,
-                                    FuzzySearch.text(cb, root.get("roomNumber"), building.get("name"),
-                                            type.get("description"), root.get("observations")),
-                                    token),
-                            cb.exists(resourceMatch));
-                }));
+                var ranks = FuzzySearch.ranks(filter.q(), token -> {
+                    Subquery<Integer> resources = FuzzySearch.subquery(query);
+                    var resource = resources.from(ClassroomResource.class);
+                    resources.where(cb.equal(resource.get("classroom"), root),
+                            cb.isNull(resource.get("deletedAt")));
+                    return FuzzySearch.greatest(cb,
+                            FuzzySearch.rank(cb, FuzzySearch.text(cb, root.get("roomNumber"), building.get("name"),
+                                    type.get("description"), root.get("observations")), token),
+                            FuzzySearch.bestOf(cb, resources,
+                                    FuzzySearch.rank(cb, resource.get("resourceType").get("name"), token)));
+                });
+                predicates.add(FuzzySearch.matchesAll(cb, ranks));
+                FuzzySearch.orderByRelevance(query, cb, ranks, root.get("id"));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

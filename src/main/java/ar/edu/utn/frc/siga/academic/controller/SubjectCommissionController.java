@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.academic.dto.SubjectCommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
+import ar.edu.utn.frc.siga.common.search.FuzzySearch;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -46,7 +47,7 @@ public class SubjectCommissionController {
         log.debug("GET /v1/subject-commissions?subjectId={}&commissionId={}&includeDeactivated={}&q={}",
                 subjectId, commissionId, includeDeactivated, q);
         SubjectCommissionFilter filter = new SubjectCommissionFilter(subjectId, commissionId, q);
-        return ResponseEntity.ok(subjectCommissionService.findAll(filter, pageable, includeDeactivated));
+        return ResponseEntity.ok(subjectCommissionService.findAll(filter, FuzzySearch.relevanceUnlessSorted(pageable, q, Sort.by(Sort.Direction.ASC, "id.subjectId")), includeDeactivated));
     }
 
     @PutMapping("/{subjectId}/{commissionId}/activation")

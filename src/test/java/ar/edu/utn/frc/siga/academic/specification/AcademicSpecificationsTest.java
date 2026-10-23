@@ -14,6 +14,7 @@ import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
+import ar.edu.utn.frc.siga.academic.repository.CommissionCountSearch;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
 import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
@@ -42,11 +43,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  * los datos que otros tests de integración dejen commiteados no afectan el resultado.
  */
 @DataJpaTest
+@org.springframework.context.annotation.Import(CommissionCountSearch.class)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("integration")
 @DisplayName("Specifications de académico contra la base")
 class AcademicSpecificationsTest {
 
+    @Autowired private CommissionCountSearch commissionCountSearch;
     @Autowired private SpecialtyRepository specialtyRepository;
     @Autowired private StudyPlanRepository studyPlanRepository;
     @Autowired private SubjectRepository subjectRepository;
@@ -557,7 +560,7 @@ class AcademicSpecificationsTest {
 
         @Test
         void comisionesBuscanPorCodigoPeriodoYNombreDeEspecialidad() {
-            assertThat(commissionIds("zzk1001", true)).contains(commissionK1Id);
+            assertThat(commissionIds("zzk1001", true)).containsExactly(commissionK1Id);
             assertThat(commissionIds("2099", true)).contains(commissionK1Id, commissionK2Id);
             assertThat(commissionIds("sistems zzk2002", true)).contains(commissionK2Id);
             assertThat(commissionIds("zz sistemas", true)).contains(commissionK1Id, commissionK2Id);
@@ -575,6 +578,82 @@ class AcademicSpecificationsTest {
         void materiaComisionBuscaPorMateriaYCodigoDeCurso() {
             assertThat(subjectCommissionIds("fisica zzk2002")).containsExactly(fisicaId);
             assertThat(subjectCommissionIds("fisica zzkabcd")).isEmpty();
+        }
+
+        @Test
+        void codigosYTokensCortosSoloCoincidenPorPalabraCompleta() {
+            assertThat(commissionIds("zzk100", true)).isEmpty();
+            assertThat(commissionIds("zzk", true)).isEmpty();
+            assertThat(commissionIds("zzk1002", true)).isEmpty();
+            assertThat(commissionIds("zzk2002", true)).containsExactly(commissionK2Id);
+        }
+
+        @Test
+        void tokenCortoDeLetrasEsPrefijoDePalabraDeDosOMasLetras() {
+            assertThat(specialtyIds("sis")).contains(sistemas.getId());
+            assertThat(specialtyIds("s")).contains(sistemas.getId());
+            assertThat(specialtyIds("stem")).contains(sistemas.getId());
+            assertThat(specialtyIds("ste")).doesNotContain(sistemas.getId());
+        }
+
+        @Test
+        void especialidadEncuentraPorMateriaYComisionDescendiente() {
+            assertThat(specialtyIds("matematico")).contains(sistemas.getId()).doesNotContain(civil.getId());
+            assertThat(specialtyIds("zzk2002")).containsExactly(sistemas.getId());
+            assertThat(specialtyIds("fisica zzk2002")).containsExactly(sistemas.getId());
+        }
+
+        @Test
+        void comisionEncuentraPorMateriaSuya() {
+            assertThat(commissionIds("analisis matematico", true)).containsExactly(commissionK1Id);
+            assertThat(commissionIds("fisica", true)).containsExactly(commissionK2Id);
+        }
+
+        @Test
+        void conEspecialidadSoloMiraLaRamaYSiLaEspecialidadCoincideIncluyeTodas() {
+            assertThat(commissionIds("fisica", 99017, true)).containsExactly(commissionK2Id);
+            assertThat(commissionIds("fisica", 99005, true)).isEmpty();
+            assertThat(commissionIds("zz sistemas", 99017, true)).containsExactlyInAnyOrder(commissionK1Id,
+                    commissionK2Id);
+            assertThat(commissionIds("zz sistemas", 99005, true)).isEmpty();
+        }
+
+        @Test
+        void materiaComisionIncluyeLosVinculosDeUnaComisionQueCoincide() {
+            assertThat(subjectCommissionIds("zzk1001")).containsExactly(analisisId);
+            assertThat(subjectCommissionIds("zzk1001 analisis")).containsExactly(analisisId);
+        }
+
+        @Test
+        void conteoDeComisionesPorEspecialidadRespetaQ() {
+            Long id = sistemas.getId();
+            assertThat(countByQ(id, "zzk1001")).isEqualTo(1);
+            assertThat(countByQ(id, "fisica")).isEqualTo(1);
+            assertThat(countByQ(id, "zz sistemas")).isEqualTo(2);
+            assertThat(countByQ(id, "zzk3003")).isZero();
+        }
+
+        @Test
+        void ordenaPorRelevanciaCuandoNoHayOrdenExplicito() {
+            Specialty parecida = specialtyRepository.save(
+                    Specialty.builder().specialtyCode(99018).name("ZZ Sistemes").build());
+            var page = specialtyRepository.findAll(SpecialtySpecification.withFilter(
+                    new SpecialtyFilter(null, null, null, null, null, null, null, null, "zz sistemas")),
+                    org.springframework.data.domain.PageRequest.of(0, 500));
+            List<Long> ids = page.stream().map(Specialty::getId).toList();
+            assertThat(ids).contains(sistemas.getId(), parecida.getId());
+            assertThat(ids.indexOf(sistemas.getId())).isLessThan(ids.indexOf(parecida.getId()));
+        }
+
+        private int countByQ(Long specialtyId, String q) {
+            var rows = commissionCountSearch.countBySpecialtyIds(List.of(specialtyId), "%", null, q, true);
+            return rows.isEmpty() ? 0 : ((Long) rows.get(0)[1]).intValue();
+        }
+
+        private List<Long> commissionIds(String q, Integer specialtyCode, boolean includeDeactivated) {
+            return commissionRepository.findAll(CommissionSpecification.withFilter(
+                    new CommissionFilter(null, null, specialtyCode, null, null, q), includeDeactivated)).stream()
+                    .map(Commission::getId).toList();
         }
 
         private List<Long> commissionIds(String q, boolean includeDeactivated) {

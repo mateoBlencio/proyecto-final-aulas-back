@@ -20,12 +20,12 @@ public class SubjectCommissionSpecification {
             if (filter.commissionId() != null) {
                 predicates.add(cb.equal(root.get("id").get("commissionId"), filter.commissionId()));
             }
-            Predicate search = FuzzySearch.allTokens(cb, filter.q(), token -> FuzzySearch.matches(cb,
-                    FuzzySearch.text(cb, root.get("subject").get("code"), root.get("subject").get("name"),
-                            root.get("commission").get("courseCode")),
-                    token));
+            var ranks = FuzzySearch.ranks(filter.q(), token -> CatalogSearch.linkRank(cb, root, token));
+            Predicate search = FuzzySearch.matchesAll(cb, ranks);
             if (search != null) {
                 predicates.add(search);
+                FuzzySearch.orderByRelevance(query, cb, ranks, root.get("id").get("subjectId"),
+                        root.get("id").get("commissionId"));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

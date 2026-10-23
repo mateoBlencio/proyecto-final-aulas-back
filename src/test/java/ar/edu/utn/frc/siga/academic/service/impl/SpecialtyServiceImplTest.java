@@ -41,12 +41,15 @@ class SpecialtyServiceImplTest {
     private SubjectRepository subjectRepository;
     @Mock
     private SpecialtyMapper specialtyMapper;
+    @Mock
+    private ar.edu.utn.frc.siga.academic.repository.CommissionCountSearch commissionCountSearch;
 
     private SpecialtyServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new SpecialtyServiceImpl(specialtyRepository, subjectCommissionRepository, subjectRepository, specialtyMapper);
+        service = new SpecialtyServiceImpl(specialtyRepository, subjectCommissionRepository, subjectRepository,
+                commissionCountSearch, specialtyMapper);
     }
 
     @Test

@@ -13,6 +13,10 @@ import org.springframework.data.jpa.domain.Specification;
 public class SpecialtySpecification {
 
     public static Specification<Specialty> withFilter(SpecialtyFilter filter) {
+        return withFilter(filter, true);
+    }
+
+    public static Specification<Specialty> withFilter(SpecialtyFilter filter, boolean includeDeactivated) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -31,11 +35,12 @@ public class SpecialtySpecification {
                                 cb.isNull(subject.get("studyPlan").get("deletedAt")));
                 predicates.add(cb.exists(subjectExists));
             }
-            Predicate search = FuzzySearch.allTokens(cb, filter.q(), token -> FuzzySearch.matches(cb,
-                    FuzzySearch.text(cb, root.get("specialtyCode"), root.get("name"), root.get("abbreviation")),
-                    token));
+            var ranks = FuzzySearch.ranks(filter.q(), token ->
+                    CatalogSearch.specialtyRank(cb, query, root, token, includeDeactivated));
+            Predicate search = FuzzySearch.matchesAll(cb, ranks);
             if (search != null) {
                 predicates.add(search);
+                FuzzySearch.orderByRelevance(query, cb, ranks, root.get("id"));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

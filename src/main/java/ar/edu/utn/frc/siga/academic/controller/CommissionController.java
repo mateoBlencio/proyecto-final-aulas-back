@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.academic.controller;
 import ar.edu.utn.frc.siga.academic.dto.CommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
+import ar.edu.utn.frc.siga.common.search.FuzzySearch;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -53,7 +54,7 @@ public class CommissionController {
                 courseCode, academicPeriodId, specialtyCode, subjectId, withoutSpecialty, includeDeactivated);
         CommissionFilter filter = new CommissionFilter(
                 courseCode, academicPeriodId, specialtyCode, subjectId, withoutSpecialty, q);
-        return ResponseEntity.ok(commissionService.findAll(filter, pageable, includeDeactivated));
+        return ResponseEntity.ok(commissionService.findAll(filter, FuzzySearch.relevanceUnlessSorted(pageable, q, Sort.by(Sort.Direction.ASC, "id")), includeDeactivated));
     }
 
     @GetMapping("/{id}")
