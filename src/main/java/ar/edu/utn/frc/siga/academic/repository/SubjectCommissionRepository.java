@@ -28,6 +28,8 @@ public interface SubjectCommissionRepository
             where sc.commission.id in :commissionIds
               and sc.deletedAt is null
               and s.deletedAt is null
+              and p.deletedAt is null
+              and sp.deletedAt is null
             order by sp.specialtyCode
             """)
     List<Object[]> findSpecialtiesByCommissionIds(Collection<Long> commissionIds);
@@ -50,7 +52,9 @@ public interface SubjectCommissionRepository
               and (:includeDeactivated = true
                    or (c.deletedAt is null
                        and (c.sysacadEnabled = true or c.sysacadHash is null)
-                       and ap.deletedAt is null))
+                       and ap.deletedAt is null
+                       and p.deletedAt is null
+                       and sp.deletedAt is null))
             group by sp.id
             """)
     List<Object[]> countCommissionsBySpecialtyIds(Collection<Long> specialtyIds, String courseCodePattern,

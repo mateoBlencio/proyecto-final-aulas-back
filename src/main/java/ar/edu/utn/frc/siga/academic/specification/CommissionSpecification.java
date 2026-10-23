@@ -12,6 +12,12 @@ import org.springframework.data.jpa.domain.Specification;
 public class CommissionSpecification {
 
     public static Specification<Commission> withFilter(CommissionFilter filter) {
+        return withFilter(filter, true);
+    }
+
+    // With includeDeactivated=false, the subjects that make a commission "offered" must also hang from an active
+    // study plan and specialty; otherwise a commission would be grouped under a specialty that is deactivated.
+    public static Specification<Commission> withFilter(CommissionFilter filter, boolean includeDeactivated) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -28,6 +34,11 @@ public class CommissionSpecification {
                 offeredPredicates.add(cb.equal(subjectCommission.get("id").get("commissionId"), root.get("id")));
                 offeredPredicates.add(cb.isNull(subjectCommission.get("deletedAt")));
                 offeredPredicates.add(cb.isNull(subjectCommission.get("subject").get("deletedAt")));
+                if (!includeDeactivated) {
+                    offeredPredicates.add(cb.isNull(subjectCommission.get("subject").get("studyPlan").get("deletedAt")));
+                    offeredPredicates.add(cb.isNull(
+                            subjectCommission.get("subject").get("studyPlan").get("specialty").get("deletedAt")));
+                }
                 if (filter.subjectId() != null) {
                     offeredPredicates.add(cb.equal(subjectCommission.get("id").get("subjectId"), filter.subjectId()));
                 }
@@ -46,7 +57,11 @@ public class CommissionSpecification {
                 offered.select(subjectCommission.get("id").get("commissionId"))
                         .where(cb.equal(subjectCommission.get("id").get("commissionId"), root.get("id")),
                                 cb.isNull(subjectCommission.get("deletedAt")),
-                                cb.isNull(subjectCommission.get("subject").get("deletedAt")));
+                                cb.isNull(subjectCommission.get("subject").get("deletedAt")),
+                                includeDeactivated ? cb.conjunction() : cb.and(
+                                        cb.isNull(subjectCommission.get("subject").get("studyPlan").get("deletedAt")),
+                                        cb.isNull(subjectCommission.get("subject").get("studyPlan").get("specialty")
+                                                .get("deletedAt"))));
                 predicates.add(cb.not(cb.exists(offered)));
             }
 

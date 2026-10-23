@@ -277,6 +277,64 @@ class AcademicSpecificationsTest {
     }
 
     @Nested
+    @DisplayName("Comisiones ofrecidas por un plan o especialidad dados de baja")
+    class CommissionOfDeactivatedChain {
+        private Long commissionOnlyInDeactivatedPlanId;
+
+        @BeforeEach
+        void linkCommissionToDeactivatedPlanSubject() {
+            Subject estatica = subjectRepository.findAll().stream()
+                    .filter(subject -> Integer.valueOf(99098).equals(subject.getCode())).findFirst().orElseThrow();
+            AcademicPeriod period = academicPeriodRepository.findById(period2099s1Id).orElseThrow();
+            Commission commission = commissionRepository.save(Commission.builder()
+                    .courseCode("ZZK5005").academicPeriod(period).sysacadEnabled(true).build());
+            subjectCommissionRepository.save(SubjectCommission.builder()
+                    .id(new SubjectCommissionId(estatica.getId(), commission.getId()))
+                    .subject(estatica).commission(commission).enrolledCount(10).build());
+            commissionOnlyInDeactivatedPlanId = commission.getId();
+        }
+
+        private List<Long> ids(CommissionFilter filter, boolean includeDeactivated) {
+            return commissionRepository.findAll(
+                            CommissionSpecification.withFilter(filter, includeDeactivated), Pageable.unpaged())
+                    .stream().map(Commission::getId).toList();
+        }
+
+        @Test
+        void elFiltroPorEspecialidadIgnoraElPlanDadoDeBajaSalvoIncludeDeactivated() {
+            var filter = new CommissionFilter(null, null, 99005, null);
+
+            assertThat(ids(filter, false)).doesNotContain(commissionOnlyInDeactivatedPlanId);
+            assertThat(ids(filter, true)).contains(commissionOnlyInDeactivatedPlanId);
+        }
+
+        @Test
+        void sinEspecialidadIncluyeLaComisionCuyoUnicoPlanEstaDadoDeBaja() {
+            var filter = new CommissionFilter(null, null, null, null, true);
+
+            assertThat(ids(filter, false)).contains(commissionOnlyInDeactivatedPlanId)
+                    .doesNotContain(commissionK1Id, commissionK2Id);
+            assertThat(ids(filter, true)).doesNotContain(commissionOnlyInDeactivatedPlanId);
+        }
+
+        @Test
+        void laComisionNoListaLaEspecialidadDelPlanDadoDeBaja() {
+            assertThat(subjectCommissionRepository.findSpecialtiesByCommissionIds(
+                    List.of(commissionOnlyInDeactivatedPlanId))).isEmpty();
+        }
+
+        @Test
+        void elConteoPorEspecialidadNoCuentaElPlanDadoDeBajaSalvoIncludeDeactivated() {
+            var civilId = List.of(civil.getId());
+
+            assertThat(subjectCommissionRepository.countCommissionsBySpecialtyIds(civilId, "%", null, false))
+                    .isEmpty();
+            assertThat(subjectCommissionRepository.countCommissionsBySpecialtyIds(civilId, "%", null, true))
+                    .singleElement().satisfies(row -> assertThat(row[1]).isEqualTo(1L));
+        }
+    }
+
+    @Nested
     @DisplayName("Conteo de comisiones por especialidad")
     class CommissionCountBySpecialty {
         private Map<Long, Long> count(String pattern, Long periodId, boolean includeDeactivated) {
