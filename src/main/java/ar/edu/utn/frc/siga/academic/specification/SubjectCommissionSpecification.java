@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.academic.specification;
 
 import ar.edu.utn.frc.siga.academic.dto.SubjectCommissionFilter;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
+import ar.edu.utn.frc.siga.common.search.FuzzySearch;
 import jakarta.persistence.criteria.Predicate;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,6 +19,13 @@ public class SubjectCommissionSpecification {
             }
             if (filter.commissionId() != null) {
                 predicates.add(cb.equal(root.get("id").get("commissionId"), filter.commissionId()));
+            }
+            Predicate search = FuzzySearch.allTokens(cb, filter.q(), token -> FuzzySearch.matches(cb,
+                    FuzzySearch.text(cb, root.get("subject").get("code"), root.get("subject").get("name"),
+                            root.get("commission").get("courseCode")),
+                    token));
+            if (search != null) {
+                predicates.add(search);
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

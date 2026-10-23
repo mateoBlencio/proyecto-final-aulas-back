@@ -37,7 +37,8 @@ public class CommissionController {
                        + "case-insensitive), período académico, código de especialidad y materia (solo comisiones "
                        + "ofrecidas por alguna materia que cumpla). Con withoutSpecialty=true devuelve solo las comisiones que no "
                        + "ofrece ninguna materia activa. Por defecto solo devuelve las activas; "
-                       + "con includeDeactivated=true incluye también las desactivadas.")
+                       + "con includeDeactivated=true incluye también las desactivadas. q: búsqueda de texto libre sobre código de curso, "
+                       + "nombre de sus especialidades, año y cuatrimestre del período.")
     public ResponseEntity<Page<CommissionResponseDto>> findAll(
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
             @RequestParam(required = false) String courseCode,
@@ -45,12 +46,13 @@ public class CommissionController {
             @RequestParam(required = false) Integer specialtyCode,
             @RequestParam(required = false) Long subjectId,
             @RequestParam(required = false) Boolean withoutSpecialty,
-            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
+            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated,
+            @RequestParam(required = false) String q) {
         log.debug("GET /v1/commissions?courseCode={}&academicPeriodId={}&specialtyCode={}&subjectId={}"
                         + "&withoutSpecialty={}&includeDeactivated={}",
                 courseCode, academicPeriodId, specialtyCode, subjectId, withoutSpecialty, includeDeactivated);
         CommissionFilter filter = new CommissionFilter(
-                courseCode, academicPeriodId, specialtyCode, subjectId, withoutSpecialty);
+                courseCode, academicPeriodId, specialtyCode, subjectId, withoutSpecialty, q);
         return ResponseEntity.ok(commissionService.findAll(filter, pageable, includeDeactivated));
     }
 

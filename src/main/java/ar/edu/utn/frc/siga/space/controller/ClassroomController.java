@@ -63,7 +63,8 @@ public class ClassroomController {
     @Operation(summary = "Listar aulas", description = "Listado paginado con filtros opcionales por número, "
             + "edificio, tipo y capacidad. Por defecto solo devuelve las aulas activas; con "
             + "includeDeactivated=true incluye también las desactivadas. notInSysacad=true devuelve solo las "
-            + "aulas que SysAcad dejó de traer.")
+            + "aulas que SysAcad dejó de traer. q: búsqueda de texto libre (sin acentos, tolera errores de tipeo) sobre número, edificio, "
+            + "tipo, observaciones y recursos.")
     public ResponseEntity<Page<ClassroomListItemDto>> findAll(
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
             @RequestParam(required = false) Integer roomNumber,
@@ -72,12 +73,13 @@ public class ClassroomController {
             @RequestParam(required = false) Integer capacityMin,
             @RequestParam(required = false) Integer capacityMax,
             @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated,
-            @RequestParam(required = false, defaultValue = "false") boolean notInSysacad) {
+            @RequestParam(required = false, defaultValue = "false") boolean notInSysacad,
+            @RequestParam(required = false) String q) {
 
-        log.debug("GET /v1/classrooms: buildingId={}, page={}, includeDeactivated={}, notInSysacad={}",
-                buildingId, pageable.getPageNumber(), includeDeactivated, notInSysacad);
+        log.debug("GET /v1/classrooms: buildingId={}, page={}, includeDeactivated={}, notInSysacad={}, q={}",
+                buildingId, pageable.getPageNumber(), includeDeactivated, notInSysacad, q);
         ClassroomFilter filter = new ClassroomFilter(roomNumber, buildingId, classroomTypeId,
-                capacityMin, capacityMax, notInSysacad);
+                capacityMin, capacityMax, notInSysacad, q);
         Page<ClassroomListItemDto> page = classroomService.findAll(filter, pageable, includeDeactivated);
         log.info("Aulas listadas: total={}", page.getTotalElements());
         return ResponseEntity.ok(page);

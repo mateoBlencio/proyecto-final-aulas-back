@@ -40,7 +40,7 @@ public class SpecialtyController {
                        + "(commissionCourseCode y commissionAcademicPeriodId acotan el conteo). subjectCount: cantidad de "
                        + "materias de la especialidad, con los mismos criterios que GET /subjects?specialtyCode= "
                        + "(subjectCode, subjectName y studyPlanId acotan el conteo). Por defecto solo devuelve las activas; con includeDeactivated=true incluye también "
-                       + "las desactivadas.")
+                       + "las desactivadas. q: búsqueda de texto libre sobre código, nombre y abreviatura (no altera los conteos).")
     public ResponseEntity<Page<SpecialtyResponseDto>> findAll(
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
             @RequestParam(required = false) Integer specialtyCode,
@@ -51,14 +51,15 @@ public class SpecialtyController {
             @RequestParam(required = false) Integer subjectCode,
             @RequestParam(required = false) String subjectName,
             @RequestParam(required = false) Long studyPlanId,
-            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
-        log.debug("GET /v1/specialties?specialtyCode={}&name={}&hasSubjects={}&commissionCourseCode={}"
+            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated,
+            @RequestParam(required = false) String q) {
+        log.debug("GET /v1/specialties?q={}&specialtyCode={}&name={}&hasSubjects={}&commissionCourseCode={}"
                         + "&commissionAcademicPeriodId={}&subjectCode={}&subjectName={}&studyPlanId={}"
                         + "&includeDeactivated={}",
-                specialtyCode, name, hasSubjects, commissionCourseCode, commissionAcademicPeriodId, subjectCode,
+                q, specialtyCode, name, hasSubjects, commissionCourseCode, commissionAcademicPeriodId, subjectCode,
                 subjectName, studyPlanId, includeDeactivated);
         SpecialtyFilter filter = new SpecialtyFilter(specialtyCode, name, hasSubjects, commissionCourseCode,
-                commissionAcademicPeriodId, subjectCode, subjectName, studyPlanId);
+                commissionAcademicPeriodId, subjectCode, subjectName, studyPlanId, q);
         return ResponseEntity.ok(specialtyService.findAll(filter, pageable, includeDeactivated));
     }
 

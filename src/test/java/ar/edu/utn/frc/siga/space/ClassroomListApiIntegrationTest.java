@@ -119,4 +119,31 @@ class ClassroomListApiIntegrationTest extends AbstractIntegrationTest {
         auxiliarMockMvc.perform(get("/v1/classrooms"))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    @DisplayName("q busca sin acentos y con errores de tipeo en observaciones y recursos, combinado con otros filtros")
+    void list_q_matchesObservationsAndResourcesTolerantly() throws Exception {
+        Building building = testData.edificio();
+        ClassroomType tipo = testData.tipoAulaPorDefecto();
+        Classroom conProyector = testData.aula(building, tipo, 50);
+        conProyector.setObservations("Ventilación deficiente");
+        classroomRepository.save(conProyector);
+        testData.recursoDeAula(conProyector, testData.tipoRecurso("Proyector", ResourceValueKind.BOOLEAN), 1);
+        Classroom otra = testData.aula(building, tipo, 40);
+
+        mockMvc.perform(get("/v1/classrooms").param("buildingId", String.valueOf(building.getId()))
+                        .param("q", "ventilacion"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(conProyector.getId().intValue()));
+        mockMvc.perform(get("/v1/classrooms").param("buildingId", String.valueOf(building.getId()))
+                        .param("q", "proyctor ventilacion"))
+                .andExpect(jsonPath("$.page.totalElements").value(1));
+        mockMvc.perform(get("/v1/classrooms").param("buildingId", String.valueOf(building.getId()))
+                        .param("q", "proyector").param("capacityMax", "45"))
+                .andExpect(jsonPath("$.page.totalElements").value(0));
+        mockMvc.perform(get("/v1/classrooms").param("buildingId", String.valueOf(building.getId()))
+                        .param("q", "  "))
+                .andExpect(jsonPath("$.page.totalElements").value(2));
+    }
 }

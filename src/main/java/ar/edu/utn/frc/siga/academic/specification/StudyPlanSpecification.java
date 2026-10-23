@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.academic.specification;
 
 import ar.edu.utn.frc.siga.academic.dto.StudyPlanFilter;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
+import ar.edu.utn.frc.siga.common.search.FuzzySearch;
 import jakarta.persistence.criteria.Predicate;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +25,13 @@ public class StudyPlanSpecification {
             }
             if (filter.specialtyCode() != null) {
                 predicates.add(cb.equal(root.get("specialty").get("specialtyCode"), filter.specialtyCode()));
+            }
+            Predicate search = FuzzySearch.allTokens(cb, filter.q(), token -> FuzzySearch.matches(cb,
+                    FuzzySearch.text(cb, root.get("planCode"), root.get("specialty").get("name"),
+                            root.get("specialty").get("abbreviation")),
+                    token));
+            if (search != null) {
+                predicates.add(search);
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

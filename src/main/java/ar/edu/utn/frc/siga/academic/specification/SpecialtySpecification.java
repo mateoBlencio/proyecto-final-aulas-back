@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.academic.specification;
 import ar.edu.utn.frc.siga.academic.dto.SpecialtyFilter;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.Subject;
+import ar.edu.utn.frc.siga.common.search.FuzzySearch;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Subquery;
 import java.util.ArrayList;
@@ -29,6 +30,12 @@ public class SpecialtySpecification {
                                 cb.isNull(subject.get("deletedAt")),
                                 cb.isNull(subject.get("studyPlan").get("deletedAt")));
                 predicates.add(cb.exists(subjectExists));
+            }
+            Predicate search = FuzzySearch.allTokens(cb, filter.q(), token -> FuzzySearch.matches(cb,
+                    FuzzySearch.text(cb, root.get("specialtyCode"), root.get("name"), root.get("abbreviation")),
+                    token));
+            if (search != null) {
+                predicates.add(search);
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

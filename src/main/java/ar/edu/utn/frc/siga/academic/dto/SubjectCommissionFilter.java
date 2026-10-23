@@ -5,6 +5,10 @@ import org.springframework.modulith.NamedInterface;
 @NamedInterface("api")
 public record SubjectCommissionFilter(
         Long subjectId,
-        Long commissionId
+        Long commissionId,
+        String q
 ) {
+    public SubjectCommissionFilter(Long subjectId, Long commissionId) {
+        this(subjectId, commissionId, null);
+    }
 }

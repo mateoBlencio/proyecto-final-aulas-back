@@ -36,15 +36,16 @@ public class SubjectCommissionController {
     @Operation(summary = "Listar materia-comisión",
                description = "Listado paginado con filtros opcionales por materia y comisión. "
                        + "Por defecto solo devuelve los vínculos activos; con includeDeactivated=true "
-                       + "incluye también los desactivados.")
+                       + "incluye también los desactivados. q: búsqueda de texto libre sobre código y nombre de la materia y código de curso.")
     public ResponseEntity<Page<SubjectCommissionResponseDto>> findAll(
             @PageableDefault(size = 20, sort = "id.subjectId", direction = Sort.Direction.ASC) Pageable pageable,
             @RequestParam(required = false) Long subjectId,
             @RequestParam(required = false) Long commissionId,
-            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
-        log.debug("GET /v1/subject-commissions?subjectId={}&commissionId={}&includeDeactivated={}",
-                subjectId, commissionId, includeDeactivated);
-        SubjectCommissionFilter filter = new SubjectCommissionFilter(subjectId, commissionId);
+            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated,
+            @RequestParam(required = false) String q) {
+        log.debug("GET /v1/subject-commissions?subjectId={}&commissionId={}&includeDeactivated={}&q={}",
+                subjectId, commissionId, includeDeactivated, q);
+        SubjectCommissionFilter filter = new SubjectCommissionFilter(subjectId, commissionId, q);
         return ResponseEntity.ok(subjectCommissionService.findAll(filter, pageable, includeDeactivated));
     }
 
