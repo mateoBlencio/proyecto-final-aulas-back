@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.academic.dto.SubjectCommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
+import ar.edu.utn.frc.siga.common.search.FuzzySearch;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -36,16 +37,17 @@ public class SubjectCommissionController {
     @Operation(summary = "Listar materia-comisión",
                description = "Listado paginado con filtros opcionales por materia y comisión. "
                        + "Por defecto solo devuelve los vínculos activos; con includeDeactivated=true "
-                       + "incluye también los desactivados.")
+                       + "incluye también los desactivados. q: búsqueda de texto libre sobre código y nombre de la materia y código de curso.")
     public ResponseEntity<Page<SubjectCommissionResponseDto>> findAll(
             @PageableDefault(size = 20, sort = "id.subjectId", direction = Sort.Direction.ASC) Pageable pageable,
             @RequestParam(required = false) Long subjectId,
             @RequestParam(required = false) Long commissionId,
-            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
-        log.debug("GET /v1/subject-commissions?subjectId={}&commissionId={}&includeDeactivated={}",
-                subjectId, commissionId, includeDeactivated);
-        SubjectCommissionFilter filter = new SubjectCommissionFilter(subjectId, commissionId);
-        return ResponseEntity.ok(subjectCommissionService.findAll(filter, pageable, includeDeactivated));
+            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated,
+            @RequestParam(required = false) String q) {
+        log.debug("GET /v1/subject-commissions?subjectId={}&commissionId={}&includeDeactivated={}&q={}",
+                subjectId, commissionId, includeDeactivated, q);
+        SubjectCommissionFilter filter = new SubjectCommissionFilter(subjectId, commissionId, q);
+        return ResponseEntity.ok(subjectCommissionService.findAll(filter, FuzzySearch.relevanceUnlessSorted(pageable, q, Sort.by(Sort.Direction.ASC, "id.subjectId")), includeDeactivated));
     }
 
     @PutMapping("/{subjectId}/{commissionId}/activation")

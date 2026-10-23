@@ -5,6 +5,8 @@ import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SpecialtyMapper;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
+import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
+import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.academic.service.command.SpecialtySyncCommand;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,13 +36,20 @@ class SpecialtyServiceImplTest {
     @Mock
     private SpecialtyRepository specialtyRepository;
     @Mock
+    private SubjectCommissionRepository subjectCommissionRepository;
+    @Mock
+    private SubjectRepository subjectRepository;
+    @Mock
     private SpecialtyMapper specialtyMapper;
+    @Mock
+    private ar.edu.utn.frc.siga.academic.repository.CommissionCountSearch commissionCountSearch;
 
     private SpecialtyServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new SpecialtyServiceImpl(specialtyRepository, specialtyMapper);
+        service = new SpecialtyServiceImpl(specialtyRepository, subjectCommissionRepository, subjectRepository,
+                commissionCountSearch, specialtyMapper);
     }
 
     @Test
@@ -51,11 +60,34 @@ class SpecialtyServiceImplTest {
         when(specialtyRepository.findAll(any(Specification.class), any(PageRequest.class)))
                 .thenReturn(new PageImpl<>(List.of(specialty)));
         when(specialtyMapper.toDto(specialty)).thenReturn(dto);
+        when(subjectCommissionRepository.countCommissionsBySpecialtyIds(List.of(1L), "%", null, false))
+                .thenReturn(List.<Object[]>of(new Object[] {1L, 3L}));
+        when(subjectRepository.countSubjectsBySpecialtyIds(List.of(1L), null, "%", null, false))
+                .thenReturn(List.<Object[]>of(new Object[] {1L, 7L}));
 
         var result = service.findAll(new SpecialtyFilter(17, null, null), PageRequest.of(0, 20), false);
 
-        assertThat(result.getContent()).containsExactly(dto);
+        assertThat(result.getContent()).containsExactly(SpecialtyResponseDto.withCounts(dto, 3, 7));
         assertThat(result.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("findAll: una especialidad sin comisiones ni materias cuenta 0 y los patrones van en minúsculas")
+    void findAllDefaultsCountToZeroAndLowercasesCourseCode() {
+        Specialty specialty = Specialty.builder().id(1L).specialtyCode(17).name("Sistemas").build();
+        SpecialtyResponseDto dto = new SpecialtyResponseDto(17, "Sistemas", null);
+        when(specialtyRepository.findAll(any(Specification.class), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(specialty)));
+        when(specialtyMapper.toDto(specialty)).thenReturn(dto);
+        when(subjectCommissionRepository.countCommissionsBySpecialtyIds(List.of(1L), "%k10%", 5L, true))
+                .thenReturn(List.of());
+        when(subjectRepository.countSubjectsBySpecialtyIds(List.of(1L), 19, "%análisis%", 4L, true))
+                .thenReturn(List.of());
+
+        var result = service.findAll(new SpecialtyFilter(null, null, null, "K10", 5L, 19, "Análisis", 4L),
+                PageRequest.of(0, 20), true);
+
+        assertThat(result.getContent()).containsExactly(SpecialtyResponseDto.withCounts(dto, 0, 0));
     }
 
     @Test

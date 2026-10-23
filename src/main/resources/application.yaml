@@ -204,7 +204,7 @@ siga:
     window-minutes: 15
   ratelimit:
     general:
-      capacity: 100
+      capacity: 600
       refill-period-seconds: 60
   sysacad:
     enabled: ${SYSACAD_ENABLED}

@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.academic.controller;
 import ar.edu.utn.frc.siga.academic.dto.CommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
+import ar.edu.utn.frc.siga.common.search.FuzzySearch;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -35,19 +36,25 @@ public class CommissionController {
     @Operation(summary = "Listar comisiones",
                description = "Listado paginado con filtros opcionales por código de curso (contiene, "
                        + "case-insensitive), período académico, código de especialidad y materia (solo comisiones "
-                       + "ofrecidas por alguna materia que cumpla). Por defecto solo devuelve las activas; "
-                       + "con includeDeactivated=true incluye también las desactivadas.")
+                       + "ofrecidas por alguna materia que cumpla). Con withoutSpecialty=true devuelve solo las comisiones que no "
+                       + "ofrece ninguna materia activa. Por defecto solo devuelve las activas; "
+                       + "con includeDeactivated=true incluye también las desactivadas. q: búsqueda de texto libre sobre código de curso, "
+                       + "nombre de sus especialidades, año y cuatrimestre del período.")
     public ResponseEntity<Page<CommissionResponseDto>> findAll(
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
             @RequestParam(required = false) String courseCode,
             @RequestParam(required = false) Long academicPeriodId,
             @RequestParam(required = false) Integer specialtyCode,
             @RequestParam(required = false) Long subjectId,
-            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
+            @RequestParam(required = false) Boolean withoutSpecialty,
+            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated,
+            @RequestParam(required = false) String q) {
         log.debug("GET /v1/commissions?courseCode={}&academicPeriodId={}&specialtyCode={}&subjectId={}"
-                + "&includeDeactivated={}", courseCode, academicPeriodId, specialtyCode, subjectId, includeDeactivated);
-        CommissionFilter filter = new CommissionFilter(courseCode, academicPeriodId, specialtyCode, subjectId);
-        return ResponseEntity.ok(commissionService.findAll(filter, pageable, includeDeactivated));
+                        + "&withoutSpecialty={}&includeDeactivated={}",
+                courseCode, academicPeriodId, specialtyCode, subjectId, withoutSpecialty, includeDeactivated);
+        CommissionFilter filter = new CommissionFilter(
+                courseCode, academicPeriodId, specialtyCode, subjectId, withoutSpecialty, q);
+        return ResponseEntity.ok(commissionService.findAll(filter, FuzzySearch.relevanceUnlessSorted(pageable, q, Sort.by(Sort.Direction.ASC, "id")), includeDeactivated));
     }
 
     @GetMapping("/{id}")

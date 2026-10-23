@@ -14,6 +14,7 @@ import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
+import ar.edu.utn.frc.siga.academic.repository.CommissionCountSearch;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
 import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
@@ -25,6 +26,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
@@ -39,11 +43,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  * los datos que otros tests de integración dejen commiteados no afectan el resultado.
  */
 @DataJpaTest
+@org.springframework.context.annotation.Import(CommissionCountSearch.class)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("integration")
 @DisplayName("Specifications de académico contra la base")
 class AcademicSpecificationsTest {
 
+    @Autowired private CommissionCountSearch commissionCountSearch;
     @Autowired private SpecialtyRepository specialtyRepository;
     @Autowired private StudyPlanRepository studyPlanRepository;
     @Autowired private SubjectRepository subjectRepository;
@@ -247,6 +253,167 @@ class AcademicSpecificationsTest {
                     Pageable.unpaged());
             assertThat(result).isEmpty();
         }
+
+        @Test
+        void withoutSpecialtyDevuelveSoloComisionesSinMateriaActivaOfrecida() {
+            AcademicPeriod period = academicPeriodRepository.findById(period2099s1Id).orElseThrow();
+            Commission huerfana = commissionRepository.save(Commission.builder()
+                    .courseCode("ZZK3003").academicPeriod(period).sysacadEnabled(true).build());
+            Commission soloBaja = commissionRepository.save(Commission.builder()
+                    .courseCode("ZZK4004").academicPeriod(period).sysacadEnabled(true).build());
+            Subject analisis = subjectRepository.findById(analisisId).orElseThrow();
+            SubjectCommission link = subjectCommissionRepository.save(SubjectCommission.builder()
+                    .id(new SubjectCommissionId(analisisId, soloBaja.getId()))
+                    .subject(analisis).commission(soloBaja).enrolledCount(10).build());
+            subjectCommissionRepository.softDelete(link);
+
+            var result = commissionRepository.findAll(
+                    CommissionSpecification.withFilter(
+                                    new CommissionFilter(null, null, null, null, true))
+                            .and(SoftDeleteSpecifications.activeUnless(false)),
+                    Pageable.unpaged());
+
+            assertThat(result).extracting(Commission::getId)
+                    .contains(huerfana.getId(), soloBaja.getId())
+                    .doesNotContain(commissionK1Id, commissionK2Id);
+        }
+    }
+
+    @Nested
+    @DisplayName("Comisiones ofrecidas por un plan o especialidad dados de baja")
+    class CommissionOfDeactivatedChain {
+        private Long commissionOnlyInDeactivatedPlanId;
+
+        @BeforeEach
+        void linkCommissionToDeactivatedPlanSubject() {
+            Subject estatica = subjectRepository.findAll().stream()
+                    .filter(subject -> Integer.valueOf(99098).equals(subject.getCode())).findFirst().orElseThrow();
+            AcademicPeriod period = academicPeriodRepository.findById(period2099s1Id).orElseThrow();
+            Commission commission = commissionRepository.save(Commission.builder()
+                    .courseCode("ZZK5005").academicPeriod(period).sysacadEnabled(true).build());
+            subjectCommissionRepository.save(SubjectCommission.builder()
+                    .id(new SubjectCommissionId(estatica.getId(), commission.getId()))
+                    .subject(estatica).commission(commission).enrolledCount(10).build());
+            commissionOnlyInDeactivatedPlanId = commission.getId();
+        }
+
+        private List<Long> ids(CommissionFilter filter, boolean includeDeactivated) {
+            return commissionRepository.findAll(
+                            CommissionSpecification.withFilter(filter, includeDeactivated), Pageable.unpaged())
+                    .stream().map(Commission::getId).toList();
+        }
+
+        @Test
+        void elFiltroPorEspecialidadIgnoraElPlanDadoDeBajaSalvoIncludeDeactivated() {
+            var filter = new CommissionFilter(null, null, 99005, null);
+
+            assertThat(ids(filter, false)).doesNotContain(commissionOnlyInDeactivatedPlanId);
+            assertThat(ids(filter, true)).contains(commissionOnlyInDeactivatedPlanId);
+        }
+
+        @Test
+        void sinEspecialidadIncluyeLaComisionCuyoUnicoPlanEstaDadoDeBaja() {
+            var filter = new CommissionFilter(null, null, null, null, true);
+
+            assertThat(ids(filter, false)).contains(commissionOnlyInDeactivatedPlanId)
+                    .doesNotContain(commissionK1Id, commissionK2Id);
+            assertThat(ids(filter, true)).doesNotContain(commissionOnlyInDeactivatedPlanId);
+        }
+
+        @Test
+        void laComisionNoListaLaEspecialidadDelPlanDadoDeBaja() {
+            assertThat(subjectCommissionRepository.findSpecialtiesByCommissionIds(
+                    List.of(commissionOnlyInDeactivatedPlanId))).isEmpty();
+        }
+
+        @Test
+        void elConteoPorEspecialidadNoCuentaElPlanDadoDeBajaSalvoIncludeDeactivated() {
+            var civilId = List.of(civil.getId());
+
+            assertThat(subjectCommissionRepository.countCommissionsBySpecialtyIds(civilId, "%", null, false))
+                    .isEmpty();
+            assertThat(subjectCommissionRepository.countCommissionsBySpecialtyIds(civilId, "%", null, true))
+                    .singleElement().satisfies(row -> assertThat(row[1]).isEqualTo(1L));
+        }
+    }
+
+    @Nested
+    @DisplayName("Conteo de comisiones por especialidad")
+    class CommissionCountBySpecialty {
+        private Map<Long, Long> count(String pattern, Long periodId, boolean includeDeactivated) {
+            return subjectCommissionRepository.countCommissionsBySpecialtyIds(
+                            List.of(sistemas.getId(), civil.getId()), pattern, periodId, includeDeactivated)
+                    .stream().collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
+        }
+
+        @Test
+        void cuentaCadaComisionUnaVezAunqueOfrezcaVariasMateriasDeLaEspecialidad() {
+            Commission k1 = commissionRepository.findById(commissionK1Id).orElseThrow();
+            Subject fisica = subjectRepository.findById(fisicaId).orElseThrow();
+            subjectCommissionRepository.save(SubjectCommission.builder()
+                    .id(new SubjectCommissionId(fisicaId, commissionK1Id))
+                    .subject(fisica).commission(k1).enrolledCount(5).build());
+
+            assertThat(count("%", null, false)).containsEntry(sistemas.getId(), 2L)
+                    .doesNotContainKey(civil.getId());
+        }
+
+        @Test
+        void respetaLosFiltrosDeCursoYPeriodo() {
+            assertThat(count("%zzk10%", null, false)).containsEntry(sistemas.getId(), 1L);
+            assertThat(count("%", period2099s2Id, false)).containsEntry(sistemas.getId(), 1L);
+            assertThat(count("%zzk10%", period2099s2Id, false)).isEmpty();
+        }
+
+        @Test
+        void excluyeComisionesDadasDeBajaSalvoIncludeDeactivated() {
+            commissionRepository.softDelete(commissionRepository.findById(commissionK1Id).orElseThrow());
+
+            assertThat(count("%", null, false)).containsEntry(sistemas.getId(), 1L);
+            assertThat(count("%", null, true)).containsEntry(sistemas.getId(), 2L);
+        }
+
+        @Test
+        void ignoraMateriaComisionDadaDeBaja() {
+            subjectCommissionRepository.softDelete(subjectCommissionRepository
+                    .findById(new SubjectCommissionId(analisisId, commissionK1Id)).orElseThrow());
+
+            assertThat(count("%", null, true)).containsEntry(sistemas.getId(), 1L);
+        }
+    }
+
+    @Nested
+    @DisplayName("Conteo de materias por especialidad")
+    class SubjectCountBySpecialty {
+        private Map<Long, Long> count(Integer code, String pattern, Long planId, boolean includeDeactivated) {
+            return subjectRepository.countSubjectsBySpecialtyIds(
+                            List.of(sistemas.getId(), civil.getId()), code, pattern, planId, includeDeactivated)
+                    .stream().collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
+        }
+
+        @Test
+        void excluyeMateriasDeUnPlanDadoDeBajaSalvoIncludeDeactivated() {
+            assertThat(count(null, "%", null, false)).containsEntry(sistemas.getId(), 2L)
+                    .doesNotContainKey(civil.getId());
+            assertThat(count(null, "%", null, true)).containsEntry(sistemas.getId(), 2L)
+                    .containsEntry(civil.getId(), 1L);
+        }
+
+        @Test
+        void respetaLosFiltrosDeCodigoNombreYPlan() {
+            assertThat(count(99019, "%", null, false)).containsEntry(sistemas.getId(), 1L);
+            assertThat(count(null, "%física%", null, false)).containsEntry(sistemas.getId(), 1L);
+            assertThat(count(null, "%", plan2023Id, false)).containsEntry(sistemas.getId(), 1L);
+            assertThat(count(99019, "%", plan2023Id, false)).isEmpty();
+        }
+
+        @Test
+        void noCuentaMateriasDadasDeBajaSalvoIncludeDeactivated() {
+            subjectRepository.softDelete(subjectRepository.findById(analisisId).orElseThrow());
+
+            assertThat(count(null, "%", null, false)).containsEntry(sistemas.getId(), 1L);
+            assertThat(count(null, "%", null, true)).containsEntry(sistemas.getId(), 2L);
+        }
     }
 
     @Nested
@@ -338,6 +505,167 @@ class AcademicSpecificationsTest {
             assertThat(result).extracting(Specialty::getId)
                     .contains(sistemas.getId())
                     .doesNotContain(civil.getId());
+        }
+    }
+
+    @Nested
+    @DisplayName("Búsqueda q")
+    class FreeTextSearch {
+
+        private List<Long> specialtyIds(String q) {
+            return specialtyRepository.findAll(SpecialtySpecification.withFilter(
+                    new SpecialtyFilter(null, null, null, null, null, null, null, null, q))).stream()
+                    .map(Specialty::getId).toList();
+        }
+
+        @Test
+        void ignoraAcentosYMayusculas() {
+            assertThat(specialtyIds("ZZ SISTEMAS")).containsExactly(sistemas.getId());
+            assertThat(subjectCommissionIds("analisis matematico")).containsExactly(analisisId);
+        }
+
+        @Test
+        void toleraErroresDeTipeoSegunLargoDelTermino() {
+            assertThat(specialtyIds("sistems")).contains(sistemas.getId());
+            assertThat(specialtyIds("sistmas")).contains(sistemas.getId());
+            assertThat(specialtyIds("civl")).contains(civil.getId());
+            assertThat(specialtyIds("sixtemax")).contains(sistemas.getId());
+            assertThat(specialtyIds("sixtemas")).contains(sistemas.getId());
+            assertThat(specialtyIds("sxxtemas")).contains(sistemas.getId());
+            assertThat(specialtyIds("sxxxemas")).doesNotContain(sistemas.getId());
+            assertThat(specialtyIds("civx")).doesNotContain(civil.getId());
+        }
+
+        @Test
+        void todosLosTokensDebenCoincidir() {
+            assertThat(specialtyIds("zz sistemas")).containsExactly(sistemas.getId());
+            assertThat(specialtyIds("sistemas civil")).isEmpty();
+        }
+
+        @Test
+        void qVacioONuloNoFiltra() {
+            assertThat(specialtyIds(null)).contains(sistemas.getId(), civil.getId());
+            assertThat(specialtyIds("  ")).contains(sistemas.getId(), civil.getId());
+        }
+
+        @Test
+        void planesBuscanPorCodigoYEspecialidad() {
+            var porCodigo = studyPlanRepository.findAll(StudyPlanSpecification.withFilter(
+                    new StudyPlanFilter(null, null, "99023")), Pageable.unpaged());
+            var porEspecialidad = studyPlanRepository.findAll(StudyPlanSpecification.withFilter(
+                    new StudyPlanFilter(null, null, "sistems 99008")), Pageable.unpaged());
+            assertThat(porCodigo).extracting(StudyPlan::getId).containsExactly(plan2023Id);
+            assertThat(porEspecialidad).extracting(StudyPlan::getId).containsExactly(plan2008Id);
+        }
+
+        @Test
+        void comisionesBuscanPorCodigoPeriodoYNombreDeEspecialidad() {
+            assertThat(commissionIds("zzk1001", true)).containsExactly(commissionK1Id);
+            assertThat(commissionIds("2099", true)).contains(commissionK1Id, commissionK2Id);
+            assertThat(commissionIds("sistems zzk2002", true)).contains(commissionK2Id);
+            assertThat(commissionIds("zz sistemas", true)).contains(commissionK1Id, commissionK2Id);
+        }
+
+        @Test
+        void comisionesNoMatcheanEspecialidadDadaDeBajaSinIncludeDeactivated() {
+            sistemas.deactivate();
+            specialtyRepository.save(sistemas);
+            assertThat(commissionIds("sistemas", false)).doesNotContain(commissionK1Id, commissionK2Id);
+            assertThat(commissionIds("sistemas", true)).contains(commissionK1Id, commissionK2Id);
+        }
+
+        @Test
+        void materiaComisionBuscaPorMateriaYCodigoDeCurso() {
+            assertThat(subjectCommissionIds("fisica zzk2002")).containsExactly(fisicaId);
+            assertThat(subjectCommissionIds("fisica zzkabcd")).isEmpty();
+        }
+
+        @Test
+        void codigosYTokensCortosSoloCoincidenPorPalabraCompleta() {
+            assertThat(commissionIds("zzk100", true)).isEmpty();
+            assertThat(commissionIds("zzk", true)).isEmpty();
+            assertThat(commissionIds("zzk1002", true)).isEmpty();
+            assertThat(commissionIds("zzk2002", true)).containsExactly(commissionK2Id);
+        }
+
+        @Test
+        void tokenCortoDeLetrasEsPrefijoDePalabraDeDosOMasLetras() {
+            assertThat(specialtyIds("sis")).contains(sistemas.getId());
+            assertThat(specialtyIds("s")).contains(sistemas.getId());
+            assertThat(specialtyIds("stem")).contains(sistemas.getId());
+            assertThat(specialtyIds("ste")).doesNotContain(sistemas.getId());
+        }
+
+        @Test
+        void especialidadEncuentraPorMateriaYComisionDescendiente() {
+            assertThat(specialtyIds("matematico")).contains(sistemas.getId()).doesNotContain(civil.getId());
+            assertThat(specialtyIds("zzk2002")).containsExactly(sistemas.getId());
+            assertThat(specialtyIds("fisica zzk2002")).containsExactly(sistemas.getId());
+        }
+
+        @Test
+        void comisionEncuentraPorMateriaSuya() {
+            assertThat(commissionIds("analisis matematico", true)).containsExactly(commissionK1Id);
+            assertThat(commissionIds("fisica", true)).containsExactly(commissionK2Id);
+        }
+
+        @Test
+        void conEspecialidadSoloMiraLaRamaYSiLaEspecialidadCoincideIncluyeTodas() {
+            assertThat(commissionIds("fisica", 99017, true)).containsExactly(commissionK2Id);
+            assertThat(commissionIds("fisica", 99005, true)).isEmpty();
+            assertThat(commissionIds("zz sistemas", 99017, true)).containsExactlyInAnyOrder(commissionK1Id,
+                    commissionK2Id);
+            assertThat(commissionIds("zz sistemas", 99005, true)).isEmpty();
+        }
+
+        @Test
+        void materiaComisionIncluyeLosVinculosDeUnaComisionQueCoincide() {
+            assertThat(subjectCommissionIds("zzk1001")).containsExactly(analisisId);
+            assertThat(subjectCommissionIds("zzk1001 analisis")).containsExactly(analisisId);
+        }
+
+        @Test
+        void conteoDeComisionesPorEspecialidadRespetaQ() {
+            Long id = sistemas.getId();
+            assertThat(countByQ(id, "zzk1001")).isEqualTo(1);
+            assertThat(countByQ(id, "fisica")).isEqualTo(1);
+            assertThat(countByQ(id, "zz sistemas")).isEqualTo(2);
+            assertThat(countByQ(id, "zzk3003")).isZero();
+        }
+
+        @Test
+        void ordenaPorRelevanciaCuandoNoHayOrdenExplicito() {
+            Specialty parecida = specialtyRepository.save(
+                    Specialty.builder().specialtyCode(99018).name("ZZ Sistemes").build());
+            var page = specialtyRepository.findAll(SpecialtySpecification.withFilter(
+                    new SpecialtyFilter(null, null, null, null, null, null, null, null, "zz sistemas")),
+                    org.springframework.data.domain.PageRequest.of(0, 500));
+            List<Long> ids = page.stream().map(Specialty::getId).toList();
+            assertThat(ids).contains(sistemas.getId(), parecida.getId());
+            assertThat(ids.indexOf(sistemas.getId())).isLessThan(ids.indexOf(parecida.getId()));
+        }
+
+        private int countByQ(Long specialtyId, String q) {
+            var rows = commissionCountSearch.countBySpecialtyIds(List.of(specialtyId), "%", null, q, true);
+            return rows.isEmpty() ? 0 : ((Long) rows.get(0)[1]).intValue();
+        }
+
+        private List<Long> commissionIds(String q, Integer specialtyCode, boolean includeDeactivated) {
+            return commissionRepository.findAll(CommissionSpecification.withFilter(
+                    new CommissionFilter(null, null, specialtyCode, null, null, q), includeDeactivated)).stream()
+                    .map(Commission::getId).toList();
+        }
+
+        private List<Long> commissionIds(String q, boolean includeDeactivated) {
+            return commissionRepository.findAll(CommissionSpecification.withFilter(
+                    new CommissionFilter(null, null, null, null, null, q), includeDeactivated)).stream()
+                    .map(Commission::getId).toList();
+        }
+
+        private List<Long> subjectCommissionIds(String q) {
+            return subjectCommissionRepository.findAll(SubjectCommissionSpecification.withFilter(
+                    new SubjectCommissionFilter(null, null, q))).stream()
+                    .map(sc -> sc.getId().getSubjectId()).toList();
         }
     }
 }

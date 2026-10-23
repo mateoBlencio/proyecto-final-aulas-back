@@ -95,7 +95,7 @@ public class CommissionServiceImpl implements CommissionService {
     @Override
     public Page<CommissionResponseDto> findAll(CommissionFilter filter, Pageable pageable, boolean includeDeactivated) {
         Page<Commission> page = commissionRepository.findAll(
-                CommissionSpecification.withFilter(filter)
+                CommissionSpecification.withFilter(filter, includeDeactivated)
                         .and(includeDeactivated ? Specification.<Commission>unrestricted() : CommissionSpecification.available()),
                 pageable);
         Iterator<CommissionResponseDto> enriched = withSpecialties(page.getContent()).iterator();

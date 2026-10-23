@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.academic.controller;
 import ar.edu.utn.frc.siga.academic.dto.StudyPlanFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.StudyPlanResponseDto;
 import ar.edu.utn.frc.siga.academic.service.StudyPlanService;
+import ar.edu.utn.frc.siga.common.search.FuzzySearch;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -35,16 +36,17 @@ public class StudyPlanController {
     @Operation(summary = "Listar planes de estudio",
                description = "Listado paginado con filtros opcionales por código de plan y de especialidad. "
                        + "Por defecto solo devuelve los activos; con includeDeactivated=true incluye "
-                       + "también los desactivados.")
+                       + "también los desactivados. q: búsqueda de texto libre sobre código de plan y nombre y abreviatura de la especialidad.")
     public ResponseEntity<Page<StudyPlanResponseDto>> findAll(
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
             @RequestParam(required = false) Integer planCode,
             @RequestParam(required = false) Integer specialtyCode,
-            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
-        log.debug("GET /v1/study-plans?planCode={}&specialtyCode={}&includeDeactivated={}",
-                planCode, specialtyCode, includeDeactivated);
-        StudyPlanFilter filter = new StudyPlanFilter(planCode, specialtyCode);
-        return ResponseEntity.ok(studyPlanService.findAll(filter, pageable, includeDeactivated));
+            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated,
+            @RequestParam(required = false) String q) {
+        log.debug("GET /v1/study-plans?planCode={}&specialtyCode={}&includeDeactivated={}&q={}",
+                planCode, specialtyCode, includeDeactivated, q);
+        StudyPlanFilter filter = new StudyPlanFilter(planCode, specialtyCode, q);
+        return ResponseEntity.ok(studyPlanService.findAll(filter, FuzzySearch.relevanceUnlessSorted(pageable, q, Sort.by(Sort.Direction.ASC, "id")), includeDeactivated));
     }
 
     @GetMapping("/{id}")
