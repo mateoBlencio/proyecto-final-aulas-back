@@ -42,6 +42,8 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.entry;
 import static org.junit.jupiter.api.Named.named;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
@@ -342,6 +344,91 @@ class HttpCameraCountClientTest {
 
         assertThat(client.health()).isEqualTo(new CameraCountHealthResponseDto(true, "yolo", "0.1.0"));
         server.verify();
+    }
+
+    @Test
+    @DisplayName("503 por plazo cortado (mismo body y Retry-After que la saturación): Unavailable con Retry-After=10")
+    void deadlineCutIsRetryableUnavailable() {
+        expectCount(withStatus(HttpStatus.SERVICE_UNAVAILABLE).headers(retryAfter("10"))
+                .contentType(MediaType.APPLICATION_JSON).body(SATURATED));
+
+        assertThatThrownBy(() -> client.count(RTSP, 5, "ocurrencia-4521"))
+                .isInstanceOfSatisfying(CameraCountUnavailableException.class,
+                        e -> assertThat(e.getHeaders()).containsExactly(entry("Retry-After", "10")));
+    }
+
+    @Test
+    @DisplayName("count con requestId válido: manda el header X-Request-Id")
+    void countSendsRequestIdHeader() {
+        server.expect(requestTo(COUNT_URL))
+                .andExpect(header("X-Request-Id", "ocurrencia-4521"))
+                .andRespond(withSuccess(COUNT_OK, MediaType.APPLICATION_JSON));
+
+        client.count(RTSP, 5, "ocurrencia-4521");
+
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("probe con requestId válido: manda el header X-Request-Id")
+    void probeSendsRequestIdHeader() {
+        server.expect(requestTo(PROBE_URL))
+                .andExpect(header("X-Request-Id", "a.b_c-1"))
+                .andRespond(withSuccess(
+                        "{\"conecta\":true,\"ancho\":1,\"alto\":1,\"motivo\":null,\"duracion_ms\":1}",
+                        MediaType.APPLICATION_JSON));
+
+        client.probe(RTSP, "a.b_c-1");
+
+        server.verify();
+    }
+
+    @ParameterizedTest(name = "requestId=\"{0}\"")
+    @ValueSource(strings = {"", "con espacio", "a/b", "ñandú"})
+    @DisplayName("requestId con formato inválido o sin requestId: no manda el header")
+    void invalidOrMissingRequestIdOmitsHeader(String requestId) {
+        server.expect(requestTo(COUNT_URL))
+                .andExpect(headerDoesNotExist("X-Request-Id"))
+                .andRespond(withSuccess(COUNT_OK, MediaType.APPLICATION_JSON));
+
+        client.count(RTSP, 5, requestId);
+
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("requestId de más de 64 caracteres: no manda el header")
+    void tooLongRequestIdOmitsHeader() {
+        server.expect(requestTo(COUNT_URL))
+                .andExpect(headerDoesNotExist("X-Request-Id"))
+                .andRespond(withSuccess(COUNT_OK, MediaType.APPLICATION_JSON));
+
+        client.count(RTSP, 5, "a".repeat(65));
+
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("requestId de exactamente 64 caracteres: manda el header")
+    void maxLengthRequestIdIsSent() {
+        String id = "a".repeat(64);
+        server.expect(requestTo(COUNT_URL))
+                .andExpect(header("X-Request-Id", id))
+                .andRespond(withSuccess(COUNT_OK, MediaType.APPLICATION_JSON));
+
+        client.count(RTSP, 5, id);
+
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("health con version que trae el commit (0.1.0+abc1234): se devuelve tal cual")
+    void healthVersionWithCommitIsPassedThrough() {
+        expectHealth(withSuccess(
+                "{\"estado\":\"ok\",\"modelo_cargado\":true,\"estimador\":\"yolo\",\"version\":\"0.1.0+abc1234\"}",
+                MediaType.APPLICATION_JSON));
+
+        assertThat(client.health().version()).isEqualTo("0.1.0+abc1234");
     }
 
     @Test

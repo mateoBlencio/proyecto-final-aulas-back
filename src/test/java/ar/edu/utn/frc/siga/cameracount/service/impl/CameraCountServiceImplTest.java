@@ -107,22 +107,36 @@ class CameraCountServiceImplTest {
     @Test
     @DisplayName("con cliente: count delega con la URL y los samples y devuelve lo del cliente")
     void countDelegatesToClient() {
-        when(client.count(RTSP, 5)).thenReturn(COUNT);
+        when(client.count(RTSP, 5, null)).thenReturn(COUNT);
 
         assertThat(service.count(RTSP, 5)).isSameAs(COUNT);
 
-        verify(client).count(RTSP, 5);
+        verify(client).count(RTSP, 5, null);
+        verifyNoMoreInteractions(client);
+    }
+
+    @Test
+    @DisplayName("con cliente: count y probe pasan el requestId al cliente")
+    void requestIdIsForwardedToClient() {
+        when(client.count(RTSP, 5, "ocurrencia-1")).thenReturn(COUNT);
+        when(client.probe(RTSP, "ocurrencia-1")).thenReturn(PROBE);
+
+        assertThat(service.count(RTSP, 5, "ocurrencia-1")).isSameAs(COUNT);
+        assertThat(service.probe(RTSP, "ocurrencia-1")).isSameAs(PROBE);
+
+        verify(client).count(RTSP, 5, "ocurrencia-1");
+        verify(client).probe(RTSP, "ocurrencia-1");
         verifyNoMoreInteractions(client);
     }
 
     @Test
     @DisplayName("con cliente: probe delega con la URL y devuelve lo del cliente")
     void probeDelegatesToClient() {
-        when(client.probe(RTSP)).thenReturn(PROBE);
+        when(client.probe(RTSP, null)).thenReturn(PROBE);
 
         assertThat(service.probe(RTSP)).isSameAs(PROBE);
 
-        verify(client).probe(RTSP);
+        verify(client).probe(RTSP, null);
         verifyNoMoreInteractions(client);
     }
 
@@ -142,11 +156,11 @@ class CameraCountServiceImplTest {
     @ValueSource(ints = {1, 10})
     @DisplayName("samples null, 1 y 10 (default y extremos del rango): delega con el mismo valor")
     void validSamplesAreDelegatedUnchanged(Integer samples) {
-        when(client.count(RTSP, samples)).thenReturn(COUNT);
+        when(client.count(RTSP, samples, null)).thenReturn(COUNT);
 
         assertThat(service.count(RTSP, samples)).isSameAs(COUNT);
 
-        verify(client).count(RTSP, samples);
+        verify(client).count(RTSP, samples, null);
     }
 
     @ParameterizedTest(name = "samples={0} lanza IllegalArgumentException sin llamar al cliente")
@@ -165,7 +179,7 @@ class CameraCountServiceImplTest {
     @DisplayName("una excepción del cliente sale tal cual y no deja log de éxito")
     void clientExceptionsPropagateUnchanged() {
         InvalidCameraUrlException failure = new InvalidCameraUrlException("rechazada");
-        when(client.count(RTSP, 5)).thenThrow(failure);
+        when(client.count(RTSP, 5, null)).thenThrow(failure);
 
         assertThatThrownBy(() -> service.count(RTSP, 5)).isSameAs(failure);
 
@@ -175,7 +189,7 @@ class CameraCountServiceImplTest {
     @Test
     @DisplayName("el log de count lleva la URL enmascarada y los datos del conteo, sin usuario ni clave")
     void countLogMasksUrl() {
-        when(client.count(RTSP, 5)).thenReturn(COUNT);
+        when(client.count(RTSP, 5, null)).thenReturn(COUNT);
 
         service.count(RTSP, 5);
 
@@ -190,7 +204,7 @@ class CameraCountServiceImplTest {
     @Test
     @DisplayName("el log de probe lleva la URL enmascarada y el resultado, sin usuario ni clave")
     void probeLogMasksUrl() {
-        when(client.probe(RTSP)).thenReturn(PROBE);
+        when(client.probe(RTSP, null)).thenReturn(PROBE);
 
         service.probe(RTSP);
 

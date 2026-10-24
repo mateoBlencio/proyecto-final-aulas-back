@@ -20,12 +20,17 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.util.regex.Pattern;
+
 @Slf4j
 public class HttpCameraCountClient {
 
     private static final String COUNT_PATH = "/conteo";
     private static final String PROBE_PATH = "/probar";
     private static final String HEALTH_PATH = "/health";
+
+    private static final String REQUEST_ID_HEADER = "X-Request-Id";
+    private static final Pattern REQUEST_ID_FORMAT = Pattern.compile("[A-Za-z0-9._-]{1,64}");
 
     private static final String UNEXPECTED_RESPONSE = "El servicio de conteo por cámaras devolvió una respuesta inesperada";
 
@@ -36,11 +41,19 @@ public class HttpCameraCountClient {
     }
 
     public CameraCountResponseDto count(String rtspUrl, Integer samples) {
-        return toCount(post(COUNT_PATH, new CameraRequest(rtspUrl, samples), RawCount.class));
+        return count(rtspUrl, samples, null);
+    }
+
+    public CameraCountResponseDto count(String rtspUrl, Integer samples, String requestId) {
+        return toCount(post(COUNT_PATH, new CameraRequest(rtspUrl, samples), requestId, RawCount.class));
     }
 
     public CameraProbeResponseDto probe(String rtspUrl) {
-        return toProbe(post(PROBE_PATH, new CameraRequest(rtspUrl, null), RawProbe.class));
+        return probe(rtspUrl, null);
+    }
+
+    public CameraProbeResponseDto probe(String rtspUrl, String requestId) {
+        return toProbe(post(PROBE_PATH, new CameraRequest(rtspUrl, null), requestId, RawProbe.class));
     }
 
     public CameraCountHealthResponseDto health() {
@@ -65,12 +78,18 @@ public class HttpCameraCountClient {
         return toHealth(raw);
     }
 
-    private <T> T post(String path, CameraRequest request, Class<T> responseType) {
+    private <T> T post(String path, CameraRequest request, String requestId, Class<T> responseType) {
         T body;
         try {
             body = restClient.post()
                     .uri(path)
                     .contentType(MediaType.APPLICATION_JSON)
+                    .headers(headers -> {
+                        // El servicio ignora ids con otro formato; no los mandamos para no ensuciar sus logs.
+                        if (requestId != null && REQUEST_ID_FORMAT.matcher(requestId).matches()) {
+                            headers.set(REQUEST_ID_HEADER, requestId);
+                        }
+                    })
                     .body(request)
                     .retrieve()
                     .body(responseType);

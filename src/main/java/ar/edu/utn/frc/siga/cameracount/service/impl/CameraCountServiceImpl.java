@@ -28,20 +28,20 @@ public class CameraCountServiceImpl implements CameraCountService {
     }
 
     @Override
-    public CameraCountResponseDto count(String rtspUrl, Integer samples) {
+    public CameraCountResponseDto count(String rtspUrl, Integer samples, String requestId) {
         if (samples != null && (samples < MIN_SAMPLES || samples > MAX_SAMPLES)) {
             throw new IllegalArgumentException(
                     "samples debe estar entre " + MIN_SAMPLES + " y " + MAX_SAMPLES + ", pero fue " + samples);
         }
-        CameraCountResponseDto count = client().count(rtspUrl, samples);
+        CameraCountResponseDto count = client().count(rtspUrl, samples, requestId);
         log.debug("Conteo de {}: {} ({} de {} muestras, {} ms)", RtspUrls.mask(rtspUrl), count.status(),
                 count.samplesOk(), count.samplesRequested(), count.durationMs());
         return count;
     }
 
     @Override
-    public CameraProbeResponseDto probe(String rtspUrl) {
-        CameraProbeResponseDto probe = client().probe(rtspUrl);
+    public CameraProbeResponseDto probe(String rtspUrl, String requestId) {
+        CameraProbeResponseDto probe = client().probe(rtspUrl, requestId);
         log.debug("Prueba de {}: conecta={} ({} ms)", RtspUrls.mask(rtspUrl), probe.connects(),
                 probe.durationMs());
         return probe;
