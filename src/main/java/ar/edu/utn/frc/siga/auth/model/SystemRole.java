@@ -34,6 +34,7 @@ public enum SystemRole {
             Permission.ROOM_REQUEST_READ,
             Permission.ROOM_REQUEST_WRITE,
             Permission.DASHBOARD_READ,
+            Permission.CAMERA_COUNT_RUN,
             Permission.USER_READ)),
 
     CONSULTA(EnumSet.of(

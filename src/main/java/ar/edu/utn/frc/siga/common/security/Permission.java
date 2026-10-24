@@ -39,6 +39,8 @@ public enum Permission {
     ROOM_REQUEST_READ(ScopeType.GLOBAL),
     ROOM_REQUEST_WRITE(ScopeType.GLOBAL),
 
+    CAMERA_COUNT_RUN(ScopeType.GLOBAL),
+
     SETTINGS_READ(ScopeType.GLOBAL),
     SETTINGS_WRITE(ScopeType.GLOBAL),
     INGEST_RUN(ScopeType.GLOBAL),

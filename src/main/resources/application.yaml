@@ -218,6 +218,12 @@ siga:
     sync:
       cron: "0 0 3 * * SUN"
       min-valid-rows-percent: 50
+  camera-count:
+    enabled: ${CONTEO_ENABLED}
+    url: ${CONTEO_URL:}
+    api-key: ${CONTEO_API_KEY:}
+    connect-timeout: 5s
+    read-timeout: ${CONTEO_TIMEOUT_SEG:90}s
   notifications:
     max-attempts: 5
     retry-interval: PT1M
