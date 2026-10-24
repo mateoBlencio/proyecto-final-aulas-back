@@ -42,3 +42,5 @@ siga:
   sysacad:
     enabled: false
     api-key: integration-test-unused
+  camera-count:
+    enabled: false
