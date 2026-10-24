@@ -33,6 +33,9 @@ services:
       MAIL_PASSWORD: ${MAIL_PASSWORD_DEV}
       MAIL_FROM: ${MAIL_FROM_DEV}
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=60
+      CONTEO_URL: http://conteo-camara-dev:8000
+      CONTEO_API_KEY: ${CONTEO_API_KEY_DEV}
+      CONTEO_TIMEOUT_SEG: ${CONTEO_TIMEOUT_SEG:-90}
     deploy:
       resources:
         limits:
@@ -40,6 +43,7 @@ services:
           cpus: "4"
     networks:
       - app-network
+      - conteo-dev-network
 
   backend-test:
     build: .
@@ -71,6 +75,9 @@ services:
       SYSACAD_ENABLED: ${SYSACAD_ENABLED}
       SYSACAD_API_KEY: ${SYSACAD_API_KEY}
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=60
+      CONTEO_URL: http://conteo-camara-test:8000
+      CONTEO_API_KEY: ${CONTEO_API_KEY_TEST}
+      CONTEO_TIMEOUT_SEG: ${CONTEO_TIMEOUT_SEG:-90}
     deploy:
       resources:
         limits:
@@ -78,6 +85,7 @@ services:
           cpus: "4"
     networks:
       - app-network
+      - conteo-test-network
 
   mailhog-test:
     image: mailhog/mailhog:v1.0.1
@@ -100,4 +108,8 @@ services:
 
 networks:
   app-network:
+    external: true
+  conteo-dev-network:
+    external: true
+  conteo-test-network:
     external: true
