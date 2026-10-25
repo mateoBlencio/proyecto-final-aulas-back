@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.siga.audit.service.impl;
 
-import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
+import ar.edu.utn.frc.siga.audit.AcademicCycleCalendar;
 import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.audit.AuditOperations;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditArchiveOutcome;
@@ -34,18 +34,18 @@ public class AuditArchiveServiceImpl implements AuditArchiveService {
 
     private static final String OPERATION = "Archivado de auditoría";
 
-    private final AcademicPeriodService academicPeriodService;
+    private final AcademicCycleCalendar cycleCalendar;
     private final AuditArchiveRepository archiveRepository;
     private final AuditArchiveRunRepository runRepository;
     private final TransactionTemplate transactionTemplate;
     private final int batchSize;
 
-    public AuditArchiveServiceImpl(AcademicPeriodService academicPeriodService,
+    public AuditArchiveServiceImpl(AcademicCycleCalendar cycleCalendar,
                                    AuditArchiveRepository archiveRepository,
                                    AuditArchiveRunRepository runRepository,
                                    PlatformTransactionManager transactionManager,
                                    @Value("${siga.audit.archive.batch-size:5000}") int batchSize) {
-        this.academicPeriodService = academicPeriodService;
+        this.cycleCalendar = cycleCalendar;
         this.archiveRepository = archiveRepository;
         this.runRepository = runRepository;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
@@ -55,7 +55,7 @@ public class AuditArchiveServiceImpl implements AuditArchiveService {
     @Override
     @AuditOperation(OPERATION)
     public AuditArchiveResultDto archive(LocalDate today) {
-        ArchiveCutoffResolver.Resolution resolution = ArchiveCutoffResolver.resolve(academicPeriodService.findActive(), today);
+        ArchiveCutoffResolver.Resolution resolution = ArchiveCutoffResolver.resolve(cycleCalendar.activePeriodStarts(), today);
         if (resolution.cutoff() == null) {
             return new AuditArchiveResultDto(resolution.failure(), null, null, 0, 0, 0);
         }

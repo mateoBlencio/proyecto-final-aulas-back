@@ -1,5 +1,8 @@
 package ar.edu.utn.frc.siga.academic.model;
 
+import org.hibernate.envers.Audited;
+import org.hibernate.envers.AuditOverride;
+import org.hibernate.envers.NotAudited;
 import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
 import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import jakarta.persistence.Column;
@@ -17,6 +20,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
+@Audited
+@AuditOverride(forClass = SoftDeletableEntity.class)
 @Table(name = "especialidad")
 @Getter
 @Setter
@@ -39,9 +44,11 @@ public class Specialty extends SoftDeletableEntity {
     @Column(name = "abreviatura")
     private String abbreviation;
 
+    @NotAudited
     @Column(name = "sincronizado_en")
     private Instant syncedAt;
 
+    @NotAudited
     @Column(name = "hash_sysacad", length = 64)
     private String sysacadHash;
 

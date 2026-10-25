@@ -1,5 +1,8 @@
 package ar.edu.utn.frc.siga.academic.model;
 
+import org.hibernate.envers.Audited;
+import org.hibernate.envers.AuditOverride;
+import org.hibernate.envers.NotAudited;
 import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
 import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import jakarta.persistence.Column;
@@ -21,6 +24,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
+@Audited
+@AuditOverride(forClass = SoftDeletableEntity.class)
 @Table(name = "materia",
        uniqueConstraints = @UniqueConstraint(name = "uq_materia_plan_codigo", columnNames = {"id_plan", "codigo_materia"}))
 @Getter
@@ -48,9 +53,11 @@ public class Subject extends SoftDeletableEntity {
     @Column(name = "dictado")
     private String term;
 
+    @NotAudited
     @Column(name = "sincronizado_en")
     private Instant syncedAt;
 
+    @NotAudited
     @Column(name = "hash_sysacad", length = 64)
     private String sysacadHash;
 

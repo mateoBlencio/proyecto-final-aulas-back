@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.audit.service;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,6 +29,13 @@ public record AuditedEntity(
         }
         if (idType == UUID.class) {
             return UUID.fromString(recordId);
+        }
+        if (idType == LocalDate.class) {
+            try {
+                return LocalDate.parse(recordId);
+            } catch (DateTimeParseException e) {
+                throw new IllegalArgumentException("Fecha inválida: " + recordId, e);
+            }
         }
         if (idType == String.class) {
             return recordId;

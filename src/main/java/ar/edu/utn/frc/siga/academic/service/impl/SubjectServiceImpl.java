@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.academic.dto.SubjectFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SubjectMapper;
@@ -62,12 +63,14 @@ public class SubjectServiceImpl implements SubjectService {
 
     @Override
     @Transactional
+    @AuditOperation("Reactivación de materia")
     public void activate(Long id) {
         subjectRepository.restore(Finder.orThrow(subjectRepository::findById, id, "Subject"));
     }
 
     @Override
     @Transactional
+    @AuditOperation("Baja de materia")
     public void deactivate(Long id) {
         subjectRepository.softDelete(Finder.orThrow(subjectRepository::findById, id, "Subject"));
     }
@@ -102,6 +105,7 @@ public class SubjectServiceImpl implements SubjectService {
 
     @Override
     @Transactional
+    @AuditOperation("Sincronización de materias desde SysAcad")
     public int syncSubjects(List<SubjectSyncCommand> commands) {
         Instant syncedAt = Instant.now();
         Map<SubjectKey, Subject> existing = Maps.byId(subjectRepository.findAll(), SubjectKey::of);

@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.academic.dto.AcademicPeriodFilter;
 import ar.edu.utn.frc.siga.academic.dto.request.UpdateAcademicPeriodRequestDto;
 import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
@@ -42,6 +43,7 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
 
     @Override
     @Transactional
+    @AuditOperation("Alta de período académico")
     public FindOrCreateResult<AcademicPeriodResponseDto> findOrCreate(Integer year, TermType termType) {
         return FindOrCreateResult.resolve(
                 academicPeriodRepository.findByYearAndSemester(year, termType.getSemester()),
@@ -99,6 +101,7 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
      */
     @Override
     @Transactional
+    @AuditOperation("Alta de períodos académicos del año en curso")
     public void materializeCurrentYear() {
         int year = LocalDate.now().getYear();
         if (!academicPeriodRepository.findByYearAndDeletedAtIsNull(year).isEmpty()) {
@@ -113,6 +116,7 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
 
     @Override
     @Transactional
+    @AuditOperation("Modificación de período académico")
     public AcademicPeriodResponseDto update(Long id, UpdateAcademicPeriodRequestDto dto) {
         AcademicPeriod period = academicPeriodRepository.findActiveById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("AcademicPeriod", id));
@@ -205,12 +209,14 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
 
     @Override
     @Transactional
+    @AuditOperation("Reactivación de período académico")
     public void activate(Long id) {
         academicPeriodRepository.restore(Finder.orThrow(academicPeriodRepository::findById, id, "AcademicPeriod"));
     }
 
     @Override
     @Transactional
+    @AuditOperation("Baja de período académico")
     public void deactivate(Long id) {
         academicPeriodRepository.softDelete(Finder.orThrow(academicPeriodRepository::findById, id, "AcademicPeriod"));
     }

@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.academic.model;
 
+import org.hibernate.envers.Audited;
+import org.hibernate.envers.NotAudited;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -13,6 +15,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
+@Audited
 @Table(name = "feriado")
 @Getter
 @Setter
@@ -28,6 +31,7 @@ public class Holiday {
     @Column(name = "descripcion", length = 255)
     private String description;
 
+    @NotAudited
     @Column(name = "sincronizado_en", nullable = false)
     private Instant syncedAt;
 }

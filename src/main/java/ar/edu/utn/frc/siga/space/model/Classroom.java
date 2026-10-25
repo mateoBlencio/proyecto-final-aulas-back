@@ -1,5 +1,8 @@
 package ar.edu.utn.frc.siga.space.model;
 
+import org.hibernate.envers.Audited;
+import org.hibernate.envers.AuditOverride;
+import org.hibernate.envers.NotAudited;
 import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
 import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import jakarta.persistence.Column;
@@ -23,6 +26,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
+@Audited
+@AuditOverride(forClass = SoftDeletableEntity.class)
 @Table(name = "aula")
 @Getter
 @Setter
@@ -54,9 +59,11 @@ public class Classroom extends SoftDeletableEntity {
     @Column(name = "vigente_sysacad", nullable = false)
     private Boolean sysacadCurrent = true;
 
+    @NotAudited
     @Column(name = "sincronizado_en")
     private Instant syncedAt;
 
+    @NotAudited
     @Column(name = "hash_sysacad", length = 64)
     private String sysacadHash;
 

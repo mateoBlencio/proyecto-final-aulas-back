@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomTypeRequestDto;
@@ -51,6 +52,7 @@ public class ClassroomTypeServiceImpl implements ClassroomTypeService {
 
     @Override
     @Transactional
+    @AuditOperation("Alta de tipo de aula")
     public ClassroomTypeResponseDto create(ClassroomTypeRequestDto dto) {
         log.debug("Creando tipo de aula: description={}", dto.description());
         rejectDuplicateDescription(dto.description(), null);
@@ -63,6 +65,7 @@ public class ClassroomTypeServiceImpl implements ClassroomTypeService {
 
     @Override
     @Transactional
+    @AuditOperation("Modificación de tipo de aula")
     public ClassroomTypeResponseDto update(Long id, ClassroomTypeRequestDto dto) {
         log.debug("Actualizando tipo de aula: id={}", id);
         ClassroomType classroomType = findExistingById(id);
@@ -76,12 +79,14 @@ public class ClassroomTypeServiceImpl implements ClassroomTypeService {
 
     @Override
     @Transactional
+    @AuditOperation("Reactivación de tipo de aula")
     public void activate(Long id) {
         classroomTypeRepository.restore(Finder.orThrow(classroomTypeRepository::findById, id, "ClassroomType"));
     }
 
     @Override
     @Transactional
+    @AuditOperation("Baja de tipo de aula")
     public void deactivate(Long id) {
         ClassroomType classroomType = Finder.orThrow(classroomTypeRepository::findById, id, "ClassroomType");
         rejectDefaultTypeChange(classroomType, null);

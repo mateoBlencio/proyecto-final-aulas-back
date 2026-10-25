@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.siga.audit.service.impl;
 
-import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
+import ar.edu.utn.frc.siga.audit.AcademicCycleCalendar.PeriodStart;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditArchiveOutcome;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -46,7 +46,7 @@ final class ArchiveCutoffResolver {
      * Safety net: the cutoff must be strictly before the start of the current cycle and at least 12 months
      * old, so a period loaded with a wrong date (e.g. before March) never makes the archive eat recent history.
      */
-    static Resolution resolve(List<AcademicPeriodResponseDto> periods, LocalDate today) {
+    static Resolution resolve(List<PeriodStart> periods, LocalDate today) {
         int year = today.getYear();
         Optional<LocalDate> startOfYear = cycleStart(periods, year);
         if (startOfYear.isEmpty()) {
@@ -71,10 +71,10 @@ final class ArchiveCutoffResolver {
         return Resolution.of(new ArchiveCutoff(retained, cutoff.get()));
     }
 
-    private static Optional<LocalDate> cycleStart(List<AcademicPeriodResponseDto> periods, int year) {
+    private static Optional<LocalDate> cycleStart(List<PeriodStart> periods, int year) {
         return periods.stream()
                 .filter(period -> period.year() != null && period.year() == year)
-                .map(AcademicPeriodResponseDto::startDate)
+                .map(PeriodStart::startDate)
                 .filter(Objects::nonNull)
                 .min(LocalDate::compareTo);
     }

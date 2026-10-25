@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.academic.dto.CommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SpecialtySummaryDto;
@@ -67,12 +68,14 @@ public class CommissionServiceImpl implements CommissionService {
 
     @Override
     @Transactional
+    @AuditOperation("Reactivación de comisión")
     public void activate(Long id) {
         commissionRepository.restore(Finder.orThrow(commissionRepository::findById, id, "Commission"));
     }
 
     @Override
     @Transactional
+    @AuditOperation("Baja de comisión")
     public void deactivate(Long id) {
         commissionRepository.softDelete(Finder.orThrow(commissionRepository::findById, id, "Commission"));
     }
@@ -162,6 +165,7 @@ public class CommissionServiceImpl implements CommissionService {
 
     @Override
     @Transactional
+    @AuditOperation("Sincronización de comisiones desde SysAcad")
     public int syncCommissions(List<CommissionSyncCommand> commands, int minValidPercent) {
         Instant syncedAt = Instant.now();
         Map<CommissionKey, Commission> existingCommissions = commissionRepository.findAll().stream()
