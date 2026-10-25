@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.academic.dto.SubjectCommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SubjectCommissionMapper;
@@ -48,6 +49,7 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
 
     @Override
     @Transactional
+    @AuditOperation("Reactivación de materia-comisión")
     public void activate(SubjectCommissionId id) {
         subjectCommissionRepository.restore(
                 Finder.orThrow(subjectCommissionRepository::findById, id, "SubjectCommission"));
@@ -55,6 +57,7 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
 
     @Override
     @Transactional
+    @AuditOperation("Baja de materia-comisión")
     public void deactivate(SubjectCommissionId id) {
         subjectCommissionRepository.softDelete(
                 Finder.orThrow(subjectCommissionRepository::findById, id, "SubjectCommission"));

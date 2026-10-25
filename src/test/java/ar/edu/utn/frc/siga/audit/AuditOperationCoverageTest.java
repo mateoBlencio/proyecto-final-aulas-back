@@ -37,11 +37,13 @@ class AuditOperationCoverageTest {
 
     private static final List<String> PACKAGES = List.of(
             "ar.edu.utn.frc.siga.audit",
+            "ar.edu.utn.frc.siga.academic",
             "ar.edu.utn.frc.siga.allocation",
             "ar.edu.utn.frc.siga.auth",
             "ar.edu.utn.frc.siga.events",
             "ar.edu.utn.frc.siga.roomrequest",
             "ar.edu.utn.frc.siga.settings",
+            "ar.edu.utn.frc.siga.space",
             "ar.edu.utn.frc.siga.sysacad.internal.sync",
             "ar.edu.utn.frc.siga.ingest.service");
 

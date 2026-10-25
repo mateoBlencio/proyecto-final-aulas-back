@@ -1,7 +1,7 @@
 package ar.edu.utn.frc.siga.audit.service.impl;
 
-import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
-import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
+import ar.edu.utn.frc.siga.audit.AcademicCycleCalendar;
+import ar.edu.utn.frc.siga.audit.AcademicCycleCalendar.PeriodStart;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditArchiveOutcome;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditArchiveResultDto;
 import ar.edu.utn.frc.siga.audit.model.AuditArchiveRun;
@@ -52,7 +52,7 @@ class AuditArchiveServiceImplTest {
     private static final long RUN_ID = 42L;
 
     @Mock
-    private AcademicPeriodService academicPeriodService;
+    private AcademicCycleCalendar cycleCalendar;
     @Mock
     private AuditArchiveRepository archiveRepository;
     @Mock
@@ -64,14 +64,14 @@ class AuditArchiveServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new AuditArchiveServiceImpl(academicPeriodService, archiveRepository, runRepository,
+        service = new AuditArchiveServiceImpl(cycleCalendar, archiveRepository, runRepository,
                 transactionManager, BATCH_SIZE);
     }
 
     private void withPeriods() {
-        when(academicPeriodService.findActive()).thenReturn(List.of(
-                new AcademicPeriodResponseDto(2025, 0, CUTOFF, LocalDate.of(2025, 12, 1)),
-                new AcademicPeriodResponseDto(2026, 0, LocalDate.of(2026, 3, 2), LocalDate.of(2026, 12, 1))));
+        when(cycleCalendar.activePeriodStarts()).thenReturn(List.of(
+                new PeriodStart(2025, CUTOFF),
+                new PeriodStart(2026, LocalDate.of(2026, 3, 2))));
     }
 
     private void withTransactions() {
@@ -106,7 +106,7 @@ class AuditArchiveServiceImplTest {
     @Test
     @DisplayName("sin períodos para el corte devuelve NO_PERIODS y no toca ni la base ni la transacción")
     void noPeriodsWritesNothing() {
-        when(academicPeriodService.findActive()).thenReturn(List.of());
+        when(cycleCalendar.activePeriodStarts()).thenReturn(List.of());
 
         AuditArchiveResultDto result = service.archive(TODAY);
 
@@ -297,9 +297,9 @@ class AuditArchiveServiceImplTest {
     @DisplayName("con períodos inválidos devuelve INVALID_PERIODS y no toca la base")
     void invalidPeriodsWritesNothing() {
         // 2025 starts the same day as 2026: the cutoff would not be before the current cycle.
-        when(academicPeriodService.findActive()).thenReturn(List.of(
-                new AcademicPeriodResponseDto(2025, 0, LocalDate.of(2026, 3, 2), LocalDate.of(2026, 12, 1)),
-                new AcademicPeriodResponseDto(2026, 0, LocalDate.of(2026, 3, 2), LocalDate.of(2026, 12, 1))));
+        when(cycleCalendar.activePeriodStarts()).thenReturn(List.of(
+                new PeriodStart(2025, LocalDate.of(2026, 3, 2)),
+                new PeriodStart(2026, LocalDate.of(2026, 3, 2))));
 
         AuditArchiveResultDto result = service.archive(TODAY);
 

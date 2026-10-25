@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.audit.service;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -36,7 +37,10 @@ class AuditedEntityRegistryTest extends AbstractIntegrationTest {
                 .containsExactlyInAnyOrder(
                         "Allocation", "User", "RoleAssignment", "AcademicEvent", "Occurrence",
                         "RoomRequest", "RoomRequestItem", "RoomPreference", "RoomRequestItemAllocation",
-                        "Setting", "AuditArchiveRun", "DashboardSnapshotRegeneration");
+                        "Setting", "AuditArchiveRun", "DashboardSnapshotRegeneration",
+                        "Building", "Classroom", "ClassroomType", "ClassroomResource", "ClassroomPermission",
+                        "ResourceType", "Holiday", "Commission", "Subject", "Specialty", "StudyPlan",
+                        "AcademicPeriod");
     }
 
     @Test
@@ -159,6 +163,44 @@ class AuditedEntityRegistryTest extends AbstractIntegrationTest {
                         .doesNotThrowAnyException();
             }
         });
+    }
+
+    @Test
+    @DisplayName("Classroom, Commission y AcademicPeriod incluyen deletedAt (eliminado_en) por el AuditOverride")
+    void softDeletableCatalogsIncludeDeletedAt() {
+        for (String name : List.of("Classroom", "Commission", "AcademicPeriod")) {
+            assertThat(entity(name).columns())
+                    .as("columnas de %s", name)
+                    .anyMatch(c -> c.property().equals("deletedAt") && c.column().equals("eliminado_en"));
+        }
+    }
+
+    @Test
+    @DisplayName("Building no incluye syncedAt, sysacadHash, version ni classrooms")
+    void buildingExcludesSyncAndTechnicalProperties() {
+        assertThat(entity("Building").columns()).extracting(AuditedColumn::property)
+                .contains("name", "buildingCode", "deletedAt")
+                .doesNotContain("syncedAt", "sysacadHash", "version", "classrooms");
+    }
+
+    @Test
+    @DisplayName("Building y Classroom incluyen sysacadEnabled, y Classroom también sysacadCurrent")
+    void sysacadStateFlagsAreAudited() {
+        assertThat(entity("Building").columns()).extracting(AuditedColumn::property).contains("sysacadEnabled");
+        assertThat(entity("Classroom").columns()).extracting(AuditedColumn::property)
+                .contains("sysacadEnabled", "sysacadCurrent");
+    }
+
+    @Test
+    @DisplayName("idType de Holiday es LocalDate")
+    void holidayIdTypeIsLocalDate() {
+        assertThat(entity("Holiday").idType()).isEqualTo(LocalDate.class);
+    }
+
+    @Test
+    @DisplayName("SubjectCommission no está auditada")
+    void subjectCommissionIsNotRegistered() {
+        assertThat(registry.all()).extracting(AuditedEntity::jpaName).doesNotContain("SubjectCommission");
     }
 
     private AuditedEntity entity(String jpaName) {

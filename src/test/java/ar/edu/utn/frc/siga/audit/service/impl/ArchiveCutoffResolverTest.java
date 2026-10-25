@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.siga.audit.service.impl;
 
-import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
+import ar.edu.utn.frc.siga.audit.AcademicCycleCalendar.PeriodStart;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditArchiveOutcome;
 import ar.edu.utn.frc.siga.audit.service.impl.ArchiveCutoffResolver.ArchiveCutoff;
 import org.junit.jupiter.api.DisplayName;
@@ -22,19 +22,19 @@ class ArchiveCutoffResolverTest {
     private static final LocalDate START_2025 = LocalDate.of(2025, 3, 3);
     private static final LocalDate START_2026 = LocalDate.of(2026, 3, 2);
 
-    private static AcademicPeriodResponseDto period(Integer year, int semester, LocalDate start) {
-        return new AcademicPeriodResponseDto(year, semester, start, start == null ? null : start.plusMonths(5));
+    private static PeriodStart period(Integer year, int semester, LocalDate start) {
+        return new PeriodStart(year, start);
     }
 
-    private static Optional<ArchiveCutoff> cutoffOf(List<AcademicPeriodResponseDto> periods, LocalDate today) {
+    private static Optional<ArchiveCutoff> cutoffOf(List<PeriodStart> periods, LocalDate today) {
         return Optional.ofNullable(ArchiveCutoffResolver.resolve(periods, today).cutoff());
     }
 
-    private static AuditArchiveOutcome failureOf(List<AcademicPeriodResponseDto> periods, LocalDate today) {
+    private static AuditArchiveOutcome failureOf(List<PeriodStart> periods, LocalDate today) {
         return ArchiveCutoffResolver.resolve(periods, today).failure();
     }
 
-    private static List<AcademicPeriodResponseDto> threeCycles() {
+    private static List<PeriodStart> threeCycles() {
         return new ArrayList<>(List.of(period(2024, 0, START_2024), period(2025, 0, START_2025),
                 period(2026, 0, START_2026)));
     }
@@ -89,7 +89,7 @@ class ArchiveCutoffResolverTest {
     @Test
     @DisplayName("sin períodos del año actual no hay corte")
     void missingCurrentYearHasNoCutoff() {
-        List<AcademicPeriodResponseDto> periods = List.of(period(2024, 0, START_2024), period(2025, 0, START_2025));
+        List<PeriodStart> periods = List.of(period(2024, 0, START_2024), period(2025, 0, START_2025));
 
         assertThat(failureOf(periods, TODAY)).isEqualTo(AuditArchiveOutcome.NO_PERIODS);
     }
@@ -97,7 +97,7 @@ class ArchiveCutoffResolverTest {
     @Test
     @DisplayName("con el año actual pero sin el ciclo previo no hay corte")
     void missingPreviousCycleHasNoCutoff() {
-        List<AcademicPeriodResponseDto> periods = List.of(period(2024, 0, START_2024), period(2026, 0, START_2026));
+        List<PeriodStart> periods = List.of(period(2024, 0, START_2024), period(2026, 0, START_2026));
 
         assertThat(failureOf(periods, TODAY)).isEqualTo(AuditArchiveOutcome.NO_PERIODS);
     }
@@ -105,7 +105,7 @@ class ArchiveCutoffResolverTest {
     @Test
     @DisplayName("antes del inicio del año, sin el ciclo de dos años atrás no hay corte")
     void missingCycleBeforeThePreviousOneHasNoCutoffInFebruary() {
-        List<AcademicPeriodResponseDto> periods = List.of(period(2025, 0, START_2025), period(2026, 0, START_2026));
+        List<PeriodStart> periods = List.of(period(2025, 0, START_2025), period(2026, 0, START_2026));
 
         assertThat(failureOf(periods, LocalDate.of(2026, 2, 15))).isEqualTo(AuditArchiveOutcome.NO_PERIODS);
     }
@@ -119,7 +119,7 @@ class ArchiveCutoffResolverTest {
     @Test
     @DisplayName("el inicio del ciclo es la menor startDate del año aunque el anual venga después en la lista")
     void cycleStartIsTheEarliestStartDateOfTheYear() {
-        List<AcademicPeriodResponseDto> periods = threeCycles();
+        List<PeriodStart> periods = threeCycles();
         periods.removeIf(p -> p.year() == 2025);
         periods.add(period(2025, 1, LocalDate.of(2025, 3, 10)));
         periods.add(period(2025, 0, START_2025));
@@ -131,7 +131,7 @@ class ArchiveCutoffResolverTest {
     @Test
     @DisplayName("un período con startDate nulo se ignora y no pisa al que sí tiene fecha")
     void nullStartDateIsIgnored() {
-        List<AcademicPeriodResponseDto> periods = threeCycles();
+        List<PeriodStart> periods = threeCycles();
         periods.add(period(2025, 1, null));
 
         assertThat(cutoffOf(periods, TODAY)).contains(new ArchiveCutoff(2025, START_2025));
@@ -140,7 +140,7 @@ class ArchiveCutoffResolverTest {
     @Test
     @DisplayName("un año con todas las startDate nulas cuenta como faltante")
     void yearWithOnlyNullStartDatesIsMissing() {
-        List<AcademicPeriodResponseDto> periods = threeCycles();
+        List<PeriodStart> periods = threeCycles();
         periods.removeIf(p -> p.year() == 2025);
         periods.add(period(2025, 0, null));
         periods.add(period(2025, 1, null));
@@ -151,7 +151,7 @@ class ArchiveCutoffResolverTest {
     @Test
     @DisplayName("un período con año nulo se ignora")
     void nullYearIsIgnored() {
-        List<AcademicPeriodResponseDto> periods = threeCycles();
+        List<PeriodStart> periods = threeCycles();
         periods.add(period(null, 0, LocalDate.of(2020, 1, 1)));
 
         assertThat(cutoffOf(periods, TODAY)).contains(new ArchiveCutoff(2025, START_2025));
@@ -160,7 +160,7 @@ class ArchiveCutoffResolverTest {
     @Test
     @DisplayName("si el inicio del ciclo previo es igual al del ciclo en curso devuelve INVALID_PERIODS")
     void previousCycleStartEqualToCurrentIsInvalid() {
-        List<AcademicPeriodResponseDto> periods = List.of(period(2025, 0, START_2026), period(2026, 0, START_2026));
+        List<PeriodStart> periods = List.of(period(2025, 0, START_2026), period(2026, 0, START_2026));
 
         assertThat(failureOf(periods, TODAY)).isEqualTo(AuditArchiveOutcome.INVALID_PERIODS);
     }
@@ -168,7 +168,7 @@ class ArchiveCutoffResolverTest {
     @Test
     @DisplayName("si el inicio del ciclo previo es posterior al del ciclo en curso devuelve INVALID_PERIODS")
     void previousCycleStartAfterCurrentIsInvalid() {
-        List<AcademicPeriodResponseDto> periods = List.of(period(2025, 0, START_2026.plusDays(30)),
+        List<PeriodStart> periods = List.of(period(2025, 0, START_2026.plusDays(30)),
                 period(2026, 0, START_2026));
 
         assertThat(failureOf(periods, TODAY)).isEqualTo(AuditArchiveOutcome.INVALID_PERIODS);
@@ -177,7 +177,7 @@ class ArchiveCutoffResolverTest {
     @Test
     @DisplayName("un período del año en curso cargado en febrero adelanta el ciclo y el corte queda a menos de 12 meses: INVALID_PERIODS")
     void periodLoadedInFebruaryMakesTheCutoffTooRecent() {
-        List<AcademicPeriodResponseDto> periods = threeCycles();
+        List<PeriodStart> periods = threeCycles();
         periods.add(period(2026, 1, LocalDate.of(2026, 2, 10)));
 
         assertThat(failureOf(periods, LocalDate.of(2026, 2, 15))).isEqualTo(AuditArchiveOutcome.INVALID_PERIODS);
@@ -186,7 +186,7 @@ class ArchiveCutoffResolverTest {
     @Test
     @DisplayName("antes del inicio del año, sin períodos del ciclo en curso (el del año anterior) devuelve NO_PERIODS")
     void missingCurrentCycleOfThePreviousYearHasNoPeriods() {
-        List<AcademicPeriodResponseDto> periods = List.of(period(2024, 0, START_2024), period(2026, 0, START_2026));
+        List<PeriodStart> periods = List.of(period(2024, 0, START_2024), period(2026, 0, START_2026));
 
         assertThat(failureOf(periods, LocalDate.of(2026, 2, 15))).isEqualTo(AuditArchiveOutcome.NO_PERIODS);
     }

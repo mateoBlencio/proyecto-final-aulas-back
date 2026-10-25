@@ -1,5 +1,8 @@
 package ar.edu.utn.frc.siga.space.model;
 
+import org.hibernate.envers.Audited;
+import org.hibernate.envers.AuditOverride;
+import org.hibernate.envers.NotAudited;
 import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
 import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -21,6 +24,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
+@Audited
+@AuditOverride(forClass = SoftDeletableEntity.class)
 @Table(name = "edificio")
 @Getter
 @Setter
@@ -40,9 +45,11 @@ public class Building extends SoftDeletableEntity {
     @Column(name = "nombre", nullable = false, length = 100)
     private String name;
 
+    @NotAudited
     @Column(name = "sincronizado_en")
     private Instant syncedAt;
 
+    @NotAudited
     @Column(name = "hash_sysacad", length = 64)
     private String sysacadHash;
 
@@ -54,6 +61,7 @@ public class Building extends SoftDeletableEntity {
     @Column(name = "version", nullable = false)
     private Long version;
 
+    @NotAudited
     @JsonIgnore
     @OneToMany(mappedBy = "building", fetch = FetchType.LAZY)
     private List<Classroom> classrooms;

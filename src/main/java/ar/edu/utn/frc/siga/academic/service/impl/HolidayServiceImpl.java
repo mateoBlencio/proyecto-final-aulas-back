@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.academic.dto.response.HolidayResponseDto;
 import ar.edu.utn.frc.siga.academic.model.Holiday;
 import ar.edu.utn.frc.siga.academic.repository.HolidayRepository;
@@ -39,6 +40,7 @@ public class HolidayServiceImpl implements HolidayService {
 
     @Override
     @Transactional
+    @AuditOperation("Sincronización de feriados desde SysAcad")
     public int syncHolidays(List<HolidaySyncCommand> commands) {
         LocalDate today = LocalDate.now(clock);
         Instant syncedAt = Instant.now(clock);

@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.academic.dto.SpecialtyFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SpecialtyMapper;
@@ -86,12 +87,14 @@ public class SpecialtyServiceImpl implements SpecialtyService {
 
     @Override
     @Transactional
+    @AuditOperation("Reactivación de especialidad")
     public void activate(Long id) {
         specialtyRepository.restore(Finder.orThrow(specialtyRepository::findById, id, "Specialty"));
     }
 
     @Override
     @Transactional
+    @AuditOperation("Baja de especialidad")
     public void deactivate(Long id) {
         specialtyRepository.softDelete(Finder.orThrow(specialtyRepository::findById, id, "Specialty"));
     }
@@ -111,6 +114,7 @@ public class SpecialtyServiceImpl implements SpecialtyService {
     // El sync es un upsert simple por código y nunca reactiva: la baja manual es de la facultad.
     @Override
     @Transactional
+    @AuditOperation("Sincronización de especialidades desde SysAcad")
     public int syncSpecialties(List<SpecialtySyncCommand> commands) {
         Instant syncedAt = Instant.now();
         Map<Integer, Specialty> existing = specialtyRepository.findAll().stream()

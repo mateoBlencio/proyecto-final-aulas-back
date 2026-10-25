@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.security.BuildingScope;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
@@ -78,6 +79,7 @@ public class BuildingServiceImpl implements BuildingService {
 
     @Override
     @Transactional
+    @AuditOperation("Cambio de estado de edificio")
     public BuildingResponseDto setActive(Long id, Boolean active) {
         log.debug("Cambiando estado activo del edificio: id={}, active={}", id, active);
         Building building = buildingRepository.findById(id)
@@ -95,18 +97,21 @@ public class BuildingServiceImpl implements BuildingService {
 
     @Override
     @Transactional
+    @AuditOperation("Reactivación de edificio")
     public void activate(Long id) {
         buildingRepository.restore(Finder.orThrow(buildingRepository::findById, id, "Building"));
     }
 
     @Override
     @Transactional
+    @AuditOperation("Baja de edificio")
     public void deactivate(Long id) {
         buildingRepository.softDelete(Finder.orThrow(buildingRepository::findById, id, "Building"));
     }
 
     @Override
     @Transactional
+    @AuditOperation("Cambio de estado de edificios en lote")
     public List<BuildingResponseDto> setActiveBatch(List<BuildingActiveBatchItemDto> items) {
         log.debug("Actualizando estado activo en lote: count={}", items.size());
         return items.stream()
@@ -116,6 +121,7 @@ public class BuildingServiceImpl implements BuildingService {
 
     @Override
     @Transactional
+    @AuditOperation("Sincronización de edificios desde SysAcad")
     public int syncBuildings(List<BuildingSyncCommand> commands, int minValidPercent) {
         Instant syncedAt = Instant.now();
         Map<Integer, Building> existing = buildingRepository.findAll().stream()

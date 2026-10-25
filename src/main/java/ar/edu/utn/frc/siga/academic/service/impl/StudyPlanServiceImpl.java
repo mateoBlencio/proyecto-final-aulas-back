@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.academic.dto.StudyPlanFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.StudyPlanResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.StudyPlanMapper;
@@ -46,12 +47,14 @@ public class StudyPlanServiceImpl implements StudyPlanService {
 
     @Override
     @Transactional
+    @AuditOperation("Reactivación de plan de estudio")
     public void activate(Long id) {
         studyPlanRepository.restore(Finder.orThrow(studyPlanRepository::findById, id, "StudyPlan"));
     }
 
     @Override
     @Transactional
+    @AuditOperation("Baja de plan de estudio")
     public void deactivate(Long id) {
         studyPlanRepository.softDelete(Finder.orThrow(studyPlanRepository::findById, id, "StudyPlan"));
     }
