@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.allocation.dto.response.AllocationConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationHistorySnapshotDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationImpactResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.AllocationSearchResultDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ReleasedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.UniqueEventAllocationResponseDto;
@@ -18,6 +19,7 @@ import ar.edu.utn.frc.siga.allocation.service.AllocationConflictService;
 import ar.edu.utn.frc.siga.allocation.service.ReleasedOccurrenceQueryService;
 import ar.edu.utn.frc.siga.allocation.dto.response.ReleasedOccurrenceItemDto;
 import ar.edu.utn.frc.siga.allocation.service.AllocationImpactService;
+import ar.edu.utn.frc.siga.allocation.service.AllocationSearchService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.model.ConflictType;
 import ar.edu.utn.frc.siga.common.security.BuildingScope;
@@ -27,6 +29,9 @@ import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -36,6 +41,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -56,6 +62,7 @@ import java.util.Set;
 @RestController
 @RequestMapping("${siga.api.base-path}/allocations")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Asignaciones", description = "Asignación manual de aulas para ocurrencias específicas")
 @PreAuthorize("hasAuthority('PERM_ALLOCATION_READ')")
 public class AllocationController {
@@ -69,6 +76,7 @@ public class AllocationController {
     private final AcademicEventService academicEventService;
     private final BuildingScopeResolver buildingScopeResolver;
     private final ReleasedOccurrenceQueryService releasedOccurrenceQueryService;
+    private final AllocationSearchService allocationSearchService;
 
     @GetMapping
     @Operation(summary = "Listar asignaciones por fecha",
@@ -79,6 +87,25 @@ public class AllocationController {
         List<AllocationResponseDto> allocations = allocationService.findByDate(date);
         log.info("Asignaciones listadas: date={}, count={}", date, allocations.size());
         return ResponseEntity.ok(allocations);
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "Buscar asignaciones en el período académico",
+               description = "Busca en el período académico activo que contiene 'date' (si hay más de uno, del menor "
+                       + "inicio al mayor fin). 'q' (mínimo 2 caracteres sin espacios de borde) se busca como "
+                       + "subcadena, sin mayúsculas ni tildes, en materia, código de comisión, número de aula y "
+                       + "especialidad. Solo ocurrencias asignadas y no liberadas. 'limit' (1 a 50, default 20) "
+                       + "corta eventos, no ocurrencias. Orden: eventos con fecha desde 'date' primero, por la más "
+                       + "cercana; después los ya terminados, por la última fecha descendente. Cada evento trae "
+                       + "sus ocurrencias coincidentes por fecha ascendente. Sin período que contenga 'date': lista vacía.")
+    public ResponseEntity<List<AllocationSearchResultDto>> search(
+            @RequestParam @Size(max = 100) String q,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(50) int limit) {
+        log.debug("GET /v1/allocations/search: qLength={}, date={}, limit={}", q.length(), date, limit);
+        List<AllocationSearchResultDto> results = allocationSearchService.search(q, date, limit);
+        log.info("Asignaciones buscadas: date={}, events={}", date, results.size());
+        return ResponseEntity.ok(results);
     }
 
     @GetMapping("/{id}")

@@ -1,0 +1,26 @@
+meta {
+  name: Buscar asignaciones en el período
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/v1/allocations/search?q=riesgos especificos&date=2026-11-19&limit=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  q: riesgos especificos
+  date: 2026-11-19
+  limit: 20
+}
+
+docs {
+  Busca en el período académico activo que contiene "date" (si hay más de uno,
+  del menor inicio al mayor fin). "q" (mínimo 2 caracteres) es una subcadena sin
+  mayúsculas ni tildes sobre materia, código de comisión, número de aula y
+  especialidad. "limit" (1 a 50) corta eventos, no ocurrencias. Orden: primero
+  los eventos con fecha desde "date", por la más cercana; después los ya
+  terminados, por la última fecha descendente.
+}
