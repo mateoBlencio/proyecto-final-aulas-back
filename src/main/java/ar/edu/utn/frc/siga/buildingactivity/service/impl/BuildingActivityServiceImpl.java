@@ -11,6 +11,7 @@ import ar.edu.utn.frc.siga.buildingactivity.service.BuildingActivityService;
 import ar.edu.utn.frc.siga.common.exception.InvalidSortPropertyException;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.BuildingScopedSpecifications;
+import ar.edu.utn.frc.siga.common.search.LikePatterns;
 import ar.edu.utn.frc.siga.common.security.Permission;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Order;
@@ -80,7 +81,7 @@ class BuildingActivityServiceImpl implements BuildingActivityService {
             });
         }
         if (actor != null && !actor.isBlank()) {
-            String pattern = "%" + escapeLike(actor.trim().toLowerCase()) + "%";
+            String pattern = LikePatterns.containing(actor.trim().toLowerCase());
             spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.<String>get("actor")), pattern, '\\'));
         }
         Pageable page = PageRequest.of(pageable.getPageNumber(), Math.min(pageable.getPageSize(), MAX_PAGE_SIZE));
@@ -124,10 +125,6 @@ class BuildingActivityServiceImpl implements BuildingActivityService {
             }
             return null;
         };
-    }
-
-    private static String escapeLike(String text) {
-        return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     private Specification<BuildingActivity> inScope() {
