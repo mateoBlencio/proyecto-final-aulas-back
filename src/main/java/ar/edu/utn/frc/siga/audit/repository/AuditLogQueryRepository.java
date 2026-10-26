@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.audit.model.ActorType;
 import ar.edu.utn.frc.siga.audit.model.RevisionKind;
 import ar.edu.utn.frc.siga.audit.service.AuditedEntity;
 import ar.edu.utn.frc.siga.audit.service.AuditedEntityRegistry;
+import ar.edu.utn.frc.siga.common.search.LikePatterns;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.envers.RevisionType;
 import org.springframework.data.domain.Pageable;
@@ -318,7 +319,7 @@ public class AuditLogQueryRepository {
         }
         if (criteria.user() != null && !criteria.user().isBlank()) {
             sql.append(" AND r.usuario ILIKE :userPattern ESCAPE '\\'");
-            params.addValue("userPattern", "%" + escapeLike(criteria.user()) + "%");
+            params.addValue("userPattern", LikePatterns.containing(criteria.user()));
         }
         if (criteria.actor() != null) {
             sql.append(" AND r.tipo_actor = :actor");
@@ -326,7 +327,7 @@ public class AuditLogQueryRepository {
         }
         if (criteria.q() != null && !criteria.q().isBlank()) {
             sql.append(" AND r.descripcion ILIKE :descriptionPattern ESCAPE '\\'");
-            params.addValue("descriptionPattern", "%" + escapeLike(criteria.q().strip()) + "%");
+            params.addValue("descriptionPattern", LikePatterns.containing(criteria.q().strip()));
         }
         return sql.toString();
     }
@@ -337,10 +338,6 @@ public class AuditLogQueryRepository {
         }
         params.addValue("revtype", toType(criteria.kind()).getRepresentation());
         return " AND x." + REVTYPE + " = :revtype";
-    }
-
-    private static String escapeLike(String value) {
-        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     private static RevisionType toType(RevisionKind kind) {
