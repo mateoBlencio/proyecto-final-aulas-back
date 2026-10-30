@@ -49,7 +49,7 @@ public class Specialty extends SoftDeletableEntity {
     private Instant syncedAt;
 
     @NotAudited
-    @Column(name = "hash_sysacad", length = 64)
+    @Column(name = "hash_raw", length = 64)
     private String sysacadHash;
 
     @Version

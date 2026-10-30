@@ -136,7 +136,7 @@ abstract class DashboardIntegrationSupport extends AbstractIntegrationTest {
 
     /** Marks the event as dropped from Sysacad (hash present, habilitado_sysacad = false). */
     protected void dropFromSysacad(Long eventId) {
-        jdbc.update("UPDATE evento_academico SET hash_sysacad = 'h-' || id_evento_academico, habilitado_sysacad = FALSE "
+        jdbc.update("UPDATE evento_academico SET hash_raw = 'h-' || id_evento_academico, habilitado_sysacad = FALSE "
                 + "WHERE id_evento_academico = ?", eventId);
     }
 

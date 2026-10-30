@@ -52,19 +52,19 @@ class ClassroomCurrentMigrationIntegrationTest {
     }
 
     private static Map<String, Object> classroom(long id) {
-        return jdbc.queryForMap("SELECT habilitada_sysacad, vigente_sysacad FROM aula WHERE id_aula = ?", id);
+        return jdbc.queryForMap("SELECT raw_habilitada, vigente_sysacad FROM aula WHERE id_aula = ?", id);
     }
 
     @Test
     @DisplayName("las aulas sincronizadas quedan habilitadas y vigentes hasta la próxima corrida, que corrige el flag")
     void syncedClassroomsAreResetToEnabledAndCurrent() {
-        assertThat(classroom(1)).containsEntry("habilitada_sysacad", true).containsEntry("vigente_sysacad", true);
-        assertThat(classroom(2)).containsEntry("habilitada_sysacad", true).containsEntry("vigente_sysacad", true);
+        assertThat(classroom(1)).containsEntry("raw_habilitada", true).containsEntry("vigente_sysacad", true);
+        assertThat(classroom(2)).containsEntry("raw_habilitada", true).containsEntry("vigente_sysacad", true);
     }
 
     @Test
     @DisplayName("un aula cargada a mano (hash nulo) conserva su flag")
     void manualClassroomKeepsItsFlag() {
-        assertThat(classroom(3)).containsEntry("habilitada_sysacad", false).containsEntry("vigente_sysacad", true);
+        assertThat(classroom(3)).containsEntry("raw_habilitada", false).containsEntry("vigente_sysacad", true);
     }
 }
