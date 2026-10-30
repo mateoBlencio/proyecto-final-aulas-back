@@ -39,7 +39,7 @@ class AuditedEntityRegistryTest extends AbstractIntegrationTest {
                         "RoomRequest", "RoomRequestItem", "RoomPreference", "RoomRequestItemAllocation",
                         "Setting", "AuditArchiveRun", "DashboardSnapshotRegeneration",
                         "Building", "Classroom", "ClassroomType", "ClassroomResource", "ClassroomPermission",
-                        "ResourceType", "Holiday", "Commission", "Subject", "Specialty", "StudyPlan",
+                        "ResourceType", "Holiday", "Commission", "Subject", "SubjectCommission", "Specialty", "StudyPlan",
                         "AcademicPeriod");
     }
 
@@ -198,9 +198,12 @@ class AuditedEntityRegistryTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("SubjectCommission no está auditada")
-    void subjectCommissionIsNotRegistered() {
-        assertThat(registry.all()).extracting(AuditedEntity::jpaName).doesNotContain("SubjectCommission");
+    @DisplayName("SubjectCommission audita la baja y el motivo, pero no la cantidad de inscriptos")
+    void subjectCommissionAuditsDeactivationButNotEnrolledCount() {
+        assertThat(tableAndColumn("SubjectCommission")).containsExactly("materia_comision_aud", "id_materia_comision");
+        assertThat(entity("SubjectCommission").columns()).extracting(AuditedColumn::property)
+                .contains("deletedAt", "deactivationReason", "inPerson")
+                .doesNotContain("enrolledCount");
     }
 
     private AuditedEntity entity(String jpaName) {

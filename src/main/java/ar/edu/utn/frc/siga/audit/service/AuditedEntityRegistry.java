@@ -49,6 +49,7 @@ public class AuditedEntityRegistry {
             Map.entry("Holiday", "Feriado"),
             Map.entry("Commission", "Comisión"),
             Map.entry("Subject", "Materia"),
+            Map.entry("SubjectCommission", "Materia-comisión"),
             Map.entry("Specialty", "Especialidad"),
             Map.entry("StudyPlan", "Plan de estudio"),
             Map.entry("AcademicPeriod", "Período académico"));

@@ -51,16 +51,20 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
     @Transactional
     @AuditOperation("Reactivación de materia-comisión")
     public void activate(SubjectCommissionId id) {
-        subjectCommissionRepository.restore(
-                Finder.orThrow(subjectCommissionRepository::findById, id, "SubjectCommission"));
+        subjectCommissionRepository.restore(requireLink(id));
     }
 
     @Override
     @Transactional
     @AuditOperation("Baja de materia-comisión")
     public void deactivate(SubjectCommissionId id) {
-        subjectCommissionRepository.softDelete(
-                Finder.orThrow(subjectCommissionRepository::findById, id, "SubjectCommission"));
+        subjectCommissionRepository.softDelete(requireLink(id));
+    }
+
+    private SubjectCommission requireLink(SubjectCommissionId id) {
+        return subjectCommissionRepository.findBySubject_IdAndCommission_Id(id.subjectId(), id.commissionId())
+                .orElseThrow(() -> ResourceNotFoundException.of("SubjectCommission",
+                        id.subjectId() + "-" + id.commissionId()));
     }
 
     private Subject requireSubject(Long id) {
@@ -79,7 +83,7 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
     public SubjectCommissionResponseDto findByCommissionAndSubjectCode(Long commissionId, Integer subjectCode,
             Integer specialtyCode, Integer studyPlanCode) {
         List<SubjectCommission> candidates = subjectCommissionRepository
-                .findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(commissionId, subjectCode);
+                .findByCommission_IdAndSubject_Code(commissionId, subjectCode);
         List<SubjectCommission> exact = candidates.stream()
                 .filter(link -> isOfStudyPlan(link.getSubject().getStudyPlan(), specialtyCode, studyPlanCode))
                 .toList();

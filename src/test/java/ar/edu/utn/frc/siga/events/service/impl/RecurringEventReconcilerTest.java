@@ -66,6 +66,24 @@ class RecurringEventReconcilerTest {
     }
 
     @Test
+    @DisplayName("retireFuture: borra las ocurrencias futuras no asignadas y conserva las asignadas")
+    void retiresFutureUnallocatedOccurrences() {
+        LocalDate nextMonday = LocalDate.now().with(java.time.temporal.TemporalAdjusters.next(DayOfWeek.MONDAY));
+        RecurringEvent event = event(nextMonday, nextMonday.plusWeeks(2));
+        Occurrence allocated = occurrence(1L, event, nextMonday);
+        Occurrence free = occurrence(2L, event, nextMonday.plusWeeks(1));
+        when(occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eq(event.getId()), any()))
+                .thenReturn(List.of(allocated, free));
+        when(occurrenceAllocationQuery.allocatedAmong(any())).thenReturn(Set.of(1L));
+
+        reconciler.retireFuture(event);
+
+        ArgumentCaptor<List<Occurrence>> deleted = ArgumentCaptor.forClass(List.class);
+        verify(occurrenceRepository).deleteAll(deleted.capture());
+        assertThat(deleted.getValue()).extracting(Occurrence::getId).containsExactly(2L);
+    }
+
+    @Test
     @DisplayName("regresión: fecha con ocurrencias simultáneas (mismo evento y fecha, distinto roomSlot) "
             + "no se duplica si sigue deseada, y se borra completa si deja de estarlo")
     void toleratesSimultaneousOccurrencesOnSameDate() {

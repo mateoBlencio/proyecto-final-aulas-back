@@ -7,6 +7,8 @@ RUN mvn package -DskipTests
 
 FROM eclipse-temurin:21.0.12.1_1-jre-alpine
 
+RUN apk upgrade --no-cache
+
 RUN addgroup -S spring && adduser -S spring -G spring
 USER spring:spring
 

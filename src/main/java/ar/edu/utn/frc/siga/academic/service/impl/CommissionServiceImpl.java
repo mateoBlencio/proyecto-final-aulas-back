@@ -11,6 +11,7 @@ import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
+import ar.edu.utn.frc.siga.academic.model.SubjectCommissionDeactivationReason;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
@@ -175,7 +176,7 @@ public class CommissionServiceImpl implements CommissionService {
         Map<Integer, Specialty> specialtyCache = new HashMap<>();
         Map<SubjectKey, Subject> existingSubjects = Maps.byId(subjectRepository.findAll(), SubjectKey::of);
         Map<SubjectCommissionId, SubjectCommission> existingLinks =
-                Maps.byId(subjectCommissionRepository.findAll(), SubjectCommission::getId);
+                Maps.byId(subjectCommissionRepository.findAll(), SubjectCommission::key);
         long currentRows = existingCommissions.values().stream()
                 .filter(commission -> commission.getSysacadHash() != null
                         && Boolean.TRUE.equals(commission.getSysacadEnabled())).count();
@@ -215,7 +216,7 @@ public class CommissionServiceImpl implements CommissionService {
                 affected++;
             }
 
-            affected += linkSubjectCommission(existingSubjects, existingLinks, studyPlan, commission, command);
+            affected += linkSubjectCommission(existingSubjects, existingLinks, studyPlan, commission, command, syncedAt);
         }
 
         SyncGuard.requireEnoughValidRows("comisiones", incoming.size(), currentRows, minValidPercent);
@@ -251,7 +252,7 @@ public class CommissionServiceImpl implements CommissionService {
 
     private int linkSubjectCommission(Map<SubjectKey, Subject> existingSubjects,
             Map<SubjectCommissionId, SubjectCommission> existingLinks,
-            Optional<StudyPlan> studyPlan, Commission commission, CommissionSyncCommand command) {
+            Optional<StudyPlan> studyPlan, Commission commission, CommissionSyncCommand command, Instant syncedAt) {
         if (studyPlan.isEmpty() || command.subjectCode() == null) {
             return 0;
         }
@@ -271,11 +272,11 @@ public class CommissionServiceImpl implements CommissionService {
                         command.courseCode(), command.subjectCode());
             }
             SubjectCommission created = SubjectCommission.builder()
-                    .id(new SubjectCommissionId())
                     .subject(subject)
                     .commission(commission)
                     .enrolledCount(enrolledCount)
                     .build();
+            applyEnrollmentState(created, command.enrolledCount(), syncedAt);
             subjectCommissionRepository.save(created);
             // Registrar el link recién creado para que un duplicado (mismo subject+commission) en el
             // mismo batch entre por la rama de actualización y no vuelva a insertar el mismo id.
@@ -287,12 +288,31 @@ public class CommissionServiceImpl implements CommissionService {
                     command.courseCode(), command.subjectCode(), link.getEnrolledCount());
             return 0;
         }
-        if (command.enrolledCount().equals(link.getEnrolledCount())) {
+        boolean countChanged = !command.enrolledCount().equals(link.getEnrolledCount());
+        link.setEnrolledCount(command.enrolledCount());
+        boolean stateChanged = applyEnrollmentState(link, command.enrolledCount(), syncedAt);
+        if (!countChanged && !stateChanged) {
             return 0;
         }
-        link.setEnrolledCount(command.enrolledCount());
         subjectCommissionRepository.save(link);
         return 1;
+    }
+
+    private boolean applyEnrollmentState(SubjectCommission link, Integer enrolledCount, Instant syncedAt) {
+        if (enrolledCount == null) {
+            return false;
+        }
+        if (enrolledCount == 0 && link.isActive()) {
+            link.deactivateFor(SubjectCommissionDeactivationReason.NO_ENROLLED, syncedAt);
+            log.info("Materia-comisión dada de baja por no tener inscriptos: comisión={}", link.getCommission().getCourseCode());
+            return true;
+        }
+        if (enrolledCount > 0 && link.isDeactivatedFor(SubjectCommissionDeactivationReason.NO_ENROLLED)) {
+            link.activate();
+            log.info("Materia-comisión reactivada por tener inscriptos: comisión={}", link.getCommission().getCourseCode());
+            return true;
+        }
+        return false;
     }
 
     private int markAbsent(Iterable<Commission> existing, Set<CommissionKey> incoming, Instant syncedAt) {

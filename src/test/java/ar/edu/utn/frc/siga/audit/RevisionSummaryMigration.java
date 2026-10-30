@@ -17,7 +17,8 @@ final class RevisionSummaryMigration {
     /** Audited tables born after the V17 backfill, so its SQL does not name them. */
     static final Set<String> TABLES_CREATED_LATER = Set.of("archivado_auditoria_aud", "regeneracion_tablero_aud",
             "edificio_aud", "aula_aud", "tipo_aula_aud", "aula_recurso_aud", "aula_permiso_aud", "tipo_recurso_aud",
-            "feriado_aud", "comision_aud", "materia_aud", "especialidad_aud", "plan_estudio_aud", "periodo_academico_aud");
+            "feriado_aud", "comision_aud", "materia_aud", "especialidad_aud", "plan_estudio_aud", "periodo_academico_aud",
+            "materia_comision_aud");
 
     private RevisionSummaryMigration() {
     }

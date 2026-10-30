@@ -77,6 +77,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     private final SubjectService subjectService;
     private final CommissionService commissionService;
     private final EventScheduleValidator eventScheduleValidator;
+    private final RecurringEventReconciler recurringEventReconciler;
 
     @Override
     @Transactional(readOnly = true)
@@ -253,6 +254,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         }
         eventRepository.saveAll(created);
         occurrenceRepository.saveAll(created.stream()
+                .filter(event -> event.getSysacadHash() == null || Boolean.TRUE.equals(event.getSysacadEnabled()))
                 .flatMap(event -> event.toOccurrences(windowByCommission.getOrDefault(
                         event.getCommissionId(), windowFor(null))).stream())
                 .toList());
@@ -264,25 +266,36 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     public List<UpsertRecurringEventResult> syncRecurringEvents(List<SyncRecurringEventCommand> commands) {
         Instant now = Instant.now();
         Set<RecurringEvent> updated = new LinkedHashSet<>();
+        List<RecurringEvent> retired = new ArrayList<>();
+        List<RecurringEvent> restored = new ArrayList<>();
 
         Partition partition = partitionByKey(commands, AcademicEventServiceImpl::keyOf,
                 cmd -> buildRecurringEvent(cmd, now),
                 (existing, cmd) -> {
+                    boolean noEnrolled = cmd.enrolled() == 0;
                     boolean enrolledChanged = !Objects.equals(existing.getEnrolled(), cmd.enrolled());
                     boolean durationChanged = reconcileDuration(existing, cmd.durationMinutes());
-                    boolean reenabled = !Boolean.TRUE.equals(existing.getSysacadEnabled());
-                    if (!enrolledChanged && !durationChanged && !reenabled) {
+                    boolean stateChanged = Boolean.TRUE.equals(existing.getSysacadEnabled()) == noEnrolled;
+                    if (!enrolledChanged && !durationChanged && !stateChanged) {
                         return;
                     }
                     existing.setEnrolled(cmd.enrolled());
                     existing.setSyncedAt(now);
-                    existing.setSysacadEnabled(true);
+                    existing.setSysacadEnabled(!noEnrolled);
                     if (existing.getId() != null) {
                         updated.add(existing);
+                        if (stateChanged) {
+                            (noEnrolled ? retired : restored).add(existing);
+                        }
                     }
                 });
 
         recurringEventRepository.saveAll(updated);
+        retired.forEach(recurringEventReconciler::retireFuture);
+        Map<Long, OccurrenceWindow> restoredWindows = windowsByCommission(restored.stream()
+                .map(RecurringEvent::getCommissionId).collect(Collectors.toSet()));
+        restored.forEach(event -> recurringEventReconciler.reconcileFuture(event,
+                restoredWindows.getOrDefault(event.getCommissionId(), windowFor(null))));
         persistCreated(partition.created(), windowsByCommission(partition.created().stream()
                 .map(RecurringEvent::getCommissionId).collect(Collectors.toSet())));
 
@@ -310,7 +323,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 .commissionId(cmd.commissionId())
                 .syncedAt(now)
                 .sysacadHash(Hashes.sha256Hex(cmd.durationMinutes()))
-                .sysacadEnabled(true)
+                .sysacadEnabled(cmd.enrolled() > 0)
                 .build();
     }
 

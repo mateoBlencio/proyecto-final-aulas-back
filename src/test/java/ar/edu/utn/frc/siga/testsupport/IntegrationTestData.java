@@ -6,7 +6,6 @@ import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
-import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
@@ -206,7 +205,6 @@ public class IntegrationTestData {
 
     public SubjectCommission materiaComision(Subject subject, Commission commission, int enrolledCount) {
         return subjectCommissionRepository.save(SubjectCommission.builder()
-                .id(new SubjectCommissionId())
                 .subject(subject)
                 .commission(commission)
                 .enrolledCount(enrolledCount)

@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.preview;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
+import ar.edu.utn.frc.siga.allocation.service.AllocationConflictService;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocationBatchRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocationItemRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
@@ -71,6 +72,8 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
     private AllocationRepository allocationRepository;
     @Autowired
     private ClassroomService classroomService;
+    @Autowired
+    private AllocationConflictService allocationConflictService;
     @Autowired
     private ObjectMapper objectMapper;
 
@@ -333,10 +336,13 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
         var sc = testData.materiaYComision();
         testData.aula(testData.edificio());
         Long uniqueId = createUniqueEvent(sc, LocalDate.now().plusDays(140), 20);
+        List<Long> otherUnallocatedIds = asFixtureUser(allocationConflictService::resolveAllUnallocatedEventIds)
+                .stream().filter(id -> !id.equals(uniqueId)).toList();
 
         MvcResult result = mockMvc.perform(post("/v1/previews")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new PreviewRequestDto(null, true, null, 2))))
+                        .content(objectMapper.writeValueAsString(
+                                new PreviewRequestDto(null, true, otherUnallocatedIds, 2))))
                 .andExpect(status().isOk())
                 .andReturn();
         PreviewResponseDto preview = objectMapper.readValue(

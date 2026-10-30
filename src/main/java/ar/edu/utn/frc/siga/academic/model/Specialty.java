@@ -38,7 +38,7 @@ public class Specialty extends SoftDeletableEntity {
     @Column(name = "codigo_especialidad", unique = true, nullable = false)
     private Integer specialtyCode;
 
-    @Column(name = "nombre", nullable = false)
+    @Column(name = "nombre")
     private String name;
 
     @Column(name = "abreviatura")
@@ -49,7 +49,7 @@ public class Specialty extends SoftDeletableEntity {
     private Instant syncedAt;
 
     @NotAudited
-    @Column(name = "hash_sysacad", length = 64)
+    @Column(name = "hash_raw", length = 64)
     private String sysacadHash;
 
     @Version

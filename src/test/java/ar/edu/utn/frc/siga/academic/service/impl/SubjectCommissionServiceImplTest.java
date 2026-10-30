@@ -9,7 +9,6 @@ import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
-import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
@@ -112,7 +111,7 @@ class SubjectCommissionServiceImplTest {
     void findByCommissionAndSubjectCodeWithExactMatchReturnsMappedDto() {
         SubjectCommission existing = linkOf(1L, 5, 2008);
         SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, null, 2L, null, 30, true, true);
-        when(subjectCommissionRepository.findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(2L, 101))
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
                 .thenReturn(List.of(existing));
         when(subjectCommissionMapper.toDto(existing)).thenReturn(dto);
 
@@ -125,7 +124,7 @@ class SubjectCommissionServiceImplTest {
         SubjectCommission lowerId = linkOf(1L, 5, 2008);
         SubjectCommission wanted = linkOf(2L, 7, 2023);
         SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(2L, null, 2L, null, 30, true, true);
-        when(subjectCommissionRepository.findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(2L, 101))
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
                 .thenReturn(List.of(lowerId, wanted));
         when(subjectCommissionMapper.toDto(wanted)).thenReturn(dto);
 
@@ -137,7 +136,7 @@ class SubjectCommissionServiceImplTest {
     void findByCommissionAndSubjectCodeFallsBackToSingleCandidate() {
         SubjectCommission only = linkOf(1L, 5, 2008);
         SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, null, 2L, null, 30, true, true);
-        when(subjectCommissionRepository.findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(2L, 101))
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
                 .thenReturn(List.of(only));
         when(subjectCommissionMapper.toDto(only)).thenReturn(dto);
 
@@ -147,7 +146,7 @@ class SubjectCommissionServiceImplTest {
     @Test
     @DisplayName("findByCommissionAndSubjectCode: dos candidatas y ninguna coincide con especialidad y plan → ResourceNotFoundException")
     void findByCommissionAndSubjectCodeAmbiguousThrows() {
-        when(subjectCommissionRepository.findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(2L, 101))
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
                 .thenReturn(List.of(linkOf(1L, 5, 2008), linkOf(2L, 7, 2023)));
 
         assertThatThrownBy(() -> service.findByCommissionAndSubjectCode(2L, 101, 9, 1999))
@@ -157,7 +156,7 @@ class SubjectCommissionServiceImplTest {
     @Test
     @DisplayName("findByCommissionAndSubjectCode: si no existe la relación, lanza ResourceNotFoundException")
     void findByCommissionAndSubjectCodeWithoutExistingRelationThrowsResourceNotFound() {
-        when(subjectCommissionRepository.findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(2L, 101))
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
                 .thenReturn(List.of());
 
         assertThatThrownBy(() -> service.findByCommissionAndSubjectCode(2L, 101, 5, 2008))
@@ -181,9 +180,9 @@ class SubjectCommissionServiceImplTest {
     @Test
     @DisplayName("findAll: con includeDeactivated=true, no restringe por deletedAt")
     void findAllWithIncludeDeactivatedMapsEveryStatus() {
-        SubjectCommission active = SubjectCommission.builder().id(new SubjectCommissionId(1L, 2L))
+        SubjectCommission active = SubjectCommission.builder().id(1L)
                 .subject(subject).commission(commission).enrolledCount(30).build();
-        SubjectCommission inactive = SubjectCommission.builder().id(new SubjectCommissionId(1L, 3L))
+        SubjectCommission inactive = SubjectCommission.builder().id(2L)
                 .subject(subject).commission(commission).enrolledCount(10).build();
         inactive.deactivate();
         SubjectCommissionResponseDto activeDto = new SubjectCommissionResponseDto(1L, null, 2L, null, 30, true, true);

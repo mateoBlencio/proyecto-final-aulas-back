@@ -712,7 +712,7 @@ class ClassroomServiceImplTest {
     }
 
     @Test
-    @DisplayName("syncClassrooms: actualiza capacidad y habilitada_sysacad sin pisar el tipo de aula local")
+    @DisplayName("syncClassrooms: actualiza capacidad y raw_habilitada sin pisar el tipo de aula local")
     void syncClassroomsUpdatesOnlySysacadOwnedFields() {
         ClassroomType type = SpaceTestData.classroomType().build();
         Classroom existing = syncClassroom(101, 40, true, Hashes.sha256Hex(40, true));

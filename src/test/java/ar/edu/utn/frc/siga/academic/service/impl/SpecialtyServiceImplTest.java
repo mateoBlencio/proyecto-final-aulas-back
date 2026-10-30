@@ -152,6 +152,19 @@ class SpecialtyServiceImplTest {
     }
 
     @Test
+    @DisplayName("syncSpecialties: completa el nombre de la especialidad sin nombre pero no le quita la baja")
+    void syncSpecialtiesFillsNameButKeepsDeactivation() {
+        Specialty nameless = Specialty.builder().id(5L).specialtyCode(5).sysacadHash(null).build();
+        nameless.deactivate();
+        when(specialtyRepository.findAll()).thenReturn(List.of(nameless));
+
+        service.syncSpecialties(List.of(new SpecialtySyncCommand(5, "Ingeniería en Sistemas de Información", "ISI")));
+
+        assertThat(nameless.getName()).isEqualTo("Ingeniería en Sistemas de Información");
+        assertThat(nameless.isDeleted()).isTrue();
+    }
+
+    @Test
     @DisplayName("syncSpecialties: pisa el stub con sysacad_hash nulo cuando llega la especialidad real")
     void syncSpecialtiesOverwritesStubWithNullHash() {
         Specialty stub = Specialty.builder()

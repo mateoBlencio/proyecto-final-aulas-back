@@ -74,7 +74,7 @@ public abstract class AcademicEvent extends TimestampedEntity {
 
     @Setter
     @NotAudited
-    @Column(name = "hash_sysacad", length = 64)
+    @Column(name = "hash_raw", length = 64)
     protected String sysacadHash;
 
     @Setter

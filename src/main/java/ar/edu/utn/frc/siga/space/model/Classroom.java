@@ -51,7 +51,7 @@ public class Classroom extends SoftDeletableEntity {
 
     /** Sysacad's "habilitada" (S/N) flag. Written only from a view row, never because of absence. */
     @Builder.Default
-    @Column(name = "habilitada_sysacad", nullable = false)
+    @Column(name = "raw_habilitada", nullable = false)
     private Boolean sysacadEnabled = false;
 
     /** {@code false} when the classroom stopped appearing in the Sysacad view. Does not remove it from the candidates. */
@@ -64,7 +64,7 @@ public class Classroom extends SoftDeletableEntity {
     private Instant syncedAt;
 
     @NotAudited
-    @Column(name = "hash_sysacad", length = 64)
+    @Column(name = "hash_raw", length = 64)
     private String sysacadHash;
 
     @Version

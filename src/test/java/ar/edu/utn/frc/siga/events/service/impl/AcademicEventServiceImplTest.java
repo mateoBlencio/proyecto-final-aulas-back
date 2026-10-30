@@ -92,13 +92,16 @@ class AcademicEventServiceImplTest {
     private CommissionService commissionService;
     @Mock
     private EventScheduleValidator eventScheduleValidator;
+    @Mock
+    private RecurringEventReconciler recurringEventReconciler;
 
     private AcademicEventServiceImpl service;
 
     @BeforeEach
     void setUp() {
         service = new AcademicEventServiceImpl(eventRepository, recurringEventRepository, uniqueEventRepository,
-                occurrenceRepository, composer, occurrenceMapper, subjectService, commissionService, eventScheduleValidator);
+                occurrenceRepository, composer, occurrenceMapper, subjectService, commissionService, eventScheduleValidator,
+                recurringEventReconciler);
     }
 
 
@@ -360,6 +363,48 @@ class AcademicEventServiceImplTest {
         assertThat(notCurrent.getSysacadEnabled()).isTrue();
         assertThat(notCurrent.getSyncedAt()).isNotNull();
         assertThat(savedRecurringEvents()).containsExactly(notCurrent);
+    }
+
+    @Test
+    @DisplayName("syncRecurringEvent: evento vigente que pasa a 0 inscriptos se deshabilita y se retiran sus ocurrencias futuras")
+    void syncRecurringEventRetiraEventoSinInscriptos() {
+        RecurringEvent existing = existingSyncedEvent(7L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of(existing));
+
+        service.syncRecurringEvent(syncCommand(90, 0));
+
+        assertThat(existing.getEnrolled()).isZero();
+        assertThat(existing.getSysacadEnabled()).isFalse();
+        verify(recurringEventReconciler).retireFuture(existing);
+        verify(recurringEventReconciler, never()).reconcileFuture(any(), any());
+    }
+
+    @Test
+    @DisplayName("syncRecurringEvent: evento deshabilitado que vuelve a tener inscriptos se rehabilita y se recrean sus ocurrencias")
+    void syncRecurringEventRestauraEventoConInscriptos() {
+        RecurringEvent existing = existingSyncedEvent(7L, Duration.ofMinutes(90), Hashes.sha256Hex(90), false);
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of(existing));
+
+        service.syncRecurringEvent(syncCommand(90, 12));
+
+        assertThat(existing.getSysacadEnabled()).isTrue();
+        verify(recurringEventReconciler).reconcileFuture(eq(existing), any());
+        verify(recurringEventReconciler, never()).retireFuture(any());
+    }
+
+    @Test
+    @DisplayName("syncRecurringEvent: evento nuevo con 0 inscriptos se crea deshabilitado y sin ocurrencias")
+    void syncRecurringEventCreaSinOcurrenciasSiNoHayInscriptos() {
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of());
+        when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(5L));
+
+        service.syncRecurringEvent(syncCommand(90, 0));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<RecurringEvent>> captor = ArgumentCaptor.forClass(List.class);
+        verify(eventRepository).saveAll(captor.capture());
+        assertThat(captor.getValue().getFirst().getSysacadEnabled()).isFalse();
+        verify(occurrenceRepository).saveAll(List.of());
     }
 
     @Test
