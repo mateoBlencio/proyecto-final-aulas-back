@@ -10,6 +10,7 @@ import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
+import ar.edu.utn.frc.siga.academic.model.SubjectCommissionDeactivationReason;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
@@ -30,6 +31,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -552,5 +554,110 @@ class CommissionServiceImplTest {
 
         assertThat(existingLink.getEnrolledCount()).isEqualTo(20);
         verify(subjectCommissionRepository, never()).save(existingLink);
+    }
+
+    @Test
+    @DisplayName("syncCommissions: con cero inscriptos da de baja el link existente con motivo NO_ENROLLED y sigue actualizándolo")
+    void syncCommissionsDeactivatesLinkWithZeroEnrolled() {
+        SubjectCommission link = existingLink(20);
+
+        syncLink(link, 0);
+
+        assertThat(link.getEnrolledCount()).isZero();
+        assertThat(link.isDeactivatedFor(SubjectCommissionDeactivationReason.NO_ENROLLED)).isTrue();
+        verify(subjectCommissionRepository).save(link);
+    }
+
+    @Test
+    @DisplayName("syncCommissions: con inscriptos positivos reactiva el link dado de baja por cero inscriptos")
+    void syncCommissionsReactivatesLinkDeactivatedForNoEnrolled() {
+        SubjectCommission link = existingLink(0);
+        link.deactivateFor(SubjectCommissionDeactivationReason.NO_ENROLLED, Instant.now());
+
+        syncLink(link, 12);
+
+        assertThat(link.isActive()).isTrue();
+        assertThat(link.getDeactivationReason()).isNull();
+        assertThat(link.getEnrolledCount()).isEqualTo(12);
+        verify(subjectCommissionRepository).save(link);
+    }
+
+    @Test
+    @DisplayName("syncCommissions: con inscriptos positivos no reactiva un link dado de baja a mano, pero actualiza la cantidad")
+    void syncCommissionsKeepsManuallyDeactivatedLinkDeactivated() {
+        SubjectCommission link = existingLink(20);
+        link.deactivate();
+
+        syncLink(link, 25);
+
+        assertThat(link.isDeleted()).isTrue();
+        assertThat(link.getDeactivationReason()).isNull();
+        assertThat(link.getEnrolledCount()).isEqualTo(25);
+    }
+
+    @Test
+    @DisplayName("syncCommissions: un link nuevo con cero inscriptos informados se crea dado de baja con motivo NO_ENROLLED")
+    void syncCommissionsCreatesDeactivatedLinkWithZeroEnrolled() {
+        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, 0);
+        AcademicPeriod annualPeriod = annualPeriod();
+        StudyPlan studyPlan = studyPlan();
+        Subject subject = Subject.builder().id(3L).code(55).studyPlan(studyPlan).build();
+
+        when(commissionRepository.findAll()).thenReturn(List.of());
+        when(subjectRepository.findAll()).thenReturn(List.of(subject));
+        when(subjectCommissionRepository.findAll()).thenReturn(List.of());
+        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any(), any())).thenReturn(Optional.of(studyPlan));
+        when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
+                .thenReturn(Optional.of(annualPeriod));
+        when(commissionRepository.save(any(Commission.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.syncCommissions(List.of(command), 0);
+
+        ArgumentCaptor<SubjectCommission> saved = ArgumentCaptor.forClass(SubjectCommission.class);
+        verify(subjectCommissionRepository).save(saved.capture());
+        assertThat(saved.getValue().isDeactivatedFor(SubjectCommissionDeactivationReason.NO_ENROLLED)).isTrue();
+    }
+
+    @Test
+    @DisplayName("syncCommissions: un link nuevo sin inscriptos informados queda activo")
+    void syncCommissionsKeepsNewLinkActiveWhenEnrollmentUnresolved() {
+        CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, null);
+        AcademicPeriod annualPeriod = annualPeriod();
+        StudyPlan studyPlan = studyPlan();
+        Subject subject = Subject.builder().id(3L).code(55).studyPlan(studyPlan).build();
+
+        when(commissionRepository.findAll()).thenReturn(List.of());
+        when(subjectRepository.findAll()).thenReturn(List.of(subject));
+        when(subjectCommissionRepository.findAll()).thenReturn(List.of());
+        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any(), any())).thenReturn(Optional.of(studyPlan));
+        when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
+                .thenReturn(Optional.of(annualPeriod));
+        when(commissionRepository.save(any(Commission.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.syncCommissions(List.of(command), 0);
+
+        ArgumentCaptor<SubjectCommission> saved = ArgumentCaptor.forClass(SubjectCommission.class);
+        verify(subjectCommissionRepository).save(saved.capture());
+        assertThat(saved.getValue().isActive()).isTrue();
+    }
+
+    private SubjectCommission existingLink(int enrolledCount) {
+        Subject subject = Subject.builder().id(3L).code(55).studyPlan(studyPlan()).build();
+        Commission commission = Commission.builder().id(9L).courseCode("101").academicPeriod(annualPeriod())
+                .sysacadHash(Hashes.sha256Hex("101", 9L, 1, 2024, 55)).sysacadEnabled(true).build();
+        return SubjectCommission.builder().id(new SubjectCommissionId(3L, 9L))
+                .subject(subject).commission(commission).enrolledCount(enrolledCount).build();
+    }
+
+    private void syncLink(SubjectCommission link, Integer enrolledCount) {
+        when(commissionRepository.findAll()).thenReturn(List.of(link.getCommission()));
+        when(subjectRepository.findAll()).thenReturn(List.of(link.getSubject()));
+        when(subjectCommissionRepository.findAll()).thenReturn(List.of(link));
+        when(studyPlanResolver.findOrCreate(eq(1), eq(2024), any(), any()))
+                .thenReturn(Optional.of(link.getSubject().getStudyPlan()));
+        when(academicPeriodRepository.findByYearAndSemester(2026, TermType.ANUAL.getSemester()))
+                .thenReturn(Optional.of(link.getCommission().getAcademicPeriod()));
+
+        service.syncCommissions(List.of(new CommissionSyncCommand("101", 1, 2024, 55, 2026, enrolledCount)), 0);
     }
 }

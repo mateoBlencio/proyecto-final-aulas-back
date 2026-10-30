@@ -112,7 +112,7 @@ class SubjectCommissionServiceImplTest {
     void findByCommissionAndSubjectCodeWithExactMatchReturnsMappedDto() {
         SubjectCommission existing = linkOf(1L, 5, 2008);
         SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, null, 2L, null, 30, true, true);
-        when(subjectCommissionRepository.findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(2L, 101))
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
                 .thenReturn(List.of(existing));
         when(subjectCommissionMapper.toDto(existing)).thenReturn(dto);
 
@@ -125,7 +125,7 @@ class SubjectCommissionServiceImplTest {
         SubjectCommission lowerId = linkOf(1L, 5, 2008);
         SubjectCommission wanted = linkOf(2L, 7, 2023);
         SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(2L, null, 2L, null, 30, true, true);
-        when(subjectCommissionRepository.findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(2L, 101))
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
                 .thenReturn(List.of(lowerId, wanted));
         when(subjectCommissionMapper.toDto(wanted)).thenReturn(dto);
 
@@ -137,7 +137,7 @@ class SubjectCommissionServiceImplTest {
     void findByCommissionAndSubjectCodeFallsBackToSingleCandidate() {
         SubjectCommission only = linkOf(1L, 5, 2008);
         SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, null, 2L, null, 30, true, true);
-        when(subjectCommissionRepository.findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(2L, 101))
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
                 .thenReturn(List.of(only));
         when(subjectCommissionMapper.toDto(only)).thenReturn(dto);
 
@@ -147,7 +147,7 @@ class SubjectCommissionServiceImplTest {
     @Test
     @DisplayName("findByCommissionAndSubjectCode: dos candidatas y ninguna coincide con especialidad y plan → ResourceNotFoundException")
     void findByCommissionAndSubjectCodeAmbiguousThrows() {
-        when(subjectCommissionRepository.findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(2L, 101))
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
                 .thenReturn(List.of(linkOf(1L, 5, 2008), linkOf(2L, 7, 2023)));
 
         assertThatThrownBy(() -> service.findByCommissionAndSubjectCode(2L, 101, 9, 1999))
@@ -157,7 +157,7 @@ class SubjectCommissionServiceImplTest {
     @Test
     @DisplayName("findByCommissionAndSubjectCode: si no existe la relación, lanza ResourceNotFoundException")
     void findByCommissionAndSubjectCodeWithoutExistingRelationThrowsResourceNotFound() {
-        when(subjectCommissionRepository.findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(2L, 101))
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
                 .thenReturn(List.of());
 
         assertThatThrownBy(() -> service.findByCommissionAndSubjectCode(2L, 101, 5, 2008))

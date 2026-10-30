@@ -70,6 +70,6 @@ public interface SubjectCommissionRepository
     // A commission can be linked to two subjects with the same code under different study plans: the
     // service disambiguates by specialty and study plan.
     @EntityGraph(attributePaths = {"commission", "commission.academicPeriod"})
-    List<SubjectCommission> findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(
+    List<SubjectCommission> findByCommission_IdAndSubject_Code(
             Long commissionId, Integer subjectCode);
 }

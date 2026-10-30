@@ -5,11 +5,14 @@ import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -47,6 +50,25 @@ public class SubjectCommission extends SoftDeletableEntity {
     @Column(name = "es_presencial", nullable = false)
     @Builder.Default
     private Boolean inPerson = true;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "motivo_baja", length = 40)
+    private SubjectCommissionDeactivationReason deactivationReason;
+
+    public void deactivateFor(SubjectCommissionDeactivationReason reason, Instant when) {
+        deactivate(when);
+        deactivationReason = reason;
+    }
+
+    @Override
+    public void activate() {
+        super.activate();
+        deactivationReason = null;
+    }
+
+    public boolean isDeactivatedFor(SubjectCommissionDeactivationReason reason) {
+        return isDeleted() && deactivationReason == reason;
+    }
 
     public UnavailableReason unavailableReason() {
         if (!isActive()) {

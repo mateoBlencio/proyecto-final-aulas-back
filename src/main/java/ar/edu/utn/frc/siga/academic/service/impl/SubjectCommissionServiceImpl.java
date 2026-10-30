@@ -79,7 +79,7 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
     public SubjectCommissionResponseDto findByCommissionAndSubjectCode(Long commissionId, Integer subjectCode,
             Integer specialtyCode, Integer studyPlanCode) {
         List<SubjectCommission> candidates = subjectCommissionRepository
-                .findByCommission_IdAndSubject_CodeAndDeletedAtIsNull(commissionId, subjectCode);
+                .findByCommission_IdAndSubject_Code(commissionId, subjectCode);
         List<SubjectCommission> exact = candidates.stream()
                 .filter(link -> isOfStudyPlan(link.getSubject().getStudyPlan(), specialtyCode, studyPlanCode))
                 .toList();
