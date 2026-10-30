@@ -33,6 +33,7 @@ class StudyPlanAuditLabelProvider implements AuditLabelProvider {
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         Map<Long, String> names = specialtyIds.isEmpty() ? new HashMap<>()
                 : specialtyRepository.findAllById(specialtyIds).stream()
+                        .filter(specialty -> specialty.getName() != null)
                         .collect(Collectors.toMap(Specialty::getId, Specialty::getName));
 
         Map<String, String> labels = new HashMap<>();
