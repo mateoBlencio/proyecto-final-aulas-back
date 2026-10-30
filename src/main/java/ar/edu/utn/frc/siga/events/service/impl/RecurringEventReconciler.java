@@ -30,6 +30,20 @@ class RecurringEventReconciler {
     private final OccurrenceAllocationQuery occurrenceAllocationQuery;
 
     @Transactional
+    void retireFuture(RecurringEvent event) {
+        List<Occurrence> future = occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(
+                event.getId(), LocalDate.now());
+        Set<Long> allocated = occurrenceAllocationQuery.allocatedAmong(
+                future.stream().map(Occurrence::getId).toList());
+        List<Occurrence> deletable = future.stream()
+                .filter(occurrence -> !allocated.contains(occurrence.getId()))
+                .toList();
+        occurrenceRepository.deleteAll(deletable);
+        log.info("Ocurrencias retiradas del evento {}: -{} borradas, {} asignadas conservadas",
+                event.getId(), deletable.size(), future.size() - deletable.size());
+    }
+
+    @Transactional
     void reconcileFuture(RecurringEvent event, OccurrenceWindow window) {
         LocalDate today = LocalDate.now();
         Set<LocalDate> desiredFuture = event.toOccurrences(window).stream()
