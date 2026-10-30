@@ -74,7 +74,9 @@ class AuditOperationCoverageTest {
             Map.entry("IngestRowResolver#resolveRefs",
                     "runs inside IngestServiceImpl.ingestFile, which opens the operation"),
             Map.entry("RecurringEventReconciler#reconcileFuture",
-                    "its only caller is AcademicPeriodChangedListener.on, which carries the annotation"));
+                    "its only caller is AcademicPeriodChangedListener.on, which carries the annotation"),
+            Map.entry("RecurringEventReconciler#retireFuture",
+                    "its only caller is AcademicEventServiceImpl.syncRecurringEvents, which carries the annotation"));
 
     @Test
     @DisplayName("todo punto de escritura tiene @AuditOperation o una excepción justificada")
