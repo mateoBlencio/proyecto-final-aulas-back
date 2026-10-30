@@ -11,7 +11,6 @@ import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommissionDeactivationReason;
-import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
@@ -445,7 +444,6 @@ class CommissionServiceImplTest {
         Commission commission = Commission.builder().id(9L).courseCode("101").academicPeriod(annualPeriod)
                 .sysacadHash(Hashes.sha256Hex("101", 9L, 1, 2024, 55)).sysacadEnabled(true).build();
         SubjectCommission existingLink = SubjectCommission.builder()
-                .id(new SubjectCommissionId(3L, 9L))
                 .subject(subject).commission(commission).enrolledCount(20).build();
 
         when(commissionRepository.findAll()).thenReturn(List.of(commission));
@@ -514,7 +512,6 @@ class CommissionServiceImplTest {
         Commission commission = Commission.builder().id(9L).courseCode("101").academicPeriod(annualPeriod)
                 .sysacadHash(Hashes.sha256Hex("101", 9L, 1, 2024, 55)).sysacadEnabled(true).build();
         SubjectCommission provisionalLink = SubjectCommission.builder()
-                .id(new SubjectCommissionId(3L, 9L))
                 .subject(subject).commission(commission).enrolledCount(0).build();
 
         when(commissionRepository.findAll()).thenReturn(List.of(commission));
@@ -540,7 +537,6 @@ class CommissionServiceImplTest {
         Commission commission = Commission.builder().id(9L).courseCode("101").academicPeriod(annualPeriod)
                 .sysacadHash(Hashes.sha256Hex("101", 9L, 1, 2024, 55)).sysacadEnabled(true).build();
         SubjectCommission existingLink = SubjectCommission.builder()
-                .id(new SubjectCommissionId(3L, 9L))
                 .subject(subject).commission(commission).enrolledCount(20).build();
 
         when(commissionRepository.findAll()).thenReturn(List.of(commission));
@@ -645,7 +641,7 @@ class CommissionServiceImplTest {
         Subject subject = Subject.builder().id(3L).code(55).studyPlan(studyPlan()).build();
         Commission commission = Commission.builder().id(9L).courseCode("101").academicPeriod(annualPeriod())
                 .sysacadHash(Hashes.sha256Hex("101", 9L, 1, 2024, 55)).sysacadEnabled(true).build();
-        return SubjectCommission.builder().id(new SubjectCommissionId(3L, 9L))
+        return SubjectCommission.builder()
                 .subject(subject).commission(commission).enrolledCount(enrolledCount).build();
     }
 

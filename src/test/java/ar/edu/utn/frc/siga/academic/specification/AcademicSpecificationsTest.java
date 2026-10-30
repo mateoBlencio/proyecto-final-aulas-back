@@ -12,7 +12,6 @@ import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
-import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
 import ar.edu.utn.frc.siga.academic.repository.CommissionCountSearch;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
@@ -108,10 +107,8 @@ class AcademicSpecificationsTest {
         commissionK2Id = k2.getId();
 
         subjectCommissionRepository.save(SubjectCommission.builder()
-                .id(new SubjectCommissionId(analisisId, commissionK1Id))
                 .subject(analisis).commission(k1).enrolledCount(30).build());
         subjectCommissionRepository.save(SubjectCommission.builder()
-                .id(new SubjectCommissionId(fisicaId, commissionK2Id))
                 .subject(fisica).commission(k2).enrolledCount(25).build());
     }
 
@@ -263,7 +260,6 @@ class AcademicSpecificationsTest {
                     .courseCode("ZZK4004").academicPeriod(period).sysacadEnabled(true).build());
             Subject analisis = subjectRepository.findById(analisisId).orElseThrow();
             SubjectCommission link = subjectCommissionRepository.save(SubjectCommission.builder()
-                    .id(new SubjectCommissionId(analisisId, soloBaja.getId()))
                     .subject(analisis).commission(soloBaja).enrolledCount(10).build());
             subjectCommissionRepository.softDelete(link);
 
@@ -292,7 +288,6 @@ class AcademicSpecificationsTest {
             Commission commission = commissionRepository.save(Commission.builder()
                     .courseCode("ZZK5005").academicPeriod(period).sysacadEnabled(true).build());
             subjectCommissionRepository.save(SubjectCommission.builder()
-                    .id(new SubjectCommissionId(estatica.getId(), commission.getId()))
                     .subject(estatica).commission(commission).enrolledCount(10).build());
             commissionOnlyInDeactivatedPlanId = commission.getId();
         }
@@ -351,7 +346,6 @@ class AcademicSpecificationsTest {
             Commission k1 = commissionRepository.findById(commissionK1Id).orElseThrow();
             Subject fisica = subjectRepository.findById(fisicaId).orElseThrow();
             subjectCommissionRepository.save(SubjectCommission.builder()
-                    .id(new SubjectCommissionId(fisicaId, commissionK1Id))
                     .subject(fisica).commission(k1).enrolledCount(5).build());
 
             assertThat(count("%", null, false)).containsEntry(sistemas.getId(), 2L)
@@ -376,7 +370,7 @@ class AcademicSpecificationsTest {
         @Test
         void ignoraMateriaComisionDadaDeBaja() {
             subjectCommissionRepository.softDelete(subjectCommissionRepository
-                    .findById(new SubjectCommissionId(analisisId, commissionK1Id)).orElseThrow());
+                    .findBySubject_IdAndCommission_Id(analisisId, commissionK1Id).orElseThrow());
 
             assertThat(count("%", null, true)).containsEntry(sistemas.getId(), 1L);
         }
@@ -431,7 +425,7 @@ class AcademicSpecificationsTest {
         @Test
         void ignoraVinculosDadosDeBaja() {
             SubjectCommission link = subjectCommissionRepository
-                    .findById(new SubjectCommissionId(analisisId, commissionK1Id)).orElseThrow();
+                    .findBySubject_IdAndCommission_Id(analisisId, commissionK1Id).orElseThrow();
             subjectCommissionRepository.softDelete(link);
 
             assertThat(subjectCommissionRepository.findSpecialtiesByCommissionIds(List.of(commissionK1Id)))
@@ -447,7 +441,7 @@ class AcademicSpecificationsTest {
             var result = subjectCommissionRepository.findAll(
                     SubjectCommissionSpecification.withFilter(new SubjectCommissionFilter(analisisId, null)),
                     Pageable.unpaged());
-            assertThat(result).extracting(sc -> sc.getId().getCommissionId()).containsExactly(commissionK1Id);
+            assertThat(result).extracting(sc -> sc.getCommission().getId()).containsExactly(commissionK1Id);
         }
 
         @Test
@@ -455,7 +449,7 @@ class AcademicSpecificationsTest {
             var result = subjectCommissionRepository.findAll(
                     SubjectCommissionSpecification.withFilter(new SubjectCommissionFilter(null, commissionK2Id)),
                     Pageable.unpaged());
-            assertThat(result).extracting(sc -> sc.getId().getSubjectId()).containsExactly(fisicaId);
+            assertThat(result).extracting(sc -> sc.getSubject().getId()).containsExactly(fisicaId);
         }
     }
 
@@ -665,7 +659,7 @@ class AcademicSpecificationsTest {
         private List<Long> subjectCommissionIds(String q) {
             return subjectCommissionRepository.findAll(SubjectCommissionSpecification.withFilter(
                     new SubjectCommissionFilter(null, null, q))).stream()
-                    .map(sc -> sc.getId().getSubjectId()).toList();
+                    .map(sc -> sc.getSubject().getId()).toList();
         }
     }
 }

@@ -39,7 +39,7 @@ public class SubjectCommissionController {
                        + "Por defecto solo devuelve los vínculos activos; con includeDeactivated=true "
                        + "incluye también los desactivados. q: búsqueda de texto libre sobre código y nombre de la materia y código de curso.")
     public ResponseEntity<Page<SubjectCommissionResponseDto>> findAll(
-            @PageableDefault(size = 20, sort = "id.subjectId", direction = Sort.Direction.ASC) Pageable pageable,
+            @PageableDefault(size = 20, sort = "subject.id", direction = Sort.Direction.ASC) Pageable pageable,
             @RequestParam(required = false) Long subjectId,
             @RequestParam(required = false) Long commissionId,
             @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated,
@@ -47,7 +47,7 @@ public class SubjectCommissionController {
         log.debug("GET /v1/subject-commissions?subjectId={}&commissionId={}&includeDeactivated={}&q={}",
                 subjectId, commissionId, includeDeactivated, q);
         SubjectCommissionFilter filter = new SubjectCommissionFilter(subjectId, commissionId, q);
-        return ResponseEntity.ok(subjectCommissionService.findAll(filter, FuzzySearch.relevanceUnlessSorted(pageable, q, Sort.by(Sort.Direction.ASC, "id.subjectId")), includeDeactivated));
+        return ResponseEntity.ok(subjectCommissionService.findAll(filter, FuzzySearch.relevanceUnlessSorted(pageable, q, Sort.by(Sort.Direction.ASC, "subject.id")), includeDeactivated));
     }
 
     @PutMapping("/{subjectId}/{commissionId}/activation")

@@ -904,9 +904,10 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
     void entityTypesReturnsAllLabels() throws Exception {
         mockMvc.perform(get("/v1/audit/entity-types"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(24)))
+                .andExpect(jsonPath("$", hasSize(25)))
                 .andExpect(jsonPath("$", hasItem("Asignación de rol")))
-                .andExpect(jsonPath("$", hasItem("Asignación de solicitud de aula")));
+                .andExpect(jsonPath("$", hasItem("Asignación de solicitud de aula")))
+                .andExpect(jsonPath("$", hasItem("Materia-comisión")));
     }
 
     @Test

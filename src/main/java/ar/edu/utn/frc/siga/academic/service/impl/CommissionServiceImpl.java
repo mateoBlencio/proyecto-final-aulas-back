@@ -176,7 +176,7 @@ public class CommissionServiceImpl implements CommissionService {
         Map<Integer, Specialty> specialtyCache = new HashMap<>();
         Map<SubjectKey, Subject> existingSubjects = Maps.byId(subjectRepository.findAll(), SubjectKey::of);
         Map<SubjectCommissionId, SubjectCommission> existingLinks =
-                Maps.byId(subjectCommissionRepository.findAll(), SubjectCommission::getId);
+                Maps.byId(subjectCommissionRepository.findAll(), SubjectCommission::key);
         long currentRows = existingCommissions.values().stream()
                 .filter(commission -> commission.getSysacadHash() != null
                         && Boolean.TRUE.equals(commission.getSysacadEnabled())).count();
@@ -272,7 +272,6 @@ public class CommissionServiceImpl implements CommissionService {
                         command.courseCode(), command.subjectCode());
             }
             SubjectCommission created = SubjectCommission.builder()
-                    .id(new SubjectCommissionId())
                     .subject(subject)
                     .commission(commission)
                     .enrolledCount(enrolledCount)

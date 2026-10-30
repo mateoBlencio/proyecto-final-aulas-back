@@ -9,7 +9,6 @@ import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
-import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
@@ -181,9 +180,9 @@ class SubjectCommissionServiceImplTest {
     @Test
     @DisplayName("findAll: con includeDeactivated=true, no restringe por deletedAt")
     void findAllWithIncludeDeactivatedMapsEveryStatus() {
-        SubjectCommission active = SubjectCommission.builder().id(new SubjectCommissionId(1L, 2L))
+        SubjectCommission active = SubjectCommission.builder().id(1L)
                 .subject(subject).commission(commission).enrolledCount(30).build();
-        SubjectCommission inactive = SubjectCommission.builder().id(new SubjectCommissionId(1L, 3L))
+        SubjectCommission inactive = SubjectCommission.builder().id(2L)
                 .subject(subject).commission(commission).enrolledCount(10).build();
         inactive.deactivate();
         SubjectCommissionResponseDto activeDto = new SubjectCommissionResponseDto(1L, null, 2L, null, 30, true, true);

@@ -60,7 +60,7 @@ public final class CatalogSearch {
         Path<?> subject = link.get("subject");
         Path<?> specialty = subject.get("studyPlan").get("specialty");
         List<Predicate> where = new ArrayList<>();
-        where.add(cb.equal(link.get("id").get("commissionId"), commission.get("id")));
+        where.add(cb.equal(link.get("commission").get("id"), commission.get("id")));
         where.add(visibleLink(cb, link, includeDeactivated));
         if (specialtyScope != null) {
             where.add(cb.equal(specialty, specialtyScope));

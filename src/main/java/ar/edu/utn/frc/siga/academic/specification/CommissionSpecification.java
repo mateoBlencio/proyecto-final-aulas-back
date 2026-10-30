@@ -32,7 +32,7 @@ public class CommissionSpecification {
                 Subquery<Long> offered = query.subquery(Long.class);
                 var subjectCommission = offered.from(SubjectCommission.class);
                 List<Predicate> offeredPredicates = new ArrayList<>();
-                offeredPredicates.add(cb.equal(subjectCommission.get("id").get("commissionId"), root.get("id")));
+                offeredPredicates.add(cb.equal(subjectCommission.get("commission").get("id"), root.get("id")));
                 offeredPredicates.add(cb.isNull(subjectCommission.get("deletedAt")));
                 offeredPredicates.add(cb.isNull(subjectCommission.get("subject").get("deletedAt")));
                 if (!includeDeactivated) {
@@ -41,22 +41,22 @@ public class CommissionSpecification {
                             subjectCommission.get("subject").get("studyPlan").get("specialty").get("deletedAt")));
                 }
                 if (filter.subjectId() != null) {
-                    offeredPredicates.add(cb.equal(subjectCommission.get("id").get("subjectId"), filter.subjectId()));
+                    offeredPredicates.add(cb.equal(subjectCommission.get("subject").get("id"), filter.subjectId()));
                 }
                 if (filter.specialtyCode() != null) {
                     offeredPredicates.add(cb.equal(
                             subjectCommission.get("subject").get("studyPlan").get("specialty").get("specialtyCode"),
                             filter.specialtyCode()));
                 }
-                offered.select(subjectCommission.get("id").get("commissionId"))
+                offered.select(subjectCommission.get("commission").get("id"))
                         .where(offeredPredicates.toArray(new Predicate[0]));
                 predicates.add(cb.exists(offered));
             }
             if (Boolean.TRUE.equals(filter.withoutSpecialty())) {
                 Subquery<Long> offered = query.subquery(Long.class);
                 var subjectCommission = offered.from(SubjectCommission.class);
-                offered.select(subjectCommission.get("id").get("commissionId"))
-                        .where(cb.equal(subjectCommission.get("id").get("commissionId"), root.get("id")),
+                offered.select(subjectCommission.get("commission").get("id"))
+                        .where(cb.equal(subjectCommission.get("commission").get("id"), root.get("id")),
                                 cb.isNull(subjectCommission.get("deletedAt")),
                                 cb.isNull(subjectCommission.get("subject").get("deletedAt")),
                                 includeDeactivated ? cb.conjunction() : cb.and(

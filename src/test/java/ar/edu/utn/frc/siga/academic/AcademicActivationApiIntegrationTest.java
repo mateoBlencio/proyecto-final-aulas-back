@@ -13,7 +13,7 @@ import ar.edu.utn.frc.siga.academic.model.Commission;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
-import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
+import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
@@ -122,11 +122,12 @@ class AcademicActivationApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("SubjectCommission: PUT/DELETE /v1/subject-commissions/{sid}/{cid}/activation (204, idempotente, 404, 403)")
     void subjectCommission_activationLifecycle() throws Exception {
         IntegrationTestData.SubjectAndCommission link = testData.materiaYComision();
-        SubjectCommissionId key = new SubjectCommissionId(link.subjectId(), link.commissionId());
         assertActivationLifecycle(
                 "/v1/subject-commissions/" + link.subjectId() + "/" + link.commissionId() + "/activation",
                 "/v1/subject-commissions/999999999/999999999/activation",
-                () -> subjectCommissionRepository.findActiveById(key).isPresent(),
+                () -> subjectCommissionRepository
+                        .findBySubject_IdAndCommission_Id(link.subjectId(), link.commissionId())
+                        .filter(SubjectCommission::isActive).isPresent(),
                 "/v1/subject-commissions?subjectId=" + link.subjectId() + "&commissionId=" + link.commissionId()
                         + "&includeDeactivated=true");
     }
