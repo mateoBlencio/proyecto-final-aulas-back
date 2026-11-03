@@ -2,6 +2,10 @@
 -- Spring Boot ejecuta este archivo automáticamente solo cuando
 -- spring.sql.init.mode=always (activo únicamente en el perfil dev-local).
 
+-- Hibernate (ddl-auto=update) crea serialized_event como varchar(255), que no entra el JSON de los eventos de
+-- Modulith; las bases con Flyway ya lo tienen en text (V27).
+ALTER TABLE event_publication ALTER COLUMN serialized_event TYPE text;
+
 -- Tipo de aula por defecto. El codigo lo busca con upper(), por eso las comparaciones tambien.
 
 -- Las bases viejas tienen 'Normal': se renombra para no dejar dos tipos y perder el que
