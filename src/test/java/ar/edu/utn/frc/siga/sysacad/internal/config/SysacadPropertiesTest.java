@@ -57,11 +57,13 @@ class SysacadPropertiesTest {
     void autogestionRequiresTargetWhenEnabled() {
         SysacadProperties properties = valid();
 
-        properties.setAutogestion(new SysacadProperties.Autogestion(true, " ", 5));
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, " ", 5, 581));
         assertThat(validator.validate(properties)).hasSize(1);
-        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5));
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, null));
+        assertThat(validator.validate(properties)).hasSize(1);
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, 581));
         assertThat(validator.validate(properties)).isEmpty();
-        properties.setAutogestion(new SysacadProperties.Autogestion(false, null, null));
+        properties.setAutogestion(new SysacadProperties.Autogestion(false, null, null, null));
         assertThat(validator.validate(properties)).isEmpty();
     }
 }

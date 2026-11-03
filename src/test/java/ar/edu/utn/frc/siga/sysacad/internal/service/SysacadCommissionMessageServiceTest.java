@@ -29,7 +29,7 @@ import static org.mockito.Mockito.when;
 @DisplayName("SysacadCommissionMessageService: envío limitado a la comisión TEST de una especialidad")
 class SysacadCommissionMessageServiceTest {
 
-    private static final RawCommission TARGET = new RawCommission("TEST", 5, 2008, 600, 2026, 77);
+    private static final RawCommission TARGET = new RawCommission("TEST", 5, 2008, 581, 2026, 77);
 
     private SysacadClient client;
     private CommissionViewFetcher fetcher;
@@ -40,24 +40,25 @@ class SysacadCommissionMessageServiceTest {
         client = mock(SysacadClient.class);
         fetcher = mock(CommissionViewFetcher.class);
         SysacadProperties properties = new SysacadProperties();
-        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5));
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, 581));
         service = new SysacadCommissionMessageService(client, fetcher, properties);
     }
 
-    private static SendCommissionMessageRequest request(String courseCode, int specialty) {
+    private static SendCommissionMessageRequest request(String courseCode, int specialty, int subject) {
         return new SendCommissionMessageRequest(
-                100, "", LocalDate.of(2026, 11, 30), 2026, specialty, courseCode, "prueba");
+                100, "", LocalDate.of(2026, 11, 30), 2026, specialty, subject, courseCode, "prueba");
     }
 
     @Test
     @DisplayName("el curso y especialidad habilitados resuelven plan, materia y comisión desde SysAcad y envían")
     void sendsWithIdsResolvedFromSysacad() {
         when(fetcher.fetch()).thenReturn(List.of(
-                new RawCommission("TEST", 27, 2008, 601, 2026, 78),
+                new RawCommission("TEST", 27, 2008, 581, 2026, 78),
+                new RawCommission("TEST", 5, 2008, 600, 2026, 79),
                 new RawCommission("1K1", 5, 2008, 519, 2026, 1),
                 TARGET));
 
-        service.send(request(" test ", 5));
+        service.send(request(" test ", 5, 581));
 
         verify(client).executeProcedure(eq("EnviarMensajeComision"), eq(Map.of(
                 "@LegajoPublica", 100,
@@ -66,7 +67,7 @@ class SysacadCommissionMessageServiceTest {
                 "@AnioAcademico", 2026,
                 "@Especialidad", 5,
                 "@Plan", 2008,
-                "@Materia", 600,
+                "@Materia", 581,
                 "@Comision", 77,
                 "@Nota", "prueba")));
     }
@@ -74,9 +75,11 @@ class SysacadCommissionMessageServiceTest {
     @Test
     @DisplayName("otro curso u otra especialidad se rechaza sin consultar ni escribir en SysAcad")
     void rejectsOtherTargetWithoutCallingSysacad() {
-        assertThatThrownBy(() -> service.send(request("1K1", 5)))
+        assertThatThrownBy(() -> service.send(request("1K1", 5, 581)))
                 .isInstanceOf(CommissionMessageNotAllowedException.class);
-        assertThatThrownBy(() -> service.send(request("TEST", 27)))
+        assertThatThrownBy(() -> service.send(request("TEST", 27, 581)))
+                .isInstanceOf(CommissionMessageNotAllowedException.class);
+        assertThatThrownBy(() -> service.send(request("TEST", 5, 600)))
                 .isInstanceOf(CommissionMessageNotAllowedException.class);
 
         verifyNoInteractions(client, fetcher);
@@ -86,11 +89,11 @@ class SysacadCommissionMessageServiceTest {
     @DisplayName("sin coincidencia o con más de una comisión en SysAcad no envía")
     void rejectsWhenNotExactlyOneMatch() {
         when(fetcher.fetch()).thenReturn(List.of());
-        assertThatThrownBy(() -> service.send(request("TEST", 5)))
+        assertThatThrownBy(() -> service.send(request("TEST", 5, 581)))
                 .isInstanceOf(CommissionMessageNotAllowedException.class);
 
-        when(fetcher.fetch()).thenReturn(List.of(TARGET, new RawCommission("TEST", 5, 2008, 601, 2026, 78)));
-        assertThatThrownBy(() -> service.send(request("TEST", 5)))
+        when(fetcher.fetch()).thenReturn(List.of(TARGET, new RawCommission("TEST", 5, 2009, 581, 2026, 78)));
+        assertThatThrownBy(() -> service.send(request("TEST", 5, 581)))
                 .isInstanceOf(CommissionMessageNotAllowedException.class);
 
         verifyNoInteractions(client);
@@ -103,7 +106,7 @@ class SysacadCommissionMessageServiceTest {
         doThrow(new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR))
                 .when(client).executeProcedure(any(), any());
 
-        assertThatThrownBy(() -> service.send(request("TEST", 5)))
+        assertThatThrownBy(() -> service.send(request("TEST", 5, 581)))
                 .isInstanceOf(CommissionMessageFailedException.class);
     }
 }

@@ -223,6 +223,7 @@ siga:
       enabled: ${SYSACAD_AUTOGESTION_ENABLED:false}
       course-code: ${SYSACAD_AUTOGESTION_COURSE_CODE:}
       specialty: ${SYSACAD_AUTOGESTION_SPECIALTY:}
+      subject: ${SYSACAD_AUTOGESTION_SUBJECT:}
   camera-count:
     enabled: ${CONTEO_ENABLED}
     url: ${CONTEO_URL:}

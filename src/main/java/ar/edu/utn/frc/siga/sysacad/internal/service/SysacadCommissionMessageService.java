@@ -51,19 +51,22 @@ public class SysacadCommissionMessageService {
     private RawCommission resolveTarget(SendCommissionMessageRequest request) {
         SysacadProperties.Autogestion allowed = properties.getAutogestion();
         if (!sameCourseCode(allowed.courseCode(), request.courseCode())
-                || !allowed.specialty().equals(request.specialty())) {
-            log.warn("Envío rechazado: curso={} especialidad={} fuera de lo habilitado",
-                    request.courseCode(), request.specialty());
+                || !allowed.specialty().equals(request.specialty())
+                || !allowed.subject().equals(request.subject())) {
+            log.warn("Envío rechazado: curso={} especialidad={} materia={} fuera de lo habilitado",
+                    request.courseCode(), request.specialty(), request.subject());
             throw new CommissionMessageNotAllowedException();
         }
         List<RawCommission> matches = commissionViewFetcher.fetch().stream()
                 .filter(row -> sameCourseCode(allowed.courseCode(), row.curso())
                         && allowed.specialty().equals(row.especialid())
+                        && allowed.subject().equals(row.materia())
                         && request.academicYear().equals(row.anoacademi()))
                 .toList();
         if (matches.size() != 1) {
-            log.warn("Envío rechazado: {} comisiones de SysAcad coinciden con curso={} especialidad={} año={}",
-                    matches.size(), request.courseCode(), request.specialty(), request.academicYear());
+            log.warn("Envío rechazado: {} comisiones de SysAcad coinciden con curso={} especialidad={} materia={} año={}",
+                    matches.size(), request.courseCode(), request.specialty(), request.subject(),
+                    request.academicYear());
             throw new CommissionMessageNotAllowedException();
         }
         return matches.get(0);
