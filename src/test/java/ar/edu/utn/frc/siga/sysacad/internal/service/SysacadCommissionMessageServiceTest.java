@@ -40,7 +40,7 @@ class SysacadCommissionMessageServiceTest {
         client = mock(SysacadClient.class);
         fetcher = mock(CommissionViewFetcher.class);
         SysacadProperties properties = new SysacadProperties();
-        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, 581, 100, "U", 14));
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, 581, 100, "U", 14, "0 0 23 * * *"));
         service = new SysacadCommissionMessageService(client, fetcher, properties);
     }
 

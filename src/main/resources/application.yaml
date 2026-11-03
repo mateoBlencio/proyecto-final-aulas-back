@@ -229,6 +229,7 @@ siga:
       public-legajo: ${SYSACAD_AUTOGESTION_PUBLIC_LEGAJO:}
       public-user-type: ${SYSACAD_AUTOGESTION_PUBLIC_USER_TYPE:}
       until-days: ${SYSACAD_AUTOGESTION_UNTIL_DAYS:14}
+      check-cron: ${SYSACAD_AUTOGESTION_CHECK_CRON:0 0 23 * * *}
   camera-count:
     enabled: ${CONTEO_ENABLED}
     url: ${CONTEO_URL:}

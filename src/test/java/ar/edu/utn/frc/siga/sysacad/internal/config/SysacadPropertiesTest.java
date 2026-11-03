@@ -57,19 +57,19 @@ class SysacadPropertiesTest {
     void autogestionRequiresTargetWhenEnabled() {
         SysacadProperties properties = valid();
 
-        properties.setAutogestion(new SysacadProperties.Autogestion(true, " ", 5, 581, 100, "U", 14));
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, " ", 5, 581, 100, "U", 14, "0 0 23 * * *"));
         assertThat(validator.validate(properties)).hasSize(1);
-        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, null, 100, "U", 14));
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, null, 100, "U", 14, "0 0 23 * * *"));
         assertThat(validator.validate(properties)).hasSize(1);
-        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, 581, null, "U", 14));
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, 581, null, "U", 14, "0 0 23 * * *"));
         assertThat(validator.validate(properties)).hasSize(1);
-        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, 581, 100, "", 14));
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, 581, 100, "", 14, "0 0 23 * * *"));
         assertThat(validator.validate(properties)).hasSize(1);
-        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, 581, 100, "U", 0));
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, 581, 100, "U", 0, "0 0 23 * * *"));
         assertThat(validator.validate(properties)).hasSize(1);
-        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, 581, 100, "U", 14));
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, 581, 100, "U", 14, "0 0 23 * * *"));
         assertThat(validator.validate(properties)).isEmpty();
-        properties.setAutogestion(new SysacadProperties.Autogestion(false, null, null, null, null, null, 14));
+        properties.setAutogestion(new SysacadProperties.Autogestion(false, null, null, null, null, null, 14, "0 0 23 * * *"));
         assertThat(validator.validate(properties)).isEmpty();
     }
 

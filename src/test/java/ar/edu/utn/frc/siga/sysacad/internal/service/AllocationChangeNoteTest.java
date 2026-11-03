@@ -17,15 +17,13 @@ class AllocationChangeNoteTest {
     private static final LocalTime START = LocalTime.of(13, 15);
 
     @Test
-    @DisplayName("asignación, cambio y liberación se describen distinto, ordenados por fecha")
+    @DisplayName("asignación y cambio de aula se describen distinto, ordenados por fecha")
     void describesEachKindOfChange() {
         String note = AllocationChangeNote.compose(List.of(
-                new Line(LocalDate.of(2026, 11, 17), START, 220, null),
                 new Line(LocalDate.of(2026, 11, 10), START, 220, 305),
                 new Line(LocalDate.of(2026, 11, 3), START, null, 220)));
 
-        assertThat(note).isEqualTo(
-                "Cambio de aula: 03/11 13:15 aula 220; 10/11 13:15 aula 220>305; 17/11 13:15 sin aula");
+        assertThat(note).isEqualTo("Cambio de aula: 03/11 13:15 aula 220; 10/11 13:15 aula 220>305");
     }
 
     @Test

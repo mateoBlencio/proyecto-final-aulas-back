@@ -24,6 +24,7 @@ public class SysacadProperties {
 
     private static final int DEFAULT_MIN_VALID_ROWS_PERCENT = 50;
     private static final int DEFAULT_UNTIL_DAYS = 14;
+    private static final String DEFAULT_CHECK_CRON = "0 0 23 * * *";
 
     private boolean enabled = false;
 
@@ -45,7 +46,7 @@ public class SysacadProperties {
     private Sync sync = new Sync(null, DEFAULT_MIN_VALID_ROWS_PERCENT, null, null, null);
 
     @Valid
-    private Autogestion autogestion = new Autogestion(false, null, null, null, null, null, DEFAULT_UNTIL_DAYS);
+    private Autogestion autogestion = new Autogestion(false, null, null, null, null, null, DEFAULT_UNTIL_DAYS, DEFAULT_CHECK_CRON);
 
     /**
      * {@code minValidRowsPercent}: minimum percentage of valid rows, relative to what is active in SIGA, for a
@@ -69,11 +70,12 @@ public class SysacadProperties {
      * Gate for EnviarMensajeComision, which writes to production SysAcad. When enabled, only the commission with
      * this course code in this specialty and subject can receive messages. {@code publicLegajo} and
      * {@code publicUserType} sign the automatic messages sent on classroom changes, which stay valid for
-     * {@code untilDays} days.
+     * {@code untilDays} days. {@code checkCron} schedules the end-of-day check of classroom changes.
      */
     public record Autogestion(@DefaultValue("false") boolean enabled, String courseCode, Integer specialty,
                               Integer subject, Integer publicLegajo, String publicUserType,
-                              @DefaultValue("14") @Min(1) int untilDays) {
+                              @DefaultValue("14") @Min(1) int untilDays,
+                              @DefaultValue("0 0 23 * * *") String checkCron) {
 
         @AssertTrue(message = "con autogestion habilitada se requieren courseCode, specialty, subject, "
                 + "publicLegajo y publicUserType")

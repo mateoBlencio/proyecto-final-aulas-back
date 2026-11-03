@@ -18,9 +18,6 @@ final class AllocationChangeNote {
 
         String text() {
             String when = DATE.format(date) + " " + TIME.format(startTime);
-            if (toRoom == null) {
-                return when + " sin aula";
-            }
             return fromRoom == null ? when + " aula " + toRoom : when + " aula " + fromRoom + ">" + toRoom;
         }
     }
