@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.sysacad.internal.config;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -40,11 +41,28 @@ public class SysacadProperties {
     private DataSize maxResponseSize = DataSize.ofMegabytes(32);
 
     @Valid
-    private Sync sync = new Sync(null, DEFAULT_MIN_VALID_ROWS_PERCENT);
+    private Sync sync = new Sync(null, DEFAULT_MIN_VALID_ROWS_PERCENT, null);
+
+    @Valid
+    private Autogestion autogestion = new Autogestion(false, null, null, null, null);
 
     /**
      * {@code minValidRowsPercent}: minimum percentage of valid rows, relative to what is active in SIGA, for a
      * view to deactivate what is absent. 0 disables the threshold (zero valid rows always aborts).
      */
-    public record Sync(String cron, @DefaultValue("50") @Min(0) @Max(100) int minValidRowsPercent) {}
+    public record Sync(String cron, @DefaultValue("50") @Min(0) @Max(100) int minValidRowsPercent,
+                       String onlySubjectName) {}
+
+    /**
+     * Gate for EnviarMensajeComision, which writes to production SysAcad. When enabled, only the configured
+     * specialty/plan/subject/commission can receive messages.
+     */
+    public record Autogestion(@DefaultValue("false") boolean enabled, Integer specialty, Integer plan,
+                              Integer subject, Integer commission) {
+
+        @AssertTrue(message = "con autogestion habilitada se requieren specialty, plan, subject y commission")
+        public boolean isTargetConfigured() {
+            return !enabled || (specialty != null && plan != null && subject != null && commission != null);
+        }
+    }
 }

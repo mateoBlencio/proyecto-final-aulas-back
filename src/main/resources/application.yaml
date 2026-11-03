@@ -218,6 +218,13 @@ siga:
     sync:
       cron: "0 0 3 * * SUN"
       min-valid-rows-percent: 50
+      only-subject-name: ${SYSACAD_SYNC_ONLY_SUBJECT_NAME:}
+    autogestion:
+      enabled: ${SYSACAD_AUTOGESTION_ENABLED:false}
+      specialty: ${SYSACAD_AUTOGESTION_SPECIALTY:}
+      plan: ${SYSACAD_AUTOGESTION_PLAN:}
+      subject: ${SYSACAD_AUTOGESTION_SUBJECT:}
+      commission: ${SYSACAD_AUTOGESTION_COMMISSION:}
   camera-count:
     enabled: ${CONTEO_ENABLED}
     url: ${CONTEO_URL:}

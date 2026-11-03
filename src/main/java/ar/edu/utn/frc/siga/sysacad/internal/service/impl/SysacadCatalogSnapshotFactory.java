@@ -10,9 +10,15 @@ import ar.edu.utn.frc.siga.sysacad.internal.client.view.ScheduleViewFetcher;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.SpecialtyViewFetcher;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.SubjectViewFetcher;
 import ar.edu.utn.frc.siga.sysacad.internal.mapper.SysacadCatalogMapper;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawCommission;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSchedule;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSubject;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -27,15 +33,29 @@ public class SysacadCatalogSnapshotFactory {
     private final SubjectViewFetcher subjectViewFetcher;
     private final HolidayViewFetcher holidayViewFetcher;
     private final SysacadCatalogMapper mapper;
+    private final SysacadProperties properties;
 
     public SysacadCatalogReader newSnapshot() {
+        Lazy<List<RawSubject>> subjects = Lazy.of(subjectViewFetcher::fetch);
+        Lazy<List<RawCommission>> commissions = Lazy.of(commissionViewFetcher::fetch);
+        Lazy<List<RawSchedule>> schedules = Lazy.of(scheduleViewFetcher::fetch);
+        String onlySubjectName = properties.getSync().onlySubjectName();
+        if (onlySubjectName != null && !onlySubjectName.isBlank()) {
+            SubjectScope scope = new SubjectScope(onlySubjectName, subjects);
+            Lazy<List<RawSubject>> allSubjects = subjects;
+            subjects = Lazy.of(() -> scope.subjects(allSubjects.get()));
+            Lazy<List<RawCommission>> allCommissions = commissions;
+            commissions = Lazy.of(() -> scope.commissions(allCommissions.get()));
+            Lazy<List<RawSchedule>> allSchedules = schedules;
+            schedules = Lazy.of(() -> scope.schedules(allSchedules.get()));
+        }
         return new SysacadCatalogSnapshot(
                 Lazy.of(buildingViewFetcher::fetch),
                 Lazy.of(classroomViewFetcher::fetch),
                 Lazy.of(specialtyViewFetcher::fetch),
-                Lazy.of(commissionViewFetcher::fetch),
-                Lazy.of(scheduleViewFetcher::fetch),
-                Lazy.of(subjectViewFetcher::fetch),
+                commissions,
+                schedules,
+                subjects,
                 Lazy.of(holidayViewFetcher::fetch),
                 mapper);
     }

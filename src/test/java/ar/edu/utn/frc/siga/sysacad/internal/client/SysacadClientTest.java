@@ -186,4 +186,31 @@ class SysacadClientTest {
             http.stop(0);
         }
     }
+
+    @Test
+    @DisplayName("executeProcedure: POST con {params} y sin reintentos ante 503")
+    void executesProcedureWithoutRetry() {
+        String procedureUrl = "http://sysacad.test/api/data/procedures/EnviarMensajeComision";
+        server.expect(requestTo(procedureUrl)).andExpect(method(HttpMethod.POST))
+                .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers
+                        .content().json("{\"params\":{\"@Nota\":\"hola\"}}"))
+                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+
+        assertThatThrownBy(() -> client.executeProcedure("EnviarMensajeComision", java.util.Map.of("@Nota", "hola")))
+                .isInstanceOf(HttpServerErrorException.class);
+
+        assertThat(sleeps).isEmpty();
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("executeProcedure: error de E/S se informa como SysacadUnavailableException")
+    void procedureIoErrorBecomesUnavailable() {
+        server.expect(requestTo("http://sysacad.test/api/data/procedures/EnviarMensajeComision"))
+                .andRespond(withException(new IOException("Read timed out")));
+
+        assertThatThrownBy(() -> client.executeProcedure("EnviarMensajeComision", java.util.Map.of()))
+                .isInstanceOf(SysacadUnavailableException.class)
+                .hasMessageContaining("EnviarMensajeComision");
+    }
 }

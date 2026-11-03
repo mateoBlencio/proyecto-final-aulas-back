@@ -42,13 +42,26 @@ class SysacadPropertiesTest {
     void rejectsThresholdOutOfRange() {
         SysacadProperties properties = valid();
 
-        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", 101));
+        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", 101, null));
         assertThat(validator.validate(properties)).hasSize(1);
-        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", -1));
+        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", -1, null));
         assertThat(validator.validate(properties)).hasSize(1);
-        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", 0));
+        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", 0, null));
         assertThat(validator.validate(properties)).isEmpty();
-        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", 100));
+        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", 100, null));
+        assertThat(validator.validate(properties)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("autogestion habilitada sin los cuatro ids del destino se rechaza; deshabilitada no exige nada")
+    void autogestionRequiresTargetWhenEnabled() {
+        SysacadProperties properties = valid();
+
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, 1, 2, 3, null));
+        assertThat(validator.validate(properties)).hasSize(1);
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, 1, 2, 3, 4));
+        assertThat(validator.validate(properties)).isEmpty();
+        properties.setAutogestion(new SysacadProperties.Autogestion(false, null, null, null, null));
         assertThat(validator.validate(properties)).isEmpty();
     }
 }

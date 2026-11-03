@@ -11,6 +11,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -20,6 +21,7 @@ import org.springframework.web.util.UriBuilder;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 @Slf4j
@@ -28,6 +30,7 @@ import java.util.function.Consumer;
 public class SysacadClient {
 
     private static final String VIEW_PATH = "/api/data/views/{view}";
+    private static final String PROCEDURE_PATH = "/api/data/procedures/{procedure}";
     private static final Duration BASE_BACKOFF = Duration.ofSeconds(1);
     private static final Duration MAX_BACKOFF = Duration.ofSeconds(30);
 
@@ -67,6 +70,20 @@ public class SysacadClient {
                 throw new SysacadUnavailableException(
                         "No se pudo conectar con SysAcad para la vista " + view, e);
             }
+        }
+    }
+
+    public void executeProcedure(String procedure, Map<String, Object> params) {
+        try {
+            restClient.post()
+                    .uri(PROCEDURE_PATH, procedure)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("params", params))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (ResourceAccessException e) {
+            throw new SysacadUnavailableException(
+                    "No se pudo conectar con SysAcad para el procedimiento " + procedure, e);
         }
     }
 
