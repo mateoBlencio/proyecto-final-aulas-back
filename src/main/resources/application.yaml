@@ -226,6 +226,9 @@ siga:
       course-code: ${SYSACAD_AUTOGESTION_COURSE_CODE:}
       specialty: ${SYSACAD_AUTOGESTION_SPECIALTY:}
       subject: ${SYSACAD_AUTOGESTION_SUBJECT:}
+      public-legajo: ${SYSACAD_AUTOGESTION_PUBLIC_LEGAJO:}
+      public-user-type: ${SYSACAD_AUTOGESTION_PUBLIC_USER_TYPE:}
+      until-days: ${SYSACAD_AUTOGESTION_UNTIL_DAYS:14}
   camera-count:
     enabled: ${CONTEO_ENABLED}
     url: ${CONTEO_URL:}

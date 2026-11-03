@@ -57,11 +57,16 @@ public class SysacadCommissionMessageService {
         log.info("SysAcad aceptó {}: {}", PROCEDURE, response);
     }
 
+    public boolean isTarget(String courseCode, Integer specialty, Integer subject) {
+        SysacadProperties.Autogestion allowed = properties.getAutogestion();
+        return sameCourseCode(allowed.courseCode(), courseCode)
+                && allowed.specialty().equals(specialty)
+                && allowed.subject().equals(subject);
+    }
+
     private RawCommission resolveTarget(SendCommissionMessageRequest request) {
         SysacadProperties.Autogestion allowed = properties.getAutogestion();
-        if (!sameCourseCode(allowed.courseCode(), request.courseCode())
-                || !allowed.specialty().equals(request.specialty())
-                || !allowed.subject().equals(request.subject())) {
+        if (!isTarget(request.courseCode(), request.specialty(), request.subject())) {
             log.warn("Envío rechazado: curso={} especialidad={} materia={} fuera de lo habilitado",
                     request.courseCode(), request.specialty(), request.subject());
             throw new CommissionMessageNotAllowedException();

@@ -53,17 +53,23 @@ class SysacadPropertiesTest {
     }
 
     @Test
-    @DisplayName("autogestion habilitada sin courseCode y specialty se rechaza; deshabilitada no exige nada")
+    @DisplayName("autogestion habilitada exige destino, legajo y tipo de usuario; deshabilitada no exige nada")
     void autogestionRequiresTargetWhenEnabled() {
         SysacadProperties properties = valid();
 
-        properties.setAutogestion(new SysacadProperties.Autogestion(true, " ", 5, 581));
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, " ", 5, 581, 100, "U", 14));
         assertThat(validator.validate(properties)).hasSize(1);
-        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, null));
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, null, 100, "U", 14));
         assertThat(validator.validate(properties)).hasSize(1);
-        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, 581));
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, 581, null, "U", 14));
+        assertThat(validator.validate(properties)).hasSize(1);
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, 581, 100, "", 14));
+        assertThat(validator.validate(properties)).hasSize(1);
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, 581, 100, "U", 0));
+        assertThat(validator.validate(properties)).hasSize(1);
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, 581, 100, "U", 14));
         assertThat(validator.validate(properties)).isEmpty();
-        properties.setAutogestion(new SysacadProperties.Autogestion(false, null, null, null));
+        properties.setAutogestion(new SysacadProperties.Autogestion(false, null, null, null, null, null, 14));
         assertThat(validator.validate(properties)).isEmpty();
     }
 
