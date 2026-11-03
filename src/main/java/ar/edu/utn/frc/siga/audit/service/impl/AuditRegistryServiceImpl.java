@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.audit.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditUserNames;
 import ar.edu.utn.frc.siga.audit.dto.AuditLogFilter;
 import ar.edu.utn.frc.siga.audit.dto.RevisionMetadata;
 import ar.edu.utn.frc.siga.audit.dto.response.AuditLogEntryDto;
@@ -37,7 +38,10 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.function.Supplier;
 
 @Slf4j
@@ -52,6 +56,8 @@ public class AuditRegistryServiceImpl implements AuditRegistryService {
     private final AuditedEntityRegistry registry;
     private final AuditLogEntryMapper auditLogEntryMapper;
     private final AuditLabelResolver labelResolver;
+    private final ReferenceLabelLoader referenceLabelLoader;
+    private final AuditUserNames userNames;
 
     @Value("${siga.audit.export.max-rows:10000}")
     private long exportMaxRows;
@@ -120,9 +126,9 @@ public class AuditRegistryServiceImpl implements AuditRegistryService {
     private List<AuditLogEntryDto> loadGroupPage(AuditLogCriteria criteria, Pageable pageable) {
         List<AuditGroupRow> groups = repository.findGroups(criteria, pageable);
         Map<RecordRevision, String> labels = loadSingleChangeLabels(groups);
-        return groups.stream()
+        return withFullNames(groups.stream()
                 .map(row -> toEntry(row, labels))
-                .toList();
+                .toList());
     }
 
     @Override
@@ -150,7 +156,7 @@ public class AuditRegistryServiceImpl implements AuditRegistryService {
                 .sorted(Comparator.comparingInt(AuditGroupRow::revision))
                 .map(auditLogEntryMapper::toOperation)
                 .toList();
-        return new AuditOperationChainDto(entries, chain.truncated());
+        return new AuditOperationChainDto(withFullNames(entries), chain.truncated());
     }
 
     @Override
@@ -166,6 +172,7 @@ public class AuditRegistryServiceImpl implements AuditRegistryService {
                 .map(row -> new RecordRevision(row.entity(), row.metadata().recordId(), row.metadata().revision()))
                 .toList());
         Map<RecordRevision, String> labels = labelResolver.resolve(states);
+        FieldValueFormatter formatter = new FieldValueFormatter(referenceLabelLoader.load(states));
         List<AuditLogEntryDto> content = rows.stream()
                 .map(row -> {
                     RecordRevision key = new RecordRevision(row.entity(), row.metadata().recordId(), row.metadata().revision());
@@ -176,10 +183,24 @@ public class AuditRegistryServiceImpl implements AuditRegistryService {
                     }
                     return auditLogEntryMapper.toChange(row.metadata(), row.entity().label(), labels.get(key),
                             recordStates == null ? null
-                                    : FieldDiffCalculator.calculate(row.entity(), row.metadata().kind(), recordStates));
+                                    : FieldDiffCalculator.calculate(row.entity(), row.metadata().kind(), recordStates,
+                                            formatter));
                 })
                 .toList();
-        return new PageImpl<>(content, pageable, total);
+        return new PageImpl<>(withFullNames(content), pageable, total);
+    }
+
+    private List<AuditLogEntryDto> withFullNames(List<AuditLogEntryDto> entries) {
+        Set<String> emails = entries.stream().map(AuditLogEntryDto::user).filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (emails.isEmpty()) {
+            return entries;
+        }
+        Map<String, String> fullNames = userNames.fullNames(emails);
+        return entries.stream()
+                .map(entry -> entry.user() == null ? entry
+                        : AuditLogEntryDto.withUserFullName(entry, fullNames.get(entry.user())))
+                .toList();
     }
 
     // Standalone single-record changes of the listing: one state load per entity type of the page.

@@ -89,8 +89,11 @@ class AuditRegistryServiceImplTest {
     }
 
     private AuditRegistryServiceImpl serviceWith(AuditLabelProvider... providers) {
+        AuditLabelResolver labelResolver =
+                new AuditLabelResolver(List.of(providers), mock(PlatformTransactionManager.class));
         return new AuditRegistryServiceImpl(repository, stateRepository, registry, new AuditLogEntryMapperImpl(),
-                new AuditLabelResolver(List.of(providers), mock(PlatformTransactionManager.class)));
+                labelResolver, new ReferenceLabelLoader(registry, stateRepository, labelResolver),
+                emails -> Map.of());
     }
 
     /** Provider of {@code ALLOCATION} records (java type String in this fixture) labelling each with "L-{id}". */
@@ -142,6 +145,11 @@ class AuditRegistryServiceImplTest {
                                             RevisionKind commonKind, String description) {
         return new AuditGroupRow(null, null, revision, DATE, "user@frc", ActorType.HUMAN, description, recordCount, entityTypes,
                 commonKind, entityTypes.getFirst(), "42");
+    }
+
+    private static AuditGroupRow groupOf(String operationId, String user) {
+        return new AuditGroupRow(operationId, null, 5, DATE, user, ActorType.HUMAN, "d", 2,
+                List.of("Asignación"), RevisionKind.CREATED, "Asignación", "7");
     }
 
     private static AuditLogFilter filter(String entityType) {
@@ -575,10 +583,33 @@ class AuditRegistryServiceImplTest {
     }
 
     @Test
+    @DisplayName("userFullName se completa por email en una sola consulta; sin usuario o sin nombre queda null")
+    void entriesCarryUserFullName() {
+        AuditGroupRow named = groupOf("op-1", "ana@frc");
+        AuditGroupRow unknown = groupOf("op-2", "ghost@frc");
+        AuditGroupRow anonymous = groupOf("op-3", null);
+        when(repository.findGroups(any(), any())).thenReturn(List.of(named, unknown, anonymous));
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        AuditLabelResolver labelResolver = new AuditLabelResolver(List.of(), mock(PlatformTransactionManager.class));
+        AuditRegistryServiceImpl withNames = new AuditRegistryServiceImpl(repository, stateRepository, registry,
+                new AuditLogEntryMapperImpl(), labelResolver,
+                new ReferenceLabelLoader(registry, stateRepository, labelResolver), emails -> {
+                    calls.incrementAndGet();
+                    return Map.of("ana@frc", "Ana Pérez");
+                });
+
+        Page<AuditLogEntryDto> page = withNames.findAll(filter(null), PageRequest.of(0, 20));
+
+        assertThat(page.getContent()).extracting(AuditLogEntryDto::userFullName)
+                .containsExactly("Ana Pérez", null, null);
+        assertThat(calls).hasValue(1);
+    }
+
+    @Test
     @DisplayName("el diff de cada fila usa su estado cargado y una fila sin estado cargado queda con changes null")
     void findOperationItems_buildsChangesFromLoadedStates() {
         AuditedEntity withColumns = new AuditedEntity(Integer.class, "Setting", "Configuración", "configuracion_aud",
-                "clave", String.class, List.of(new AuditedEntity.AuditedColumn("configuracion_aud", "valor", "value")));
+                "clave", String.class, List.of(new AuditedEntity.AuditedColumn("configuracion_aud", "valor", "value", null, null)));
         RevisionMetadata loaded = new RevisionMetadata("k1", 31, DATE, "user@frc", ActorType.HUMAN,
                 RevisionKind.MODIFIED, "Modificación de configuración", "op-1");
         RevisionMetadata missing = new RevisionMetadata("k2", 30, DATE, "user@frc", ActorType.HUMAN,
@@ -592,7 +623,7 @@ class AuditRegistryServiceImplTest {
 
         Page<AuditLogEntryDto> page = service.findOperationItems("op-1", filter(null), PageRequest.of(0, 2));
 
-        assertThat(page.getContent().get(0).changes()).containsExactly(new FieldChangeDto("value", "A", "B"));
+        assertThat(page.getContent().get(0).changes()).containsExactly(new FieldChangeDto("value", "Valor", "A", "B"));
         assertThat(page.getContent().get(1).changes()).isNull();
     }
 
@@ -600,7 +631,7 @@ class AuditRegistryServiceImplTest {
     @DisplayName("un MODIFIED con estado cargado y sin campos auditados distintos queda con changes de lista vacía, no null")
     void findOperationItems_modifiedWithoutAuditedChangesHasEmptyList() {
         AuditedEntity withColumns = new AuditedEntity(Integer.class, "Setting", "Configuración", "configuracion_aud",
-                "clave", String.class, List.of(new AuditedEntity.AuditedColumn("configuracion_aud", "valor", "value")));
+                "clave", String.class, List.of(new AuditedEntity.AuditedColumn("configuracion_aud", "valor", "value", null, null)));
         RevisionMetadata metadata = new RevisionMetadata("k1", 31, DATE, "user@frc", ActorType.HUMAN,
                 RevisionKind.MODIFIED, "Modificación de configuración", "op-1");
         when(repository.countChanges(any(), any())).thenReturn(1L);
