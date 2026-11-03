@@ -29,8 +29,9 @@ public class SysacadCommissionMessageController {
     @PreAuthorize("hasAuthority('PERM_SYSACAD_SYNC')")
     @Operation(summary = "Enviar un mensaje de autogestión a una comisión",
                description = "Ejecuta EnviarMensajeComision, que escribe en SysAcad productivo. Solo existe con "
-                       + "siga.sysacad.autogestion.enabled=true y rechaza con 403 cualquier especialidad, plan, "
-                       + "materia o comisión distinta de la configurada en siga.sysacad.autogestion. "
+                       + "siga.sysacad.autogestion.enabled=true y rechaza con 403 cualquier código de curso o "
+                       + "especialidad distinto del configurado en siga.sysacad.autogestion, o que no resuelva a "
+                       + "exactamente una comisión de SysAcad en el año indicado. "
                        + "Responde 502 si SysAcad no acepta el mensaje.")
     public ResponseEntity<Void> send(@Valid @RequestBody SendCommissionMessageRequest request) {
         log.info("POST /v1/sysacad/commission-messages");

@@ -53,15 +53,15 @@ class SysacadPropertiesTest {
     }
 
     @Test
-    @DisplayName("autogestion habilitada sin los cuatro ids del destino se rechaza; deshabilitada no exige nada")
+    @DisplayName("autogestion habilitada sin courseCode y specialty se rechaza; deshabilitada no exige nada")
     void autogestionRequiresTargetWhenEnabled() {
         SysacadProperties properties = valid();
 
-        properties.setAutogestion(new SysacadProperties.Autogestion(true, 1, 2, 3, null));
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, " ", 5));
         assertThat(validator.validate(properties)).hasSize(1);
-        properties.setAutogestion(new SysacadProperties.Autogestion(true, 1, 2, 3, 4));
+        properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5));
         assertThat(validator.validate(properties)).isEmpty();
-        properties.setAutogestion(new SysacadProperties.Autogestion(false, null, null, null, null));
+        properties.setAutogestion(new SysacadProperties.Autogestion(false, null, null));
         assertThat(validator.validate(properties)).isEmpty();
     }
 }

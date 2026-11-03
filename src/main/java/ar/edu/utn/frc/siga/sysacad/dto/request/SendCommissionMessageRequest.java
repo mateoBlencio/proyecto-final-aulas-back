@@ -12,8 +12,6 @@ public record SendCommissionMessageRequest(
         @NotNull LocalDate untilDate,
         @NotNull Integer academicYear,
         @NotNull Integer specialty,
-        @NotNull Integer plan,
-        @NotNull Integer subject,
-        @NotNull Integer commission,
+        @NotBlank String courseCode,
         @NotBlank @Size(max = 150) String note) {
 }

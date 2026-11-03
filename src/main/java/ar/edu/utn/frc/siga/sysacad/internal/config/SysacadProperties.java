@@ -44,7 +44,7 @@ public class SysacadProperties {
     private Sync sync = new Sync(null, DEFAULT_MIN_VALID_ROWS_PERCENT, null);
 
     @Valid
-    private Autogestion autogestion = new Autogestion(false, null, null, null, null);
+    private Autogestion autogestion = new Autogestion(false, null, null);
 
     /**
      * {@code minValidRowsPercent}: minimum percentage of valid rows, relative to what is active in SIGA, for a
@@ -54,15 +54,14 @@ public class SysacadProperties {
                        String onlySubjectName) {}
 
     /**
-     * Gate for EnviarMensajeComision, which writes to production SysAcad. When enabled, only the configured
-     * specialty/plan/subject/commission can receive messages.
+     * Gate for EnviarMensajeComision, which writes to production SysAcad. When enabled, only the commission with
+     * this course code in this specialty can receive messages.
      */
-    public record Autogestion(@DefaultValue("false") boolean enabled, Integer specialty, Integer plan,
-                              Integer subject, Integer commission) {
+    public record Autogestion(@DefaultValue("false") boolean enabled, String courseCode, Integer specialty) {
 
-        @AssertTrue(message = "con autogestion habilitada se requieren specialty, plan, subject y commission")
+        @AssertTrue(message = "con autogestion habilitada se requieren courseCode y specialty")
         public boolean isTargetConfigured() {
-            return !enabled || (specialty != null && plan != null && subject != null && commission != null);
+            return !enabled || (courseCode != null && !courseCode.isBlank() && specialty != null);
         }
     }
 }
