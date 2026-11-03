@@ -73,14 +73,14 @@ public class SysacadClient {
         }
     }
 
-    public void executeProcedure(String procedure, Map<String, Object> params) {
+    public String executeProcedure(String procedure, Map<String, Object> params) {
         try {
-            restClient.post()
+            return restClient.post()
                     .uri(PROCEDURE_PATH, procedure)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("params", params))
                     .retrieve()
-                    .toBodilessEntity();
+                    .body(String.class);
         } catch (ResourceAccessException e) {
             throw new SysacadUnavailableException(
                     "No se pudo conectar con SysAcad para el procedimiento " + procedure, e);

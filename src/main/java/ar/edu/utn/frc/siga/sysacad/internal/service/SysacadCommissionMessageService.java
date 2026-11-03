@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.sysacad.internal.client.view.CommissionViewFetcher;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
 import ar.edu.utn.frc.siga.sysacad.internal.exception.CommissionMessageFailedException;
 import ar.edu.utn.frc.siga.sysacad.internal.exception.CommissionMessageNotAllowedException;
+import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadUnavailableException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -30,8 +31,12 @@ public class SysacadCommissionMessageService {
 
     public void send(SendCommissionMessageRequest request) {
         RawCommission target = resolveTarget(request);
+        log.info("Enviando {} a SysAcad: curso={} especialidad={} plan={} materia={} comisión={} año={} hasta={}",
+                PROCEDURE, request.courseCode(), target.especialid(), target.plan(), target.materia(),
+                target.comision(), request.academicYear(), request.untilDate());
+        String response;
         try {
-            client.executeProcedure(PROCEDURE, Map.of(
+            response = client.executeProcedure(PROCEDURE, Map.of(
                     "@LegajoPublica", request.publicLegajo(),
                     "@IdTipoUsuarioPublica", request.publicUserType(),
                     "@FechaHasta", request.untilDate().toString(),
@@ -42,10 +47,14 @@ public class SysacadCommissionMessageService {
                     "@Comision", target.comision(),
                     "@Nota", request.note()));
         } catch (RestClientResponseException e) {
-            log.error("SysAcad respondió {} a {}", e.getStatusCode().value(), PROCEDURE);
+            log.error("SysAcad respondió {} a {}: {}", e.getStatusCode().value(), PROCEDURE,
+                    e.getResponseBodyAsString());
+            throw new CommissionMessageFailedException(e);
+        } catch (SysacadUnavailableException e) {
+            log.error("Sin conexión con SysAcad al ejecutar {}", PROCEDURE);
             throw new CommissionMessageFailedException(e);
         }
-        log.info("Mensaje enviado a la comisión {} de la especialidad {}", request.courseCode(), request.specialty());
+        log.info("SysAcad aceptó {}: {}", PROCEDURE, response);
     }
 
     private RawCommission resolveTarget(SendCommissionMessageRequest request) {
