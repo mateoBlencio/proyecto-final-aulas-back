@@ -19,9 +19,9 @@ class FieldDiffCalculatorTest {
 
     private static final AuditedEntity ENTITY = new AuditedEntity(
             Object.class, "Occurrence", "Ocurrencia", "ocurrencia_aud", "id_ocurrencia", Long.class,
-            List.of(new AuditedColumn("ocurrencia_aud", "fecha", "date"),
-                    new AuditedColumn("ocurrencia_aud", "estado", "status"),
-                    new AuditedColumn("ocurrencia_aud", "id_evento_academico", "event")));
+            List.of(new AuditedColumn("ocurrencia_aud", "fecha", "date", null, null),
+                    new AuditedColumn("ocurrencia_aud", "estado", "status", null, null),
+                    new AuditedColumn("ocurrencia_aud", "id_evento_academico", "event", null, null)));
 
     private static Map<String, Object> state(Object date, Object status, Object event) {
         Map<String, Object> values = new HashMap<>();
@@ -31,6 +31,7 @@ class FieldDiffCalculatorTest {
         return values;
     }
 
+    private static final FieldValueFormatter PLAIN = FieldValueFormatter.withoutReferences();
     private static final Map<String, Object> NO_PREVIOUS = state(null, null, null);
 
     @Test
@@ -38,10 +39,10 @@ class FieldDiffCalculatorTest {
     void createdListsNonNullFieldsWithNullOld() {
         RecordStates states = new RecordStates(state("2026-05-04", "NEEDS_ROOM", 7L), NO_PREVIOUS);
 
-        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.CREATED, states)).containsExactly(
-                new FieldChangeDto("date", null, "2026-05-04"),
-                new FieldChangeDto("status", null, "NEEDS_ROOM"),
-                new FieldChangeDto("event", null, "7"));
+        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.CREATED, states, PLAIN)).containsExactly(
+                new FieldChangeDto("date", "Fecha", null, "2026-05-04"),
+                new FieldChangeDto("status", "Estado", null, "NEEDS_ROOM"),
+                new FieldChangeDto("event", "Evento", null, "7"));
     }
 
     @Test
@@ -49,7 +50,7 @@ class FieldDiffCalculatorTest {
     void createdIgnoresPreviousState() {
         RecordStates states = new RecordStates(state("2026-05-04", "NEEDS_ROOM", 7L), state("X", "Y", 1L));
 
-        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.CREATED, states))
+        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.CREATED, states, PLAIN))
                 .extracting(FieldChangeDto::oldValue).containsOnlyNulls();
     }
 
@@ -58,10 +59,10 @@ class FieldDiffCalculatorTest {
     void deletedListsLastStateWithNullNew() {
         RecordStates states = new RecordStates(state("2026-05-04", "ROOM_RELEASED", 7L), state("2026-05-04", "NEEDS_ROOM", 7L));
 
-        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.DELETED, states)).containsExactly(
-                new FieldChangeDto("date", "2026-05-04", null),
-                new FieldChangeDto("status", "ROOM_RELEASED", null),
-                new FieldChangeDto("event", "7", null));
+        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.DELETED, states, PLAIN)).containsExactly(
+                new FieldChangeDto("date", "Fecha", "2026-05-04", null),
+                new FieldChangeDto("status", "Estado", "ROOM_RELEASED", null),
+                new FieldChangeDto("event", "Evento", "7", null));
     }
 
     @Test
@@ -70,8 +71,8 @@ class FieldDiffCalculatorTest {
         RecordStates states = new RecordStates(
                 state("2026-05-04", "ROOM_RELEASED", 7L), state("2026-05-04", "NEEDS_ROOM", 7L));
 
-        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.MODIFIED, states))
-                .containsExactly(new FieldChangeDto("status", "NEEDS_ROOM", "ROOM_RELEASED"));
+        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.MODIFIED, states, PLAIN))
+                .containsExactly(new FieldChangeDto("status", "Estado", "NEEDS_ROOM", "ROOM_RELEASED"));
     }
 
     @Test
@@ -79,10 +80,10 @@ class FieldDiffCalculatorTest {
     void modifiedWithoutPreviousRowListsEveryNonNullField() {
         RecordStates states = new RecordStates(state("2026-05-04", "NEEDS_ROOM", 7L), NO_PREVIOUS);
 
-        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.MODIFIED, states)).containsExactly(
-                new FieldChangeDto("date", null, "2026-05-04"),
-                new FieldChangeDto("status", null, "NEEDS_ROOM"),
-                new FieldChangeDto("event", null, "7"));
+        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.MODIFIED, states, PLAIN)).containsExactly(
+                new FieldChangeDto("date", "Fecha", null, "2026-05-04"),
+                new FieldChangeDto("status", "Estado", null, "NEEDS_ROOM"),
+                new FieldChangeDto("event", "Evento", null, "7"));
     }
 
     @Test
@@ -91,7 +92,7 @@ class FieldDiffCalculatorTest {
         RecordStates states = new RecordStates(
                 state("2026-05-04", "NEEDS_ROOM", 7L), state("2026-05-04", "NEEDS_ROOM", 7L));
 
-        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.MODIFIED, states)).isNotNull().isEmpty();
+        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.MODIFIED, states, PLAIN)).isNotNull().isEmpty();
     }
 
     @Test
@@ -100,7 +101,7 @@ class FieldDiffCalculatorTest {
         RecordStates states = new RecordStates(
                 state("2026-05-04", "NEEDS_ROOM", Long.valueOf(1000)), state("2026-05-04", "NEEDS_ROOM", Long.valueOf(1000)));
 
-        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.MODIFIED, states)).isEmpty();
+        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.MODIFIED, states, PLAIN)).isEmpty();
     }
 
     @Test
@@ -109,26 +110,26 @@ class FieldDiffCalculatorTest {
         RecordStates cleared = new RecordStates(state("2026-05-04", null, 7L), state("2026-05-04", "NEEDS_ROOM", 7L));
         RecordStates filled = new RecordStates(state("2026-05-04", "NEEDS_ROOM", 7L), state("2026-05-04", null, 7L));
 
-        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.MODIFIED, cleared))
-                .containsExactly(new FieldChangeDto("status", "NEEDS_ROOM", null));
-        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.MODIFIED, filled))
-                .containsExactly(new FieldChangeDto("status", null, "NEEDS_ROOM"));
+        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.MODIFIED, cleared, PLAIN))
+                .containsExactly(new FieldChangeDto("status", "Estado", "NEEDS_ROOM", null));
+        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.MODIFIED, filled, PLAIN))
+                .containsExactly(new FieldChangeDto("status", "Estado", null, "NEEDS_ROOM"));
     }
 
     @Test
     @DisplayName("MODIFIED compara BigDecimal con compareTo: 1.0 contra 1.00 no es un cambio, 1.0 contra 2.0 sí")
     void modifiedComparesBigDecimalByValue() {
         AuditedEntity priced = new AuditedEntity(Object.class, "Priced", "Precio", "precio_aud", "id", Long.class,
-                List.of(new AuditedColumn("precio_aud", "monto", "amount")));
+                List.of(new AuditedColumn("precio_aud", "monto", "amount", null, null)));
 
         RecordStates sameValue = new RecordStates(Map.of("amount", new java.math.BigDecimal("1.00")),
                 Map.of("amount", new java.math.BigDecimal("1.0")));
         RecordStates otherValue = new RecordStates(Map.of("amount", new java.math.BigDecimal("2.0")),
                 Map.of("amount", new java.math.BigDecimal("1.0")));
 
-        assertThat(FieldDiffCalculator.calculate(priced, RevisionKind.MODIFIED, sameValue)).isEmpty();
-        assertThat(FieldDiffCalculator.calculate(priced, RevisionKind.MODIFIED, otherValue))
-                .containsExactly(new FieldChangeDto("amount", "1.0", "2.0"));
+        assertThat(FieldDiffCalculator.calculate(priced, RevisionKind.MODIFIED, sameValue, PLAIN)).isEmpty();
+        assertThat(FieldDiffCalculator.calculate(priced, RevisionKind.MODIFIED, otherValue, PLAIN))
+                .containsExactly(new FieldChangeDto("amount", "Amount", "1.0", "2.0"));
     }
 
     @Test
@@ -140,7 +141,7 @@ class FieldDiffCalculatorTest {
         reversed.put("date", "2026-05-04");
         RecordStates states = new RecordStates(reversed, NO_PREVIOUS);
 
-        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.CREATED, states))
+        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.CREATED, states, PLAIN))
                 .extracting(FieldChangeDto::field).containsExactly("date", "status", "event");
     }
 
@@ -149,11 +150,11 @@ class FieldDiffCalculatorTest {
     void nullOnBothSidesProducesNoItem() {
         RecordStates states = new RecordStates(state("2026-05-04", null, null), state("2026-05-04", null, null));
 
-        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.CREATED, states))
+        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.CREATED, states, PLAIN))
                 .extracting(FieldChangeDto::field).containsExactly("date");
-        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.DELETED, states))
+        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.DELETED, states, PLAIN))
                 .extracting(FieldChangeDto::field).containsExactly("date");
-        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.MODIFIED, states)).isEmpty();
+        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.MODIFIED, states, PLAIN)).isEmpty();
     }
 
     @Test
@@ -162,7 +163,47 @@ class FieldDiffCalculatorTest {
         Map<String, Object> current = state("2026-05-04", "NEEDS_ROOM", 7L);
         current.put("passwordHash", "secret");
 
-        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.CREATED, new RecordStates(current, NO_PREVIOUS)))
+        assertThat(FieldDiffCalculator.calculate(ENTITY, RevisionKind.CREATED, new RecordStates(current, NO_PREVIOUS), PLAIN))
                 .extracting(FieldChangeDto::field).doesNotContain("passwordHash");
+    }
+
+    @Test
+    @DisplayName("formatea para una persona: Sí/No, fechas dd/MM/yyyy, horas, enums traducidos y etiqueta del campo")
+    void formatsValuesForAPerson() {
+        AuditedEntity entity = new AuditedEntity(Object.class, "Item", "Ítem", "item_aud", "id", Long.class, List.of(
+                new AuditedColumn("item_aud", "proyector", "requiresProjector", Boolean.class, null),
+                new AuditedColumn("item_aud", "fecha", "date", java.time.LocalDate.class, null),
+                new AuditedColumn("item_aud", "hora", "startTime", java.time.LocalTime.class, null),
+                new AuditedColumn("item_aud", "estado", "status", java.time.DayOfWeek.class, null),
+                new AuditedColumn("item_aud", "otro", "requiredSoftware", String.class, null)));
+        Map<String, Object> current = new HashMap<>();
+        current.put("requiresProjector", true);
+        current.put("date", java.time.LocalDate.of(2026, 11, 3));
+        current.put("startTime", java.time.LocalTime.of(13, 15));
+        current.put("status", "TUESDAY");
+        current.put("requiredSoftware", "NEEDS_ROOM");
+        Map<String, Object> previous = new HashMap<>();
+        previous.put("requiresProjector", false);
+
+        assertThat(FieldDiffCalculator.calculate(entity, RevisionKind.MODIFIED, new RecordStates(current, previous), PLAIN))
+                .containsExactly(
+                        new FieldChangeDto("requiresProjector", "Requiere proyector", "No", "Sí"),
+                        new FieldChangeDto("date", "Fecha", null, "03/11/2026"),
+                        new FieldChangeDto("startTime", "Hora de inicio", null, "13:15"),
+                        new FieldChangeDto("status", "Estado", null, "Martes"),
+                        new FieldChangeDto("requiredSoftware", "Software requerido", null, "NEEDS_ROOM"));
+    }
+
+    @Test
+    @DisplayName("una referencia se muestra con la etiqueta precargada y, si no la hay, con el id")
+    void showsReferenceLabelOrFallsBackToId() {
+        AuditedEntity entity = new AuditedEntity(Object.class, "Allocation", "Asignación", "asig_aud", "id", Long.class,
+                List.of(new AuditedColumn("asig_aud", "id_aula", "classroomId", Long.class, String.class)));
+        FieldValueFormatter formatter = new FieldValueFormatter(
+                Map.of(new FieldValueFormatter.ReferenceKey(String.class, "87"), "Aula 220, Central"));
+        RecordStates states = new RecordStates(Map.of("classroomId", 88L), Map.of("classroomId", 87L));
+
+        assertThat(FieldDiffCalculator.calculate(entity, RevisionKind.MODIFIED, states, formatter)).containsExactly(
+                new FieldChangeDto("classroomId", "Aula", "Aula 220, Central", "88"));
     }
 }

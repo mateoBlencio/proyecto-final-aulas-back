@@ -22,17 +22,18 @@ public final class FieldDiffCalculator {
      * (Envers keeps it with {@code store_data_at_delete}). {@code MODIFIED}: the properties that differ from
      * the previous audit row; with no previous row, every non-null value.
      */
-    public static List<FieldChangeDto> calculate(AuditedEntity entity, RevisionKind kind, RecordStates states) {
+    public static List<FieldChangeDto> calculate(AuditedEntity entity, RevisionKind kind, RecordStates states,
+                                                 FieldValueFormatter formatter) {
         List<FieldChangeDto> changes = new ArrayList<>();
         for (AuditedColumn column : entity.columns()) {
             Object current = states.current().get(column.property());
             Object previous = states.previous().get(column.property());
             switch (kind) {
-                case CREATED -> add(changes, column, null, current);
-                case DELETED -> add(changes, column, current, null);
+                case CREATED -> add(changes, formatter, column, null, current);
+                case DELETED -> add(changes, formatter, column, current, null);
                 case MODIFIED -> {
                     if (differs(previous, current)) {
-                        add(changes, column, previous, current);
+                        add(changes, formatter, column, previous, current);
                     }
                 }
             }
@@ -48,11 +49,11 @@ public final class FieldDiffCalculator {
         return !Objects.equals(previous, current);
     }
 
-    private static void add(List<FieldChangeDto> changes, AuditedColumn column, Object oldValue, Object newValue) {
+    private static void add(List<FieldChangeDto> changes, FieldValueFormatter formatter, AuditedColumn column,
+                            Object oldValue, Object newValue) {
         if (oldValue != null || newValue != null) {
-            changes.add(new FieldChangeDto(column.property(),
-                    oldValue == null ? null : oldValue.toString(),
-                    newValue == null ? null : newValue.toString()));
+            changes.add(new FieldChangeDto(column.property(), formatter.label(column),
+                    formatter.format(column, oldValue), formatter.format(column, newValue)));
         }
     }
 }

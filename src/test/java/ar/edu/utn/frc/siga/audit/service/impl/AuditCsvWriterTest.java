@@ -24,13 +24,13 @@ class AuditCsvWriterTest {
     private static final String BOM = "﻿";
 
     private static AuditLogEntryDto change(String description, String recordId, String recordLabel) {
-        return new AuditLogEntryDto(AuditLogEntryType.CHANGE, 7, DATE, "user@frc", ActorType.HUMAN, description,
+        return new AuditLogEntryDto(AuditLogEntryType.CHANGE, 7, DATE, "user@frc", null, ActorType.HUMAN, description,
                 RevisionKind.MODIFIED, "Configuración", recordId, recordLabel, null, null, null, null, null);
     }
 
     private static AuditLogEntryDto operation(String description, String parentOperationId, Integer recordCount,
                                               List<String> entityTypes) {
-        return new AuditLogEntryDto(AuditLogEntryType.OPERATION, 9, DATE, "user@frc", ActorType.SYSTEM, description,
+        return new AuditLogEntryDto(AuditLogEntryType.OPERATION, 9, DATE, "user@frc", null, ActorType.SYSTEM, description,
                 RevisionKind.CREATED, null, null, null, "op-1", parentOperationId, recordCount, entityTypes, null);
     }
 
@@ -110,7 +110,7 @@ class AuditCsvWriterTest {
     @Test
     @DisplayName("el usuario, el registro y la operación también se neutralizan")
     void otherTextColumnsAreNeutralized() throws IOException {
-        AuditLogEntryDto entry = new AuditLogEntryDto(AuditLogEntryType.OPERATION, 1, DATE, "=evil", ActorType.HUMAN,
+        AuditLogEntryDto entry = new AuditLogEntryDto(AuditLogEntryType.OPERATION, 1, DATE, "=evil", null, ActorType.HUMAN,
                 "d", RevisionKind.CREATED, null, null, null, "-op", "@parent", 2, List.of("A"), null);
 
         String[] cells = rowCells(render(entry));
@@ -123,7 +123,7 @@ class AuditCsvWriterTest {
     @Test
     @DisplayName("cantidad y revisión negativas no llevan apóstrofo")
     void negativeNumbersAreNotPrefixed() throws IOException {
-        AuditLogEntryDto entry = new AuditLogEntryDto(AuditLogEntryType.TRANSACTION, -5, DATE, "u", ActorType.HUMAN,
+        AuditLogEntryDto entry = new AuditLogEntryDto(AuditLogEntryType.TRANSACTION, -5, DATE, "u", null, ActorType.HUMAN,
                 "d", RevisionKind.MODIFIED, null, null, null, null, null, -3, List.of("A"), null);
 
         String[] cells = rowCells(render(entry));
@@ -179,7 +179,7 @@ class AuditCsvWriterTest {
     @Test
     @DisplayName("campos nulos salen como celdas vacías sin la palabra null")
     void nullFieldsAreEmpty() throws IOException {
-        AuditLogEntryDto entry = new AuditLogEntryDto(AuditLogEntryType.TRANSACTION, null, null, null, null, null,
+        AuditLogEntryDto entry = new AuditLogEntryDto(AuditLogEntryType.TRANSACTION, null, null, null, null, null, null,
                 null, null, null, null, null, null, 2, null, null);
 
         String csv = render(entry);

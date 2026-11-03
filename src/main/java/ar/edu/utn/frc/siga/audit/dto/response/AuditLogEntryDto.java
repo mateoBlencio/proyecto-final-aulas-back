@@ -38,6 +38,8 @@ public record AuditLogEntryDto(
         Integer revision,
         LocalDateTime date,
         String user,
+        @Schema(description = "Nombre y apellido del usuario. Null si user es null o el usuario ya no existe.")
+        String userFullName,
         ActorType actorType,
         String description,
         RevisionKind kind,
@@ -56,4 +58,11 @@ public record AuditLogEntryDto(
                 + "Vacío si no cambió ningún campo auditado. En un drill-down, null si el estado auditado "
                 + "del registro no está disponible.")
         List<FieldChangeDto> changes) {
+
+    // Static so MapStruct does not read it as a fluent setter.
+    public static AuditLogEntryDto withUserFullName(AuditLogEntryDto entry, String fullName) {
+        return new AuditLogEntryDto(entry.type, entry.revision, entry.date, entry.user, fullName, entry.actorType,
+                entry.description, entry.kind, entry.entityType, entry.recordId, entry.recordLabel, entry.operationId,
+                entry.parentOperationId, entry.recordCount, entry.entityTypes, entry.changes);
+    }
 }

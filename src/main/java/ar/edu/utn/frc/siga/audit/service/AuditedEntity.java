@@ -43,7 +43,12 @@ public record AuditedEntity(
         throw new IllegalStateException("Tipo de identificador no soportado: " + idType.getName());
     }
 
-    /** Audited column of {@code property}, living in {@code auditTable} (the root's or a subclass's). */
-    public record AuditedColumn(String auditTable, String column, String property) {
+    /**
+     * Audited column of {@code property}, living in {@code auditTable} (the root's or a subclass's).
+     * {@code valueType} is the Java type of the property (null if unknown). {@code targetType} is the entity
+     * the value points to, for a to-one or an id column that references one (null otherwise).
+     */
+    public record AuditedColumn(String auditTable, String column, String property, Class<?> valueType,
+                                Class<?> targetType) {
     }
 }

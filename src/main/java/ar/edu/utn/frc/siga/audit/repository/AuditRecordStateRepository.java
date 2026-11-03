@@ -39,6 +39,28 @@ public class AuditRecordStateRepository {
         return result;
     }
 
+    /** State at the latest revision of each existing record of {@code entity} among {@code recordIds}. */
+    public Map<RecordRevision, RecordStates> loadLatest(AuditedEntity entity, Collection<String> recordIds) {
+        List<Object> ids = new ArrayList<>();
+        for (String recordId : recordIds) {
+            try {
+                ids.add(entity.convertId(recordId));
+            } catch (IllegalArgumentException e) {
+                continue;
+            }
+        }
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        String id = entity.idColumn();
+        List<RecordRevision> keys = jdbc.query(
+                "SELECT CAST(" + id + " AS varchar) AS record_id, MAX(rev) AS rev FROM " + entity.auditTable()
+                        + " WHERE " + id + " IN (:ids) GROUP BY " + id,
+                new MapSqlParameterSource("ids", ids),
+                (rs, rowNum) -> new RecordRevision(entity, rs.getString("record_id"), rs.getInt("rev")));
+        return load(keys);
+    }
+
     private void loadEntity(AuditedEntity entity, List<RecordRevision> keys, Map<RecordRevision, RecordStates> result) {
         List<AuditedColumn> columns = entity.columns();
         List<String> subTables = columns.stream().map(AuditedColumn::auditTable)

@@ -986,6 +986,11 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
         return items;
     }
 
+    private static String spanishDay(DayOfWeek day) {
+        String name = day.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.of("es"));
+        return Character.toUpperCase(name.charAt(0)) + name.substring(1);
+    }
+
     private static JsonNode ofType(List<JsonNode> items, String entityType) {
         return items.stream().filter(item -> entityType.equals(item.get("entityType").asText()))
                 .findFirst().orElseThrow(() -> new AssertionError("No hay una entrada de " + entityType));
@@ -1043,7 +1048,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(items).hasSize(1);
         assertThat(items.getFirst().get("entityType").asText()).isEqualTo("Ocurrencia");
         assertThat(changeSummary(items.getFirst())).containsExactlyInAnyOrder(
-                "status:NEEDS_ROOM:ROOM_RELEASED", "releaseReason:null:OTHER",
+                "status:Necesita aula:Aula liberada", "releaseReason:null:Otro",
                 "releaseNote:null:test");
     }
 
@@ -1061,13 +1066,15 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
         JsonNode change = ofType(revisionItems(revision), "Evento académico");
 
         assertThat(change.get("kind").asText()).isEqualTo("MODIFIED");
-        assertThat(changeSummary(change)).containsExactly("dayOfWeek:" + date.getDayOfWeek() + ":" + newDay);
+        assertThat(changeSummary(change)).containsExactly(
+                "dayOfWeek:" + spanishDay(date.getDayOfWeek()) + ":" + spanishDay(newDay));
     }
 
     @Test
     @DisplayName("una baja (revocar un rol) trae el último estado con newValue null en todos los campos")
     void deletionShowsLastStateWithNullNewValues() throws Exception {
-        long userId = createUser(uniqueUserEmail(), true);
+        String email = uniqueUserEmail();
+        long userId = createUser(email, true);
         long assignmentId = jdbcTemplate.queryForObject(
                 "SELECT id_usuario_rol FROM usuario_rol WHERE id_usuario = ?", Long.class, userId);
         mockMvc.perform(delete("/v1/users/{id}/role-assignments/{aid}", userId, assignmentId))
@@ -1079,7 +1086,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(items).hasSize(1);
         assertThat(items.getFirst().get("kind").asText()).isEqualTo("DELETED");
         assertThat(changeSummary(items.getFirst())).containsExactlyInAnyOrder(
-                "user:" + userId + ":null", "role:CONSULTA:null", "scopeType:GLOBAL:null");
+                "user:" + email + ":null", "role:Consulta:null", "scopeType:Global:null");
     }
 
     @Test
@@ -1118,17 +1125,19 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
         JsonNode occurrence = ofType(revisionItems(lastRevisionOf("ocurrencia_aud", "id_ocurrencia", occurrenceId)),
                 "Ocurrencia");
 
-        long userId = createUser(uniqueUserEmail(), true);
+        String email = uniqueUserEmail();
+        long userId = createUser(email, true);
         long assignmentId = jdbcTemplate.queryForObject(
                 "SELECT id_usuario_rol FROM usuario_rol WHERE id_usuario = ?", Long.class, userId);
         JsonNode assignment = ofType(revisionItems(lastRevisionOf("usuario_rol_aud", "id_usuario_rol", assignmentId)),
                 "Asignación de rol");
 
-        assertThat(changeSummary(occurrence)).contains("event:null:" + eventId);
-        assertThat(changeSummary(assignment)).contains("user:null:" + userId);
+        assertThat(changeSummary(occurrence)).anyMatch(c -> c.startsWith("event:null:") && !c.equals("event:null:" + eventId));
+        assertThat(changeSummary(assignment)).contains("user:null:" + email);
         for (JsonNode entry : List.of(occurrence, assignment)) {
             for (JsonNode change : entry.get("changes")) {
                 assertThat(change.get("field").asText()).doesNotEndWith("_id");
+                assertThat(change.get("label").asText()).isNotBlank().isNotEqualTo(change.get("field").asText());
             }
         }
     }
@@ -1154,7 +1163,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
         JsonNode created = ofType(revisionItems(creation), "Usuario");
         assertThat(changeSummary(created)).anyMatch(c -> c.startsWith("email:null:"));
         JsonNode modified = ofType(revisionItems(modification), "Usuario");
-        assertThat(changeSummary(modified)).containsExactly("enabled:true:false");
+        assertThat(changeSummary(modified)).containsExactly("enabled:Sí:No");
     }
 
     @Test
@@ -1343,7 +1352,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
             assertThat(item.get("changes")).isNotEmpty();
         });
         assertThat(changeSummary(page.get("content").get(0))).containsExactlyInAnyOrder(
-                "status:NEEDS_ROOM:ROOM_RELEASED", "releaseReason:null:OTHER",
+                "status:Necesita aula:Aula liberada", "releaseReason:null:Otro",
                 "releaseNote:null:test");
     }
 
