@@ -42,13 +42,13 @@ class SysacadPropertiesTest {
     void rejectsThresholdOutOfRange() {
         SysacadProperties properties = valid();
 
-        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", 101, null));
+        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", 101, null, null, null));
         assertThat(validator.validate(properties)).hasSize(1);
-        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", -1, null));
+        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", -1, null, null, null));
         assertThat(validator.validate(properties)).hasSize(1);
-        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", 0, null));
+        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", 0, null, null, null));
         assertThat(validator.validate(properties)).isEmpty();
-        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", 100, null));
+        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", 100, null, null, null));
         assertThat(validator.validate(properties)).isEmpty();
     }
 
@@ -64,6 +64,21 @@ class SysacadPropertiesTest {
         properties.setAutogestion(new SysacadProperties.Autogestion(true, "TEST", 5, 581));
         assertThat(validator.validate(properties)).isEmpty();
         properties.setAutogestion(new SysacadProperties.Autogestion(false, null, null, null));
+        assertThat(validator.validate(properties)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("el filtro del sync exige courseCode, specialty y subject juntos")
+    void syncScopeRequiresAllThree() {
+        SysacadProperties properties = valid();
+
+        properties.setSync(new SysacadProperties.Sync(null, 50, "TEST", 5, null));
+        assertThat(validator.validate(properties)).hasSize(1);
+        properties.setSync(new SysacadProperties.Sync(null, 50, null, 5, 581));
+        assertThat(validator.validate(properties)).hasSize(1);
+        properties.setSync(new SysacadProperties.Sync(null, 50, "TEST", 5, 581));
+        assertThat(validator.validate(properties)).isEmpty();
+        properties.setSync(new SysacadProperties.Sync(null, 50, "", null, null));
         assertThat(validator.validate(properties)).isEmpty();
     }
 }

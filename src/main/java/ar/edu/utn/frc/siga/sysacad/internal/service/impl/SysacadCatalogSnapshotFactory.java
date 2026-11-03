@@ -39,9 +39,9 @@ public class SysacadCatalogSnapshotFactory {
         Lazy<List<RawSubject>> subjects = Lazy.of(subjectViewFetcher::fetch);
         Lazy<List<RawCommission>> commissions = Lazy.of(commissionViewFetcher::fetch);
         Lazy<List<RawSchedule>> schedules = Lazy.of(scheduleViewFetcher::fetch);
-        String onlySubjectName = properties.getSync().onlySubjectName();
-        if (onlySubjectName != null && !onlySubjectName.isBlank()) {
-            SubjectScope scope = new SubjectScope(onlySubjectName, subjects);
+        SysacadProperties.Sync sync = properties.getSync();
+        if (sync.isScoped()) {
+            SyncScope scope = new SyncScope(sync.onlyCourseCode(), sync.onlySpecialty(), sync.onlySubject());
             Lazy<List<RawSubject>> allSubjects = subjects;
             subjects = Lazy.of(() -> scope.subjects(allSubjects.get()));
             Lazy<List<RawCommission>> allCommissions = commissions;

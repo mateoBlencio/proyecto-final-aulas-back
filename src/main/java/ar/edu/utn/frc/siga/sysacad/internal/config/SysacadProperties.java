@@ -41,7 +41,7 @@ public class SysacadProperties {
     private DataSize maxResponseSize = DataSize.ofMegabytes(32);
 
     @Valid
-    private Sync sync = new Sync(null, DEFAULT_MIN_VALID_ROWS_PERCENT, null);
+    private Sync sync = new Sync(null, DEFAULT_MIN_VALID_ROWS_PERCENT, null, null, null);
 
     @Valid
     private Autogestion autogestion = new Autogestion(false, null, null, null);
@@ -51,7 +51,18 @@ public class SysacadProperties {
      * view to deactivate what is absent. 0 disables the threshold (zero valid rows always aborts).
      */
     public record Sync(String cron, @DefaultValue("50") @Min(0) @Max(100) int minValidRowsPercent,
-                       String onlySubjectName) {}
+                       String onlyCourseCode, Integer onlySpecialty, Integer onlySubject) {
+
+        public boolean isScoped() {
+            return onlyCourseCode != null && !onlyCourseCode.isBlank();
+        }
+
+        @AssertTrue(message = "only-course-code, only-specialty y only-subject se configuran juntos")
+        public boolean isScopeComplete() {
+            return !isScoped() ? onlySpecialty == null && onlySubject == null
+                    : onlySpecialty != null && onlySubject != null;
+        }
+    }
 
     /**
      * Gate for EnviarMensajeComision, which writes to production SysAcad. When enabled, only the commission with

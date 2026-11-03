@@ -218,7 +218,9 @@ siga:
     sync:
       cron: "0 0 3 * * SUN"
       min-valid-rows-percent: 50
-      only-subject-name: ${SYSACAD_SYNC_ONLY_SUBJECT_NAME:}
+      only-course-code: ${SYSACAD_SYNC_ONLY_COURSE_CODE:}
+      only-specialty: ${SYSACAD_SYNC_ONLY_SPECIALTY:}
+      only-subject: ${SYSACAD_SYNC_ONLY_SUBJECT:}
     autogestion:
       enabled: ${SYSACAD_AUTOGESTION_ENABLED:false}
       course-code: ${SYSACAD_AUTOGESTION_COURSE_CODE:}
