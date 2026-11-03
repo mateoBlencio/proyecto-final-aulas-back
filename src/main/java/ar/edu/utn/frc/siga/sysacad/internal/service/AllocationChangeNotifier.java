@@ -56,8 +56,11 @@ class AllocationChangeNotifier {
                 .filter(change -> targetEvents.containsKey(change.eventId()))
                 .toList();
         if (changes.isEmpty()) {
+            log.debug("Operación {} sin cambios de la comisión habilitada para autogestión", movements.operationId());
             return;
         }
+        log.info("Operación {}: {} cambios de aula de la comisión habilitada para autogestión",
+                movements.operationId(), changes.size());
 
         Map<Long, Integer> roomNumbers = roomNumbers(changes);
         List<AllocationChangeNote.Line> lines = changes.stream()
