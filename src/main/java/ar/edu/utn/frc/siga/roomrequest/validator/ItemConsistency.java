@@ -28,22 +28,29 @@ public final class ItemConsistency {
         }
     }
 
-    public static boolean commissionScheduleOverlap(Long commissionA, LocalDate dateA, LocalTime startA, LocalTime endA,
-                                                      Long commissionB, LocalDate dateB, LocalTime startB, LocalTime endB) {
-        boolean sameCommission = !(commissionA == null && commissionB == null)
-                && (commissionA == null || commissionB == null || commissionA.equals(commissionB));
+    public enum Overlap { NONE, BLOCKING, WARNING }
+
+    /** Misma materia y comisión coincidente (o alguna es "todas") bloquea; otra materia solo avisa. */
+    public static Overlap commissionScheduleOverlap(
+            Long subjectA, Long commissionA, LocalDate dateA, LocalTime startA, LocalTime endA,
+            Long subjectB, Long commissionB, LocalDate dateB, LocalTime startB, LocalTime endB) {
+        boolean sameCommission = commissionA == null || commissionB == null || commissionA.equals(commissionB);
         boolean sameDate = Objects.equals(dateA, dateB);
         boolean timeOverlap = startA.isBefore(endB) && startB.isBefore(endA);
-        return sameCommission && sameDate && timeOverlap;
+        if (!sameCommission || !sameDate || !timeOverlap) {
+            return Overlap.NONE;
+        }
+        return Objects.equals(subjectA, subjectB) ? Overlap.BLOCKING : Overlap.WARNING;
     }
 
+    /** Los pedidos de una misma solicitud comparten materia. */
     public static void requireNoCommissionOverlap(List<FreeFormItemDto> items) {
         for (int i = 0; i < items.size(); i++) {
             for (int j = i + 1; j < items.size(); j++) {
                 FreeFormItemDto a = items.get(i);
                 FreeFormItemDto b = items.get(j);
-                if (commissionScheduleOverlap(a.commissionId(), a.date(), a.startTime(), a.endTime(),
-                        b.commissionId(), b.date(), b.startTime(), b.endTime())) {
+                if (commissionScheduleOverlap(null, a.commissionId(), a.date(), a.startTime(), a.endTime(),
+                        null, b.commissionId(), b.date(), b.startTime(), b.endTime()) == Overlap.BLOCKING) {
                     throw new InvalidRoomRequestException(COMMISSION_OVERLAP_MESSAGE);
                 }
             }

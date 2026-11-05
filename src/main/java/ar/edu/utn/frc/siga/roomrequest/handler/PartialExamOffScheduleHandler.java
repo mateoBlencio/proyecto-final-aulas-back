@@ -62,10 +62,10 @@ public class PartialExamOffScheduleHandler extends AbstractRoomRequestHandler {
                 .distinct()
                 .forEach(commissionId ->
                         academicReference.requireCommissionOfSubject(dto.subjectId(), commissionId));
-        requireNoOverlapWithExistingRequests(((CreatePartialExamOffScheduleDto) dto).items());
+        requireNoOverlapWithExistingRequests(dto.subjectId(), ((CreatePartialExamOffScheduleDto) dto).items());
     }
 
-    private void requireNoOverlapWithExistingRequests(List<FreeFormItemDto> items) {
+    private void requireNoOverlapWithExistingRequests(Long subjectId, List<FreeFormItemDto> items) {
         List<LocalDate> dates = items.stream().map(FreeFormItemDto::date).distinct().toList();
         Map<LocalDate, List<RoomRequestItem>> existingByDate = itemRepository
                 .findActiveOffScheduleItemsByDateIn(dates).stream()
@@ -74,8 +74,9 @@ public class PartialExamOffScheduleHandler extends AbstractRoomRequestHandler {
         for (FreeFormItemDto item : items) {
             boolean overlaps = existingByDate.getOrDefault(item.date(), List.of()).stream()
                     .anyMatch(existing -> ItemConsistency.commissionScheduleOverlap(
-                            item.commissionId(), item.date(), item.startTime(), item.endTime(),
-                            existing.getCommissionId(), existing.getDate(), existing.getStartTime(), existing.endTime()));
+                            subjectId, item.commissionId(), item.date(), item.startTime(), item.endTime(),
+                            existing.getRequest().getSubjectId(), existing.getCommissionId(), existing.getDate(),
+                            existing.getStartTime(), existing.endTime()) == ItemConsistency.Overlap.BLOCKING);
             if (overlaps) {
                 throw new InvalidRoomRequestException(ItemConsistency.COMMISSION_OVERLAP_MESSAGE);
             }
