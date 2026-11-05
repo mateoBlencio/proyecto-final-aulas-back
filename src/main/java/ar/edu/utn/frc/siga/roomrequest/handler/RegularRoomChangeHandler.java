@@ -37,18 +37,21 @@ public class RegularRoomChangeHandler extends AbstractRoomRequestHandler {
             ItemConsistency.requireNoEstimated(item);
             ItemConsistency.requireExamUsersConsistent(false, item);
         }
-        ItemConsistency.requireDistinct(items.stream().map(ScheduledItemDto::dayOfWeek).toList(), "un día de dictado");
     }
 
     @Override
     protected void validateReferences(CreateRoomRequestDto dto) {
         academicReference.requireSubject(dto.subjectId());
         academicReference.requireCommissionOfSubject(dto.subjectId(), dto.commissionId());
+        ItemConsistency.requireDistinct(((CreateRegularRoomChangeDto) dto).items().stream()
+                .map(item -> classSchedule.requireClassDay(dto.subjectId(), dto.commissionId(),
+                        item.dayOfWeek(), item.startTime()).recurringEventId())
+                .toList(), "una clase");
     }
 
     @Override
     protected RoomRequestItem buildItem(CreateRoomRequestItemDto item, CreateRoomRequestDto dto) {
-        ClassSlot slot = classSchedule.requireClassDay(dto.subjectId(), dto.commissionId(), item.dayOfWeek());
+        ClassSlot slot = classSchedule.requireClassDay(dto.subjectId(), dto.commissionId(), item.dayOfWeek(), item.startTime());
         return baseItem(item)
                 .commissionId(dto.commissionId())
                 .dayOfWeek(item.dayOfWeek())

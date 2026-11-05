@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.settings.api.SettingsReader;
 import ar.edu.utn.frc.siga.settings.model.SettingKey;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassDateSlotsDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CommissionScheduleDto;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestCatalogMapper;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
@@ -57,6 +58,9 @@ class RoomRequestCatalogServiceImplTest {
                 new ClassSlot(100L, DayOfWeek.TUESDAY, LocalTime.of(18, 0), LocalTime.of(20, 0))));
         when(classScheduleService.classDates(eq(1L), eq(9L), any()))
                 .thenReturn(List.of(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 8)));
+        when(classScheduleService.classDateSlots(eq(1L), eq(9L), any())).thenReturn(List.of(
+                new ClassDateSlotsDto(LocalDate.of(2026, 9, 8),
+                        List.of(new ClassDateSlotsDto.TimeSlot(LocalTime.of(18, 0), LocalTime.of(20, 0))))));
 
         CommissionScheduleDto result = service.findCommissionSchedule(1L, 9L);
 
@@ -67,6 +71,11 @@ class RoomRequestCatalogServiceImplTest {
             assertThat(slot.endTime()).isEqualTo(LocalTime.of(20, 0));
         });
         assertThat(result.dates()).containsExactly(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 8));
+        assertThat(result.dateSlots()).singleElement().satisfies(d -> {
+            assertThat(d.date()).isEqualTo(LocalDate.of(2026, 9, 8));
+            assertThat(d.slots()).containsExactly(
+                    new ClassDateSlotsDto.TimeSlot(LocalTime.of(18, 0), LocalTime.of(20, 0)));
+        });
     }
 
     @Test

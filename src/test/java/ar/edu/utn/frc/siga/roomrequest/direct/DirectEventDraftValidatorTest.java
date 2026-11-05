@@ -130,7 +130,7 @@ class DirectEventDraftValidatorTest {
     @Test
     @DisplayName("parcial en clase en una fecha sin cursado: propaga el 400 de requireClassDate")
     void partialInClassOnNonClassDate_propagatesRejection() {
-        when(classSchedule.requireClassDate(1L, 7L, FUTURE))
+        when(classSchedule.requireClassDate(1L, 7L, FUTURE, null))
                 .thenThrow(new InvalidRoomRequestException("La comisión 7 no tiene clase el " + FUTURE + "."));
 
         assertBadRequest(draft(RoomRequestType.PARTIAL_EXAM_IN_CLASS, 7L, null, null, true, null));
@@ -162,9 +162,30 @@ class DirectEventDraftValidatorTest {
     }
 
     @Test
+    @DisplayName("parcial en clase: startTime elige la clase del día y se pasa al servicio")
+    void partialInClass_startTimeIsForwarded() {
+        when(classSchedule.requireClassDate(1L, 7L, FUTURE, LocalTime.of(20, 40))).thenReturn(
+                new ClassSlot(6L, DayOfWeek.TUESDAY, LocalTime.of(20, 40), LocalTime.of(22, 55)));
+
+        ResolvedSchedule schedule = validator.validate(
+                draft(RoomRequestType.PARTIAL_EXAM_IN_CLASS, 7L, LocalTime.of(20, 40), null, false, null));
+
+        assertThat(schedule.startTime()).isEqualTo(LocalTime.of(20, 40));
+        assertThat(schedule.duration()).isEqualTo(Duration.ofMinutes(135));
+    }
+
+    @Test
+    @DisplayName("parcial en clase: endTime sigue rechazado")
+    void partialInClass_endTimeIsRejected() {
+        assertBadRequest(draft(RoomRequestType.PARTIAL_EXAM_IN_CLASS, 7L, LocalTime.of(20, 40),
+                LocalTime.of(22, 0), false, null));
+        Mockito.verifyNoInteractions(classSchedule);
+    }
+
+    @Test
     @DisplayName("caso feliz parcial en clase: devuelve el horario del cursado, no el del body")
     void validPartialInClass_returnsClassSchedule() {
-        when(classSchedule.requireClassDate(any(), any(), any())).thenReturn(
+        when(classSchedule.requireClassDate(any(), any(), any(), any())).thenReturn(
                 new ClassSlot(5L, DayOfWeek.TUESDAY, LocalTime.of(18, 0), LocalTime.of(20, 0)));
 
         ResolvedSchedule schedule = validator.validate(
@@ -172,7 +193,7 @@ class DirectEventDraftValidatorTest {
 
         assertThat(schedule.startTime()).isEqualTo(LocalTime.of(18, 0));
         assertThat(schedule.duration()).isEqualTo(Duration.ofHours(2));
-        verify(classSchedule).requireClassDate(1L, 7L, FUTURE);
+        verify(classSchedule).requireClassDate(1L, 7L, FUTURE, null);
         verify(academicReferences).requireCommissionOfSubject(1L, 7L);
     }
 }

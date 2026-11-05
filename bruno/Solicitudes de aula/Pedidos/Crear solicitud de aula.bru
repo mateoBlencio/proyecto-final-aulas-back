@@ -79,7 +79,9 @@ docs {
   endTime, estimated son obligatorios; commissionId es opcional (ver arriba).
   Se envía hora de inicio y hora de FIN; el backend guarda inicio + duración.
 
-  Ítem scheduled (ver 07): NO lleva horario. Lleva "date" en
+  Ítem scheduled (ver 07): NO lleva endTime; startTime ("HH:mm") es opcional y
+  solo sirve para elegir la clase si la comisión tiene más de una ese día o
+  fecha. Lleva "date" en
   ONE_TIME_ROOM_CHANGE y PARTIAL_EXAM_IN_CLASS —eventos de una sola fecha— y
   "dayOfWeek" en REGULAR_ROOM_CHANGE, que afecta toda la cursada. Mandar el
   campo del otro molde da 400. El horario se deriva del dictado de esa

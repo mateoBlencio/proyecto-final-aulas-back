@@ -76,11 +76,12 @@ public class DirectEventDraftValidator {
 
     private ResolvedSchedule resolveSchedule(DirectEventDraftDto draft) {
         if (draft.type() == RoomRequestType.PARTIAL_EXAM_IN_CLASS) {
-            if (draft.startTime() != null || draft.endTime() != null) {
+            if (draft.endTime() != null) {
                 throw new InvalidRoomRequestException(
-                        "El parcial en horario de clases toma el horario de cursado: no enviar startTime ni endTime.");
+                        "El parcial en horario de clases toma el horario de cursado: no enviar endTime.");
             }
-            ClassSlot slot = classSchedule.requireClassDate(draft.subjectId(), draft.commissionId(), draft.date());
+            ClassSlot slot = classSchedule.requireClassDate(
+                    draft.subjectId(), draft.commissionId(), draft.date(), draft.startTime());
             return new ResolvedSchedule(slot.startTime(), slot.duration());
         }
         if (draft.startTime() == null || draft.endTime() == null) {

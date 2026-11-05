@@ -2,15 +2,21 @@ package ar.edu.utn.frc.siga.roomrequest.validator;
 
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassDateSlotsDto;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 @Component
@@ -29,6 +35,24 @@ public class ClassScheduleService {
         return academicEventService.findClassOccurrences(subjectId, commissionId, from).stream()
                 .map(occurrence -> occurrence.date())
                 .distinct()
+                .toList();
+    }
+
+    public List<ClassDateSlotsDto> classDateSlots(Long subjectId, Long commissionId, LocalDate from) {
+        Map<Long, ClassSlot> slotByEvent = slots(subjectId, commissionId).stream()
+                .collect(Collectors.toMap(ClassSlot::recurringEventId, slot -> slot, (a, b) -> a));
+        Map<LocalDate, Set<ClassDateSlotsDto.TimeSlot>> byDate = new TreeMap<>();
+        for (OccurrenceResponseDto occurrence : academicEventService.findClassOccurrences(subjectId, commissionId, from)) {
+            ClassSlot slot = slotByEvent.get(occurrence.eventId());
+            if (slot != null) {
+                byDate.computeIfAbsent(occurrence.date(), d -> new TreeSet<>(
+                                Comparator.comparing(ClassDateSlotsDto.TimeSlot::startTime)
+                                        .thenComparing(ClassDateSlotsDto.TimeSlot::endTime)))
+                        .add(new ClassDateSlotsDto.TimeSlot(slot.startTime(), slot.endTime()));
+            }
+        }
+        return byDate.entrySet().stream()
+                .map(e -> new ClassDateSlotsDto(e.getKey(), List.copyOf(e.getValue())))
                 .toList();
     }
 
@@ -51,7 +75,7 @@ public class ClassScheduleService {
         return List.copyOf(byDayAndHours.values());
     }
 
-    public ClassSlot requireClassDay(Long subjectId, Long commissionId, DayOfWeek dayOfWeek) {
+    public ClassSlot requireClassDay(Long subjectId, Long commissionId, DayOfWeek dayOfWeek, LocalTime startTime) {
         List<ClassSlot> matching = distinctSlots(subjectId, commissionId).stream()
                 .filter(slot -> slot.dayOfWeek() == dayOfWeek)
                 .toList();
@@ -59,10 +83,10 @@ public class ClassScheduleService {
             throw new InvalidRoomRequestException(
                     "La comisión " + commissionId + " no dicta clase los " + dayOfWeek + ".");
         }
-        return requireSingleClass(matching, "los " + dayOfWeek, commissionId);
+        return requireSingleClass(matching, startTime, "los " + dayOfWeek, commissionId);
     }
 
-    public ClassSlot requireClassDate(Long subjectId, Long commissionId, LocalDate date) {
+    public ClassSlot requireClassDate(Long subjectId, Long commissionId, LocalDate date, LocalTime startTime) {
         List<Long> eventIds = academicEventService.findClassOccurrences(subjectId, commissionId, date).stream()
                 .filter(occurrence -> occurrence.date().equals(date))
                 .map(OccurrenceResponseDto::eventId)
@@ -80,10 +104,18 @@ public class ClassScheduleService {
                     "No se pudo resolver el horario de cursado de la comisión " + commissionId
                             + " para el " + date + ".");
         }
-        return requireSingleClass(matching, "el " + date, commissionId);
+        return requireSingleClass(matching, startTime, "el " + date, commissionId);
     }
 
-    private static ClassSlot requireSingleClass(List<ClassSlot> classes, String when, Long commissionId) {
+    private static ClassSlot requireSingleClass(List<ClassSlot> classes, LocalTime startTime, String when,
+                                                Long commissionId) {
+        if (startTime != null) {
+            classes = classes.stream().filter(slot -> slot.startTime().equals(startTime)).toList();
+            if (classes.isEmpty()) {
+                throw new InvalidRoomRequestException(
+                        "La comisión " + commissionId + " no tiene una clase " + when + " a las " + startTime + ".");
+            }
+        }
         if (classes.size() == 1) {
             return classes.getFirst();
         }
@@ -92,6 +124,6 @@ public class ClassScheduleService {
                 .collect(Collectors.joining(", "));
         throw new InvalidRoomRequestException(
                 "La comisión " + commissionId + " tiene más de una clase " + when + " (" + hours + "). "
-                        + "Este trámite todavía no permite elegir cuál: comunicate con subsecretaría.");
+                        + "Elegí el horario de la clase que querés mover.");
     }
 }

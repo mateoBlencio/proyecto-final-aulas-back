@@ -87,7 +87,8 @@ public class RoomRequestCatalogServiceImpl implements RoomRequestCatalogService 
                         slot.startTime(), slot.endTime()))
                 .toList();
         return new CommissionScheduleDto(slots,
-                classScheduleService.classDates(subjectId, commissionId, LocalDate.now()));
+                classScheduleService.classDates(subjectId, commissionId, LocalDate.now()),
+                classScheduleService.classDateSlots(subjectId, commissionId, LocalDate.now()));
     }
 
     @Override
