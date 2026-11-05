@@ -11,6 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.LinkedHashMap;
@@ -39,7 +40,9 @@ class RoomRequestNotificationModelTest {
 
         assertThat(result).containsExactlyInAnyOrderEntriesOf(Map.ofEntries(
                 entry("docente", "Ada Lovelace"),
-                entry("tituloBanner", "Cambio de aula confirmado"),
+                entry("pedidoId", 10L),
+                entry("pedidoRespuesta", "Si estás de acuerdo no hace falta que respondas. Si necesitás otras aulas, respondé este mail contando por qué."),
+                entry("tituloBanner", "Cambio de aula asignado"),
                 entry("aulasLabel", "Aula nueva"),
                 entry("aulas", List.of("Aula 5 (Pabellón 1)")),
                 entry("materia", "Análisis Matemático I (código 101)"),
@@ -50,7 +53,7 @@ class RoomRequestNotificationModelTest {
                 entry("aulaAnterior", "Aula 3 (Pabellón 2)"),
                 entry("asuntoTitulo", "Cambio de aula regular"),
                 entry("asuntoPartes", List.of("Análisis Matemático I", "3K1")),
-                entry("parrafoConfirmacion", "Confirmamos el cambio de aula de tu pedido #10 (solicitud #1)."),
+                entry("parrafoConfirmacion", "Te asignamos el aula para el cambio de aula de tu pedido #10 (solicitud #1)."),
                 entry("notaAdicional", "Rige para todas las clases de ese día hasta fin del cuatrimestre.")));
     }
 
@@ -68,7 +71,9 @@ class RoomRequestNotificationModelTest {
 
         assertThat(result).containsExactlyInAnyOrderEntriesOf(Map.ofEntries(
                 entry("docente", "Ada Lovelace"),
-                entry("tituloBanner", "Cambio de aula confirmado"),
+                entry("pedidoId", 11L),
+                entry("pedidoRespuesta", "Si estás de acuerdo no hace falta que respondas. Si necesitás otras aulas, respondé este mail contando por qué."),
+                entry("tituloBanner", "Cambio de aula asignado"),
                 entry("aulasLabel", "Aula nueva"),
                 entry("aulas", List.of("Aula 8 (Edificio Anexo)")),
                 entry("materia", "Bases de Datos I (código 205)"),
@@ -77,7 +82,7 @@ class RoomRequestNotificationModelTest {
                 entry("aulaAnterior", "Aula 6 (Edificio Anexo)"),
                 entry("asuntoTitulo", "Cambio de aula"),
                 entry("asuntoPartes", List.of("Bases de Datos I", "14/10")),
-                entry("parrafoConfirmacion", "Confirmamos el cambio de aula de tu pedido #11 (solicitud #1), solo para esa fecha."),
+                entry("parrafoConfirmacion", "Te asignamos el aula para el cambio de aula de tu pedido #11 (solicitud #1), solo para esa fecha."),
                 entry("notaAdicional", "Después de esa clase volvés al aula habitual.")));
     }
 
@@ -95,15 +100,17 @@ class RoomRequestNotificationModelTest {
         assertThat(result).doesNotContainKeys("comisiones", "comisionesLabel");
         assertThat(result).containsExactlyInAnyOrderEntriesOf(Map.ofEntries(
                 entry("docente", "Ada Lovelace"),
-                entry("tituloBanner", "Aula confirmada"),
+                entry("pedidoId", 12L),
+                entry("pedidoRespuesta", "Si estás de acuerdo no hace falta que respondas. Si necesitás otras aulas, respondé este mail contando por qué."),
+                entry("tituloBanner", "Aula asignada"),
                 entry("aulasLabel", "Aula"),
                 entry("aulas", List.of("Aula 12 (Pabellón Argentina)")),
                 entry("materia", "Sistemas Operativos (código 310)"),
                 entry("fecha", "Viernes 20/11/2026"),
                 entry("horario", "09:00 a 11:00"),
-                entry("asuntoTitulo", "Aula confirmada"),
+                entry("asuntoTitulo", "Aula asignada"),
                 entry("asuntoPartes", List.of("Final de Sistemas Operativos", "20/11")),
-                entry("parrafoConfirmacion", "Confirmamos el aula para tu examen final, pedido #12 (solicitud #1).")));
+                entry("parrafoConfirmacion", "Te asignamos el aula para tu examen final, pedido #12 (solicitud #1).")));
     }
 
     @Test
@@ -119,16 +126,18 @@ class RoomRequestNotificationModelTest {
 
         assertThat(result).containsExactlyInAnyOrderEntriesOf(Map.ofEntries(
                 entry("docente", "Ada Lovelace"),
-                entry("tituloBanner", "Aula confirmada"),
+                entry("pedidoId", 13L),
+                entry("pedidoRespuesta", "Si estás de acuerdo no hace falta que respondas. Si necesitás otras aulas, respondé este mail contando por qué."),
+                entry("tituloBanner", "Aula asignada"),
                 entry("aulasLabel", "Aula"),
                 entry("aulas", List.of("Aula 15 (Pabellón Argentina)")),
                 entry("materia", "Programación II (código 220)"),
                 entry("comisiones", "4K2 y 4K3"),
                 entry("comisionesLabel", "Comisiones"),
                 entry("horario", "14:00 a 16:00 (horario de cursado)"),
-                entry("asuntoTitulo", "Aula confirmada"),
+                entry("asuntoTitulo", "Aula asignada"),
                 entry("asuntoPartes", List.of("Parcial de Programación II", "4K2 y 4K3")),
-                entry("parrafoConfirmacion", "Confirmamos el aula para el parcial de tu pedido #13 (solicitud #1).")));
+                entry("parrafoConfirmacion", "Te asignamos el aula para el parcial de tu pedido #13 (solicitud #1).")));
     }
 
     @Test
@@ -145,16 +154,18 @@ class RoomRequestNotificationModelTest {
 
         assertThat(result).containsExactlyInAnyOrderEntriesOf(Map.ofEntries(
                 entry("docente", "Ada Lovelace"),
-                entry("tituloBanner", "Aula confirmada"),
+                entry("pedidoId", 14L),
+                entry("pedidoRespuesta", "Si estás de acuerdo no hace falta que respondas. Si necesitás otras aulas, respondé este mail contando por qué."),
+                entry("tituloBanner", "Aula asignada"),
                 entry("aulasLabel", "Aula"),
                 entry("aulas", List.of("Aula 20 (Pabellón España)")),
                 entry("materia", "Redes de Datos (código 330)"),
                 entry("comisiones", "3K1, 3K2 y 3K5"),
                 entry("comisionesLabel", "Comisiones"),
                 entry("horario", "08:00 a 10:00"),
-                entry("asuntoTitulo", "Aula confirmada"),
+                entry("asuntoTitulo", "Aula asignada"),
                 entry("asuntoPartes", List.of("Parcial de Redes de Datos", "fuera de horario")),
-                entry("parrafoConfirmacion", "Confirmamos el aula para tu parcial, pedido #14 (solicitud #1)."),
+                entry("parrafoConfirmacion", "Te asignamos el aula para tu parcial, pedido #14 (solicitud #1)."),
                 entry("notaAdicional", "Es fuera del horario habitual de cursado.")));
     }
 
@@ -170,12 +181,14 @@ class RoomRequestNotificationModelTest {
         assertThat(result).doesNotContainKey("materia");
         assertThat(result).containsExactlyInAnyOrderEntriesOf(Map.ofEntries(
                 entry("docente", "Ada Lovelace"),
-                entry("tituloBanner", "Aula confirmada"),
+                entry("pedidoId", 15L),
+                entry("pedidoRespuesta", "Si estás de acuerdo no hace falta que respondas. Si necesitás otras aulas, respondé este mail contando por qué."),
+                entry("tituloBanner", "Aula asignada"),
                 entry("aulasLabel", "Aula"),
                 entry("aulas", List.of("Aula 1 (Aula Magna)")),
-                entry("asuntoTitulo", "Aula confirmada"),
+                entry("asuntoTitulo", "Aula asignada"),
                 entry("asuntoPartes", List.of("Congreso / Conferencia")),
-                entry("parrafoConfirmacion", "Confirmamos el aula para tu actividad, pedido #15 (solicitud #1).")));
+                entry("parrafoConfirmacion", "Te asignamos el aula para tu actividad, pedido #15 (solicitud #1).")));
     }
 
     @Test
@@ -190,13 +203,15 @@ class RoomRequestNotificationModelTest {
         assertThat(result).doesNotContainKeys("fecha", "horario");
         assertThat(result).containsExactlyInAnyOrderEntriesOf(Map.ofEntries(
                 entry("docente", "Ada Lovelace"),
-                entry("tituloBanner", "Aula confirmada"),
+                entry("pedidoId", 16L),
+                entry("pedidoRespuesta", "Si estás de acuerdo no hace falta que respondas. Si necesitás otras aulas, respondé este mail contando por qué."),
+                entry("tituloBanner", "Aula asignada"),
                 entry("aulasLabel", "Aula"),
                 entry("aulas", List.of("Aula 2 (Pabellón Argentina)")),
                 entry("observaciones", "Necesita pizarra adicional"),
-                entry("asuntoTitulo", "Aula confirmada"),
+                entry("asuntoTitulo", "Aula asignada"),
                 entry("asuntoPartes", List.of("Otro")),
-                entry("parrafoConfirmacion", "Confirmamos el aula para tu pedido #16 (solicitud #1).")));
+                entry("parrafoConfirmacion", "Te asignamos el aula para tu pedido #16 (solicitud #1).")));
     }
 
     @Test
@@ -245,17 +260,38 @@ class RoomRequestNotificationModelTest {
         assertThat(sinAulaAnteriorResult).containsExactlyInAnyOrderEntriesOf(conAulaAnteriorSinClave);
     }
 
+    @Test
+    @DisplayName("con plazo de aceptación: plazoRespuesta lo muestra en hora de Buenos Aires")
+    void plazoRespuestaEnHoraLocal() {
+        AssignedClassroomDto aula = new AssignedClassroomDto(5L, 12, "Pabellón Argentina", 60);
+        RoomRequestItemDetailDto detail = detail(RoomRequestType.FINAL_EXAM, null, 12L,
+                List.of(), LocalDate.of(2026, 11, 14), null, LocalTime.of(9, 0), LocalTime.of(11, 0), 1,
+                List.of(aula), null, null, null, Instant.parse("2026-11-13T15:00:00Z"));
+
+        assertThat(model.build(detail)).containsEntry("plazoRespuesta",
+                "Si no recibimos respuesta hasta el 13/11/2026 a las 12:00, damos por aceptada la asignación.");
+    }
+
     private static RoomRequestItemDetailDto detail(RoomRequestType type, SubjectResponseDto subject, Long itemId,
             List<CommissionResponseDto> commissions, LocalDate date, DayOfWeek dayOfWeek,
             LocalTime startTime, LocalTime endTime, Integer classroomCount,
             List<AssignedClassroomDto> assignedClassrooms, AssignedClassroomDto previousClassroom,
             String decisionReason, String observations) {
+        return detail(type, subject, itemId, commissions, date, dayOfWeek, startTime, endTime, classroomCount,
+                assignedClassrooms, previousClassroom, decisionReason, observations, null);
+    }
+
+    private static RoomRequestItemDetailDto detail(RoomRequestType type, SubjectResponseDto subject, Long itemId,
+            List<CommissionResponseDto> commissions, LocalDate date, DayOfWeek dayOfWeek,
+            LocalTime startTime, LocalTime endTime, Integer classroomCount,
+            List<AssignedClassroomDto> assignedClassrooms, AssignedClassroomDto previousClassroom,
+            String decisionReason, String observations, Instant acceptanceDeadline) {
         RoomRequestItemDetailHeaderDto header = new RoomRequestItemDetailHeaderDto(
                 1L, type, null, "Ada Lovelace", "ada@frc.utn.edu.ar", null, subject, null, 1);
         RoomRequestItemResponseDto item = new RoomRequestItemResponseDto(
                 itemId, 1, null, null, null, decisionReason, commissions, date, dayOfWeek, startTime, endTime,
                 null, null, null, classroomCount, null, null, null, null, null, observations,
-                List.of(), null, assignedClassrooms, previousClassroom, null, null, null, null, null, List.of());
-        return new RoomRequestItemDetailDto(header, item, List.of());
+                List.of(), null, assignedClassrooms, previousClassroom, null, acceptanceDeadline, null, null, null, null, null, null, List.of());
+        return new RoomRequestItemDetailDto(header, item, List.of(), List.of());
     }
 }

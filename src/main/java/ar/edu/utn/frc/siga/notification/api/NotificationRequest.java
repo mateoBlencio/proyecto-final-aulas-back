@@ -10,5 +10,11 @@ public record NotificationRequest(
         NotificationTemplate template,
         List<NotificationRecipient> recipients,
         Map<String, Object> model,
-        String idempotencyKey) {
+        String idempotencyKey,
+        List<String> replyTo) {
+
+    public NotificationRequest(NotificationTemplate template, List<NotificationRecipient> recipients,
+                               Map<String, Object> model, String idempotencyKey) {
+        this(template, recipients, model, idempotencyKey, List.of());
+    }
 }

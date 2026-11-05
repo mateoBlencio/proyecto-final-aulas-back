@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -46,7 +47,8 @@ class NotificationDispatcher {
 
         try {
             sender.get().send(
-                    new RenderedNotification(notification.getSubject(), notification.getBody()),
+                    new RenderedNotification(notification.getSubject(), notification.getBody(),
+                            splitReplyTo(notification.getReplyTo())),
                     new NotificationRecipient(notification.getRecipientName(), notification.getRecipient()));
             notification.markSent(Instant.now());
         } catch (RuntimeException e) {
@@ -55,6 +57,10 @@ class NotificationDispatcher {
             log.warn("Fallo al enviar la notificación {} (intento {}): {}",
                     id, notification.getAttempts(), e.getMessage());
         }
+    }
+
+    private static List<String> splitReplyTo(String replyTo) {
+        return replyTo == null || replyTo.isBlank() ? List.of() : List.of(replyTo.split(","));
     }
 
     static Duration backoffFor(int attempt) {

@@ -144,16 +144,41 @@ class NotificationRendererTest {
     }
 
     @Test
-    void closingTextHasNoContactAddress() {
+    void subjectEndsWithRequestNumberWhenPresent() {
+        Map<String, Object> model = new HashMap<>();
+        model.put("asuntoTitulo", "Aula asignada");
+        model.put("asuntoPartes", List.of("Parcial de Redes"));
+        model.put("pedidoId", 158L);
+
+        RenderedNotification rendered = renderer.render(NotificationTemplate.ROOM_REQUEST_RESOLVED, model);
+
+        assertThat(rendered.subject()).isEqualTo("Aula asignada — Parcial de Redes — pedido #158");
+    }
+
+    @Test
+    void bodyShowsDeadlineAndHowToReplyWhenPresent() {
+        Map<String, Object> model = baseModel();
+        model.put("plazoRespuesta", "Si no recibimos respuesta hasta el 13/11/2026 a las 12:00, damos por aceptada la asignación.");
+        model.put("pedidoRespuesta", "Si necesitás otras aulas, respondé este mail contando por qué.");
+
+        RenderedNotification rendered = renderer.render(NotificationTemplate.ROOM_REQUEST_RESOLVED, model);
+
+        assertThat(rendered.body())
+                .contains("13/11/2026 a las 12:00")
+                .contains("Si necesitás otras aulas, respondé este mail contando por qué.");
+    }
+
+    @Test
+    void closingTextAsksToReplyWithoutShowingAnAddress() {
         Map<String, Object> model = baseModel();
 
         RenderedNotification rendered = renderer.render(NotificationTemplate.ROOM_REQUEST_RESOLVED, model);
 
         assertThat(rendered.body())
-                .contains("No respondas este mail")
+                .contains("respondé este mail")
+                .doesNotContain("No respondas este mail")
                 .doesNotContain("mailto:")
-                .doesNotContain("@frc")
-                .doesNotContain("respondé este mail");
+                .doesNotContain("@frc");
     }
 
     private static int occurrences(String text, String needle) {

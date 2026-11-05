@@ -22,5 +22,6 @@ public class NotificationProperties {
     public static class Email {
         private boolean enabled = false;
         private String from;
+        private String replyTo;
     }
 }
