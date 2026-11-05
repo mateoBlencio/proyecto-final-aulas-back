@@ -63,7 +63,7 @@ docs {
 
   Reasignar (un segundo `assign` sobre un pedido ya `IN_EVALUATION`) reemplaza el
   conjunto de aulas anterior entero. Solo transiciona desde `NEW`,
-  `DERIVED_TO_BUILDING` o `IN_EVALUATION` (409 desde `RESOLVED` o `CANCELLED`). 404
+  `DERIVED_TO_BUILDING` o `IN_EVALUATION` (409 desde `NOTIFIED`, `RESOLVED` o `CANCELLED`: hay que reabrir primero). 404
   si el ítem no existe.
 
   Respuesta: 200 con el pedido actualizado (`status: "IN_EVALUATION"`).

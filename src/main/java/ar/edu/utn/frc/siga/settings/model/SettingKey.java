@@ -52,7 +52,13 @@ public enum SettingKey {
     ROOM_REQUESTS_MAX_COMPUTER_COUNT(
             "roomRequests.maxComputerCount", SettingType.INT, RiskLevel.SAFE, "roomRequests", null),
     ROOM_REQUESTS_ALERT_DAYS_BEFORE_DATE(
-            "roomRequests.alertDaysBeforeDate", SettingType.INT, RiskLevel.SAFE, "roomRequests", null);
+            "roomRequests.alertDaysBeforeDate", SettingType.INT, RiskLevel.SAFE, "roomRequests", null),
+    ROOM_REQUESTS_ACCEPTANCE_BUSINESS_HOURS(
+            "roomRequests.acceptance.businessHours", SettingType.INT, RiskLevel.SAFE, "roomRequests",
+            "Cada día hábil (lunes a viernes sin feriado) suma 24 horas al plazo que tiene el docente para "
+                    + "responder: 48 son dos días hábiles, no dos jornadas de 8 horas."),
+    ROOM_REQUESTS_ACCEPTANCE_HOURS_BEFORE_EVENT(
+            "roomRequests.acceptance.hoursBeforeEvent", SettingType.INT, RiskLevel.SAFE, "roomRequests", null);
 
     private final String key;
     private final SettingType type;

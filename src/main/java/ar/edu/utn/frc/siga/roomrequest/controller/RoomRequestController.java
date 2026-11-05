@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.roomrequest.dto.request.CancelRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.ConfirmRoomRequestSuggestionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.DeriveRoomRequestItemDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.ReopenRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.ReturnRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.SuggestRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
@@ -138,7 +139,7 @@ public class RoomRequestController {
     @Operation(summary = "Asignar aula(s) a un pedido",
                description = "Asigna una o más aulas y deja el pedido en IN_EVALUATION. Admite "
                        + "resolución parcial (menos aulas que classroomCount, con motivo obligatorio) "
-                       + "y reasignación mientras el pedido no fue notificado. Si alguna aula se superpone con otra "
+                       + "y reasignación mientras el pedido no esté en NOTIFIED ni RESOLVED (hay que reabrirlo). Si alguna aula se superpone con otra "
                        + "asignación, el 409 (o el 400 si el solape entra en el margen y falta motivo) trae "
                        + "'classroomIds' con todas las aulas en conflicto.")
     public ResponseEntity<RoomRequestItemResponseDto> assignItem(@PathVariable Long id,
@@ -154,8 +155,9 @@ public class RoomRequestController {
     @PostMapping("/items/{id}/cancel")
     @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
     @Operation(summary = "Cancelar un pedido de aula",
-               description = "Cancela el pedido desde cualquier estado no final. RESOLVED es terminal: "
-                       + "una vez notificado el docente, no se puede cancelar. Libera las aulas que tuviera asignadas.")
+               description = "Cancela el pedido desde NEW, DERIVED_TO_BUILDING, IN_EVALUATION o NOTIFIED. Un pedido "
+                       + "RESOLVED (aceptado) no se cancela: primero hay que reabrirlo. Libera las aulas que tuviera "
+                       + "asignadas; en un cambio regular, solo las de clases futuras.")
     public ResponseEntity<RoomRequestItemResponseDto> cancelItem(@PathVariable Long id,
                                                                   @Valid @RequestBody CancelRoomRequestItemDto dto,
                                                                   Principal principal) {
@@ -172,9 +174,9 @@ public class RoomRequestController {
                description = "Aulas activas que cumplen los requisitos del pedido (computadoras, "
                        + "proyector), con disponibilidad ya calculada contra su fecha y horario. "
                        + "Lista vacía es una respuesta válida.")
-    public ResponseEntity<List<AllowedClassroomDto>> findAllowedClassrooms(@PathVariable Long id) {
+    public ResponseEntity<List<AllowedClassroomDto>> findAllowedClassrooms(@PathVariable Long id, Principal principal) {
         log.debug("GET /v1/room-requests/items/{}/allowed-classrooms", id);
-        List<AllowedClassroomDto> response = roomRequestResolutionService.findAllowedClassrooms(id);
+        List<AllowedClassroomDto> response = roomRequestResolutionService.findAllowedClassrooms(id, principal.getName());
         log.info("Aulas candidatas listadas vía controller: itemId={}, total={}", id, response.size());
         return ResponseEntity.ok(response);
     }
@@ -212,14 +214,44 @@ public class RoomRequestController {
 
     @PostMapping("/items/{id}/notify")
     @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
-    @Operation(summary = "Avisar al docente que su pedido quedó resuelto",
-               description = "Sella la resolución y deja el pedido en RESOLVED. Idempotente: llamarlo "
-                       + "de nuevo sobre un pedido ya notificado devuelve 200 sin resellar ni volver a "
-                       + "avisar. Requiere IN_EVALUATION con al menos un aula asignada.")
+    @Operation(summary = "Avisar al docente las aulas asignadas",
+               description = "Deja el pedido en NOTIFIED, calcula el plazo de aceptación automática "
+                       + "(acceptanceDeadline) y encola el mail al docente. Idempotente: llamarlo de nuevo "
+                       + "sobre un pedido NOTIFIED o RESOLVED devuelve 200 sin volver a avisar. Un pedido "
+                       + "reabierto se puede notificar de nuevo y suma una ronda. Requiere IN_EVALUATION con "
+                       + "al menos un aula asignada.")
     public ResponseEntity<RoomRequestItemResponseDto> notifyItem(@PathVariable Long id, Principal principal) {
         log.debug("POST /v1/room-requests/items/{}/notify", id);
         RoomRequestItemResponseDto response = roomRequestResolutionService.notify(id, principal.getName());
         log.info("Pedido de aula notificado vía controller: id={}", id);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/items/{id}/confirm")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
+    @Operation(summary = "Confirmar la aceptación del docente",
+               description = "Pasa el pedido de NOTIFIED a RESOLVED, registra quién lo aceptó y limpia el "
+                       + "plazo de aceptación. Sin cuerpo.")
+    public ResponseEntity<RoomRequestItemResponseDto> confirmItem(@PathVariable Long id, Principal principal) {
+        log.debug("POST /v1/room-requests/items/{}/confirm", id);
+        RoomRequestItemResponseDto response = roomRequestResolutionService.confirm(id, principal.getName());
+        log.info("Aceptación de pedido de aula confirmada vía controller: id={}", id);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/items/{id}/reopen")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
+    @Operation(summary = "Reabrir un pedido notificado o resuelto",
+               description = "Vuelve el pedido a IN_EVALUATION con el motivo del docente (obligatorio). Las "
+                       + "aulas siguen reservadas hasta que se reasigne. Conserva la fecha de notificación y "
+                       + "limpia plazo y datos de aceptación. Desde RESOLVED exige que queden fechas futuras.")
+    public ResponseEntity<RoomRequestItemResponseDto> reopenItem(@PathVariable Long id,
+                                                                  @Valid @RequestBody ReopenRoomRequestItemDto dto,
+                                                                  Principal principal) {
+        log.debug("POST /v1/room-requests/items/{}/reopen", id);
+        RoomRequestItemResponseDto response =
+                roomRequestResolutionService.reopen(id, dto.reason(), principal.getName());
+        log.info("Pedido de aula reabierto vía controller: id={}", id);
         return ResponseEntity.ok(response);
     }
 
@@ -229,9 +261,9 @@ public class RoomRequestController {
                description = "Edificios con al menos un aula libre que cumple los requisitos del "
                        + "pedido y que tienen algún auxiliar áulico asignado. Lista vacía es una "
                        + "respuesta válida.")
-    public ResponseEntity<List<CandidateBuildingDto>> findCandidateBuildings(@PathVariable Long id) {
+    public ResponseEntity<List<CandidateBuildingDto>> findCandidateBuildings(@PathVariable Long id, Principal principal) {
         log.debug("GET /v1/room-requests/items/{}/candidate-buildings", id);
-        List<CandidateBuildingDto> response = roomRequestResolutionService.findCandidateBuildings(id);
+        List<CandidateBuildingDto> response = roomRequestResolutionService.findCandidateBuildings(id, principal.getName());
         log.info("Edificios candidatos listados vía controller: itemId={}, total={}", id, response.size());
         return ResponseEntity.ok(response);
     }
@@ -264,7 +296,7 @@ public class RoomRequestController {
     public ResponseEntity<RoomRequestItemResponseDto> confirmSuggestion(
             @PathVariable Long id,
             @PathVariable String suggestionId,
-            @RequestBody(required = false) ConfirmRoomRequestSuggestionDto dto,
+            @Valid @RequestBody(required = false) ConfirmRoomRequestSuggestionDto dto,
             Principal principal) {
         log.debug("POST /v1/room-requests/items/{}/suggestion/{}/confirm", id, suggestionId);
         RoomRequestItemResponseDto response = roomRequestSuggestionService.confirm(

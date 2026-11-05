@@ -14,13 +14,17 @@ public interface RoomRequestResolutionService {
 
     RoomRequestItemResponseDto cancel(Long itemId, String reason, String actor);
 
-    List<AllowedClassroomDto> findAllowedClassrooms(Long itemId);
+    List<AllowedClassroomDto> findAllowedClassrooms(Long itemId, String actor);
 
-    List<CandidateBuildingDto> findCandidateBuildings(Long itemId);
+    List<CandidateBuildingDto> findCandidateBuildings(Long itemId, String actor);
 
     RoomRequestItemResponseDto derive(Long itemId, Long buildingId, String actor);
 
     RoomRequestItemResponseDto returnItem(Long itemId, String reason, String actor);
 
     RoomRequestItemResponseDto notify(Long itemId, String actor);
+
+    RoomRequestItemResponseDto confirm(Long itemId, String actor);
+
+    RoomRequestItemResponseDto reopen(Long itemId, String reason, String actor);
 }

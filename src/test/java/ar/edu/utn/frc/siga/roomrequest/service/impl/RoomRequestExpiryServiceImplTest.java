@@ -5,7 +5,9 @@ import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.model.EventType;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.roomrequest.event.RoomRequestItemAccepted;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItemAllocation;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -15,14 +17,17 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,8 +39,11 @@ class RoomRequestExpiryServiceImplTest {
     @Mock
     private AcademicEventService academicEventService;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private RoomRequestExpiryServiceImpl newService() {
-        return new RoomRequestExpiryServiceImpl(itemRepository, academicEventService);
+        return new RoomRequestExpiryServiceImpl(itemRepository, academicEventService, eventPublisher);
     }
 
     @Test
@@ -101,6 +109,93 @@ class RoomRequestExpiryServiceImplTest {
 
         assertThat(cancelled).isZero();
         assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.NEW);
+    }
+
+    @Test
+    @DisplayName("IN_EVALUATION con aula y sin ninguna notificación vence con el motivo de no notificado")
+    void cancelsAssignedNeverNotifiedItemWithOwnReason() {
+        RoomRequestItem item = inEvaluationWithRoom(5L, 0);
+        when(itemRepository.findExpiredByDate(any())).thenReturn(List.of(item));
+        when(itemRepository.findActiveRegularRoomChangeItems()).thenReturn(List.of());
+
+        newService().expireOverdueItems();
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.CANCELLED);
+        assertThat(item.getDecidedBy()).isEqualTo("SISTEMA");
+        assertThat(item.getDecisionReason()).isEqualTo("Vencido sin notificar al docente");
+    }
+
+    @Test
+    @DisplayName("IN_EVALUATION con aula pero ya notificado una vez (reabierto) vence con el motivo general")
+    void cancelsReopenedItemWithGeneralReason() {
+        RoomRequestItem item = inEvaluationWithRoom(6L, 1);
+        when(itemRepository.findExpiredByDate(any())).thenReturn(List.of(item));
+        when(itemRepository.findActiveRegularRoomChangeItems()).thenReturn(List.of());
+
+        newService().expireOverdueItems();
+
+        assertThat(item.getDecisionReason()).isEqualTo("Vencido: la fecha del pedido ya pasó");
+    }
+
+    @Test
+    @DisplayName("IN_EVALUATION sin aula vence con el motivo general")
+    void cancelsUnassignedInEvaluationItemWithGeneralReason() {
+        RoomRequestItem item = RoomRequestItem.builder().id(7L).status(RoomRequestStatus.IN_EVALUATION)
+                .date(LocalDate.now().minusDays(1)).build();
+        when(itemRepository.findExpiredByDate(any())).thenReturn(List.of(item));
+        when(itemRepository.findActiveRegularRoomChangeItems()).thenReturn(List.of());
+
+        newService().expireOverdueItems();
+
+        assertThat(item.getDecisionReason()).isEqualTo("Vencido: la fecha del pedido ya pasó");
+    }
+
+    @Test
+    @DisplayName("NOTIFIED con la fecha pasada pasa a RESOLVED con actor SISTEMA y publica la aceptación")
+    void acceptsNotifiedItemWhoseDatePassed() {
+        RoomRequestItem item = RoomRequestItem.builder().id(8L).status(RoomRequestStatus.NOTIFIED)
+                .date(LocalDate.now().minusDays(1)).notificationRound(1).build();
+        when(itemRepository.findExpiredByDate(any())).thenReturn(List.of(item));
+        when(itemRepository.findActiveRegularRoomChangeItems()).thenReturn(List.of());
+
+        newService().expireOverdueItems();
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.RESOLVED);
+        assertThat(item.getAcceptedBy()).isEqualTo("SISTEMA");
+        assertThat(item.getAcceptedAt()).isNotNull();
+        verify(eventPublisher).publishEvent(org.mockito.ArgumentMatchers.any(RoomRequestItemAccepted.class));
+    }
+
+    @Test
+    @DisplayName("acepta los NOTIFIED con plazo vencido con actor SISTEMA y publica el evento")
+    void acceptsOverdueNotifiedItems() {
+        RoomRequestItem item = RoomRequestItem.builder().id(9L).status(RoomRequestStatus.NOTIFIED)
+                .acceptanceDeadline(Instant.now().minusSeconds(60)).notificationRound(1).build();
+        when(itemRepository.findNotifiedWithDeadlineUntil(any())).thenReturn(List.of(item));
+
+        int accepted = newService().acceptOverdueNotifiedItems();
+
+        assertThat(accepted).isEqualTo(1);
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.RESOLVED);
+        assertThat(item.getDecidedBy()).isEqualTo("SISTEMA");
+        assertThat(item.getAcceptedBy()).isEqualTo("SISTEMA");
+        assertThat(item.getAcceptanceDeadline()).isNull();
+        verify(eventPublisher).publishEvent(org.mockito.ArgumentMatchers.any(RoomRequestItemAccepted.class));
+    }
+
+    @Test
+    @DisplayName("sin NOTIFIED vencidos no acepta nada")
+    void acceptsNothingWhenNoneOverdue() {
+        when(itemRepository.findNotifiedWithDeadlineUntil(any())).thenReturn(List.of());
+
+        assertThat(newService().acceptOverdueNotifiedItems()).isZero();
+    }
+
+    private RoomRequestItem inEvaluationWithRoom(Long id, int round) {
+        RoomRequestItem item = RoomRequestItem.builder().id(id).status(RoomRequestStatus.IN_EVALUATION)
+                .date(LocalDate.now().minusDays(1)).notificationRound(round).build();
+        item.getAllocations().add(RoomRequestItemAllocation.builder().classroomId(1L).position(1).build());
+        return item;
     }
 
     @ParameterizedTest

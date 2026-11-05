@@ -8,6 +8,8 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -17,7 +19,9 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class RoomRequestAccessControl {
 
-    public enum Action { ASSIGN, DERIVE, RETURN, CANCEL, NOTIFY }
+    private static final ZoneId ZONE = ZoneId.of("America/Argentina/Buenos_Aires");
+
+    public enum Action { ASSIGN, DERIVE, RETURN, CANCEL, NOTIFY, CONFIRM, REOPEN }
 
     private final UserService userService;
 
@@ -44,8 +48,14 @@ public class RoomRequestAccessControl {
                 : auxiliarAllows(item, action, actor.ownsBuilding(item.getDerivedBuildingId()));
     }
 
+    /** Pista de UI: oculta REOPEN en un RESOLVED con fecha pasada. En el cambio regular no hay fecha propia y lo decide {@code reopen}. */
     public List<Action> allowedActions(RoomRequestItem item, Actor actor) {
-        return Arrays.stream(Action.values()).filter(action -> allows(item, actor, action)).toList();
+        boolean pastDate = item.getStatus() == RoomRequestStatus.RESOLVED
+                && item.getDate() != null && item.getDate().isBefore(LocalDate.now(ZONE));
+        return Arrays.stream(Action.values())
+                .filter(action -> allows(item, actor, action))
+                .filter(action -> !(pastDate && action == Action.REOPEN))
+                .toList();
     }
 
     public void authorize(RoomRequestItem item, String actorEmail, Action action) {
@@ -76,7 +86,10 @@ public class RoomRequestAccessControl {
             case DERIVED_TO_BUILDING -> action == Action.RETURN || action == Action.CANCEL;
             case IN_EVALUATION -> action == Action.CANCEL
                     || (item.getDerivedBuildingId() == null && (action == Action.ASSIGN || action == Action.NOTIFY));
-            case RESOLVED, CANCELLED -> false;
+            case NOTIFIED -> item.getDerivedBuildingId() == null
+                    && (action == Action.CANCEL || action == Action.CONFIRM || action == Action.REOPEN);
+            case RESOLVED -> item.getDerivedBuildingId() == null && action == Action.REOPEN;
+            case CANCELLED -> false;
         };
     }
 
@@ -88,7 +101,10 @@ public class RoomRequestAccessControl {
                     && (action == Action.ASSIGN || action == Action.RETURN || action == Action.CANCEL);
             case IN_EVALUATION -> ownsBuilding
                     && (action == Action.ASSIGN || action == Action.NOTIFY || action == Action.CANCEL);
-            case RESOLVED, CANCELLED -> false;
+            case NOTIFIED -> item.getDerivedBuildingId() != null && ownsBuilding
+                    && (action == Action.CANCEL || action == Action.CONFIRM || action == Action.REOPEN);
+            case RESOLVED -> item.getDerivedBuildingId() != null && ownsBuilding && action == Action.REOPEN;
+            case CANCELLED -> false;
         };
     }
 }

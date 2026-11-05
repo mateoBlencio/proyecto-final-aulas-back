@@ -162,6 +162,30 @@ class RoomRequestCatalogsResolver {
         return result;
     }
 
+    /** Ocurrencias de hoy en adelante de cada cambio regular: las clases pasadas conservan el aula vieja y no cuentan como vigentes. */
+    Map<Long, Set<Long>> resolveFutureOccurrenceIdsByItemId(Collection<RoomRequestItem> items) {
+        List<RoomRequestItem> regular = items.stream()
+                .filter(item -> item.getRequest().getType() == RoomRequestType.REGULAR_ROOM_CHANGE)
+                .filter(item -> item.getSourceRecurringEventId() != null && !item.getAllocations().isEmpty())
+                .toList();
+        if (regular.isEmpty()) {
+            return Map.of();
+        }
+        LocalDate today = LocalDate.now();
+        Map<Long, Set<Long>> futureIdsByEventId = academicEventService
+                .findOccurrencesByEventIds(regular.stream().map(RoomRequestItem::getSourceRecurringEventId)
+                        .collect(Collectors.toSet()))
+                .stream()
+                .filter(o -> !o.date().isBefore(today))
+                .collect(Collectors.groupingBy(OccurrenceResponseDto::eventId,
+                        Collectors.mapping(OccurrenceResponseDto::id, Collectors.toSet())));
+        Map<Long, Set<Long>> result = new LinkedHashMap<>();
+        for (RoomRequestItem item : regular) {
+            result.put(item.getId(), futureIdsByEventId.getOrDefault(item.getSourceRecurringEventId(), Set.of()));
+        }
+        return result;
+    }
+
     /**
      * Fechas liberadas que el pedido reactivaría al asignarse: la fecha puntual (cambio único o parcial en
      * clase) o las futuras del día de la semana (cambio regular). Los espejos retirados no cuentan.

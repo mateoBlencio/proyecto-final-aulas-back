@@ -74,7 +74,8 @@ public interface RoomRequestMapper {
                                    List<CommissionResponseDto> commissions,
                                    String derivedBuildingName,
                                    Integer assignedClassroomCount,
-                                   List<RoomRequestAccessControl.Action> allowedActions);
+                                   List<RoomRequestAccessControl.Action> allowedActions,
+                                   Boolean overlapsWithOtherSubject);
 
     @Mapping(target = "id", source = "request.id")
     @Mapping(target = "itemCount", expression = "java(request.getItems().size())")

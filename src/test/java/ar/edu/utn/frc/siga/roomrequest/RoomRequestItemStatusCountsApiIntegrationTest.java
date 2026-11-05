@@ -43,16 +43,17 @@ class RoomRequestItemStatusCountsApiIntegrationTest extends AbstractIntegrationT
     private RoomRequestRepository roomRequestRepository;
 
     @Test
-    @DisplayName("devuelve siempre los 5 estados, en orden del enum")
-    void alwaysReturnsFiveStatusesInEnumOrder() throws Exception {
+    @DisplayName("devuelve siempre los 6 estados, en orden del enum")
+    void alwaysReturnsSixStatusesInEnumOrder() throws Exception {
         mockMvc.perform(get("/v1/room-requests/items/status-counts"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(5))
+                .andExpect(jsonPath("$.length()").value(6))
                 .andExpect(jsonPath("$[0].status").value("NEW"))
                 .andExpect(jsonPath("$[1].status").value("DERIVED_TO_BUILDING"))
                 .andExpect(jsonPath("$[2].status").value("IN_EVALUATION"))
-                .andExpect(jsonPath("$[3].status").value("RESOLVED"))
-                .andExpect(jsonPath("$[4].status").value("CANCELLED"))
+                .andExpect(jsonPath("$[3].status").value("NOTIFIED"))
+                .andExpect(jsonPath("$[4].status").value("RESOLVED"))
+                .andExpect(jsonPath("$[5].status").value("CANCELLED"))
                 .andExpect(jsonPath("$[0].count").isNumber())
                 .andExpect(jsonPath("$[4].count").isNumber());
     }

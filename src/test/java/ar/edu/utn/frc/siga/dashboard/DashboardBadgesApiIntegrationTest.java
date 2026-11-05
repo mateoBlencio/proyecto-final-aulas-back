@@ -48,7 +48,7 @@ class DashboardBadgesApiIntegrationTest extends DashboardIntegrationSupport {
     }
 
     @Test
-    @DisplayName("awaiting action: Subsecretaria sees new and non-derived in-evaluation items, each auxiliar the ones derived to its building")
+    @DisplayName("awaiting action: Subsecretaria sees new and non-derived in-evaluation or notified items, each auxiliar the ones derived to its building")
     void awaitingActionDependsOnTheRole() throws Exception {
         Building a = building();
         Building b = building();
@@ -61,12 +61,14 @@ class DashboardBadgesApiIntegrationTest extends DashboardIntegrationSupport {
         item(RoomRequestStatus.IN_EVALUATION, a.getId(), null, null);
         item(RoomRequestStatus.DERIVED_TO_BUILDING, a.getId(), null, null);
         item(RoomRequestStatus.DERIVED_TO_BUILDING, b.getId(), null, null);
+        item(RoomRequestStatus.NOTIFIED, null, null, null);
+        item(RoomRequestStatus.NOTIFIED, b.getId(), null, null);
         item(RoomRequestStatus.RESOLVED, a.getId(), null, null);
         item(RoomRequestStatus.CANCELLED, null, null, null);
 
-        assertThat(badges(mockMvc).get("roomRequestsAwaitingAction").asLong() - subsecretariaBefore).isEqualTo(2);
+        assertThat(badges(mockMvc).get("roomRequestsAwaitingAction").asLong() - subsecretariaBefore).isEqualTo(3);
         assertThat(badges(auxA).get("roomRequestsAwaitingAction").asLong()).isEqualTo(2);
-        assertThat(badges(auxB).get("roomRequestsAwaitingAction").asLong()).isEqualTo(1);
+        assertThat(badges(auxB).get("roomRequestsAwaitingAction").asLong()).isEqualTo(2);
     }
 
     @Test

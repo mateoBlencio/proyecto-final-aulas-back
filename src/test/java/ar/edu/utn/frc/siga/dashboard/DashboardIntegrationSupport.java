@@ -175,10 +175,16 @@ abstract class DashboardIntegrationSupport extends AbstractIntegrationTest {
                 + "(SELECT id_solicitud FROM solicitud_aula_item WHERE id_item = ?)", createdAt, itemId);
     }
 
-    /** Resolves the item with notification at {@code notifiedAt}. */
-    protected void resolve(Long itemId, OffsetDateTime notifiedAt) {
+    /** Resolves the item notified at {@code notifiedAt} and accepted at {@code acceptedAt}. */
+    protected void resolve(Long itemId, OffsetDateTime notifiedAt, OffsetDateTime acceptedAt) {
         jdbc.update("UPDATE solicitud_aula_item SET estado = 'RESOLVED', decidido_por = 'test@frc.utn.edu.ar', "
-                + "fecha_decision = ?, fecha_notificacion = ? WHERE id_item = ?", notifiedAt, notifiedAt, itemId);
+                + "fecha_decision = ?, fecha_notificacion = ?, fecha_aceptacion = ?, ronda_notificacion = 1 "
+                + "WHERE id_item = ?", acceptedAt, notifiedAt, acceptedAt, itemId);
+    }
+
+    /** Resolves the item accepted at the same moment it was notified. */
+    protected void resolve(Long itemId, OffsetDateTime notifiedAt) {
+        resolve(itemId, notifiedAt, notifiedAt);
     }
 
     /** Cancels the item as {@code decidedBy} at {@code decidedAt} ("SISTEMA" is the expiry process). */

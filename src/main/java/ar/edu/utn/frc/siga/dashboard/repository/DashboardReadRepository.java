@@ -87,7 +87,7 @@ public class DashboardReadRepository {
         return jdbc.query("""
                 SELECT i.estado, i.id_edificio_derivado, i.fecha, i.hora_inicio, s.creado_en, i.fecha_derivacion
                 FROM solicitud_aula_item i JOIN solicitud_aula s ON s.id_solicitud = i.id_solicitud
-                WHERE i.estado IN ('NEW', 'DERIVED_TO_BUILDING', 'IN_EVALUATION')
+                WHERE i.estado IN ('NEW', 'DERIVED_TO_BUILDING', 'IN_EVALUATION', 'NOTIFIED')
                 """, new MapSqlParameterSource(),
                 (rs, i) -> new PendingItemRow(rs.getString("estado"), (Long) rs.getObject("id_edificio_derivado"),
                         rs.getObject("fecha", LocalDate.class), rs.getObject("hora_inicio", LocalTime.class),
@@ -96,7 +96,7 @@ public class DashboardReadRepository {
     }
 
     /**
-     * Items resolved (RESOLVED) with notification in [from, to), per year. Per building of the allocated room
+     * Items resolved (RESOLVED) with acceptance in [from, to), per year. Per building of the allocated room
      * (an item with rooms in two buildings counts once in each) plus a campus row that counts it once.
      * The year is the one in the clock's zone.
      */
@@ -104,12 +104,12 @@ public class DashboardReadRepository {
         return jdbc.query("""
                 SELECT t.year, t.building_id, GROUPING(t.building_id) AS is_campus,
                        COUNT(DISTINCT t.id_item) AS total
-                FROM (SELECT EXTRACT(YEAR FROM i.fecha_notificacion AT TIME ZONE :zone)::int AS year,
+                FROM (SELECT EXTRACT(YEAR FROM i.fecha_aceptacion AT TIME ZONE :zone)::int AS year,
                              c.id_edificio AS building_id, i.id_item
                       FROM solicitud_aula_item i
                       LEFT JOIN solicitud_item_asignacion ia ON ia.id_item = i.id_item
                       LEFT JOIN aula c ON c.id_aula = ia.id_aula
-                      WHERE i.estado = 'RESOLVED' AND i.fecha_notificacion >= :from AND i.fecha_notificacion < :to) t
+                      WHERE i.estado = 'RESOLVED' AND i.fecha_aceptacion >= :from AND i.fecha_aceptacion < :to) t
                 GROUP BY GROUPING SETS ((t.year), (t.year, t.building_id))
                 """, rangeParams(from, to),
                 (rs, i) -> new RequestCountRow(rs.getInt("year"), (Long) rs.getObject("building_id"),
@@ -135,7 +135,7 @@ public class DashboardReadRepository {
 
     /**
      * Items that were open at {@code at}, per derived building (current derived building). Rebuilt from the
-     * current state: created before {@code at} and not resolved (notified) or cancelled before it.
+     * current state: created before {@code at} and not resolved (accepted) or cancelled before it.
      * {@code creado_en} has no zone, so it is compared in the clock's zone.
      */
     public List<RequestCountRow> countPendingAt(Instant at) {
@@ -143,7 +143,7 @@ public class DashboardReadRepository {
                 SELECT i.id_edificio_derivado AS building_id, COUNT(*) AS total
                 FROM solicitud_aula_item i JOIN solicitud_aula s ON s.id_solicitud = i.id_solicitud
                 WHERE s.creado_en < :atLocal
-                  AND NOT (i.estado = 'RESOLVED'  AND COALESCE(i.fecha_notificacion < :at, TRUE))
+                  AND NOT (i.estado = 'RESOLVED'  AND COALESCE(i.fecha_aceptacion < :at, TRUE))
                   AND NOT (i.estado = 'CANCELLED' AND COALESCE(i.fecha_decision    < :at, TRUE))
                 GROUP BY 1
                 """, new MapSqlParameterSource().addValue("at", utc(at))

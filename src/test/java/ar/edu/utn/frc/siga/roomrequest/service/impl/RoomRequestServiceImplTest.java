@@ -126,8 +126,8 @@ class RoomRequestServiceImplTest {
 
         RoomRequestItem item = RoomRequestItem.builder().id(5L).build();
         RoomRequestItemRowDto row = new RoomRequestItemRowDto(
-                5L, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, List.of(Action.ASSIGN));
+                5L, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, List.of(Action.ASSIGN), false);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         when(itemRepository.findAll(ArgumentMatchers.<Specification<RoomRequestItem>>any(), pageableCaptor.capture()))
@@ -175,6 +175,7 @@ class RoomRequestServiceImplTest {
                 new RoomRequestItemStatusCountDto(RoomRequestStatus.NEW, 30L),
                 new RoomRequestItemStatusCountDto(RoomRequestStatus.DERIVED_TO_BUILDING, 0L),
                 new RoomRequestItemStatusCountDto(RoomRequestStatus.IN_EVALUATION, 0L),
+                new RoomRequestItemStatusCountDto(RoomRequestStatus.NOTIFIED, 0L),
                 new RoomRequestItemStatusCountDto(RoomRequestStatus.RESOLVED, 2L),
                 new RoomRequestItemStatusCountDto(RoomRequestStatus.CANCELLED, 0L));
         verify(itemRepository, times(1)).countByStatus(ArgumentMatchers.<Specification<RoomRequestItem>>any());
@@ -185,7 +186,7 @@ class RoomRequestServiceImplTest {
     @DisplayName("findItemById: delega en el repositorio y compone el detalle con las acciones permitidas")
     void findItemByIdDelegatesToRepositoryAndComposer() {
         RoomRequestItem item = RoomRequestItem.builder().id(5L).build();
-        RoomRequestItemDetailDto detail = new RoomRequestItemDetailDto(null, null, List.of(Action.CANCEL));
+        RoomRequestItemDetailDto detail = new RoomRequestItemDetailDto(null, null, List.of(Action.CANCEL), List.of());
         RoomRequestAccessControl.Actor actor = new RoomRequestAccessControl.Actor(true, false, Set.of());
         when(itemRepository.findWithRequestById(5L)).thenReturn(Optional.of(item));
         when(accessControl.resolveActor("subsecretaria@frc.utn.edu.ar")).thenReturn(actor);

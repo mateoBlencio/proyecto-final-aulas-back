@@ -170,7 +170,7 @@ class RoomRequestMapperTest {
                 .requiresComputers(true)
                 .build();
 
-        RoomRequestItemRowDto dto = mapper.toRowDto(itemWithComputers, null, List.of(), null, 1, List.of());
+        RoomRequestItemRowDto dto = mapper.toRowDto(itemWithComputers, null, List.of(), null, 1, List.of(), false);
 
         assertThat(dto.requiresSpecialAssignment()).isTrue();
         assertThat(dto.wasReturned()).isFalse();
@@ -183,7 +183,7 @@ class RoomRequestMapperTest {
     void rowDtoWithoutSpecialRequirementsIsFalse() {
         RoomRequestItem plain = RoomRequestItem.builder().id(5L).position(1).classroomCount(1).build();
 
-        RoomRequestItemRowDto dto = mapper.toRowDto(plain, null, List.of(), null, 1, List.of());
+        RoomRequestItemRowDto dto = mapper.toRowDto(plain, null, List.of(), null, 1, List.of(), false);
 
         assertThat(dto.requiresSpecialAssignment()).isFalse();
         assertThat(dto.partiallyResolved()).isFalse();
@@ -196,7 +196,7 @@ class RoomRequestMapperTest {
                 .id(5L).position(1).classroomCount(1).returnedFromBuildingId(9L)
                 .build();
 
-        RoomRequestItemRowDto dto = mapper.toRowDto(returned, null, List.of(), null, 0, List.of());
+        RoomRequestItemRowDto dto = mapper.toRowDto(returned, null, List.of(), null, 0, List.of(), false);
 
         assertThat(dto.wasReturned()).isTrue();
         assertThat(dto.partiallyResolved()).isFalse();
@@ -209,7 +209,7 @@ class RoomRequestMapperTest {
         List<RoomRequestAccessControl.Action> actions =
                 List.of(RoomRequestAccessControl.Action.ASSIGN, RoomRequestAccessControl.Action.CANCEL);
 
-        RoomRequestItemRowDto dto = mapper.toRowDto(item, null, List.of(), null, 0, actions);
+        RoomRequestItemRowDto dto = mapper.toRowDto(item, null, List.of(), null, 0, actions, false);
 
         assertThat(dto.allowedActions()).containsExactly(
                 RoomRequestAccessControl.Action.ASSIGN, RoomRequestAccessControl.Action.CANCEL);

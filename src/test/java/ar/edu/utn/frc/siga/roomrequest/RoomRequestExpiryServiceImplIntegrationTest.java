@@ -94,7 +94,7 @@ class RoomRequestExpiryServiceImplIntegrationTest extends AbstractIntegrationTes
                 .decidedBy("subsecretaria@frc.utn.edu.ar")
                 .decidedAt(Instant.now())
                 .build();
-        item.assignClassrooms(java.util.List.of(classroomId), java.util.List.of(java.util.List.of(occurrenceId)));
+        item.assignClassrooms(java.util.List.of(classroomId), java.util.List.of(java.util.List.of(occurrenceId)), java.util.List.of());
         request.addItem(item);
         roomRequestRepository.save(request);
 

@@ -2,10 +2,12 @@ package ar.edu.utn.frc.siga.roomrequest;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
+import ar.edu.utn.frc.siga.common.security.ScopeType;
 import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
+import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestRepository;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
@@ -20,6 +22,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
@@ -38,6 +41,8 @@ class RoomRequestItemAllowedClassroomsApiIntegrationTest extends AbstractIntegra
     private IntegrationTestData testData;
     @Autowired
     private RoomRequestRepository roomRequestRepository;
+    @Autowired
+    private RoomRequestItemRepository roomRequestItemRepository;
 
     @Test
     @DisplayName("aula activa disponible: aparece con available=true")
@@ -77,8 +82,8 @@ class RoomRequestItemAllowedClassroomsApiIntegrationTest extends AbstractIntegra
     }
 
     @Test
-    @DisplayName("sin token: 401; con AUXILIAR_AULICO: 200 (lectura habilitada para ambos roles)")
-    void authenticationAndAuthorization() throws Exception {
+    @DisplayName("sin token: 401")
+    void sinToken_returnsUnauthorized() throws Exception {
         RoomRequestItem item = seedItem(null, false, null);
 
         MockMvc anonymousMockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
@@ -86,10 +91,47 @@ class RoomRequestItemAllowedClassroomsApiIntegrationTest extends AbstractIntegra
                 .build();
         anonymousMockMvc.perform(get("/v1/room-requests/items/" + item.getId() + "/allowed-classrooms"))
                 .andExpect(status().isUnauthorized());
+    }
 
-        mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar")
+    @Test
+    @DisplayName("AUXILIAR_AULICO sobre un ítem sin derivar: 403")
+    void auxiliar_itemSinDerivar_returnsForbidden() throws Exception {
+        RoomRequestItem item = seedItem(null, false, null);
+
+        mockMvcAsAuxiliar("auxiliar-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar")
+                .perform(get("/v1/room-requests/items/" + item.getId() + "/allowed-classrooms"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("AUXILIAR_AULICO de otro edificio sobre un ítem derivado: 403")
+    void auxiliar_itemDerivadoAOtroEdificio_returnsForbidden() throws Exception {
+        Building derivedTo = testData.edificio();
+        RoomRequestItem item = seedItem(null, false, null);
+        derive(item, derivedTo);
+
+        mockMvcAsAuxiliar("auxiliar-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar")
+                .perform(get("/v1/room-requests/items/" + item.getId() + "/allowed-classrooms"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("AUXILIAR_AULICO del edificio al que se derivó el ítem: 200")
+    void auxiliar_itemDerivadoASuEdificio_returnsOk() throws Exception {
+        Building derivedTo = testData.edificio();
+        RoomRequestItem item = seedItem(null, false, null);
+        derive(item, derivedTo);
+
+        mockMvcAsScoped("auxiliar-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar",
+                SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, derivedTo.getId())
                 .perform(get("/v1/room-requests/items/" + item.getId() + "/allowed-classrooms"))
                 .andExpect(status().isOk());
+    }
+
+    private void derive(RoomRequestItem item, Building building) {
+        RoomRequestItem stored = roomRequestItemRepository.findById(item.getId()).orElseThrow();
+        stored.deriveTo(building.getId(), "subsecretaria@frc.utn.edu.ar", Instant.now());
+        roomRequestItemRepository.save(stored);
     }
 
     private RoomRequestItem seedItem(Boolean requiresComputers, boolean requiresProjector, Integer computerCount) {

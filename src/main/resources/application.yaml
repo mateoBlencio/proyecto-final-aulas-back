@@ -121,6 +121,8 @@ siga:
       enabled: ${DASHBOARD_SNAPSHOT_ENABLED:true}
       cron: "0 0 3 1 * *"
   room-requests:
+    acceptance:
+      cron: "0 0 * * * *"
     expiry:
       cron: "0 0 7 * * *"
   settings:
@@ -200,6 +202,14 @@ siga:
         default-value: "3"
         min: "0"
         max: "60"
+      - key: roomRequests.acceptance.businessHours
+        default-value: "48"
+        min: "1"
+        max: "720"
+      - key: roomRequests.acceptance.hoursBeforeEvent
+        default-value: "24"
+        min: "0"
+        max: "720"
   optimizer:
     parallel-solver-count: AUTO
     environment-mode: NO_ASSERT
@@ -246,6 +256,7 @@ siga:
     email:
       enabled: ${MAIL_ENABLED:false}
       from: ${MAIL_FROM:no-reply@frc.utn.edu.ar}
+      reply-to: ${MAIL_REPLY_TO:}
 
 logging:
   level:

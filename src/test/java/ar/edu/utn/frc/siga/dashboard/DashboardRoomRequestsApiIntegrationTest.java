@@ -91,6 +91,20 @@ class DashboardRoomRequestsApiIntegrationTest extends DashboardIntegrationSuppor
     }
 
     @Test
+    @DisplayName("a resolved item counts in the year it was accepted, not the year it was notified")
+    void resolvedCountsByAcceptanceDate() throws Exception {
+        Building a = building();
+        Classroom room = room(a, 30);
+        Long id = item(RoomRequestStatus.NEW, null, null, null);
+        resolve(id, OffsetDateTime.now().minusYears(2), OffsetDateTime.now());
+        assignRoom(id, room, 1);
+
+        JsonNode current = thisYear(mockMvc);
+
+        assertThat(buildingRow(current, a).get("resolved").asLong()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("an item cancelled by SISTEMA counts as expired, one cancelled by a person does not")
     void expiredCountsOnlyCancellationsBySystem() throws Exception {
         Building a = building();
