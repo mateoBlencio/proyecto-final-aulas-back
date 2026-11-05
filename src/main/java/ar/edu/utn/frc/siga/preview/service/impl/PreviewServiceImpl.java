@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.preview.service.impl;
 
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
+import ar.edu.utn.frc.siga.allocation.exception.ReallocationObservationRequiredException;
 import ar.edu.utn.frc.siga.allocation.service.AllocationConflictService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
@@ -206,12 +207,20 @@ public class PreviewServiceImpl implements PreviewService {
 
     @Override
     @Transactional
-    public List<AllocationResponseDto> confirmReallocationSuggestion(String suggestionId) {
+    public List<AllocationResponseDto> confirmReallocationSuggestion(String suggestionId, String observation) {
         ReallocationSuggestion suggestion = previewStore.takeSuggestion(suggestionId)
                 .orElseThrow(() -> new ExpiredPreviewException(suggestionId));
+        boolean classroomChanges = allocationService.findByOccurrenceIds(suggestion.occurrenceIds()).stream()
+                .anyMatch(a -> !suggestion.classroomId().equals(a.classroom().id()));
+        if (classroomChanges && (observation == null || observation.isBlank())) {
+            // La sugerencia se consume al sacarla: se devuelve para que el front pueda reintentar con motivo.
+            previewStore.saveSuggestion(suggestion);
+            throw new ReallocationObservationRequiredException();
+        }
         AllocationItem item = new AllocationItem(
                 new AllocationTarget.Occurrences(suggestion.occurrenceIds()), suggestion.classroomId());
-        List<AllocationResponseDto> saved = allocationService.reallocate(AllocationCommand.automatic(List.of(item)));
+        List<AllocationResponseDto> saved = allocationService.reallocate(
+                AllocationCommand.automatic(List.of(item), observation));
         log.info("Confirm de sugerencia: suggestionId={}, applied={}", suggestionId, saved.size());
         return saved;
     }

@@ -1,6 +1,8 @@
 package ar.edu.utn.frc.siga.preview.service.impl;
 
+import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
+import ar.edu.utn.frc.siga.allocation.exception.ReallocationObservationRequiredException;
 import ar.edu.utn.frc.siga.allocation.service.AllocationConflictService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
@@ -456,7 +458,7 @@ class PreviewServiceImplTest {
                 .thenReturn(Optional.of(new ReallocationSuggestion("sug_x", 1L, List.of(10L, 20L), 5L)));
         when(allocationService.reallocate(any())).thenReturn(List.of());
 
-        service.confirmReallocationSuggestion("sug_x");
+        service.confirmReallocationSuggestion("sug_x", null);
 
         ArgumentCaptor<AllocationCommand> commandCaptor = ArgumentCaptor.forClass(AllocationCommand.class);
         verify(allocationService).reallocate(commandCaptor.capture());
@@ -467,14 +469,64 @@ class PreviewServiceImplTest {
     }
 
     @Test
+    @DisplayName("confirmReallocationSuggestion: aula distinta sin motivo → Observation required, sugerencia re-guardada y reallocate nunca se llama")
+    void confirmReallocationSuggestionAulaDistintaSinMotivoLanzaYReGuarda() {
+        ReallocationSuggestion suggestion = new ReallocationSuggestion("sug_x", 1L, List.of(10L, 20L), 5L);
+        when(previewStore.takeSuggestion("sug_x")).thenReturn(Optional.of(suggestion));
+        when(allocationService.findByOccurrenceIds(List.of(10L, 20L))).thenReturn(List.of(allocationIn(9L)));
+
+        assertThatThrownBy(() -> service.confirmReallocationSuggestion("sug_x", "  "))
+                .isInstanceOf(ReallocationObservationRequiredException.class);
+
+        verify(previewStore).saveSuggestion(suggestion);
+        verify(allocationService, never()).reallocate(any());
+    }
+
+    @Test
+    @DisplayName("confirmReallocationSuggestion: aula distinta con motivo → reallocate recibe la observation")
+    void confirmReallocationSuggestionAulaDistintaConMotivoPasaObservation() {
+        when(previewStore.takeSuggestion("sug_x"))
+                .thenReturn(Optional.of(new ReallocationSuggestion("sug_x", 1L, List.of(10L), 5L)));
+        when(allocationService.findByOccurrenceIds(List.of(10L))).thenReturn(List.of(allocationIn(9L)));
+        when(allocationService.reallocate(any())).thenReturn(List.of());
+
+        service.confirmReallocationSuggestion("sug_x", "por obra");
+
+        ArgumentCaptor<AllocationCommand> commandCaptor = ArgumentCaptor.forClass(AllocationCommand.class);
+        verify(allocationService).reallocate(commandCaptor.capture());
+        assertThat(commandCaptor.getValue().observation()).isEqualTo("por obra");
+        verify(previewStore, never()).saveSuggestion(any());
+    }
+
+    @Test
+    @DisplayName("confirmReallocationSuggestion: misma aula que la sugerida sin motivo → reallocate sin exigir motivo")
+    void confirmReallocationSuggestionMismaAulaSinMotivoAplica() {
+        when(previewStore.takeSuggestion("sug_x"))
+                .thenReturn(Optional.of(new ReallocationSuggestion("sug_x", 1L, List.of(10L), 5L)));
+        when(allocationService.findByOccurrenceIds(List.of(10L))).thenReturn(List.of(allocationIn(5L)));
+        when(allocationService.reallocate(any())).thenReturn(List.of());
+
+        service.confirmReallocationSuggestion("sug_x", null);
+
+        verify(allocationService).reallocate(any());
+        verify(previewStore, never()).saveSuggestion(any());
+    }
+
+    @Test
     @DisplayName("confirmReallocationSuggestion: sugerencia inexistente → ExpiredPreviewException, reallocate nunca se llama")
     void confirmReallocationSuggestionSinSugerenciaLanzaExpirado() {
         when(previewStore.takeSuggestion("sug_missing")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.confirmReallocationSuggestion("sug_missing"))
+        assertThatThrownBy(() -> service.confirmReallocationSuggestion("sug_missing", null))
                 .isInstanceOf(ExpiredPreviewException.class);
 
         verify(allocationService, never()).reallocate(any());
+    }
+
+    private AllocationResponseDto allocationIn(long classroomId) {
+        ClassroomResponseDto classroom =
+                new ClassroomResponseDto(classroomId, 5, 40, 1L, "Edificio 1", 1L, "Tipo", null, true);
+        return new AllocationResponseDto(1L, AllocationSource.MANUAL, null, null, null, null, classroom, null);
     }
 
     private void stubSuggestSinAula() {

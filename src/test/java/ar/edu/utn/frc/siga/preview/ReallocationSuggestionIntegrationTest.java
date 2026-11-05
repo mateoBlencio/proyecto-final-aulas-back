@@ -39,6 +39,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** Sugerencia automática de aula para reasignación (día puntual o rango) y su confirmación. */
@@ -188,6 +189,42 @@ class ReallocationSuggestionIntegrationTest extends AbstractIntegrationTest {
         Allocation persisted = allocationRepository.findByOccurrenceId(occurrence.getId()).orElseThrow();
         assertThat(persisted.getClassroomId()).isEqualTo(room.getId());
         assertThat(persisted.getSource()).isEqualTo(AllocationSource.MANUAL);
+    }
+
+    @Test
+    @DisplayName("confirm sin motivo sobre una clase con otra aula responde 400 Observation required, la sugerencia sigue vigente y con motivo se aplica")
+    void confirm_classroomChangesWithoutObservation_returns400_thenSucceedsWithObservation() throws Exception {
+        var sc = testData.materiaYComision();
+        LocalDate date = LocalDate.now().plusDays(540);
+        var edificio = testData.edificio();
+        Classroom roomOld = testData.aula(edificio);
+        blockAllAvailableRooms(date);
+        Classroom roomNew = testData.aula(edificio);
+        Long eventId = createEvent(sc, date);
+        Occurrence occurrence = occurrenceOf(eventId);
+        allocateDirect(occurrence, roomOld.getId());
+
+        ReallocationSuggestionResponseDto suggestion = suggest(
+                new ReallocationSuggestionRequestDto(List.of(occurrence.getId()), null, null, null, null));
+        assertThat(suggestion.status()).isEqualTo(SuggestionStatus.SUGGESTED);
+        assertThat(suggestion.classroom().id()).isEqualTo(roomNew.getId());
+
+        mockMvc.perform(post("/v1/previews/reallocation-suggestion/{id}/confirm", suggestion.suggestionId()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Observation required"))
+                .andExpect(jsonPath("$.overlaps").isEmpty());
+
+        assertThat(allocationRepository.findByOccurrenceId(occurrence.getId()).orElseThrow().getClassroomId())
+                .isEqualTo(roomOld.getId());
+
+        mockMvc.perform(post("/v1/previews/reallocation-suggestion/{id}/confirm", suggestion.suggestionId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"observation\":\"por obra\"}"))
+                .andExpect(status().isOk());
+
+        Allocation persisted = allocationRepository.findByOccurrenceId(occurrence.getId()).orElseThrow();
+        assertThat(persisted.getClassroomId()).isEqualTo(roomNew.getId());
+        assertThat(persisted.getObservation()).isEqualTo("por obra");
     }
 
     @Test

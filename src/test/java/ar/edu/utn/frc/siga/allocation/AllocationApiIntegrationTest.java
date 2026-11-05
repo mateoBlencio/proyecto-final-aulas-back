@@ -80,6 +80,11 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
                 List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, null, null, classroomId)), null);
     }
 
+    private static AllocationBatchRequestDto byOccurrence(Long occurrenceId, Long classroomId, String observation) {
+        return new AllocationBatchRequestDto(
+                List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, null, null, classroomId)), observation);
+    }
+
     private static AllocationBatchRequestDto byEvent(Long eventId, Long classroomId, String observation) {
         return new AllocationBatchRequestDto(
                 List.of(new AllocationItemRequestDto(null, eventId, null, null, classroomId)), observation);
@@ -284,11 +289,45 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(put("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(byOccurrence(occurrence.getId(), aulaNueva.getId()))))
+                        .content(objectMapper.writeValueAsString(byOccurrence(occurrence.getId(), aulaNueva.getId(), "cambio de aula"))))
                 .andExpect(status().isOk());
 
         assertThat(allocationRepository.findById(allocationId).orElseThrow().getClassroomId())
                 .isEqualTo(aulaNueva.getId());
+    }
+
+    @Test
+    @DisplayName("PUT /v1/allocations cambiando de aula sin motivo responde 400 Observation required con overlaps vacío y no cambia nada")
+    void reallocate_classroomChangesWithoutObservation_returns400() throws Exception {
+        var sc = testData.materiaYComision();
+        var edificio = testData.edificio();
+        Classroom aulaOriginal = testData.aula(edificio);
+        Classroom aulaNueva = testData.aula(edificio);
+        Occurrence occurrence = seedOccurrence(sc, LocalDate.now().plusDays(10));
+        allocateOk(occurrence.getId(), aulaOriginal.getId());
+
+        mockMvc.perform(put("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(byOccurrence(occurrence.getId(), aulaNueva.getId()))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Observation required"))
+                .andExpect(jsonPath("$.overlaps").isEmpty());
+
+        assertThat(classroomOf(occurrence.getId())).isEqualTo(aulaOriginal.getId());
+    }
+
+    @Test
+    @DisplayName("PUT /v1/allocations con la misma aula y sin motivo responde 200")
+    void reallocate_sameClassroomWithoutObservation_returns200() throws Exception {
+        var sc = testData.materiaYComision();
+        Classroom aula = testData.aula(testData.edificio());
+        Occurrence occurrence = seedOccurrence(sc, LocalDate.now().plusDays(10));
+        allocateOk(occurrence.getId(), aula.getId());
+
+        mockMvc.perform(put("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(byOccurrence(occurrence.getId(), aula.getId()))))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -311,7 +350,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
 
         var dto = new AllocationBatchRequestDto(List.of(
                 new AllocationItemRequestDto(List.of(occ1.getId()), null, null, null, aulaLibre.getId()),
-                new AllocationItemRequestDto(List.of(occ2.getId()), null, null, null, aulaC.getId())), null);
+                new AllocationItemRequestDto(List.of(occ2.getId()), null, null, null, aulaC.getId())), "cambio de aula");
 
         mockMvc.perform(put("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -339,7 +378,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(put("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(byEvent(eventId, aula.getId(), null))))
+                        .content(objectMapper.writeValueAsString(byEvent(eventId, aula.getId(), "cambio de aula"))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.conflicts").isArray());
 
@@ -584,7 +623,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
 
         var dto = new AllocationBatchRequestDto(List.of(
                 new AllocationItemRequestDto(null, eventId, start, start.plusWeeks(1), aulaRango.getId()),
-                new AllocationItemRequestDto(List.of(suelta.getId()), null, null, null, aulaPuntual.getId())), null);
+                new AllocationItemRequestDto(List.of(suelta.getId()), null, null, null, aulaPuntual.getId())), "cambio de aula");
 
         mockMvc.perform(put("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -610,7 +649,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
 
         auxiliar.perform(put("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(byOccurrence(occurrence.getId(), aulaA.getId()))))
+                        .content(objectMapper.writeValueAsString(byOccurrence(occurrence.getId(), aulaA.getId(), "cambio de aula"))))
                 .andExpect(status().isForbidden());
 
         assertThat(classroomOf(occurrence.getId())).isEqualTo(aulaB.getId());
@@ -630,7 +669,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
 
         auxiliar.perform(put("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(byOccurrence(occurrence.getId(), aulaDestino.getId()))))
+                        .content(objectMapper.writeValueAsString(byOccurrence(occurrence.getId(), aulaDestino.getId(), "cambio de aula"))))
                 .andExpect(status().isOk());
 
         assertThat(classroomOf(occurrence.getId())).isEqualTo(aulaDestino.getId());

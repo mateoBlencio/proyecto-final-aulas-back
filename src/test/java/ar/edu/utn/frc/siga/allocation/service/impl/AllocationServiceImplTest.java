@@ -37,6 +37,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.http.HttpStatus;
+import ar.edu.utn.frc.siga.allocation.exception.ReallocationObservationRequiredException;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
@@ -476,6 +480,58 @@ class AllocationServiceImplTest {
         assertThat(service.reallocateExisting(command)).hasSize(1);
 
         verify(writer).upsert(resolved, "obs", AllocationSource.MANUAL);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", "   "})
+    @DisplayName("reallocateExisting: aula distinta de la actual sin motivo (nulo o en blanco) → 400 Observation required y no escribe")
+    void reallocateExistingClassroomChangesWithoutObservationThrows(String observation) {
+        AllocationCommand command = stubReallocateExisting(observation, 9);
+
+        assertThatThrownBy(() -> service.reallocateExisting(command))
+                .isInstanceOf(ReallocationObservationRequiredException.class)
+                .satisfies(e -> {
+                    ReallocationObservationRequiredException ex = (ReallocationObservationRequiredException) e;
+                    assertThat(ex.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(ex.getTitle()).isEqualTo("Observation required");
+                });
+
+        verify(writer, never()).upsert(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("reallocateExisting: aula distinta de la actual con motivo → upsert")
+    void reallocateExistingClassroomChangesWithObservationUpserts() {
+        AllocationCommand command = stubReallocateExisting("por obra", 9);
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occurrenceSlot(10L, 1L, futureDate(1)), 5);
+        when(writer.upsert(resolved, "por obra", AllocationSource.MANUAL)).thenReturn(List.of());
+
+        service.reallocateExisting(command);
+
+        verify(writer).upsert(resolved, "por obra", AllocationSource.MANUAL);
+    }
+
+    @Test
+    @DisplayName("reallocateExisting: misma aula que la actual sin motivo → upsert sin exigir motivo")
+    void reallocateExistingSameClassroomWithoutObservationUpserts() {
+        AllocationCommand command = stubReallocateExisting(null, 5);
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occurrenceSlot(10L, 1L, futureDate(1)), 5);
+        when(writer.upsert(resolved, null, AllocationSource.MANUAL)).thenReturn(List.of());
+
+        service.reallocateExisting(command);
+
+        verify(writer).upsert(resolved, null, AllocationSource.MANUAL);
+    }
+
+    private AllocationCommand stubReallocateExisting(String observation, long currentClassroomId) {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), observation);
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occurrenceSlot(10L, 1L, futureDate(1)), 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()))).thenReturn(assignments(resolved));
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L)))
+                .thenReturn(List.of(allocation(900L, 10L, currentClassroomId, AllocationSource.MANUAL)));
+        return command;
     }
 
     @Test

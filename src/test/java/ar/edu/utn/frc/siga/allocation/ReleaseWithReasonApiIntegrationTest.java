@@ -145,7 +145,7 @@ class ReleaseWithReasonApiIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"items\":[{\"eventId\":" + f.eventId() + ",\"classroomId\":" + f.other().getId() + "}]}"))
+                        .content("{\"items\":[{\"eventId\":" + f.eventId() + ",\"classroomId\":" + f.other().getId() + "}],\"observation\":\"cambio de aula\"}"))
                 .andExpect(status().isOk());
 
         assertThat(allocationRepository.findByOccurrenceId(f.firstOccurrenceId()).orElseThrow().getClassroomId())

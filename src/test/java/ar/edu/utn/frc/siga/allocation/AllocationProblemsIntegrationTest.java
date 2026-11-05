@@ -114,7 +114,8 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
     private JsonNode conflictsContent(String types, LocalDate from, LocalDate to) throws Exception {
         MvcResult result = mockMvc.perform(get("/v1/allocations/conflicts")
                         .param("types", types)
-                        .param("from", from.toString()).param("to", to.toString()))
+                        .param("from", from.toString()).param("to", to.toString())
+                        .param("size", "500"))
                 .andExpect(status().isOk())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("content");
