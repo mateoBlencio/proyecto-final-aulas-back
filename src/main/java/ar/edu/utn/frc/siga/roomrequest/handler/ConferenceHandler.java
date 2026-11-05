@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.roomrequest.handler;
 
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateConferenceDto;
+import ar.edu.utn.frc.siga.events.validator.EventScheduleValidator;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.FreeFormItemDto;
@@ -15,10 +16,14 @@ import org.springframework.stereotype.Component;
 @Component
 public class ConferenceHandler extends AbstractRoomRequestHandler {
 
+    private final EventScheduleValidator eventSchedule;
+
     public ConferenceHandler(AcademicReferenceValidator academicReference,
                              ClassroomReferenceValidator classroomReference,
-                             ClassScheduleService classSchedule) {
+                             ClassScheduleService classSchedule,
+                             EventScheduleValidator eventSchedule) {
         super(academicReference, classroomReference, classSchedule);
+        this.eventSchedule = eventSchedule;
     }
 
     @Override
@@ -32,6 +37,7 @@ public class ConferenceHandler extends AbstractRoomRequestHandler {
             ItemConsistency.requireNoCommission(item,
                     "Una charla o conferencia no pertenece al cursado de una comisión: los pedidos no llevan comisión.");
             ItemConsistency.requireExamUsersConsistent(false, item);
+            eventSchedule.validateBusinessHours(item.startTime(), item.endTime());
             ItemConsistency.requireNotPast(item.date(), item.startTime());
         }
     }

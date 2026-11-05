@@ -184,6 +184,22 @@ siga:
         default-value: "true"
       - key: notifications.channel.email.enabled
         default-value: "true"
+      - key: roomRequests.maxClassroomCount
+        default-value: "20"
+        min: "1"
+        max: "100"
+      - key: roomRequests.maxEstimated
+        default-value: "500"
+        min: "1"
+        max: "10000"
+      - key: roomRequests.maxComputerCount
+        default-value: "500"
+        min: "1"
+        max: "1000"
+      - key: roomRequests.alertDaysBeforeDate
+        default-value: "3"
+        min: "0"
+        max: "60"
   optimizer:
     parallel-solver-count: AUTO
     environment-mode: NO_ASSERT

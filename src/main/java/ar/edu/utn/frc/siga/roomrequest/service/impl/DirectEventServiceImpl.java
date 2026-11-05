@@ -69,15 +69,15 @@ public class DirectEventServiceImpl implements DirectEventService {
 
     @Override
     public List<AllowedClassroomDto> findAvailableClassrooms(DirectEventDraftDto draft, String actor) {
-        ResolvedSchedule schedule = draftValidator.validate(draft, actor);
-        return candidateResolver.findAllowedClassrooms(needsOf(draft, schedule));
+        ResolvedSchedule schedule = draftValidator.validate(draft);
+        return candidateResolver.findAllWithMissingRequirements(needsOf(draft, schedule));
     }
 
     // Sin @Transactional: el solver no debe correr con una conexión tomada.
     @Override
     public DirectEventSuggestionResponseDto suggest(DirectEventSuggestionRequestDto request, String actor) {
         DirectEventDraftDto draft = request.draft();
-        ResolvedSchedule schedule = draftValidator.validate(draft, actor);
+        ResolvedSchedule schedule = draftValidator.validate(draft);
         Set<Long> excluded = request.excludedClassroomIds() == null ? Set.of() : Set.copyOf(request.excludedClassroomIds());
 
         List<ClassroomResponseDto> classrooms = candidateResolver.candidateClassrooms(needsOf(draft, schedule)).stream()
@@ -133,7 +133,7 @@ public class DirectEventServiceImpl implements DirectEventService {
                 suggestionId, status, classroomIds);
         List<AllowedClassroomDto> allowed = suggested.stream()
                 .map(c -> new AllowedClassroomDto(c.id(), c.roomNumber(), c.buildingId(), c.buildingName(),
-                        c.capacity(), true, null))
+                        c.capacity(), true, null, List.of()))
                 .toList();
         return new DirectEventSuggestionResponseDto(suggestionId, status, allowed, overcrowdedBy);
     }
@@ -143,15 +143,12 @@ public class DirectEventServiceImpl implements DirectEventService {
     @AuditOperation("Alta directa de evento con aula")
     public List<AllocationResponseDto> create(CreateDirectEventRequestDto request, String actor) {
         DirectEventDraftDto draft = request.draft();
-        ResolvedSchedule schedule = draftValidator.validate(draft, actor);
+        ResolvedSchedule schedule = draftValidator.validate(draft);
         List<Long> classroomIds = request.classroomIds();
-        if (classroomIds.size() > draft.roomCount()) {
-            throw new InvalidRoomRequestException("No se pueden asignar más aulas que las pedidas (" + draft.roomCount() + ").");
-        }
         if (classroomIds.stream().distinct().count() != classroomIds.size()) {
             throw new InvalidRoomRequestException("No se puede repetir un aula en el alta.");
         }
-        requireCandidates(draft, schedule, classroomIds);
+        requireInScope(classroomIds);
 
         DirectEventSuggestion suggestion = null;
         if (request.suggestionId() != null) {
@@ -194,16 +191,16 @@ public class DirectEventServiceImpl implements DirectEventService {
         }
     }
 
-    // Sin esto, el borrador podría pedir computadoras y el alta asignar un aula común: los filtros
-    // de /available-classrooms y /suggestion son del front, el back tiene que volver a exigirlos.
-    private void requireCandidates(DirectEventDraftDto draft, ResolvedSchedule schedule, List<Long> classroomIds) {
-        Set<Long> candidateIds = candidateResolver.candidateClassrooms(needsOf(draft, schedule)).stream()
+    // Las aulas que no cumplen lo pedido pasan (el motivo del alta ya es obligatorio); las fuera de alcance o
+    // inactivas, no.
+    private void requireInScope(List<Long> classroomIds) {
+        Set<Long> inScopeIds = classroomService.findAllAvailable().stream()
                 .map(ClassroomResponseDto::id)
                 .collect(Collectors.toSet());
-        List<Long> rejected = classroomIds.stream().filter(id -> !candidateIds.contains(id)).toList();
+        List<Long> rejected = classroomIds.stream().filter(id -> !inScopeIds.contains(id)).toList();
         if (!rejected.isEmpty()) {
             throw new InvalidRoomRequestException(
-                    "Estas aulas no cumplen los requisitos del evento o están fuera de su alcance: " + rejected + ".");
+                    "Estas aulas no están disponibles o están fuera de tu alcance: " + rejected + ".");
         }
     }
 

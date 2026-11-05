@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.roomrequest.handler;
 
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreatePartialExamOffScheduleDto;
+import ar.edu.utn.frc.siga.events.validator.EventScheduleValidator;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.FreeFormItemDto;
@@ -24,13 +25,16 @@ import java.util.stream.Collectors;
 public class PartialExamOffScheduleHandler extends AbstractRoomRequestHandler {
 
     private final RoomRequestItemRepository itemRepository;
+    private final EventScheduleValidator eventSchedule;
 
     public PartialExamOffScheduleHandler(AcademicReferenceValidator academicReference,
                                          ClassroomReferenceValidator classroomReference,
                                          ClassScheduleService classSchedule,
-                                         RoomRequestItemRepository itemRepository) {
+                                         RoomRequestItemRepository itemRepository,
+                                         EventScheduleValidator eventSchedule) {
         super(academicReference, classroomReference, classSchedule);
         this.itemRepository = itemRepository;
+        this.eventSchedule = eventSchedule;
     }
 
     @Override
@@ -43,6 +47,7 @@ public class PartialExamOffScheduleHandler extends AbstractRoomRequestHandler {
         List<FreeFormItemDto> items = ((CreatePartialExamOffScheduleDto) dto).items();
         for (FreeFormItemDto item : items) {
             ItemConsistency.requireExamUsersConsistent(true, item);
+            eventSchedule.validateBusinessHours(item.startTime(), item.endTime());
             ItemConsistency.requireExamAdvanceNotice(item.date(), item.startTime());
         }
         ItemConsistency.requireNoCommissionOverlap(items);

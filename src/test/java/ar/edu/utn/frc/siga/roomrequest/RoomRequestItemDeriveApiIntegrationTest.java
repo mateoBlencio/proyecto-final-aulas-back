@@ -69,8 +69,8 @@ class RoomRequestItemDeriveApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("edificio sin ninguna aula libre: 400 Building not available")
-    void derive_sinAulasLibres_returnsBadRequest() throws Exception {
+    @DisplayName("edificio sin ninguna aula libre: se deriva igual")
+    void derive_sinAulasLibres_isAccepted() throws Exception {
         Building building = testData.edificio();
         mockMvcAsScoped("auxiliar-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar",
                 SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, building.getId());
@@ -79,8 +79,8 @@ class RoomRequestItemDeriveApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/derive")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"buildingId\":" + building.getId() + "}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("Building not available"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DERIVED_TO_BUILDING"));
     }
 
     @Test

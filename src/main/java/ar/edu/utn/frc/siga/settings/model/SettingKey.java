@@ -44,7 +44,15 @@ public enum SettingKey {
             "notifications.enabled", SettingType.BOOLEAN, RiskLevel.SAFE, "notifications",
             "Apagarlo corta todo aviso automático: los pedidos resueltos quedan sin comunicar al docente."),
     NOTIFICATIONS_CHANNEL_EMAIL_ENABLED(
-            "notifications.channel.email.enabled", SettingType.BOOLEAN, RiskLevel.SAFE, "notifications", null);
+            "notifications.channel.email.enabled", SettingType.BOOLEAN, RiskLevel.SAFE, "notifications", null),
+    ROOM_REQUESTS_MAX_CLASSROOM_COUNT(
+            "roomRequests.maxClassroomCount", SettingType.INT, RiskLevel.SAFE, "roomRequests", null),
+    ROOM_REQUESTS_MAX_ESTIMATED(
+            "roomRequests.maxEstimated", SettingType.INT, RiskLevel.SAFE, "roomRequests", null),
+    ROOM_REQUESTS_MAX_COMPUTER_COUNT(
+            "roomRequests.maxComputerCount", SettingType.INT, RiskLevel.SAFE, "roomRequests", null),
+    ROOM_REQUESTS_ALERT_DAYS_BEFORE_DATE(
+            "roomRequests.alertDaysBeforeDate", SettingType.INT, RiskLevel.SAFE, "roomRequests", null);
 
     private final String key;
     private final SettingType type;

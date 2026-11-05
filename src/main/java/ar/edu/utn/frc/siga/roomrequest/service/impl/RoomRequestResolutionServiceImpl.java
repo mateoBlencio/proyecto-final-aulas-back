@@ -18,7 +18,6 @@ import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
-import ar.edu.utn.frc.siga.roomrequest.exception.BuildingNotAvailableException;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.exception.PartialAssignmentReasonRequiredException;
 import ar.edu.utn.frc.siga.roomrequest.exception.RoomRequestAlreadyNotifiedException;
@@ -33,7 +32,6 @@ import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestResolutionService;
 import ar.edu.utn.frc.siga.roomrequest.validator.ItemConsistency;
 import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl;
 import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl.Action;
-import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestDeriveEligibilityValidator;
 import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestTransitionValidator;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
@@ -47,7 +45,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Function;
 
 @Slf4j
@@ -58,7 +55,6 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
     private final RoomRequestItemRepository itemRepository;
     private final RoomRequestTransitionValidator transitionValidator;
     private final RoomRequestAccessControl accessControl;
-    private final RoomRequestDeriveEligibilityValidator deriveEligibilityValidator;
     private final AllocationService allocationService;
     private final OccurrenceService occurrenceService;
     private final BuildingService buildingService;
@@ -106,8 +102,8 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         boolean noReason = reason == null || reason.isBlank();
         List<ClassroomResponseDto> classrooms = classroomService.findByIds(ids);
 
+        requireDerivedBuilding(item, classrooms);
         if (Boolean.TRUE.equals(item.getRequiresComputers())) {
-            requireSameBuilding(item, classrooms);
             int assignedPcs = candidateResolver.computersByClassroom(ids).values().stream()
                     .mapToInt(Integer::intValue).sum();
             if (item.getComputerCount() != null && assignedPcs < item.getComputerCount() && noReason) {
@@ -115,8 +111,9 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
                         + assignedPcs + " de las " + item.getComputerCount() + " computadoras pedidas.");
             }
         } else {
-            if (ids.size() > item.getClassroomCount()) {
-                throw new InvalidRoomRequestException("No se pueden asignar más aulas de las pedidas.");
+            if (ids.size() > item.getClassroomCount() && noReason) {
+                throw new PartialAssignmentReasonRequiredException("El motivo es obligatorio: se asignan "
+                        + ids.size() + " aulas y el pedido pide " + item.getClassroomCount() + ".");
             }
             if (ids.size() < item.getClassroomCount() && noReason) {
                 throw new PartialAssignmentReasonRequiredException();
@@ -164,10 +161,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         return composer.composeItem(item);
     }
 
-    private void requireSameBuilding(RoomRequestItem item, List<ClassroomResponseDto> classrooms) {
-        if (classrooms.stream().map(ClassroomResponseDto::buildingId).distinct().count() > 1) {
-            throw new InvalidRoomRequestException("Las aulas de un pedido tienen que ser del mismo edificio.");
-        }
+    private void requireDerivedBuilding(RoomRequestItem item, List<ClassroomResponseDto> classrooms) {
         Long derivedBuildingId = item.getDerivedBuildingId();
         if (derivedBuildingId != null && classrooms.stream().anyMatch(c -> !derivedBuildingId.equals(c.buildingId()))) {
             throw new InvalidRoomRequestException("Las aulas tienen que ser del edificio al que se derivó el pedido.");
@@ -227,7 +221,6 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
         transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.DERIVED_TO_BUILDING);
         accessControl.authorize(item, actor, Action.DERIVE);
-        deriveEligibilityValidator.validate(item);
 
         BuildingResponseDto building = buildingService.findById(buildingId);
         if (!Boolean.TRUE.equals(building.active())) {
@@ -235,13 +228,6 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         }
         if (userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, buildingId).isEmpty()) {
             throw new InvalidRoomRequestException("El edificio no tiene un auxiliar áulico asignado.");
-        }
-
-        Set<Long> occupiedClassroomIds = candidateResolver.occupiedClassroomIds(item);
-        boolean hasFreeClassroom = candidateResolver.candidateClassrooms(item).stream()
-                .anyMatch(c -> c.buildingId().equals(buildingId) && !occupiedClassroomIds.contains(c.id()));
-        if (!hasFreeClassroom) {
-            throw new BuildingNotAvailableException(buildingId);
         }
 
         item.deriveTo(buildingId, actor, Instant.now());

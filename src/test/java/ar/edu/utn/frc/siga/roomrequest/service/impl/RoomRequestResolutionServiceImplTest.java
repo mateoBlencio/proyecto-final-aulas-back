@@ -16,7 +16,6 @@ import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailHeaderDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
-import ar.edu.utn.frc.siga.roomrequest.exception.BuildingNotAvailableException;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestTransitionException;
 import ar.edu.utn.frc.siga.roomrequest.exception.PartialAssignmentReasonRequiredException;
@@ -30,7 +29,6 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl;
-import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestDeriveEligibilityValidator;
 import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestTransitionValidator;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
@@ -71,8 +69,6 @@ class RoomRequestResolutionServiceImplTest {
     private RoomRequestTransitionValidator transitionValidator;
     @Mock
     private RoomRequestAccessControl accessControl;
-    @Mock
-    private RoomRequestDeriveEligibilityValidator deriveEligibilityValidator;
     @Mock
     private AllocationService allocationService;
     @Mock
@@ -201,7 +197,7 @@ class RoomRequestResolutionServiceImplTest {
     @DisplayName("findAllowedClassrooms: delega en RoomRequestCandidateResolver")
     void findAllowedClassrooms_delega() {
         List<AllowedClassroomDto> expected = List.of(
-                new AllowedClassroomDto(101L, 101, 1L, "Edificio Central", 40, true, null));
+                new AllowedClassroomDto(101L, 101, 1L, "Edificio Central", 40, true, null, List.of()));
         when(candidateResolver.findAllowedClassrooms(1L)).thenReturn(expected);
 
         assertThat(service.findAllowedClassrooms(1L)).isSameAs(expected);
@@ -219,14 +215,12 @@ class RoomRequestResolutionServiceImplTest {
     // ---------- derive ----------
 
     @Test
-    @DisplayName("derive: edificio activo, con auxiliar y aula libre → pasa a DERIVED_TO_BUILDING")
+    @DisplayName("derive: edificio activo y con auxiliar → pasa a DERIVED_TO_BUILDING")
     void derive_ok() {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true, null));
         when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of(auxiliar()));
-        when(candidateResolver.occupiedClassroomIds(item)).thenReturn(Set.of());
-        when(candidateResolver.candidateClassrooms(item)).thenReturn(List.of(classroom(101L, 1L, "Edificio Central")));
         when(composer.composeItem(item)).thenReturn(mockResponse());
 
         service.derive(1L, 1L, "subsecretaria@frc.utn.edu.ar");
@@ -237,35 +231,19 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     @Test
-    @DisplayName("derive: edificio con solo 1 de 2 aulas libres también se acepta (resolución parcial)")
-    void derive_resolucionParcial() {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW).classroomCount(2).build();
+    @DisplayName("derive: un pedido sin requisitos especiales y un edificio sin aulas libres también se deriva")
+    void derive_sinAulasLibresNiRequisitosEspeciales() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .requiresComputers(false).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true, null));
         when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of(auxiliar()));
-        when(candidateResolver.occupiedClassroomIds(item)).thenReturn(Set.of(102L));
-        when(candidateResolver.candidateClassrooms(item)).thenReturn(
-                List.of(classroom(101L, 1L, "Edificio Central"), classroom(102L, 1L, "Edificio Central")));
         when(composer.composeItem(item)).thenReturn(mockResponse());
 
         service.derive(1L, 1L, "subsecretaria@frc.utn.edu.ar");
 
         assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.DERIVED_TO_BUILDING);
-    }
-
-    @Test
-    @DisplayName("derive: sin ninguna aula libre en el edificio se rechaza")
-    void derive_sinAulasLibres() {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW).build();
-        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
-        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true, null));
-        when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of(auxiliar()));
-        when(candidateResolver.occupiedClassroomIds(item)).thenReturn(Set.of(101L));
-        when(candidateResolver.candidateClassrooms(item)).thenReturn(List.of(classroom(101L, 1L, "Edificio Central")));
-
-        assertThatThrownBy(() -> service.derive(1L, 1L, "subsecretaria@frc.utn.edu.ar"))
-                .isInstanceOf(BuildingNotAvailableException.class);
-        verifyNoInteractions(composer);
+        verifyNoInteractions(candidateResolver);
     }
 
     @Test
@@ -313,22 +291,6 @@ class RoomRequestResolutionServiceImplTest {
 
         assertThatThrownBy(() -> service.derive(1L, 1L, "subsecretaria@frc.utn.edu.ar"))
                 .isInstanceOf(InvalidRoomRequestTransitionException.class);
-        verifyNoInteractions(buildingService, composer);
-    }
-
-    @Test
-    @DisplayName("derive: delega la elegibilidad en RoomRequestDeriveEligibilityValidator, tras el rol/edificio")
-    void derive_delegaElegibilidad() {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW).build();
-        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
-        org.mockito.Mockito.doThrow(new InvalidRoomRequestException("no requiere asignación especial"))
-                .when(deriveEligibilityValidator).validate(item);
-
-        assertThatThrownBy(() -> service.derive(1L, 1L, "subsecretaria@frc.utn.edu.ar"))
-                .isInstanceOf(InvalidRoomRequestException.class);
-
-        org.mockito.Mockito.verify(accessControl).authorize(item, "subsecretaria@frc.utn.edu.ar",
-                ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl.Action.DERIVE);
         verifyNoInteractions(buildingService, composer);
     }
 
@@ -548,15 +510,62 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     @Test
-    @DisplayName("assign: más aulas que classroomCount se rechaza")
-    void assign_masAulasQueClassroomCount() {
+    @DisplayName("assign: más aulas que classroomCount sin motivo pide motivo (400 Partial assignment reason required)")
+    void assign_masAulasQueClassroomCountSinMotivo() {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
                 .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findByIds(List.of(104L, 105L)))
+                .thenReturn(List.of(classroom(104L, 1L, "A"), classroom(105L, 1L, "A")));
 
         assertThatThrownBy(() -> service.assign(1L, List.of(104L, 105L), null, "subsecretaria@frc.utn.edu.ar"))
-                .isInstanceOf(InvalidRoomRequestException.class);
+                .isInstanceOf(PartialAssignmentReasonRequiredException.class)
+                .hasMessageContaining("2 aulas");
         verifyNoInteractions(allocationService, occurrenceResolver, composer);
+    }
+
+    @Test
+    @DisplayName("assign: más aulas que classroomCount con motivo se acepta")
+    void assign_masAulasQueClassroomCountConMotivo() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findByIds(List.of(104L, 105L)))
+                .thenReturn(List.of(classroom(104L, 1L, "A"), classroom(105L, 1L, "A")));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 2, false))
+                .thenReturn(List.of(List.of(9000L), List.of(9001L)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(104L, 105L), "No entran en una", "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(item.getAllocations()).hasSize(2);
+        assertThat(item.getDecisionReason()).isEqualTo("No entran en una");
+    }
+
+    @Test
+    @DisplayName("assign: pedido de 2 aulas con 1 sola sin motivo sigue pidiendo motivo")
+    void assign_menosAulasSinMotivo() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(2).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findByIds(List.of(104L))).thenReturn(List.of(classroom(104L, 1L, "A")));
+
+        assertThatThrownBy(() -> service.assign(1L, List.of(104L), null, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(PartialAssignmentReasonRequiredException.class);
+    }
+
+    @Test
+    @DisplayName("assign: pedido sin computadoras derivado a un edificio rechaza aulas de otro")
+    void assign_sinComputadorasFueraDelEdificioDerivado() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1).requiresComputers(false).build();
+        item.deriveTo(1L, "sub@frc.utn.edu.ar", java.time.Instant.now());
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findByIds(List.of(301L))).thenReturn(List.of(classroom(301L, 3L, "C")));
+
+        assertThatThrownBy(() -> service.assign(1L, List.of(301L), "motivo", "aux@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestException.class);
+        verifyNoInteractions(allocationService, composer);
     }
 
     @Test
@@ -809,16 +818,20 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     @Test
-    @DisplayName("assign: laboratorio con aulas de edificios distintos se rechaza")
+    @DisplayName("assign: laboratorio con aulas de edificios distintos se acepta (subsecretaría reparte entre edificios)")
     void assign_laboratorioEdificiosDistintos() {
         RoomRequestItem item = labItem(2, 40);
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         when(classroomService.findByIds(List.of(101L, 301L)))
                 .thenReturn(List.of(classroom(101L, 1L, "A"), classroom(301L, 3L, "C")));
+        when(candidateResolver.computersByClassroom(List.of(101L, 301L))).thenReturn(Map.of(101L, 20, 301L, 20));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 2, false))
+                .thenReturn(List.of(List.of(9000L), List.of(9001L)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
 
-        assertThatThrownBy(() -> service.assign(1L, List.of(101L, 301L), "motivo", "aux@frc.utn.edu.ar"))
-                .isInstanceOf(InvalidRoomRequestException.class);
-        verifyNoInteractions(allocationService, composer);
+        service.assign(1L, List.of(101L, 301L), null, "sub@frc.utn.edu.ar");
+
+        assertThat(item.getAllocations()).hasSize(2);
     }
 
     @Test

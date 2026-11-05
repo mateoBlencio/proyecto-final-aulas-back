@@ -11,11 +11,15 @@ import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
+import ar.edu.utn.frc.siga.space.dto.BuildingFilter;
+import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.model.ClassroomResources;
+import ar.edu.utn.frc.siga.space.service.BuildingService;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,7 +29,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,10 +39,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 class RoomRequestCandidateResolver {
 
+    private static final String MISSING_PROJECTOR = "PROJECTOR";
+    private static final String MISSING_COMPUTERS = "COMPUTERS";
+
     private final RoomRequestItemRepository itemRepository;
     private final ClassroomService classroomService;
     private final AllocationOccupancyService allocationOccupancyService;
     private final UserService userService;
+    private final BuildingService buildingService;
     private final RoomRequestOccurrenceResolver occurrenceResolver;
 
     @Transactional(readOnly = true)
@@ -50,8 +57,7 @@ class RoomRequestCandidateResolver {
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
 
         List<ClassroomResponseDto> candidates = candidateClassrooms(item).stream()
-                .filter(c -> !(item.getRequiresComputers() && item.getDerivedBuildingId() != null)
-                        || item.getDerivedBuildingId().equals(c.buildingId()))
+                .filter(c -> item.getDerivedBuildingId() == null || item.getDerivedBuildingId().equals(c.buildingId()))
                 .toList();
         return toAllowed(candidates, occupiedClassroomIds(item), item.getRequiresComputers());
     }
@@ -66,13 +72,12 @@ class RoomRequestCandidateResolver {
         Set<Long> occupiedClassroomIds = occupiedClassroomIds(item);
         Map<Long, List<ClassroomResponseDto>> freeByBuilding = candidateClassrooms(item).stream()
                 .filter(c -> !occupiedClassroomIds.contains(c.id()))
-                .collect(Collectors.groupingBy(ClassroomResponseDto::buildingId, LinkedHashMap::new, Collectors.toList()));
-        if (freeByBuilding.isEmpty()) {
-            return List.of();
-        }
+                .collect(Collectors.groupingBy(ClassroomResponseDto::buildingId));
 
+        List<BuildingResponseDto> buildings = buildingService
+                .findAll(new BuildingFilter(null), Pageable.unpaged(), false).getContent();
         Set<Long> buildingIdsWithAuxiliar = userService.findBuildingIdsCoveredByRole(
-                SystemRole.AUXILIAR_AULICO, freeByBuilding.keySet());
+                SystemRole.AUXILIAR_AULICO, buildings.stream().map(BuildingResponseDto::id).toList());
 
         boolean requiresComputers = item.getRequiresComputers();
         Map<Long, Integer> computersByClassroom = requiresComputers
@@ -81,16 +86,15 @@ class RoomRequestCandidateResolver {
                 : Map.of();
 
         List<CandidateBuildingDto> result = new ArrayList<>();
-        for (Map.Entry<Long, List<ClassroomResponseDto>> entry : freeByBuilding.entrySet()) {
-            Long buildingId = entry.getKey();
-            if (!buildingIdsWithAuxiliar.contains(buildingId)) {
+        for (BuildingResponseDto building : buildings) {
+            if (!buildingIdsWithAuxiliar.contains(building.id())) {
                 continue;
             }
+            List<ClassroomResponseDto> free = freeByBuilding.getOrDefault(building.id(), List.of());
             Integer computers = requiresComputers
-                    ? entry.getValue().stream().mapToInt(c -> computersByClassroom.getOrDefault(c.id(), 0)).sum()
+                    ? free.stream().mapToInt(c -> computersByClassroom.getOrDefault(c.id(), 0)).sum()
                     : null;
-            result.add(new CandidateBuildingDto(buildingId, entry.getValue().getFirst().buildingName(),
-                    entry.getValue().size(), computers));
+            result.add(new CandidateBuildingDto(building.id(), building.name(), free.size(), computers));
         }
         if (requiresComputers) {
             int required = item.getComputerCount();
@@ -132,8 +136,32 @@ class RoomRequestCandidateResolver {
         return classroomService.findResourceAmounts(ClassroomResources.COMPUTERS, classroomIds);
     }
 
-    List<AllowedClassroomDto> findAllowedClassrooms(RoomNeeds needs) {
-        return toAllowed(candidateClassrooms(needs), occupiedClassroomIds(needs), needs.requiresComputers());
+    /** Todas las aulas activas del alcance, las que cumplen lo pedido primero. */
+    List<AllowedClassroomDto> findAllWithMissingRequirements(RoomNeeds needs) {
+        List<ClassroomResponseDto> all = classroomService.findAllAvailable();
+        Set<Long> withComputers = needs.requiresComputers()
+                ? classroomService.findIdsWithResourceAtLeast(ClassroomResources.COMPUTERS, 1) : Set.of();
+        Set<Long> withProjector = needs.requiresProjector()
+                ? classroomService.findIdsWithResourceAtLeast(ClassroomResources.PROJECTOR, 1) : Set.of();
+        Set<Long> occupied = occupiedClassroomIds(needs);
+        Map<Long, Integer> computersByClassroom = needs.requiresComputers()
+                ? computersByClassroom(all.stream().map(ClassroomResponseDto::id).toList())
+                : Map.of();
+        return all.stream()
+                .map(classroom -> {
+                    List<String> missing = new ArrayList<>();
+                    if (needs.requiresProjector() && !withProjector.contains(classroom.id())) {
+                        missing.add(MISSING_PROJECTOR);
+                    }
+                    if (needs.requiresComputers() && !withComputers.contains(classroom.id())) {
+                        missing.add(MISSING_COMPUTERS);
+                    }
+                    return new AllowedClassroomDto(classroom.id(), classroom.roomNumber(), classroom.buildingId(),
+                            classroom.buildingName(), classroom.capacity(), !occupied.contains(classroom.id()),
+                            computersByClassroom.get(classroom.id()), missing);
+                })
+                .sorted(Comparator.comparing((AllowedClassroomDto c) -> !c.missingRequirements().isEmpty()))
+                .toList();
     }
 
     Set<Long> occupiedClassroomIds(RoomRequestItem item) {
@@ -172,7 +200,7 @@ class RoomRequestCandidateResolver {
                 .map(classroom -> new AllowedClassroomDto(classroom.id(), classroom.roomNumber(),
                         classroom.buildingId(), classroom.buildingName(), classroom.capacity(),
                         !occupiedClassroomIds.contains(classroom.id()),
-                        computersByClassroom.get(classroom.id())))
+                        computersByClassroom.get(classroom.id()), List.of()))
                 .toList();
     }
 }

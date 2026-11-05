@@ -1,0 +1,35 @@
+meta {
+  name: Valores configurables del formulario (catálogo)
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/v1/room-requests/catalog/form-settings
+  body: none
+  auth: none
+}
+
+docs {
+  GET /v1/room-requests/catalog/form-settings. Endpoint PÚBLICO (sin login), igual que el resto de /catalog.
+
+  Respuesta:
+  {
+    "hoursStart": "08:00",
+    "hoursEnd": "23:00",
+    "maxClassroomCount": 20,
+    "maxEstimated": 500,
+    "maxComputerCount": 500,
+    "alertDaysBeforeDate": 3
+  }
+
+  - `hoursStart` / `hoursEnd` (HH:mm): ventana horaria permitida (`events.hours.start` / `events.hours.end`).
+    El alta de conferencia, final, otro y parcial fuera de horario la valida y devuelve 400 si el
+    horario cae afuera.
+  - `maxClassroomCount`, `maxEstimated`, `maxComputerCount`: topes por pedido
+    (`roomRequests.maxClassroomCount`, `roomRequests.maxEstimated`, `roomRequests.maxComputerCount`).
+    El alta devuelve 400 si se superan.
+  - `alertDaysBeforeDate`: días de anticipación del aviso de pedido derivado sin aula
+    (`roomRequests.alertDaysBeforeDate`). Va acá porque `GET /settings` pide PERM_SETTINGS_READ y el
+    auxiliar no lo tiene.
+}

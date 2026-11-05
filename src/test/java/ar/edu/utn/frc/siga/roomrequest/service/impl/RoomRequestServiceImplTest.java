@@ -24,6 +24,7 @@ import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestRepository;
 import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl;
 import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl.Action;
+import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestLimitsValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -67,12 +68,14 @@ class RoomRequestServiceImplTest {
     private RoomRequestHandlers handlers;
     @Mock
     private RoomRequestAccessControl accessControl;
+    @Mock
+    private RoomRequestLimitsValidator limitsValidator;
 
     private RoomRequestServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new RoomRequestServiceImpl(repository, itemRepository, composer, handlers, accessControl);
+        service = new RoomRequestServiceImpl(repository, itemRepository, composer, handlers, accessControl, limitsValidator);
     }
 
     @Test
@@ -93,7 +96,8 @@ class RoomRequestServiceImplTest {
         RoomRequestResponseDto result = service.create(dto);
 
         assertThat(result).isSameAs(response);
-        var order = inOrder(handler, repository, composer);
+        var order = inOrder(limitsValidator, handler, repository, composer);
+        order.verify(limitsValidator).validate(dto);
         order.verify(handler).validate(dto);
         order.verify(handler).assemble(dto);
         order.verify(repository).save(assembled);

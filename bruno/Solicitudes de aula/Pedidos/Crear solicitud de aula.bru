@@ -89,6 +89,14 @@ docs {
 
   classroomCount > 1 = aulas EN SIMULTÁNEO para la misma franja.
 
+  Topes por pedido (400 si se superan): classroomCount, estimated y computerCount no pueden
+  superar roomRequests.maxClassroomCount (20), roomRequests.maxEstimated (500) y
+  roomRequests.maxComputerCount (500). Se leen en GET /catalog/form-settings.
+
+  Ventana horaria (400 si el horario cae afuera): en conferencia, final, otro y parcial
+  fuera de horario, startTime y endTime tienen que estar dentro de events.hours.start y
+  events.hours.end (08:00 a 23:00 por defecto; también en form-settings).
+
   Booleanos: se pueden omitir (ausente = false).
   computerCount: obligatorio si requiresComputers=true, se omite si es false.
   requiredSoftware: solo si requiresComputers=true.

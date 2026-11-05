@@ -10,11 +10,13 @@ import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.modulith.NamedInterface;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalTime;
 
 @Component
+@NamedInterface("api")
 @RequiredArgsConstructor
 public class EventScheduleValidator {
 

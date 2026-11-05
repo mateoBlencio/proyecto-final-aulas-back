@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.roomrequest.handler;
 
+import ar.edu.utn.frc.siga.events.exception.InvalidEventScheduleException;
+import ar.edu.utn.frc.siga.events.validator.EventScheduleValidator;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateConferenceDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateFinalExamDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateOneTimeRoomChangeDto;
@@ -64,6 +66,8 @@ class RoomRequestHandlersTest {
     private ClassScheduleService classSchedule;
     @Mock
     private RoomRequestItemRepository itemRepository;
+    @Mock
+    private EventScheduleValidator eventSchedule;
 
     private static RequesterInfo requester() {
         return new RequesterInfo(AcademicScope.GRADO, "Ada Lovelace", "ada@frc.utn.edu.ar", "351-1234567");
@@ -312,7 +316,7 @@ class RoomRequestHandlersTest {
 
         @BeforeEach
         void setUp() {
-            handler = new PartialExamOffScheduleHandler(academicReference, classroomReference, classSchedule, itemRepository);
+            handler = new PartialExamOffScheduleHandler(academicReference, classroomReference, classSchedule, itemRepository, eventSchedule);
             when(itemRepository.findActiveOffScheduleItemsByDateIn(any())).thenReturn(List.of());
         }
 
@@ -437,7 +441,7 @@ class RoomRequestHandlersTest {
 
         @BeforeEach
         void setUp() {
-            handler = new FinalExamHandler(academicReference, classroomReference, classSchedule);
+            handler = new FinalExamHandler(academicReference, classroomReference, classSchedule, eventSchedule);
         }
 
         private CreateFinalExamDto dto(FreeFormItemDto... items) {
@@ -489,8 +493,8 @@ class RoomRequestHandlersTest {
 
         @BeforeEach
         void setUp() {
-            conference = new ConferenceHandler(academicReference, classroomReference, classSchedule);
-            other = new OtherHandler(academicReference, classroomReference, classSchedule);
+            conference = new ConferenceHandler(academicReference, classroomReference, classSchedule, eventSchedule);
+            other = new OtherHandler(academicReference, classroomReference, classSchedule, eventSchedule);
         }
 
         @Test
@@ -570,6 +574,85 @@ class RoomRequestHandlersTest {
             return new FreeFormItemDto(commissionId, LocalDate.now().plusDays(7),
                     LocalTime.of(10, 0), LocalTime.of(12, 0), 35, 1, false, false, null, null, null,
                     "Grabación de video", List.of());
+        }
+    }
+
+    @Nested
+    @DisplayName("ventana horaria (events.hours): los cuatro tipos de horario libre la validan al crear")
+    class BusinessHours {
+
+        private final LocalTime tooEarly = LocalTime.of(7, 30);
+        private final LocalTime tooLate = LocalTime.of(23, 30);
+
+        private FreeFormItemDto itemAt(LocalTime start, LocalTime end, String observations) {
+            return new FreeFormItemDto(null, LocalDate.now().plusDays(7), start, end, 35, 1, false, false, null, null,
+                    null, observations, List.of());
+        }
+
+        private void windowRejects(LocalTime start, LocalTime end) {
+            org.mockito.Mockito.doThrow(new InvalidEventScheduleException("fuera de la ventana permitida"))
+                    .when(eventSchedule).validateBusinessHours(start, end);
+        }
+
+        @Test
+        @DisplayName("conferencia 07:30-09:00: rechazada con el error de la ventana, sin llegar a materia")
+        void conferenceBeforeStart() {
+            windowRejects(tooEarly, LocalTime.of(9, 0));
+            CreateConferenceDto dto = new CreateConferenceDto(RoomRequestType.CONFERENCE, requester(), null,
+                    List.of(itemAt(tooEarly, LocalTime.of(9, 0), null)));
+
+            assertThatThrownBy(() -> new ConferenceHandler(academicReference, classroomReference, classSchedule,
+                    eventSchedule).validate(dto)).isInstanceOf(InvalidEventScheduleException.class);
+            verifyNoInteractions(academicReference);
+        }
+
+        @Test
+        @DisplayName("otro 22:00-23:30: rechazado")
+        void otherAfterEnd() {
+            windowRejects(LocalTime.of(22, 0), tooLate);
+            CreateOtherDto dto = new CreateOtherDto(RoomRequestType.OTHER, requester(), null,
+                    List.of(itemAt(LocalTime.of(22, 0), tooLate, "detalle")));
+
+            assertThatThrownBy(() -> new OtherHandler(academicReference, classroomReference, classSchedule,
+                    eventSchedule).validate(dto)).isInstanceOf(InvalidEventScheduleException.class);
+        }
+
+        @Test
+        @DisplayName("final 07:30-10:00: rechazado")
+        void finalBeforeStart() {
+            windowRejects(tooEarly, LocalTime.of(10, 0));
+            CreateFinalExamDto dto = new CreateFinalExamDto(RoomRequestType.FINAL_EXAM, requester(), SUBJECT,
+                    List.of(itemAt(tooEarly, LocalTime.of(10, 0), null)));
+
+            assertThatThrownBy(() -> new FinalExamHandler(academicReference, classroomReference, classSchedule,
+                    eventSchedule).validate(dto)).isInstanceOf(InvalidEventScheduleException.class);
+        }
+
+        @Test
+        @DisplayName("parcial fuera de horario 22:00-23:30: rechazado antes de consultar superposiciones")
+        void partialOffScheduleAfterEnd() {
+            windowRejects(LocalTime.of(22, 0), tooLate);
+            CreatePartialExamOffScheduleDto dto = new CreatePartialExamOffScheduleDto(
+                    RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, requester(), SUBJECT,
+                    List.of(itemAt(LocalTime.of(22, 0), tooLate, null)));
+
+            assertThatThrownBy(() -> new PartialExamOffScheduleHandler(academicReference, classroomReference,
+                    classSchedule, itemRepository, eventSchedule).validate(dto))
+                    .isInstanceOf(InvalidEventScheduleException.class);
+            verifyNoInteractions(itemRepository);
+        }
+
+        @Test
+        @DisplayName("08:00-23:00 (los bordes de la ventana): se acepta y se consulta con esos valores")
+        void edgesAreAccepted() {
+            LocalTime start = LocalTime.of(8, 0);
+            LocalTime end = LocalTime.of(23, 0);
+            CreateConferenceDto dto = new CreateConferenceDto(RoomRequestType.CONFERENCE, requester(), null,
+                    List.of(itemAt(start, end, null)));
+
+            assertThatCode(() -> new ConferenceHandler(academicReference, classroomReference, classSchedule,
+                    eventSchedule).validate(dto)).doesNotThrowAnyException();
+            verify(eventSchedule).validateBusinessHours(start, end);
         }
     }
 }

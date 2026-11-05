@@ -85,11 +85,10 @@ class ScheduledItemDtoTest {
     }
 
     @Test
-    @DisplayName("cantidad de aulas: 0 y más de 100 rechazadas; 100 admitida")
+    @DisplayName("cantidad de aulas: 0 rechazada; el tope máximo lo valida el setting, no el DTO")
     void classroomCountBounds() {
         assertThat(violations(item().classroomCount(0).build())).isNotEmpty();
-        assertThat(violations(item().classroomCount(101).build())).isNotEmpty();
-        assertThat(violations(item().classroomCount(100).build())).isEmpty();
+        assertThat(violations(item().classroomCount(101).build())).isEmpty();
     }
 
     @Test

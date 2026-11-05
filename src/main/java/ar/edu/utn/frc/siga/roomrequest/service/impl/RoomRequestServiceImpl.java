@@ -20,6 +20,7 @@ import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestService;
 import ar.edu.utn.frc.siga.roomrequest.specification.RoomRequestItemSort;
 import ar.edu.utn.frc.siga.roomrequest.specification.RoomRequestItemSpecification;
 import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl;
+import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestLimitsValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -43,6 +44,7 @@ public class RoomRequestServiceImpl implements RoomRequestService {
     private final RoomRequestComposer composer;
     private final RoomRequestHandlers handlers;
     private final RoomRequestAccessControl accessControl;
+    private final RoomRequestLimitsValidator limitsValidator;
 
     @Override
     @Transactional
@@ -53,6 +55,7 @@ public class RoomRequestServiceImpl implements RoomRequestService {
                 dto.subjectId(), dto.items().size());
 
         RoomRequestTypeHandler handler = handlers.forType(dto.type());
+        limitsValidator.validate(dto);
         handler.validate(dto);
         RoomRequest saved = repository.save(handler.assemble(dto));
 

@@ -15,13 +15,15 @@ docs {
   (hasAnyRole SUBSECRETARIA, AUXILIAR_AULICO). Sin query params: todo sale de los
   datos del ítem.
 
-  Solo devuelve edificios que tienen **al menos un aula libre** que cumple los
-  requisitos del pedido (computadoras, proyector) Y que tienen **al menos un
-  auxiliar áulico asignado** — si nadie puede resolverlo ahí, no se ofrece como
-  destino de derivación.
+  Devuelve los edificios activos que tienen **al menos un auxiliar áulico asignado**
+  — si nadie puede resolverlo ahí, no se ofrece como destino de derivación. Un edificio
+  sin aulas libres que cumplan los requisitos del pedido (computadoras, proyector) en
+  su fecha y horario también aparece, con `availableClassroomCount: 0` (y
+  `availableComputerCount: 0` si el pedido pide PCs): el front avisa "sin lugar" y
+  subsecretaría decide.
 
-  No exige llegar a `classroomCount`: un edificio con 1 de 2 aulas libres igual
-  aparece, con `availableClassroomCount: 1` (la resolución puede ser parcial).
+  No exige llegar a `classroomCount`: un edificio con 1 de 2 aulas libres aparece con
+  `availableClassroomCount: 1` (la resolución puede ser parcial).
 
   En un pedido de laboratorio (`requiresComputers`), `computerCount` es el total
   de PCs y se suma entre las aulas: cualquier aula con al menos 1 PC es candidata.
@@ -30,6 +32,6 @@ docs {
   `computerCount`, después los que se quedan cortos, de más a menos PCs.
 
   Respuesta: array de { id, name, availableClassroomCount, availableComputerCount }. Lista vacía es una
-  respuesta válida (200, no 404) cuando ningún edificio tiene nada libre. 404
+  respuesta válida (200, no 404) cuando ningún edificio activo tiene auxiliar. 404
   solo si el id del ítem no existe.
 }

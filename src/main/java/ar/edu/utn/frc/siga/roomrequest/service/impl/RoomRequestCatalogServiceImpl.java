@@ -11,12 +11,15 @@ import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CommissionOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CommissionScheduleDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassSlotDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestFormSettingsDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.SpecialtyOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.SubjectOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestCatalogMapper;
 import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestCatalogService;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
 import ar.edu.utn.frc.siga.common.security.SystemScope;
+import ar.edu.utn.frc.siga.settings.api.SettingsReader;
+import ar.edu.utn.frc.siga.settings.model.SettingKey;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +41,7 @@ public class RoomRequestCatalogServiceImpl implements RoomRequestCatalogService 
     private final ClassroomService classroomService;
     private final ClassScheduleService classScheduleService;
     private final RoomRequestCatalogMapper mapper;
+    private final SettingsReader settingsReader;
 
     @Override
     @Transactional(readOnly = true)
@@ -84,5 +88,16 @@ public class RoomRequestCatalogServiceImpl implements RoomRequestCatalogService 
                 .toList();
         return new CommissionScheduleDto(slots,
                 classScheduleService.classDates(subjectId, commissionId, LocalDate.now()));
+    }
+
+    @Override
+    public RoomRequestFormSettingsDto findFormSettings() {
+        return new RoomRequestFormSettingsDto(
+                settingsReader.getTime(SettingKey.EVENTS_HOURS_START),
+                settingsReader.getTime(SettingKey.EVENTS_HOURS_END),
+                settingsReader.getInt(SettingKey.ROOM_REQUESTS_MAX_CLASSROOM_COUNT),
+                settingsReader.getInt(SettingKey.ROOM_REQUESTS_MAX_ESTIMATED),
+                settingsReader.getInt(SettingKey.ROOM_REQUESTS_MAX_COMPUTER_COUNT),
+                settingsReader.getInt(SettingKey.ROOM_REQUESTS_ALERT_DAYS_BEFORE_DATE));
     }
 }

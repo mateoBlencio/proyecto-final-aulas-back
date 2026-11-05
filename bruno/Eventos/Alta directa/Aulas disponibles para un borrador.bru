@@ -27,6 +27,12 @@ body:json {
 docs {
   POST /v1/events/direct/available-classrooms. Permiso: PERM_EVENT_DIRECT_CREATE (AUXILIAR_AULICO).
 
-  Devuelve las aulas del alcance del usuario que cumplen los requisitos del borrador;
-  `available=false` marca las ocupadas en esa fecha y horario. No persiste nada.
+  Devuelve todas las aulas activas del alcance del usuario, las que cumplen los requisitos
+  del borrador primero. `available=false` marca las ocupadas en esa fecha y horario (`available`
+  sigue significando libre). `missingRequirements` lista lo que el aula no cumple
+  (`PROJECTOR`, `COMPUTERS`); vacío si cumple todo. Asignar un aula que no cumple exige el
+  `reason` del alta, que ya es obligatorio. No persiste nada.
+
+  Respuesta: array de { id, roomNumber, buildingId, buildingName, capacity, available,
+  computerCount, missingRequirements }.
 }
