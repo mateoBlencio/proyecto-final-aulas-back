@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.preview.controller;
 
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.preview.dto.request.ConfirmPreviewRequestDto;
+import ar.edu.utn.frc.siga.preview.dto.request.ConfirmReallocationSuggestionRequestDto;
 import ar.edu.utn.frc.siga.preview.dto.request.PreviewRequestDto;
 import ar.edu.utn.frc.siga.preview.dto.request.ReallocationSuggestionRequestDto;
 import ar.edu.utn.frc.siga.preview.dto.response.ConfirmPreviewResponseDto;
@@ -93,11 +94,15 @@ public class PreviewController {
     @Operation(summary = "Confirmar la sugerencia de reasignación",
                description = "Aplica, con source=AUTOMATIC, el aula sugerida a las ocurrencias que resolvió la "
                        + "sugerencia, revalidando todo contra la base. 410 si la sugerencia expiró, no existe o "
-                       + "ya se usó (se consume al primer intento de confirm, aunque falle).")
+                       + "ya se usó (se consume al primer intento de confirm, aunque falle). Body opcional "
+                       + "{observation}: obligatorio si la clase ya tenía aula y cambia (400 Observation "
+                       + "required, la sugerencia sigue vigente).")
     public ResponseEntity<List<AllocationResponseDto>> confirmReallocationSuggestion(
-            @PathVariable String suggestionId) {
+            @PathVariable String suggestionId,
+            @Valid @RequestBody(required = false) ConfirmReallocationSuggestionRequestDto body) {
         log.debug("POST /v1/previews/reallocation-suggestion/{}/confirm", suggestionId);
-        List<AllocationResponseDto> response = previewService.confirmReallocationSuggestion(suggestionId);
+        List<AllocationResponseDto> response = previewService.confirmReallocationSuggestion(
+                suggestionId, body == null ? null : body.observation());
         log.info("Confirm de sugerencia de reasignación: suggestionId={}, applied={}", suggestionId, response.size());
         return ResponseEntity.ok(response);
     }

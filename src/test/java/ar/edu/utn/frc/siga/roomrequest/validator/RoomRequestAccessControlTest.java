@@ -106,12 +106,81 @@ class RoomRequestAccessControlTest {
     }
 
     @Test
-    @DisplayName("subsecretaría en RESOLVED o CANCELLED: nada")
-    void subsecretariaEnEstadoTerminal() {
+    @DisplayName("subsecretaría en CANCELLED, o en NOTIFIED/RESOLVED de un pedido derivado: nada")
+    void subsecretariaEnEstadoTerminalOEnDerivado() {
         asSubsecretaria();
-        for (RoomRequestStatus status : Set.of(RoomRequestStatus.RESOLVED, RoomRequestStatus.CANCELLED)) {
+        for (RoomRequestStatus status : Set.of(RoomRequestStatus.NOTIFIED, RoomRequestStatus.RESOLVED,
+                RoomRequestStatus.CANCELLED)) {
             assertForbidden(item(status, SU_BUILDING), SUBSECRETARIA_EMAIL, Action.values());
         }
+        assertForbidden(item(RoomRequestStatus.CANCELLED, null), SUBSECRETARIA_EMAIL, Action.values());
+    }
+
+    @Test
+    @DisplayName("subsecretaría en NOTIFIED no derivado: cancela, confirma y reabre; no reasigna ni notifica")
+    void subsecretariaEnNotificado() {
+        asSubsecretaria();
+        RoomRequestItem item = item(RoomRequestStatus.NOTIFIED, null);
+
+        assertAllowed(item, SUBSECRETARIA_EMAIL, Action.CANCEL, Action.CONFIRM, Action.REOPEN);
+        assertForbidden(item, SUBSECRETARIA_EMAIL, Action.ASSIGN, Action.NOTIFY, Action.DERIVE, Action.RETURN);
+    }
+
+    @Test
+    @DisplayName("subsecretaría en RESOLVED no derivado: solo reabre")
+    void subsecretariaEnResuelto() {
+        asSubsecretaria();
+        RoomRequestItem item = item(RoomRequestStatus.RESOLVED, null);
+
+        assertAllowed(item, SUBSECRETARIA_EMAIL, Action.REOPEN);
+        assertForbidden(item, SUBSECRETARIA_EMAIL, Action.CANCEL, Action.CONFIRM, Action.ASSIGN, Action.NOTIFY);
+    }
+
+    @Test
+    @DisplayName("auxiliar en NOTIFIED de su edificio: cancela, confirma y reabre; en otro edificio o sin derivar, nada")
+    void auxiliarEnNotificado() {
+        asAuxiliar(SU_BUILDING);
+
+        assertAllowed(item(RoomRequestStatus.NOTIFIED, SU_BUILDING), AUXILIAR_EMAIL,
+                Action.CANCEL, Action.CONFIRM, Action.REOPEN);
+        assertForbidden(item(RoomRequestStatus.NOTIFIED, OTRO_BUILDING), AUXILIAR_EMAIL, Action.values());
+        assertForbidden(item(RoomRequestStatus.NOTIFIED, null), AUXILIAR_EMAIL, Action.values());
+    }
+
+    @Test
+    @DisplayName("auxiliar global en NOTIFIED o RESOLVED de un pedido sin derivar: nada")
+    void auxiliarGlobalSinDerivar() {
+        asAuxiliarGlobal();
+
+        assertForbidden(item(RoomRequestStatus.NOTIFIED, null), AUXILIAR_EMAIL, Action.values());
+        assertForbidden(item(RoomRequestStatus.RESOLVED, null), AUXILIAR_EMAIL, Action.values());
+    }
+
+    @Test
+    @DisplayName("auxiliar en RESOLVED de su edificio: solo reabre")
+    void auxiliarEnResuelto() {
+        asAuxiliar(SU_BUILDING);
+        RoomRequestItem item = item(RoomRequestStatus.RESOLVED, SU_BUILDING);
+
+        assertAllowed(item, AUXILIAR_EMAIL, Action.REOPEN);
+        assertForbidden(item, AUXILIAR_EMAIL, Action.CANCEL, Action.CONFIRM);
+    }
+
+    @Test
+    @DisplayName("allowedActions no ofrece REOPEN en un RESOLVED con fecha pasada, pero authorize sí lo permite")
+    void allowedActionsOcultaReopenConFechaPasada() {
+        asSubsecretaria();
+        RoomRequestAccessControl.Actor actor = accessControl.resolveActor(SUBSECRETARIA_EMAIL);
+        RoomRequestItem past = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.RESOLVED)
+                .date(java.time.LocalDate.now().minusDays(1)).build();
+        RoomRequestItem future = RoomRequestItem.builder().id(2L).status(RoomRequestStatus.RESOLVED)
+                .date(java.time.LocalDate.now().plusDays(1)).build();
+        RoomRequestItem regular = RoomRequestItem.builder().id(3L).status(RoomRequestStatus.RESOLVED).build();
+
+        assertThat(accessControl.allowedActions(past, actor)).isEmpty();
+        assertThat(accessControl.allowedActions(future, actor)).containsExactly(Action.REOPEN);
+        assertThat(accessControl.allowedActions(regular, actor)).containsExactly(Action.REOPEN);
+        assertAllowed(past, SUBSECRETARIA_EMAIL, Action.REOPEN);
     }
 
     // ---------- auxiliar áulico ----------

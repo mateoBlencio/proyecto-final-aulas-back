@@ -85,19 +85,18 @@ class ScheduledItemDtoTest {
     }
 
     @Test
-    @DisplayName("cantidad de aulas: 0 y más de 100 rechazadas; 100 admitida")
+    @DisplayName("cantidad de aulas: 0 rechazada; el tope máximo lo valida el setting, no el DTO")
     void classroomCountBounds() {
         assertThat(violations(item().classroomCount(0).build())).isNotEmpty();
-        assertThat(violations(item().classroomCount(101).build())).isNotEmpty();
-        assertThat(violations(item().classroomCount(100).build())).isEmpty();
+        assertThat(violations(item().classroomCount(101).build())).isEmpty();
     }
 
     @Test
     @DisplayName("fecha en el pasado: rechazada (fecha ausente sí se admite: la usa el subtipo por día)")
     void pastDate() {
-        assertThat(violations(new ScheduledItemDto(LocalDate.now().minusDays(1), null, null, 1,
+        assertThat(violations(new ScheduledItemDto(LocalDate.now().minusDays(1), null, null, null, 1,
                 false, false, null, null, null, null, List.of()))).isNotEmpty();
-        assertThat(violations(new ScheduledItemDto(null, DayOfWeek.TUESDAY, null, 1,
+        assertThat(violations(new ScheduledItemDto(null, DayOfWeek.TUESDAY, null, null, 1,
                 false, false, null, null, null, null, List.of()))).isEmpty();
     }
 
@@ -134,7 +133,7 @@ class ScheduledItemDtoTest {
         Builder preferredClassroomIds(List<Long> v) { this.preferredClassroomIds = v; return this; }
 
         ScheduledItemDto build() {
-            return new ScheduledItemDto(date, dayOfWeek, estimated, classroomCount, requiresProjector,
+            return new ScheduledItemDto(date, dayOfWeek, null, estimated, classroomCount, requiresProjector,
                     requiresComputers, computerCount, requiresExamUsers, requiredSoftware, observations,
                     preferredClassroomIds);
         }

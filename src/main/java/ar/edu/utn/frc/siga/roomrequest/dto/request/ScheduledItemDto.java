@@ -1,13 +1,14 @@
 package ar.edu.utn.frc.siga.roomrequest.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.FutureOrPresent;
-import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -15,8 +16,9 @@ import java.util.List;
 public record ScheduledItemDto(
         @FutureOrPresent LocalDate date,
         DayOfWeek dayOfWeek,
+        @JsonFormat(pattern = "HH:mm") LocalTime startTime,
         @Min(0) Integer estimated,
-        @Min(1) @Max(100) Integer classroomCount,
+        @Min(1) Integer classroomCount,
         Boolean requiresProjector,
         Boolean requiresComputers,
         @Min(1) Integer computerCount,

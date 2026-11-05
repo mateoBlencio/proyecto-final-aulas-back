@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
+import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestRepository;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.ResourceType;
@@ -18,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
@@ -33,6 +35,8 @@ class RoomRequestItemCandidateBuildingsApiIntegrationTest extends AbstractIntegr
     private IntegrationTestData testData;
     @Autowired
     private RoomRequestRepository roomRequestRepository;
+    @Autowired
+    private RoomRequestItemRepository roomRequestItemRepository;
 
     @Test
     @DisplayName("edificio con aula libre y auxiliar áulico asignado: aparece con availableClassroomCount")
@@ -77,6 +81,30 @@ class RoomRequestItemCandidateBuildingsApiIntegrationTest extends AbstractIntegr
 
         mockMvc.perform(get("/v1/room-requests/items/" + unknownId + "/candidate-buildings"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("AUXILIAR_AULICO sobre un ítem sin derivar: 403")
+    void candidateBuildings_auxiliarItemSinDerivar_returnsForbidden() throws Exception {
+        RoomRequestItem item = seedItem();
+
+        mockMvcAsAuxiliar("auxiliar-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar")
+                .perform(get("/v1/room-requests/items/" + item.getId() + "/candidate-buildings"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("AUXILIAR_AULICO de otro edificio sobre un ítem derivado: 403")
+    void candidateBuildings_auxiliarDeOtroEdificio_returnsForbidden() throws Exception {
+        Building derivedTo = testData.edificio();
+        RoomRequestItem item = seedItem();
+        RoomRequestItem stored = roomRequestItemRepository.findById(item.getId()).orElseThrow();
+        stored.deriveTo(derivedTo.getId(), "subsecretaria@frc.utn.edu.ar", Instant.now());
+        roomRequestItemRepository.save(stored);
+
+        mockMvcAsAuxiliar("auxiliar-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar")
+                .perform(get("/v1/room-requests/items/" + item.getId() + "/candidate-buildings"))
+                .andExpect(status().isForbidden());
     }
 
     private RoomRequestItem seedItem() {

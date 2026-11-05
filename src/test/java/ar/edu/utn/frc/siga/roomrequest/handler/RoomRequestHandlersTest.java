@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.roomrequest.handler;
 
+import ar.edu.utn.frc.siga.events.exception.InvalidEventScheduleException;
+import ar.edu.utn.frc.siga.events.validator.EventScheduleValidator;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateConferenceDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateFinalExamDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateOneTimeRoomChangeDto;
@@ -52,6 +54,7 @@ import static org.mockito.Mockito.when;
 class RoomRequestHandlersTest {
 
     private static final Long SUBJECT = 42L;
+    private static final Long OTHER_SUBJECT = 43L;
     private static final Long COMMISSION = 7L;
     private static final ClassSlot TUESDAY_SLOT =
             new ClassSlot(100L, DayOfWeek.TUESDAY, LocalTime.of(18, 0), LocalTime.of(20, 0));
@@ -64,13 +67,21 @@ class RoomRequestHandlersTest {
     private ClassScheduleService classSchedule;
     @Mock
     private RoomRequestItemRepository itemRepository;
+    @Mock
+    private EventScheduleValidator eventSchedule;
 
     private static RequesterInfo requester() {
         return new RequesterInfo(AcademicScope.GRADO, "Ada Lovelace", "ada@frc.utn.edu.ar", "351-1234567");
     }
 
     private static ScheduledItemDto scheduledItem(LocalDate date, DayOfWeek dayOfWeek, Integer estimated) {
-        return new ScheduledItemDto(date, dayOfWeek, estimated, 1, false, false, null, null, null, null, List.of());
+        return scheduledItem(date, dayOfWeek, estimated, null);
+    }
+
+    private static ScheduledItemDto scheduledItem(LocalDate date, DayOfWeek dayOfWeek, Integer estimated,
+                                                  LocalTime startTime) {
+        return new ScheduledItemDto(date, dayOfWeek, startTime, estimated, 1, false, false, null, null, null, null,
+                List.of());
     }
 
     private static FreeFormItemDto freeFormItem(Long commissionId) {
@@ -97,7 +108,7 @@ class RoomRequestHandlersTest {
         @Test
         @DisplayName("happy: fecha por ítem, sin día ni estimado; valida materia+comisión y cada fecha contra el cursado")
         void happy() {
-            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), any())).thenReturn(TUESDAY_SLOT);
+            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), any(), any())).thenReturn(TUESDAY_SLOT);
             CreateOneTimeRoomChangeDto dto = dto(scheduledItem(LocalDate.now().plusDays(7), null, null));
 
             assertThatCode(() -> handler.validate(dto)).doesNotThrowAnyException();
@@ -121,7 +132,33 @@ class RoomRequestHandlersTest {
         @DisplayName("dos ítems con la misma fecha: rechazado")
         void duplicateDates() {
             LocalDate date = LocalDate.now().plusDays(7);
+            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), eq(date), any())).thenReturn(TUESDAY_SLOT);
             assertThatThrownBy(() -> handler.validate(dto(scheduledItem(date, null, null), scheduledItem(date, null, null))))
+                    .isInstanceOf(InvalidRoomRequestException.class);
+        }
+
+        @Test
+        @DisplayName("misma fecha con dos horarios distintos de la comisión: se aceptan (caso 6)")
+        void sameDateDifferentClasses() {
+            LocalDate date = LocalDate.now().plusDays(7);
+            ClassSlot morning = new ClassSlot(200L, DayOfWeek.TUESDAY, LocalTime.of(10, 25), LocalTime.of(11, 55));
+            ClassSlot night = new ClassSlot(201L, DayOfWeek.TUESDAY, LocalTime.of(20, 40), LocalTime.of(22, 55));
+            when(classSchedule.requireClassDate(SUBJECT, COMMISSION, date, LocalTime.of(10, 25))).thenReturn(morning);
+            when(classSchedule.requireClassDate(SUBJECT, COMMISSION, date, LocalTime.of(20, 40))).thenReturn(night);
+            assertThatCode(() -> handler.validate(dto(
+                    scheduledItem(date, null, null, LocalTime.of(10, 25)),
+                    scheduledItem(date, null, null, LocalTime.of(20, 40)))))
+                    .doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("misma fecha, una con horario y otra sin, que resuelven la misma clase: rechazado")
+        void sameDateSameResolvedClass() {
+            LocalDate date = LocalDate.now().plusDays(7);
+            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), eq(date), any())).thenReturn(TUESDAY_SLOT);
+            assertThatThrownBy(() -> handler.validate(dto(
+                    scheduledItem(date, null, null, null),
+                    scheduledItem(date, null, null, LocalTime.of(18, 0)))))
                     .isInstanceOf(InvalidRoomRequestException.class);
         }
 
@@ -130,7 +167,7 @@ class RoomRequestHandlersTest {
         void todayButAlreadyPast() {
             LocalDate today = LocalDate.now();
             ClassSlot pastSlot = new ClassSlot(100L, today.getDayOfWeek(), LocalTime.MIDNIGHT, LocalTime.MAX);
-            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), eq(today))).thenReturn(pastSlot);
+            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), eq(today), any())).thenReturn(pastSlot);
 
             assertThatThrownBy(() -> handler.assemble(dto(scheduledItem(today, null, null))))
                     .isInstanceOf(InvalidRoomRequestException.class);
@@ -141,7 +178,7 @@ class RoomRequestHandlersTest {
         void todayButNotYetPast() {
             LocalDate today = LocalDate.now();
             ClassSlot futureSlot = new ClassSlot(100L, today.getDayOfWeek(), LocalTime.MAX, LocalTime.MAX);
-            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), eq(today))).thenReturn(futureSlot);
+            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), eq(today), any())).thenReturn(futureSlot);
 
             assertThatCode(() -> handler.assemble(dto(scheduledItem(today, null, null))))
                     .doesNotThrowAnyException();
@@ -151,7 +188,7 @@ class RoomRequestHandlersTest {
         @DisplayName("assemble: deriva horario y evento del cursado, deja date y comisión, estimado null")
         void assemble() {
             LocalDate date = LocalDate.now().plusDays(7);
-            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), eq(date))).thenReturn(TUESDAY_SLOT);
+            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), eq(date), any())).thenReturn(TUESDAY_SLOT);
 
             RoomRequest request = handler.assemble(dto(scheduledItem(date, null, null)));
 
@@ -186,7 +223,7 @@ class RoomRequestHandlersTest {
         @Test
         @DisplayName("happy: día por ítem, sin fecha; valida cada día contra el cursado")
         void happy() {
-            when(classSchedule.requireClassDay(eq(SUBJECT), eq(COMMISSION), any())).thenReturn(TUESDAY_SLOT);
+            when(classSchedule.requireClassDay(eq(SUBJECT), eq(COMMISSION), any(), any())).thenReturn(TUESDAY_SLOT);
             assertThatCode(() -> handler.validate(dto(scheduledItem(null, DayOfWeek.TUESDAY, null))))
                     .doesNotThrowAnyException();
         }
@@ -203,15 +240,48 @@ class RoomRequestHandlersTest {
         @Test
         @DisplayName("días repetidos: rechazado")
         void duplicateDays() {
+            when(classSchedule.requireClassDay(eq(SUBJECT), eq(COMMISSION), eq(DayOfWeek.TUESDAY), any()))
+                    .thenReturn(TUESDAY_SLOT);
             assertThatThrownBy(() -> handler.validate(dto(
                     scheduledItem(null, DayOfWeek.TUESDAY, null), scheduledItem(null, DayOfWeek.TUESDAY, null))))
                     .isInstanceOf(InvalidRoomRequestException.class);
         }
 
         @Test
+        @DisplayName("martes y martes 18:00 resuelven la misma clase: rechazado")
+        void sameDayOneWithTimeOneWithout() {
+            when(classSchedule.requireClassDay(eq(SUBJECT), eq(COMMISSION), eq(DayOfWeek.TUESDAY), any()))
+                    .thenReturn(TUESDAY_SLOT);
+            assertThatThrownBy(() -> handler.validate(dto(
+                    scheduledItem(null, DayOfWeek.TUESDAY, null, null),
+                    scheduledItem(null, DayOfWeek.TUESDAY, null, LocalTime.of(18, 0)))))
+                    .isInstanceOf(InvalidRoomRequestException.class);
+        }
+
+        @Test
+        @DisplayName("mismo día con dos horarios distintos: se aceptan y cada uno toma su clase (caso 6)")
+        void sameDayDifferentClasses() {
+            ClassSlot morning = new ClassSlot(200L, DayOfWeek.MONDAY, LocalTime.of(10, 25), LocalTime.of(11, 55));
+            ClassSlot night = new ClassSlot(201L, DayOfWeek.MONDAY, LocalTime.of(20, 40), LocalTime.of(22, 55));
+            when(classSchedule.requireClassDay(SUBJECT, COMMISSION, DayOfWeek.MONDAY, LocalTime.of(10, 25))).thenReturn(morning);
+            when(classSchedule.requireClassDay(SUBJECT, COMMISSION, DayOfWeek.MONDAY, LocalTime.of(20, 40))).thenReturn(night);
+
+            RoomRequest request = handler.assemble(dto(
+                    scheduledItem(null, DayOfWeek.MONDAY, null, LocalTime.of(10, 25)),
+                    scheduledItem(null, DayOfWeek.MONDAY, null, LocalTime.of(20, 40))));
+            assertThatCode(() -> handler.validate(dto(
+                    scheduledItem(null, DayOfWeek.MONDAY, null, LocalTime.of(10, 25)),
+                    scheduledItem(null, DayOfWeek.MONDAY, null, LocalTime.of(20, 40)))))
+                    .doesNotThrowAnyException();
+
+            assertThat(request.getItems()).extracting(RoomRequestItem::getStartTime)
+                    .containsExactly(LocalTime.of(10, 25), LocalTime.of(20, 40));
+        }
+
+        @Test
         @DisplayName("assemble: date null, dayOfWeek seteado, horario del cursado")
         void assemble() {
-            when(classSchedule.requireClassDay(eq(SUBJECT), eq(COMMISSION), eq(DayOfWeek.TUESDAY)))
+            when(classSchedule.requireClassDay(eq(SUBJECT), eq(COMMISSION), eq(DayOfWeek.TUESDAY), any()))
                     .thenReturn(TUESDAY_SLOT);
 
             RoomRequest request = handler.assemble(dto(scheduledItem(null, DayOfWeek.TUESDAY, null)));
@@ -244,7 +314,7 @@ class RoomRequestHandlersTest {
         @Test
         @DisplayName("happy: fecha + estimado; horario derivado del cursado de esa fecha")
         void happy() {
-            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), any())).thenReturn(TUESDAY_SLOT);
+            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), any(), any())).thenReturn(TUESDAY_SLOT);
             assertThatCode(() -> handler.validate(dto(scheduledItem(LocalDate.now().plusDays(7), null, 35))))
                     .doesNotThrowAnyException();
         }
@@ -270,6 +340,7 @@ class RoomRequestHandlersTest {
         @DisplayName("dos ítems con la misma fecha: rechazado")
         void duplicateDates() {
             LocalDate date = LocalDate.now().plusDays(7);
+            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), eq(date), any())).thenReturn(TUESDAY_SLOT);
             assertThatThrownBy(() -> handler.validate(dto(scheduledItem(date, null, 35), scheduledItem(date, null, 40))))
                     .isInstanceOf(InvalidRoomRequestException.class);
         }
@@ -278,7 +349,7 @@ class RoomRequestHandlersTest {
         @DisplayName("assemble: dayOfWeek null, fecha y estimado copiados, horario del cursado")
         void assemble() {
             LocalDate date = LocalDate.now().plusDays(7);
-            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), eq(date))).thenReturn(TUESDAY_SLOT);
+            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), eq(date), any())).thenReturn(TUESDAY_SLOT);
 
             RoomRequest request = handler.assemble(dto(scheduledItem(date, null, 35)));
 
@@ -297,7 +368,7 @@ class RoomRequestHandlersTest {
             LocalDate today = LocalDate.now();
             ClassSlot soonSlot = new ClassSlot(100L, today.getDayOfWeek(),
                     LocalTime.now().plusMinutes(30), LocalTime.now().plusMinutes(90));
-            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), eq(today))).thenReturn(soonSlot);
+            when(classSchedule.requireClassDate(eq(SUBJECT), eq(COMMISSION), eq(today), any())).thenReturn(soonSlot);
 
             assertThatThrownBy(() -> handler.assemble(dto(scheduledItem(today, null, 35))))
                     .isInstanceOf(InvalidRoomRequestException.class);
@@ -312,7 +383,7 @@ class RoomRequestHandlersTest {
 
         @BeforeEach
         void setUp() {
-            handler = new PartialExamOffScheduleHandler(academicReference, classroomReference, classSchedule, itemRepository);
+            handler = new PartialExamOffScheduleHandler(academicReference, classroomReference, classSchedule, itemRepository, eventSchedule);
             when(itemRepository.findActiveOffScheduleItemsByDateIn(any())).thenReturn(List.of());
         }
 
@@ -345,9 +416,20 @@ class RoomRequestHandlersTest {
         }
 
         @Test
-        @DisplayName("dos ítems sin comisión en la misma solicitud: no chocan entre sí")
-        void twoNullCommissionsDoNotCollide() {
-            assertThatCode(() -> handler.validate(dto(freeFormItem(null), freeFormItem(null))))
+        @DisplayName("dos ítems 'todas' que se pisan en la misma solicitud: rechazado (misma materia)")
+        void twoNullCommissionsOverlappingCollide() {
+            assertThatThrownBy(() -> handler.validate(dto(freeFormItem(null), freeFormItem(null))))
+                    .isInstanceOf(InvalidRoomRequestException.class)
+                    .hasMessageContaining("Esa comisión ya tiene otro pedido en la misma fecha y horario");
+        }
+
+        @Test
+        @DisplayName("dos ítems 'todas' en horarios que no se pisan en la misma solicitud: permitido")
+        void twoNullCommissionsNotOverlappingDoNotCollide() {
+            LocalDate date = LocalDate.now().plusDays(7);
+            assertThatCode(() -> handler.validate(dto(
+                    freeFormItemAt(null, date, LocalTime.of(10, 0), LocalTime.of(12, 0)),
+                    freeFormItemAt(null, date, LocalTime.of(12, 0), LocalTime.of(14, 0)))))
                     .doesNotThrowAnyException();
         }
 
@@ -391,20 +473,88 @@ class RoomRequestHandlersTest {
         }
 
         @Test
-        @DisplayName("choca contra un pedido de otra solicitud ya persistida: rechazado")
-        void overlapsWithPersistedRequest() {
-            LocalDate date = LocalDate.now().plusDays(7);
+        @DisplayName("caso 9 a: misma materia, misma comisión, se pisan: rechazado")
+        void sameSubjectSameCommissionOverlapIsRejected() {
+            givenExisting(SUBJECT, 7L, 12, 14);
+
+            assertThatThrownBy(() -> handler.validate(dto(freeFormItemAtHours(7L, 13, 15))))
+                    .isInstanceOf(InvalidRoomRequestException.class)
+                    .hasMessageContaining("Esa comisión ya tiene otro pedido en la misma fecha y horario");
+        }
+
+        @Test
+        @DisplayName("caso 9 b: otra materia, misma comisión, se pisan: aceptado")
+        void otherSubjectSameCommissionOverlapIsAccepted() {
+            givenExisting(OTHER_SUBJECT, 7L, 12, 14);
+
+            assertThatCode(() -> handler.validate(dto(freeFormItemAtHours(7L, 12, 14)))).doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("caso 9 c: existente 'todas' de otra materia, nuevo con comisión puntual: aceptado")
+        void otherSubjectExistingAllIsAccepted() {
+            givenExisting(OTHER_SUBJECT, null, 12, 14);
+
+            assertThatCode(() -> handler.validate(dto(freeFormItemAtHours(7L, 12, 14)))).doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("caso 9 d: existente 'todas' (dos comisiones) de otra materia, nuevo de otra comisión: aceptado")
+        void otherSubjectExistingAllWithDifferentCommissionIsAccepted() {
+            givenExisting(OTHER_SUBJECT, null, 12, 14);
+
+            assertThatCode(() -> handler.validate(dto(freeFormItemAtHours(9L, 12, 14)))).doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("caso 9 e: misma materia, los dos 'todas', se pisan: rechazado")
+        void sameSubjectBothAllIsRejected() {
+            givenExisting(SUBJECT, null, 12, 14);
+
+            assertThatThrownBy(() -> handler.validate(dto(freeFormItemAtHours(null, 12, 14))))
+                    .isInstanceOf(InvalidRoomRequestException.class);
+        }
+
+        @Test
+        @DisplayName("caso 9 e': misma materia, existente 'todas' y nuevo con comisión puntual: rechazado")
+        void sameSubjectExistingAllIsRejected() {
+            givenExisting(SUBJECT, null, 12, 14);
+
+            assertThatThrownBy(() -> handler.validate(dto(freeFormItemAtHours(7L, 13, 15))))
+                    .isInstanceOf(InvalidRoomRequestException.class);
+        }
+
+        @Test
+        @DisplayName("caso 9 f: borde exacto, no se pisan: aceptado")
+        void touchingBordersAreAccepted() {
+            givenExisting(SUBJECT, 7L, 12, 14);
+
+            assertThatCode(() -> handler.validate(dto(freeFormItemAtHours(7L, 14, 16)))).doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("misma materia, distinta comisión puntual, se pisan: aceptado")
+        void sameSubjectDifferentCommissionIsAccepted() {
+            givenExisting(SUBJECT, 7L, 12, 14);
+
+            assertThatCode(() -> handler.validate(dto(freeFormItemAtHours(8L, 12, 14)))).doesNotThrowAnyException();
+        }
+
+        private void givenExisting(Long subjectId, Long commissionId, int fromHour, int toHour) {
+            RoomRequest request = RoomRequest.builder().subjectId(subjectId).build();
             RoomRequestItem existing = RoomRequestItem.builder()
-                    .commissionId(7L)
-                    .date(date)
-                    .startTime(LocalTime.of(11, 0))
-                    .duration(Duration.ofHours(2))
+                    .request(request)
+                    .commissionId(commissionId)
+                    .date(LocalDate.now().plusDays(7))
+                    .startTime(LocalTime.of(fromHour, 0))
+                    .duration(Duration.ofHours(toHour - fromHour))
                     .build();
             when(itemRepository.findActiveOffScheduleItemsByDateIn(any())).thenReturn(List.of(existing));
+        }
 
-            assertThatThrownBy(() -> handler.validate(dto(
-                    freeFormItemAt(7L, date, LocalTime.of(10, 0), LocalTime.of(12, 0)))))
-                    .isInstanceOf(InvalidRoomRequestException.class);
+        private FreeFormItemDto freeFormItemAtHours(Long commissionId, int fromHour, int toHour) {
+            return freeFormItemAt(commissionId, LocalDate.now().plusDays(7),
+                    LocalTime.of(fromHour, 0), LocalTime.of(toHour, 0));
         }
 
         @Test
@@ -437,7 +587,7 @@ class RoomRequestHandlersTest {
 
         @BeforeEach
         void setUp() {
-            handler = new FinalExamHandler(academicReference, classroomReference, classSchedule);
+            handler = new FinalExamHandler(academicReference, classroomReference, classSchedule, eventSchedule);
         }
 
         private CreateFinalExamDto dto(FreeFormItemDto... items) {
@@ -489,8 +639,8 @@ class RoomRequestHandlersTest {
 
         @BeforeEach
         void setUp() {
-            conference = new ConferenceHandler(academicReference, classroomReference, classSchedule);
-            other = new OtherHandler(academicReference, classroomReference, classSchedule);
+            conference = new ConferenceHandler(academicReference, classroomReference, classSchedule, eventSchedule);
+            other = new OtherHandler(academicReference, classroomReference, classSchedule, eventSchedule);
         }
 
         @Test
@@ -570,6 +720,85 @@ class RoomRequestHandlersTest {
             return new FreeFormItemDto(commissionId, LocalDate.now().plusDays(7),
                     LocalTime.of(10, 0), LocalTime.of(12, 0), 35, 1, false, false, null, null, null,
                     "Grabación de video", List.of());
+        }
+    }
+
+    @Nested
+    @DisplayName("ventana horaria (events.hours): los cuatro tipos de horario libre la validan al crear")
+    class BusinessHours {
+
+        private final LocalTime tooEarly = LocalTime.of(7, 30);
+        private final LocalTime tooLate = LocalTime.of(23, 30);
+
+        private FreeFormItemDto itemAt(LocalTime start, LocalTime end, String observations) {
+            return new FreeFormItemDto(null, LocalDate.now().plusDays(7), start, end, 35, 1, false, false, null, null,
+                    null, observations, List.of());
+        }
+
+        private void windowRejects(LocalTime start, LocalTime end) {
+            org.mockito.Mockito.doThrow(new InvalidEventScheduleException("fuera de la ventana permitida"))
+                    .when(eventSchedule).validateBusinessHours(start, end);
+        }
+
+        @Test
+        @DisplayName("conferencia 07:30-09:00: rechazada con el error de la ventana, sin llegar a materia")
+        void conferenceBeforeStart() {
+            windowRejects(tooEarly, LocalTime.of(9, 0));
+            CreateConferenceDto dto = new CreateConferenceDto(RoomRequestType.CONFERENCE, requester(), null,
+                    List.of(itemAt(tooEarly, LocalTime.of(9, 0), null)));
+
+            assertThatThrownBy(() -> new ConferenceHandler(academicReference, classroomReference, classSchedule,
+                    eventSchedule).validate(dto)).isInstanceOf(InvalidEventScheduleException.class);
+            verifyNoInteractions(academicReference);
+        }
+
+        @Test
+        @DisplayName("otro 22:00-23:30: rechazado")
+        void otherAfterEnd() {
+            windowRejects(LocalTime.of(22, 0), tooLate);
+            CreateOtherDto dto = new CreateOtherDto(RoomRequestType.OTHER, requester(), null,
+                    List.of(itemAt(LocalTime.of(22, 0), tooLate, "detalle")));
+
+            assertThatThrownBy(() -> new OtherHandler(academicReference, classroomReference, classSchedule,
+                    eventSchedule).validate(dto)).isInstanceOf(InvalidEventScheduleException.class);
+        }
+
+        @Test
+        @DisplayName("final 07:30-10:00: rechazado")
+        void finalBeforeStart() {
+            windowRejects(tooEarly, LocalTime.of(10, 0));
+            CreateFinalExamDto dto = new CreateFinalExamDto(RoomRequestType.FINAL_EXAM, requester(), SUBJECT,
+                    List.of(itemAt(tooEarly, LocalTime.of(10, 0), null)));
+
+            assertThatThrownBy(() -> new FinalExamHandler(academicReference, classroomReference, classSchedule,
+                    eventSchedule).validate(dto)).isInstanceOf(InvalidEventScheduleException.class);
+        }
+
+        @Test
+        @DisplayName("parcial fuera de horario 22:00-23:30: rechazado antes de consultar superposiciones")
+        void partialOffScheduleAfterEnd() {
+            windowRejects(LocalTime.of(22, 0), tooLate);
+            CreatePartialExamOffScheduleDto dto = new CreatePartialExamOffScheduleDto(
+                    RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE, requester(), SUBJECT,
+                    List.of(itemAt(LocalTime.of(22, 0), tooLate, null)));
+
+            assertThatThrownBy(() -> new PartialExamOffScheduleHandler(academicReference, classroomReference,
+                    classSchedule, itemRepository, eventSchedule).validate(dto))
+                    .isInstanceOf(InvalidEventScheduleException.class);
+            verifyNoInteractions(itemRepository);
+        }
+
+        @Test
+        @DisplayName("08:00-23:00 (los bordes de la ventana): se acepta y se consulta con esos valores")
+        void edgesAreAccepted() {
+            LocalTime start = LocalTime.of(8, 0);
+            LocalTime end = LocalTime.of(23, 0);
+            CreateConferenceDto dto = new CreateConferenceDto(RoomRequestType.CONFERENCE, requester(), null,
+                    List.of(itemAt(start, end, null)));
+
+            assertThatCode(() -> new ConferenceHandler(academicReference, classroomReference, classSchedule,
+                    eventSchedule).validate(dto)).doesNotThrowAnyException();
+            verify(eventSchedule).validateBusinessHours(start, end);
         }
     }
 }

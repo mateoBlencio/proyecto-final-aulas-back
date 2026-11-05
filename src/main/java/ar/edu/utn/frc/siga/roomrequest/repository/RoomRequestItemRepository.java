@@ -11,6 +11,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
@@ -28,7 +29,7 @@ public interface RoomRequestItemRepository
     @EntityGraph(attributePaths = {"request", "preferences"})
     Optional<RoomRequestItem> findWithRequestById(Long id);
 
-    @Query("select i from RoomRequestItem i "
+    @Query("select i from RoomRequestItem i join fetch i.request "
             + "where i.request.type = ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE "
             + "and i.date in :dates "
             + "and i.status <> ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.CANCELLED")
@@ -37,7 +38,8 @@ public interface RoomRequestItemRepository
     @Query("select i from RoomRequestItem i "
             + "where i.status in (ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.NEW, "
             + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.DERIVED_TO_BUILDING, "
-            + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.IN_EVALUATION) "
+            + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.IN_EVALUATION, "
+            + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.NOTIFIED) "
             + "and i.request.type <> ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType.REGULAR_ROOM_CHANGE "
             + "and i.date < :today")
     List<RoomRequestItem> findExpiredByDate(@Param("today") LocalDate today);
@@ -45,7 +47,13 @@ public interface RoomRequestItemRepository
     @Query("select i from RoomRequestItem i "
             + "where i.status in (ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.NEW, "
             + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.DERIVED_TO_BUILDING, "
-            + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.IN_EVALUATION) "
+            + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.IN_EVALUATION, "
+            + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.NOTIFIED) "
             + "and i.request.type = ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType.REGULAR_ROOM_CHANGE")
     List<RoomRequestItem> findActiveRegularRoomChangeItems();
+
+    @Query("select i from RoomRequestItem i "
+            + "where i.status = ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.NOTIFIED "
+            + "and i.acceptanceDeadline <= :now")
+    List<RoomRequestItem> findNotifiedWithDeadlineUntil(@Param("now") Instant now);
 }

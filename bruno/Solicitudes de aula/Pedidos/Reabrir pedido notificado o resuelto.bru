@@ -1,0 +1,36 @@
+meta {
+  name: Reabrir pedido notificado o resuelto
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/v1/room-requests/items/1/reopen
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "reason": "El docente pide la 101: la 204 queda lejos"
+  }
+}
+
+docs {
+  POST /v1/room-requests/items/{id}/reopen. Rol: SUBSECRETARIA (pedidos no derivados),
+  AUXILIAR_AULICO (pedidos derivados a su edificio).
+
+  Vuelve el pedido de `NOTIFIED` o `RESOLVED` a `IN_EVALUATION`. `reason` es obligatorio y
+  queda en `decisionReason`. Las aulas siguen reservadas hasta que se reasigne con `assign`.
+  Conserva `notifiedAt`: el front reconoce un pedido reabierto por `IN_EVALUATION` con
+  `notifiedAt` no nulo. Limpia `acceptanceDeadline`, `acceptedAt` y `acceptedBy`.
+
+  Desde `RESOLVED` exige fechas futuras: la fecha propia no pasada en los tipos por
+  fecha, o clases futuras en el cambio regular. En un cambio regular, la reasignación
+  posterior solo toca las clases futuras.
+
+  Errores: 400 si falta `reason` o no quedan fechas futuras; 409 si el pedido no está
+  `NOTIFIED` ni `RESOLVED`; 403 si el rol no corresponde.
+
+  Publica `RoomRequestItemReopened` (hoy sin listener).
+}

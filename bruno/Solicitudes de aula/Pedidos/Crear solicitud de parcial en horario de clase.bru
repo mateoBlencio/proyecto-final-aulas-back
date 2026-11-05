@@ -24,6 +24,7 @@ body:json {
     "items": [
       {
         "date": "2026-09-22",
+        "startTime": "10:25",
         "estimated": 100,
         "classroomCount": 1,
         "requiresProjector": true,
@@ -42,8 +43,9 @@ docs {
 
   Diferencias con 06 (free-form):
   - commissionId va en la CABECERA, no en el ítem.
-  - El ítem lleva "date" pero NO startTime/endTime: el backend deriva el
-    horario del dictado de esa comisión en esa fecha (evento recurrente),
+  - El ítem lleva "date" y, opcional, "startTime" ("HH:mm") para elegir la
+    clase cuando la comisión tiene más de una ese día. NO lleva endTime: el
+    backend deriva el horario del dictado de esa comisión (evento recurrente),
     guardando id_evento_recurrente para trazabilidad.
   - El parcial se toma UN día concreto, no todos los martes: por eso va la
     fecha. El que se ata a dayOfWeek es REGULAR_ROOM_CHANGE, que sí afecta
@@ -53,15 +55,16 @@ docs {
   - estimated sigue siendo obligatorio.
   - dayOfWeek en el ítem => 400 ("se ata a una fecha, no a un día de dictado").
   - Fecha pasada => 400 (@FutureOrPresent).
-  - No se puede repetir la misma fecha en dos ítems => 400.
+  - No se puede repetir la misma clase en dos ítems => 400. Se compara la clase
+    ya resuelta: "martes" y "martes 18:00" son la misma si la comisión tiene una sola.
   - Se valida que la comisión efectivamente tenga clase esa fecha (400 si no).
 
   Comisión con DOS clases esa fecha en horarios distintos (ej. lunes 10:25
-  y lunes 20:40): 400. La fecha no alcanza para saber cuál pide el docente, y
-  el back no elige una al azar. Mismo corte en ONE_TIME_ROOM_CHANGE.
-  El detail nombra los horarios y deriva a subsecretaría. Es un caso raro (1
-  comisión en database_dev, hoy no vigente); la solución de fondo —elegir la
-  franja y no el día— está pendiente de definición y cambiaría el contrato.
+  y lunes 20:40): sin startTime es 400 y el detail pide elegir el horario
+  (los lista). Con startTime, el pedido toma esa clase; un startTime que no
+  coincide con ninguna es 400. Los horarios de cada fecha salen de dateSlots
+  en 05. Mismo contrato en ONE_TIME_ROOM_CHANGE y, con dayOfWeek, en
+  REGULAR_ROOM_CHANGE (para mover las dos clases, dos ítems con su startTime).
 
   Dos slots del mismo día con el MISMO horario no son ese caso: es una cursada
   anual partida en un evento por cuatrimestre, y se cuentan como una sola.

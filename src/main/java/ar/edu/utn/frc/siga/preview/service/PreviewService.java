@@ -20,5 +20,5 @@ public interface PreviewService {
 
     ReallocationSuggestionResponseDto suggestReallocation(ReallocationSuggestionRequestDto request);
 
-    List<AllocationResponseDto> confirmReallocationSuggestion(String suggestionId);
+    List<AllocationResponseDto> confirmReallocationSuggestion(String suggestionId, String observation);
 }

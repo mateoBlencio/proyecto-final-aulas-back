@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.roomrequest.handler;
 
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateOtherDto;
+import ar.edu.utn.frc.siga.events.validator.EventScheduleValidator;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.FreeFormItemDto;
@@ -15,10 +16,14 @@ import org.springframework.stereotype.Component;
 @Component
 public class OtherHandler extends AbstractRoomRequestHandler {
 
+    private final EventScheduleValidator eventSchedule;
+
     public OtherHandler(AcademicReferenceValidator academicReference,
                         ClassroomReferenceValidator classroomReference,
-                        ClassScheduleService classSchedule) {
+                        ClassScheduleService classSchedule,
+                        EventScheduleValidator eventSchedule) {
         super(academicReference, classroomReference, classSchedule);
+        this.eventSchedule = eventSchedule;
     }
 
     @Override
@@ -33,6 +38,7 @@ public class OtherHandler extends AbstractRoomRequestHandler {
             ItemConsistency.requireNoCommission(item,
                     "Una solicitud de tipo OTHER no pertenece al cursado de una comisión: los pedidos no llevan comisión.");
             ItemConsistency.requireExamUsersConsistent(false, item);
+            eventSchedule.validateBusinessHours(item.startTime(), item.endTime());
             ItemConsistency.requireNotPast(item.date(), item.startTime());
         }
     }

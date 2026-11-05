@@ -4,6 +4,9 @@ import ar.edu.utn.frc.siga.academic.service.SpecialtyService;
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.settings.api.SettingsReader;
+import ar.edu.utn.frc.siga.settings.model.SettingKey;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassDateSlotsDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CommissionScheduleDto;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestCatalogMapper;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
@@ -38,13 +41,14 @@ class RoomRequestCatalogServiceImplTest {
     @Mock private ClassroomService classroomService;
     @Mock private ClassScheduleService classScheduleService;
     @Mock private RoomRequestCatalogMapper mapper;
+    @Mock private SettingsReader settingsReader;
 
     private RoomRequestCatalogServiceImpl service;
 
     @BeforeEach
     void setUp() {
         service = new RoomRequestCatalogServiceImpl(specialtyService, subjectService, subjectCommissionService,
-                classroomService, classScheduleService, mapper);
+                classroomService, classScheduleService, mapper, settingsReader);
     }
 
     @Test
@@ -54,6 +58,9 @@ class RoomRequestCatalogServiceImplTest {
                 new ClassSlot(100L, DayOfWeek.TUESDAY, LocalTime.of(18, 0), LocalTime.of(20, 0))));
         when(classScheduleService.classDates(eq(1L), eq(9L), any()))
                 .thenReturn(List.of(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 8)));
+        when(classScheduleService.classDateSlots(eq(1L), eq(9L), any())).thenReturn(List.of(
+                new ClassDateSlotsDto(LocalDate.of(2026, 9, 8),
+                        List.of(new ClassDateSlotsDto.TimeSlot(LocalTime.of(18, 0), LocalTime.of(20, 0))))));
 
         CommissionScheduleDto result = service.findCommissionSchedule(1L, 9L);
 
@@ -64,6 +71,11 @@ class RoomRequestCatalogServiceImplTest {
             assertThat(slot.endTime()).isEqualTo(LocalTime.of(20, 0));
         });
         assertThat(result.dates()).containsExactly(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 8));
+        assertThat(result.dateSlots()).singleElement().satisfies(d -> {
+            assertThat(d.date()).isEqualTo(LocalDate.of(2026, 9, 8));
+            assertThat(d.slots()).containsExactly(
+                    new ClassDateSlotsDto.TimeSlot(LocalTime.of(18, 0), LocalTime.of(20, 0)));
+        });
     }
 
     @Test
@@ -76,5 +88,19 @@ class RoomRequestCatalogServiceImplTest {
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verifyNoInteractions(classScheduleService);
+    }
+
+    @Test
+    @DisplayName("findFormSettings: arma el DTO con la ventana horaria y los topes del setting")
+    void findFormSettings_readsSettings() {
+        when(settingsReader.getTime(SettingKey.EVENTS_HOURS_START)).thenReturn(java.time.LocalTime.of(8, 0));
+        when(settingsReader.getTime(SettingKey.EVENTS_HOURS_END)).thenReturn(java.time.LocalTime.of(23, 0));
+        when(settingsReader.getInt(SettingKey.ROOM_REQUESTS_MAX_CLASSROOM_COUNT)).thenReturn(20);
+        when(settingsReader.getInt(SettingKey.ROOM_REQUESTS_MAX_ESTIMATED)).thenReturn(500);
+        when(settingsReader.getInt(SettingKey.ROOM_REQUESTS_MAX_COMPUTER_COUNT)).thenReturn(600);
+        when(settingsReader.getInt(SettingKey.ROOM_REQUESTS_ALERT_DAYS_BEFORE_DATE)).thenReturn(3);
+
+        assertThat(service.findFormSettings()).isEqualTo(new ar.edu.utn.frc.siga.roomrequest.dto.response
+                .RoomRequestFormSettingsDto(java.time.LocalTime.of(8, 0), java.time.LocalTime.of(23, 0), 20, 500, 600, 3));
     }
 }

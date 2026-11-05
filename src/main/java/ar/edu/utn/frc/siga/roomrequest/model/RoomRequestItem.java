@@ -35,6 +35,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -150,6 +151,20 @@ public class RoomRequestItem extends TimestampedEntity {
     @Column(name = "fecha_notificacion")
     private Instant notifiedAt;
 
+    @Column(name = "plazo_aceptacion")
+    private Instant acceptanceDeadline;
+
+    @Column(name = "fecha_aceptacion")
+    private Instant acceptedAt;
+
+    @Column(name = "aceptado_por", length = 150)
+    private String acceptedBy;
+
+    /** Cantidad de veces que se notificó al docente; 0 mientras no se notificó nunca. */
+    @Column(name = "ronda_notificacion", nullable = false)
+    @Builder.Default
+    private Integer notificationRound = 0;
+
     /** Aula que ocupaba la clase antes del primer assign. Solo se completa una vez: si Subsecretaría
      *  reasigna A -> B -> C, el docente sigue viendo A como aula anterior, porque nunca vio B. */
     @Column(name = "id_aula_anterior")
@@ -201,12 +216,32 @@ public class RoomRequestItem extends TimestampedEntity {
     }
 
     /** No toca decisionReason: preserva el motivo de resolución parcial que haya dejado el último assign. */
-    public void resolve(String decidedBy, Instant notifiedAt) {
+    public void notifyTeacher(String decidedBy, Instant notifiedAt, Instant acceptanceDeadline) {
         Instant truncated = truncateToMicros(notifiedAt);
-        this.status = RoomRequestStatus.RESOLVED;
+        this.status = RoomRequestStatus.NOTIFIED;
         this.decidedBy = decidedBy;
         this.decidedAt = truncated;
         this.notifiedAt = truncated;
+        this.acceptanceDeadline = acceptanceDeadline == null ? null : truncateToMicros(acceptanceDeadline);
+        this.notificationRound = notificationRound + 1;
+    }
+
+    public void accept(String acceptedBy, Instant acceptedAt) {
+        Instant truncated = truncateToMicros(acceptedAt);
+        this.status = RoomRequestStatus.RESOLVED;
+        this.decidedBy = acceptedBy;
+        this.decidedAt = truncated;
+        this.acceptedBy = acceptedBy;
+        this.acceptedAt = truncated;
+        this.acceptanceDeadline = null;
+    }
+
+    /** Conserva notifiedAt y la ronda: el front reconoce un pedido reabierto por IN_EVALUATION con notifiedAt. */
+    public void reopen(String reason, String decidedBy, Instant reopenedAt) {
+        decide(RoomRequestStatus.IN_EVALUATION, decidedBy, reason, reopenedAt);
+        this.acceptanceDeadline = null;
+        this.acceptedAt = null;
+        this.acceptedBy = null;
     }
 
     private static Instant truncateToMicros(Instant value) {
@@ -221,9 +256,11 @@ public class RoomRequestItem extends TimestampedEntity {
         this.derivedAt = null;
     }
 
-    /** classroomIds[i] cubre occurrencesBySlot.get(i): una fila por ocurrencia real, orden = i+1. */
-    /** Actualiza en el lugar la fila cuya ocurrencia se reutiliza (p. ej. la principal en una reasignación): borrar y recrear con la misma id_ocurrencia viola el UNIQUE(id_item, id_ocurrencia) por el orden de flush de Hibernate. */
-    public void assignClassrooms(List<Long> classroomIds, List<List<Long>> occurrencesBySlot) {
+    /** Actualiza en el lugar la fila cuya ocurrencia se reutiliza (p. ej. la principal en una reasignación): borrar y recrear con la misma id_ocurrencia viola el UNIQUE(id_item, id_ocurrencia) por el orden de flush de Hibernate.
+     *  classroomIds[i] cubre occurrencesBySlot.get(i): una fila por ocurrencia real, orden = i+1. Solo se borran las filas
+     *  de los espejos que se retiraron; las demás (clases pasadas de un cambio regular) quedan con su aula. */
+    public void assignClassrooms(List<Long> classroomIds, List<List<Long>> occurrencesBySlot,
+                                 Collection<Long> retiredOccurrenceIds) {
         Map<Long, RoomRequestItemAllocation> existingByOccurrence = allocations.stream()
                 .collect(java.util.stream.Collectors.toMap(RoomRequestItemAllocation::getOccurrenceId, a -> a));
         Set<Long> keptOccurrenceIds = new HashSet<>();
@@ -246,7 +283,8 @@ public class RoomRequestItem extends TimestampedEntity {
                 }
             }
         }
-        allocations.removeIf(a -> !keptOccurrenceIds.contains(a.getOccurrenceId()));
+        allocations.removeIf(a -> !keptOccurrenceIds.contains(a.getOccurrenceId())
+                && retiredOccurrenceIds.contains(a.getOccurrenceId()));
     }
 
     public void addPreferences(List<Long> classroomIds) {

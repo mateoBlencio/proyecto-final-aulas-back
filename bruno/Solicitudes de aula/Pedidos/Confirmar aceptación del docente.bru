@@ -1,0 +1,25 @@
+meta {
+  name: Confirmar aceptación del docente
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/v1/room-requests/items/1/confirm
+  body: none
+  auth: inherit
+}
+
+docs {
+  POST /v1/room-requests/items/{id}/confirm. Sin cuerpo. Rol: SUBSECRETARIA (pedidos no
+  derivados), AUXILIAR_AULICO (pedidos derivados a su edificio).
+
+  El docente respondió que está de acuerdo: pasa el pedido de `NOTIFIED` a `RESOLVED`,
+  registra `acceptedAt` y `acceptedBy` (el usuario) y limpia `acceptanceDeadline`.
+  Publica el evento `RoomRequestItemAccepted` (hoy sin listener).
+
+  Errores: 409 si el pedido no está `NOTIFIED`; 403 si el rol no corresponde; 404 si el
+  id no existe.
+
+  Respuesta: 200 con el pedido (`status: "RESOLVED"`).
+}

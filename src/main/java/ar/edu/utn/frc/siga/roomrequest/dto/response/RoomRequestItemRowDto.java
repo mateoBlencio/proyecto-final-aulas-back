@@ -15,6 +15,8 @@ public record RoomRequestItemRowDto(
         Long itemId,
         RoomRequestStatus status,
         Instant decidedAt,
+        @Schema(description = "Plazo en que el pedido notificado se acepta solo si el docente no responde. Nulo fuera de NOTIFIED.")
+        Instant acceptanceDeadline,
         RoomRequestRowHeaderDto request,
         List<CommissionResponseDto> commissions,
         LocalDate date,
@@ -31,5 +33,7 @@ public record RoomRequestItemRowDto(
         Integer assignedClassroomCount,
         Boolean partiallyResolved,
         @Schema(description = "Acciones que el usuario autenticado puede ejecutar sobre el ítem según rol, estado y edificio derivado. Pista de UI: el back valida igual en cada endpoint.")
-        List<RoomRequestAccessControl.Action> allowedActions
+        List<RoomRequestAccessControl.Action> allowedActions,
+        @Schema(description = "Parcial fuera de horario que se pisa con un pedido activo de otra materia para la misma comisión. Se calcula al leer.")
+        Boolean overlapsWithOtherSubject
 ) {}

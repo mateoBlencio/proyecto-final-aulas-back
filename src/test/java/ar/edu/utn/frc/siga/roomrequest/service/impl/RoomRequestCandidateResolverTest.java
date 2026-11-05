@@ -12,6 +12,8 @@ import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
+import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
+import ar.edu.utn.frc.siga.space.service.BuildingService;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -32,6 +35,8 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.never;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -53,6 +58,8 @@ class RoomRequestCandidateResolverTest {
     private AllocationOccupancyService allocationOccupancyService;
     @Mock
     private UserService userService;
+    @Mock
+    private BuildingService buildingService;
     @Mock
     private RoomRequestOccurrenceResolver occurrenceResolver;
 
@@ -213,6 +220,7 @@ class RoomRequestCandidateResolverTest {
         RoomRequestItem item = RoomRequestItem.builder()
                 .date(date).startTime(LocalTime.of(10, 0)).duration(Duration.ofMinutes(60))
                 .classroomCount(2).build();
+        givenBuildings(building(1L, "Edificio Central"));
         when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
         when(classroomService.findAllAvailable()).thenReturn(
                 List.of(classroom(101L, 1L, "Edificio Central"), classroom(102L, 1L, "Edificio Central")));
@@ -223,7 +231,7 @@ class RoomRequestCandidateResolverTest {
         List<CandidateBuildingDto> result = resolver.findCandidateBuildings(1L);
 
         assertThat(result).containsExactly(new CandidateBuildingDto(1L, "Edificio Central", 2, null));
-        verify(userService).findBuildingIdsCoveredByRole(SystemRole.AUXILIAR_AULICO, Set.of(1L));
+        verify(userService).findBuildingIdsCoveredByRole(SystemRole.AUXILIAR_AULICO, List.of(1L));
     }
 
     @Test
@@ -233,6 +241,7 @@ class RoomRequestCandidateResolverTest {
         RoomRequestItem item = RoomRequestItem.builder()
                 .date(date).startTime(LocalTime.of(10, 0)).duration(Duration.ofMinutes(60))
                 .classroomCount(2).build();
+        givenBuildings(building(1L, "Edificio Central"));
         when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
         when(classroomService.findAllAvailable()).thenReturn(
                 List.of(classroom(101L, 1L, "Edificio Central"), classroom(102L, 1L, "Edificio Central")));
@@ -244,7 +253,7 @@ class RoomRequestCandidateResolverTest {
         List<CandidateBuildingDto> result = resolver.findCandidateBuildings(1L);
 
         assertThat(result).containsExactly(new CandidateBuildingDto(1L, "Edificio Central", 1, null));
-        verify(userService).findBuildingIdsCoveredByRole(SystemRole.AUXILIAR_AULICO, Set.of(1L));
+        verify(userService).findBuildingIdsCoveredByRole(SystemRole.AUXILIAR_AULICO, List.of(1L));
     }
 
     @Test
@@ -264,12 +273,66 @@ class RoomRequestCandidateResolverTest {
     }
 
     @Test
+    @DisplayName("findAllowedClassrooms: pedido sin computadoras derivado también devuelve solo el edificio derivado")
+    void findAllowedClassrooms_derivadoSinComputadoras() {
+        LocalDate date = LocalDate.of(2026, 3, 10);
+        RoomRequestItem item = RoomRequestItem.builder()
+                .date(date).startTime(LocalTime.of(10, 0)).duration(Duration.ofMinutes(60))
+                .requiresComputers(false).derivedBuildingId(1L).build();
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findAllAvailable()).thenReturn(
+                List.of(classroom(101L, 1L, "A"), classroom(301L, 3L, "C")));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of());
+
+        assertThat(resolver.findAllowedClassrooms(1L)).extracting(AllowedClassroomDto::id).containsExactly(101L);
+    }
+
+    @Test
+    @DisplayName("findAllWithMissingRequirements: devuelve todas las aulas, las que cumplen primero y con lo que les falta")
+    void findAllWithMissingRequirements_todasConFaltantes() {
+        LocalDate date = LocalDate.of(2026, 3, 10);
+        RoomRequestCandidateResolver.RoomNeeds needs = new RoomRequestCandidateResolver.RoomNeeds(
+                date, LocalTime.of(10, 0), LocalTime.of(11, 0), true, 30, true);
+        when(classroomService.findAllAvailable()).thenReturn(
+                List.of(classroom(101L), classroom(102L), classroom(103L), classroom(104L)));
+        when(classroomService.findIdsWithResourceAtLeast("Cantidad de PC", 1)).thenReturn(Set.of(101L, 103L));
+        when(classroomService.findIdsWithResourceAtLeast("Proyector", 1)).thenReturn(Set.of(103L, 104L));
+        when(classroomService.findResourceAmounts(eq("Cantidad de PC"), any())).thenReturn(Map.of(101L, 35, 103L, 40));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of());
+
+        List<AllowedClassroomDto> result = resolver.findAllWithMissingRequirements(needs);
+
+        assertThat(result).extracting(AllowedClassroomDto::id).containsExactly(103L, 101L, 102L, 104L);
+        assertThat(result).extracting(AllowedClassroomDto::missingRequirements).containsExactly(
+                List.of(), List.of("PROJECTOR"), List.of("PROJECTOR", "COMPUTERS"), List.of("COMPUTERS"));
+        assertThat(result.getFirst().computerCount()).isEqualTo(40);
+    }
+
+    @Test
+    @DisplayName("findAllWithMissingRequirements: sin requisitos todas cumplen y marca las ocupadas con available=false")
+    void findAllWithMissingRequirements_sinRequisitos() {
+        LocalDate date = LocalDate.of(2026, 3, 10);
+        RoomRequestCandidateResolver.RoomNeeds needs = new RoomRequestCandidateResolver.RoomNeeds(
+                date, LocalTime.of(10, 0), LocalTime.of(11, 0), false, null, false);
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(101L), classroom(102L)));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of(
+                new OccupiedSlot(102L, date, LocalTime.of(10, 30), LocalTime.of(11, 30), 5L, 7L)));
+
+        List<AllowedClassroomDto> result = resolver.findAllWithMissingRequirements(needs);
+
+        assertThat(result).extracting(AllowedClassroomDto::missingRequirements).containsOnly(List.of());
+        assertThat(result).extracting(AllowedClassroomDto::available).containsExactly(true, false);
+        verify(classroomService, never()).findIdsWithResourceAtLeast(any(), anyInt());
+    }
+
+    @Test
     @DisplayName("findCandidateBuildings: pedido de 67 PCs suma las PCs libres por edificio y ordena los que alcanzan primero")
     void findCandidateBuildings_sumaPcs() {
         LocalDate date = LocalDate.of(2026, 3, 10);
         RoomRequestItem item = RoomRequestItem.builder()
                 .date(date).startTime(LocalTime.of(10, 0)).duration(Duration.ofMinutes(60))
                 .requiresComputers(true).computerCount(67).build();
+        givenBuildings(building(3L, "C"), building(1L, "A"));
         when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
         when(classroomService.findAllAvailable()).thenReturn(List.of(
                 classroom(301L, 3L, "C"), classroom(101L, 1L, "A"), classroom(102L, 1L, "A")));
@@ -292,6 +355,7 @@ class RoomRequestCandidateResolverTest {
         RoomRequestItem item = RoomRequestItem.builder()
                 .date(date).startTime(LocalTime.of(10, 0)).duration(Duration.ofMinutes(60))
                 .requiresComputers(true).computerCount(200).build();
+        givenBuildings(building(3L, "C"), building(1L, "A"));
         when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
         when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(301L, 3L, "C"), classroom(101L, 1L, "A")));
         when(classroomService.findIdsWithResourceAtLeast("Cantidad de PC", 1)).thenReturn(Set.of(101L, 301L));
@@ -303,17 +367,39 @@ class RoomRequestCandidateResolverTest {
     }
 
     @Test
-    @DisplayName("findCandidateBuildings: edificio sin ninguna aula libre no aparece y no consulta auxiliares")
+    @DisplayName("findCandidateBuildings: edificio con auxiliar y sin ninguna aula libre aparece con 0 aulas")
     void findCandidateBuildings_sinAulasLibres() {
         LocalDate date = LocalDate.of(2026, 3, 10);
         RoomRequestItem item = itemFor(date, LocalTime.of(10, 0), 60);
+        givenBuildings(building(1L, "Edificio Central"), building(2L, "Edificio Vacío"));
         when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
         when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(101L, 1L, "Edificio Central")));
         when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of(
                 new OccupiedSlot(101L, date, LocalTime.of(10, 0), LocalTime.of(11, 0), 5L, 7L)));
+        when(userService.findBuildingIdsCoveredByRole(eq(SystemRole.AUXILIAR_AULICO), any()))
+                .thenReturn(Set.of(1L, 2L));
 
-        assertThat(resolver.findCandidateBuildings(1L)).isEmpty();
-        verifyNoInteractions(userService);
+        assertThat(resolver.findCandidateBuildings(1L)).containsExactly(
+                new CandidateBuildingDto(1L, "Edificio Central", 0, null),
+                new CandidateBuildingDto(2L, "Edificio Vacío", 0, null));
+    }
+
+    @Test
+    @DisplayName("findCandidateBuildings: pedido con computadoras y edificio sin laboratorios libres aparece con 0 aulas y 0 PCs")
+    void findCandidateBuildings_laboratorioSinLibres() {
+        LocalDate date = LocalDate.of(2026, 3, 10);
+        RoomRequestItem item = RoomRequestItem.builder()
+                .date(date).startTime(LocalTime.of(10, 0)).duration(Duration.ofMinutes(60))
+                .requiresComputers(true).computerCount(40).build();
+        givenBuildings(building(1L, "A"));
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(101L, 1L, "A")));
+        when(classroomService.findIdsWithResourceAtLeast("Cantidad de PC", 1)).thenReturn(Set.of(101L));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of(
+                new OccupiedSlot(101L, date, LocalTime.of(10, 0), LocalTime.of(11, 0), 5L, 7L)));
+        when(userService.findBuildingIdsCoveredByRole(eq(SystemRole.AUXILIAR_AULICO), any())).thenReturn(Set.of(1L));
+
+        assertThat(resolver.findCandidateBuildings(1L)).containsExactly(new CandidateBuildingDto(1L, "A", 0, 0));
     }
 
     @Test
@@ -321,12 +407,21 @@ class RoomRequestCandidateResolverTest {
     void findCandidateBuildings_sinAuxiliarAsignado() {
         LocalDate date = LocalDate.of(2026, 3, 10);
         RoomRequestItem item = itemFor(date, LocalTime.of(10, 0), 60);
+        givenBuildings(building(1L, "Edificio Central"));
         when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
         when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(101L, 1L, "Edificio Central")));
         when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of());
         when(userService.findBuildingIdsCoveredByRole(eq(SystemRole.AUXILIAR_AULICO), any())).thenReturn(Set.of());
 
         assertThat(resolver.findCandidateBuildings(1L)).isEmpty();
+    }
+
+    private void givenBuildings(BuildingResponseDto... buildings) {
+        when(buildingService.findAll(any(), any(), eq(false))).thenReturn(new PageImpl<>(List.of(buildings)));
+    }
+
+    private static BuildingResponseDto building(Long id, String name) {
+        return new BuildingResponseDto(id, name, true, null);
     }
 
     private static RoomRequestItem regularItem() {

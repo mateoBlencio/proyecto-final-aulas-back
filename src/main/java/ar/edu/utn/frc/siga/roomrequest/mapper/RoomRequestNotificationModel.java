@@ -12,13 +12,14 @@ import org.springframework.stereotype.Component;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Arma el modelo del mail "pedido resuelto" (template {@code room-request-resolved}) a partir del
+/** Arma el modelo del mail "aula asignada" (template {@code room-request-resolved}) a partir del
  *  {@link RoomRequestItemDetailDto} que ya compone {@link RoomRequestComposer}. Una clave ausente del
  *  mapa apaga su fila en el template ({@code th:if}): nunca se pone cadena vacía ni "—". */
 @Component
@@ -35,6 +36,10 @@ public class RoomRequestNotificationModel {
 
     private static final DateTimeFormatter LONG_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter SHORT_DATE = DateTimeFormatter.ofPattern("dd/MM");
+    private static final DateTimeFormatter DEADLINE = DateTimeFormatter.ofPattern("dd/MM/yyyy 'a las' HH:mm");
+    private static final ZoneId LOCAL_ZONE = ZoneId.of("America/Argentina/Buenos_Aires");
+    private static final String RESPUESTA =
+            "Si estás de acuerdo no hace falta que respondas. Si necesitás otras aulas, respondé este mail contando por qué.";
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 
     public Map<String, Object> build(RoomRequestItemDetailDto detail) {
@@ -50,7 +55,7 @@ public class RoomRequestNotificationModel {
 
         Map<String, Object> model = new LinkedHashMap<>();
         model.put("docente", request.teacherName());
-        model.put("tituloBanner", roomChange ? "Cambio de aula confirmado" : "Aula confirmada");
+        model.put("tituloBanner", roomChange ? "Cambio de aula asignado" : "Aula asignada");
         model.put("aulasLabel", roomChange ? "Aula nueva" : (item.assignedClassrooms().size() > 1 ? "Aulas" : "Aula"));
         model.put("aulas", item.assignedClassrooms().stream().map(this::formatClassroom).toList());
 
@@ -75,6 +80,12 @@ public class RoomRequestNotificationModel {
         }
 
         putPorTipo(model, type, item.id(), request.id(), materiaNombre, comisiones, item.date());
+        model.put("pedidoId", item.id());
+        model.put("pedidoRespuesta", RESPUESTA);
+        if (item.acceptanceDeadline() != null) {
+            model.put("plazoRespuesta", "Si no recibimos respuesta hasta el %s, damos por aceptada la asignación."
+                    .formatted(item.acceptanceDeadline().atZone(LOCAL_ZONE).format(DEADLINE)));
+        }
         return model;
     }
 
@@ -84,44 +95,44 @@ public class RoomRequestNotificationModel {
             case REGULAR_ROOM_CHANGE -> {
                 model.put("asuntoTitulo", "Cambio de aula regular");
                 model.put("asuntoPartes", asuntoPartes(materiaNombre, comisiones));
-                model.put("parrafoConfirmacion", "Confirmamos el cambio de aula de tu pedido #%d (solicitud #%d).".formatted(itemId, requestId));
+                model.put("parrafoConfirmacion", "Te asignamos el aula para el cambio de aula de tu pedido #%d (solicitud #%d).".formatted(itemId, requestId));
                 model.put("notaAdicional", "Rige para todas las clases de ese día hasta fin del cuatrimestre.");
             }
             case ONE_TIME_ROOM_CHANGE -> {
                 model.put("asuntoTitulo", "Cambio de aula");
                 model.put("asuntoPartes", asuntoPartes(materiaNombre, formatShortDate(date)));
                 model.put("parrafoConfirmacion",
-                        "Confirmamos el cambio de aula de tu pedido #%d (solicitud #%d), solo para esa fecha.".formatted(itemId, requestId));
+                        "Te asignamos el aula para el cambio de aula de tu pedido #%d (solicitud #%d), solo para esa fecha.".formatted(itemId, requestId));
                 model.put("notaAdicional", "Después de esa clase volvés al aula habitual.");
             }
             case FINAL_EXAM -> {
-                model.put("asuntoTitulo", "Aula confirmada");
+                model.put("asuntoTitulo", "Aula asignada");
                 model.put("asuntoPartes",
                         asuntoPartes(materiaNombre != null ? "Final de " + materiaNombre : null, formatShortDate(date)));
-                model.put("parrafoConfirmacion", "Confirmamos el aula para tu examen final, pedido #%d (solicitud #%d).".formatted(itemId, requestId));
+                model.put("parrafoConfirmacion", "Te asignamos el aula para tu examen final, pedido #%d (solicitud #%d).".formatted(itemId, requestId));
             }
             case PARTIAL_EXAM_IN_CLASS -> {
-                model.put("asuntoTitulo", "Aula confirmada");
+                model.put("asuntoTitulo", "Aula asignada");
                 model.put("asuntoPartes",
                         asuntoPartes(materiaNombre != null ? "Parcial de " + materiaNombre : null, comisiones));
-                model.put("parrafoConfirmacion", "Confirmamos el aula para el parcial de tu pedido #%d (solicitud #%d).".formatted(itemId, requestId));
+                model.put("parrafoConfirmacion", "Te asignamos el aula para el parcial de tu pedido #%d (solicitud #%d).".formatted(itemId, requestId));
             }
             case PARTIAL_EXAM_OFF_SCHEDULE -> {
-                model.put("asuntoTitulo", "Aula confirmada");
+                model.put("asuntoTitulo", "Aula asignada");
                 model.put("asuntoPartes",
                         asuntoPartes(materiaNombre != null ? "Parcial de " + materiaNombre : null, "fuera de horario"));
-                model.put("parrafoConfirmacion", "Confirmamos el aula para tu parcial, pedido #%d (solicitud #%d).".formatted(itemId, requestId));
+                model.put("parrafoConfirmacion", "Te asignamos el aula para tu parcial, pedido #%d (solicitud #%d).".formatted(itemId, requestId));
                 model.put("notaAdicional", "Es fuera del horario habitual de cursado.");
             }
             case CONFERENCE -> {
-                model.put("asuntoTitulo", "Aula confirmada");
+                model.put("asuntoTitulo", "Aula asignada");
                 model.put("asuntoPartes", List.of("Congreso / Conferencia"));
-                model.put("parrafoConfirmacion", "Confirmamos el aula para tu actividad, pedido #%d (solicitud #%d).".formatted(itemId, requestId));
+                model.put("parrafoConfirmacion", "Te asignamos el aula para tu actividad, pedido #%d (solicitud #%d).".formatted(itemId, requestId));
             }
             case OTHER -> {
-                model.put("asuntoTitulo", "Aula confirmada");
+                model.put("asuntoTitulo", "Aula asignada");
                 model.put("asuntoPartes", List.of("Otro"));
-                model.put("parrafoConfirmacion", "Confirmamos el aula para tu pedido #%d (solicitud #%d).".formatted(itemId, requestId));
+                model.put("parrafoConfirmacion", "Te asignamos el aula para tu pedido #%d (solicitud #%d).".formatted(itemId, requestId));
             }
         }
     }

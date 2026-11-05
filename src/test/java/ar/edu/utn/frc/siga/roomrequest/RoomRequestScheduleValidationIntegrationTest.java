@@ -69,6 +69,90 @@ class RoomRequestScheduleValidationIntegrationTest extends AbstractIntegrationTe
         });
     }
 
+    private void seedSecondTuesdayClass() {
+        testData.eventoRecurrente(subjectId, commissionId, DayOfWeek.TUESDAY, java.time.LocalTime.of(20, 40),
+                135, LocalDate.now().minusDays(1), LocalDate.now().plusMonths(4), 30);
+    }
+
+    @Test
+    @DisplayName("regular: dos clases el mismo día y se elige 20:40 → 201 con ese horario")
+    void regular_twoClassesSameDay_pickingStartTime() {
+        seedSecondTuesdayClass();
+
+        RoomRequestResponseDto created = roomRequestService.create(new CreateRegularRoomChangeDto(
+                RoomRequestType.REGULAR_ROOM_CHANGE, requester(), subjectId, commissionId,
+                List.of(scheduled(null, DayOfWeek.TUESDAY, null, java.time.LocalTime.of(20, 40)))));
+
+        assertThat(created.items()).singleElement().satisfies(item -> {
+            assertThat(item.startTime()).isEqualTo(java.time.LocalTime.of(20, 40));
+            assertThat(item.durationMinutes()).isEqualTo(135);
+        });
+    }
+
+    @Test
+    @DisplayName("regular: dos clases el mismo día y no se elige horario → rechazado pidiendo elegir")
+    void regular_twoClassesSameDay_withoutStartTime_isRejected() {
+        seedSecondTuesdayClass();
+
+        assertThatThrownBy(() -> roomRequestService.create(new CreateRegularRoomChangeDto(
+                RoomRequestType.REGULAR_ROOM_CHANGE, requester(), subjectId, commissionId,
+                List.of(scheduled(null, DayOfWeek.TUESDAY)))))
+                .isInstanceOf(InvalidRoomRequestException.class)
+                .hasMessageContaining("Elegí el horario");
+    }
+
+    @Test
+    @DisplayName("regular: las dos clases del mismo día en una solicitud → 201 con dos pedidos")
+    void regular_bothClassesSameDay_isAccepted() {
+        seedSecondTuesdayClass();
+
+        RoomRequestResponseDto created = roomRequestService.create(new CreateRegularRoomChangeDto(
+                RoomRequestType.REGULAR_ROOM_CHANGE, requester(), subjectId, commissionId,
+                List.of(scheduled(null, DayOfWeek.TUESDAY, null, java.time.LocalTime.of(18, 0)),
+                        scheduled(null, DayOfWeek.TUESDAY, null, java.time.LocalTime.of(20, 40)))));
+
+        assertThat(created.items()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("regular: una sola clase, 'martes' y 'martes 18:00' son la misma clase → rechazado por repetida")
+    void regular_sameClassWithAndWithoutStartTime_isRejected() {
+        assertThatThrownBy(() -> roomRequestService.create(new CreateRegularRoomChangeDto(
+                RoomRequestType.REGULAR_ROOM_CHANGE, requester(), subjectId, commissionId,
+                List.of(scheduled(null, DayOfWeek.TUESDAY),
+                        scheduled(null, DayOfWeek.TUESDAY, null, java.time.LocalTime.of(18, 0))))))
+                .isInstanceOf(InvalidRoomRequestException.class)
+                .hasMessageContaining("No se puede repetir");
+    }
+
+    @Test
+    @DisplayName("por única vez: dos clases ese día y se elige 20:40 → 201")
+    void oneTime_twoClassesSameDate_pickingStartTime() {
+        seedSecondTuesdayClass();
+        LocalDate nextTuesday = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.TUESDAY));
+
+        RoomRequestResponseDto created = roomRequestService.create(new CreateOneTimeRoomChangeDto(
+                RoomRequestType.ONE_TIME_ROOM_CHANGE, requester(), subjectId, commissionId,
+                List.of(scheduled(nextTuesday, null, null, java.time.LocalTime.of(20, 40)))));
+
+        assertThat(created.items()).singleElement()
+                .satisfies(item -> assertThat(item.startTime()).isEqualTo(java.time.LocalTime.of(20, 40)));
+    }
+
+    @Test
+    @DisplayName("parcial en clase: dos clases ese día y se elige 18:00 → 201 con ese horario")
+    void partialInClass_twoClassesSameDate_pickingStartTime() {
+        seedSecondTuesdayClass();
+        LocalDate nextTuesday = LocalDate.now().plusWeeks(1).with(TemporalAdjusters.next(DayOfWeek.TUESDAY));
+
+        RoomRequestResponseDto created = roomRequestService.create(new CreatePartialExamInClassDto(
+                RoomRequestType.PARTIAL_EXAM_IN_CLASS, requester(), subjectId, commissionId,
+                List.of(scheduled(nextTuesday, null, 40, java.time.LocalTime.of(18, 0)))));
+
+        assertThat(created.items()).singleElement()
+                .satisfies(item -> assertThat(item.startTime()).isEqualTo(java.time.LocalTime.of(18, 0)));
+    }
+
     @Test
     @DisplayName("regular: cursada anual cargada como un evento recurrente por cuatrimestre → 201, no la trata como doble bloque")
     void regular_annualSplitSameDayAndTime_isAccepted() {
@@ -199,6 +283,11 @@ class RoomRequestScheduleValidationIntegrationTest extends AbstractIntegrationTe
     }
 
     private static ScheduledItemDto scheduled(LocalDate date, DayOfWeek dayOfWeek, Integer estimated) {
-        return new ScheduledItemDto(date, dayOfWeek, estimated, 1, false, false, null, null, null, null, List.of());
+        return scheduled(date, dayOfWeek, estimated, null);
+    }
+
+    private static ScheduledItemDto scheduled(LocalDate date, DayOfWeek dayOfWeek, Integer estimated,
+                                              java.time.LocalTime startTime) {
+        return new ScheduledItemDto(date, dayOfWeek, startTime, estimated, 1, false, false, null, null, null, null, List.of());
     }
 }

@@ -332,6 +332,19 @@ class RoomRequestApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("form-settings sin autenticación: ventana en HH:mm (sin segundos) y los cuatro valores numéricos")
+    void formSettings_withoutAuthentication_returnsHhMmAndNumbers() throws Exception {
+        anonymousMockMvc.perform(get("/v1/room-requests/catalog/form-settings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hoursStart").value(org.hamcrest.Matchers.matchesPattern("\\d{2}:\\d{2}")))
+                .andExpect(jsonPath("$.hoursEnd").value(org.hamcrest.Matchers.matchesPattern("\\d{2}:\\d{2}")))
+                .andExpect(jsonPath("$.maxClassroomCount").isNumber())
+                .andExpect(jsonPath("$.maxEstimated").isNumber())
+                .andExpect(jsonPath("$.maxComputerCount").isNumber())
+                .andExpect(jsonPath("$.alertDaysBeforeDate").isNumber());
+    }
+
+    @Test
     @DisplayName("catálogo de comisiones de una materia inexistente: 404")
     void commissionsCatalog_withUnknownSubject_returnsNotFound() throws Exception {
         anonymousMockMvc.perform(get("/v1/room-requests/catalog/commissions")

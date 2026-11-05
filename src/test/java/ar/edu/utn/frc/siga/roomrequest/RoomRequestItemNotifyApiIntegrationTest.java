@@ -47,13 +47,15 @@ class RoomRequestItemNotifyApiIntegrationTest extends AbstractIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    @DisplayName("IN_EVALUATION con aula asignada: pasa a RESOLVED y sella notifiedAt")
+    @DisplayName("IN_EVALUATION con aula asignada: pasa a NOTIFIED y sella notifiedAt")
     void notify_ok() throws Exception {
         RoomRequestItem item = seedPreApprovedItem(1);
 
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/notify"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("RESOLVED"));
+                .andExpect(jsonPath("$.status").value("NOTIFIED"))
+                .andExpect(jsonPath("$.acceptanceDeadline").isNotEmpty())
+                .andExpect(jsonPath("$.notifiedAt").isNotEmpty());
     }
 
     @Test
@@ -69,7 +71,7 @@ class RoomRequestItemNotifyApiIntegrationTest extends AbstractIntegrationTest {
         Map<String, Object> notification = rows.getFirst();
         assertThat(notification.get("destinatario")).isEqualTo("ada@frc.utn.edu.ar");
         assertThat(notification.get("plantilla")).isEqualTo("ROOM_REQUEST_RESOLVED");
-        assertThat((String) notification.get("asunto")).startsWith("Aula confirmada");
+        assertThat((String) notification.get("asunto")).startsWith("Aula asignada");
     }
 
     @Test
@@ -86,6 +88,30 @@ class RoomRequestItemNotifyApiIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(first.getResponse().getContentAsString()).isEqualTo(second.getResponse().getContentAsString());
         assertThat(notificationRows(item.getId())).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("notificar, reabrir y volver a notificar: segunda ronda con otro mail y notifiedAt conservado")
+    void notify_reabrirYNotificarDeNuevo() throws Exception {
+        RoomRequestItem item = seedPreApprovedItem(1);
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/notify")).andExpect(status().isOk());
+        MvcResult reopened = mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/reopen")
+                        .contentType("application/json")
+                        .content("{\"reason\":\"Pide otra aula\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_EVALUATION"))
+                .andExpect(jsonPath("$.notifiedAt").isNotEmpty())
+                .andReturn();
+        assertThat(reopened.getResponse().getContentAsString()).contains("\"acceptanceDeadline\":null");
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/notify"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("NOTIFIED"));
+
+        assertThat(notificationRows(item.getId())).hasSize(1);
+        assertThat(jdbcTemplate.queryForList("SELECT 1 FROM notificacion WHERE clave_idempotencia = ?",
+                "room-request-item:" + item.getId() + ":NOTIFIED:2")).hasSize(1);
     }
 
     @Test
@@ -120,7 +146,7 @@ class RoomRequestItemNotifyApiIntegrationTest extends AbstractIntegrationTest {
     private List<Map<String, Object>> notificationRows(Long itemId) {
         return jdbcTemplate.queryForList(
                 "SELECT destinatario, plantilla, asunto FROM notificacion WHERE clave_idempotencia = ?",
-                "room-request-item:" + itemId + ":RESOLVED");
+                "room-request-item:" + itemId + ":NOTIFIED:1");
     }
 
     private RoomRequestItem seedPreApprovedItem(int classroomCount) {
@@ -150,7 +176,7 @@ class RoomRequestItemNotifyApiIntegrationTest extends AbstractIntegrationTest {
                 .decidedBy("subsecretaria@frc.utn.edu.ar")
                 .decidedAt(Instant.now())
                 .build();
-        item.assignClassrooms(List.of(classroomId), List.of(List.of(occurrenceId)));
+        item.assignClassrooms(List.of(classroomId), List.of(List.of(occurrenceId)), List.of());
         request.addItem(item);
         roomRequestRepository.save(request);
         return item;

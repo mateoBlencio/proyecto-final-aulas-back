@@ -35,13 +35,15 @@ docs {
   Crea el evento único y asigna las aulas en una sola transacción; si la asignación falla,
   no queda evento. Devuelve la lista de asignaciones.
 
-  - `classroomIds`: entre 1 y `classroomCount` aulas, sin repetidos.
+  - `classroomIds`: al menos 1 aula, sin repetidos. Puede haber más aulas que `classroomCount`;
+    el `reason` obligatorio queda como motivo.
   - `suggestionId` (opcional): de `/suggestion`. Las aulas deben ser exactamente las
     sugeridas, en el mismo orden, y la asignación queda como AUTOMATIC; sin él, MANUAL.
     410 si expiró, ya se usó o no coincide con el borrador. Un error posterior (400, 409)
     no consume la sugerencia.
   - `reason`: obligatorio, hasta 500 caracteres; queda como observación de cada asignación.
-  - 400 si un aula no cumple los requisitos del borrador (computadoras, proyector) o está
-    fuera de los edificios del usuario: el back revalida los filtros, no confía en el front.
+  - 400 si un aula está inactiva o fuera de los edificios del usuario. Un aula que no cumple
+    computadoras o proyector se acepta (el `reason` ya es obligatorio). El auxiliar puede asignar
+    cualquier aula de su edificio, tenga o no computadoras.
   - 409 con `ALLOCATION_CONFLICT` si el aula se ocupó mientras el usuario elegía.
 }

@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.roomrequest.controller;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CommissionOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CommissionScheduleDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestFormSettingsDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.SpecialtyOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.SubjectOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestCatalogService;
@@ -72,5 +73,15 @@ public class RoomRequestCatalogController {
         log.debug("GET /v1/room-requests/catalog/commission-schedule: subjectId={}, commissionId={}",
                 subjectId, commissionId);
         return ResponseEntity.ok(catalogService.findCommissionSchedule(subjectId, commissionId));
+    }
+
+    @GetMapping("/form-settings")
+    @Operation(summary = "Valores configurables del formulario",
+               description = "Ventana horaria permitida (hoursStart, hoursEnd en HH:mm), topes de aulas, asistentes "
+                       + "y computadoras por pedido, y días de anticipación del aviso de pedido derivado sin aula. "
+                       + "Público: lo lee el formulario sin login y el auxiliar, que no tiene permiso de configuración.")
+    public ResponseEntity<RoomRequestFormSettingsDto> findFormSettings() {
+        log.debug("GET /v1/room-requests/catalog/form-settings");
+        return ResponseEntity.ok(catalogService.findFormSettings());
     }
 }

@@ -22,7 +22,11 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Comparator;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -52,14 +56,15 @@ class RoomRequestOccurrenceResolver {
         return occurrencesBySlot;
     }
 
-    void releaseOldMirrors(RoomRequestItem item) {
-        List<Long> oldMirrorOccurrenceIds = item.getAllocations().stream()
+    /** Libera los espejos futuros del pedido y devuelve sus ids; los pasados quedan como historial. */
+    List<Long> releaseOldMirrors(RoomRequestItem item) {
+        List<Long> oldMirrorOccurrenceIds = onlyFuture(item, item.getAllocations().stream()
                 .filter(allocation -> allocation.getPosition() > 1)
                 .map(RoomRequestItemAllocation::getOccurrenceId)
                 .distinct()
-                .toList();
+                .toList());
         if (oldMirrorOccurrenceIds.isEmpty()) {
-            return;
+            return List.of();
         }
         allocationService.deallocate(new DeallocationCommand(
                 List.of(new AllocationTarget.Occurrences(oldMirrorOccurrenceIds)),
@@ -67,6 +72,24 @@ class RoomRequestOccurrenceResolver {
         occurrenceService.release(
                 oldMirrorOccurrenceIds.stream().map(id -> new OccurrenceRelease(id, null)).toList(),
                 ReleaseReason.MIRROR_RETIRED, "Reasignación de pedido de aula #" + item.getId());
+        return oldMirrorOccurrenceIds;
+    }
+
+    /** En un cambio regular las clases pasadas conservan su aula: solo las futuras se pueden liberar. */
+    List<Long> onlyFuture(RoomRequestItem item, List<Long> occurrenceIds) {
+        if (item.getRequest().getType() != RoomRequestType.REGULAR_ROOM_CHANGE || occurrenceIds.isEmpty()) {
+            return occurrenceIds;
+        }
+        Set<Long> futureIds = occurrenceService.findSlotsByEvent(item.getSourceRecurringEventId(), LocalDate.now())
+                .stream()
+                .map(OccurrenceSlotDto::occurrenceId)
+                .collect(Collectors.toSet());
+        return occurrenceIds.stream().filter(futureIds::contains).toList();
+    }
+
+    /** Fecha de la próxima clase de un cambio regular, o vacío si no quedan. */
+    Optional<LocalDate> nextClassDate(RoomRequestItem item) {
+        return slotsOnDayOfWeekFromToday(item).stream().map(OccurrenceSlotDto::date).min(Comparator.naturalOrder());
     }
 
     private List<Long> resolveTargetOccurrences(RoomRequestItem item, boolean reassigning) {
@@ -107,15 +130,19 @@ class RoomRequestOccurrenceResolver {
     }
 
     List<OccurrenceSlotDto> futureSlotsOnDayOfWeek(RoomRequestItem item) {
-        List<OccurrenceSlotDto> slots = occurrenceService.findSlotsByEvent(item.getSourceRecurringEventId(), LocalDate.now())
-                .stream()
-                .filter(slot -> slot.mirrorOfOccurrenceId() == null)
-                .filter(slot -> slot.date().getDayOfWeek() == item.getDayOfWeek())
-                .toList();
+        List<OccurrenceSlotDto> slots = slotsOnDayOfWeekFromToday(item);
         if (slots.isEmpty()) {
             throw new InvalidRoomRequestException("No quedan clases futuras para este cambio regular de aula.");
         }
         return slots;
+    }
+
+    private List<OccurrenceSlotDto> slotsOnDayOfWeekFromToday(RoomRequestItem item) {
+        return occurrenceService.findSlotsByEvent(item.getSourceRecurringEventId(), LocalDate.now())
+                .stream()
+                .filter(slot -> slot.mirrorOfOccurrenceId() == null)
+                .filter(slot -> slot.date().getDayOfWeek() == item.getDayOfWeek())
+                .toList();
     }
 
     private Long createEventOccurrence(RoomRequestItem item, RoomRequestType type) {

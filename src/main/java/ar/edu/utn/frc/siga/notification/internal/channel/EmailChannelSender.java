@@ -5,6 +5,8 @@ import ar.edu.utn.frc.siga.notification.api.NotificationRecipient;
 import ar.edu.utn.frc.siga.notification.internal.config.NotificationProperties;
 import ar.edu.utn.frc.siga.notification.internal.render.RenderedNotification;
 import jakarta.mail.MessagingException;
+import jakarta.mail.internet.AddressException;
+import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +17,9 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 @Slf4j
@@ -54,6 +58,7 @@ public class EmailChannelSender implements ChannelSender {
             helper.setTo(address);
             helper.setSubject(stripHeaderInjection(message.subject()));
             helper.setText(message.body(), true);
+            setReplyTo(mimeMessage, message.replyTo());
             for (Map.Entry<String, String> image : INLINE_IMAGES.entrySet()) {
                 if (message.body().contains("cid:" + image.getKey())) {
                     helper.addInline(image.getKey(), new ClassPathResource(image.getValue()));
@@ -69,6 +74,27 @@ public class EmailChannelSender implements ChannelSender {
             throw new IllegalStateException("No se pudo enviar el mail a " + mask(address), e);
         }
         log.info("Mail enviado a {}", mask(address));
+    }
+
+    private static void setReplyTo(MimeMessage mimeMessage, List<String> replyTo) throws MessagingException {
+        InternetAddress[] addresses = replyTo.stream()
+                .map(String::strip)
+                .filter(EmailChannelSender::isValidAddress)
+                .map(EmailChannelSender::toInternetAddress)
+                .flatMap(Optional::stream)
+                .toArray(InternetAddress[]::new);
+        if (addresses.length > 0) {
+            mimeMessage.setReplyTo(addresses);
+        }
+    }
+
+    private static Optional<InternetAddress> toInternetAddress(String address) {
+        try {
+            return Optional.of(new InternetAddress(address));
+        } catch (AddressException e) {
+            log.warn("Reply-To descartado por dirección inválida: {}", mask(address));
+            return Optional.empty();
+        }
     }
 
     private static boolean isValidAddress(String address) {

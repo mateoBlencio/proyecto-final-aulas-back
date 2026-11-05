@@ -17,11 +17,12 @@ body:json {
 }
 
 docs {
-  Cancela el pedido (item) desde cualquier estado no final, incluido RESOLVED.
+  Cancela el pedido (item) desde NEW, DERIVED_TO_BUILDING, IN_EVALUATION o NOTIFIED.
+  Un pedido RESOLVED (aceptado) no se cancela: primero hay que reabrirlo.
   Requiere autenticación (hasAnyRole SUBSECRETARIA, AUXILIAR_AULICO).
 
-  Si el pedido tenía aulas asignadas, las libera. `reason` es obligatorio.
+  Si el pedido tenía aulas asignadas, las libera (en un cambio regular, solo las de clases futuras). `reason` es obligatorio.
 
-  Errores: 400 si falta `reason`; 409 si ya estaba CANCELLED; 404 si el id
+  Errores: 400 si falta `reason`; 409 si ya estaba CANCELLED o está RESOLVED; 404 si el id
   no existe.
 }

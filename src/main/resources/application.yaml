@@ -121,6 +121,8 @@ siga:
       enabled: ${DASHBOARD_SNAPSHOT_ENABLED:true}
       cron: "0 0 3 1 * *"
   room-requests:
+    acceptance:
+      cron: "0 0 * * * *"
     expiry:
       cron: "0 0 7 * * *"
   settings:
@@ -184,6 +186,30 @@ siga:
         default-value: "true"
       - key: notifications.channel.email.enabled
         default-value: "true"
+      - key: roomRequests.maxClassroomCount
+        default-value: "20"
+        min: "1"
+        max: "100"
+      - key: roomRequests.maxEstimated
+        default-value: "500"
+        min: "1"
+        max: "10000"
+      - key: roomRequests.maxComputerCount
+        default-value: "500"
+        min: "1"
+        max: "1000"
+      - key: roomRequests.alertDaysBeforeDate
+        default-value: "3"
+        min: "0"
+        max: "60"
+      - key: roomRequests.acceptance.businessHours
+        default-value: "48"
+        min: "1"
+        max: "720"
+      - key: roomRequests.acceptance.hoursBeforeEvent
+        default-value: "24"
+        min: "0"
+        max: "720"
   optimizer:
     parallel-solver-count: AUTO
     environment-mode: NO_ASSERT
@@ -230,6 +256,7 @@ siga:
     email:
       enabled: ${MAIL_ENABLED:false}
       from: ${MAIL_FROM:no-reply@frc.utn.edu.ar}
+      reply-to: ${MAIL_REPLY_TO:}
 
 logging:
   level:

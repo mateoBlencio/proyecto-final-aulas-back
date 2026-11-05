@@ -29,7 +29,13 @@ public final class SettingsCatalogFixture {
                 definition("events.hours.end", "23:00", null, null),
                 definition("allocation.maxOverlapMinutes", "40", "0", null),
                 definition("notifications.enabled", "true", null, null),
-                definition("notifications.channel.email.enabled", "true", null, null)));
+                definition("notifications.channel.email.enabled", "true", null, null),
+                definition("roomRequests.maxClassroomCount", "20", "1", "100"),
+                definition("roomRequests.maxEstimated", "500", "1", "10000"),
+                definition("roomRequests.maxComputerCount", "500", "1", "1000"),
+                definition("roomRequests.alertDaysBeforeDate", "3", "0", "60"),
+                definition("roomRequests.acceptance.businessHours", "48", "1", "720"),
+                definition("roomRequests.acceptance.hoursBeforeEvent", "24", "0", "720")));
         return properties;
     }
 

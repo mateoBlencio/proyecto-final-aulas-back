@@ -60,6 +60,7 @@ public class DashboardQueryServiceImpl implements DashboardQueryService {
     private static final String NEW = "NEW";
     private static final String DERIVED_TO_BUILDING = "DERIVED_TO_BUILDING";
     private static final String IN_EVALUATION = "IN_EVALUATION";
+    private static final String NOTIFIED = "NOTIFIED";
     private static final int EXPIRING_SOON_HOURS = 48;
     private static final int BADGE_WINDOW_DAYS = 7;
 
@@ -202,17 +203,20 @@ public class DashboardQueryServiceImpl implements DashboardQueryService {
     }
 
     /**
-     * Who acts on each state: without building restriction, NEW and IN_EVALUATION not derived; with
-     * restriction, what was derived to its buildings (DERIVED_TO_BUILDING, or IN_EVALUATION that the building
-     * allocates and notifies).
+     * Who acts on each state: without building restriction, NEW and IN_EVALUATION or NOTIFIED not derived; with
+     * restriction, what was derived to its buildings (DERIVED_TO_BUILDING, or IN_EVALUATION or NOTIFIED that the
+     * building allocates and notifies). The teacher's reply reaches whoever notified, who confirms or reopens.
      */
     private static boolean awaitsAction(PendingItemRow item, BuildingScope scope) {
         if (scope.isUnrestricted()) {
             return NEW.equals(item.status())
-                    || (IN_EVALUATION.equals(item.status()) && item.derivedBuildingId() == null);
+                    || (isAssigned(item) && item.derivedBuildingId() == null);
         }
-        return (DERIVED_TO_BUILDING.equals(item.status()) || IN_EVALUATION.equals(item.status()))
-                && inScope(item, scope);
+        return (DERIVED_TO_BUILDING.equals(item.status()) || isAssigned(item)) && inScope(item, scope);
+    }
+
+    private static boolean isAssigned(PendingItemRow item) {
+        return IN_EVALUATION.equals(item.status()) || NOTIFIED.equals(item.status());
     }
 
     private static boolean inScope(PendingItemRow item, BuildingScope scope) {

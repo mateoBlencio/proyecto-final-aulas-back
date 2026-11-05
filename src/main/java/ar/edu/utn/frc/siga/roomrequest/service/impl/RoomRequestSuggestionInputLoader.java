@@ -57,7 +57,7 @@ class RoomRequestSuggestionInputLoader {
     Inputs load(Long itemId, Set<Long> excludedClassroomIds, String actor) {
         RoomRequestItem item = itemRepository.findWithRequestById(itemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
-        if (item.getStatus() == RoomRequestStatus.RESOLVED) {
+        if (item.getStatus() == RoomRequestStatus.NOTIFIED || item.getStatus() == RoomRequestStatus.RESOLVED) {
             throw new RoomRequestAlreadyNotifiedException(itemId);
         }
         transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.IN_EVALUATION);

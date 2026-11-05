@@ -88,6 +88,39 @@ class DirectEventIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("más aulas que classroomCount del borrador: se crea con el motivo del alta")
+    void create_moreRoomsThanRequested_isCreated() throws Exception {
+        Classroom first = testData.aula(testData.edificio());
+        Classroom second = testData.aula(testData.edificio());
+        Map<String, Object> draft = draft("CONFERENCE", LocalDate.now().plusDays(34));
+        draft.put("classroomCount", 1);
+
+        direct(draft, List.of(first.getId(), second.getId())).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    @DisplayName("available-classrooms: devuelve todas las aulas, las que cumplen primero, con missingRequirements")
+    void availableClassrooms_returnsAllWithMissingRequirements() throws Exception {
+        Building building = testData.edificio();
+        Classroom plain = testData.aula(building);
+        Classroom projector = testData.aula(building);
+        testData.recursoDeAula(projector, testData.tipoRecurso("Proyector", ResourceValueKind.BOOLEAN), 1);
+        Map<String, Object> draft = draft("CONFERENCE", LocalDate.now().plusDays(35));
+        draft.put("requiresProjector", true);
+
+        String json = mockMvc.perform(post("/v1/events/direct/available-classrooms")
+                        .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(draft)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == " + projector.getId() + ")].missingRequirements[0]").isEmpty())
+                .andExpect(jsonPath("$[?(@.id == " + plain.getId() + ")].missingRequirements[0]").value("PROJECTOR"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(json.indexOf("\"id\":" + projector.getId()))
+                .isLessThan(json.indexOf("\"id\":" + plain.getId()));
+    }
+
+    @Test
     @DisplayName("la misma aula repetida en classroomIds: 400 y no queda ninguna asignación")
     void create_repeatedClassroom_returnsBadRequest() throws Exception {
         Classroom aula = testData.aula(testData.edificio());
@@ -231,8 +264,8 @@ class DirectEventIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("auxiliar con un aula sin computadoras de su edificio para un borrador que las exige: 400 y nada persistido")
-    void create_auxiliarRoomWithoutComputers_returnsBadRequest() throws Exception {
+    @DisplayName("auxiliar con un aula sin computadoras de su edificio para un borrador que las exige: se crea con el motivo")
+    void create_auxiliarRoomWithoutComputers_isCreated() throws Exception {
         Building building = testData.edificio();
         Classroom plainRoom = testData.aula(building);
         MockMvc auxiliar = auxiliarOf(building);
@@ -240,14 +273,23 @@ class DirectEventIntegrationTest extends AbstractIntegrationTest {
         draft.put("requiresComputers", true);
         draft.put("computerCount", 30);
 
-        directAs(auxiliar, draft, List.of(plainRoom.getId())).andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("Estas aulas no cumplen")));
+        directAs(auxiliar, draft, List.of(plainRoom.getId())).andExpect(status().isCreated());
 
-        assertNothingPersisted(plainRoom, draft);
+        assertThat(rowFor(plainRoom).get("requiere_computadoras")).isEqualTo(true);
     }
 
     @Test
-    @DisplayName("auxiliar con un aula de otro edificio: 400 por no ser candidata y nada persistido")
+    @DisplayName("auxiliar crea un evento sin computadoras en un aula común de su edificio")
+    void create_auxiliarPlainEventInOwnBuilding_isCreated() throws Exception {
+        Building building = testData.edificio();
+        Classroom plainRoom = testData.aula(building);
+        Map<String, Object> draft = draft("CONFERENCE", LocalDate.now().plusDays(3000 + IntegrationTestData.nextSeq() % 500));
+
+        directAs(auxiliarOf(building), draft, List.of(plainRoom.getId())).andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("auxiliar con un aula de otro edificio: 400 por estar fuera de su alcance y nada persistido")
     void create_auxiliarRoomOfOtherBuilding_isRejected() throws Exception {
         Classroom foreignRoom = testData.aula(testData.edificio());
         testData.recursoDeAula(foreignRoom, testData.tipoRecurso("Cantidad de PC", ResourceValueKind.COUNT), 40);
@@ -257,7 +299,7 @@ class DirectEventIntegrationTest extends AbstractIntegrationTest {
         draft.put("computerCount", 30);
 
         directAs(auxiliar, draft, List.of(foreignRoom.getId())).andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("Estas aulas no cumplen")));
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("fuera de tu alcance")));
 
         assertNothingPersisted(foreignRoom, draft);
     }

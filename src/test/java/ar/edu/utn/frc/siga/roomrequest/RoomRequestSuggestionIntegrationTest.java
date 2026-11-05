@@ -147,6 +147,25 @@ class RoomRequestSuggestionIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("confirmar con reason de 256 caracteres: 400 y no se asigna; con 255 se acepta")
+    void confirmarConReasonLargo_devuelveBadRequest() throws Exception {
+        testData.aula(testData.edificio());
+        RoomRequestItem item = seedItem(60);
+        String suggestionId = suggest(item);
+
+        mockMvc.perform(post(suggestionUrl(item) + "/" + suggestionId + "/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"" + "a".repeat(256) + "\"}"))
+                .andExpect(status().isBadRequest());
+        assertThat(statusOf(item)).isNotEqualTo(RoomRequestStatus.IN_EVALUATION.name());
+
+        mockMvc.perform(post(suggestionUrl(item) + "/" + suggestionId + "/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"" + "a".repeat(255) + "\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     @DisplayName("sin token: 401; con AUXILIAR_AULICO sobre un NEW: 403, en sugerir y en confirmar")
     void authenticationAndAuthorization() throws Exception {
         testData.aula(testData.edificio());

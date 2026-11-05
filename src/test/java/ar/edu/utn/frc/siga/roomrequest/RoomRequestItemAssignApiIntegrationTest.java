@@ -170,8 +170,8 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("más aulas que classroomCount: 400")
-    void assign_masAulasQueClassroomCount_returnsBadRequest() throws Exception {
+    @DisplayName("más aulas que classroomCount sin motivo: 400 Partial assignment reason required; con motivo: 200")
+    void assign_masAulasQueClassroomCount_exigeMotivo() throws Exception {
         Classroom aula1 = testData.aula(testData.edificio());
         Classroom aula2 = testData.aula(testData.edificio());
         RoomRequestItem item = seedCreatedEventItem(RoomRequestType.FINAL_EXAM, LocalDate.now().plusDays(23));
@@ -179,7 +179,14 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/assign")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(assignBody(List.of(aula1.getId(), aula2.getId()), null)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Partial assignment reason required"));
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/assign")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(List.of(aula1.getId(), aula2.getId()), "No entran en una")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_EVALUATION"));
     }
 
     @Test
@@ -404,8 +411,8 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("laboratorio con aulas de dos edificios: 400")
-    void assign_laboratorioAulasDeEdificiosDistintos_returnsBadRequest() throws Exception {
+    @DisplayName("laboratorio con aulas de dos edificios: se acepta (subsecretaría reparte entre edificios)")
+    void assign_laboratorioAulasDeEdificiosDistintos_isAccepted() throws Exception {
         ResourceType pcs = testData.tipoRecurso("Cantidad de PC", ResourceValueKind.COUNT);
         Classroom lab1 = testData.aula(testData.edificio());
         Classroom lab2 = testData.aula(testData.edificioConNombre("Edificio-Lejano-" + IntegrationTestData.nextSeq()));
@@ -416,8 +423,8 @@ class RoomRequestItemAssignApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/assign")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(assignBody(List.of(lab1.getId(), lab2.getId()), null)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("Invalid room request"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_EVALUATION"));
     }
 
     @Test

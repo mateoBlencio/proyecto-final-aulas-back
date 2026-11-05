@@ -1,1 +1,1 @@
-[(${asuntoTitulo})][# th:each="parte : ${asuntoPartes}"] — [(${parte})][/]
+[(${asuntoTitulo})][# th:each="parte : ${asuntoPartes}"] — [(${parte})][/][# th:if="${pedidoId != null}"] — pedido #[(${pedidoId})][/]

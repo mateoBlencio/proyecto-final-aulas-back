@@ -214,9 +214,12 @@ class RoomRequestOccurrenceResolverTest {
         RoomRequestItemAllocation mirror2 = RoomRequestItemAllocation.builder()
                 .occurrenceId(9002L).classroomId(106L).position(3).build();
         RoomRequestItem item = RoomRequestItem.builder().id(1L)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM))
                 .allocations(List.of(principal, mirror1, mirror2)).build();
 
-        resolver.releaseOldMirrors(item);
+        List<Long> retired = resolver.releaseOldMirrors(item);
+
+        assertThat(retired).containsExactlyInAnyOrder(9001L, 9002L);
 
         ArgumentCaptor<DeallocationCommand> captor = ArgumentCaptor.forClass(DeallocationCommand.class);
         verify(allocationService).deallocate(captor.capture());
@@ -232,11 +235,64 @@ class RoomRequestOccurrenceResolverTest {
     void releaseOldMirrors_sinMirrors() {
         RoomRequestItemAllocation principal = RoomRequestItemAllocation.builder()
                 .occurrenceId(9000L).classroomId(104L).position(1).build();
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).allocations(List.of(principal)).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).allocations(List.of(principal)).build();
 
-        resolver.releaseOldMirrors(item);
+        assertThat(resolver.releaseOldMirrors(item)).isEmpty();
 
         verifyNoInteractions(allocationService);
+    }
+
+    @Test
+    @DisplayName("releaseOldMirrors: en un cambio regular los espejos de clases pasadas no se liberan")
+    void releaseOldMirrors_cambioRegularSoloLiberaFuturos() {
+        RoomRequestItemAllocation pastMirror = RoomRequestItemAllocation.builder()
+                .occurrenceId(9001L).classroomId(105L).position(2).build();
+        RoomRequestItemAllocation futureMirror = RoomRequestItemAllocation.builder()
+                .occurrenceId(9101L).classroomId(105L).position(2).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L)
+                .request(requestOfType(RoomRequestType.REGULAR_ROOM_CHANGE)).sourceRecurringEventId(50L)
+                .allocations(List.of(pastMirror, futureMirror)).build();
+        when(occurrenceService.findSlotsByEvent(eq(50L), any(LocalDate.class)))
+                .thenReturn(List.of(occurrenceSlot(9101L, 50L, LocalDate.now().plusDays(7))));
+
+        List<Long> retired = resolver.releaseOldMirrors(item);
+
+        assertThat(retired).containsExactly(9101L);
+        ArgumentCaptor<DeallocationCommand> captor = ArgumentCaptor.forClass(DeallocationCommand.class);
+        verify(allocationService).deallocate(captor.capture());
+        AllocationTarget.Occurrences target = (AllocationTarget.Occurrences) captor.getValue().targets().getFirst();
+        assertThat(target.occurrenceIds()).containsExactly(9101L);
+    }
+
+    @Test
+    @DisplayName("onlyFuture: un cambio regular filtra a las ocurrencias de hoy en adelante; otros tipos devuelven todo")
+    void onlyFuture() {
+        RoomRequestItem regular = RoomRequestItem.builder().id(1L)
+                .request(requestOfType(RoomRequestType.REGULAR_ROOM_CHANGE)).sourceRecurringEventId(50L).build();
+        RoomRequestItem other = RoomRequestItem.builder().id(2L)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).build();
+        when(occurrenceService.findSlotsByEvent(eq(50L), any(LocalDate.class)))
+                .thenReturn(List.of(occurrenceSlot(11L, 50L, LocalDate.now().plusDays(1))));
+
+        assertThat(resolver.onlyFuture(regular, List.of(10L, 11L))).containsExactly(11L);
+        assertThat(resolver.onlyFuture(other, List.of(10L, 11L))).containsExactly(10L, 11L);
+    }
+
+    @Test
+    @DisplayName("nextClassDate: la fecha más próxima del día de dictado, o vacío si no quedan clases")
+    void nextClassDate() {
+        LocalDate first = LocalDate.now().plusDays(1);
+        RoomRequestItem item = RoomRequestItem.builder().id(1L)
+                .request(requestOfType(RoomRequestType.REGULAR_ROOM_CHANGE)).sourceRecurringEventId(50L)
+                .dayOfWeek(first.getDayOfWeek()).build();
+        when(occurrenceService.findSlotsByEvent(eq(50L), any(LocalDate.class)))
+                .thenReturn(List.of(occurrenceSlot(12L, 50L, first.plusDays(7)), occurrenceSlot(11L, 50L, first)));
+
+        assertThat(resolver.nextClassDate(item)).contains(first);
+
+        when(occurrenceService.findSlotsByEvent(eq(50L), any(LocalDate.class))).thenReturn(List.of());
+        assertThat(resolver.nextClassDate(item)).isEmpty();
     }
 
     private static RoomRequest requestOfType(RoomRequestType type) {

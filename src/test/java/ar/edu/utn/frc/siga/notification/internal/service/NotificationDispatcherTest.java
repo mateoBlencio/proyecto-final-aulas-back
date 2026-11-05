@@ -62,6 +62,24 @@ class NotificationDispatcherTest {
     }
 
     @Test
+    void retryPassesTheStoredReplyToAddressesToTheChannel() {
+        NotificationDispatcher dispatcher = newDispatcher();
+        Notification notification = Notification.builder()
+                .id(1L).template("ROOM_REQUEST_RESOLVED").channel(NotificationChannel.EMAIL)
+                .recipient("docente@frc.utn.edu.ar").subject("Aula asignada").body("<p>cuerpo</p>")
+                .status(NotificationStatus.PENDING).idempotencyKey("k")
+                .replyTo("aux1@frc.utn.edu.ar,aux2@frc.utn.edu.ar").build();
+        when(repository.findById(1L)).thenReturn(Optional.of(notification));
+
+        dispatcher.dispatch(1L);
+
+        org.mockito.ArgumentCaptor<ar.edu.utn.frc.siga.notification.internal.render.RenderedNotification> captor =
+                org.mockito.ArgumentCaptor.forClass(ar.edu.utn.frc.siga.notification.internal.render.RenderedNotification.class);
+        org.mockito.Mockito.verify(channelSender).send(captor.capture(), any());
+        assertThat(captor.getValue().replyTo()).containsExactly("aux1@frc.utn.edu.ar", "aux2@frc.utn.edu.ar");
+    }
+
+    @Test
     void backoffForThirdAttemptIsFourMinutes() {
         assertThat(NotificationDispatcher.backoffFor(3)).isEqualTo(Duration.ofMinutes(4));
     }

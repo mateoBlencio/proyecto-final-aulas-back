@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.roomrequest.handler;
 
+import ar.edu.utn.frc.siga.events.validator.EventScheduleValidator;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.validator.AcademicReferenceValidator;
@@ -29,16 +30,18 @@ class RoomRequestHandlersRegistryTest {
     private ClassScheduleService classSchedule;
     @Mock
     private RoomRequestItemRepository itemRepository;
+    @Mock
+    private EventScheduleValidator eventSchedule;
 
     private List<RoomRequestTypeHandler> allHandlers() {
         return List.of(
                 new OneTimeRoomChangeHandler(academicReference, classroomReference, classSchedule),
                 new RegularRoomChangeHandler(academicReference, classroomReference, classSchedule),
                 new PartialExamInClassHandler(academicReference, classroomReference, classSchedule),
-                new PartialExamOffScheduleHandler(academicReference, classroomReference, classSchedule, itemRepository),
-                new FinalExamHandler(academicReference, classroomReference, classSchedule),
-                new ConferenceHandler(academicReference, classroomReference, classSchedule),
-                new OtherHandler(academicReference, classroomReference, classSchedule));
+                new PartialExamOffScheduleHandler(academicReference, classroomReference, classSchedule, itemRepository, eventSchedule),
+                new FinalExamHandler(academicReference, classroomReference, classSchedule, eventSchedule),
+                new ConferenceHandler(academicReference, classroomReference, classSchedule, eventSchedule),
+                new OtherHandler(academicReference, classroomReference, classSchedule, eventSchedule));
     }
 
     @Test
@@ -55,7 +58,7 @@ class RoomRequestHandlersRegistryTest {
     @DisplayName("falta un handler: falla al construir el registro")
     void missingHandlerFailsFast() {
         assertThatThrownBy(() -> new RoomRequestHandlers(
-                List.of(new OtherHandler(academicReference, classroomReference, classSchedule))))
+                List.of(new OtherHandler(academicReference, classroomReference, classSchedule, eventSchedule))))
                 .isInstanceOf(IllegalStateException.class);
     }
 }

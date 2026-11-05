@@ -161,6 +161,29 @@ class RoomRequestCatalogCascadeIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("horario de una comisión: dateSlots trae los horarios de cada fecha en HH:mm, sin segundos")
+    void commissionSchedule_dateSlots_areHhMm() throws Exception {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+        testData.eventoRecurrente(academic.subjectId(), academic.commissionId(), java.time.DayOfWeek.MONDAY,
+                java.time.LocalTime.of(10, 25), 90, java.time.LocalDate.now().minusDays(1),
+                java.time.LocalDate.now().plusMonths(2), 30);
+        testData.eventoRecurrente(academic.subjectId(), academic.commissionId(), java.time.DayOfWeek.MONDAY,
+                java.time.LocalTime.of(20, 40), 135, java.time.LocalDate.now().minusDays(1),
+                java.time.LocalDate.now().plusMonths(2), 30);
+
+        anonymousMockMvc.perform(get("/v1/room-requests/catalog/commission-schedule")
+                        .param("subjectId", String.valueOf(academic.subjectId()))
+                        .param("commissionId", String.valueOf(academic.commissionId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dates").isArray())
+                .andExpect(jsonPath("$.dateSlots[0].date").isString())
+                .andExpect(jsonPath("$.dateSlots[0].slots[0].startTime").value("10:25"))
+                .andExpect(jsonPath("$.dateSlots[0].slots[0].endTime").value("11:55"))
+                .andExpect(jsonPath("$.dateSlots[0].slots[1].startTime").value("20:40"))
+                .andExpect(jsonPath("$.dateSlots[0].slots[1].endTime").value("22:55"));
+    }
+
+    @Test
     @DisplayName("materias de una especialidad: una materia de un plan inhabilitado deja de aparecer")
     void subjectsCatalog_hidesSubjectOfInactivePlan() throws Exception {
         int specialtyCode = (int) IntegrationTestData.nextSeq();

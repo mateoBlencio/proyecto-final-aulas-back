@@ -1,7 +1,5 @@
 package ar.edu.utn.frc.siga.roomrequest.direct;
 
-import ar.edu.utn.frc.siga.auth.model.SystemRole;
-import ar.edu.utn.frc.siga.auth.service.UserService;
 import ar.edu.utn.frc.siga.roomrequest.direct.dto.DirectEventDraftDto;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
@@ -25,13 +23,11 @@ public class DirectEventDraftValidator {
         }
     }
 
-    private final UserService userService;
     private final AcademicReferenceValidator academicReferences;
     private final ClassScheduleService classSchedule;
 
-    public ResolvedSchedule validate(DirectEventDraftDto draft, String actor) {
+    public ResolvedSchedule validate(DirectEventDraftDto draft) {
         requireSupportedType(draft.type());
-        requireComputersForAuxiliar(draft, actor);
         validateAcademicReferences(draft);
         if (draft.type() == RoomRequestType.OTHER
                 && (draft.description() == null || draft.description().isBlank())) {
@@ -46,12 +42,6 @@ public class DirectEventDraftValidator {
     private void requireSupportedType(RoomRequestType type) {
         if (type == RoomRequestType.ONE_TIME_ROOM_CHANGE || type == RoomRequestType.REGULAR_ROOM_CHANGE) {
             throw new InvalidRoomRequestException("El tipo " + type + " no crea un evento con aula asignada.");
-        }
-    }
-
-    private void requireComputersForAuxiliar(DirectEventDraftDto draft, String actor) {
-        if (!Boolean.TRUE.equals(draft.requiresComputers()) && !userService.hasRole(actor, SystemRole.SUBSECRETARIA)) {
-            throw new InvalidRoomRequestException("El auxiliar solo puede asignar aulas con computadoras.");
         }
     }
 
@@ -86,11 +76,12 @@ public class DirectEventDraftValidator {
 
     private ResolvedSchedule resolveSchedule(DirectEventDraftDto draft) {
         if (draft.type() == RoomRequestType.PARTIAL_EXAM_IN_CLASS) {
-            if (draft.startTime() != null || draft.endTime() != null) {
+            if (draft.endTime() != null) {
                 throw new InvalidRoomRequestException(
-                        "El parcial en horario de clases toma el horario de cursado: no enviar startTime ni endTime.");
+                        "El parcial en horario de clases toma el horario de cursado: no enviar endTime.");
             }
-            ClassSlot slot = classSchedule.requireClassDate(draft.subjectId(), draft.commissionId(), draft.date());
+            ClassSlot slot = classSchedule.requireClassDate(
+                    draft.subjectId(), draft.commissionId(), draft.date(), draft.startTime());
             return new ResolvedSchedule(slot.startTime(), slot.duration());
         }
         if (draft.startTime() == null || draft.endTime() == null) {

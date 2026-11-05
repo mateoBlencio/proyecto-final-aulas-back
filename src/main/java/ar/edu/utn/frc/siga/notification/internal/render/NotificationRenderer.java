@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -24,7 +25,7 @@ public class NotificationRenderer {
         String baseName = baseNameFor(template);
         String subject = templateEngine.process(baseName + "-subject", context).strip();
         String body = templateEngine.process(baseName + "-body", context);
-        return new RenderedNotification(subject, body);
+        return new RenderedNotification(subject, body, List.of());
     }
 
     private static String baseNameFor(NotificationTemplate template) {

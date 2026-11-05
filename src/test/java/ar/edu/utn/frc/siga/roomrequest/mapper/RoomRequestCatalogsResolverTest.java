@@ -145,6 +145,36 @@ class RoomRequestCatalogsResolverTest {
     }
 
     @Test
+    @DisplayName("resolveFutureOccurrenceIdsByItemId: solo los cambios regulares con asignaciones, y solo las ocurrencias de hoy en adelante")
+    void resolveFutureOccurrenceIdsByItemId_soloFuturasDeCambiosRegulares() {
+        LocalDate today = LocalDate.now();
+        RoomRequestItem regular = RoomRequestItem.builder().id(1L).sourceRecurringEventId(50L)
+                .allocations(List.of(ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItemAllocation.builder()
+                        .occurrenceId(10L).classroomId(1L).position(1).build())).build();
+        RoomRequest.builder().id(1L).type(RoomRequestType.REGULAR_ROOM_CHANGE).build().addItem(regular);
+        RoomRequestItem other = RoomRequestItem.builder().id(2L).sourceRecurringEventId(51L)
+                .allocations(List.of(ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItemAllocation.builder()
+                        .occurrenceId(20L).classroomId(1L).position(1).build())).build();
+        RoomRequest.builder().id(2L).type(RoomRequestType.ONE_TIME_ROOM_CHANGE).build().addItem(other);
+        when(academicEventService.findOccurrencesByEventIds(Set.of(50L))).thenReturn(List.of(
+                new OccurrenceResponseDto(10L, 50L, today.minusDays(7), OccurrenceStatus.NEEDS_ROOM, null, null, null, null, null),
+                new OccurrenceResponseDto(11L, 50L, today, OccurrenceStatus.NEEDS_ROOM, null, null, null, null, null),
+                new OccurrenceResponseDto(12L, 50L, today.plusDays(7), OccurrenceStatus.NEEDS_ROOM, null, null, null, null, null)));
+
+        Map<Long, Set<Long>> result = resolver.resolveFutureOccurrenceIdsByItemId(List.of(regular, other));
+
+        assertThat(result).containsOnlyKeys(1L);
+        assertThat(result.get(1L)).containsExactlyInAnyOrder(11L, 12L);
+    }
+
+    @Test
+    @DisplayName("resolveFutureOccurrenceIdsByItemId: sin cambios regulares no consulta eventos")
+    void resolveFutureOccurrenceIdsByItemId_sinRegulares() {
+        assertThat(resolver.resolveFutureOccurrenceIdsByItemId(List.of())).isEmpty();
+        verifyNoInteractions(academicEventService);
+    }
+
+    @Test
     @DisplayName("resolveEnrolledByEventId: sin eventIds, no consulta el servicio de eventos y devuelve vacío")
     void resolveEnrolledByEventId_sinEventos() {
         assertThat(resolver.resolveEnrolledByEventId(Set.of())).isEmpty();

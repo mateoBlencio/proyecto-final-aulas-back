@@ -43,7 +43,7 @@ class EmailChannelSenderTest {
 
     @Test
     void rejectsAddressWithHeaderInjectionWithoutTouchingMailSender() {
-        RenderedNotification message = new RenderedNotification("Aula confirmada", "<p>cuerpo</p>");
+        RenderedNotification message = new RenderedNotification("Aula confirmada", "<p>cuerpo</p>", List.of());
         NotificationRecipient recipient = new NotificationRecipient(
                 "Docente", "docente@frc.utn.edu.ar\nBcc: externo@mail.com");
 
@@ -57,7 +57,7 @@ class EmailChannelSenderTest {
     void sendsMailWithConfiguredFromAndRenderedSubjectForValidAddress() {
         MimeMessage mimeMessage = new MimeMessage(Session.getDefaultInstance(new Properties()));
         when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
-        RenderedNotification message = new RenderedNotification("Aula confirmada — #158", "<p>cuerpo</p>");
+        RenderedNotification message = new RenderedNotification("Aula confirmada — #158", "<p>cuerpo</p>", List.of());
         NotificationRecipient recipient = new NotificationRecipient("Docente", "docente@frc.utn.edu.ar");
 
         sender.send(message, recipient);
@@ -66,11 +66,64 @@ class EmailChannelSenderTest {
     }
 
     @Test
+    void setsEveryReplyToAddressOnTheMessage() throws Exception {
+        MimeMessage mimeMessage = new MimeMessage(Session.getDefaultInstance(new Properties()));
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+        RenderedNotification message = new RenderedNotification("Aula asignada", "<p>cuerpo</p>",
+                List.of("aux1@frc.utn.edu.ar", "aux2@frc.utn.edu.ar"));
+
+        sender.send(message, new NotificationRecipient("Docente", "docente@frc.utn.edu.ar"));
+
+        assertThat(mimeMessage.getReplyTo()).extracting(Object::toString)
+                .containsExactly("aux1@frc.utn.edu.ar", "aux2@frc.utn.edu.ar");
+    }
+
+    @Test
+    void skipsInvalidReplyToAddressesAndKeepsTheValidOnes() throws Exception {
+        MimeMessage mimeMessage = new MimeMessage(Session.getDefaultInstance(new Properties()));
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+        RenderedNotification message = new RenderedNotification("Aula asignada", "<p>cuerpo</p>",
+                List.of("no-es-un-mail", "aux2@frc.utn.edu.ar"));
+
+        sender.send(message, new NotificationRecipient("Docente", "docente@frc.utn.edu.ar"));
+
+        assertThat(mimeMessage.getReplyTo()).extracting(Object::toString)
+                .containsExactly("aux2@frc.utn.edu.ar");
+    }
+
+    @Test
+    void discardsReplyToThatPassesTheFormatFilterButFailsParsingAndStillSendsTheMail() throws Exception {
+        MimeMessage mimeMessage = new MimeMessage(Session.getDefaultInstance(new Properties()));
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+        RenderedNotification message = new RenderedNotification("Aula asignada", "<p>cuerpo</p>",
+                List.of("aux..doble@frc.utn.edu.ar", "uno@frc.utn.edu.ar,dos@frc.utn.edu.ar", "aux2@frc.utn.edu.ar"));
+
+        sender.send(message, new NotificationRecipient("Docente", "docente@frc.utn.edu.ar"));
+
+        assertThat(mimeMessage.getReplyTo()).extracting(Object::toString)
+                .containsExactly("aux2@frc.utn.edu.ar");
+        verify(mailSender).send(mimeMessage);
+    }
+
+    @Test
+    void sendsTheMailWithoutReplyToWhenEveryReplyToAddressFailsParsing() throws Exception {
+        MimeMessage mimeMessage = new MimeMessage(Session.getDefaultInstance(new Properties()));
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+        RenderedNotification message = new RenderedNotification("Aula asignada", "<p>cuerpo</p>",
+                List.of("aux..doble@frc.utn.edu.ar"));
+
+        sender.send(message, new NotificationRecipient("Docente", "docente@frc.utn.edu.ar"));
+
+        assertThat(mimeMessage.getHeader("Reply-To")).isNull();
+        verify(mailSender).send(mimeMessage);
+    }
+
+    @Test
     void attachesBothLogosInlineWhenBodyReferencesTheirCids() throws Exception {
         MimeMessage mimeMessage = new MimeMessage(Session.getDefaultInstance(new Properties()));
         when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
         RenderedNotification message = new RenderedNotification(
-                "Aula confirmada", "<img src=\"cid:logoSiga\"><img src=\"cid:logoUtnFrc\">");
+                "Aula confirmada", "<img src=\"cid:logoSiga\"><img src=\"cid:logoUtnFrc\">", List.of());
         NotificationRecipient recipient = new NotificationRecipient("Docente", "docente@frc.utn.edu.ar");
 
         sender.send(message, recipient);
@@ -84,7 +137,7 @@ class EmailChannelSenderTest {
     void doesNotAttachInlinePartsWhenBodyHasNoCidReference() throws Exception {
         MimeMessage mimeMessage = new MimeMessage(Session.getDefaultInstance(new Properties()));
         when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
-        RenderedNotification message = new RenderedNotification("Aula confirmada", "<p>cuerpo sin logos</p>");
+        RenderedNotification message = new RenderedNotification("Aula confirmada", "<p>cuerpo sin logos</p>", List.of());
         NotificationRecipient recipient = new NotificationRecipient("Docente", "docente@frc.utn.edu.ar");
 
         sender.send(message, recipient);

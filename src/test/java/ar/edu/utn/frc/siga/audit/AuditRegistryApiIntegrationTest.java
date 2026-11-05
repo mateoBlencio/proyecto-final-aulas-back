@@ -1189,7 +1189,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated());
         var body = new AllocationBatchRequestDto(List.of(
                 new AllocationItemRequestDto(List.of(occurrences.get(0).getId()), null, null, null, classroomA),
-                new AllocationItemRequestDto(List.of(occurrences.get(1).getId()), null, null, null, classroomB)), null);
+                new AllocationItemRequestDto(List.of(occurrences.get(1).getId()), null, null, null, classroomB)), "cambio de aula");
 
         mockMvc.perform(put("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)

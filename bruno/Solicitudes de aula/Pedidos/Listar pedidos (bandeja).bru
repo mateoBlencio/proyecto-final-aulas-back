@@ -39,7 +39,7 @@ docs {
   - types: ONE_TIME_ROOM_CHANGE | REGULAR_ROOM_CHANGE | PARTIAL_EXAM_IN_CLASS |
     PARTIAL_EXAM_OFF_SCHEDULE | FINAL_EXAM | CONFERENCE | OTHER
     (repetir el param para varios valores)
-  - statuses: NEW | DERIVED_TO_BUILDING | IN_EVALUATION | RESOLVED | CANCELLED
+  - statuses: NEW | DERIVED_TO_BUILDING | IN_EVALUATION | NOTIFIED | RESOLVED | CANCELLED
     (repetir el param para varios valores)
   - scope: GRADO | TECNICATURA | LICENCIATURA | EXTENSION | POSTGRADO
   - subjectId: id de materia
@@ -64,6 +64,11 @@ docs {
   derivedBuildingName/derivedAt, wasReturned, assignedClassroomCount (0 si nada
   asignado) y partiallyResolved — todos calculados por el back, no hace falta
   derivarlos en el front.
+
+  overlapsWithOtherSubject: true si el parcial fuera de horario se pisa (misma
+  fecha, horario que se cruza y misma comision o alguno de los dos "todas") con
+  un pedido activo de OTRA materia. Se calcula al leer: desaparece si el otro
+  pedido se cancela. Con la misma materia el alta se rechaza, por eso no aparece.
 
   Cada fila trae allowedActions: subconjunto de ASSIGN | DERIVE | RETURN | CANCEL |
   NOTIFY que el usuario autenticado puede ejecutar sobre ese pedido segun rol,

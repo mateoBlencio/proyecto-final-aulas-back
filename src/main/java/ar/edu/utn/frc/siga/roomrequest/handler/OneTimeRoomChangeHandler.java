@@ -37,18 +37,21 @@ public class OneTimeRoomChangeHandler extends AbstractRoomRequestHandler {
             ItemConsistency.requireNoEstimated(item);
             ItemConsistency.requireExamUsersConsistent(false, item);
         }
-        ItemConsistency.requireDistinct(items.stream().map(ScheduledItemDto::date).toList(), "una fecha");
     }
 
     @Override
     protected void validateReferences(CreateRoomRequestDto dto) {
         academicReference.requireSubject(dto.subjectId());
         academicReference.requireCommissionOfSubject(dto.subjectId(), dto.commissionId());
+        ItemConsistency.requireDistinct(((CreateOneTimeRoomChangeDto) dto).items().stream()
+                .map(item -> List.of(item.date(), classSchedule.requireClassDate(dto.subjectId(),
+                        dto.commissionId(), item.date(), item.startTime()).recurringEventId()))
+                .toList(), "una clase");
     }
 
     @Override
     protected RoomRequestItem buildItem(CreateRoomRequestItemDto item, CreateRoomRequestDto dto) {
-        ClassSlot slot = classSchedule.requireClassDate(dto.subjectId(), dto.commissionId(), item.date());
+        ClassSlot slot = classSchedule.requireClassDate(dto.subjectId(), dto.commissionId(), item.date(), item.startTime());
         ItemConsistency.requireNotPast(item.date(), slot.startTime());
         return baseItem(item)
                 .commissionId(dto.commissionId())

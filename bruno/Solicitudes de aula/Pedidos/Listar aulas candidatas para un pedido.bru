@@ -17,9 +17,10 @@ docs {
   todo sale de los datos del ítem.
 
   Respuesta: array de { id, roomNumber, buildingId, buildingName, capacity,
-  available, computerCount }. `computerCount` es el recurso "Cantidad de PC" del
-  aula (`null` si no lo tiene). En un laboratorio derivado solo salen las aulas
-  del edificio derivado. `available: false` = ocupada en esa fecha/horario, pero igual
+  available, computerCount, missingRequirements }. `computerCount` es el recurso "Cantidad de PC" del
+  aula (`null` si no lo tiene). En un pedido derivado solo salen las aulas
+  del edificio derivado, pida computadoras o no. `missingRequirements` viaja siempre
+  vacío en este endpoint (solo lo llena el alta directa). `available: false` = ocupada en esa fecha/horario, pero igual
   aparece en la lista (no se filtra). `requiredSoftware` no filtra, ya viaja en
   el detalle del ítem.
 

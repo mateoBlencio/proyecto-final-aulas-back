@@ -58,23 +58,45 @@ class RoomRequestTransitionValidatorTest {
     }
 
     @Test
-    @DisplayName("un pedido en evaluación se puede reasignar (IN_EVALUATION -> IN_EVALUATION), notificar o cancelar")
+    @DisplayName("un pedido en evaluación se puede reasignar (IN_EVALUATION -> IN_EVALUATION), notificar o cancelar; no resolver directo")
     void fromInEvaluation() {
         assertThatCode(() -> validator.validateTransition(
                 RoomRequestStatus.IN_EVALUATION, RoomRequestStatus.IN_EVALUATION)).doesNotThrowAnyException();
         assertThatCode(() -> validator.validateTransition(
-                RoomRequestStatus.IN_EVALUATION, RoomRequestStatus.RESOLVED)).doesNotThrowAnyException();
+                RoomRequestStatus.IN_EVALUATION, RoomRequestStatus.NOTIFIED)).doesNotThrowAnyException();
         assertThatCode(() -> validator.validateTransition(
                 RoomRequestStatus.IN_EVALUATION, RoomRequestStatus.CANCELLED)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> validator.validateTransition(
+                RoomRequestStatus.IN_EVALUATION, RoomRequestStatus.RESOLVED))
+                .isInstanceOf(InvalidRoomRequestTransitionException.class);
         assertThatThrownBy(() -> validator.validateTransition(
                 RoomRequestStatus.IN_EVALUATION, RoomRequestStatus.DERIVED_TO_BUILDING))
                 .isInstanceOf(InvalidRoomRequestTransitionException.class);
     }
 
     @Test
-    @DisplayName("RESOLVED es terminal: no sale hacia ningún estado, ni siquiera CANCELLED")
-    void resolvedIsTerminal() {
-        for (RoomRequestStatus target : RoomRequestStatus.values()) {
+    @DisplayName("un pedido NOTIFIED se puede aceptar, reabrir o cancelar")
+    void fromNotified() {
+        assertThatCode(() -> validator.validateTransition(
+                RoomRequestStatus.NOTIFIED, RoomRequestStatus.RESOLVED)).doesNotThrowAnyException();
+        assertThatCode(() -> validator.validateTransition(
+                RoomRequestStatus.NOTIFIED, RoomRequestStatus.IN_EVALUATION)).doesNotThrowAnyException();
+        assertThatCode(() -> validator.validateTransition(
+                RoomRequestStatus.NOTIFIED, RoomRequestStatus.CANCELLED)).doesNotThrowAnyException();
+        for (RoomRequestStatus target : EnumSet.of(RoomRequestStatus.NEW, RoomRequestStatus.DERIVED_TO_BUILDING,
+                RoomRequestStatus.NOTIFIED)) {
+            assertThatThrownBy(() -> validator.validateTransition(RoomRequestStatus.NOTIFIED, target))
+                    .as("NOTIFIED -> %s", target)
+                    .isInstanceOf(InvalidRoomRequestTransitionException.class);
+        }
+    }
+
+    @Test
+    @DisplayName("RESOLVED solo sale hacia IN_EVALUATION (reabrir), ni siquiera hacia CANCELLED")
+    void resolvedOnlyReopens() {
+        assertThatCode(() -> validator.validateTransition(
+                RoomRequestStatus.RESOLVED, RoomRequestStatus.IN_EVALUATION)).doesNotThrowAnyException();
+        for (RoomRequestStatus target : EnumSet.complementOf(EnumSet.of(RoomRequestStatus.IN_EVALUATION))) {
             assertThatThrownBy(() -> validator.validateTransition(RoomRequestStatus.RESOLVED, target))
                     .as("RESOLVED -> %s", target)
                     .isInstanceOf(InvalidRoomRequestTransitionException.class);

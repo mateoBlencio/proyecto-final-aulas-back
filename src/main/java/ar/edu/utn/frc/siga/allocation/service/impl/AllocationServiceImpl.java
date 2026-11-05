@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ReleasedOccurrenceDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
+import ar.edu.utn.frc.siga.allocation.exception.ReallocationObservationRequiredException;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationComposer;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
@@ -152,6 +153,11 @@ public class AllocationServiceImpl implements AllocationService {
         Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolved.classroomByOccurrence();
         Map<Long, Long> current = requirePreviousAllocation(classroomByOccurrence.keySet());
         requireAccessToClassrooms(Set.copyOf(current.values()));
+        boolean classroomChanges = classroomByOccurrence.entrySet().stream()
+                .anyMatch(e -> !e.getValue().equals(current.get(e.getKey().occurrenceId())));
+        if (classroomChanges && (command.observation() == null || command.observation().isBlank())) {
+            throw new ReallocationObservationRequiredException();
+        }
         List<ClassroomResponseDto> classrooms = lockAndValidate(command, classroomByOccurrence);
         describeAllocation("Reasignación", classrooms, resolved.skippedReleased().size());
         List<Allocation> saved = writer.upsert(classroomByOccurrence, command.observation(), command.source());

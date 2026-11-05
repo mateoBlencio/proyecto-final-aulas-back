@@ -93,7 +93,7 @@ class AuditHistoryApiIntegrationTest extends AbstractIntegrationTest {
 
     private void reallocateOk(Long occurrenceId, Long classroomId) throws Exception {
         var dto = new AllocationBatchRequestDto(
-                List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, null, null, classroomId)), null);
+                List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, null, null, classroomId)), "cambio de aula");
         mockMvc.perform(put("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(dto)))

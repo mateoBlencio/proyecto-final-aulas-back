@@ -4,10 +4,11 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * Cursado de una comisión para el formulario de solicitud: los {@code slots} (día + horario) y las
- * {@code dates} de cursado futuras (calendario del cambio de aula "por única vez").
+ * Cursado de una comisión para el formulario de solicitud: los {@code slots} (día + horario), las
+ * {@code dates} de cursado futuras y, por fecha, los horarios de clase de ese día ({@code dateSlots}).
  */
 public record CommissionScheduleDto(
         List<ClassSlotDto> slots,
-        List<LocalDate> dates
+        List<LocalDate> dates,
+        List<ClassDateSlotsDto> dateSlots
 ) {}
