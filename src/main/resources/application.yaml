@@ -241,7 +241,7 @@ siga:
     read-timeout: 120s
     max-retries: 3
     max-response-size: 32MB
-    commission-message-enabled: ${SYSACAD_COMMISSION_MESSAGE_ENABLED:false}
+    commission-message-enabled: ${AUTOGESTION_MESSAGE_ENABLED:false}
     sync:
       cron: "0 0 3 * * SUN"
       min-valid-rows-percent: 50
