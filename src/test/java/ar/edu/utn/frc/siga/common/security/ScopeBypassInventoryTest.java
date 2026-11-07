@@ -29,7 +29,9 @@ class ScopeBypassInventoryTest {
             "ar/edu/utn/frc/siga/ingest/service/impl/IngestServiceImpl.java", 1,
             "ar/edu/utn/frc/siga/notification/internal/service/NotificationRetryScheduler.java", 1,
             "ar/edu/utn/frc/siga/roomrequest/service/impl/RoomRequestCatalogServiceImpl.java", 1,
-            "ar/edu/utn/frc/siga/sysacad/internal/sync/AllocationSyncService.java", 1);
+            "ar/edu/utn/frc/siga/sysacad/internal/sync/AllocationSyncService.java", 1,
+            "ar/edu/utn/frc/siga/sysacad/internal/write/DirectChangeHandler.java", 1,
+            "ar/edu/utn/frc/siga/sysacad/internal/write/SysacadReviewService.java", 1);
 
     private static final Map<String, Integer> EXPECTED_UNRESTRICTED = Map.of(
             "ar/edu/utn/frc/siga/auth/security/DefaultBuildingScopeResolver.java", 1,

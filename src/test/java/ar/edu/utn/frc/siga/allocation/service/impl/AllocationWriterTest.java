@@ -22,6 +22,7 @@ import java.time.LocalTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyCollection;
@@ -61,7 +62,7 @@ class AllocationWriterTest {
         Map<OccurrenceSlotDto, Long> classroomByOccurrence = mapOf(occ, 5L);
         when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of());
 
-        int affected = writer.syncFromSysacad(classroomByOccurrence);
+        int affected = writer.syncFromSysacad(classroomByOccurrence, Set.of(1L));
 
         assertThat(affected).isEqualTo(1);
         ArgumentCaptor<Allocation> captor = ArgumentCaptor.forClass(Allocation.class);
@@ -81,7 +82,7 @@ class AllocationWriterTest {
         Allocation existing = allocation(100L, 10L, 5L, AllocationSource.SYSACAD);
         when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of(existing));
 
-        int affected = writer.syncFromSysacad(classroomByOccurrence);
+        int affected = writer.syncFromSysacad(classroomByOccurrence, Set.of(1L));
 
         assertThat(affected).isEqualTo(1);
         assertThat(existing.getClassroomId()).isEqualTo(7L);
@@ -99,8 +100,8 @@ class AllocationWriterTest {
         existing.setObservation("Recuperado de SysAcad");
         when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of(existing));
 
-        int first = writer.syncFromSysacad(classroomByOccurrence);
-        int second = writer.syncFromSysacad(classroomByOccurrence);
+        int first = writer.syncFromSysacad(classroomByOccurrence, Set.of(1L));
+        int second = writer.syncFromSysacad(classroomByOccurrence, Set.of(1L));
 
         assertThat(first).isZero();
         assertThat(second).isZero();
@@ -117,7 +118,7 @@ class AllocationWriterTest {
         Allocation existing = allocation(100L, 10L, 5L, foreignSource);
         when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of(existing));
 
-        int affected = writer.syncFromSysacad(classroomByOccurrence);
+        int affected = writer.syncFromSysacad(classroomByOccurrence, Set.of(1L));
 
         assertThat(affected).isEqualTo(0);
         assertThat(existing.getClassroomId()).isEqualTo(5L);
@@ -126,9 +127,77 @@ class AllocationWriterTest {
     }
 
     @Test
+    @DisplayName("clase pasada sin asignación se crea aunque el evento no esté en el set")
+    void createsPastOccurrenceWithoutAllocation() {
+        OccurrenceSlotDto past = occurrenceSlot(10L, 1L, LocalDate.now().minusDays(2));
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of());
+
+        int affected = writer.syncFromSysacad(mapOf(past, 5L), Set.of());
+
+        assertThat(affected).isEqualTo(1);
+        verify(allocationRepository).save(org.mockito.ArgumentMatchers.argThat(a -> a.getOccurrenceId().equals(10L)
+                && a.getClassroomId().equals(5L) && a.getSource() == AllocationSource.SYSACAD));
+    }
+
+    @Test
+    @DisplayName("clases pasadas sin tocar: asignación SYSACAD de clase pasada no se actualiza aunque el evento esté en el set")
+    void doesNotUpdatePastSysacadAllocationEvenIfEventInSet() {
+        OccurrenceSlotDto past = occurrenceSlot(10L, 1L, LocalDate.now().minusDays(2));
+        Allocation existing = allocation(100L, 10L, 5L, AllocationSource.SYSACAD);
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of(existing));
+
+        int affected = writer.syncFromSysacad(mapOf(past, 7L), Set.of(1L));
+
+        assertThat(affected).isZero();
+        assertThat(existing.getClassroomId()).isEqualTo(5L);
+        verify(allocationRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("clase futura SYSACAD con el evento fuera del set no se actualiza")
+    void doesNotUpdateFutureSysacadAllocationWhenEventNotInSet() {
+        OccurrenceSlotDto future = occurrenceSlot(10L, 1L, LocalDate.now().plusDays(3));
+        Allocation existing = allocation(100L, 10L, 5L, AllocationSource.SYSACAD);
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of(existing));
+
+        int affected = writer.syncFromSysacad(mapOf(future, 7L), Set.of(2L));
+
+        assertThat(affected).isZero();
+        assertThat(existing.getClassroomId()).isEqualTo(5L);
+    }
+
+    @Test
+    @DisplayName("clase futura SYSACAD con el evento en el set se actualiza")
+    void updatesFutureSysacadAllocationWhenEventInSet() {
+        OccurrenceSlotDto future = occurrenceSlot(10L, 1L, LocalDate.now().plusDays(3));
+        Allocation existing = allocation(100L, 10L, 5L, AllocationSource.SYSACAD);
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of(existing));
+
+        int affected = writer.syncFromSysacad(mapOf(future, 7L), Set.of(1L));
+
+        assertThat(affected).isEqualTo(1);
+        assertThat(existing.getClassroomId()).isEqualTo(7L);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = AllocationSource.class, names = {"MANUAL", "IMPORTED", "AUTOMATIC"})
+    @DisplayName("clase futura de otro origen no se toca aunque el evento esté en el set")
+    void doesNotUpdateForeignFutureAllocationEvenIfEventInSet(AllocationSource foreignSource) {
+        OccurrenceSlotDto future = occurrenceSlot(10L, 1L, LocalDate.now().plusDays(3));
+        Allocation existing = allocation(100L, 10L, 5L, foreignSource);
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of(existing));
+
+        int affected = writer.syncFromSysacad(mapOf(future, 7L), Set.of(1L));
+
+        assertThat(affected).isZero();
+        assertThat(existing.getClassroomId()).isEqualTo(5L);
+        assertThat(existing.getSource()).isEqualTo(foreignSource);
+    }
+
+    @Test
     @DisplayName("lote vacío es un no-op, sin ir a buscar asignaciones existentes")
     void emptyBatchIsNoOp() {
-        int affected = writer.syncFromSysacad(Map.of());
+        int affected = writer.syncFromSysacad(Map.of(), Set.of());
 
         assertThat(affected).isEqualTo(0);
         verify(allocationRepository, never()).findByOccurrenceIdIn(anyCollection());
@@ -150,7 +219,7 @@ class AllocationWriterTest {
         when(allocationRepository.findByOccurrenceIdIn(List.of(10L, 11L, 12L)))
                 .thenReturn(List.of(ownAllocation, foreignAllocation));
 
-        int affected = writer.syncFromSysacad(classroomByOccurrence);
+        int affected = writer.syncFromSysacad(classroomByOccurrence, Set.of(1L));
 
         assertThat(affected).isEqualTo(2);
         verify(allocationRepository).save(org.mockito.ArgumentMatchers.argThat(a -> a.getOccurrenceId().equals(10L)));
@@ -250,7 +319,7 @@ class AllocationWriterTest {
         when(allocationRepository.findByOccurrenceIdIn(List.of(10L, 11L)))
                 .thenReturn(List.of(allocation(200L, 11L, 1L, AllocationSource.SYSACAD)));
 
-        assertThat(writer.syncFromSysacad(batch)).isEqualTo(2);
+        assertThat(writer.syncFromSysacad(batch, Set.of(1L))).isEqualTo(2);
 
         verifyNoInteractions(movementPublisher);
     }
@@ -263,7 +332,11 @@ class AllocationWriterTest {
     }
 
     private OccurrenceSlotDto occurrenceSlot(long id, long eventId) {
-        return new OccurrenceSlotDto(id, eventId, LocalDate.now().plusDays(1), LocalTime.of(8, 0),
+        return occurrenceSlot(id, eventId, LocalDate.now().plusDays(1));
+    }
+
+    private OccurrenceSlotDto occurrenceSlot(long id, long eventId, LocalDate date) {
+        return new OccurrenceSlotDto(id, eventId, date, LocalTime.of(8, 0),
                 LocalTime.of(9, 30), OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
     }
 
@@ -280,5 +353,82 @@ class AllocationWriterTest {
         Map<OccurrenceSlotDto, Long> map = new LinkedHashMap<>();
         map.put(occ, classroomId);
         return map;
+    }
+
+
+    @Test
+    @DisplayName("overwriteFromSysacad: pisa la asignación de cualquier origen y la deja SYSACAD con la observación recibida")
+    void overwriteReplacesAnySourceAndPublishesChanges() {
+        OccurrenceSlotDto manual = occurrenceSlot(10L, 1L);
+        OccurrenceSlotDto imported = occurrenceSlot(11L, 1L);
+        Allocation manualAllocation = allocation(100L, 10L, 5L, AllocationSource.MANUAL);
+        Allocation importedAllocation = allocation(101L, 11L, 6L, AllocationSource.IMPORTED);
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L, 11L)))
+                .thenReturn(List.of(manualAllocation, importedAllocation));
+
+        Map<OccurrenceSlotDto, Long> target = new LinkedHashMap<>();
+        target.put(manual, 9L);
+        target.put(imported, 9L);
+
+        List<Change> changes = writer.overwriteFromSysacad(target, "Cambio directo en SysAcad", "SYSACAD");
+
+        assertThat(manualAllocation.getClassroomId()).isEqualTo(9L);
+        assertThat(manualAllocation.getSource()).isEqualTo(AllocationSource.SYSACAD);
+        assertThat(manualAllocation.getObservation()).isEqualTo("Cambio directo en SysAcad");
+        assertThat(importedAllocation.getSource()).isEqualTo(AllocationSource.SYSACAD);
+        assertThat(changes).extracting(Change::occurrenceId, Change::fromClassroomId, Change::toClassroomId)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(10L, 5L, 9L),
+                        org.assertj.core.groups.Tuple.tuple(11L, 6L, 9L));
+        verify(movementPublisher).publishSysacadDirectChange("SYSACAD", "Cambio directo en SysAcad", changes);
+    }
+
+    @Test
+    @DisplayName("overwriteFromSysacad: crea la asignación que faltaba con source SYSACAD y desde nulo")
+    void overwriteCreatesMissingAllocation() {
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L);
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of());
+
+        List<Change> changes = writer.overwriteFromSysacad(mapOf(occ, 9L), "Cambio directo en SysAcad", "SYSACAD");
+
+        ArgumentCaptor<Allocation> saved = ArgumentCaptor.forClass(Allocation.class);
+        verify(allocationRepository).save(saved.capture());
+        assertThat(saved.getValue().getClassroomId()).isEqualTo(9L);
+        assertThat(saved.getValue().getSource()).isEqualTo(AllocationSource.SYSACAD);
+        assertThat(changes).singleElement().satisfies(change -> assertThat(change.fromClassroomId()).isNull());
+    }
+
+    @Test
+    @DisplayName("overwriteFromSysacad: una asignación que ya está en esa aula no cambia ni cuenta como movimiento")
+    void overwriteSkipsAllocationAlreadyInClassroom() {
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L);
+        Allocation existing = allocation(100L, 10L, 9L, AllocationSource.MANUAL);
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of(existing));
+
+        List<Change> changes = writer.overwriteFromSysacad(mapOf(occ, 9L), "Cambio directo en SysAcad", "SYSACAD");
+
+        assertThat(changes).isEmpty();
+        assertThat(existing.getSource()).isEqualTo(AllocationSource.MANUAL);
+        verify(movementPublisher).publishSysacadDirectChange("SYSACAD", "Cambio directo en SysAcad", List.of());
+    }
+
+    @Test
+    @DisplayName("overwriteFromSysacad: sin ocurrencias no consulta ni publica")
+    void overwriteWithoutOccurrencesDoesNothing() {
+        assertThat(writer.overwriteFromSysacad(Map.of(), "x", "SYSACAD")).isEmpty();
+
+        verifyNoInteractions(allocationRepository, movementPublisher);
+    }
+
+    @Test
+    @DisplayName("syncFromSysacad: no actualiza una asignación SYSACAD de un evento que no está en eventIdsToUpdate")
+    void syncDoesNotUpdateEventOutsideUpdateSet() {
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L);
+        Allocation existing = allocation(100L, 10L, 5L, AllocationSource.SYSACAD);
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of(existing));
+
+        int affected = writer.syncFromSysacad(mapOf(occ, 7L), Set.of(99L));
+
+        assertThat(affected).isZero();
+        assertThat(existing.getClassroomId()).isEqualTo(5L);
     }
 }

@@ -1,5 +1,8 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
+import ar.edu.utn.frc.siga.allocation.dto.response.AllocationLastRevisionDto;
+import ar.edu.utn.frc.siga.audit.dto.RevisionMetadata;
+import ar.edu.utn.frc.siga.audit.service.RevisionReader;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationGroupDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationSiblingDto;
@@ -99,13 +102,15 @@ class AllocationServiceImplTest {
     private BuildingScopeResolver buildingScopeResolver;
     @Mock
     private ClassroomAllocationLock classroomLock;
+    @Mock
+    private RevisionReader revisionReader;
 
     private AllocationServiceImpl service;
 
     @BeforeEach
     void setUp() {
         service = new AllocationServiceImpl(allocationRepository, occurrenceService, composer, validator, targetResolver,
-                writer, classroomService, buildingScopeResolver, classroomLock);
+                writer, classroomService, buildingScopeResolver, classroomLock, revisionReader);
         lenient().when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of());
         lenient().when(buildingScopeResolver.scopeFor(any())).thenReturn(BuildingScope.unrestricted());
     }
@@ -848,13 +853,13 @@ class AllocationServiceImplTest {
         OccurrenceSlotDto pastOcc = occurrenceSlot(10L, 1L, LocalDate.now().minusMonths(2));
         Map<OccurrenceSlotDto, Long> resolved = mapOf(pastOcc, 5);
         when(targetResolver.resolveClassroomByOccurrence(List.of(item), null)).thenReturn(assignments(resolved));
-        when(writer.syncFromSysacad(resolved)).thenReturn(1);
+        when(writer.syncFromSysacad(resolved, Set.of(1L))).thenReturn(1);
 
-        int affected = service.syncFromSysacad(List.of(item));
+        int affected = service.syncFromSysacad(List.of(item), Set.of(1L));
 
         assertThat(affected).isEqualTo(1);
         verify(targetResolver).resolveClassroomByOccurrence(List.of(item), null);
-        verify(writer).syncFromSysacad(resolved);
+        verify(writer).syncFromSysacad(resolved, Set.of(1L));
     }
 
     @Test
@@ -868,7 +873,7 @@ class AllocationServiceImplTest {
         Map<OccurrenceSlotDto, Long> resolved = mapOf(libre, 5);
         when(targetResolver.resolveClassroomByOccurrence(List.of(item), null))
                 .thenReturn(new AllocationTargetResolver.ResolvedAssignments(resolved, List.of(liberada)));
-        when(writer.syncFromSysacad(resolved)).thenReturn(1);
+        when(writer.syncFromSysacad(resolved, Set.of())).thenReturn(1);
         ch.qos.logback.classic.Logger logger =
                 (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(AllocationServiceImpl.class);
         ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> appender =
@@ -877,12 +882,12 @@ class AllocationServiceImplTest {
         logger.addAppender(appender);
 
         try {
-            service.syncFromSysacad(List.of(item));
+            service.syncFromSysacad(List.of(item), Set.of());
         } finally {
             logger.detachAppender(appender);
         }
 
-        verify(writer).syncFromSysacad(resolved);
+        verify(writer).syncFromSysacad(resolved, Set.of());
         assertThat(appender.list).anySatisfy(e -> {
             assertThat(e.getLevel()).isEqualTo(ch.qos.logback.classic.Level.WARN);
             assertThat(e.getFormattedMessage()).contains("liberadas salteadas").contains("11");
@@ -896,9 +901,9 @@ class AllocationServiceImplTest {
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
         Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
         when(targetResolver.resolveClassroomByOccurrence(List.of(item), null)).thenReturn(assignments(resolved));
-        when(writer.syncFromSysacad(resolved)).thenReturn(1);
+        when(writer.syncFromSysacad(resolved, Set.of())).thenReturn(1);
 
-        service.syncFromSysacad(List.of(item));
+        service.syncFromSysacad(List.of(item), Set.of());
 
         verify(validator).validateClassroomsAvailable(Set.of(5L));
     }
@@ -910,9 +915,9 @@ class AllocationServiceImplTest {
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
         Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
         when(targetResolver.resolveClassroomByOccurrence(List.of(item), null)).thenReturn(assignments(resolved));
-        when(writer.syncFromSysacad(resolved)).thenReturn(1);
+        when(writer.syncFromSysacad(resolved, Set.of())).thenReturn(1);
 
-        service.syncFromSysacad(List.of(item));
+        service.syncFromSysacad(List.of(item), Set.of());
 
         verify(validator, never()).validateManualOverlap(anyList(), any());
     }
@@ -924,9 +929,9 @@ class AllocationServiceImplTest {
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
         Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
         when(targetResolver.resolveClassroomByOccurrence(List.of(item), null)).thenReturn(assignments(resolved));
-        when(writer.syncFromSysacad(resolved)).thenReturn(1);
+        when(writer.syncFromSysacad(resolved, Set.of())).thenReturn(1);
 
-        service.syncFromSysacad(List.of(item));
+        service.syncFromSysacad(List.of(item), Set.of());
 
         verify(classroomLock).lock(Set.of(5L));
         verify(validator, never()).validateManualOverlap(anyList(), any());
@@ -938,9 +943,9 @@ class AllocationServiceImplTest {
     void syncFromSysacadTargetVacioEsNoOp() {
         AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5L);
         when(targetResolver.resolveClassroomByOccurrence(List.of(item), null)).thenReturn(assignments(Map.of()));
-        when(writer.syncFromSysacad(Map.of())).thenReturn(0);
+        when(writer.syncFromSysacad(Map.of(), Set.of())).thenReturn(0);
 
-        int affected = service.syncFromSysacad(List.of(item));
+        int affected = service.syncFromSysacad(List.of(item), Set.of());
 
         assertThat(affected).isEqualTo(0);
         verify(validator, never()).validateClassroomsAvailable(any());
@@ -1269,12 +1274,12 @@ class AllocationServiceImplTest {
         auditedService();
         AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5L);
         when(targetResolver.resolveClassroomByOccurrence(List.of(item), null)).thenReturn(assignments(Map.of()));
-        when(writer.syncFromSysacad(Map.of())).thenAnswer(inv -> {
+        when(writer.syncFromSysacad(Map.of(), Set.of())).thenAnswer(inv -> {
             AuditDescriptionProbe.stamp();
             return affected;
         });
 
-        audited.syncFromSysacad(List.of(item));
+        audited.syncFromSysacad(List.of(item), Set.of());
 
         assertThat(probe.rewrittenDescription())
                 .isEqualTo("Sincronización de asignaciones desde SysAcad: " + expectedCount);
@@ -1339,5 +1344,43 @@ class AllocationServiceImplTest {
 
     private LocalDate futureDate(int daysFromNow) {
         return LocalDate.now().plusDays(daysFromNow);
+    }
+
+
+    // ---------- findClassroomIdsByOccurrences / findLastRevision ----------
+
+    @Test
+    @DisplayName("findClassroomIdsByOccurrences: devuelve el aula de cada ocurrencia asignada y omite las que no tienen")
+    void findClassroomIdsByOccurrencesMapsAssigned() {
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L, 11L)))
+                .thenReturn(List.of(allocation(100L, 10L, 5, AllocationSource.MANUAL)));
+
+        assertThat(service.findClassroomIdsByOccurrences(List.of(10L, 11L))).containsExactly(Map.entry(10L, 5L));
+    }
+
+    @Test
+    @DisplayName("findClassroomIdsByOccurrences: sin ids no consulta el repositorio")
+    void findClassroomIdsByOccurrencesWithoutIdsSkipsRepository() {
+        assertThat(service.findClassroomIdsByOccurrences(List.of())).isEmpty();
+
+        org.mockito.Mockito.verifyNoInteractions(allocationRepository);
+    }
+
+    @Test
+    @DisplayName("findLastRevision: toma usuario y operación de la última revisión de la asignación de la ocurrencia")
+    void findLastRevisionMapsLatestRevision() {
+        when(revisionReader.readLatest(Allocation.class, "occurrenceId", 10L)).thenReturn(Optional.of(
+                new RevisionMetadata(null, 7, java.time.LocalDateTime.of(2026, 3, 10, 12, 0), "sub@utn.edu.ar", null,
+                        null, "desc", "op-1")));
+
+        assertThat(service.findLastRevision(10L)).contains(new AllocationLastRevisionDto("sub@utn.edu.ar", "op-1"));
+    }
+
+    @Test
+    @DisplayName("findLastRevision: sin revisión devuelve vacío")
+    void findLastRevisionWithoutRevisionIsEmpty() {
+        when(revisionReader.readLatest(Allocation.class, "occurrenceId", 10L)).thenReturn(Optional.empty());
+
+        assertThat(service.findLastRevision(10L)).isEmpty();
     }
 }

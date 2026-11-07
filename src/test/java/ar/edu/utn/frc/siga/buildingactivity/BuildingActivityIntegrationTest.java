@@ -358,6 +358,41 @@ class BuildingActivityIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    @Test
+    @DisplayName("un cambio directo de SysAcad llega a actividad_edificio con usuario SYSACAD y origen SYSACAD")
+    void sysacadDirectChangeReachesBuildingActivity() {
+        Scenario s = scenario();
+
+        ar.edu.utn.frc.siga.common.security.SystemScope.call(() -> allocationService.applySysacadDirectChange(
+                new ar.edu.utn.frc.siga.allocation.service.command.SysacadDirectChangeCommand(
+                        List.of(s.eventId()), s.to().getId(), "Cambio directo en SysAcad", "SYSACAD", false)));
+
+        awaitActivities(s.building().getId(), 1);
+        assertThat(jdbcTemplate.queryForObject("select usuario from actividad_edificio where id_edificio = ?",
+                String.class, s.building().getId())).isEqualTo("SYSACAD");
+        assertThat(jdbcTemplate.queryForObject("select origen from actividad_edificio where id_edificio = ?",
+                String.class, s.building().getId())).isEqualTo("SYSACAD");
+    }
+
+    @Test
+    @DisplayName("el sync común de SysAcad cambia el aula y no deja actividad en el edificio")
+    void commonSysacadSyncLeavesNoActivity() throws Exception {
+        Scenario s = scenario();
+        allocationRepository.findByOccurrenceId(s.occurrence().getId()).ifPresent(a -> {
+            a.setSource(AllocationSource.SYSACAD);
+            allocationRepository.save(a);
+        });
+
+        asFixtureUser(() -> allocationService.syncFromSysacad(
+                List.of(new AllocationItem(new AllocationTarget.Event(s.eventId()), s.to().getId())),
+                java.util.Set.of(s.eventId())));
+
+        assertThat(allocationRepository.findByOccurrenceId(s.occurrence().getId()).orElseThrow().getClassroomId())
+                .isEqualTo(s.to().getId());
+        Thread.sleep(1500);
+        assertThat(activitiesIn(s.building().getId())).isZero();
+    }
+
     private void publishInTransaction(ClassroomMovements event) {
         transactionTemplate.executeWithoutResult(status -> eventPublisher.publishEvent(event));
     }

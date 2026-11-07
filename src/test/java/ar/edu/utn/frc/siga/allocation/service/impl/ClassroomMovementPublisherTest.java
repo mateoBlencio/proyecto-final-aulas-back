@@ -351,4 +351,39 @@ class ClassroomMovementPublisherTest {
             action.run();
         }
     }
+
+
+    @Test
+    @DisplayName("publishSysacadDirectChange: publica con actor y origen SYSACAD aun bajo SystemScope y sin transacción")
+    void sysacadDirectChangePublishesWithSysacadActor() {
+        SystemScope.run(() -> publisher.publishSysacadDirectChange("SYSACAD", "Cambio directo en SysAcad", CHANGES));
+
+        ArgumentCaptor<ClassroomMovements> captor = ArgumentCaptor.forClass(ClassroomMovements.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        ClassroomMovements event = captor.getValue();
+        assertThat(event.actor()).isEqualTo("SYSACAD");
+        assertThat(event.source()).isEqualTo(AllocationSource.SYSACAD);
+        assertThat(event.reason()).isEqualTo("Cambio directo en SysAcad");
+        assertThat(event.changes()).isEqualTo(CHANGES);
+        assertThat(event.operationId()).isNotBlank();
+    }
+
+    @Test
+    @DisplayName("publishSysacadDirectChange: lista vacía no publica")
+    void sysacadDirectChangeDoesNotPublishEmptyChanges() {
+        publisher.publishSysacadDirectChange("SYSACAD", "Cambio directo en SysAcad", List.of());
+
+        verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    @DisplayName("publishSysacadDirectChange: el actor recibido viaja en el evento")
+    void sysacadDirectChangeCarriesGivenActor() {
+        publisher.publishSysacadDirectChange("sub@frc.utn.edu.ar", "motivo", CHANGES);
+
+        ArgumentCaptor<ClassroomMovements> captor = ArgumentCaptor.forClass(ClassroomMovements.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().actor()).isEqualTo("sub@frc.utn.edu.ar");
+        assertThat(captor.getValue().source()).isEqualTo(AllocationSource.SYSACAD);
+    }
 }

@@ -44,7 +44,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("Búsqueda de asignaciones en el período (integración)")
 class AllocationSearchApiIntegrationTest extends AbstractIntegrationTest {
 
-    private static final AtomicInteger NEXT_YEAR = new AtomicInteger(2600);
+    // Por encima de 3500: DashboardPeriodApiIntegrationTest deja activo un período de 2000 a 3500 en la base compartida.
+    private static final AtomicInteger NEXT_YEAR = new AtomicInteger(3600);
 
     @Autowired
     private IntegrationTestData testData;
