@@ -14,12 +14,14 @@ import static org.mockito.Mockito.when;
 import ar.edu.utn.frc.siga.auth.dto.response.UserResponseDto;
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.service.UserService;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.notification.api.NotificationRequest;
 import ar.edu.utn.frc.siga.notification.api.NotificationSender;
 import ar.edu.utn.frc.siga.notification.api.NotificationTemplate;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
+import ar.edu.utn.frc.siga.sysacad.internal.model.DestinationNotSendableReason;
 import ar.edu.utn.frc.siga.sysacad.internal.model.ScheduleLogType;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadReviewReason;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
@@ -37,6 +39,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -266,5 +270,68 @@ class SysacadAlertServiceTest {
         service.alert(null);
 
         verifyNoMoreInteractions(notificationSender);
+    }
+
+    private static SysacadScheduleLogEntry notSendableEntry(long scheduleId, DestinationNotSendableReason reason) {
+        return SysacadScheduleLogEntry.builder().scheduleId(scheduleId).type(ScheduleLogType.DESTINATION_NOT_SENDABLE)
+                .reason(reason.name()).occurrenceId(77L).occurredAt(RUN_END).build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> sentLines() {
+        ArgumentCaptor<NotificationRequest> captor = ArgumentCaptor.forClass(NotificationRequest.class);
+        verify(notificationSender).send(captor.capture());
+        return (List<String>) captor.getValue().model().get("lineas");
+    }
+
+    private void slot77() {
+        when(occurrenceService.findSlots(any())).thenReturn(List.of(
+                new OccurrenceSlotDto(77L, 5L, java.time.LocalDate.of(2026, 3, 12), java.time.LocalTime.of(18, 30),
+                        java.time.LocalTime.of(20, 0), null, 0)));
+    }
+
+    @Test
+    @DisplayName("destino no enviable: manda mail con el motivo y la clase afectada")
+    void notSendableDestinationMailsReasonAndClass() {
+        finishedRun();
+        newsInWindow(notSendableEntry(1L, DestinationNotSendableReason.CLASSROOM_WITHOUT_NUMBER));
+        slot77();
+        subsecretaria("sub@utn.edu.ar");
+
+        service.alert(PREVIOUS_END);
+
+        assertThat(sentLines()).singleElement().asString()
+                .contains("1K1").contains("el aula de SIGA no tiene número en SysAcad")
+                .contains("clase: 12/03/2026 18:30");
+    }
+
+    @Test
+    @DisplayName("destino no enviable junto con revisión abierta: un solo mail con ambas líneas")
+    void notSendableAndReviewShareOneMail() {
+        finishedRun();
+        newsInWindow(notSendableEntry(1L, DestinationNotSendableReason.CLASSROOM_NOT_CURRENT_IN_SYSACAD),
+                reviewEntry(1L));
+        slot77();
+        subsecretaria("sub@utn.edu.ar");
+
+        assertThatCode(() -> service.alert(PREVIOUS_END)).doesNotThrowAnyException();
+
+        assertThat(sentLines()).hasSize(2)
+                .anyMatch(l -> l.contains("no está vigente en SysAcad"))
+                .anyMatch(l -> l.contains("ocupada"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(DestinationNotSendableReason.class)
+    @DisplayName("cada motivo de destino no enviable tiene texto")
+    void everyNotSendableReasonHasText(DestinationNotSendableReason reason) {
+        finishedRun();
+        newsInWindow(notSendableEntry(1L, reason));
+        slot77();
+        subsecretaria("sub@utn.edu.ar");
+
+        assertThatCode(() -> service.alert(PREVIOUS_END)).doesNotThrowAnyException();
+
+        assertThat(sentLines()).singleElement().asString().contains("1K1").doesNotContain(reason.name());
     }
 }

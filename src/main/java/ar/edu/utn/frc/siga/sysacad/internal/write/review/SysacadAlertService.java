@@ -12,6 +12,7 @@ import ar.edu.utn.frc.siga.notification.api.NotificationSender;
 import ar.edu.utn.frc.siga.notification.api.NotificationTemplate;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadScheduleStatus;
+import ar.edu.utn.frc.siga.sysacad.internal.model.DestinationNotSendableReason;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
 import ar.edu.utn.frc.siga.sysacad.internal.model.ScheduleLogType;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadReviewReason;
@@ -52,7 +53,7 @@ public class SysacadAlertService {
     private static final Locale ES = Locale.forLanguageTag("es-AR");
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private static final List<ScheduleLogType> NEWS_TYPES = List.of(ScheduleLogType.REVIEW_OPENED,
-            ScheduleLogType.NO_ROOM_AFTER_CANCEL);
+            ScheduleLogType.NO_ROOM_AFTER_CANCEL, ScheduleLogType.DESTINATION_NOT_SENDABLE);
 
     private final SysacadScheduleLogRepository logRepository;
     private final SysacadScheduleRepository scheduleRepository;
@@ -199,6 +200,9 @@ public class SysacadAlertService {
         if (entry.getType() == ScheduleLogType.NO_ROOM_AFTER_CANCEL) {
             return "se canceló el pedido y la próxima clase quedó sin aula";
         }
+        if (entry.getType() == ScheduleLogType.DESTINATION_NOT_SENDABLE) {
+            return destinationText(DestinationNotSendableReason.valueOf(entry.getReason()));
+        }
         return switch (SysacadReviewReason.valueOf(entry.getReason())) {
             case ROOM_OCCUPIED -> "el aula que puso SysAcad está ocupada en SIGA";
             case NO_ROOM_IN_SYSACAD -> "SysAcad dejó el horario sin aula";
@@ -212,6 +216,16 @@ public class SysacadAlertService {
             case SCHEDULE_NOT_FOUND -> "SysAcad no encuentra el horario";
             case ROOM_NOT_IN_SYSACAD -> "SysAcad no tiene el aula de SIGA";
             case ROWS_DIVERGED -> "las filas del horario en SysAcad no coinciden entre sí";
+        };
+    }
+
+    private static String destinationText(DestinationNotSendableReason reason) {
+        return switch (reason) {
+            case CLASSROOM_NOT_CURRENT_IN_SYSACAD -> "el aula de SIGA no está vigente en SysAcad";
+            case CLASSROOM_WITHOUT_NUMBER -> "el aula de SIGA no tiene número en SysAcad";
+            case CLASSROOM_RESERVED_NUMBER -> "el aula de SIGA usa un número reservado en SysAcad";
+            case BUILDING_WITHOUT_CODE -> "el edificio del aula de SIGA no tiene código en SysAcad";
+            case CLASSROOM_NOT_FOUND -> "SIGA no encuentra el aula de destino";
         };
     }
 }
