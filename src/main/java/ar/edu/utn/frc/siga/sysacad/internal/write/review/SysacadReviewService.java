@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.sysacad.internal.write;
+package ar.edu.utn.frc.siga.sysacad.internal.write.review;
 
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.service.command.SysacadDirectChangeCommand;
@@ -23,6 +23,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.AffectedOccurrence;
+import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadScheduleStateWriter;
 
 /**
  * Resolución humana de un horario en revisión. Sin transacción externa: la operación de {@code allocation} y el

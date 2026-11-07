@@ -29,7 +29,7 @@ import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadScheduleStatus;
 import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleRepository;
 import ar.edu.utn.frc.siga.sysacad.internal.service.impl.SysacadCatalogSnapshotFactory;
 import ar.edu.utn.frc.siga.sysacad.internal.write.RunReport;
-import ar.edu.utn.frc.siga.sysacad.internal.write.SysacadReviewService;
+import ar.edu.utn.frc.siga.sysacad.internal.write.review.SysacadReviewService;
 import ar.edu.utn.frc.siga.sysacad.internal.write.SysacadWriteRun;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData.SubjectAndCommission;

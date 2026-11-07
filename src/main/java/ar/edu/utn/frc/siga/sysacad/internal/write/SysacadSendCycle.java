@@ -14,7 +14,7 @@ import ar.edu.utn.frc.siga.sysacad.internal.mapper.SysacadCatalogMapper;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadReviewReason;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.sync.ReconcileOutcome;
-import ar.edu.utn.frc.siga.sysacad.internal.write.NextClassDecision.Send;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Send;
 import ar.edu.utn.frc.siga.sysacad.internal.write.SendOutcome.Failure;
 import ar.edu.utn.frc.siga.sysacad.internal.write.SendOutcome.Kind;
 import java.time.Clock;
@@ -32,6 +32,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Component;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.ScheduleTimes;
+import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadScheduleStateWriter;
+import ar.edu.utn.frc.siga.sysacad.internal.write.review.DirectChangeHandler;
 
 /**
  * Sin transacción propia: cada paso persiste por {@link SysacadScheduleStateWriter}, así el resultado de un
@@ -76,7 +79,6 @@ public class SysacadSendCycle {
         }
     }
 
-    /** Filas de la clave ya mapeadas, o el resultado que corta el ciclo. */
     private record Reading(List<SysacadAllocationDto> rows, boolean complete, SendOutcome failure) {
     }
 

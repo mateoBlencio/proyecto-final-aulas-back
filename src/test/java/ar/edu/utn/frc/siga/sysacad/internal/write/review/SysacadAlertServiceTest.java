@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.sysacad.internal.write;
+package ar.edu.utn.frc.siga.sysacad.internal.write.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -41,6 +41,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.json.JsonMapper;
+import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadWriteStateService;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("SysacadAlertService")

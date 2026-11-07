@@ -39,12 +39,12 @@ import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleLogReposit
 import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleRepository;
 import ar.edu.utn.frc.siga.sysacad.internal.service.impl.SysacadCatalogSnapshotFactory;
 import ar.edu.utn.frc.siga.sysacad.internal.sync.RecentSendLookup;
-import ar.edu.utn.frc.siga.sysacad.internal.write.PlannedSchedule;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.PlannedSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.write.RunReport;
-import ar.edu.utn.frc.siga.sysacad.internal.write.ScheduleTimes;
-import ar.edu.utn.frc.siga.sysacad.internal.write.SysacadScheduleStateWriter;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.ScheduleTimes;
+import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadScheduleStateWriter;
 import ar.edu.utn.frc.siga.sysacad.internal.write.SysacadWriteJob;
-import ar.edu.utn.frc.siga.sysacad.internal.write.SysacadWritePlanner;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.SysacadWritePlanner;
 import ar.edu.utn.frc.siga.sysacad.internal.write.SysacadWriteRun;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData.SubjectAndCommission;

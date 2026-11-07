@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.sysacad.internal.write;
+package ar.edu.utn.frc.siga.sysacad.internal.write.state;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.Maps;
@@ -13,7 +13,7 @@ import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadScheduleStatus;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadWriteState;
 import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleLogRepository;
 import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleRepository;
-import ar.edu.utn.frc.siga.sysacad.internal.write.NextClassDecision.Waiting;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Waiting;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -31,6 +31,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.SysacadWritePlanner;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.PlannedSchedule;
 
 /** Consultas para la bandeja de revisión de Subsecretaría y el estado del job. */
 @Service
@@ -86,7 +88,6 @@ public class SysacadScheduleQuery {
         return new PageImpl<>(items, pageable, rows.size());
     }
 
-    /** Registro del horario, del más nuevo al más viejo. */
     @Transactional(readOnly = true)
     public Page<SysacadScheduleLogEntryDto> findLog(Long scheduleId, Pageable pageable) {
         if (!scheduleRepository.existsById(scheduleId)) {

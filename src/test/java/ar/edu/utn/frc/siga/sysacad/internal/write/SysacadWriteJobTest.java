@@ -23,6 +23,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Bean;
+import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadWriteStateService;
+import ar.edu.utn.frc.siga.sysacad.internal.write.review.SysacadAlertService;
 
 @DisplayName("SysacadWriteJob")
 class SysacadWriteJobTest {

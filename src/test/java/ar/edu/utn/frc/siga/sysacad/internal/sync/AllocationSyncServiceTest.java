@@ -24,7 +24,7 @@ import ar.edu.utn.frc.siga.sysacad.internal.model.NotSendableReason;
 import ar.edu.utn.frc.siga.sysacad.internal.sync.SysacadScheduleLoader.BaseRoom;
 import ar.edu.utn.frc.siga.sysacad.internal.sync.SysacadScheduleLoader.LoadResult;
 import ar.edu.utn.frc.siga.sysacad.internal.sync.SysacadScheduleLoader.ScheduleKey;
-import ar.edu.utn.frc.siga.sysacad.internal.write.DirectChangeHandler;
+import ar.edu.utn.frc.siga.sysacad.internal.write.review.DirectChangeHandler;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;

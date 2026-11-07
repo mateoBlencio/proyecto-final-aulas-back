@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.sysacad.internal.write;
+package ar.edu.utn.frc.siga.sysacad.internal.write.plan;
 
 import ar.edu.utn.frc.siga.academic.dto.response.HolidayResponseDto;
 import ar.edu.utn.frc.siga.academic.service.HolidayService;
@@ -46,7 +46,6 @@ public class SysacadWritePlanner {
     private record Candidate(SysacadSchedule schedule, List<OccurrenceSlotDto> slots, OccurrenceSlotDto next) {
     }
 
-    /** Decisión por horario con algo para mostrar o enviar, ordenada por la clase más cercana. */
     @Transactional(readOnly = true)
     public List<PlannedSchedule> plan(LocalDateTime now) {
         Set<Long> currentEventIds = academicEventService.findSysacadRecurringEvents().stream()

@@ -12,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Component;
+import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadWriteStateService;
+import ar.edu.utn.frc.siga.sysacad.internal.write.review.SysacadAlertService;
 
 @Slf4j
 @Component
@@ -25,8 +27,6 @@ public class SysacadWriteJob implements SmartLifecycle {
     private final SysacadProperties properties;
     private final Clock clock;
 
-    // Executor propio y no un bean: un TaskScheduler o ScheduledExecutorService publicado movería
-    // todos los @Scheduled de la app a este hilo.
     private ScheduledExecutorService executor;
 
     public SysacadWriteJob(SysacadWriteRun run, SysacadWriteStateService stateService,

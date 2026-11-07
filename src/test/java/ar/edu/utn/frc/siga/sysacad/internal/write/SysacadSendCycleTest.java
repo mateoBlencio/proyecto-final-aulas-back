@@ -27,7 +27,7 @@ import ar.edu.utn.frc.siga.sysacad.internal.mapper.SysacadCatalogMapper;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadReviewReason;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.sync.ReconcileOutcome;
-import ar.edu.utn.frc.siga.sysacad.internal.write.NextClassDecision.Send;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Send;
 import ar.edu.utn.frc.siga.sysacad.internal.write.SendOutcome.Kind;
 import java.time.Clock;
 import java.time.Duration;
@@ -47,6 +47,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.ScheduleTimes;
+import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadScheduleStateWriter;
+import ar.edu.utn.frc.siga.sysacad.internal.write.review.DirectChangeHandler;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("SysacadSendCycle")

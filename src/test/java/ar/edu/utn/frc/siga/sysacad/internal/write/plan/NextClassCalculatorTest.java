@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.sysacad.internal.write;
+package ar.edu.utn.frc.siga.sysacad.internal.write.plan;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -9,13 +9,13 @@ import ar.edu.utn.frc.siga.roomrequest.model.OccurrenceRequestState;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomSysacadRefDto;
 import ar.edu.utn.frc.siga.sysacad.internal.model.DestinationNotSendableReason;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
-import ar.edu.utn.frc.siga.sysacad.internal.write.NextClassDecision.NoNextClass;
-import ar.edu.utn.frc.siga.sysacad.internal.write.NextClassDecision.NoRoom;
-import ar.edu.utn.frc.siga.sysacad.internal.write.NextClassDecision.NoRoomAfterCancel;
-import ar.edu.utn.frc.siga.sysacad.internal.write.NextClassDecision.NotSendable;
-import ar.edu.utn.frc.siga.sysacad.internal.write.NextClassDecision.Send;
-import ar.edu.utn.frc.siga.sysacad.internal.write.NextClassDecision.Unchanged;
-import ar.edu.utn.frc.siga.sysacad.internal.write.NextClassDecision.Waiting;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NoNextClass;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NoRoom;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NoRoomAfterCancel;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NotSendable;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Send;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Unchanged;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Waiting;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;

@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.sysacad.internal.write;
+package ar.edu.utn.frc.siga.sysacad.internal.write.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -44,6 +44,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.AffectedOccurrence;
+import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadScheduleStateWriter;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DirectChangeHandler")

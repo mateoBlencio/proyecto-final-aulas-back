@@ -23,14 +23,14 @@ import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadScheduleStatus;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadWriteState;
 import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleRepository;
 import ar.edu.utn.frc.siga.sysacad.internal.sync.SysacadScheduleLoader.DryRunChange;
-import ar.edu.utn.frc.siga.sysacad.internal.write.NextClassDecision.NoRoomAfterCancel;
-import ar.edu.utn.frc.siga.sysacad.internal.write.NextClassDecision.NotSendable;
-import ar.edu.utn.frc.siga.sysacad.internal.write.NextClassDecision.Send;
-import ar.edu.utn.frc.siga.sysacad.internal.write.NextClassDecision.Waiting;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NoRoomAfterCancel;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NotSendable;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Send;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Waiting;
 import ar.edu.utn.frc.siga.sysacad.internal.write.RunReport.Result;
 import ar.edu.utn.frc.siga.sysacad.internal.write.SendOutcome.Failure;
 import ar.edu.utn.frc.siga.sysacad.internal.write.SendOutcome.Kind;
-import ar.edu.utn.frc.siga.sysacad.internal.write.SysacadViewReader.ViewReadResult;
+import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadViewReader.ViewReadResult;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -47,6 +47,12 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.SysacadWritePlanner;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.PlannedSchedule;
+import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadScheduleStateWriter;
+import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadWriteStateService;
+import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadViewReader;
+import ar.edu.utn.frc.siga.sysacad.internal.write.review.DirectChangeHandler;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("SysacadWriteRun")

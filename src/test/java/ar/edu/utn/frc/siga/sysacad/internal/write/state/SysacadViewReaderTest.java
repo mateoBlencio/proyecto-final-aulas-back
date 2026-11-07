@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.sysacad.internal.write;
+package ar.edu.utn.frc.siga.sysacad.internal.write.state;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -22,7 +22,7 @@ import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleRepository
 import ar.edu.utn.frc.siga.sysacad.internal.sync.ReconcileOutcome;
 import ar.edu.utn.frc.siga.sysacad.internal.sync.SysacadScheduleLoader.DryRunChange;
 import ar.edu.utn.frc.siga.sysacad.internal.sync.SysacadViewReconciler;
-import ar.edu.utn.frc.siga.sysacad.internal.write.SysacadViewReader.ViewReadResult;
+import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadViewReader.ViewReadResult;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;

@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.sysacad.internal.write;
+package ar.edu.utn.frc.siga.sysacad.internal.write.state;
 
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadWriteState;
 import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadWriteStateRepository;

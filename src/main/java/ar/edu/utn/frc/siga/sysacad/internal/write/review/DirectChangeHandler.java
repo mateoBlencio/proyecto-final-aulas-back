@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.sysacad.internal.write;
+package ar.edu.utn.frc.siga.sysacad.internal.write.review;
 
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.service.command.SysacadDirectChangeCommand;
@@ -27,6 +27,8 @@ import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.AffectedOccurrence;
+import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadScheduleStateWriter;
 
 /**
  * Una operación y una transacción por horario: no se envuelve en {@code @AuditOperation} ni en una

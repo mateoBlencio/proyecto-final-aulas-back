@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.sysacad.internal.write;
+package ar.edu.utn.frc.siga.sysacad.internal.write.review;
 
 import ar.edu.utn.frc.siga.auth.dto.response.UserResponseDto;
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
@@ -39,6 +39,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
+import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadWriteStateService;
 
 /** Mails a Subsecretaría: novedades de la corrida y caída prolongada de SysAcad. Nunca a auxiliares. */
 @Slf4j

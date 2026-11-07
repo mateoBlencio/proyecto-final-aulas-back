@@ -9,16 +9,16 @@ import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadScheduleStatus;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadWriteState;
 import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleRepository;
 import ar.edu.utn.frc.siga.sysacad.internal.sync.SysacadScheduleLoader.DryRunChange;
-import ar.edu.utn.frc.siga.sysacad.internal.write.NextClassDecision.NoRoom;
-import ar.edu.utn.frc.siga.sysacad.internal.write.NextClassDecision.NoRoomAfterCancel;
-import ar.edu.utn.frc.siga.sysacad.internal.write.NextClassDecision.NotSendable;
-import ar.edu.utn.frc.siga.sysacad.internal.write.NextClassDecision.Send;
-import ar.edu.utn.frc.siga.sysacad.internal.write.NextClassDecision.Waiting;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NoRoom;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NoRoomAfterCancel;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NotSendable;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Send;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Waiting;
 import ar.edu.utn.frc.siga.sysacad.internal.write.RunReport.ClassWithoutRoom;
 import ar.edu.utn.frc.siga.sysacad.internal.write.RunReport.Result;
 import ar.edu.utn.frc.siga.sysacad.internal.write.RunReport.ReviewedSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.write.SendOutcome.Failure;
-import ar.edu.utn.frc.siga.sysacad.internal.write.SysacadViewReader.ViewReadResult;
+import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadViewReader.ViewReadResult;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -31,6 +31,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.SysacadWritePlanner;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.PlannedSchedule;
+import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadScheduleStateWriter;
+import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadWriteStateService;
+import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadViewReader;
+import ar.edu.utn.frc.siga.sysacad.internal.write.review.DirectChangeHandler;
 
 @Slf4j
 @Component
@@ -144,7 +150,6 @@ public class SysacadWriteRun {
         }
     }
 
-    /** Devuelve false si la corrida debe cortar. */
     private boolean readView(Instant now, Execution execution) {
         ViewReadResult result;
         try {
@@ -194,7 +199,6 @@ public class SysacadWriteRun {
         }
     }
 
-    /** Devuelve true si la corrida debe cortar. */
     private boolean handle(SysacadSchedule schedule, SendOutcome outcome, Instant now, Execution execution) {
         SysacadProperties.Write config = properties.getWrite();
         if (outcome.kind() == SendOutcome.Kind.SCHEDULE_FAILED) {

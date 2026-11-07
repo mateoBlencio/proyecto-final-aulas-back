@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.sysacad.internal.write;
+package ar.edu.utn.frc.siga.sysacad.internal.write.plan;
 
 import ar.edu.utn.frc.siga.sysacad.internal.model.DestinationNotSendableReason;
 import java.time.LocalDate;

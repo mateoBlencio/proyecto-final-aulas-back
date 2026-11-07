@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.sysacad.internal.write;
+package ar.edu.utn.frc.siga.sysacad.internal.write.state;
 
 import ar.edu.utn.frc.siga.sysacad.api.SysacadAllocationDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;

@@ -1,4 +1,4 @@
-package ar.edu.utn.frc.siga.sysacad.internal.write;
+package ar.edu.utn.frc.siga.sysacad.internal.write.state;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -24,6 +24,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.json.JsonMapper;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.AffectedOccurrence;
 
 @DisplayName("SysacadScheduleStateWriter: resolución de revisión")
 class SysacadScheduleStateWriterResolveTest {

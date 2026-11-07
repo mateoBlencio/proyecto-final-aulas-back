@@ -22,7 +22,7 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadViewSyncer;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
 import ar.edu.utn.frc.siga.sysacad.internal.model.NotSendableReason;
-import ar.edu.utn.frc.siga.sysacad.internal.write.DirectChangeHandler;
+import ar.edu.utn.frc.siga.sysacad.internal.write.review.DirectChangeHandler;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;

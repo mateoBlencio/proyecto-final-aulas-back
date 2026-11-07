@@ -1,15 +1,18 @@
-package ar.edu.utn.frc.siga.sysacad.internal.write;
+package ar.edu.utn.frc.siga.sysacad.internal.write.state;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.sysacad.internal.model.ScheduleLogType;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadReviewReason;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadScheduleLogEntry;
+import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadScheduleLogEntry.SysacadScheduleLogEntryBuilder;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadScheduleStatus;
 import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleLogRepository;
 import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleRepository;
 import ar.edu.utn.frc.siga.sysacad.internal.sync.ReconcileOutcome;
 import ar.edu.utn.frc.siga.sysacad.internal.sync.SysacadViewReconciler;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.AffectedOccurrence;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.ScheduleTimes;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalTime;
@@ -55,20 +58,8 @@ public class SysacadScheduleStateWriter {
         schedule.setStatus(SysacadScheduleStatus.SENDING);
         schedule.setSendingBuilding(building);
         schedule.setSendingRoom(room);
-        logRepository.save(entry(schedule, ScheduleLogType.SEND_INTENT)
-                .previousBuilding(schedule.getKnownBuilding())
-                .previousRoom(schedule.getKnownRoom())
-                .newBuilding(building)
-                .newRoom(room)
-                .occurrenceId(occurrenceId)
-                .itemId(itemId)
-                .sentStartTime(sentStartTime)
-                .sentDurationMinutes(sentDurationMinutes)
-                .readStartTime(read.startTime())
-                .readDurationMinutes(read.durationMinutes())
-                .readEndTime(read.endTime())
-                .attempts(schedule.getAttempts())
-                .build());
+        logRepository.save(intentEntry(schedule, building, room, occurrenceId, read, sentStartTime,
+                sentDurationMinutes).itemId(itemId).build());
     }
 
     /** Intención de la reversión: deja los valores previos en el registro sin tocar el estado del horario. */
@@ -76,19 +67,8 @@ public class SysacadScheduleStateWriter {
     public void markRevertIntent(Long scheduleId, Integer building, Integer room, Long occurrenceId,
             ScheduleTimes read, LocalTime sentStartTime, Integer sentDurationMinutes) {
         SysacadSchedule schedule = load(scheduleId);
-        logRepository.save(entry(schedule, ScheduleLogType.SEND_INTENT)
-                .previousBuilding(schedule.getKnownBuilding())
-                .previousRoom(schedule.getKnownRoom())
-                .newBuilding(building)
-                .newRoom(room)
-                .occurrenceId(occurrenceId)
-                .sentStartTime(sentStartTime)
-                .sentDurationMinutes(sentDurationMinutes)
-                .readStartTime(read.startTime())
-                .readDurationMinutes(read.durationMinutes())
-                .readEndTime(read.endTime())
-                .attempts(schedule.getAttempts())
-                .build());
+        logRepository.save(intentEntry(schedule, building, room, occurrenceId, read, sentStartTime,
+                sentDurationMinutes).build());
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -100,12 +80,8 @@ public class SysacadScheduleStateWriter {
         if (building == null || room == null) {
             return;
         }
-        logRepository.save(entry(schedule, ScheduleLogType.SEND_CONFIRMED)
-                .previousBuilding(schedule.getKnownBuilding())
-                .previousRoom(schedule.getKnownRoom())
+        logRepository.save(change(schedule, ScheduleLogType.SEND_CONFIRMED, building, room)
                 .result("CONFIRMED")
-                .newBuilding(building)
-                .newRoom(room)
                 .occurrenceId(occurrenceId)
                 .itemId(itemId)
                 .revisionUser(truncate(revisionUser, 150))
@@ -131,13 +107,10 @@ public class SysacadScheduleStateWriter {
         schedule.setNextAttemptAt(nextAttemptAt);
         schedule.setLastError(truncate(error, LAST_ERROR_MAX));
         schedule.setStatus(SysacadScheduleStatus.PENDING);
-        logRepository.save(entry(schedule, ScheduleLogType.SEND_FAILED)
-                .previousBuilding(schedule.getKnownBuilding())
-                .previousRoom(schedule.getKnownRoom())
+        logRepository.save(change(schedule, ScheduleLogType.SEND_FAILED, schedule.getSendingBuilding(),
+                schedule.getSendingRoom())
                 .result(truncate(result, RESULT_MAX))
                 .reason(truncate(error, REASON_MAX))
-                .newBuilding(schedule.getSendingBuilding())
-                .newRoom(schedule.getSendingRoom())
                 .response(response)
                 .errorId(truncate(errorId, ERROR_ID_MAX))
                 .attempts(schedule.getAttempts())
@@ -162,16 +135,15 @@ public class SysacadScheduleStateWriter {
         if (schedule.getStatus() == SysacadScheduleStatus.REVIEW) {
             return;
         }
-        Instant now = clock.instant();
         schedule.setStatus(SysacadScheduleStatus.REVIEW);
         schedule.setReviewReason(reason);
-        schedule.setReviewSince(now);
+        schedule.setReviewSince(clock.instant());
         schedule.setNextAttemptAt(null);
         Integer newBuilding = schedule.getDifferentBuilding() != null
                 ? schedule.getDifferentBuilding() : schedule.getSendingBuilding();
         Integer newRoom = schedule.getDifferentRoom() != null
                 ? schedule.getDifferentRoom() : schedule.getSendingRoom();
-        SysacadScheduleLogEntry.SysacadScheduleLogEntryBuilder entry = entry(schedule, ScheduleLogType.REVIEW_OPENED)
+        SysacadScheduleLogEntryBuilder entry = entry(schedule, ScheduleLogType.REVIEW_OPENED)
                 .reason(reason.name())
                 .result(truncate(result, RESULT_MAX))
                 .newBuilding(newBuilding)
@@ -212,29 +184,13 @@ public class SysacadScheduleStateWriter {
         SysacadSchedule schedule = load(scheduleId);
         Integer building = schedule.getDifferentBuilding();
         Integer room = schedule.getDifferentRoom();
-        logRepository.save(entry(schedule, ScheduleLogType.DIRECT_CHANGE_DETECTED)
-                .previousBuilding(schedule.getKnownBuilding())
-                .previousRoom(schedule.getKnownRoom())
-                .newBuilding(building)
-                .newRoom(room)
-                .build());
-        if (!annulled.isEmpty()) {
-            logRepository.save(entry(schedule, ScheduleLogType.SIGA_CHANGES_ANNULLED)
-                    .previousBuilding(schedule.getKnownBuilding())
-                    .previousRoom(schedule.getKnownRoom())
-                    .newBuilding(building)
-                    .newRoom(room)
-                    .occurrences(json(annulled))
-                    .build());
-        }
+        logRepository.save(change(schedule, ScheduleLogType.DIRECT_CHANGE_DETECTED, building, room).build());
+        logAnnulled(schedule, building, room, annulled);
         schedule.setKnownBuilding(building);
         schedule.setKnownRoom(room);
         schedule.setBaseBuilding(building);
         schedule.setBaseRoom(room);
-        schedule.setDifferentBuilding(null);
-        schedule.setDifferentRoom(null);
-        schedule.setDifferenceDetectedAt(null);
-        clearSend(schedule);
+        closeDifference(schedule);
         schedule.setStatus(SysacadScheduleStatus.SYNCED);
     }
 
@@ -256,15 +212,7 @@ public class SysacadScheduleStateWriter {
         SysacadSchedule schedule = load(scheduleId);
         Integer building = lastReadBuilding(schedule);
         Integer room = lastReadRoom(schedule);
-        if (!annulled.isEmpty()) {
-            logRepository.save(entry(schedule, ScheduleLogType.SIGA_CHANGES_ANNULLED)
-                    .previousBuilding(schedule.getKnownBuilding())
-                    .previousRoom(schedule.getKnownRoom())
-                    .newBuilding(building)
-                    .newRoom(room)
-                    .occurrences(json(annulled))
-                    .build());
-        }
+        logAnnulled(schedule, building, room, annulled);
         logResolved(schedule, "KEEP_SYSACAD", user, building, room);
         schedule.setKnownBuilding(building);
         schedule.setKnownRoom(room);
@@ -279,27 +227,6 @@ public class SysacadScheduleStateWriter {
 
     public static Integer lastReadRoom(SysacadSchedule schedule) {
         return schedule.getDifferentRoom() != null ? schedule.getDifferentRoom() : schedule.getKnownRoom();
-    }
-
-    private void logResolved(SysacadSchedule schedule, String action, String user, Integer building, Integer room) {
-        logRepository.save(entry(schedule, ScheduleLogType.REVIEW_RESOLVED)
-                .reason(action)
-                .resolvedBy(truncate(user, 150))
-                .previousBuilding(schedule.getKnownBuilding())
-                .previousRoom(schedule.getKnownRoom())
-                .newBuilding(building)
-                .newRoom(room)
-                .build());
-    }
-
-    private static void closeReview(SysacadSchedule schedule) {
-        schedule.setDifferentBuilding(null);
-        schedule.setDifferentRoom(null);
-        schedule.setDifferenceDetectedAt(null);
-        clearSend(schedule);
-        schedule.setReviewReason(null);
-        schedule.setReviewSince(null);
-        schedule.setStatus(SysacadScheduleStatus.SYNCED);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -334,11 +261,7 @@ public class SysacadScheduleStateWriter {
         if (repeated) {
             return;
         }
-        logRepository.save(entry(schedule, type)
-                .previousBuilding(schedule.getKnownBuilding())
-                .previousRoom(schedule.getKnownRoom())
-                .newBuilding(building)
-                .newRoom(room)
+        logRepository.save(change(schedule, type, building, room)
                 .occurrenceId(occurrenceId)
                 .itemId(itemId)
                 .reason(truncatedReason)
@@ -350,6 +273,49 @@ public class SysacadScheduleStateWriter {
                 .orElseThrow(() -> ResourceNotFoundException.of("SysacadSchedule", scheduleId));
     }
 
+    private void logResolved(SysacadSchedule schedule, String action, String user, Integer building, Integer room) {
+        logRepository.save(change(schedule, ScheduleLogType.REVIEW_RESOLVED, building, room)
+                .reason(action)
+                .resolvedBy(truncate(user, 150))
+                .build());
+    }
+
+    private void logAnnulled(SysacadSchedule schedule, Integer building, Integer room,
+            List<AffectedOccurrence> annulled) {
+        if (annulled.isEmpty()) {
+            return;
+        }
+        logRepository.save(change(schedule, ScheduleLogType.SIGA_CHANGES_ANNULLED, building, room)
+                .occurrences(json(annulled))
+                .build());
+    }
+
+    private SysacadScheduleLogEntryBuilder intentEntry(SysacadSchedule schedule, Integer building, Integer room,
+            Long occurrenceId, ScheduleTimes read, LocalTime sentStartTime, Integer sentDurationMinutes) {
+        return change(schedule, ScheduleLogType.SEND_INTENT, building, room)
+                .occurrenceId(occurrenceId)
+                .sentStartTime(sentStartTime)
+                .sentDurationMinutes(sentDurationMinutes)
+                .readStartTime(read.startTime())
+                .readDurationMinutes(read.durationMinutes())
+                .readEndTime(read.endTime())
+                .attempts(schedule.getAttempts());
+    }
+
+    private static void closeReview(SysacadSchedule schedule) {
+        closeDifference(schedule);
+        schedule.setReviewReason(null);
+        schedule.setReviewSince(null);
+        schedule.setStatus(SysacadScheduleStatus.SYNCED);
+    }
+
+    private static void closeDifference(SysacadSchedule schedule) {
+        schedule.setDifferentBuilding(null);
+        schedule.setDifferentRoom(null);
+        schedule.setDifferenceDetectedAt(null);
+        clearSend(schedule);
+    }
+
     private static void clearSend(SysacadSchedule schedule) {
         schedule.setSendingBuilding(null);
         schedule.setSendingRoom(null);
@@ -358,8 +324,17 @@ public class SysacadScheduleStateWriter {
         schedule.setLastError(null);
     }
 
-    private SysacadScheduleLogEntry.SysacadScheduleLogEntryBuilder entry(SysacadSchedule schedule,
-            ScheduleLogType type) {
+    /** Fila que pasa del aula conocida del horario a la indicada. */
+    private SysacadScheduleLogEntryBuilder change(SysacadSchedule schedule, ScheduleLogType type,
+            Integer newBuilding, Integer newRoom) {
+        return entry(schedule, type)
+                .previousBuilding(schedule.getKnownBuilding())
+                .previousRoom(schedule.getKnownRoom())
+                .newBuilding(newBuilding)
+                .newRoom(newRoom);
+    }
+
+    private SysacadScheduleLogEntryBuilder entry(SysacadSchedule schedule, ScheduleLogType type) {
         return SysacadScheduleLogEntry.builder()
                 .scheduleId(schedule.getId())
                 .occurredAt(clock.instant())
