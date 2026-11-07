@@ -309,7 +309,7 @@ class SysacadViewReconcilerTest {
     @DisplayName("ON: un SEND_INTENT reciente en el registro confirma aunque el horario ya no tenga el envío en curso")
     void loggedRecentIntentConfirmsReplacedSend() {
         SysacadScheduleLogRepository logRepository = mock(SysacadScheduleLogRepository.class);
-        when(logRepository.existsRecentIntent(eq(7L), eq(5), eq(229), any())).thenReturn(true);
+        when(logRepository.existsUnconfirmedRecentIntent(eq(7L), eq(5), eq(229), any())).thenReturn(true);
         SysacadSchedule withId = SysacadSchedule.builder().id(7L)
                 .year(2026).specialty(5).plan(2008).subject(115).commission(7).dayOfWeek(1).semester(1)
                 .knownBuilding(5).knownRoom(228).status(SysacadScheduleStatus.PENDING)

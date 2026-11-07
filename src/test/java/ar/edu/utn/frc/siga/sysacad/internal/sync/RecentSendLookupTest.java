@@ -1,8 +1,6 @@
 package ar.edu.utn.frc.siga.sysacad.internal.sync;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -64,7 +62,7 @@ class RecentSendLookupTest {
 
         assertThat(lookup.isRecentSend(schedule, 5, 229, NOW)).isFalse();
 
-        verify(logRepository).existsRecentIntent(any(), any(), any(), any());
+        verify(logRepository).existsUnconfirmedRecentIntent(1L, 5, 229, NOW.minus(Duration.ofDays(7)));
     }
 
     @Test
@@ -78,17 +76,17 @@ class RecentSendLookupTest {
     }
 
     @Test
-    @DisplayName("Un SEND_INTENT dentro de la ventana de recentSendWindow en el registro es un envío reciente")
-    void loggedIntentInsideWindowIsRecent() {
-        when(logRepository.existsRecentIntent(1L, 5, 229, NOW.minus(Duration.ofDays(7)))).thenReturn(true);
+    @DisplayName("Un SEND_INTENT sin confirmar dentro de la ventana en el registro es un envío reciente")
+    void unconfirmedIntentInsideWindowIsRecent() {
+        when(logRepository.existsUnconfirmedRecentIntent(1L, 5, 229, NOW.minus(Duration.ofDays(7)))).thenReturn(true);
 
         assertThat(lookup.isRecentSend(schedule(1L), 5, 229, NOW)).isTrue();
     }
 
     @Test
-    @DisplayName("Sin SEND_INTENT dentro de la ventana no es un envío reciente")
-    void noLoggedIntentInsideWindowIsNotRecent() {
-        when(logRepository.existsRecentIntent(1L, 5, 229, NOW.minus(Duration.ofDays(7)))).thenReturn(false);
+    @DisplayName("Sin SEND_INTENT sin confirmar dentro de la ventana no es un envío reciente")
+    void noUnconfirmedIntentIsNotRecent() {
+        when(logRepository.existsUnconfirmedRecentIntent(1L, 5, 229, NOW.minus(Duration.ofDays(7)))).thenReturn(false);
 
         assertThat(lookup.isRecentSend(schedule(1L), 5, 229, NOW)).isFalse();
     }
@@ -98,6 +96,6 @@ class RecentSendLookupTest {
     void scheduleWithoutIdSkipsLog() {
         assertThat(lookup.isRecentSend(schedule(null), 5, 229, NOW)).isFalse();
 
-        verify(logRepository, never()).existsRecentIntent(any(), any(), any(), any());
+        verifyNoInteractions(logRepository);
     }
 }

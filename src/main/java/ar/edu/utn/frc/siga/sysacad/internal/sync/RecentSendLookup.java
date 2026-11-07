@@ -23,7 +23,10 @@ public class RecentSendLookup {
                 && Objects.equals(schedule.getSendingRoom(), room)) {
             return true;
         }
-        return schedule.getId() != null && logRepository.existsRecentIntent(schedule.getId(), building, room,
+        if (schedule.getId() == null) {
+            return false;
+        }
+        return logRepository.existsUnconfirmedRecentIntent(schedule.getId(), building, room,
                 now.minus(properties.getWrite().recentSendWindow()));
     }
 }

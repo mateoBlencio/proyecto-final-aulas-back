@@ -22,8 +22,11 @@ public interface SysacadScheduleLogRepository extends JpaRepository<SysacadSched
             select count(e) > 0 from SysacadScheduleLogEntry e
             where e.scheduleId = :scheduleId and e.type = ar.edu.utn.frc.siga.sysacad.internal.model.ScheduleLogType.SEND_INTENT
               and e.newBuilding = :building and e.newRoom = :room and e.occurredAt >= :since
+              and e.id > coalesce((select max(c.id) from SysacadScheduleLogEntry c
+                                   where c.scheduleId = :scheduleId
+                                     and c.type = ar.edu.utn.frc.siga.sysacad.internal.model.ScheduleLogType.SEND_CONFIRMED), 0)
             """)
-    boolean existsRecentIntent(@Param("scheduleId") Long scheduleId, @Param("building") Integer building,
+    boolean existsUnconfirmedRecentIntent(@Param("scheduleId") Long scheduleId, @Param("building") Integer building,
             @Param("room") Integer room, @Param("since") Instant since);
 
     Page<SysacadScheduleLogEntry> findByScheduleId(Long scheduleId, Pageable pageable);

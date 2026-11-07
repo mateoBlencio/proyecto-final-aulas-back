@@ -440,6 +440,36 @@ class SysacadWriteCycleIntegrationTest extends AbstractIntegrationTest {
         assertThat(schedulers.keySet()).noneMatch(name -> name.toLowerCase().contains("sysacad"));
     }
 
+    @Test
+    @DisplayName("RecentSendLookup contra Postgres: un intent anterior a una confirmación posterior no es eco (B y A confirmados, la vista muestra B)")
+    void intentResolvedByLaterConfirmationIsNotRecent() {
+        Seeded seeded = seed(true, true);
+        Instant now = Instant.now();
+        insertIntent(seeded, 229, now.minus(Duration.ofDays(4)));
+        insertConfirmed(seeded, 229, now.minus(Duration.ofDays(4)));
+        insertIntent(seeded, 230, now.minus(Duration.ofDays(2)));
+        insertConfirmed(seeded, 230, now.minus(Duration.ofDays(2)));
+        SysacadSchedule schedule = schedule(seeded);
+
+        assertThat(recentSendLookup.isRecentSend(schedule, seeded.buildingCode(), 229, now)).isFalse();
+    }
+
+    @Test
+    @DisplayName("RecentSendLookup contra Postgres: un intent sin confirmar fuera de la ventana no es eco")
+    void unconfirmedIntentOutsideWindowIsNotRecent() {
+        Seeded seeded = seed(true, true);
+        Instant now = Instant.now();
+        insertIntent(seeded, 229, now.minus(Duration.ofDays(8)));
+
+        assertThat(recentSendLookup.isRecentSend(schedule(seeded), seeded.buildingCode(), 229, now)).isFalse();
+    }
+
+    private void insertConfirmed(Seeded seeded, int room, Instant at) {
+        jdbc.update("INSERT INTO sysacad_horario_registro (id_horario, fecha, tipo, edificio_nuevo, aula_nuevo) "
+                + "VALUES (?, ?, 'SEND_CONFIRMED', ?, ?)", seeded.scheduleId(), Timestamp.from(at),
+                seeded.buildingCode(), room);
+    }
+
     private void insertIntent(Seeded seeded, int room, Instant at) {
         jdbc.update("INSERT INTO sysacad_horario_registro (id_horario, fecha, tipo, edificio_nuevo, aula_nuevo) "
                 + "VALUES (?, ?, 'SEND_INTENT', ?, ?)", seeded.scheduleId(), Timestamp.from(at),
