@@ -4,6 +4,7 @@ public enum ScheduleLogType {
     SEND_INTENT,
     SEND_CONFIRMED,
     SEND_FAILED,
+    COMMISSION_MESSAGE,
     DRY_RUN_SEND,
     WAITING,
     NO_ROOM_AFTER_CANCEL,

@@ -114,4 +114,13 @@ class ProcedureResponseParserTest {
         assertThat(ProcedureResponseParser.extractErrorId("500 - Internal Server Error")).isNull();
         assertThat(ProcedureResponseParser.extractErrorId(null)).isNull();
     }
+
+    @Test
+    @DisplayName("reportsFailure: solo Estado 0 es un rechazo; un cuerpo con otro formato no lo es")
+    void reportsFailure() {
+        assertThat(ProcedureResponseParser.reportsFailure(envelope("0", "No se envio"))).isTrue();
+        assertThat(ProcedureResponseParser.reportsFailure(envelope("1", "Enviado"))).isFalse();
+        assertThat(ProcedureResponseParser.reportsFailure("{}")).isFalse();
+        assertThat(ProcedureResponseParser.reportsFailure("esto no es json")).isFalse();
+    }
 }

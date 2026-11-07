@@ -81,6 +81,8 @@ class SysacadSendCycleTest {
     private DirectChangeHandler directChangeHandler;
     @Mock
     private AllocationService allocationService;
+    @Mock
+    private CommissionMessageSender commissionMessageSender;
 
     private SysacadProperties properties;
     private SysacadSendCycle cycle;
@@ -94,7 +96,7 @@ class SysacadSendCycleTest {
         properties.setSync(new SysacadProperties.Sync("0 0 3 * * *", 50));
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         cycle = new SysacadSendCycle(client, new SysacadCatalogMapper(), stateWriter, directChangeHandler,
-                allocationService, properties, clock);
+                allocationService, commissionMessageSender, properties, clock);
         pacer = new RequestPacer(clock, wait -> { }, 30);
         schedule = SysacadSchedule.builder().id(SCHEDULE_ID)
                 .year(YEAR).specialty(SPECIALTY).plan(PLAN).subject(SUBJECT).commission(COMMISSION)
@@ -155,6 +157,20 @@ class SysacadSendCycleTest {
         verify(client).updateRoom(command.capture());
         assertThat(command.getValue()).isEqualTo(new UpdateRoomCommand(YEAR, SPECIALTY, PLAN, SUBJECT, COMMISSION,
                 DAY, SEMESTER, 800, 135, BUILDING, NEW_ROOM));
+    }
+
+    @Test
+    @DisplayName("Envío confirmado: el mensaje a la comisión sale después de guardar la confirmación")
+    void confirmedSendMessagesCommissionAfterConfirm() {
+        readsReturn(rows(rawSiga(KNOWN_ROOM)), rows(rawSiga(NEW_ROOM)));
+        postReturns(new UpdateRoomResult.Applied("ok"));
+        when(allocationService.findLastRevision(OCCURRENCE_ID)).thenReturn(Optional.empty());
+
+        send();
+
+        InOrder order = inOrder(stateWriter, commissionMessageSender);
+        order.verify(stateWriter).confirm(SCHEDULE_ID, OCCURRENCE_ID, null, null, null, TIMES);
+        order.verify(commissionMessageSender).sendAfterConfirmation(schedule, decision(), pacer);
     }
 
     @Test
@@ -358,6 +374,7 @@ class SysacadSendCycleTest {
         assertThat(outcome.kind()).isEqualTo(Kind.SCHEDULE_FAILED);
         assertThat(outcome.failure().result()).isEqualTo("NOT_CONFIRMED");
         verify(stateWriter, never()).confirm(any(), any(), any(), any(), any(), any());
+        verifyNoInteractions(commissionMessageSender);
     }
 
     @Test

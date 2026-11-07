@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.sysacad.internal.client;
 
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.CommissionMessageCommand;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.CommissionMessageResult;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.ScheduleReadResult;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.UpdateRoomCommand;
@@ -22,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.SocketTimeoutException;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,6 +42,9 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 class SysacadWriteClientTest {
 
     private static final String PROCEDURE_URL = "http://sysacad.test/api/data/procedures/ActualizarHorarioAula";
+    private static final String MESSAGE_URL = "http://sysacad.test/api/data/procedures/EnviarMensajeComision";
+    private static final CommissionMessageCommand MESSAGE = new CommissionMessageCommand(
+            LocalDate.of(2026, 11, 17), 2026, 9, 2023, 101, 1, "Cambio de aula");
     private static final String VIEW_PATH = "/api/data/views/HorariosComisionesCupos";
     private static final String ERROR_ID = "e33f7028-a3ce-4b22-a30f-a453c700217e-1";
     private static final String ERROR_BODY = "500 - Internal Server Error. Error id " + ERROR_ID;
@@ -418,6 +424,58 @@ class SysacadWriteClientTest {
 
         assertThat(result).isInstanceOf(ScheduleReadResult.ServerError.class);
         assertThat(((ScheduleReadResult.ServerError) result).status()).isEqualTo(200);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("sendCommissionMessage: el POST va a EnviarMensajeComision con los 9 parámetros")
+    void sendsExactCommissionMessage() {
+        server.expect(requestTo(MESSAGE_URL))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE))
+                .andExpect(content().string("{\"params\":{\"@LegajoPublica\":0,\"@IdTipoUsuarioPublica\":\"S\","
+                        + "\"@FechaHasta\":\"2026-11-17\",\"@AnioAcademico\":2026,\"@Especialidad\":9,"
+                        + "\"@Plan\":2023,\"@Materia\":101,\"@Comision\":1,\"@Nota\":\"Cambio de aula\"}}"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        assertThat(client.sendCommissionMessage(MESSAGE)).isEqualTo(new CommissionMessageResult(true, "{}"));
+
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("sendCommissionMessage: Estado 0 en una respuesta 200 cuenta como no entregado")
+    void commissionMessageRejectedInBody() {
+        String body = envelope("0", "No se envio");
+        server.expect(requestTo(MESSAGE_URL)).andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+
+        assertThat(client.sendCommissionMessage(MESSAGE)).isEqualTo(new CommissionMessageResult(false, body));
+
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("sendCommissionMessage: un 500 no se reintenta, para no duplicar el mensaje")
+    void commissionMessageServerErrorIsNotRetried() {
+        server.expect(requestTo(MESSAGE_URL))
+                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR).body(ERROR_BODY));
+
+        CommissionMessageResult result = client.sendCommissionMessage(MESSAGE);
+
+        assertThat(result.delivered()).isFalse();
+        assertThat(result.response()).startsWith("HTTP 500");
+        assertThat(sleeps).isEmpty();
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("sendCommissionMessage: un corte de conexión no lanza ni se reintenta")
+    void commissionMessageConnectionFailureIsNotRetried() {
+        server.expect(requestTo(MESSAGE_URL)).andRespond(withException(new SocketTimeoutException("read timed out")));
+
+        assertThat(client.sendCommissionMessage(MESSAGE).delivered()).isFalse();
+
+        assertThat(sleeps).isEmpty();
         server.verify();
     }
 }

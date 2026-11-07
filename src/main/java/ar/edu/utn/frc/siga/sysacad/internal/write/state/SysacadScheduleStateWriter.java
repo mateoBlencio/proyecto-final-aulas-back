@@ -98,6 +98,17 @@ public class SysacadScheduleStateWriter {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordCommissionMessage(Long scheduleId, Long occurrenceId, Integer building, Integer room,
+            String note, boolean delivered, String response) {
+        logRepository.save(change(load(scheduleId), ScheduleLogType.COMMISSION_MESSAGE, building, room)
+                .result(delivered ? "SENT" : "FAILED")
+                .occurrenceId(occurrenceId)
+                .reason(truncate(note, REASON_MAX))
+                .response(response)
+                .build());
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordFailure(Long scheduleId, String result, boolean countAttempt, Instant nextAttemptAt,
             String error, String response, String errorId) {
         SysacadSchedule schedule = load(scheduleId);

@@ -42,6 +42,8 @@ public class SysacadProperties {
 
     private DataSize maxResponseSize = DataSize.ofMegabytes(32);
 
+    private boolean commissionMessageEnabled = false;
+
     @Valid
     private Sync sync = new Sync(null, DEFAULT_MIN_VALID_ROWS_PERCENT);
 

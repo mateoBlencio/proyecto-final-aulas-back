@@ -19,8 +19,7 @@ public final class ProcedureResponseParser {
 
     public static UpdateRoomResult parse(String body) {
         try {
-            JsonNode outer = MAPPER.readTree(body);
-            JsonNode inner = MAPPER.readTree(outer.path("resultSets").path(0).path("rows").path(0).path("JSON").asString(""));
+            JsonNode inner = innerJson(body);
             String state = inner.path("Estado").asString("");
             String description = inner.path("Descripcion").asString("");
             String normalized = description.toLowerCase(Locale.ROOT);
@@ -39,6 +38,19 @@ public final class ProcedureResponseParser {
         } catch (RuntimeException e) {
             return new UpdateRoomResult.Unparseable(body);
         }
+    }
+
+    public static boolean reportsFailure(String body) {
+        try {
+            return "0".equals(innerJson(body).path("Estado").asString(""));
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    private static JsonNode innerJson(String body) {
+        JsonNode outer = MAPPER.readTree(body);
+        return MAPPER.readTree(outer.path("resultSets").path(0).path("rows").path(0).path("JSON").asString(""));
     }
 
     public static String extractErrorId(String body) {

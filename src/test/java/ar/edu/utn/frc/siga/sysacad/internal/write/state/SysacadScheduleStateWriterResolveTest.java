@@ -126,4 +126,20 @@ class SysacadScheduleStateWriterResolveTest {
                 .containsExactly(ScheduleLogType.SIGA_CHANGES_ANNULLED, ScheduleLogType.REVIEW_RESOLVED);
         assertThat(captor.getAllValues().getFirst().getOccurrences()).contains("\"occurrenceId\":1");
     }
+
+    @Test
+    @DisplayName("recordCommissionMessage: registra el texto, el resultado y la respuesta sin tocar el estado del horario")
+    void recordCommissionMessageKeepsScheduleState() {
+        writer.recordCommissionMessage(7L, 100L, 5, 229, "Cambio de aula", false, "HTTP 500: error");
+
+        SysacadScheduleLogEntry row = savedRow();
+        assertThat(row.getType()).isEqualTo(ScheduleLogType.COMMISSION_MESSAGE);
+        assertThat(row.getResult()).isEqualTo("FAILED");
+        assertThat(row.getReason()).isEqualTo("Cambio de aula");
+        assertThat(row.getResponse()).isEqualTo("HTTP 500: error");
+        assertThat(row.getOccurrenceId()).isEqualTo(100L);
+        assertThat(row.getNewRoom()).isEqualTo(229);
+        assertThat(schedule.getStatus()).isEqualTo(SysacadScheduleStatus.REVIEW);
+        assertThat(schedule.getAttempts()).isEqualTo(4);
+    }
 }

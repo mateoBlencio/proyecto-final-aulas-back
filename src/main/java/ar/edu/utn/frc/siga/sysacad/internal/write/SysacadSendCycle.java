@@ -58,6 +58,7 @@ public class SysacadSendCycle {
     private final SysacadScheduleStateWriter stateWriter;
     private final DirectChangeHandler directChangeHandler;
     private final AllocationService allocationService;
+    private final CommissionMessageSender commissionMessageSender;
     private final SysacadProperties properties;
     private final Clock clock;
 
@@ -159,6 +160,7 @@ public class SysacadSendCycle {
             stateWriter.confirm(schedule.getId(), decision.occurrenceId(), null,
                     revision == null ? null : revision.user(), revision == null ? null : revision.operationId(),
                     snapshots.get(0).times());
+            commissionMessageSender.sendAfterConfirmation(schedule, decision, pacer);
             return SendOutcome.of(Kind.CONFIRMED);
         }
         if (connectionMessage != null) {

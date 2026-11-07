@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.sysacad.internal.client;
 
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.CommissionMessageCommand;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.CommissionMessageResult;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.ScheduleReadResult;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.UpdateRoomCommand;
@@ -30,6 +32,7 @@ import java.util.function.Consumer;
 public class SysacadWriteClient {
 
     private static final String PROCEDURE_PATH = "/api/data/procedures/ActualizarHorarioAula";
+    private static final String MESSAGE_PROCEDURE_PATH = "/api/data/procedures/EnviarMensajeComision";
     private static final String SCHEDULE_VIEW = "HorariosComisionesCupos";
     private static final ParameterizedTypeReference<ViewResponse<RawSchedule>> SCHEDULE_TYPE =
             new ParameterizedTypeReference<>() {};
@@ -57,6 +60,24 @@ public class SysacadWriteClient {
         }
         sleeper.accept(properties.inCallRetryDelay());
         return postOnce(command);
+    }
+
+    // Un solo intento: reintentar tras un corte puede duplicar el mensaje a toda la comisión.
+    public CommissionMessageResult sendCommissionMessage(CommissionMessageCommand command) {
+        try {
+            String body = restClient.post()
+                    .uri(MESSAGE_PROCEDURE_PATH)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("params", toParams(command)))
+                    .retrieve()
+                    .body(String.class);
+            return new CommissionMessageResult(!ProcedureResponseParser.reportsFailure(body), body);
+        } catch (RestClientResponseException e) {
+            return new CommissionMessageResult(false, "HTTP " + e.getStatusCode().value() + ": "
+                    + e.getResponseBodyAsString());
+        } catch (RestClientException | SysacadResponseTooLargeException e) {
+            return new CommissionMessageResult(false, e.getMessage());
+        }
     }
 
     public ScheduleReadResult readSchedule(int specialty, int plan, int subject) {
@@ -120,6 +141,20 @@ public class SysacadWriteClient {
     private static boolean isRetryable(UpdateRoomResult result) {
         return result instanceof UpdateRoomResult.Unparseable
                 || result instanceof UpdateRoomResult.ServerError error && error.status() >= 500;
+    }
+
+    private static Map<String, Object> toParams(CommissionMessageCommand command) {
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("@LegajoPublica", 0);
+        params.put("@IdTipoUsuarioPublica", "S");
+        params.put("@FechaHasta", command.visibleUntil().toString());
+        params.put("@AnioAcademico", command.academicYear());
+        params.put("@Especialidad", command.specialty());
+        params.put("@Plan", command.plan());
+        params.put("@Materia", command.subject());
+        params.put("@Comision", command.commission());
+        params.put("@Nota", command.note());
+        return params;
     }
 
     private static Map<String, Integer> toParams(UpdateRoomCommand command) {
