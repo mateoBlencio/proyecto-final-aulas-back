@@ -114,15 +114,11 @@ class CommissionMessageSenderTest {
     }
 
     @Test
-    @DisplayName("Clase liberada: el texto dice que queda sin aula, no el número 999")
-    void releasedClassHasNoRoomNumber() {
-        subjectIs("Física I");
-        when(client.sendCommissionMessage(any())).thenReturn(new CommissionMessageResult(true, "ok"));
-
+    @DisplayName("Clase liberada: no avisa a la comisión ni registra un mensaje")
+    void releasedClassIsNotNotified() {
         sender.sendAfterConfirmation(schedule, decision(999), pacer);
 
-        assertThat(sentCommand().note())
-                .isEqualTo("Cambio de aula: tu clase de Física I del martes 17/11 queda sin aula asignada.");
+        verifyNoInteractions(client, stateWriter, subjectService, classroomService);
     }
 
     @Test

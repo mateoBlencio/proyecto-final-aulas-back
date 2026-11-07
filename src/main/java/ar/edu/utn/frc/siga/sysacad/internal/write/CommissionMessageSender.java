@@ -37,7 +37,7 @@ public class CommissionMessageSender {
 
     // No propaga errores: el aula ya quedó confirmada y un fallo del mensaje no es un fallo del envío.
     public void sendAfterConfirmation(SysacadSchedule schedule, Send decision, RequestPacer pacer) {
-        if (!properties.isCommissionMessageEnabled()) {
+        if (!properties.isCommissionMessageEnabled() || decision.room() == RELEASED_ROOM) {
             return;
         }
         String note = null;
@@ -73,9 +73,6 @@ public class CommissionMessageSender {
     }
 
     private String destination(Send decision) {
-        if (decision.room() == RELEASED_ROOM) {
-            return " queda sin aula asignada";
-        }
         String building = classroomService.findByRoomNumberAndBuildingCode(decision.room(), decision.building())
                 .map(ClassroomResponseDto::buildingName)
                 .map(name -> " de " + name)
