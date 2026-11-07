@@ -1,0 +1,18 @@
+meta {
+  name: Reenviar lo de SIGA
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/v1/sysacad/schedules/1/review/resend-siga
+  body: none
+  auth: inherit
+}
+
+docs {
+  Toma la última lectura de SysAcad como valor conocido, limpia la diferencia,
+  los intentos y el error, y devuelve el horario a la cola: el job envía el aula
+  de SIGA en la corrida siguiente. Responde 409 si el horario no está en
+  revisión o si corre el job o el sync. Requiere PERM_SYSACAD_SYNC.
+}

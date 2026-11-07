@@ -1,0 +1,25 @@
+meta {
+  name: Horarios a revisar
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/v1/sysacad/schedules/review
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 0
+  size: 20
+}
+
+docs {
+  Lista paginada de horarios que necesitan atención: REVIEW (en revisión),
+  NOT_SENDABLE (no se pueden enviar y están en la vista) y WAITING (esperan un
+  pedido sin aceptar con la clase a menos de 24 horas). Cada ítem trae el
+  motivo, el aula conocida, el aula leída de SysAcad, el último envío
+  confirmado y, en los WAITING, la clase y el ítem que frenan el envío.
+  Requiere PERM_SYSACAD_READ.
+}
