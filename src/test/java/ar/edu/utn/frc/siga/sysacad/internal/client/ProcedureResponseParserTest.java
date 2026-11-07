@@ -116,11 +116,15 @@ class ProcedureResponseParserTest {
     }
 
     @Test
-    @DisplayName("reportsFailure: solo Estado 0 es un rechazo; un cuerpo con otro formato no lo es")
+    @DisplayName("reportsFailure: Estado 0, cuerpo vacío o no JSON son fallo; un JSON sin Estado no lo es")
     void reportsFailure() {
         assertThat(ProcedureResponseParser.reportsFailure(envelope("0", "No se envio"))).isTrue();
         assertThat(ProcedureResponseParser.reportsFailure(envelope("1", "Enviado"))).isFalse();
         assertThat(ProcedureResponseParser.reportsFailure("{}")).isFalse();
-        assertThat(ProcedureResponseParser.reportsFailure("esto no es json")).isFalse();
+        assertThat(ProcedureResponseParser.reportsFailure("esto no es json")).isTrue();
+        assertThat(ProcedureResponseParser.reportsFailure("<html>Bad gateway</html>")).isTrue();
+        assertThat(ProcedureResponseParser.reportsFailure("")).isTrue();
+        assertThat(ProcedureResponseParser.reportsFailure("   ")).isTrue();
+        assertThat(ProcedureResponseParser.reportsFailure(null)).isTrue();
     }
 }

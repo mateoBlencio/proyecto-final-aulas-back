@@ -41,10 +41,13 @@ public final class ProcedureResponseParser {
     }
 
     public static boolean reportsFailure(String body) {
+        if (body == null || body.isBlank()) {
+            return true;
+        }
         try {
             return "0".equals(innerJson(body).path("Estado").asString(""));
         } catch (RuntimeException e) {
-            return false;
+            return true;
         }
     }
 

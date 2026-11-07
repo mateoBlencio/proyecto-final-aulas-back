@@ -40,16 +40,27 @@ public class CommissionMessageSender {
         if (!properties.isCommissionMessageEnabled()) {
             return;
         }
+        String note = null;
+        CommissionMessageResult result;
         try {
-            String note = note(schedule, decision);
+            note = note(schedule, decision);
             pacer.acquire();
-            CommissionMessageResult result = client.sendCommissionMessage(new CommissionMessageCommand(
+            result = client.sendCommissionMessage(new CommissionMessageCommand(
                     decision.date(), schedule.getYear(), schedule.getSpecialty(), schedule.getPlan(),
                     schedule.getSubject(), schedule.getCommission(), note));
+        } catch (RuntimeException e) {
+            log.error("No se pudo enviar el mensaje a la comisión del horario {}", schedule.getId(), e);
+            result = new CommissionMessageResult(false, e.toString());
+        }
+        record(schedule, decision, note, result);
+    }
+
+    private void record(SysacadSchedule schedule, Send decision, String note, CommissionMessageResult result) {
+        try {
             stateWriter.recordCommissionMessage(schedule.getId(), decision.occurrenceId(), decision.building(),
                     decision.room(), note, result.delivered(), result.response());
         } catch (RuntimeException e) {
-            log.error("No se pudo enviar el mensaje a la comisión del horario {}", schedule.getId(), e);
+            log.error("No se pudo registrar el mensaje a la comisión del horario {}", schedule.getId(), e);
         }
     }
 
@@ -68,7 +79,8 @@ public class CommissionMessageSender {
         String building = classroomService.findByRoomNumberAndBuildingCode(decision.room(), decision.building())
                 .map(ClassroomResponseDto::buildingName)
                 .map(name -> " de " + name)
-                .orElse("");
+                .orElseThrow(() -> new IllegalStateException("Sin edificio para el aula " + decision.room()
+                        + " del edificio " + decision.building() + ": el número solo es ambiguo"));
         return " será en el aula " + decision.room() + building;
     }
 

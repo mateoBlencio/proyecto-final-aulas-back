@@ -455,6 +455,27 @@ class SysacadWriteClientTest {
     }
 
     @Test
+    @DisplayName("sendCommissionMessage: un 200 con HTML de un proxy cuenta como no entregado")
+    void commissionMessageHtmlBodyIsNotDelivered() {
+        String body = "<html>Bad gateway</html>";
+        server.expect(requestTo(MESSAGE_URL)).andRespond(withSuccess(body, MediaType.TEXT_HTML));
+
+        assertThat(client.sendCommissionMessage(MESSAGE)).isEqualTo(new CommissionMessageResult(false, body));
+
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("sendCommissionMessage: un 200 sin cuerpo cuenta como no entregado")
+    void commissionMessageEmptyBodyIsNotDelivered() {
+        server.expect(requestTo(MESSAGE_URL)).andRespond(withSuccess());
+
+        assertThat(client.sendCommissionMessage(MESSAGE).delivered()).isFalse();
+
+        server.verify();
+    }
+
+    @Test
     @DisplayName("sendCommissionMessage: un 500 no se reintenta, para no duplicar el mensaje")
     void commissionMessageServerErrorIsNotRetried() {
         server.expect(requestTo(MESSAGE_URL))

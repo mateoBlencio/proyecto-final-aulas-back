@@ -3,6 +3,10 @@ package ar.edu.utn.frc.siga.sysacad.internal.write;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -148,7 +152,7 @@ class CommissionMessageSenderTest {
     }
 
     @Test
-    @DisplayName("Una excepción al armar el texto no sale del método ni llama a SysAcad")
+    @DisplayName("Una excepción al armar el texto no sale del método, no llama a SysAcad y queda registrada")
     void failureDoesNotEscape() {
         when(subjectService.findByCodeAndStudyPlan(101, 2023, 9)).thenThrow(new IllegalStateException("sin materia"));
 
@@ -156,5 +160,35 @@ class CommissionMessageSenderTest {
                 .doesNotThrowAnyException();
 
         verify(client, never()).sendCommissionMessage(any());
+        verify(stateWriter).recordCommissionMessage(eq(SCHEDULE_ID), eq(OCCURRENCE_ID), eq(BUILDING), eq(ROOM),
+                isNull(), eq(false), argThat(response -> response.contains("sin materia")));
+    }
+
+    @Test
+    @DisplayName("Aula sin edificio resuelto: no manda un número ambiguo y registra el fallo")
+    void roomWithoutBuildingIsNotSent() {
+        subjectIs("Física I");
+        when(classroomService.findByRoomNumberAndBuildingCode(ROOM, BUILDING)).thenReturn(Optional.empty());
+
+        sender.sendAfterConfirmation(schedule, decision(ROOM), pacer);
+
+        verify(client, never()).sendCommissionMessage(any());
+        verify(stateWriter).recordCommissionMessage(eq(SCHEDULE_ID), eq(OCCURRENCE_ID), eq(BUILDING), eq(ROOM),
+                isNull(), eq(false), argThat(response -> response.contains("Sin edificio")));
+    }
+
+    @Test
+    @DisplayName("Si falla el registro de un mensaje entregado, no lanza ni lo registra como fallido")
+    void recordFailureDoesNotEscape() {
+        subjectIs("Física I");
+        buildingIs("Maders");
+        when(client.sendCommissionMessage(any())).thenReturn(new CommissionMessageResult(true, "ok"));
+        doThrow(new IllegalStateException("sin base")).when(stateWriter)
+                .recordCommissionMessage(any(), any(), any(), any(), any(), eq(true), any());
+
+        assertThatCode(() -> sender.sendAfterConfirmation(schedule, decision(ROOM), pacer))
+                .doesNotThrowAnyException();
+
+        verify(stateWriter, never()).recordCommissionMessage(any(), any(), any(), any(), any(), eq(false), any());
     }
 }
