@@ -5,5 +5,6 @@ import org.springframework.modulith.NamedInterface;
 @NamedInterface("api")
 public enum NotificationTemplate {
     ROOM_REQUEST_RESOLVED,
-    BUILDING_ACTIVITY
+    BUILDING_ACTIVITY,
+    SYSACAD_ALERT
 }

@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.buildingactivity.service;
 
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
+import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.allocation.model.ClassroomMovements;
 import ar.edu.utn.frc.siga.allocation.model.ClassroomMovements.Change;
 import ar.edu.utn.frc.siga.auth.dto.response.UserResponseDto;
@@ -36,8 +37,10 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Registra los movimientos de aula por edificio y avisa por mail a los auxiliares. Solo cuenta lo que hizo
- * Subsecretaría: lo de un auxiliar no se avisa.
+ * Registra los movimientos de aula por edificio y avisa por mail a los auxiliares. Cuenta lo que hizo
+ * Subsecretaría y los cambios directos en SysAcad (origen {@code SYSACAD}, sin mirar el rol del actor): lo de
+ * un auxiliar no se avisa. Los cambios directos además se mandan por mail a Subsecretaría del edificio. El sync
+ * común de SysAcad no publica movimientos y queda en silencio.
  */
 @Slf4j
 @Component
@@ -58,7 +61,8 @@ class ClassroomMovementsListener {
     @ApplicationModuleListener
     void on(ClassroomMovements event) {
         if (repository.existsByOperationId(event.operationId())) return;
-        if (!userService.hasRole(event.actor(), SystemRole.SUBSECRETARIA)) return;
+        if (event.source() != AllocationSource.SYSACAD
+                && !userService.hasRole(event.actor(), SystemRole.SUBSECRETARIA)) return;
 
         Map<Long, ClassroomRef> classrooms = classroomsOf(event.changes());
         Map<Long, String> labels = labelsOf(event.changes());
@@ -95,17 +99,24 @@ class ClassroomMovementsListener {
                 .lines(objectMapper.writeValueAsString(lines))
                 .build());
 
-        List<NotificationRecipient> recipients = userService
-                .findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, buildingId).stream()
-                .map(ClassroomMovementsListener::toRecipient)
-                .toList();
+        boolean directInSysacad = event.source() == AllocationSource.SYSACAD;
+        Map<String, NotificationRecipient> recipientsByEmail = new LinkedHashMap<>();
+        userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, buildingId)
+                .forEach(user -> recipientsByEmail.putIfAbsent(user.email(), toRecipient(user)));
+        if (directInSysacad) {
+            userService.findByRoleForBuilding(SystemRole.SUBSECRETARIA, buildingId)
+                    .forEach(user -> recipientsByEmail.putIfAbsent(user.email(), toRecipient(user)));
+        }
+        List<NotificationRecipient> recipients = List.copyOf(recipientsByEmail.values());
         if (recipients.isEmpty()) return;
 
         List<String> shown = lines.stream().limit(MAIL_MAX_LINES).map(ClassroomMovementsListener::describe).toList();
         Map<String, Object> model = new HashMap<>();
         model.put("edificio", buildingName);
-        model.put("resumen", "Subsecretaría registró " + lines.size()
-                + (lines.size() == 1 ? " movimiento" : " movimientos") + " de aula en " + buildingName + ".");
+        String movements = lines.size() + (lines.size() == 1 ? " movimiento" : " movimientos");
+        model.put("resumen", directInSysacad
+                ? "Se hizo un cambio directo en SysAcad: " + movements + " de aula en " + buildingName + "."
+                : "Subsecretaría registró " + movements + " de aula en " + buildingName + ".");
         model.put("motivo", event.reason());
         model.put("lineas", shown);
         model.put("restantes", lines.size() - shown.size());
