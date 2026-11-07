@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.audit.service.impl;
 
+import ar.edu.utn.frc.siga.audit.dto.RevisionMetadata;
 import ar.edu.utn.frc.siga.audit.dto.response.RevisionDto;
 import ar.edu.utn.frc.siga.audit.model.RevisionKind;
 import ar.edu.utn.frc.siga.audit.model.SigaRevision;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 
 @Component
@@ -59,6 +61,24 @@ public class RevisionReaderImpl implements RevisionReader {
                 .getResultList();
 
         return toRevisionDtos(results, toSnapshot);
+    }
+
+    @Override
+    public <E> Optional<RevisionMetadata> readLatest(Class<E> entityClass, String property, Object value) {
+        List<?> results = AuditReaderFactory.get(entityManager)
+                .createQuery()
+                .forRevisionsOfEntity(entityClass, false, true)
+                .add(AuditEntity.property(property).eq(value))
+                .addOrder(AuditEntity.revisionNumber().desc())
+                .setMaxResults(1)
+                .getResultList();
+        return results.stream().findFirst().map(row -> {
+            Object[] tuple = (Object[]) row;
+            SigaRevision revision = (SigaRevision) tuple[1];
+            return new RevisionMetadata(null, revision.getId(), revision.getFechaRevision(), revision.getUsuario(),
+                    revision.getActorType(), toKind((RevisionType) tuple[2]), revision.getDescripcion(),
+                    revision.getOperacionId());
+        });
     }
 
     private <E, S> List<RevisionDto<S>> toRevisionDtos(List<?> results, Function<E, S> toSnapshot) {

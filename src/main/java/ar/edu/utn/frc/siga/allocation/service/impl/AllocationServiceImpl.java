@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.allocation.service.impl;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationGroupDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationSiblingDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.AllocationLastRevisionDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ReleasedOccurrenceDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
@@ -17,10 +18,16 @@ import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.ReleaseCommand;
+import ar.edu.utn.frc.siga.allocation.service.command.SysacadDirectChangeCommand;
+import ar.edu.utn.frc.siga.allocation.service.command.SysacadDirectChangeResult;
+import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceConflictDto;
+import ar.edu.utn.frc.siga.allocation.model.ClassroomMovements.Change;
+import ar.edu.utn.frc.siga.allocation.validator.OverlapReview;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.service.command.OccurrenceRelease;
 import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.audit.AuditOperations;
+import ar.edu.utn.frc.siga.audit.service.RevisionReader;
 import ar.edu.utn.frc.siga.common.util.Plurals;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
@@ -62,6 +69,7 @@ public class AllocationServiceImpl implements AllocationService {
     private final ClassroomService classroomService;
     private final BuildingScopeResolver buildingScopeResolver;
     private final ClassroomAllocationLock classroomLock;
+    private final RevisionReader revisionReader;
 
     @Override
     @Transactional(readOnly = true)
@@ -111,6 +119,23 @@ public class AllocationServiceImpl implements AllocationService {
             return List.of();
         }
         return composer.composeAll(allocationRepository.findByOccurrenceIdIn(occurrenceIds));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<Long, Long> findClassroomIdsByOccurrences(Collection<Long> occurrenceIds) {
+        if (occurrenceIds.isEmpty()) {
+            return Map.of();
+        }
+        return allocationRepository.findByOccurrenceIdIn(occurrenceIds).stream()
+                .collect(Collectors.toMap(Allocation::getOccurrenceId, Allocation::getClassroomId));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<AllocationLastRevisionDto> findLastRevision(Long occurrenceId) {
+        return revisionReader.readLatest(Allocation.class, "occurrenceId", occurrenceId)
+                .map(revision -> new AllocationLastRevisionDto(revision.user(), revision.operationId()));
     }
 
     @Override
@@ -233,14 +258,69 @@ public class AllocationServiceImpl implements AllocationService {
     @Override
     @Transactional
     @AuditOperation("Sincronización de asignaciones desde SysAcad")
-    public int syncFromSysacad(List<AllocationItem> items) {
+    public int syncFromSysacad(List<AllocationItem> items, Set<Long> eventIdsToUpdate) {
         AllocationCommand command = new AllocationCommand(items, null, AllocationSource.SYSACAD);
         Map<OccurrenceSlotDto, Long> classroomByOccurrence = resolve(command).classroomByOccurrence();
         lockAndValidate(command, classroomByOccurrence);
-        int affected = writer.syncFromSysacad(classroomByOccurrence);
+        int affected = writer.syncFromSysacad(classroomByOccurrence, eventIdsToUpdate);
         AuditOperations.describe("Sincronización de asignaciones desde SysAcad: " + Plurals.count(affected, "afectada", "afectadas"));
         log.info("Sync de SysAcad: asignaciones afectadas={}", affected);
         return affected;
+    }
+
+    @Override
+    @Transactional
+    @AuditOperation("Cambio directo en SysAcad")
+    public SysacadDirectChangeResult applySysacadDirectChange(SysacadDirectChangeCommand command) {
+        List<OccurrenceSlotDto> futureClasses = occurrenceService
+                .findSlotsByEvents(command.eventIds(), LocalDate.now()).stream()
+                .filter(o -> !o.isPast())
+                .filter(o -> o.mirrorOfOccurrenceId() == null)
+                .filter(o -> o.status() != OccurrenceStatus.ROOM_RELEASED)
+                .toList();
+        if (futureClasses.isEmpty()) {
+            AuditOperations.describe("Cambio directo en SysAcad: sin clases futuras para cambiar");
+            return new SysacadDirectChangeResult.Applied(List.of());
+        }
+        if (command.classroomId() == null) {
+            List<Change> changes = writer.removeFromSysacad(futureClasses, command.reason(), command.actor());
+            AuditOperations.describe("Cambio directo en SysAcad: "
+                    + Plurals.count(changes.size(), "clase sin aula", "clases sin aula") + reasonSuffix(command));
+            log.info("Cambio directo de SysAcad sin aula: clases={}", changes.size());
+            return new SysacadDirectChangeResult.Applied(changes);
+        }
+
+        Map<OccurrenceSlotDto, Long> classroomByOccurrence = futureClasses.stream()
+                .collect(Collectors.toMap(o -> o, o -> command.classroomId(), (a, b) -> a, LinkedHashMap::new));
+        Set<Long> classroomIds = Set.of(command.classroomId());
+        classroomLock.lock(classroomIds);
+        requireAccessToClassrooms(classroomIds);
+        validator.validateClassroomsAvailable(classroomIds);
+        List<AllocationCandidate> candidates = classroomByOccurrence.keySet().stream()
+                .map(o -> new AllocationCandidate(o, command.classroomId()))
+                .toList();
+        if (command.applyManualRules()) {
+            validator.validateManualOverlap(candidates, command.reason());
+        } else {
+            OverlapReview review = validator.reviewManualOverlaps(candidates);
+            if (!review.blocking().isEmpty()) {
+                List<Long> occupied = review.blocking().stream().map(OccurrenceConflictDto::occurrenceId).distinct()
+                        .toList();
+                AuditOperations.describe("Cambio directo en SysAcad: aula ocupada en "
+                        + Plurals.count(occupied.size(), "clase", "clases"));
+                return new SysacadDirectChangeResult.Occupied(occupied);
+            }
+        }
+
+        List<Change> changes = writer.overwriteFromSysacad(classroomByOccurrence, command.reason(), command.actor());
+        AuditOperations.describe("Cambio directo en SysAcad: "
+                + Plurals.count(changes.size(), "clase cambiada", "clases cambiadas") + reasonSuffix(command));
+        log.info("Cambio directo de SysAcad aplicado: clases={}", changes.size());
+        return new SysacadDirectChangeResult.Applied(changes);
+    }
+
+    private static String reasonSuffix(SysacadDirectChangeCommand command) {
+        return command.applyManualRules() ? " (" + command.reason() + ")" : "";
     }
 
     /** E.g. "Reasignación de 12 aulas, edificio Central" or "..., 3 edificios". */

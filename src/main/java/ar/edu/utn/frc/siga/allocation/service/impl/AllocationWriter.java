@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.Set;
 
 @Slf4j
 @Component
@@ -84,10 +85,11 @@ class AllocationWriter {
      * Escritura del sync ASIGNACIONES de SysAcad: a diferencia de {@link #create}/{@link #upsert}, no
      * es "todo o nada" por lote — la política de precedencia se decide ocurrencia por ocurrencia (ver
      * .claude/docs/plan-sync-eventos-sysacad.md §4): sin asignación -> crea (source=SYSACAD); con
-     * asignación propia (source=SYSACAD) -> actualiza el aula solo si cambió; con asignación de otro origen (humano o
+     * asignación propia (source=SYSACAD) -> actualiza el aula solo si el evento está en
+     * {@code eventIdsToUpdate}, la ocurrencia no es pasada y el aula cambió; con asignación de otro origen (humano o
      * import de Excel) -> no se toca, WARN. Devuelve la cantidad de ocurrencias creadas+actualizadas.
      */
-    int syncFromSysacad(Map<OccurrenceSlotDto, Long> classroomByOccurrence) {
+    int syncFromSysacad(Map<OccurrenceSlotDto, Long> classroomByOccurrence, Set<Long> eventIdsToUpdate) {
         if (classroomByOccurrence.isEmpty()) return 0;
 
         List<Long> occurrenceIds = classroomByOccurrence.keySet().stream().map(OccurrenceSlotDto::occurrenceId).toList();
@@ -109,7 +111,8 @@ class AllocationWriter {
                         .build());
                 affected++;
             } else if (existing.getSource() == AllocationSource.SYSACAD) {
-                if (classroomId.equals(existing.getClassroomId())) {
+                if (!eventIdsToUpdate.contains(occurrence.eventId()) || occurrence.isPast()
+                        || classroomId.equals(existing.getClassroomId())) {
                     continue;
                 }
                 existing.setClassroomId(classroomId);
@@ -121,6 +124,60 @@ class AllocationWriter {
             }
         }
         return affected;
+    }
+
+    /** Cambio directo en SysAcad: pisa cualquier origen, crea si falta y publica con el actor indicado. */
+    List<Change> overwriteFromSysacad(Map<OccurrenceSlotDto, Long> classroomByOccurrence, String observation,
+            String actor) {
+        if (classroomByOccurrence.isEmpty()) return List.of();
+
+        List<Long> occurrenceIds = classroomByOccurrence.keySet().stream().map(OccurrenceSlotDto::occurrenceId).toList();
+        Map<Long, Allocation> existingByOccurrence = Maps.byId(
+                allocationRepository.findByOccurrenceIdIn(occurrenceIds), Allocation::getOccurrenceId);
+
+        List<Change> changes = new ArrayList<>();
+        for (Entry<OccurrenceSlotDto, Long> entry : classroomByOccurrence.entrySet()) {
+            OccurrenceSlotDto occurrence = entry.getKey();
+            Long classroomId = entry.getValue();
+            Allocation existing = existingByOccurrence.get(occurrence.occurrenceId());
+            Long fromClassroomId = existing == null ? null : existing.getClassroomId();
+            if (Objects.equals(fromClassroomId, classroomId)) {
+                continue;
+            }
+            changes.add(new Change(occurrence.occurrenceId(), occurrence.eventId(), occurrence.date(),
+                    occurrence.startTime(), occurrence.endTime(), fromClassroomId, classroomId));
+            if (existing != null) {
+                existing.setClassroomId(classroomId);
+                existing.setSource(AllocationSource.SYSACAD);
+                existing.setObservation(observation);
+            } else {
+                allocationRepository.save(Allocation.builder()
+                        .occurrenceId(occurrence.occurrenceId())
+                        .classroomId(classroomId)
+                        .source(AllocationSource.SYSACAD)
+                        .observation(observation)
+                        .build());
+            }
+        }
+        movementPublisher.publishSysacadDirectChange(actor, observation, changes);
+        return changes;
+    }
+
+    /** Cambio directo en SysAcad hacia 999 o 0: borra la asignación, la clase queda pendiente de aula. */
+    List<Change> removeFromSysacad(List<OccurrenceSlotDto> occurrences, String observation, String actor) {
+        List<Long> occurrenceIds = occurrences.stream().map(OccurrenceSlotDto::occurrenceId).toList();
+        List<Allocation> existing = allocationRepository.findByOccurrenceIdIn(occurrenceIds);
+        if (existing.isEmpty()) return List.of();
+
+        allocationRepository.deleteAll(existing);
+        Map<Long, OccurrenceSlotDto> slotById = Maps.byId(occurrences, OccurrenceSlotDto::occurrenceId, (a, b) -> a);
+        List<Change> changes = existing.stream().map(a -> {
+            OccurrenceSlotDto slot = slotById.get(a.getOccurrenceId());
+            return new Change(a.getOccurrenceId(), slot.eventId(), slot.date(), slot.startTime(), slot.endTime(),
+                    a.getClassroomId(), null);
+        }).toList();
+        movementPublisher.publishSysacadDirectChange(actor, observation, changes);
+        return changes;
     }
 
     List<DeallocatedOccurrence> delete(List<OccurrenceSlotDto> occurrences, String observation) {

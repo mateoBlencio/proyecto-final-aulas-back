@@ -4,7 +4,9 @@ import java.time.LocalDateTime;
 
 import ar.edu.utn.frc.siga.audit.model.ActorType;
 import ar.edu.utn.frc.siga.audit.model.RevisionKind;
+import org.springframework.modulith.NamedInterface;
 
+@NamedInterface("api")
 public record RevisionMetadata(
         String recordId,
         Integer revision,

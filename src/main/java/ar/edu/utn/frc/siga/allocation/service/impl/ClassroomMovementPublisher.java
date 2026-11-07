@@ -68,6 +68,13 @@ class ClassroomMovementPublisher {
         pending.add(source, reason, changes);
     }
 
+    // Sin los cortes de publish: corre bajo SystemScope o sin usuario y siempre se avisa.
+    void publishSysacadDirectChange(String actor, String reason, List<Change> changes) {
+        if (changes.isEmpty()) return;
+        eventPublisher.publishEvent(new ClassroomMovements(operationId(), actor, AllocationSource.SYSACAD,
+                reason, Instant.now(), changes));
+    }
+
     private static String operationId() {
         String operationId = AuditOperations.currentOperationId();
         return operationId != null ? operationId : UUID.randomUUID().toString();
