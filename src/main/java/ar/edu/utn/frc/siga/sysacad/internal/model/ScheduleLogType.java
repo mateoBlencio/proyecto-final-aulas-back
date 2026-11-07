@@ -1,0 +1,16 @@
+package ar.edu.utn.frc.siga.sysacad.internal.model;
+
+public enum ScheduleLogType {
+    SEND_INTENT,
+    SEND_CONFIRMED,
+    SEND_FAILED,
+    DRY_RUN_SEND,
+    WAITING,
+    NO_ROOM_AFTER_CANCEL,
+    DESTINATION_NOT_SENDABLE,
+    DIRECT_CHANGE_DETECTED,
+    DIRECT_CHANGE_DRY_RUN,
+    SIGA_CHANGES_ANNULLED,
+    REVIEW_OPENED,
+    REVIEW_RESOLVED
+}

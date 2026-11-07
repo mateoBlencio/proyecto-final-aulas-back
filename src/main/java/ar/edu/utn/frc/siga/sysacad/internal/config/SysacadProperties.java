@@ -4,6 +4,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.Setter;
@@ -14,6 +16,7 @@ import org.springframework.util.unit.DataSize;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Duration;
+import java.util.List;
 
 @Getter
 @Setter
@@ -42,9 +45,37 @@ public class SysacadProperties {
     @Valid
     private Sync sync = new Sync(null, DEFAULT_MIN_VALID_ROWS_PERCENT);
 
+    @Valid
+    private Write write = Write.of(SysacadWriteMode.OFF);
+
     /**
      * {@code minValidRowsPercent}: minimum percentage of valid rows, relative to what is active in SIGA, for a
      * view to deactivate what is absent. 0 disables the threshold (zero valid rows always aborts).
      */
     public record Sync(String cron, @DefaultValue("50") @Min(0) @Max(100) int minValidRowsPercent) {}
+
+    public record Write(
+            @DefaultValue("OFF") @NotNull SysacadWriteMode mode,
+            @DefaultValue("PT5M") @NotNull Duration jobDelay,
+            @DefaultValue("PT1H") @NotNull Duration viewReadInterval,
+            @DefaultValue("5") @Min(1) int maxAttempts,
+            @DefaultValue("3") @Min(1) int maxConsecutiveFailures,
+            @DefaultValue({"PT5M", "PT15M", "PT30M", "PT1H"}) @NotEmpty List<Duration> retryBackoff,
+            @DefaultValue("PT15S") @NotNull Duration readTimeout,
+            @DefaultValue("PT2S") @NotNull Duration inCallRetryDelay,
+            @DefaultValue("PT1H") @NotNull Duration outageAlertAfter,
+            @DefaultValue("P1D") @NotNull Duration outageAlertRepeat,
+            @DefaultValue("30") @Min(1) int maxSendsPerRun,
+            @DefaultValue("30") @Min(1) int maxRequestsPerMinute,
+            @DefaultValue("P7D") @NotNull Duration recentSendWindow,
+            @DefaultValue("PT24H") @NotNull Duration waitingVisibleBefore
+    ) {
+
+        public static Write of(SysacadWriteMode mode) {
+            return new Write(mode, Duration.ofMinutes(5), Duration.ofHours(1), 5, 3,
+                    List.of(Duration.ofMinutes(5), Duration.ofMinutes(15), Duration.ofMinutes(30), Duration.ofHours(1)),
+                    Duration.ofSeconds(15), Duration.ofSeconds(2), Duration.ofHours(1), Duration.ofDays(1),
+                    30, 30, Duration.ofDays(7), Duration.ofHours(24));
+        }
+    }
 }

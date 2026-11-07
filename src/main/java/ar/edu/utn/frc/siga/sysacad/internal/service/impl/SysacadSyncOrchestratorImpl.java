@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.sysacad.internal.service.impl;
 import ar.edu.utn.frc.siga.sysacad.internal.exception.SyncError;
 import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadUnavailableException;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadResyncOutcome;
+import ar.edu.utn.frc.siga.sysacad.internal.service.SysacadSyncLock;
 import ar.edu.utn.frc.siga.sysacad.internal.service.SysacadSyncOrchestrator;
 
 import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
@@ -37,12 +38,14 @@ public class SysacadSyncOrchestratorImpl implements SysacadSyncOrchestrator {
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final SysacadCatalogSnapshotFactory snapshotFactory;
     private final SysacadSyncStateService syncStateService;
+    private final SysacadSyncLock syncLock;
 
     public SysacadSyncOrchestratorImpl(List<SysacadViewSyncer> syncers, SysacadCatalogSnapshotFactory snapshotFactory,
-            SysacadSyncStateService syncStateService) {
+            SysacadSyncStateService syncStateService, SysacadSyncLock syncLock) {
         syncers.forEach(syncer -> syncersByView.put(syncer.view(), syncer));
         this.snapshotFactory = snapshotFactory;
         this.syncStateService = syncStateService;
+        this.syncLock = syncLock;
     }
 
     @Override
@@ -51,13 +54,15 @@ public class SysacadSyncOrchestratorImpl implements SysacadSyncOrchestrator {
             log.info("Resync manual ignorado: ya hay uno en curso");
             return SysacadResyncOutcome.SUCCESS;
         }
+        // El job de escritura y el sync no pueden cruzarse: el sync leería un estado a medias.
+        syncLock.lock();
         int attemptedViews = 0;
         int failedViews = 0;
         int connectivityFailures = 0;
         Set<SysacadView> failed = EnumSet.noneOf(SysacadView.class);
         Set<SysacadView> failedByConnectivity = EnumSet.noneOf(SysacadView.class);
-        SysacadCatalogReader snapshot = snapshotFactory.newSnapshot();
         try {
+            SysacadCatalogReader snapshot = snapshotFactory.newSnapshot();
             for (SysacadView view : SysacadView.values()) {
                 SysacadViewSyncer syncer = syncersByView.get(view);
                 if (syncer == null) {
@@ -92,6 +97,7 @@ public class SysacadSyncOrchestratorImpl implements SysacadSyncOrchestrator {
                 }
             }
         } finally {
+            syncLock.unlock();
             running.set(false);
         }
         if (failedViews == 0) {

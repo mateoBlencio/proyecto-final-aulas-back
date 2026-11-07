@@ -10,6 +10,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.web.client.RestClient;
 
 import java.net.http.HttpClient;
+import java.time.Duration;
 
 @Configuration
 @EnableAsync
@@ -21,11 +22,20 @@ public class SysacadConfiguration {
 
     @Bean
     public RestClient sysacadRestClient(SysacadProperties properties) {
+        return buildClient(properties, properties.getReadTimeout());
+    }
+
+    @Bean
+    public RestClient sysacadWriteRestClient(SysacadProperties properties) {
+        return buildClient(properties, properties.getWrite().readTimeout());
+    }
+
+    private static RestClient buildClient(SysacadProperties properties, Duration readTimeout) {
         HttpClient httpClient = HttpClient.newBuilder()
                 .connectTimeout(properties.getConnectTimeout())
                 .build();
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
-        requestFactory.setReadTimeout(properties.getReadTimeout());
+        requestFactory.setReadTimeout(readTimeout);
 
         return RestClient.builder()
                 .baseUrl(properties.getBaseUrl())

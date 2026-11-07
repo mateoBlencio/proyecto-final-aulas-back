@@ -166,7 +166,8 @@ public class SysacadCatalogMapper {
         if (startTime == null) {
             return null;
         }
-        warnIfDurationInconsistent(raw, curso, startTime);
+        LocalTime endTime = parseEndTime(raw, curso);
+        warnIfDurationInconsistent(raw, curso, startTime, endTime);
         return new SysacadAllocationDto(
                 curso,
                 raw.materia(),
@@ -175,6 +176,8 @@ public class SysacadCatalogMapper {
                 dayOfWeek,
                 startTime,
                 raw.duracion(),
+                endTime,
+                raw.comision(),
                 raw.horarioCuatrimestre(),
                 raw.aula(),
                 raw.edificio());
@@ -202,21 +205,28 @@ public class SysacadCatalogMapper {
         }
     }
 
-    private void warnIfDurationInconsistent(RawSchedule raw, String curso, LocalTime startTime) {
+    private LocalTime parseEndTime(RawSchedule raw, String curso) {
         String horaFin = trim(raw.horaFin());
-        if (raw.duracion() == null || horaFin == null || horaFin.isEmpty()) {
-            return;
+        if (horaFin == null || horaFin.isEmpty()) {
+            return null;
         }
         try {
-            LocalTime endTime = LocalTime.parse(horaFin);
-            long computedMinutes = Duration.between(startTime, endTime).toMinutes();
-            if (computedMinutes != raw.duracion()) {
-                log.warn("DURACION inconsistente para curso={} materia={}: columna={} min, "
-                                + "HoraComienzo-HoraFin={} min",
-                        curso, raw.materia(), raw.duracion(), computedMinutes);
-            }
+            return LocalTime.parse(horaFin);
         } catch (DateTimeParseException e) {
             log.warn("HoraFin inválida para curso={} materia={}: '{}'", curso, raw.materia(), horaFin);
+            return null;
+        }
+    }
+
+    private void warnIfDurationInconsistent(RawSchedule raw, String curso, LocalTime startTime, LocalTime endTime) {
+        if (raw.duracion() == null || endTime == null) {
+            return;
+        }
+        long computedMinutes = Duration.between(startTime, endTime).toMinutes();
+        if (computedMinutes != raw.duracion()) {
+            log.warn("DURACION inconsistente para curso={} materia={}: columna={} min, "
+                            + "HoraComienzo-HoraFin={} min",
+                    curso, raw.materia(), raw.duracion(), computedMinutes);
         }
     }
 

@@ -11,6 +11,8 @@ public record SysacadAllocationDto(
         DayOfWeek dayOfWeek,
         LocalTime startTime,
         Integer durationMinutes,
+        LocalTime endTime,
+        Integer commissionNumber,
         Integer semester,
         Integer roomNumber,
         Integer buildingCode
