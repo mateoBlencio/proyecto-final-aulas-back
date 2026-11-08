@@ -23,6 +23,7 @@ import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSubject;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -171,15 +172,25 @@ class SysacadCatalogMapperTest {
     }
 
     @Test
-    @DisplayName("toAllocation: DURACION inconsistente con HoraComienzo/HoraFin no se recalcula, se usa la columna tal cual")
-    void noRecalculaDuracionInconsistente() {
-        // HoraComienzo-HoraFin da 75 minutos, pero DURACION dice 135: se conserva 135 (no se recalcula, §2).
+    @DisplayName("toAllocation: DURACION distinta del rango HoraComienzo/HoraFin se conserva cruda y no loguea")
+    void toAllocationConservaDuracionCruda() {
         RawSchedule row = new RawSchedule("1H90SR", 90, 805, 15, "Edif. X", 2, 0, "A", "A",
-                "10:30", "11:45", "10:30-11:45", 135, 5, "Especialidad", 2008, 115, "Materia", 0);
+                "10:30", "12:45", "10:30-12:45", 120, 5, "Especialidad", 2008, 115, "Materia", 0);
+        Logger logger = (Logger) LoggerFactory.getLogger(SysacadCatalogMapper.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        SysacadAllocationDto allocation;
+        try {
+            allocation = mapper.toAllocation(row);
+        } finally {
+            logger.detachAppender(appender);
+        }
 
-        SysacadAllocationDto allocation = mapper.toAllocation(row);
-
-        assertThat(allocation.durationMinutes()).isEqualTo(135);
+        assertThat(allocation.durationMinutes()).isEqualTo(120);
+        assertThat(allocation.endTime()).isEqualTo(LocalTime.of(12, 45));
+        assertThat(appender.list).extracting(ILoggingEvent::getFormattedMessage)
+                .noneMatch(m -> m.contains("DURACION inconsistente"));
     }
 
     @Test
@@ -239,14 +250,66 @@ class SysacadCatalogMapperTest {
     }
 
     @Test
-    @DisplayName("toAcademicEvent(RawSchedule): DURACION rara (0/negativa) no se rechaza, se propaga tal cual")
+    @DisplayName("toAcademicEvent(RawSchedule): 10:30-12:45 con DURACION 135 da 135")
+    void duracionPorRangoCoincideConColumna() {
+        assertThat(mapper.toAcademicEvent(schedule("12:45", 135)).durationMinutes()).isEqualTo(135);
+    }
+
+    @Test
+    @DisplayName("toAcademicEvent(RawSchedule): 10:30-12:45 con DURACION 120 da 135 (fin menos comienzo) sin warn")
+    void duracionPorRangoGanaSobreColumna() {
+        List<ILoggingEvent> logs = new java.util.ArrayList<>();
+        SysacadAcademicEventDto event = capturingLogs(logs, () -> mapper.toAcademicEvent(schedule("12:45", 120)));
+
+        assertThat(event.durationMinutes()).isEqualTo(135);
+        assertThat(logs).isEmpty();
+    }
+
+    @Test
+    @DisplayName("toAcademicEvent(RawSchedule): HoraFin válida y DURACION nula da la duración del rango")
+    void duracionPorRangoSinColumna() {
+        assertThat(mapper.toAcademicEvent(schedule("12:45", null)).durationMinutes()).isEqualTo(135);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"  ", "no-es-hora", "25:00", "10:30", "09:00"})
+    @DisplayName("toAcademicEvent(RawSchedule): HoraFin ausente, inválida o no posterior a HoraComienzo cae a DURACION con warn")
+    void respaldoADuracionConWarn(String horaFin) {
+        List<ILoggingEvent> logs = new java.util.ArrayList<>();
+        SysacadAcademicEventDto event = capturingLogs(logs, () -> mapper.toAcademicEvent(schedule(horaFin, 120)));
+
+        assertThat(event.durationMinutes()).isEqualTo(120);
+        assertThat(logs).extracting(ILoggingEvent::getFormattedMessage)
+                .anyMatch(m -> m.contains("HoraFin ausente, inválida o no posterior a HoraComienzo")
+                        && m.contains("DURACION=120"));
+    }
+
+    @Test
+    @DisplayName("toAcademicEvent(RawSchedule): DURACION rara (negativa) con HoraFin anterior al comienzo se propaga tal cual")
     void propagaDuracionRaraDesdeScheduleSinRechazar() {
         RawSchedule row = new RawSchedule("1H90SR", 90, 805, 15, "Edif. X", 3, 0, "A", "A",
                 "18:00", "12:45", "10:30-12:45", -15, 5, "Especialidad", 2008, 115, "Materia", 30);
 
-        SysacadAcademicEventDto event = mapper.toAcademicEvent(row);
+        assertThat(mapper.toAcademicEvent(row).durationMinutes()).isEqualTo(-15);
+    }
 
-        assertThat(event.durationMinutes()).isEqualTo(-15);
+    private static RawSchedule schedule(String horaFin, Integer duracion) {
+        return new RawSchedule("1H90SR", 90, 805, 15, "Edif. X", 2, 0, "A", "A",
+                "10:30", horaFin, "10:30-12:45", duracion, 5, "Especialidad", 2008, 115, "Materia", 30);
+    }
+
+    private static <T> T capturingLogs(List<ILoggingEvent> sink, java.util.function.Supplier<T> action) {
+        Logger logger = (Logger) LoggerFactory.getLogger(SysacadCatalogMapper.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            return action.get();
+        } finally {
+            logger.detachAppender(appender);
+            sink.addAll(appender.list);
+        }
     }
 
     @Test

@@ -15,7 +15,9 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadAcademicEventDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
+import ar.edu.utn.frc.siga.sysacad.internal.mapper.SysacadCatalogMapper;
 import ar.edu.utn.frc.siga.common.exception.SyncAbortedException;
 
 import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadEmptyViewException;
@@ -214,6 +216,35 @@ class AcademicEventSyncServiceTest {
 
         verify(academicEventService, never()).syncRecurringEvents(anyList());
         verify(academicEventService, never()).markRecurringEventsAbsent(anyCollection(), anyCollection(), anyInt());
+    }
+
+    private static RawSchedule rawRow(String horaFin, Integer duracion) {
+        return new RawSchedule("101", 1, 805, 15, "Edif. X", 1, 1, "A", "A", "08:00", horaFin,
+                "08:00-" + horaFin, duracion, 1, "Sistemas", 2024, 55, "Materia", 30);
+    }
+
+    private SyncRecurringEventCommand syncMappedRow(RawSchedule raw) {
+        when(catalogReader.findAcademicEvents()).thenReturn(List.of(new SysacadCatalogMapper().toAcademicEvent(raw)));
+        when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 1, 2024)).thenReturn(link(9L, 1L, 30));
+        when(academicEventService.syncRecurringEvents(anyList())).thenReturn(List.of(created(100L)));
+
+        service.sync(catalogReader);
+
+        verify(academicEventService).syncRecurringEvents(commandsCaptor.capture());
+        return commandsCaptor.getValue().getFirst();
+    }
+
+    @Test
+    @DisplayName("sync: fila 08:00-10:15 con DURACION 120 → el command lleva 135 (fin menos comienzo)")
+    void syncUsesRangeDurationOverColumn() {
+        assertThat(syncMappedRow(rawRow("10:15", 120)).durationMinutes()).isEqualTo(135);
+    }
+
+    @Test
+    @DisplayName("sync: fila sin HoraFin y con DURACION 120 → el command usa DURACION")
+    void syncFallsBackToColumnWithoutEndTime() {
+        assertThat(syncMappedRow(rawRow(null, 120)).durationMinutes()).isEqualTo(120);
     }
 
     @Test
