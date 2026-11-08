@@ -35,10 +35,7 @@ public interface OccurrenceService {
 
     List<OccurrenceSlotDto> findSlotsByEvents(Collection<Long> eventIds);
 
-    /**
-     * Las primeras {@code limitPerEvent} clases principales (sin espejos) de cada evento con fecha desde
-     * {@code from}, saltando las fechas de {@code excludedDates}.
-     */
+    /** Sin espejos y sin orden garantizado. */
     List<OccurrenceSlotDto> findNextSlotsByEvents(Collection<Long> eventIds, LocalDate from,
             Collection<LocalDate> excludedDates, int limitPerEvent);
 
