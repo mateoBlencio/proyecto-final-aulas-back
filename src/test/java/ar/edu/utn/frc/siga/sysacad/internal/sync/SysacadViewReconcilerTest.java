@@ -214,6 +214,36 @@ class SysacadViewReconcilerTest {
     }
 
     @Test
+    @DisplayName("SANDBOX, primera lectura distinta: DIFFERENCE_RECORDED como en ON, conocido y base intactos")
+    void sandboxFirstDifferentReadingRecordsDifference() {
+        SysacadSchedule schedule = schedule();
+
+        ReconcileOutcome outcome = reconcilerIn(SysacadWriteMode.SANDBOX).reconcile(schedule, 5, 229, NOW);
+
+        assertThat(outcome).isEqualTo(ReconcileOutcome.DIFFERENCE_RECORDED);
+        assertThat(schedule.getDifferentBuilding()).isEqualTo(5);
+        assertThat(schedule.getDifferentRoom()).isEqualTo(229);
+        assertThat(schedule.getDifferenceDetectedAt()).isEqualTo(NOW);
+        assertThat(schedule.getKnownRoom()).isEqualTo(228);
+        assertThat(schedule.getBaseRoom()).isEqualTo(228);
+    }
+
+    @Test
+    @DisplayName("SANDBOX, misma diferencia que la guardada: DIRECT_CHANGE, conocido y base intactos")
+    void sandboxSameDifferenceIsDirectChange() {
+        SysacadSchedule schedule = schedule();
+        schedule.setDifferentBuilding(5);
+        schedule.setDifferentRoom(229);
+        schedule.setDifferenceDetectedAt(EARLIER);
+
+        ReconcileOutcome outcome = reconcilerIn(SysacadWriteMode.SANDBOX).reconcile(schedule, 5, 229, NOW);
+
+        assertThat(outcome).isEqualTo(ReconcileOutcome.DIRECT_CHANGE);
+        assertThat(schedule.getKnownRoom()).isEqualTo(228);
+        assertThat(schedule.getBaseRoom()).isEqualTo(228);
+    }
+
+    @Test
     @DisplayName("ON, primera lectura distinta: DIFFERENCE_RECORDED, conocido y base intactos")
     void writeOnFirstDifferentReadingRecordsDifference() {
         SysacadSchedule schedule = schedule();

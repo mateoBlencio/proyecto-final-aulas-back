@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -330,6 +331,39 @@ class SysacadWriteCycleIntegrationTest extends AbstractIntegrationTest {
         SysacadSchedule after = schedule(seeded);
         assertThat(after.getKnownRoom()).isEqualTo(229);
         assertThat(after.getStatus()).isEqualTo(SysacadScheduleStatus.SYNCED);
+        assertThat(logTypes(seeded)).containsExactly(ScheduleLogType.SEND_INTENT.name(),
+                ScheduleLogType.SEND_CONFIRMED.name());
+    }
+
+    @Test
+    @DisplayName("SANDBOX no llama a SysAcad y deja el horario sin enviar; al pasar a ON se envía una sola vez")
+    void sandboxHoldsTheSendUntilOn() {
+        Seeded seeded = seed(true, true);
+        viewShows(seeded, 228);
+        when(writeClient.readSchedule(1, 2008, seeded.subject())).thenReturn(
+                new ScheduleReadResult.Rows(List.of(viewRow(seeded, 228))),
+                new ScheduleReadResult.Rows(List.of(viewRow(seeded, 229))));
+        when(writeClient.updateRoom(any())).thenReturn(new UpdateRoomResult.Applied("ok"));
+        SysacadModeSupport.use(settingsStore, SysacadWriteMode.SANDBOX);
+
+        RunReport sandboxReport = run();
+
+        assertThat(sandboxReport.result()).isEqualTo(RunReport.Result.OK);
+        verifyNoInteractions(writeClient);
+        SysacadSchedule held = schedule(seeded);
+        assertThat(held.getKnownRoom()).isEqualTo(228);
+        assertThat(held.getStatus()).isEqualTo(SysacadScheduleStatus.SYNCED);
+        assertThat(logTypes(seeded)).isEmpty();
+        assertThat(allocationRepository.findByOccurrenceId(seeded.occurrenceId()).orElseThrow().getClassroomId())
+                .isEqualTo(seeded.target().getId());
+
+        SysacadModeSupport.use(settingsStore, SysacadWriteMode.ON);
+        forgetViewRead();
+        run();
+
+        verify(writeClient, times(1)).updateRoom(any());
+        SysacadSchedule sent = schedule(seeded);
+        assertThat(sent.getKnownRoom()).isEqualTo(229);
         assertThat(logTypes(seeded)).containsExactly(ScheduleLogType.SEND_INTENT.name(),
                 ScheduleLogType.SEND_CONFIRMED.name());
     }

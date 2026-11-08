@@ -166,6 +166,18 @@ class SysacadWriteRunTest {
     }
 
     @Test
+    @DisplayName("SANDBOX no envía ni registra el envío simulado")
+    void sandboxDoesNotSend() {
+        configure(SysacadWriteMode.SANDBOX, 5, 3, 30, List.of(Duration.ofMinutes(5)));
+        planReturns(send(schedule(1)));
+
+        run.run(NOW);
+
+        verifyNoInteractions(sendCycle);
+        verify(scheduleWriter, never()).recordEvent(anyLong(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("Respeta el tope maxSendsPerRun y envía en el orden del plan, que ya viene por la clase más cercana")
     void respectsSendCapInPlanOrder() {
         configure(SysacadWriteMode.ON, 5, 3, 2, List.of(Duration.ofMinutes(5)));

@@ -252,6 +252,23 @@ class SysacadScheduleLoaderTest {
     }
 
     @Test
+    @DisplayName("load: con escritura SANDBOX, otra aula en un horario existente guarda la diferencia y no toca conocido ni base")
+    void existingScheduleWithOtherRoomRecordsDifferenceWhenSandbox() {
+        SysacadSchedule schedule = existing();
+        when(repository.findAll()).thenReturn(List.of(schedule));
+
+        LoadResult result = loaderIn(SysacadWriteMode.SANDBOX).load(List.of(resolved(otherRoomRow(), 20L, 30L)));
+
+        assertThat(schedule.getKnownBuilding()).isEqualTo(5);
+        assertThat(schedule.getKnownRoom()).isEqualTo(200);
+        assertThat(schedule.getBaseBuilding()).isEqualTo(5);
+        assertThat(schedule.getBaseRoom()).isEqualTo(200);
+        assertThat(schedule.getDifferentBuilding()).isEqualTo(6);
+        assertThat(schedule.getDifferentRoom()).isEqualTo(301);
+        assertThat(result.eventIdsToUpdate()).isEmpty();
+    }
+
+    @Test
     @DisplayName("load: horario existente con conocido nulo que llega sin conflicto carga conocido y base")
     void existingScheduleWithNullKnownLoadsKnownAndBase() {
         SysacadSchedule schedule = existing();
@@ -419,6 +436,25 @@ class SysacadScheduleLoaderTest {
         LoadResult result = loaderIn(mode).load(List.of(resolved(baseDto(), 10L)));
 
         assertThat(result.eventIdsToUpdate()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("load: con escritura SANDBOX nunca hay eventos a actualizar (horario nuevo, cambio de aula, KEY_CONFLICT y vista igual a la base)")
+    void writeSandboxNeverSendsEventsToUpdate() {
+        SysacadScheduleLoader sandboxLoader = loaderIn(SysacadWriteMode.SANDBOX);
+        when(repository.findAll()).thenReturn(List.of(existing()));
+
+        LoadResult changed = sandboxLoader.load(List.of(resolved(otherRoomSameTimeRow(), 10L)));
+        LoadResult conflict = sandboxLoader.load(List.of(resolved(baseDto(), 10L), resolved(variant("room"), 10L)));
+        LoadResult same = sandboxLoader.load(List.of(resolved(baseDto(), 10L)));
+
+        when(repository.findAll()).thenReturn(List.of());
+        LoadResult created = sandboxLoader.load(List.of(resolved(baseDto(), 10L)));
+
+        assertThat(changed.eventIdsToUpdate()).isEmpty();
+        assertThat(conflict.eventIdsToUpdate()).isEmpty();
+        assertThat(same.eventIdsToUpdate()).isEmpty();
+        assertThat(created.eventIdsToUpdate()).isEmpty();
     }
 
     @Test

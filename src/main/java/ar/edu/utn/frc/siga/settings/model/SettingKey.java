@@ -61,7 +61,8 @@ public enum SettingKey {
             "roomRequests.acceptance.hoursBeforeEvent", SettingType.INT, RiskLevel.SAFE, "roomRequests", null),
     SYSACAD_WRITE_MODE(
             "sysacad.write.mode", SettingType.ENUM, RiskLevel.ADVANCED, "sysacad",
-            "OFF no envía nada. DRY_RUN calcula y registra los envíos sin llamar a SysAcad. "
+            "OFF no envía nada y SIGA sigue lo que dice SysAcad. DRY_RUN calcula y registra los envíos sin llamar a SysAcad. "
+                    + "SANDBOX conserva en SIGA los cambios de aula y no envía nada: al pasar a ON se envían los acumulados. "
                     + "ON modifica aulas reales en SysAcad: dev y test comparten la misma base de SysAcad."),
     SYSACAD_AUTOGESTION_MODE(
             "sysacad.autogestion.mode", SettingType.ENUM, RiskLevel.ADVANCED, "sysacad",

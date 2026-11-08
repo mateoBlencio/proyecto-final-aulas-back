@@ -205,7 +205,7 @@ class SettingsApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.sysacad[?(@.key=='sysacad.write.mode')].type").value("ENUM"))
                 .andExpect(jsonPath("$.sysacad[?(@.key=='sysacad.write.mode')].options")
                         .value(org.hamcrest.Matchers.contains(
-                                org.hamcrest.Matchers.contains("OFF", "DRY_RUN", "ON"))))
+                                org.hamcrest.Matchers.contains("OFF", "DRY_RUN", "SANDBOX", "ON"))))
                 .andExpect(jsonPath("$.allocation[?(@.key=='allocation.maxOverlapMinutes')].options")
                         .value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.empty())));
     }
@@ -230,6 +230,22 @@ class SettingsApiIntegrationTest extends AbstractIntegrationTest {
 
             assertThat(settingRepository.findById("sysacad.write.mode"))
                     .get().extracting(Setting::getValue).isEqualTo("DRY_RUN");
+        } finally {
+            new TransactionTemplate(transactionManager).executeWithoutResult(tx ->
+                    settingsStore.write(SettingKey.SYSACAD_WRITE_MODE, "OFF"));
+        }
+    }
+
+    @Test
+    @DisplayName("PUT de sysacad.write.mode=SANDBOX persiste y se vuelve a OFF al final")
+    void put_sandboxMode_persists() throws Exception {
+        try {
+            putValue("sysacad.write.mode", "SANDBOX")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.value").value("SANDBOX"));
+
+            assertThat(settingRepository.findById("sysacad.write.mode"))
+                    .get().extracting(Setting::getValue).isEqualTo("SANDBOX");
         } finally {
             new TransactionTemplate(transactionManager).executeWithoutResult(tx ->
                     settingsStore.write(SettingKey.SYSACAD_WRITE_MODE, "OFF"));

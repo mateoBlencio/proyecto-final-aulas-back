@@ -20,7 +20,6 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadViewSyncer;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
-import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
 import ar.edu.utn.frc.siga.sysacad.internal.model.NotSendableReason;
 import ar.edu.utn.frc.siga.sysacad.internal.write.review.DirectChangeHandler;
 import java.time.DayOfWeek;
@@ -74,7 +73,7 @@ public class AllocationSyncService implements SysacadViewSyncer {
         Map<OverlapKey, List<OverlapEntry>> overlapsBySlot = new LinkedHashMap<>();
         Map<Long, Long> classroomIdByEvent = new LinkedHashMap<>();
         int conflictingRooms = 0;
-        boolean writeOn = runtimeSettings.writeMode() == SysacadWriteMode.ON;
+        boolean writeOn = runtimeSettings.writeMode().keepsSigaChanges();
         Map<SysacadScheduleLoader.ScheduleKey, SysacadScheduleLoader.BaseRoom> baseRooms =
                 writeOn ? scheduleLoader.findBaseRooms() : Map.of();
 

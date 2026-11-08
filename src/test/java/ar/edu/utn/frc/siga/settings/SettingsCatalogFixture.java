@@ -36,7 +36,7 @@ public final class SettingsCatalogFixture {
                 definition("roomRequests.alertDaysBeforeDate", "3", "0", "60"),
                 definition("roomRequests.acceptance.businessHours", "48", "1", "720"),
                 definition("roomRequests.acceptance.hoursBeforeEvent", "24", "0", "720"),
-                enumDefinition("sysacad.write.mode", "OFF", "OFF", "DRY_RUN", "ON"),
+                enumDefinition("sysacad.write.mode", "OFF", "OFF", "DRY_RUN", "SANDBOX", "ON"),
                 enumDefinition("sysacad.autogestion.mode", "OFF", "OFF", "TEST_COMMISSIONS", "ON"),
                 definition("sysacad.write.jobDelayMinutes", "5", "1", "1440"),
                 definition("sysacad.write.viewReadIntervalMinutes", "60", "5", "1440"),

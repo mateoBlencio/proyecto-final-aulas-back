@@ -103,7 +103,7 @@ public class SysacadScheduleLoader {
             if (result.dryRunChange() != null) {
                 dryRunChanges.add(result.dryRunChange());
             }
-            if (result.followView() && mode != SysacadWriteMode.ON) {
+            if (result.followView() && !mode.keepsSigaChanges()) {
                 eventIdsToUpdate.addAll(result.eventIds());
             }
         });

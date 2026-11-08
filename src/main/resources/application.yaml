@@ -212,7 +212,7 @@ siga:
         max: "720"
       - key: sysacad.write.mode
         default-value: ${SYSACAD_WRITE_MODE:OFF}
-        options: ["OFF", DRY_RUN, "ON"]
+        options: ["OFF", DRY_RUN, SANDBOX, "ON"]
       - key: sysacad.autogestion.mode
         default-value: ${AUTOGESTION_MESSAGE_MODE:OFF}
         options: ["OFF", TEST_COMMISSIONS, "ON"]

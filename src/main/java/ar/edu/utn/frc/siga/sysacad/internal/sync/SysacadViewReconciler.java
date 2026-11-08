@@ -1,7 +1,6 @@
 package ar.edu.utn.frc.siga.sysacad.internal.sync;
 
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
-import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
 import ar.edu.utn.frc.siga.sysacad.internal.model.ScheduleLogType;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadScheduleLogEntry;
@@ -69,7 +68,7 @@ public class SysacadViewReconciler {
             }
             return ReconcileOutcome.SEND_CONFIRMED;
         }
-        if (runtimeSettings.writeMode() != SysacadWriteMode.ON) {
+        if (!runtimeSettings.writeMode().keepsSigaChanges()) {
             schedule.setKnownBuilding(building);
             schedule.setKnownRoom(room);
             schedule.setBaseBuilding(building);
