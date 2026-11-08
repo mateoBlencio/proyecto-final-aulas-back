@@ -52,7 +52,8 @@ class SysacadWriteJobTest {
         properties.setWrite(new SysacadProperties.Write(mode, Duration.ofMillis(20), base.viewReadInterval(),
                 base.maxAttempts(), base.maxConsecutiveFailures(), base.retryBackoff(), base.readTimeout(),
                 base.inCallRetryDelay(), base.outageAlertAfter(), base.outageAlertRepeat(), base.maxSendsPerRun(),
-                base.maxRequestsPerMinute(), base.recentSendWindow(), base.waitingVisibleBefore()));
+                base.maxRequestsPerMinute(), base.recentSendWindow(), base.waitingVisibleBefore(), base.afterSyncMargin(), base.noCronRetryDelay(),
+                base.alertMailMaxLines()));
         job = new SysacadWriteJob(run, stateService, alertService, syncLock, properties, Clock.fixed(NOW, ZoneOffset.UTC));
         return job;
     }

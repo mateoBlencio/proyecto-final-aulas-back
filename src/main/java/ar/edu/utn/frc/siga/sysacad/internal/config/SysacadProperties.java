@@ -16,6 +16,7 @@ import org.springframework.util.unit.DataSize;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.List;
 
 @Getter
@@ -44,8 +45,13 @@ public class SysacadProperties {
 
     private boolean commissionMessageEnabled = false;
 
+    private int commissionMessagePublisherLegajo = 0;
+
+    @NotBlank
+    private String commissionMessagePublisherUserType = "S";
+
     @Valid
-    private Sync sync = new Sync(null, DEFAULT_MIN_VALID_ROWS_PERCENT);
+    private Sync sync = new Sync(null, DEFAULT_MIN_VALID_ROWS_PERCENT, Sync.DEFAULT_ZONE);
 
     @Valid
     private Write write = Write.of(SysacadWriteMode.OFF);
@@ -54,7 +60,14 @@ public class SysacadProperties {
      * {@code minValidRowsPercent}: minimum percentage of valid rows, relative to what is active in SIGA, for a
      * view to deactivate what is absent. 0 disables the threshold (zero valid rows always aborts).
      */
-    public record Sync(String cron, @DefaultValue("50") @Min(0) @Max(100) int minValidRowsPercent) {}
+    public record Sync(
+            String cron,
+            @DefaultValue("50") @Min(0) @Max(100) int minValidRowsPercent,
+            @DefaultValue("America/Argentina/Buenos_Aires") @NotNull ZoneId zone
+    ) {
+
+        public static final ZoneId DEFAULT_ZONE = ZoneId.of("America/Argentina/Buenos_Aires");
+    }
 
     public record Write(
             @DefaultValue("OFF") @NotNull SysacadWriteMode mode,
@@ -70,14 +83,18 @@ public class SysacadProperties {
             @DefaultValue("30") @Min(1) int maxSendsPerRun,
             @DefaultValue("30") @Min(1) int maxRequestsPerMinute,
             @DefaultValue("P7D") @NotNull Duration recentSendWindow,
-            @DefaultValue("PT24H") @NotNull Duration waitingVisibleBefore
+            @DefaultValue("PT24H") @NotNull Duration waitingVisibleBefore,
+            @DefaultValue("PT1H") @NotNull Duration afterSyncMargin,
+            @DefaultValue("P1D") @NotNull Duration noCronRetryDelay,
+            @DefaultValue("30") @Min(1) int alertMailMaxLines
     ) {
 
         public static Write of(SysacadWriteMode mode) {
             return new Write(mode, Duration.ofMinutes(5), Duration.ofHours(1), 5, 3,
                     List.of(Duration.ofMinutes(5), Duration.ofMinutes(15), Duration.ofMinutes(30), Duration.ofHours(1)),
                     Duration.ofSeconds(15), Duration.ofSeconds(2), Duration.ofHours(1), Duration.ofDays(1),
-                    30, 30, Duration.ofDays(7), Duration.ofHours(24));
+                    30, 30, Duration.ofDays(7), Duration.ofHours(24),
+                    Duration.ofHours(1), Duration.ofDays(1), 30);
         }
     }
 }

@@ -38,16 +38,16 @@ public class SysacadWriteClient {
             new ParameterizedTypeReference<>() {};
 
     private final RestClient restClient;
-    private final SysacadProperties.Write properties;
+    private final SysacadProperties properties;
     private final Consumer<Duration> sleeper;
 
     @Autowired
     public SysacadWriteClient(@Qualifier("sysacadWriteRestClient") RestClient restClient,
                               SysacadProperties properties) {
-        this(restClient, properties.getWrite(), SysacadClient::sleep);
+        this(restClient, properties, SysacadClient::sleep);
     }
 
-    SysacadWriteClient(RestClient restClient, SysacadProperties.Write properties, Consumer<Duration> sleeper) {
+    SysacadWriteClient(RestClient restClient, SysacadProperties properties, Consumer<Duration> sleeper) {
         this.restClient = restClient;
         this.properties = properties;
         this.sleeper = sleeper;
@@ -58,7 +58,7 @@ public class SysacadWriteClient {
         if (!isRetryable(result)) {
             return result;
         }
-        sleeper.accept(properties.inCallRetryDelay());
+        sleeper.accept(properties.getWrite().inCallRetryDelay());
         return postOnce(command);
     }
 
@@ -143,10 +143,10 @@ public class SysacadWriteClient {
                 || result instanceof UpdateRoomResult.ServerError error && error.status() >= 500;
     }
 
-    private static Map<String, Object> toParams(CommissionMessageCommand command) {
+    private Map<String, Object> toParams(CommissionMessageCommand command) {
         Map<String, Object> params = new LinkedHashMap<>();
-        params.put("@LegajoPublica", 0);
-        params.put("@IdTipoUsuarioPublica", "S");
+        params.put("@LegajoPublica", properties.getCommissionMessagePublisherLegajo());
+        params.put("@IdTipoUsuarioPublica", properties.getCommissionMessagePublisherUserType());
         params.put("@FechaHasta", command.visibleUntil().toString());
         params.put("@AnioAcademico", command.academicYear());
         params.put("@Especialidad", command.specialty());

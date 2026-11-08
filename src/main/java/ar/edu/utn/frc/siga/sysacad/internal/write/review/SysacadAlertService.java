@@ -49,7 +49,6 @@ import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadWriteStateService
 @ConditionalOnProperty(prefix = "siga.sysacad", name = "enabled", havingValue = "true")
 public class SysacadAlertService {
 
-    private static final int MAIL_MAX_LINES = 30;
     private static final Locale ES = Locale.forLanguageTag("es-AR");
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private static final List<ScheduleLogType> NEWS_TYPES = List.of(ScheduleLogType.REVIEW_OPENED,
@@ -95,7 +94,7 @@ public class SysacadAlertService {
                 SysacadSchedule::getId);
         Map<Long, OccurrenceSlotDto> slots = slotsOf(news);
 
-        List<String> lines = news.stream().limit(MAIL_MAX_LINES)
+        List<String> lines = news.stream().limit(properties.getWrite().alertMailMaxLines())
                 .map(entry -> describe(entry, schedules.get(entry.getScheduleId()), slots))
                 .toList();
         String count = news.size() + (news.size() == 1 ? " horario necesita" : " horarios necesitan");

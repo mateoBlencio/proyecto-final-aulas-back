@@ -99,7 +99,8 @@ class SysacadWriteRunTest {
         properties.setWrite(new SysacadProperties.Write(mode, base.jobDelay(), base.viewReadInterval(), maxAttempts,
                 maxFailures, backoff, base.readTimeout(), base.inCallRetryDelay(), base.outageAlertAfter(),
                 base.outageAlertRepeat(), maxSends, base.maxRequestsPerMinute(), base.recentSendWindow(),
-                base.waitingVisibleBefore()));
+                base.waitingVisibleBefore(), base.afterSyncMargin(), base.noCronRetryDelay(),
+                base.alertMailMaxLines()));
     }
 
     private static SysacadSchedule schedule(long id) {

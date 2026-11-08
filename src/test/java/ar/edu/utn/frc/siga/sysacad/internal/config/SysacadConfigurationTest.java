@@ -103,7 +103,8 @@ class SysacadConfigurationTest {
         return new SysacadProperties.Write(w.mode(), w.jobDelay(), w.viewReadInterval(), w.maxAttempts(),
                 w.maxConsecutiveFailures(), w.retryBackoff(), Duration.ofMillis(300), w.inCallRetryDelay(),
                 w.outageAlertAfter(), w.outageAlertRepeat(), w.maxSendsPerRun(), w.maxRequestsPerMinute(),
-                w.recentSendWindow(), w.waitingVisibleBefore());
+                w.recentSendWindow(), w.waitingVisibleBefore(), w.afterSyncMargin(), w.noCronRetryDelay(),
+                w.alertMailMaxLines());
     }
 
     @Test

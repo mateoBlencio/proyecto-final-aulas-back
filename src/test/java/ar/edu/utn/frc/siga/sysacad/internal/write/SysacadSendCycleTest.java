@@ -93,7 +93,7 @@ class SysacadSendCycleTest {
     void setUp() {
         properties = new SysacadProperties();
         properties.setWrite(SysacadProperties.Write.of(SysacadWriteMode.ON));
-        properties.setSync(new SysacadProperties.Sync("0 0 3 * * *", 50));
+        properties.setSync(new SysacadProperties.Sync("0 0 3 * * *", 50, SysacadProperties.Sync.DEFAULT_ZONE));
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         cycle = new SysacadSendCycle(client, new SysacadCatalogMapper(), stateWriter, directChangeHandler,
                 allocationService, commissionMessageSender, properties, clock);
@@ -585,7 +585,7 @@ class SysacadSendCycleTest {
     @Test
     @DisplayName("Sin filas y sin cron configurado: reintenta en un día")
     void noRowsWithoutCronRetriesInOneDay() {
-        properties.setSync(new SysacadProperties.Sync(null, 50));
+        properties.setSync(new SysacadProperties.Sync(null, 50, SysacadProperties.Sync.DEFAULT_ZONE));
         readsReturn(rows());
 
         send();

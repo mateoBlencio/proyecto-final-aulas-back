@@ -242,9 +242,12 @@ siga:
     max-retries: 3
     max-response-size: 32MB
     commission-message-enabled: ${AUTOGESTION_MESSAGE_ENABLED:false}
+    commission-message-publisher-legajo: 0
+    commission-message-publisher-user-type: "S"
     sync:
       cron: "0 0 3 * * SUN"
       min-valid-rows-percent: 50
+      zone: America/Argentina/Buenos_Aires
     write:
       mode: ${SYSACAD_WRITE_MODE:OFF}
       job-delay: PT5M
@@ -260,6 +263,9 @@ siga:
       max-requests-per-minute: 30
       recent-send-window: P7D
       waiting-visible-before: PT24H
+      after-sync-margin: PT1H
+      no-cron-retry-delay: P1D
+      alert-mail-max-lines: 30
   camera-count:
     enabled: ${CONTEO_ENABLED}
     url: ${CONTEO_URL:}

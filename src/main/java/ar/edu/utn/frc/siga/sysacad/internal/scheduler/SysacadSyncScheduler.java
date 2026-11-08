@@ -15,7 +15,7 @@ public class SysacadSyncScheduler {
 
     private final SysacadSyncOrchestrator orchestrator;
 
-    @Scheduled(cron = "${siga.sysacad.sync.cron}", zone = "America/Argentina/Buenos_Aires")
+    @Scheduled(cron = "${siga.sysacad.sync.cron}", zone = "${siga.sysacad.sync.zone}")
     public void resyncAll() {
         log.info("Cron de sync de SysAcad disparado");
         orchestrator.resyncAll();

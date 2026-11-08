@@ -21,7 +21,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
-import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -48,10 +47,6 @@ public class SysacadSendCycle {
 
     static final String NOT_CONFIRMED = "NOT_CONFIRMED";
     static final String SCHEDULE_NOT_FOUND = "SCHEDULE_NOT_FOUND";
-
-    private static final ZoneId SYNC_ZONE = ZoneId.of("America/Argentina/Buenos_Aires");
-    private static final Duration AFTER_SYNC_MARGIN = Duration.ofHours(1);
-    private static final Duration NO_CRON_DELAY = Duration.ofDays(1);
 
     private final SysacadWriteClient client;
     private final SysacadCatalogMapper mapper;
@@ -211,12 +206,13 @@ public class SysacadSendCycle {
 
     private Instant afterNextSync() {
         Instant now = clock.instant();
-        String cron = properties.getSync().cron();
-        if (cron == null) {
-            return now.plus(NO_CRON_DELAY);
+        SysacadProperties.Sync sync = properties.getSync();
+        SysacadProperties.Write write = properties.getWrite();
+        if (sync.cron() == null) {
+            return now.plus(write.noCronRetryDelay());
         }
-        ZonedDateTime next = CronExpression.parse(cron).next(now.atZone(SYNC_ZONE));
-        return next == null ? now.plus(NO_CRON_DELAY) : next.toInstant().plus(AFTER_SYNC_MARGIN);
+        ZonedDateTime next = CronExpression.parse(sync.cron()).next(now.atZone(sync.zone()));
+        return next == null ? now.plus(write.noCronRetryDelay()) : next.toInstant().plus(write.afterSyncMargin());
     }
 
     private SendOutcome stop(SysacadSchedule schedule, String error, Kind kind, Duration retryAfter) {
