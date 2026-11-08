@@ -127,7 +127,7 @@ public class SysacadWriteRun {
                             schedule.getId(), ScheduleLogType.DRY_RUN_SEND, send.building(), send.room(),
                             send.occurrenceId(), null, null);
                     case Send send -> {
-                        if (mode != SysacadWriteMode.ON
+                        if (!mode.sendsToSysacad()
                                 || schedule.getNextAttemptAt() != null && schedule.getNextAttemptAt().isAfter(now)
                                 || sends >= config.maxSendsPerRun()) {
                             continue;

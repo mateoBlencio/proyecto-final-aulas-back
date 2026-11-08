@@ -73,9 +73,9 @@ public class AllocationSyncService implements SysacadViewSyncer {
         Map<OverlapKey, List<OverlapEntry>> overlapsBySlot = new LinkedHashMap<>();
         Map<Long, Long> classroomIdByEvent = new LinkedHashMap<>();
         int conflictingRooms = 0;
-        boolean writeOn = runtimeSettings.writeMode().keepsSigaChanges();
+        boolean keepsSigaChanges = runtimeSettings.writeMode().keepsSigaChanges();
         Map<SysacadScheduleLoader.ScheduleKey, SysacadScheduleLoader.BaseRoom> baseRooms =
-                writeOn ? scheduleLoader.findBaseRooms() : Map.of();
+                keepsSigaChanges ? scheduleLoader.findBaseRooms() : Map.of();
 
         Map<RecurringEventKey, Long> eventIdsByKey = academicEventService.findSysacadRecurringEvents().stream()
                 .collect(Collectors.toMap(AllocationSyncService::keyOf, SysacadRecurringEventRefDto::eventId,
@@ -187,7 +187,7 @@ public class AllocationSyncService implements SysacadViewSyncer {
                 .toList();
         SysacadScheduleLoader.LoadResult loadResult = scheduleLoader.load(scheduleRows);
         Set<Long> eventIdsToUpdate = new TreeSet<>(loadResult.eventIdsToUpdate());
-        if (!writeOn) {
+        if (!keepsSigaChanges) {
             eventIdsToUpdate.addAll(keylessEventIds);
         }
         int affected = SystemScope.call(() -> allocationService.syncFromSysacad(items, eventIdsToUpdate));

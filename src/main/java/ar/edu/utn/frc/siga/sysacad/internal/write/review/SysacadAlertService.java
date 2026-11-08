@@ -14,7 +14,6 @@ import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadScheduleStatus;
 import ar.edu.utn.frc.siga.sysacad.internal.model.DestinationNotSendableReason;
-import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
 import ar.edu.utn.frc.siga.sysacad.internal.model.ScheduleLogType;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadReviewReason;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
@@ -68,7 +67,7 @@ public class SysacadAlertService {
 
     /** {@code previousRunEnd} es el fin de la corrida anterior, leído antes de que esta corrida lo pise. */
     public void alert(Instant previousRunEnd) {
-        if (runtimeSettings.writeMode() != SysacadWriteMode.ON) {
+        if (!runtimeSettings.writeMode().sendsToSysacad()) {
             return;
         }
         SysacadWriteState state = stateService.current();
