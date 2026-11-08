@@ -71,7 +71,7 @@ class NextClassCalculatorTest {
     }
 
     private static ClassroomSysacadRefDto ref(int room) {
-        return new ClassroomSysacadRefDto((long) room, room, BUILDING, true);
+        return new ClassroomSysacadRefDto((long) room, room, BUILDING, true, true, true);
     }
 
     private static Map<Long, ClassroomSysacadRefDto> refs(int... rooms) {
@@ -340,17 +340,21 @@ class NextClassCalculatorTest {
 
     static Stream<Arguments> invalidDestinations() {
         return Stream.of(
-                Arguments.of(new ClassroomSysacadRefDto(229L, 229, BUILDING, false),
-                        DestinationNotSendableReason.CLASSROOM_NOT_CURRENT_IN_SYSACAD),
-                Arguments.of(new ClassroomSysacadRefDto(229L, null, BUILDING, true),
+                Arguments.of(new ClassroomSysacadRefDto(229L, 229, BUILDING, true, true, false),
+                        DestinationNotSendableReason.BUILDING_NOT_IN_SYSACAD),
+                Arguments.of(new ClassroomSysacadRefDto(229L, 229, BUILDING, false, true, true),
+                        DestinationNotSendableReason.CLASSROOM_NOT_IN_SYSACAD),
+                Arguments.of(new ClassroomSysacadRefDto(229L, 229, BUILDING, true, false, true),
+                        DestinationNotSendableReason.CLASSROOM_DISABLED_IN_SYSACAD),
+                Arguments.of(new ClassroomSysacadRefDto(229L, null, BUILDING, true, true, true),
                         DestinationNotSendableReason.CLASSROOM_WITHOUT_NUMBER),
-                Arguments.of(new ClassroomSysacadRefDto(229L, 229, null, true),
+                Arguments.of(new ClassroomSysacadRefDto(229L, 229, null, true, true, true),
                         DestinationNotSendableReason.BUILDING_WITHOUT_CODE),
-                Arguments.of(new ClassroomSysacadRefDto(229L, 999, BUILDING, true),
+                Arguments.of(new ClassroomSysacadRefDto(229L, 999, BUILDING, true, true, true),
                         DestinationNotSendableReason.CLASSROOM_RESERVED_NUMBER),
-                Arguments.of(new ClassroomSysacadRefDto(229L, 0, BUILDING, true),
+                Arguments.of(new ClassroomSysacadRefDto(229L, 0, BUILDING, true, true, true),
                         DestinationNotSendableReason.CLASSROOM_RESERVED_NUMBER),
-                Arguments.of(new ClassroomSysacadRefDto(229L, -1, BUILDING, true),
+                Arguments.of(new ClassroomSysacadRefDto(229L, -1, BUILDING, true, true, true),
                         DestinationNotSendableReason.CLASSROOM_RESERVED_NUMBER),
                 Arguments.of(null, DestinationNotSendableReason.CLASSROOM_NOT_FOUND));
     }
@@ -373,7 +377,7 @@ class NextClassCalculatorTest {
     @Test
     @DisplayName("El mismo número de aula en otro edificio es un cambio y da Send con el edificio nuevo")
     void sameRoomNumberInAnotherBuildingIsSent() {
-        Map<Long, ClassroomSysacadRefDto> refs = Map.of(500L, new ClassroomSysacadRefDto(500L, 228, 2, true));
+        Map<Long, ClassroomSysacadRefDto> refs = Map.of(500L, new ClassroomSysacadRefDto(500L, 228, 2, true, true, true));
 
         NextClassDecision decision = NextClassCalculator.calculate(known(228), List.of(slot(1, D1)), rooms(500L),
                 refs, Map.of(), Set.of(), D1.atTime(7, 0));
@@ -427,7 +431,7 @@ class NextClassCalculatorTest {
                 refs(228, 229), pending, Set.of(), inProgress)).isEqualTo(new Waiting(1L, 77L, D1, START));
         assertThat(calc(known(228), List.of(slot(1, D1)), Map.of(), inProgress)).isEqualTo(new NoRoom(1L, D1));
         assertThat(NextClassCalculator.calculate(known(228), List.of(slot(1, D1)), rooms(500L),
-                Map.of(500L, new ClassroomSysacadRefDto(500L, 0, BUILDING, true)), Map.of(), Set.of(), inProgress))
+                Map.of(500L, new ClassroomSysacadRefDto(500L, 0, BUILDING, true, true, true)), Map.of(), Set.of(), inProgress))
                 .isEqualTo(new NotSendable(1L, D1, DestinationNotSendableReason.CLASSROOM_RESERVED_NUMBER));
     }
 

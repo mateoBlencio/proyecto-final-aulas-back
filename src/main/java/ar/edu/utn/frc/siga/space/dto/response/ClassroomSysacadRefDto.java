@@ -7,5 +7,7 @@ public record ClassroomSysacadRefDto(
         Long classroomId,
         Integer roomNumber,
         Integer buildingCode,
-        boolean currentInSysacad) {
+        boolean currentInSysacad,
+        boolean enabledInSysacad,
+        boolean buildingCurrentInSysacad) {
 }

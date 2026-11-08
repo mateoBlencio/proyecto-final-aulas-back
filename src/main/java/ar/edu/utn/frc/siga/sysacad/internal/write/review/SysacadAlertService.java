@@ -220,7 +220,9 @@ public class SysacadAlertService {
 
     private static String destinationText(DestinationNotSendableReason reason) {
         return switch (reason) {
-            case CLASSROOM_NOT_CURRENT_IN_SYSACAD -> "el aula de SIGA no está vigente en SysAcad";
+            case BUILDING_NOT_IN_SYSACAD -> "SysAcad ya no lista el edificio del aula de SIGA";
+            case CLASSROOM_NOT_IN_SYSACAD -> "SysAcad ya no lista el aula de SIGA";
+            case CLASSROOM_DISABLED_IN_SYSACAD -> "el aula de SIGA está inhabilitada en SysAcad";
             case CLASSROOM_WITHOUT_NUMBER -> "el aula de SIGA no tiene número en SysAcad";
             case CLASSROOM_RESERVED_NUMBER -> "el aula de SIGA usa un número reservado en SysAcad";
             case BUILDING_WITHOUT_CODE -> "el edificio del aula de SIGA no tiene código en SysAcad";

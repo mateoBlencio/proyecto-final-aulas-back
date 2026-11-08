@@ -52,8 +52,8 @@ class ClassroomFindSysacadRefsIntegrationTest extends AbstractIntegrationTest {
                 List.of(first.getId(), second.getId(), unknownId));
 
         assertThat(refs).containsExactlyInAnyOrder(
-                new ClassroomSysacadRefDto(first.getId(), 228, code, true),
-                new ClassroomSysacadRefDto(second.getId(), 229, code, true));
+                new ClassroomSysacadRefDto(first.getId(), 228, code, true, true, true),
+                new ClassroomSysacadRefDto(second.getId(), 229, code, true, true, true));
     }
 
     @Test
@@ -66,7 +66,7 @@ class ClassroomFindSysacadRefsIntegrationTest extends AbstractIntegrationTest {
 
         List<ClassroomSysacadRefDto> refs = classroomService.findSysacadRefs(List.of(classroom.getId()));
 
-        assertThat(refs).containsExactly(new ClassroomSysacadRefDto(classroom.getId(), 230, code, true));
+        assertThat(refs).containsExactly(new ClassroomSysacadRefDto(classroom.getId(), 230, code, true, true, true));
     }
 
     @Test
@@ -76,16 +76,17 @@ class ClassroomFindSysacadRefsIntegrationTest extends AbstractIntegrationTest {
         Classroom classroom = testData.aulaConNumero(231, buildingWithCode(code), testData.tipoAulaPorDefecto(), 40);
         classroom.setSysacadHash("h-" + classroom.getRoomNumber());
         classroom.setSysacadCurrent(false);
+        classroom.setSysacadEnabled(true);
         classroomRepository.save(classroom);
 
         List<ClassroomSysacadRefDto> refs = classroomService.findSysacadRefs(List.of(classroom.getId()));
 
-        assertThat(refs).containsExactly(new ClassroomSysacadRefDto(classroom.getId(), 231, code, false));
+        assertThat(refs).containsExactly(new ClassroomSysacadRefDto(classroom.getId(), 231, code, false, true, true));
     }
 
     @Test
-    @DisplayName("Un aula con habilitada = N en SysAcad viene con currentInSysacad en falso")
-    void classroomDisabledInSysacadIsNotCurrent() {
+    @DisplayName("Un aula con habilitada = N en SysAcad viene con enabledInSysacad en falso y sigue vigente")
+    void classroomDisabledInSysacadIsNotEnabled() {
         int code = uniqueCode();
         Classroom classroom = testData.aulaConNumero(232, buildingWithCode(code), testData.tipoAulaPorDefecto(), 40);
         classroom.setSysacadHash("h-" + classroom.getRoomNumber());
@@ -95,7 +96,22 @@ class ClassroomFindSysacadRefsIntegrationTest extends AbstractIntegrationTest {
 
         List<ClassroomSysacadRefDto> refs = classroomService.findSysacadRefs(List.of(classroom.getId()));
 
-        assertThat(refs).containsExactly(new ClassroomSysacadRefDto(classroom.getId(), 232, code, false));
+        assertThat(refs).containsExactly(new ClassroomSysacadRefDto(classroom.getId(), 232, code, true, false, true));
+    }
+
+    @Test
+    @DisplayName("Un aula de un edificio que SysAcad ya no lista viene con buildingCurrentInSysacad en falso")
+    void buildingDroppedFromSysacadIsNotCurrent() {
+        int code = uniqueCode();
+        Building building = buildingWithCode(code);
+        building.setSysacadHash("h-" + code);
+        building.setSysacadEnabled(false);
+        buildingRepository.save(building);
+        Classroom classroom = testData.aulaConNumero(233, building, testData.tipoAulaPorDefecto(), 40);
+
+        List<ClassroomSysacadRefDto> refs = classroomService.findSysacadRefs(List.of(classroom.getId()));
+
+        assertThat(refs).containsExactly(new ClassroomSysacadRefDto(classroom.getId(), 233, code, true, true, false));
     }
 
     @Test
@@ -105,7 +121,7 @@ class ClassroomFindSysacadRefsIntegrationTest extends AbstractIntegrationTest {
 
         List<ClassroomSysacadRefDto> refs = classroomService.findSysacadRefs(List.of(classroom.getId()));
 
-        assertThat(refs).containsExactly(new ClassroomSysacadRefDto(classroom.getId(), 232, null, true));
+        assertThat(refs).containsExactly(new ClassroomSysacadRefDto(classroom.getId(), 232, null, true, true, true));
     }
 
     @Test

@@ -309,7 +309,7 @@ class SysacadAlertServiceTest {
     @DisplayName("destino no enviable junto con revisión abierta: un solo mail con ambas líneas")
     void notSendableAndReviewShareOneMail() {
         finishedRun();
-        newsInWindow(notSendableEntry(1L, DestinationNotSendableReason.CLASSROOM_NOT_CURRENT_IN_SYSACAD),
+        newsInWindow(notSendableEntry(1L, DestinationNotSendableReason.CLASSROOM_DISABLED_IN_SYSACAD),
                 reviewEntry(1L));
         slot77();
         subsecretaria("sub@utn.edu.ar");
@@ -317,7 +317,7 @@ class SysacadAlertServiceTest {
         assertThatCode(() -> service.alert(PREVIOUS_END)).doesNotThrowAnyException();
 
         assertThat(sentLines()).hasSize(2)
-                .anyMatch(l -> l.contains("no está vigente en SysAcad"))
+                .anyMatch(l -> l.contains("está inhabilitada en SysAcad"))
                 .anyMatch(l -> l.contains("ocupada"));
     }
 
