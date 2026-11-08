@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.sysacad.internal.sync;
 
+import ar.edu.utn.frc.siga.sysacad.SysacadTestSettings;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -34,9 +35,8 @@ class SysacadViewReconcilerTest {
     }
 
     private static SysacadViewReconciler reconcilerIn(SysacadWriteMode mode, SysacadScheduleLogRepository logRepository) {
-        SysacadProperties properties = new SysacadProperties();
-        properties.setWrite(SysacadProperties.Write.of(mode));
-        return new SysacadViewReconciler(properties, new RecentSendLookup(logRepository, properties), logRepository);
+        return new SysacadViewReconciler(SysacadTestSettings.with(mode),
+                new RecentSendLookup(logRepository, new SysacadProperties()), logRepository);
     }
 
     private static SysacadSchedule schedule() {
@@ -211,6 +211,36 @@ class SysacadViewReconcilerTest {
         assertThat(schedule.getBaseRoom()).isEqualTo(229);
         assertThat(schedule.getDifferentRoom()).isNull();
         assertThat(schedule.getDifferenceDetectedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("SANDBOX, primera lectura distinta: DIFFERENCE_RECORDED como en ON, conocido y base intactos")
+    void sandboxFirstDifferentReadingRecordsDifference() {
+        SysacadSchedule schedule = schedule();
+
+        ReconcileOutcome outcome = reconcilerIn(SysacadWriteMode.SANDBOX).reconcile(schedule, 5, 229, NOW);
+
+        assertThat(outcome).isEqualTo(ReconcileOutcome.DIFFERENCE_RECORDED);
+        assertThat(schedule.getDifferentBuilding()).isEqualTo(5);
+        assertThat(schedule.getDifferentRoom()).isEqualTo(229);
+        assertThat(schedule.getDifferenceDetectedAt()).isEqualTo(NOW);
+        assertThat(schedule.getKnownRoom()).isEqualTo(228);
+        assertThat(schedule.getBaseRoom()).isEqualTo(228);
+    }
+
+    @Test
+    @DisplayName("SANDBOX, misma diferencia que la guardada: DIRECT_CHANGE, conocido y base intactos")
+    void sandboxSameDifferenceIsDirectChange() {
+        SysacadSchedule schedule = schedule();
+        schedule.setDifferentBuilding(5);
+        schedule.setDifferentRoom(229);
+        schedule.setDifferenceDetectedAt(EARLIER);
+
+        ReconcileOutcome outcome = reconcilerIn(SysacadWriteMode.SANDBOX).reconcile(schedule, 5, 229, NOW);
+
+        assertThat(outcome).isEqualTo(ReconcileOutcome.DIRECT_CHANGE);
+        assertThat(schedule.getKnownRoom()).isEqualTo(228);
+        assertThat(schedule.getBaseRoom()).isEqualTo(228);
     }
 
     @Test

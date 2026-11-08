@@ -134,7 +134,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         }
         return classroomRepository.findAllByIdWithBuilding(ids).stream()
                 .map(c -> new ClassroomSysacadRefDto(c.getId(), c.getRoomNumber(), c.getBuilding().getBuildingCode(),
-                        c.isCurrentInSysacad() && c.isEnabledInSysacad() && c.getBuilding().isCurrentInSysacad()))
+                        c.isCurrentInSysacad(), c.isEnabledInSysacad(), c.getBuilding().isCurrentInSysacad()))
                 .toList();
     }
 

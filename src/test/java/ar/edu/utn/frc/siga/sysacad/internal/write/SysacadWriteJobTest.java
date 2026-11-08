@@ -1,5 +1,13 @@
 package ar.edu.utn.frc.siga.sysacad.internal.write;
 
+import ar.edu.utn.frc.siga.settings.api.SettingChangedEvent;
+import ar.edu.utn.frc.siga.settings.model.SettingKey;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
+import ar.edu.utn.frc.siga.sysacad.SysacadTestSettings;
+import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadConflictException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -37,6 +45,7 @@ class SysacadWriteJobTest {
     private final SysacadWriteStateService stateService = mock(SysacadWriteStateService.class);
     private final SysacadAlertService alertService = mock(SysacadAlertService.class);
     private final SysacadSyncLock syncLock = new SysacadSyncLock();
+    private SysacadRuntimeSettings runtimeSettings;
     private SysacadWriteJob job;
 
     @BeforeEach
@@ -47,14 +56,10 @@ class SysacadWriteJobTest {
     }
 
     private SysacadWriteJob jobIn(SysacadWriteMode mode) {
-        SysacadProperties properties = new SysacadProperties();
-        SysacadProperties.Write base = SysacadProperties.Write.of(mode);
-        properties.setWrite(new SysacadProperties.Write(mode, Duration.ofMillis(20), base.viewReadInterval(),
-                base.maxAttempts(), base.maxConsecutiveFailures(), base.retryBackoff(), base.readTimeout(),
-                base.inCallRetryDelay(), base.outageAlertAfter(), base.outageAlertRepeat(), base.maxSendsPerRun(),
-                base.maxRequestsPerMinute(), base.recentSendWindow(), base.waitingVisibleBefore(), base.afterSyncMargin(), base.noCronRetryDelay(),
-                base.alertMailMaxLines()));
-        job = new SysacadWriteJob(run, stateService, alertService, syncLock, properties, Clock.fixed(NOW, ZoneOffset.UTC));
+        runtimeSettings = SysacadTestSettings.with(mode);
+        when(runtimeSettings.jobDelay()).thenReturn(Duration.ofMillis(20));
+        job = new SysacadWriteJob(run, stateService, alertService, syncLock, runtimeSettings,
+                Clock.fixed(NOW, ZoneOffset.UTC));
         return job;
     }
 
@@ -66,11 +71,11 @@ class SysacadWriteJobTest {
     }
 
     @Test
-    @DisplayName("Con el modo OFF no agenda nada")
-    void offDoesNotSchedule() throws InterruptedException {
+    @DisplayName("Con el modo OFF agenda el job pero no corre nada")
+    void offSchedulesButDoesNotRun() throws InterruptedException {
         jobIn(SysacadWriteMode.OFF).start();
 
-        assertThat(job.isRunning()).isFalse();
+        assertThat(job.isRunning()).isTrue();
         Thread.sleep(100);
         verify(run, never()).run(any());
     }
@@ -188,5 +193,109 @@ class SysacadWriteJobTest {
         Thread.sleep(50);
         assertThat(syncLock.tryLock()).isTrue();
         syncLock.unlock();
+    }
+
+    @Test
+    @DisplayName("Cambiar el delay del job reinicia el executor con el delay nuevo")
+    void delayChangeRestartsExecutorWithNewDelay() throws InterruptedException {
+        when(run.run(NOW)).thenReturn(OK);
+        jobIn(SysacadWriteMode.ON);
+        when(runtimeSettings.jobDelay()).thenReturn(Duration.ofHours(1));
+        job.start();
+        Thread.sleep(100);
+        verify(run, never()).run(any());
+
+        when(runtimeSettings.jobDelay()).thenReturn(Duration.ofMillis(20));
+        job.onSettingChanged(new SettingChangedEvent(SettingKey.SYSACAD_WRITE_JOB_DELAY_MINUTES));
+
+        assertThat(job.isRunning()).isTrue();
+        verify(run, timeout(2000).atLeastOnce()).run(NOW);
+    }
+
+    @Test
+    @DisplayName("Un cambio de otra clave no reinicia el executor")
+    void otherKeyDoesNotRestartExecutor() throws InterruptedException {
+        when(run.run(NOW)).thenReturn(OK);
+        jobIn(SysacadWriteMode.ON);
+        when(runtimeSettings.jobDelay()).thenReturn(Duration.ofHours(1));
+        job.start();
+
+        when(runtimeSettings.jobDelay()).thenReturn(Duration.ofMillis(20));
+        job.onSettingChanged(new SettingChangedEvent(SettingKey.SYSACAD_WRITE_MODE));
+
+        Thread.sleep(150);
+        verify(run, never()).run(any());
+        verify(runtimeSettings, org.mockito.Mockito.times(1)).jobDelay();
+    }
+
+    @Test
+    @DisplayName("Un cambio de delay sin el job iniciado no arranca nada")
+    void delayChangeWithoutStartedJobDoesNotStart() {
+        jobIn(SysacadWriteMode.ON);
+
+        job.onSettingChanged(new SettingChangedEvent(SettingKey.SYSACAD_WRITE_JOB_DELAY_MINUTES));
+
+        assertThat(job.isRunning()).isFalse();
+        verify(runtimeSettings, never()).jobDelay();
+    }
+
+    @Test
+    @DisplayName("runNow con el modo OFF lanza conflicto y no corre")
+    void runNowInOffThrowsConflict() {
+        jobIn(SysacadWriteMode.OFF);
+
+        assertThatThrownBy(() -> job.runNow()).isInstanceOf(SysacadConflictException.class);
+        verify(run, never()).run(any());
+    }
+
+    @Test
+    @DisplayName("runNow con el lock tomado por otro hilo lanza conflicto y no corre")
+    void runNowWithLockHeldElsewhereThrowsConflict() throws InterruptedException {
+        jobIn(SysacadWriteMode.ON);
+        CountDownLatch held = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        Thread holder = new Thread(() -> {
+            syncLock.lock();
+            held.countDown();
+            try {
+                release.await();
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            } finally {
+                syncLock.unlock();
+            }
+        });
+        holder.start();
+        assertThat(held.await(2, TimeUnit.SECONDS)).isTrue();
+        try {
+            assertThatThrownBy(() -> job.runNow()).isInstanceOf(SysacadConflictException.class);
+            verify(run, never()).run(any());
+        } finally {
+            release.countDown();
+            holder.join(2000);
+        }
+    }
+
+    @Test
+    @DisplayName("runNow en ON devuelve el reporte de la corrida y suelta el lock")
+    void runNowReturnsReportAndReleasesLock() {
+        when(run.run(NOW)).thenReturn(OK);
+        jobIn(SysacadWriteMode.ON);
+
+        RunReport report = job.runNow();
+
+        assertThat(report).isSameAs(OK);
+        verify(alertService).alert(PREVIOUS_END);
+        assertThat(syncLock.tryLock()).isTrue();
+        syncLock.unlock();
+    }
+
+    @Test
+    @DisplayName("runNow en DRY_RUN también corre")
+    void runNowInDryRunRuns() {
+        when(run.run(NOW)).thenReturn(OK);
+        jobIn(SysacadWriteMode.DRY_RUN);
+
+        assertThat(job.runNow()).isSameAs(OK);
     }
 }

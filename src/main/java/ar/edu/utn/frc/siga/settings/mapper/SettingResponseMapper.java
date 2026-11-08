@@ -15,6 +15,6 @@ public class SettingResponseMapper {
     public SettingResponseDto toDto(SettingKey key, String value) {
         return new SettingResponseDto(
                 key.getKey(), key.getType(), value, catalog.defaultValue(key), key.getRisk(),
-                catalog.min(key), catalog.max(key), key.getWarning());
+                catalog.min(key), catalog.max(key), catalog.options(key), key.getWarning());
     }
 }

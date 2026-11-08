@@ -58,7 +58,24 @@ public enum SettingKey {
             "Cada día hábil (lunes a viernes sin feriado) suma 24 horas al plazo que tiene el docente para "
                     + "responder: 48 son dos días hábiles, no dos jornadas de 8 horas."),
     ROOM_REQUESTS_ACCEPTANCE_HOURS_BEFORE_EVENT(
-            "roomRequests.acceptance.hoursBeforeEvent", SettingType.INT, RiskLevel.SAFE, "roomRequests", null);
+            "roomRequests.acceptance.hoursBeforeEvent", SettingType.INT, RiskLevel.SAFE, "roomRequests", null),
+    SYSACAD_WRITE_MODE(
+            "sysacad.write.mode", SettingType.ENUM, RiskLevel.ADVANCED, "sysacad",
+            "OFF no envía nada y SIGA sigue lo que dice SysAcad. DRY_RUN calcula y registra los envíos sin llamar a SysAcad. "
+                    + "SANDBOX conserva en SIGA los cambios de aula y no envía nada: al pasar a ON se envían los acumulados. "
+                    + "ON modifica aulas reales en SysAcad: dev y test comparten la misma base de SysAcad."),
+    SYSACAD_AUTOGESTION_MODE(
+            "sysacad.autogestion.mode", SettingType.ENUM, RiskLevel.ADVANCED, "sysacad",
+            "ON publica el mensaje de autogestión a los alumnos de todas las comisiones afectadas. "
+                    + "TEST_COMMISSIONS lo limita a las comisiones de prueba."),
+    SYSACAD_WRITE_JOB_DELAY_MINUTES(
+            "sysacad.write.jobDelayMinutes", SettingType.LONG, RiskLevel.SAFE, "sysacad", null),
+    SYSACAD_WRITE_VIEW_READ_INTERVAL_MINUTES(
+            "sysacad.write.viewReadIntervalMinutes", SettingType.LONG, RiskLevel.SAFE, "sysacad", null),
+    SYSACAD_SYNC_DAY_OF_WEEK(
+            "sysacad.sync.dayOfWeek", SettingType.ENUM, RiskLevel.SAFE, "sysacad", null),
+    SYSACAD_SYNC_TIME(
+            "sysacad.sync.time", SettingType.TIME, RiskLevel.SAFE, "sysacad", null);
 
     private final String key;
     private final SettingType type;

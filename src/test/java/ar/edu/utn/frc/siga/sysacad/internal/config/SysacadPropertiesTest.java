@@ -51,13 +51,13 @@ class SysacadPropertiesTest {
     void rejectsThresholdOutOfRange() {
         SysacadProperties properties = valid();
 
-        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", 101, SysacadProperties.Sync.DEFAULT_ZONE));
+        properties.setSync(new SysacadProperties.Sync(101, SysacadProperties.Sync.DEFAULT_ZONE));
         assertThat(validator.validate(properties)).hasSize(1);
-        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", -1, SysacadProperties.Sync.DEFAULT_ZONE));
+        properties.setSync(new SysacadProperties.Sync(-1, SysacadProperties.Sync.DEFAULT_ZONE));
         assertThat(validator.validate(properties)).hasSize(1);
-        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", 0, SysacadProperties.Sync.DEFAULT_ZONE));
+        properties.setSync(new SysacadProperties.Sync(0, SysacadProperties.Sync.DEFAULT_ZONE));
         assertThat(validator.validate(properties)).isEmpty();
-        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", 100, SysacadProperties.Sync.DEFAULT_ZONE));
+        properties.setSync(new SysacadProperties.Sync(100, SysacadProperties.Sync.DEFAULT_ZONE));
         assertThat(validator.validate(properties)).isEmpty();
     }
 
@@ -89,7 +89,6 @@ class SysacadPropertiesTest {
         assertThat(bound.getSync().zone()).isEqualTo(java.time.ZoneId.of("America/Argentina/Buenos_Aires"));
         assertThat(bound.getCommissionMessagePublisherLegajo()).isZero();
         assertThat(bound.getCommissionMessagePublisherUserType()).isEqualTo("S");
-        assertThat(bound.getCommissionMessageMode()).isEqualTo(CommissionMessageMode.OFF);
         assertThat(bound.getCommissionMessageTestCommissions())
                 .containsExactly(new SysacadProperties.MessageCommission(5, 2023, 581, 5));
     }
@@ -97,7 +96,6 @@ class SysacadPropertiesTest {
     @Test
     @DisplayName("el mensaje viene en OFF y sin comisiones de prueba; una comisión con un campo nulo se rechaza")
     void messageDefaultsAndRejectNulls() {
-        assertThat(valid().getCommissionMessageMode()).isEqualTo(CommissionMessageMode.OFF);
         assertThat(valid().getCommissionMessageTestCommissions()).isEmpty();
 
         SysacadProperties properties = valid();
@@ -109,20 +107,13 @@ class SysacadPropertiesTest {
     }
 
     @Test
-    @DisplayName("el modo de escritura es OFF por defecto")
-    void writeModeDefaultsToOff() {
-        assertThat(valid().getWrite().mode()).isEqualTo(SysacadWriteMode.OFF);
+    @DisplayName("Write.defaults() coincide con los defaults del bloque write")
+    void writeDefaultsMatchBlockDefaults() {
+        assertThat(SysacadProperties.Write.defaults()).isEqualTo(valid().getWrite());
     }
 
     @Test
-    @DisplayName("Write.of(OFF) coincide con los defaults del bloque write")
-    void writeOfMatchesDefaults() {
-        assertThat(SysacadProperties.Write.of(SysacadWriteMode.OFF)).isEqualTo(valid().getWrite());
-        assertThat(SysacadProperties.Write.of(SysacadWriteMode.ON).mode()).isEqualTo(SysacadWriteMode.ON);
-    }
-
-    @Test
-    @DisplayName("bound sin el bloque write, queda en OFF con los defaults de Write.of")
+    @DisplayName("bound sin el bloque write, queda con los defaults de Write.defaults")
     void bindingWithoutWriteBlockDefaultsToOff() {
         StandardEnvironment environment = new StandardEnvironment();
         environment.getPropertySources().addFirst(new org.springframework.core.env.MapPropertySource("test",
@@ -131,7 +122,7 @@ class SysacadPropertiesTest {
 
         SysacadProperties bound = Binder.get(environment).bind("siga.sysacad", SysacadProperties.class).get();
 
-        assertThat(bound.getWrite()).isEqualTo(SysacadProperties.Write.of(SysacadWriteMode.OFF));
+        assertThat(bound.getWrite()).isEqualTo(SysacadProperties.Write.defaults());
     }
 
     @Test
@@ -147,7 +138,7 @@ class SysacadPropertiesTest {
         SysacadProperties bound = Binder.get(environment).bind("siga.sysacad", SysacadProperties.class).get();
 
         assertThat(bound.getWrite()).isEqualTo(new SysacadProperties.Write(
-                SysacadWriteMode.OFF, Duration.ofMinutes(5), Duration.ofHours(1), 5, 3,
+                5, 3,
                 List.of(Duration.ofMinutes(5), Duration.ofMinutes(15), Duration.ofMinutes(30), Duration.ofHours(1)),
                 Duration.ofSeconds(15), Duration.ofSeconds(2), Duration.ofHours(1), Duration.ofDays(1),
                 30, 30, Duration.ofDays(7), Duration.ofHours(24),
@@ -158,7 +149,7 @@ class SysacadPropertiesTest {
     @DisplayName("max-attempts en 0 falla la validación; en 1 es válido")
     void maxAttemptsBelowOneIsRejected() {
         SysacadProperties properties = valid();
-        SysacadProperties.Write base = SysacadProperties.Write.of(SysacadWriteMode.ON);
+        SysacadProperties.Write base = SysacadProperties.Write.defaults();
 
         properties.setWrite(withMaxAttempts(base, 0));
         assertThat(validator.validate(properties)).extracting(v -> v.getPropertyPath().toString())
@@ -168,7 +159,7 @@ class SysacadPropertiesTest {
     }
 
     private static SysacadProperties.Write withMaxAttempts(SysacadProperties.Write w, int maxAttempts) {
-        return new SysacadProperties.Write(w.mode(), w.jobDelay(), w.viewReadInterval(), maxAttempts,
+        return new SysacadProperties.Write(maxAttempts,
                 w.maxConsecutiveFailures(), w.retryBackoff(), w.readTimeout(), w.inCallRetryDelay(),
                 w.outageAlertAfter(), w.outageAlertRepeat(), w.maxSendsPerRun(), w.maxRequestsPerMinute(),
                 w.recentSendWindow(), w.waitingVisibleBefore(), w.afterSyncMargin(), w.noCronRetryDelay(),

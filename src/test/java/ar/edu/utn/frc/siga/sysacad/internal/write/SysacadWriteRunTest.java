@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.sysacad.internal.write;
 
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
+import ar.edu.utn.frc.siga.sysacad.SysacadTestSettings;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -78,25 +80,28 @@ class SysacadWriteRunTest {
     private SysacadScheduleRepository scheduleRepository;
 
     private SysacadProperties properties;
+    private SysacadRuntimeSettings runtimeSettings;
     private SysacadWriteState state;
     private SysacadWriteRun run;
 
     @BeforeEach
     void setUp() {
         properties = new SysacadProperties();
+        runtimeSettings = SysacadTestSettings.with(SysacadWriteMode.ON);
         configure(SysacadWriteMode.ON, 5, 3, 30, List.of(Duration.ofMinutes(5), Duration.ofMinutes(15),
                 Duration.ofMinutes(30), Duration.ofHours(1)));
         state = new SysacadWriteState();
         state.setLastViewReadAt(NOW.minus(Duration.ofMinutes(10)));
         run = new SysacadWriteRun(stateService, viewReader, planner, sendCycle, scheduleWriter, directChangeHandler,
-                scheduleRepository, properties, Clock.fixed(NOW, ZoneOffset.UTC));
+                scheduleRepository, properties, runtimeSettings, Clock.fixed(NOW, ZoneOffset.UTC));
         lenient().when(stateService.current()).thenAnswer(invocation -> state);
     }
 
     private void configure(SysacadWriteMode mode, int maxAttempts, int maxFailures, int maxSends,
             List<Duration> backoff) {
-        SysacadProperties.Write base = SysacadProperties.Write.of(mode);
-        properties.setWrite(new SysacadProperties.Write(mode, base.jobDelay(), base.viewReadInterval(), maxAttempts,
+        lenient().when(runtimeSettings.writeMode()).thenReturn(mode);
+        SysacadProperties.Write base = SysacadProperties.Write.defaults();
+        properties.setWrite(new SysacadProperties.Write(maxAttempts,
                 maxFailures, backoff, base.readTimeout(), base.inCallRetryDelay(), base.outageAlertAfter(),
                 base.outageAlertRepeat(), maxSends, base.maxRequestsPerMinute(), base.recentSendWindow(),
                 base.waitingVisibleBefore(), base.afterSyncMargin(), base.noCronRetryDelay(),
@@ -152,6 +157,18 @@ class SysacadWriteRunTest {
     @DisplayName("OFF no envía ni registra el envío simulado")
     void offDoesNotApply() {
         configure(SysacadWriteMode.OFF, 5, 3, 30, List.of(Duration.ofMinutes(5)));
+        planReturns(send(schedule(1)));
+
+        run.run(NOW);
+
+        verifyNoInteractions(sendCycle);
+        verify(scheduleWriter, never()).recordEvent(anyLong(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("SANDBOX no envía ni registra el envío simulado")
+    void sandboxDoesNotSend() {
+        configure(SysacadWriteMode.SANDBOX, 5, 3, 30, List.of(Duration.ofMinutes(5)));
         planReturns(send(schedule(1)));
 
         run.run(NOW);
@@ -528,7 +545,7 @@ class SysacadWriteRunTest {
 
         run.run(NOW);
 
-        verify(stateService).pauseUntil(NOW.plus(properties.getWrite().jobDelay()));
+        verify(stateService).pauseUntil(NOW.plus(runtimeSettings.jobDelay()));
     }
 
     @Test

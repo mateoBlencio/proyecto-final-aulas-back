@@ -1,10 +1,13 @@
 package ar.edu.utn.frc.siga.sysacad;
 
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
+import ar.edu.utn.frc.siga.settings.service.SettingsStore;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -78,11 +81,22 @@ import org.springframework.transaction.support.TransactionTemplate;
 @DisplayName("Ciclo de envío de aulas a SysAcad (integración, modo ON)")
 @TestPropertySource(properties = {
         "siga.sysacad.enabled=true",
-        "siga.sysacad.write.mode=ON",
-        "siga.sysacad.write.job-delay=PT24H",
         "siga.sysacad.write.max-requests-per-minute=60000"
 })
 class SysacadWriteCycleIntegrationTest extends AbstractIntegrationTest {
+
+    @Autowired
+    private SettingsStore settingsStore;
+
+    @BeforeEach
+    void useWriteMode() {
+        SysacadModeSupport.use(settingsStore, SysacadWriteMode.ON);
+    }
+
+    @AfterEach
+    void resetWriteMode() {
+        SysacadModeSupport.reset(settingsStore);
+    }
 
     private static final int YEAR = 2095;
     private static final LocalTime START = LocalTime.of(8, 0);
@@ -317,6 +331,39 @@ class SysacadWriteCycleIntegrationTest extends AbstractIntegrationTest {
         SysacadSchedule after = schedule(seeded);
         assertThat(after.getKnownRoom()).isEqualTo(229);
         assertThat(after.getStatus()).isEqualTo(SysacadScheduleStatus.SYNCED);
+        assertThat(logTypes(seeded)).containsExactly(ScheduleLogType.SEND_INTENT.name(),
+                ScheduleLogType.SEND_CONFIRMED.name());
+    }
+
+    @Test
+    @DisplayName("SANDBOX no llama a SysAcad y deja el horario sin enviar; al pasar a ON se envía una sola vez")
+    void sandboxHoldsTheSendUntilOn() {
+        Seeded seeded = seed(true, true);
+        viewShows(seeded, 228);
+        when(writeClient.readSchedule(1, 2008, seeded.subject())).thenReturn(
+                new ScheduleReadResult.Rows(List.of(viewRow(seeded, 228))),
+                new ScheduleReadResult.Rows(List.of(viewRow(seeded, 229))));
+        when(writeClient.updateRoom(any())).thenReturn(new UpdateRoomResult.Applied("ok"));
+        SysacadModeSupport.use(settingsStore, SysacadWriteMode.SANDBOX);
+
+        RunReport sandboxReport = run();
+
+        assertThat(sandboxReport.result()).isEqualTo(RunReport.Result.OK);
+        verifyNoInteractions(writeClient);
+        SysacadSchedule held = schedule(seeded);
+        assertThat(held.getKnownRoom()).isEqualTo(228);
+        assertThat(held.getStatus()).isEqualTo(SysacadScheduleStatus.SYNCED);
+        assertThat(logTypes(seeded)).isEmpty();
+        assertThat(allocationRepository.findByOccurrenceId(seeded.occurrenceId()).orElseThrow().getClassroomId())
+                .isEqualTo(seeded.target().getId());
+
+        SysacadModeSupport.use(settingsStore, SysacadWriteMode.ON);
+        forgetViewRead();
+        run();
+
+        verify(writeClient, times(1)).updateRoom(any());
+        SysacadSchedule sent = schedule(seeded);
+        assertThat(sent.getKnownRoom()).isEqualTo(229);
         assertThat(logTypes(seeded)).containsExactly(ScheduleLogType.SEND_INTENT.name(),
                 ScheduleLogType.SEND_CONFIRMED.name());
     }

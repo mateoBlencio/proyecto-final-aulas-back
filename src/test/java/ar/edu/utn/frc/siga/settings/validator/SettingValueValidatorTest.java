@@ -82,4 +82,67 @@ class SettingValueValidatorTest {
                 .doesNotThrowAnyException();
         assertThat(validator.validate(SettingKey.OPTIMIZER_WEIGHT_UNUSED_CAPACITY, "  42  ")).isEqualTo("42");
     }
+
+    @Test
+    @DisplayName("ENUM con una opción del catálogo se acepta")
+    void enumValidOptionIsAccepted() {
+        assertThat(validator.validate(SettingKey.SYSACAD_WRITE_MODE, "DRY_RUN")).isEqualTo("DRY_RUN");
+        assertThat(validator.validate(SettingKey.SYSACAD_SYNC_DAY_OF_WEEK, "WED")).isEqualTo("WED");
+    }
+
+    @Test
+    @DisplayName("ENUM fuera del catálogo lanza 400 y el mensaje lista las opciones")
+    void enumUnknownOptionIsRejected() {
+        assertThatThrownBy(() -> validator.validate(SettingKey.SYSACAD_WRITE_MODE, "MAYBE"))
+                .isInstanceOf(InvalidSettingValueException.class)
+                .hasMessageContaining("MAYBE")
+                .hasMessageContaining("DRY_RUN");
+    }
+
+    @Test
+    @DisplayName("ENUM vacío o en blanco lanza 400")
+    void enumBlankIsRejected() {
+        assertThatThrownBy(() -> validator.validate(SettingKey.SYSACAD_WRITE_MODE, ""))
+                .isInstanceOf(InvalidSettingValueException.class);
+        assertThatThrownBy(() -> validator.validate(SettingKey.SYSACAD_WRITE_MODE, "   "))
+                .isInstanceOf(InvalidSettingValueException.class);
+    }
+
+    @Test
+    @DisplayName("ENUM distingue mayúsculas y minúsculas")
+    void enumIsCaseSensitive() {
+        assertThatThrownBy(() -> validator.validate(SettingKey.SYSACAD_WRITE_MODE, "on"))
+                .isInstanceOf(InvalidSettingValueException.class);
+        assertThatThrownBy(() -> validator.validate(SettingKey.SYSACAD_SYNC_DAY_OF_WEEK, "Sun"))
+                .isInstanceOf(InvalidSettingValueException.class);
+    }
+
+    @Test
+    @DisplayName("ENUM con espacios alrededor se recorta antes de comparar")
+    void enumIsTrimmed() {
+        assertThat(validator.validate(SettingKey.SYSACAD_WRITE_MODE, " ON ")).isEqualTo("ON");
+    }
+
+    @Test
+    @DisplayName("BOOLEAN true y false se aceptan")
+    void booleanValidValuesAreAccepted() {
+        assertThat(validator.validate(SettingKey.NOTIFICATIONS_ENABLED, "true")).isEqualTo("true");
+        assertThat(validator.validate(SettingKey.NOTIFICATIONS_ENABLED, "false")).isEqualTo("false");
+    }
+
+    @Test
+    @DisplayName("BOOLEAN en mayúsculas se normaliza a minúsculas")
+    void booleanIsNormalizedToLowerCase() {
+        assertThat(validator.validate(SettingKey.NOTIFICATIONS_ENABLED, "TRUE")).isEqualTo("true");
+        assertThat(validator.validate(SettingKey.NOTIFICATIONS_ENABLED, "False")).isEqualTo("false");
+    }
+
+    @Test
+    @DisplayName("BOOLEAN con un valor que no es true ni false lanza 400")
+    void booleanInvalidIsRejected() {
+        assertThatThrownBy(() -> validator.validate(SettingKey.NOTIFICATIONS_ENABLED, "yes"))
+                .isInstanceOf(InvalidSettingValueException.class);
+        assertThatThrownBy(() -> validator.validate(SettingKey.NOTIFICATIONS_ENABLED, "1"))
+                .isInstanceOf(InvalidSettingValueException.class);
+    }
 }

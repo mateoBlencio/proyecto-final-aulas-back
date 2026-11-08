@@ -94,7 +94,7 @@ class SysacadWritePlannerTest {
     }
 
     private static ClassroomSysacadRefDto room(long classroomId) {
-        return new ClassroomSysacadRefDto(classroomId, (int) classroomId, 1, true);
+        return new ClassroomSysacadRefDto(classroomId, (int) classroomId, 1, true, true, true);
     }
 
     private void stubSchedules(SysacadSchedule... schedules) {

@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.sysacad;
 
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
+import ar.edu.utn.frc.siga.settings.service.SettingsStore;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -32,8 +34,21 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @DisplayName("sysacad_horario (integración, flag encendido)")
-@TestPropertySource(properties = {"siga.sysacad.enabled=true", "siga.sysacad.write.mode=ON"})
+@TestPropertySource(properties = {"siga.sysacad.enabled=true"})
 class SysacadScheduleIntegrationTest extends AbstractIntegrationTest {
+
+    @Autowired
+    private SettingsStore settingsStore;
+
+    @BeforeEach
+    void useWriteMode() {
+        SysacadModeSupport.use(settingsStore, SysacadWriteMode.ON);
+    }
+
+    @AfterEach
+    void resetWriteMode() {
+        SysacadModeSupport.reset(settingsStore);
+    }
 
     private static final int YEAR = 2097;
 

@@ -11,9 +11,9 @@ import ar.edu.utn.frc.siga.notification.api.NotificationRequest;
 import ar.edu.utn.frc.siga.notification.api.NotificationSender;
 import ar.edu.utn.frc.siga.notification.api.NotificationTemplate;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadScheduleStatus;
 import ar.edu.utn.frc.siga.sysacad.internal.model.DestinationNotSendableReason;
-import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
 import ar.edu.utn.frc.siga.sysacad.internal.model.ScheduleLogType;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadReviewReason;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
@@ -61,12 +61,13 @@ public class SysacadAlertService {
     private final UserService userService;
     private final NotificationSender notificationSender;
     private final SysacadProperties properties;
+    private final SysacadRuntimeSettings runtimeSettings;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
     /** {@code previousRunEnd} es el fin de la corrida anterior, leído antes de que esta corrida lo pise. */
     public void alert(Instant previousRunEnd) {
-        if (properties.getWrite().mode() != SysacadWriteMode.ON) {
+        if (!runtimeSettings.writeMode().sendsToSysacad()) {
             return;
         }
         SysacadWriteState state = stateService.current();
@@ -220,7 +221,9 @@ public class SysacadAlertService {
 
     private static String destinationText(DestinationNotSendableReason reason) {
         return switch (reason) {
-            case CLASSROOM_NOT_CURRENT_IN_SYSACAD -> "el aula de SIGA no está vigente en SysAcad";
+            case BUILDING_NOT_IN_SYSACAD -> "SysAcad ya no lista el edificio del aula de SIGA";
+            case CLASSROOM_NOT_IN_SYSACAD -> "SysAcad ya no lista el aula de SIGA";
+            case CLASSROOM_DISABLED_IN_SYSACAD -> "el aula de SIGA está inhabilitada en SysAcad";
             case CLASSROOM_WITHOUT_NUMBER -> "el aula de SIGA no tiene número en SysAcad";
             case CLASSROOM_RESERVED_NUMBER -> "el aula de SIGA usa un número reservado en SysAcad";
             case BUILDING_WITHOUT_CODE -> "el edificio del aula de SIGA no tiene código en SysAcad";

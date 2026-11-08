@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.sysacad.internal.sync;
 
+import ar.edu.utn.frc.siga.sysacad.SysacadTestSettings;
 import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
@@ -99,11 +100,9 @@ class AllocationSyncServiceTest {
     }
 
     private AllocationSyncService serviceIn(SysacadWriteMode mode) {
-        SysacadProperties properties = new SysacadProperties();
-        properties.setWrite(SysacadProperties.Write.of(mode));
         return new AllocationSyncService(commissionService, subjectCommissionService,
                 academicEventService, classroomService, allocationService, syncStateService, scheduleLoader,
-                directChangeHandler, properties);
+                directChangeHandler, SysacadTestSettings.with(mode));
     }
 
     @Test
@@ -646,6 +645,41 @@ class AllocationSyncServiceTest {
         verify(allocationService).syncFromSysacad(captor.capture(), any());
         assertThat(captor.getValue()).containsExactly(new AllocationItem(new AllocationTarget.Event(100L), 50L));
         assertThat(loadedRows().getFirst().skipReason()).isNull();
+    }
+
+    @Test
+    @DisplayName("SANDBOX: evento nuevo con aula base se crea con la base aunque la fila muestre un 229 puntual")
+    void sandboxProposesBaseRoomEvenIfRowShowsOtherRoom() {
+        when(catalogReader.findAllocations()).thenReturn(List.of(row("101", 55, 1, 229, 5)));
+        stubResolvedEvent();
+        when(classroomService.findByRoomNumberAndBuildingCode(228, 5)).thenReturn(Optional.of(classroom(50L)));
+        when(classroomService.findByRoomNumberAndBuildingCode(229, 5)).thenReturn(Optional.of(classroom(51L)));
+        AllocationSyncService sandboxService = serviceIn(SysacadWriteMode.SANDBOX);
+        when(scheduleLoader.findBaseRooms()).thenReturn(Map.of(KEY, new BaseRoom(5, 228)));
+
+        sandboxService.sync(catalogReader);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<AllocationItem>> captor = ArgumentCaptor.forClass(List.class);
+        verify(allocationService).syncFromSysacad(captor.capture(), any());
+        assertThat(captor.getValue()).containsExactly(new AllocationItem(new AllocationTarget.Event(100L), 50L));
+        verify(scheduleLoader).findBaseRooms();
+    }
+
+    @Test
+    @DisplayName("OFF: no consulta las aulas base y propone el aula de la fila")
+    void writeOffIgnoresBaseRooms() {
+        when(catalogReader.findAllocations()).thenReturn(List.of(row("101", 55, 1, 229, 5)));
+        stubResolvedEvent();
+        when(classroomService.findByRoomNumberAndBuildingCode(229, 5)).thenReturn(Optional.of(classroom(51L)));
+
+        service.sync(catalogReader);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<AllocationItem>> captor = ArgumentCaptor.forClass(List.class);
+        verify(allocationService).syncFromSysacad(captor.capture(), any());
+        assertThat(captor.getValue()).containsExactly(new AllocationItem(new AllocationTarget.Event(100L), 51L));
+        verify(scheduleLoader, org.mockito.Mockito.never()).findBaseRooms();
     }
 
     @Test

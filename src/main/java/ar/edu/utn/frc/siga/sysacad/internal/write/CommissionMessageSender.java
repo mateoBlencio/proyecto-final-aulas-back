@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.sysacad.internal.client.SysacadWriteClient;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.CommissionMessageCommand;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.CommissionMessageResult;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Send;
 import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadScheduleStateWriter;
@@ -34,6 +35,7 @@ public class CommissionMessageSender {
     private final SubjectService subjectService;
     private final ClassroomService classroomService;
     private final SysacadProperties properties;
+    private final SysacadRuntimeSettings runtimeSettings;
 
     // No propaga errores: el aula ya quedó confirmada y un fallo del mensaje no es un fallo del envío.
     public void sendAfterConfirmation(SysacadSchedule schedule, Send decision, RequestPacer pacer) {
@@ -58,7 +60,7 @@ public class CommissionMessageSender {
     // EnviarMensajeComision no tiene entorno de pruebas y llega a alumnos reales: en TEST_COMMISSIONS solo se avisa
     // a las comisiones de prueba listadas.
     private boolean enabledFor(SysacadSchedule schedule) {
-        return switch (properties.getCommissionMessageMode()) {
+        return switch (runtimeSettings.commissionMessageMode()) {
             case OFF -> false;
             case ON -> true;
             case TEST_COMMISSIONS -> properties.getCommissionMessageTestCommissions().stream().anyMatch(c -> c.matches(

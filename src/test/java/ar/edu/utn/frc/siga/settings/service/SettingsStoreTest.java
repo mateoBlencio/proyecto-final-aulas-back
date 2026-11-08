@@ -18,6 +18,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -78,5 +79,21 @@ class SettingsStoreTest {
         assertThat(existing.getValue()).isEqualTo("60");
         verify(repository).save(existing);
         assertThat(store.getLong(key)).isEqualTo(60L);
+    }
+
+    @Test
+    @DisplayName("write registra el valor en el cache antes de publicar el evento")
+    void writeUpdatesCacheBeforePublishingEvent() {
+        SettingKey key = SettingKey.SYSACAD_WRITE_MODE;
+        when(repository.findById(key.getKey())).thenReturn(Optional.empty());
+        java.util.concurrent.atomic.AtomicReference<String> seenByListener = new java.util.concurrent.atomic.AtomicReference<>();
+        doAnswer(invocation -> {
+            seenByListener.set(store.getRaw(key));
+            return null;
+        }).when(eventPublisher).publishEvent(any(SettingChangedEvent.class));
+
+        store.write(key, "DRY_RUN");
+
+        assertThat(seenByListener.get()).isEqualTo("DRY_RUN");
     }
 }

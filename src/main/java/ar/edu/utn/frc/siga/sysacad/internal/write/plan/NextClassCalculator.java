@@ -98,8 +98,14 @@ public final class NextClassCalculator {
         if (ref == null) {
             return DestinationNotSendableReason.CLASSROOM_NOT_FOUND;
         }
+        if (!ref.buildingCurrentInSysacad()) {
+            return DestinationNotSendableReason.BUILDING_NOT_IN_SYSACAD;
+        }
         if (!ref.currentInSysacad()) {
-            return DestinationNotSendableReason.CLASSROOM_NOT_CURRENT_IN_SYSACAD;
+            return DestinationNotSendableReason.CLASSROOM_NOT_IN_SYSACAD;
+        }
+        if (!ref.enabledInSysacad()) {
+            return DestinationNotSendableReason.CLASSROOM_DISABLED_IN_SYSACAD;
         }
         if (ref.roomNumber() == null) {
             return DestinationNotSendableReason.CLASSROOM_WITHOUT_NUMBER;

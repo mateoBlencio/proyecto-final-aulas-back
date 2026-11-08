@@ -89,7 +89,7 @@ class SysacadConfigurationTest {
         properties.setApiKey("clave");
         properties.setReadTimeout(Duration.ofSeconds(10));
         properties.setMaxRetries(0);
-        properties.setWrite(shortReadTimeout(SysacadProperties.Write.of(SysacadWriteMode.ON)));
+        properties.setWrite(shortReadTimeout(SysacadProperties.Write.defaults()));
         SysacadConfiguration configuration = new SysacadConfiguration();
 
         SysacadClient readClient = new SysacadClient(configuration.sysacadRestClient(properties), properties);
@@ -100,7 +100,7 @@ class SysacadConfigurationTest {
     }
 
     private static SysacadProperties.Write shortReadTimeout(SysacadProperties.Write w) {
-        return new SysacadProperties.Write(w.mode(), w.jobDelay(), w.viewReadInterval(), w.maxAttempts(),
+        return new SysacadProperties.Write(w.maxAttempts(),
                 w.maxConsecutiveFailures(), w.retryBackoff(), Duration.ofMillis(300), w.inCallRetryDelay(),
                 w.outageAlertAfter(), w.outageAlertRepeat(), w.maxSendsPerRun(), w.maxRequestsPerMinute(),
                 w.recentSendWindow(), w.waitingVisibleBefore(), w.afterSyncMargin(), w.noCronRetryDelay(),

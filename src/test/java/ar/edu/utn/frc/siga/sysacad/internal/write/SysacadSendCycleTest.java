@@ -1,5 +1,8 @@
 package ar.edu.utn.frc.siga.sysacad.internal.write;
 
+import ar.edu.utn.frc.siga.sysacad.SysacadTestSettings;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
+import static org.mockito.Mockito.lenient;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -85,6 +88,7 @@ class SysacadSendCycleTest {
     private CommissionMessageSender commissionMessageSender;
 
     private SysacadProperties properties;
+    private SysacadRuntimeSettings runtimeSettings;
     private SysacadSendCycle cycle;
     private RequestPacer pacer;
     private SysacadSchedule schedule;
@@ -92,11 +96,11 @@ class SysacadSendCycleTest {
     @BeforeEach
     void setUp() {
         properties = new SysacadProperties();
-        properties.setWrite(SysacadProperties.Write.of(SysacadWriteMode.ON));
-        properties.setSync(new SysacadProperties.Sync("0 0 3 * * *", 50, SysacadProperties.Sync.DEFAULT_ZONE));
+        runtimeSettings = SysacadTestSettings.with(SysacadWriteMode.ON);
+        lenient().when(runtimeSettings.syncCron()).thenReturn("0 0 3 * * *");
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         cycle = new SysacadSendCycle(client, new SysacadCatalogMapper(), stateWriter, directChangeHandler,
-                allocationService, commissionMessageSender, properties, clock);
+                allocationService, commissionMessageSender, properties, runtimeSettings, clock);
         pacer = new RequestPacer(clock, wait -> { }, 30);
         schedule = SysacadSchedule.builder().id(SCHEDULE_ID)
                 .year(YEAR).specialty(SPECIALTY).plan(PLAN).subject(SUBJECT).commission(COMMISSION)
@@ -633,9 +637,9 @@ class SysacadSendCycleTest {
     }
 
     @Test
-    @DisplayName("Sin filas y sin cron configurado: reintenta en un día")
+    @DisplayName("Sin filas y sin próxima ejecución del cron: reintenta en un día")
     void noRowsWithoutCronRetriesInOneDay() {
-        properties.setSync(new SysacadProperties.Sync(null, 50, SysacadProperties.Sync.DEFAULT_ZONE));
+        when(runtimeSettings.syncCron()).thenReturn("0 0 3 30 2 *");
         readsReturn(rows());
 
         send();

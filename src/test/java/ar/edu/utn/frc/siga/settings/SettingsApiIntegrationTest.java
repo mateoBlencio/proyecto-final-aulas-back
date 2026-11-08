@@ -42,6 +42,8 @@ class SettingsApiIntegrationTest extends AbstractIntegrationTest {
     private ObjectMapper objectMapper;
     @Autowired
     private SettingsCatalogProperties catalog;
+    @Autowired
+    private ar.edu.utn.frc.siga.settings.service.SettingsStore settingsStore;
 
     @BeforeEach
     void ensureSeeded() {
@@ -193,6 +195,61 @@ class SettingsApiIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"value\":\"50\"}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("GET /v1/settings expone las opciones de un setting ENUM y deja options vacío para los demás")
+    void findAll_exposesEnumOptions() throws Exception {
+        mockMvc.perform(get("/v1/settings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sysacad[?(@.key=='sysacad.write.mode')].type").value("ENUM"))
+                .andExpect(jsonPath("$.sysacad[?(@.key=='sysacad.write.mode')].options")
+                        .value(org.hamcrest.Matchers.contains(
+                                org.hamcrest.Matchers.contains("OFF", "DRY_RUN", "SANDBOX", "ON"))))
+                .andExpect(jsonPath("$.allocation[?(@.key=='allocation.maxOverlapMinutes')].options")
+                        .value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.empty())));
+    }
+
+    @Test
+    @DisplayName("PUT de un ENUM con un valor fuera de las opciones responde 400 y no persiste")
+    void put_enumOutsideOptions_returns400() throws Exception {
+        putValue("sysacad.write.mode", "MAYBE").andExpect(status().isBadRequest());
+        putValue("sysacad.write.mode", "on").andExpect(status().isBadRequest());
+
+        assertThat(settingRepository.findById("sysacad.write.mode"))
+                .get().extracting(Setting::getValue).isEqualTo("OFF");
+    }
+
+    @Test
+    @DisplayName("PUT de sysacad.write.mode=DRY_RUN persiste y se vuelve a OFF al final")
+    void put_enumValidOption_persists() throws Exception {
+        try {
+            putValue("sysacad.write.mode", "DRY_RUN")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.value").value("DRY_RUN"));
+
+            assertThat(settingRepository.findById("sysacad.write.mode"))
+                    .get().extracting(Setting::getValue).isEqualTo("DRY_RUN");
+        } finally {
+            new TransactionTemplate(transactionManager).executeWithoutResult(tx ->
+                    settingsStore.write(SettingKey.SYSACAD_WRITE_MODE, "OFF"));
+        }
+    }
+
+    @Test
+    @DisplayName("PUT de sysacad.write.mode=SANDBOX persiste y se vuelve a OFF al final")
+    void put_sandboxMode_persists() throws Exception {
+        try {
+            putValue("sysacad.write.mode", "SANDBOX")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.value").value("SANDBOX"));
+
+            assertThat(settingRepository.findById("sysacad.write.mode"))
+                    .get().extracting(Setting::getValue).isEqualTo("SANDBOX");
+        } finally {
+            new TransactionTemplate(transactionManager).executeWithoutResult(tx ->
+                    settingsStore.write(SettingKey.SYSACAD_WRITE_MODE, "OFF"));
+        }
     }
 
     private org.springframework.test.web.servlet.ResultActions putValue(String key, String value) throws Exception {

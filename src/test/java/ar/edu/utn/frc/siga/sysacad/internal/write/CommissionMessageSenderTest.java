@@ -1,5 +1,9 @@
 package ar.edu.utn.frc.siga.sysacad.internal.write;
 
+import ar.edu.utn.frc.siga.sysacad.SysacadTestSettings;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
+import static org.mockito.Mockito.lenient;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
@@ -60,6 +64,7 @@ class CommissionMessageSenderTest {
     private ClassroomService classroomService;
 
     private SysacadProperties properties;
+    private SysacadRuntimeSettings runtimeSettings;
     private CommissionMessageSender sender;
     private RequestPacer pacer;
     private SysacadSchedule schedule;
@@ -67,8 +72,10 @@ class CommissionMessageSenderTest {
     @BeforeEach
     void setUp() {
         properties = new SysacadProperties();
-        properties.setCommissionMessageMode(CommissionMessageMode.ON);
-        sender = new CommissionMessageSender(client, stateWriter, subjectService, classroomService, properties);
+        runtimeSettings = SysacadTestSettings.with(SysacadWriteMode.ON);
+        lenient().when(runtimeSettings.commissionMessageMode()).thenReturn(CommissionMessageMode.ON);
+        sender = new CommissionMessageSender(client, stateWriter, subjectService, classroomService, properties,
+                runtimeSettings);
         pacer = new RequestPacer(Clock.systemUTC(), wait -> { }, 30);
         schedule = SysacadSchedule.builder().id(SCHEDULE_ID)
                 .year(2026).specialty(9).plan(2023).subject(101).commission(1).build();
@@ -97,7 +104,7 @@ class CommissionMessageSenderTest {
     @Test
     @DisplayName("En OFF no consulta nada, no llama a SysAcad y no registra, aunque la comisión esté listada")
     void offDoesNothing() {
-        properties.setCommissionMessageMode(CommissionMessageMode.OFF);
+        when(runtimeSettings.commissionMessageMode()).thenReturn(CommissionMessageMode.OFF);
         properties.setCommissionMessageTestCommissions(List.of(new MessageCommission(9, 2023, 101, 1)));
 
         sender.sendAfterConfirmation(schedule, decision(ROOM), pacer);
@@ -108,7 +115,7 @@ class CommissionMessageSenderTest {
     @Test
     @DisplayName("En TEST_COMMISSIONS manda a una comisión listada")
     void testModeSendsToListedCommission() {
-        properties.setCommissionMessageMode(CommissionMessageMode.TEST_COMMISSIONS);
+        when(runtimeSettings.commissionMessageMode()).thenReturn(CommissionMessageMode.TEST_COMMISSIONS);
         properties.setCommissionMessageTestCommissions(List.of(new MessageCommission(9, 2023, 101, 1)));
         subjectIs("Física I");
         buildingIs("Maders");
@@ -122,7 +129,7 @@ class CommissionMessageSenderTest {
     @Test
     @DisplayName("En TEST_COMMISSIONS sin comisiones listadas no avisa a nadie")
     void testModeWithoutListSendsToNobody() {
-        properties.setCommissionMessageMode(CommissionMessageMode.TEST_COMMISSIONS);
+        when(runtimeSettings.commissionMessageMode()).thenReturn(CommissionMessageMode.TEST_COMMISSIONS);
 
         sender.sendAfterConfirmation(schedule, decision(ROOM), pacer);
 
@@ -133,7 +140,7 @@ class CommissionMessageSenderTest {
     @CsvSource({"27, 2023, 101, 1", "9, 2008, 101, 1", "9, 2023, 581, 1", "9, 2023, 101, 2"})
     @DisplayName("En TEST_COMMISSIONS, un horario que difiere de la comisión listada en un solo campo no recibe el mensaje")
     void testModeSkipsUnlistedCommission(int specialty, int plan, int subject, int commission) {
-        properties.setCommissionMessageMode(CommissionMessageMode.TEST_COMMISSIONS);
+        when(runtimeSettings.commissionMessageMode()).thenReturn(CommissionMessageMode.TEST_COMMISSIONS);
         properties.setCommissionMessageTestCommissions(List.of(new MessageCommission(9, 2023, 101, 1)));
         schedule = SysacadSchedule.builder().id(SCHEDULE_ID).year(2026)
                 .specialty(specialty).plan(plan).subject(subject).commission(commission).build();
