@@ -43,9 +43,10 @@ public class SysacadProperties {
 
     private DataSize maxResponseSize = DataSize.ofMegabytes(32);
 
-    private boolean commissionMessageEnabled = false;
+    @NotNull
+    private CommissionMessageMode commissionMessageMode = CommissionMessageMode.OFF;
 
-    private List<@Valid @NotNull MessageCommission> commissionMessageCommissions = List.of();
+    private List<@Valid @NotNull MessageCommission> commissionMessageTestCommissions = List.of();
 
     private int commissionMessagePublisherLegajo = 0;
 

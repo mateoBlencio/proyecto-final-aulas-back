@@ -19,6 +19,7 @@ import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import ar.edu.utn.frc.siga.sysacad.internal.client.SysacadWriteClient;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.CommissionMessageCommand;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.CommissionMessageResult;
+import ar.edu.utn.frc.siga.sysacad.internal.config.CommissionMessageMode;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties.MessageCommission;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
@@ -66,8 +67,7 @@ class CommissionMessageSenderTest {
     @BeforeEach
     void setUp() {
         properties = new SysacadProperties();
-        properties.setCommissionMessageEnabled(true);
-        properties.setCommissionMessageCommissions(List.of(new MessageCommission(9, 2023, 101, 1)));
+        properties.setCommissionMessageMode(CommissionMessageMode.ON);
         sender = new CommissionMessageSender(client, stateWriter, subjectService, classroomService, properties);
         pacer = new RequestPacer(Clock.systemUTC(), wait -> { }, 30);
         schedule = SysacadSchedule.builder().id(SCHEDULE_ID)
@@ -95,9 +95,10 @@ class CommissionMessageSenderTest {
     }
 
     @Test
-    @DisplayName("Con la flag apagada no consulta nada, no llama a SysAcad y no registra")
-    void disabledDoesNothing() {
-        properties.setCommissionMessageEnabled(false);
+    @DisplayName("En OFF no consulta nada, no llama a SysAcad y no registra, aunque la comisión esté listada")
+    void offDoesNothing() {
+        properties.setCommissionMessageMode(CommissionMessageMode.OFF);
+        properties.setCommissionMessageTestCommissions(List.of(new MessageCommission(9, 2023, 101, 1)));
 
         sender.sendAfterConfirmation(schedule, decision(ROOM), pacer);
 
@@ -105,9 +106,23 @@ class CommissionMessageSenderTest {
     }
 
     @Test
-    @DisplayName("Sin comisiones listadas no avisa a nadie aunque la flag esté encendida")
-    void emptyListSendsToNobody() {
-        properties.setCommissionMessageCommissions(List.of());
+    @DisplayName("En TEST_COMMISSIONS manda a una comisión listada")
+    void testModeSendsToListedCommission() {
+        properties.setCommissionMessageMode(CommissionMessageMode.TEST_COMMISSIONS);
+        properties.setCommissionMessageTestCommissions(List.of(new MessageCommission(9, 2023, 101, 1)));
+        subjectIs("Física I");
+        buildingIs("Maders");
+        when(client.sendCommissionMessage(any())).thenReturn(new CommissionMessageResult(true, "ok"));
+
+        sender.sendAfterConfirmation(schedule, decision(ROOM), pacer);
+
+        assertThat(sentCommand().commission()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("En TEST_COMMISSIONS sin comisiones listadas no avisa a nadie")
+    void testModeWithoutListSendsToNobody() {
+        properties.setCommissionMessageMode(CommissionMessageMode.TEST_COMMISSIONS);
 
         sender.sendAfterConfirmation(schedule, decision(ROOM), pacer);
 
@@ -116,8 +131,10 @@ class CommissionMessageSenderTest {
 
     @ParameterizedTest(name = "especialidad {0}, plan {1}, materia {2}, comisión {3}")
     @CsvSource({"27, 2023, 101, 1", "9, 2008, 101, 1", "9, 2023, 581, 1", "9, 2023, 101, 2"})
-    @DisplayName("Un horario que difiere de la comisión listada en un solo campo no recibe el mensaje")
-    void unlistedCommissionIsNotNotified(int specialty, int plan, int subject, int commission) {
+    @DisplayName("En TEST_COMMISSIONS, un horario que difiere de la comisión listada en un solo campo no recibe el mensaje")
+    void testModeSkipsUnlistedCommission(int specialty, int plan, int subject, int commission) {
+        properties.setCommissionMessageMode(CommissionMessageMode.TEST_COMMISSIONS);
+        properties.setCommissionMessageTestCommissions(List.of(new MessageCommission(9, 2023, 101, 1)));
         schedule = SysacadSchedule.builder().id(SCHEDULE_ID).year(2026)
                 .specialty(specialty).plan(plan).subject(subject).commission(commission).build();
 
