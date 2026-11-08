@@ -242,6 +242,12 @@ siga:
     max-retries: 3
     max-response-size: 32MB
     commission-message-enabled: ${AUTOGESTION_MESSAGE_ENABLED:false}
+    # Curso TEST de Ing. en Sistemas, Gestión de la Calidad (Elec.): el único habilitado para probar el mensaje.
+    commission-message-commissions:
+      - specialty: 5
+        plan: 2023
+        subject: 581
+        commission: 5
     commission-message-publisher-legajo: 0
     commission-message-publisher-user-type: "S"
     sync:

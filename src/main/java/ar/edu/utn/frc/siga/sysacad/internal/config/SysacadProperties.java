@@ -45,6 +45,8 @@ public class SysacadProperties {
 
     private boolean commissionMessageEnabled = false;
 
+    private List<@Valid @NotNull MessageCommission> commissionMessageCommissions = List.of();
+
     private int commissionMessagePublisherLegajo = 0;
 
     @NotBlank
@@ -55,6 +57,19 @@ public class SysacadProperties {
 
     @Valid
     private Write write = Write.of(SysacadWriteMode.OFF);
+
+    public record MessageCommission(
+            @NotNull Integer specialty,
+            @NotNull Integer plan,
+            @NotNull Integer subject,
+            @NotNull Integer commission
+    ) {
+
+        public boolean matches(Integer specialty, Integer plan, Integer subject, Integer commission) {
+            return this.specialty.equals(specialty) && this.plan.equals(plan)
+                    && this.subject.equals(subject) && this.commission.equals(commission);
+        }
+    }
 
     /**
      * {@code minValidRowsPercent}: minimum percentage of valid rows, relative to what is active in SIGA, for a
