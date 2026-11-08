@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadScheduleReviewItemDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadScheduleReviewItemDto.ConfirmedSend;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadWriteStatusDto;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadScheduleLogEntry;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadScheduleStatus;
@@ -47,6 +48,7 @@ public class SysacadScheduleQuery {
     private final SysacadWritePlanner planner;
     private final SysacadWriteStateService stateService;
     private final SysacadProperties properties;
+    private final SysacadRuntimeSettings runtimeSettings;
     private final Clock clock;
 
     private enum Type { REVIEW, NOT_SENDABLE, WAITING }
@@ -100,7 +102,7 @@ public class SysacadScheduleQuery {
 
     public SysacadWriteStatusDto writeStatus() {
         SysacadWriteState state = stateService.current();
-        return new SysacadWriteStatusDto(properties.getWrite().mode().name(), state.getLastRunStartedAt(),
+        return new SysacadWriteStatusDto(runtimeSettings.writeMode().name(), state.getLastRunStartedAt(),
                 state.getLastRunFinishedAt(), state.getLastResult(), state.getLastViewReadAt(),
                 state.getOutageSince(), state.getPausedUntil(), state.getLastError(),
                 scheduleRepository.countByStatus(SysacadScheduleStatus.REVIEW),

@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.sysacad.internal.sync;
 
+import ar.edu.utn.frc.siga.sysacad.SysacadTestSettings;
 import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
@@ -99,11 +100,9 @@ class AllocationSyncServiceTest {
     }
 
     private AllocationSyncService serviceIn(SysacadWriteMode mode) {
-        SysacadProperties properties = new SysacadProperties();
-        properties.setWrite(SysacadProperties.Write.of(mode));
         return new AllocationSyncService(commissionService, subjectCommissionService,
                 academicEventService, classroomService, allocationService, syncStateService, scheduleLoader,
-                directChangeHandler, properties);
+                directChangeHandler, SysacadTestSettings.with(mode));
     }
 
     @Test

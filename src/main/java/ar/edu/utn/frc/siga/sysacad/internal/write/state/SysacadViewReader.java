@@ -12,7 +12,7 @@ import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleRepository
 import ar.edu.utn.frc.siga.sysacad.internal.sync.ReconcileOutcome;
 import ar.edu.utn.frc.siga.sysacad.internal.sync.SysacadScheduleLoader.DryRunChange;
 import ar.edu.utn.frc.siga.sysacad.internal.sync.SysacadViewReconciler;
-import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
 import java.time.Clock;
 import java.time.Instant;
@@ -40,7 +40,7 @@ public class SysacadViewReader {
     private final SysacadCatalogMapper mapper;
     private final SysacadScheduleRepository scheduleRepository;
     private final SysacadViewReconciler reconciler;
-    private final SysacadProperties properties;
+    private final SysacadRuntimeSettings runtimeSettings;
     private final PlatformTransactionManager transactionManager;
     private final Clock clock;
 
@@ -80,7 +80,7 @@ public class SysacadViewReader {
 
     private ViewReadResult reconcileAll(Map<RowKey, List<SysacadAllocationDto>> rowsByKey) {
         Instant now = clock.instant();
-        boolean dryRun = properties.getWrite().mode() == SysacadWriteMode.DRY_RUN;
+        boolean dryRun = runtimeSettings.writeMode() == SysacadWriteMode.DRY_RUN;
         List<Long> directChanges = new ArrayList<>();
         List<DryRunChange> dryRunChanges = new ArrayList<>();
         for (SysacadSchedule schedule : scheduleRepository.findByPresentInViewTrue()) {

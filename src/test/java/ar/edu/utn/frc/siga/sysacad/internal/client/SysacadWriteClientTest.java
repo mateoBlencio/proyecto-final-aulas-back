@@ -78,7 +78,7 @@ class SysacadWriteClientTest {
         server = MockRestServiceServer.bindTo(builder).build();
         sleeps.clear();
         SysacadProperties properties = new SysacadProperties();
-        properties.setWrite(SysacadProperties.Write.of(SysacadWriteMode.ON));
+        properties.setWrite(SysacadProperties.Write.defaults());
         client = new SysacadWriteClient(builder.build(), properties, sleeps::add);
     }
 

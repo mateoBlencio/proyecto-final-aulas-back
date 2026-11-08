@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.sysacad.internal.write.state;
 
+import ar.edu.utn.frc.siga.sysacad.SysacadTestSettings;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -12,7 +13,7 @@ import static org.mockito.Mockito.when;
 
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.ScheduleViewFetcher;
-import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
 import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadEmptyViewException;
 import ar.edu.utn.frc.siga.sysacad.internal.mapper.SysacadCatalogMapper;
@@ -50,15 +51,14 @@ class SysacadViewReaderTest {
     @Mock
     private PlatformTransactionManager transactionManager;
 
-    private SysacadProperties properties;
+    private SysacadRuntimeSettings runtimeSettings;
     private SysacadViewReader reader;
 
     @BeforeEach
     void setUp() {
-        properties = new SysacadProperties();
-        properties.setWrite(SysacadProperties.Write.of(SysacadWriteMode.ON));
+        runtimeSettings = SysacadTestSettings.with(SysacadWriteMode.ON);
         reader = new SysacadViewReader(fetcher, new SysacadCatalogMapper(), scheduleRepository, reconciler,
-                properties, transactionManager, Clock.fixed(NOW, ZoneOffset.UTC));
+                runtimeSettings, transactionManager, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private static SysacadSchedule schedule(long id, int subject) {
@@ -116,7 +116,7 @@ class SysacadViewReaderTest {
     @Test
     @DisplayName("En DRY_RUN un cambio externo aplicado se devuelve con el aula previa, tomada antes de reconciliar")
     void dryRunReturnsExternalChangeWithPreviousRoom() {
-        properties.setWrite(SysacadProperties.Write.of(SysacadWriteMode.DRY_RUN));
+        when(runtimeSettings.writeMode()).thenReturn(SysacadWriteMode.DRY_RUN);
         SysacadSchedule schedule = schedule(1, 115);
         when(fetcher.fetch()).thenReturn(List.of(raw(115, 5, 229)));
         when(scheduleRepository.findByPresentInViewTrue()).thenReturn(List.of(schedule));

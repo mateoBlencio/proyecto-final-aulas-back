@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.sysacad.internal.write.review;
 
+import ar.edu.utn.frc.siga.sysacad.SysacadTestSettings;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
@@ -75,10 +76,9 @@ class SysacadAlertServiceTest {
     @BeforeEach
     void setUp() {
         SysacadProperties properties = new SysacadProperties();
-        properties.setWrite(SysacadProperties.Write.of(SysacadWriteMode.ON));
         state = new SysacadWriteState();
         service = new SysacadAlertService(logRepository, scheduleRepository, stateService, occurrenceService,
-                userService, notificationSender, properties, JsonMapper.builder().build(),
+                userService, notificationSender, properties, SysacadTestSettings.with(SysacadWriteMode.ON), JsonMapper.builder().build(),
                 Clock.fixed(NOW, ZoneOffset.UTC));
         org.mockito.Mockito.lenient().when(stateService.current()).thenReturn(state);
     }
@@ -244,9 +244,9 @@ class SysacadAlertServiceTest {
     @DisplayName("en DRY_RUN no sale ningún aviso: los avisos corren solo en ON")
     void dryRunSendsNoAlert() {
         SysacadProperties properties = new SysacadProperties();
-        properties.setWrite(SysacadProperties.Write.of(SysacadWriteMode.DRY_RUN));
         SysacadAlertService dryRun = new SysacadAlertService(logRepository, scheduleRepository, stateService,
-                occurrenceService, userService, notificationSender, properties, JsonMapper.builder().build(),
+                occurrenceService, userService, notificationSender, properties,
+                SysacadTestSettings.with(SysacadWriteMode.DRY_RUN), JsonMapper.builder().build(),
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         dryRun.alert(PREVIOUS_END);

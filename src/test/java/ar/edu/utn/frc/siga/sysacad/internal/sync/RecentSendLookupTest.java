@@ -32,7 +32,7 @@ class RecentSendLookupTest {
     @BeforeEach
     void setUp() {
         SysacadProperties properties = new SysacadProperties();
-        properties.setWrite(SysacadProperties.Write.of(SysacadWriteMode.ON));
+        properties.setWrite(SysacadProperties.Write.defaults());
         lookup = new RecentSendLookup(logRepository, properties);
     }
 

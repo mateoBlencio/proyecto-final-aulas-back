@@ -11,6 +11,7 @@ import ar.edu.utn.frc.siga.notification.api.NotificationRequest;
 import ar.edu.utn.frc.siga.notification.api.NotificationSender;
 import ar.edu.utn.frc.siga.notification.api.NotificationTemplate;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadScheduleStatus;
 import ar.edu.utn.frc.siga.sysacad.internal.model.DestinationNotSendableReason;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
@@ -61,12 +62,13 @@ public class SysacadAlertService {
     private final UserService userService;
     private final NotificationSender notificationSender;
     private final SysacadProperties properties;
+    private final SysacadRuntimeSettings runtimeSettings;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
     /** {@code previousRunEnd} es el fin de la corrida anterior, leído antes de que esta corrida lo pise. */
     public void alert(Instant previousRunEnd) {
-        if (properties.getWrite().mode() != SysacadWriteMode.ON) {
+        if (runtimeSettings.writeMode() != SysacadWriteMode.ON) {
             return;
         }
         SysacadWriteState state = stateService.current();

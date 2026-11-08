@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.sysacad.internal.write;
 
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
 import ar.edu.utn.frc.siga.sysacad.internal.model.ScheduleLogType;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadReviewReason;
@@ -52,6 +53,7 @@ public class SysacadWriteRun {
     private final DirectChangeHandler directChangeHandler;
     private final SysacadScheduleRepository scheduleRepository;
     private final SysacadProperties properties;
+    private final SysacadRuntimeSettings runtimeSettings;
     private final Clock clock;
 
     private record PendingFailure(SysacadSchedule schedule, Failure failure) {
@@ -94,8 +96,9 @@ public class SysacadWriteRun {
 
     private void execute(Instant now, SysacadWriteState state, Execution execution) {
         SysacadProperties.Write config = properties.getWrite();
+        SysacadWriteMode mode = runtimeSettings.writeMode();
         boolean viewDue = state.getLastViewReadAt() == null
-                || !now.isBefore(state.getLastViewReadAt().plus(config.viewReadInterval()));
+                || !now.isBefore(state.getLastViewReadAt().plus(runtimeSettings.viewReadInterval()));
         if (viewDue && !readView(now, execution)) {
             return;
         }
@@ -120,11 +123,11 @@ public class SysacadWriteRun {
                     case NotSendable notSendable -> scheduleWriter.recordEvent(schedule.getId(),
                             ScheduleLogType.DESTINATION_NOT_SENDABLE, null, null, notSendable.occurrenceId(), null,
                             notSendable.reason().name());
-                    case Send send when config.mode() == SysacadWriteMode.DRY_RUN -> scheduleWriter.recordEvent(
+                    case Send send when mode == SysacadWriteMode.DRY_RUN -> scheduleWriter.recordEvent(
                             schedule.getId(), ScheduleLogType.DRY_RUN_SEND, send.building(), send.room(),
                             send.occurrenceId(), null, null);
                     case Send send -> {
-                        if (config.mode() != SysacadWriteMode.ON
+                        if (mode != SysacadWriteMode.ON
                                 || schedule.getNextAttemptAt() != null && schedule.getNextAttemptAt().isAfter(now)
                                 || sends >= config.maxSendsPerRun()) {
                             continue;
@@ -227,7 +230,7 @@ public class SysacadWriteRun {
                 return true;
             }
             case STOP_RATE_LIMITED -> {
-                Duration pause = outcome.retryAfter() != null ? outcome.retryAfter() : config.jobDelay();
+                Duration pause = outcome.retryAfter() != null ? outcome.retryAfter() : runtimeSettings.jobDelay();
                 stateService.pauseUntil(clock.instant().plus(pause));
                 execution.result = Result.STOPPED_RATE_LIMITED;
                 return true;

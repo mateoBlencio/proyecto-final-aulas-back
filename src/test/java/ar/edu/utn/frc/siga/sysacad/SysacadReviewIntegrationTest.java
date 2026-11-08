@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.sysacad;
 
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
+import ar.edu.utn.frc.siga.settings.service.SettingsStore;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
@@ -53,11 +55,22 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @Import(IntegrationTestData.class)
 @DisplayName("Quedarse con lo de SysAcad (integración, decisión 4)")
 @TestPropertySource(properties = {
-        "siga.sysacad.enabled=true",
-        "siga.sysacad.write.mode=ON",
-        "siga.sysacad.write.job-delay=PT24H"
+        "siga.sysacad.enabled=true"
 })
 class SysacadReviewIntegrationTest extends AbstractIntegrationTest {
+
+    @Autowired
+    private SettingsStore settingsStore;
+
+    @BeforeEach
+    void useWriteMode() {
+        SysacadModeSupport.use(settingsStore, SysacadWriteMode.ON);
+    }
+
+    @AfterEach
+    void resetWriteMode() {
+        SysacadModeSupport.reset(settingsStore);
+    }
 
     private static final int YEAR = 2094;
     private static final String USER = "sub@frc.utn.edu.ar";

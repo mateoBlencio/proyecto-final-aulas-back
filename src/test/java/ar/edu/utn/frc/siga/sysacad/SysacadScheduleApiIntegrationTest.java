@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.sysacad;
 
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
+import ar.edu.utn.frc.siga.settings.service.SettingsStore;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
@@ -41,11 +43,22 @@ import org.springframework.test.web.servlet.MockMvc;
 @Import(IntegrationTestData.class)
 @DisplayName("API de horarios de SysAcad (integración, flag encendido)")
 @TestPropertySource(properties = {
-        "siga.sysacad.enabled=true",
-        "siga.sysacad.write.mode=DRY_RUN",
-        "siga.sysacad.write.job-delay=PT24H"
+        "siga.sysacad.enabled=true"
 })
 class SysacadScheduleApiIntegrationTest extends AbstractIntegrationTest {
+
+    @Autowired
+    private SettingsStore settingsStore;
+
+    @BeforeEach
+    void useWriteMode() {
+        SysacadModeSupport.use(settingsStore, SysacadWriteMode.DRY_RUN);
+    }
+
+    @AfterEach
+    void resetWriteMode() {
+        SysacadModeSupport.reset(settingsStore);
+    }
 
     private static final int YEAR = 2093;
     private static final String KEEP_BODY = "{\"observation\":\"Lo pidió Subsecretaría\"}";

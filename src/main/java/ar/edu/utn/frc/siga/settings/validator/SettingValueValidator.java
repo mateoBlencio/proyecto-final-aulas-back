@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -25,6 +26,7 @@ public class SettingValueValidator {
             case LONG -> String.valueOf(validateLong(key, value));
             case BOOLEAN -> validateBoolean(key, value);
             case TIME -> validateTime(key, value).toString();
+            case ENUM -> validateEnum(key, value);
         };
     }
 
@@ -49,6 +51,15 @@ public class SettingValueValidator {
         if (value.equalsIgnoreCase("false")) return "false";
         throw new InvalidSettingValueException(
                 "El valor de '" + key.getKey() + "' debe ser 'true' o 'false', pero fue: " + value);
+    }
+
+    private String validateEnum(SettingKey key, String value) {
+        List<String> options = catalog.options(key);
+        if (!options.contains(value)) {
+            throw new InvalidSettingValueException(
+                    "El valor de '" + key.getKey() + "' debe ser uno de " + options + ", pero fue: " + value);
+        }
+        return value;
     }
 
     private LocalTime validateTime(SettingKey key, String value) {

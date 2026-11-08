@@ -54,14 +54,19 @@ public class SettingsStore {
         return LocalTime.parse(getRaw(key));
     }
 
+    public String getString(SettingKey key) {
+        return getRaw(key);
+    }
+
 
     public void write(SettingKey key, String value) {
         Setting setting = repository.findById(key.getKey())
                 .orElseGet(() -> new Setting(key.getKey(), value));
         setting.setValue(value);
         repository.save(setting);
-        eventPublisher.publishEvent(new SettingChangedEvent(key));
+        // El caché se registra antes que el evento: el listener async tiene que leer el valor nuevo.
         updateCacheAfterCommit(key, value);
+        eventPublisher.publishEvent(new SettingChangedEvent(key));
     }
 
     private void updateCacheAfterCommit(SettingKey key, String value) {

@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.siga.sysacad.internal.sync;
 
-import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
 import ar.edu.utn.frc.siga.sysacad.internal.model.ScheduleLogType;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(prefix = "siga.sysacad", name = "enabled", havingValue = "true")
 public class SysacadViewReconciler {
 
-    private final SysacadProperties properties;
+    private final SysacadRuntimeSettings runtimeSettings;
     private final RecentSendLookup recentSendLookup;
     private final SysacadScheduleLogRepository logRepository;
 
@@ -69,7 +69,7 @@ public class SysacadViewReconciler {
             }
             return ReconcileOutcome.SEND_CONFIRMED;
         }
-        if (properties.getWrite().mode() != SysacadWriteMode.ON) {
+        if (runtimeSettings.writeMode() != SysacadWriteMode.ON) {
             schedule.setKnownBuilding(building);
             schedule.setKnownRoom(room);
             schedule.setBaseBuilding(building);
@@ -82,7 +82,7 @@ public class SysacadViewReconciler {
                 && schedule.getDifferenceDetectedAt() != null;
         if (sameDifference) {
             // Dos lecturas separadas por segundos (la horaria y la previa al envío) no son dos corridas.
-            Instant confirmableFrom = schedule.getDifferenceDetectedAt().plus(properties.getWrite().jobDelay());
+            Instant confirmableFrom = schedule.getDifferenceDetectedAt().plus(runtimeSettings.jobDelay());
             return confirmableFrom.isAfter(now) ? ReconcileOutcome.DIFFERENCE_RECORDED
                     : ReconcileOutcome.DIRECT_CHANGE;
         }

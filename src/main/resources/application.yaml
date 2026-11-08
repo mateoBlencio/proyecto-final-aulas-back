@@ -210,6 +210,25 @@ siga:
         default-value: "24"
         min: "0"
         max: "720"
+      - key: sysacad.write.mode
+        default-value: ${SYSACAD_WRITE_MODE:OFF}
+        options: ["OFF", DRY_RUN, "ON"]
+      - key: sysacad.autogestion.mode
+        default-value: ${AUTOGESTION_MESSAGE_MODE:OFF}
+        options: ["OFF", TEST_COMMISSIONS, "ON"]
+      - key: sysacad.write.jobDelayMinutes
+        default-value: "5"
+        min: "1"
+        max: "1440"
+      - key: sysacad.write.viewReadIntervalMinutes
+        default-value: "60"
+        min: "5"
+        max: "1440"
+      - key: sysacad.sync.dayOfWeek
+        default-value: SUN
+        options: [MON, TUE, WED, THU, FRI, SAT, SUN]
+      - key: sysacad.sync.time
+        default-value: "03:00"
   optimizer:
     parallel-solver-count: AUTO
     environment-mode: NO_ASSERT
@@ -241,7 +260,6 @@ siga:
     read-timeout: 120s
     max-retries: 3
     max-response-size: 32MB
-    commission-message-mode: ${AUTOGESTION_MESSAGE_MODE:OFF}
     # Curso TEST de Ing. en Sistemas, Gestión de la Calidad (Elec.).
     commission-message-test-commissions:
       - specialty: 5
@@ -251,13 +269,9 @@ siga:
     commission-message-publisher-legajo: 0
     commission-message-publisher-user-type: "S"
     sync:
-      cron: "0 0 3 * * SUN"
       min-valid-rows-percent: 50
       zone: America/Argentina/Buenos_Aires
     write:
-      mode: ${SYSACAD_WRITE_MODE:OFF}
-      job-delay: PT5M
-      view-read-interval: PT1H
       max-attempts: 5
       max-consecutive-failures: 3
       retry-backoff: PT5M,PT15M,PT30M,PT1H

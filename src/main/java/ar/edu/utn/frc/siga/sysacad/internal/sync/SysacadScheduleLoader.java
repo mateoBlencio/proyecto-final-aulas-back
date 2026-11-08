@@ -1,7 +1,7 @@
 package ar.edu.utn.frc.siga.sysacad.internal.sync;
 
 import ar.edu.utn.frc.siga.sysacad.api.SysacadAllocationDto;
-import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
 import ar.edu.utn.frc.siga.sysacad.internal.model.NotSendableReason;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
@@ -33,7 +33,7 @@ public class SysacadScheduleLoader {
 
     private final SysacadScheduleRepository repository;
     private final SysacadViewReconciler reconciler;
-    private final SysacadProperties properties;
+    private final SysacadRuntimeSettings runtimeSettings;
 
     public record ResolvedScheduleRow(SysacadAllocationDto row, Integer year, Set<Long> eventIds,
             NotSendableReason skipReason) {
@@ -75,7 +75,7 @@ public class SysacadScheduleLoader {
     @Transactional
     public LoadResult load(List<ResolvedScheduleRow> rows) {
         Instant now = Instant.now();
-        SysacadWriteMode mode = properties.getWrite().mode();
+        SysacadWriteMode mode = runtimeSettings.writeMode();
         Set<Long> eventIdsToUpdate = new TreeSet<>();
         List<Long> directChangeScheduleIds = new ArrayList<>();
         List<DryRunChange> dryRunChanges = new ArrayList<>();
@@ -175,7 +175,7 @@ public class SysacadScheduleLoader {
                         && Objects.equals(schedule.getKnownRoom(), schedule.getBaseRoom());
                 directChange = outcome == ReconcileOutcome.DIRECT_CHANGE;
                 if (outcome == ReconcileOutcome.EXTERNAL_CHANGE_APPLIED
-                        && properties.getWrite().mode() == SysacadWriteMode.DRY_RUN) {
+                        && runtimeSettings.writeMode() == SysacadWriteMode.DRY_RUN) {
                     dryRunChange = new DryRunChange(schedule.getId(), previousBuilding, previousRoom,
                             first.buildingCode(), first.roomNumber());
                 }

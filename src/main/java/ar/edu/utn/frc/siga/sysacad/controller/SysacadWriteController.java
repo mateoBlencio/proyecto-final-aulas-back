@@ -3,6 +3,8 @@ package ar.edu.utn.frc.siga.sysacad.controller;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadWritePreviewItemDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadWriteStatusDto;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
+import ar.edu.utn.frc.siga.sysacad.internal.write.RunReport;
+import ar.edu.utn.frc.siga.sysacad.internal.write.SysacadWriteJob;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.PlannedSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadScheduleQuery;
@@ -17,6 +19,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -30,6 +33,7 @@ public class SysacadWriteController {
 
     private final SysacadWritePlanner planner;
     private final SysacadScheduleQuery query;
+    private final SysacadWriteJob job;
 
     @GetMapping("/preview")
     @PreAuthorize("hasAuthority('PERM_SYSACAD_READ')")
@@ -54,6 +58,17 @@ public class SysacadWriteController {
     public ResponseEntity<SysacadWriteStatusDto> status() {
         log.debug("GET /v1/sysacad/write/status");
         return ResponseEntity.ok(query.writeStatus());
+    }
+
+    @PostMapping("/run")
+    @PreAuthorize("hasAuthority('PERM_SYSACAD_SYNC')")
+    @Operation(summary = "Forzar una corrida del job de envío a SysAcad",
+               description = "Ejecuta ahora una corrida del job de envío, con el modo de escritura vigente, y "
+                       + "devuelve el resultado. Responde 409 si el modo está en OFF o si hay un sync o una "
+                       + "corrida de envío en curso.")
+    public ResponseEntity<RunReport> run() {
+        log.info("POST /v1/sysacad/write/run: corrida manual del job de envío");
+        return ResponseEntity.ok(job.runNow());
     }
 
     private static SysacadWritePreviewItemDto toItem(PlannedSchedule planned) {

@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.sysacad;
 
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
+import ar.edu.utn.frc.siga.settings.service.SettingsStore;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -78,11 +80,22 @@ import org.springframework.transaction.support.TransactionTemplate;
 @DisplayName("Ciclo de envío de aulas a SysAcad (integración, modo ON)")
 @TestPropertySource(properties = {
         "siga.sysacad.enabled=true",
-        "siga.sysacad.write.mode=ON",
-        "siga.sysacad.write.job-delay=PT24H",
         "siga.sysacad.write.max-requests-per-minute=60000"
 })
 class SysacadWriteCycleIntegrationTest extends AbstractIntegrationTest {
+
+    @Autowired
+    private SettingsStore settingsStore;
+
+    @BeforeEach
+    void useWriteMode() {
+        SysacadModeSupport.use(settingsStore, SysacadWriteMode.ON);
+    }
+
+    @AfterEach
+    void resetWriteMode() {
+        SysacadModeSupport.reset(settingsStore);
+    }
 
     private static final int YEAR = 2095;
     private static final LocalTime START = LocalTime.of(8, 0);

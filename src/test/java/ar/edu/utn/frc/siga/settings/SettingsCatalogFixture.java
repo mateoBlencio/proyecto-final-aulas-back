@@ -35,8 +35,20 @@ public final class SettingsCatalogFixture {
                 definition("roomRequests.maxComputerCount", "500", "1", "1000"),
                 definition("roomRequests.alertDaysBeforeDate", "3", "0", "60"),
                 definition("roomRequests.acceptance.businessHours", "48", "1", "720"),
-                definition("roomRequests.acceptance.hoursBeforeEvent", "24", "0", "720")));
+                definition("roomRequests.acceptance.hoursBeforeEvent", "24", "0", "720"),
+                enumDefinition("sysacad.write.mode", "OFF", "OFF", "DRY_RUN", "ON"),
+                enumDefinition("sysacad.autogestion.mode", "OFF", "OFF", "TEST_COMMISSIONS", "ON"),
+                definition("sysacad.write.jobDelayMinutes", "5", "1", "1440"),
+                definition("sysacad.write.viewReadIntervalMinutes", "60", "5", "1440"),
+                enumDefinition("sysacad.sync.dayOfWeek", "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"),
+                definition("sysacad.sync.time", "03:00", null, null)));
         return properties;
+    }
+
+    private static Definition enumDefinition(String key, String defaultValue, String... options) {
+        Definition definition = definition(key, defaultValue, null, null);
+        definition.setOptions(List.of(options));
+        return definition;
     }
 
     private static Definition definition(String key, String defaultValue, String min, String max) {

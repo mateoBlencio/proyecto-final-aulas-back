@@ -50,6 +50,11 @@ public class SettingsServiceImpl implements SettingsService {
     }
 
     @Override
+    public String getString(SettingKey key) {
+        return store.getString(key);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Map<String, List<SettingResponseDto>> findAllGroupedByCategory() {
         Map<String, List<SettingResponseDto>> grouped = new LinkedHashMap<>();

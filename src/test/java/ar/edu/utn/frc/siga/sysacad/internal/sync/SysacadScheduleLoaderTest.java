@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.sysacad.internal.sync;
 
+import ar.edu.utn.frc.siga.sysacad.SysacadTestSettings;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.verify;
@@ -55,12 +57,13 @@ class SysacadScheduleLoaderTest {
 
     private SysacadScheduleLoader loaderIn(SysacadWriteMode mode) {
         SysacadProperties properties = new SysacadProperties();
-        properties.setWrite(SysacadProperties.Write.of(mode));
+        SysacadRuntimeSettings runtimeSettings = SysacadTestSettings.with(mode);
         var logRepository = org.mockito.Mockito.mock(
                 ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleLogRepository.class);
         return new SysacadScheduleLoader(repository,
-                new SysacadViewReconciler(properties, new RecentSendLookup(logRepository, properties), logRepository),
-                properties);
+                new SysacadViewReconciler(runtimeSettings, new RecentSendLookup(logRepository, properties),
+                        logRepository),
+                runtimeSettings);
     }
 
     private static SysacadAllocationDto dto(LocalTime start, LocalTime end, Integer duration, Integer building,

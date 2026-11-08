@@ -10,6 +10,7 @@ import ar.edu.utn.frc.siga.sysacad.internal.client.dto.ScheduleReadResult;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.UpdateRoomCommand;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.UpdateRoomResult;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
 import ar.edu.utn.frc.siga.sysacad.internal.mapper.SysacadCatalogMapper;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadReviewReason;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
@@ -55,6 +56,7 @@ public class SysacadSendCycle {
     private final AllocationService allocationService;
     private final CommissionMessageSender commissionMessageSender;
     private final SysacadProperties properties;
+    private final SysacadRuntimeSettings runtimeSettings;
     private final Clock clock;
 
     private record Snapshot(LocalTime startTime, Integer durationMinutes, LocalTime endTime, Integer building,
@@ -206,12 +208,9 @@ public class SysacadSendCycle {
 
     private Instant afterNextSync() {
         Instant now = clock.instant();
-        SysacadProperties.Sync sync = properties.getSync();
         SysacadProperties.Write write = properties.getWrite();
-        if (sync.cron() == null) {
-            return now.plus(write.noCronRetryDelay());
-        }
-        ZonedDateTime next = CronExpression.parse(sync.cron()).next(now.atZone(sync.zone()));
+        ZonedDateTime next = CronExpression.parse(runtimeSettings.syncCron())
+                .next(now.atZone(properties.getSync().zone()));
         return next == null ? now.plus(write.noCronRetryDelay()) : next.toInstant().plus(write.afterSyncMargin());
     }
 

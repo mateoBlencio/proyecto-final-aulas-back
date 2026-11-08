@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.sysacad.internal.sync;
 
+import ar.edu.utn.frc.siga.sysacad.SysacadTestSettings;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -34,9 +35,8 @@ class SysacadViewReconcilerTest {
     }
 
     private static SysacadViewReconciler reconcilerIn(SysacadWriteMode mode, SysacadScheduleLogRepository logRepository) {
-        SysacadProperties properties = new SysacadProperties();
-        properties.setWrite(SysacadProperties.Write.of(mode));
-        return new SysacadViewReconciler(properties, new RecentSendLookup(logRepository, properties), logRepository);
+        return new SysacadViewReconciler(SysacadTestSettings.with(mode),
+                new RecentSendLookup(logRepository, new SysacadProperties()), logRepository);
     }
 
     private static SysacadSchedule schedule() {
