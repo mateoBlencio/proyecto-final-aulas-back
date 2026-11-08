@@ -115,7 +115,7 @@ class SysacadReviewIntegrationTest extends AbstractIntegrationTest {
 
         SubjectAndCommission academic = testData.materiaYComision();
         LocalDate first = LocalDate.now().plusYears(1).with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY))
-                .plusWeeks(IntegrationTestData.nextSeq() % 500);
+                .plusWeeks(IntegrationTestData.nextSeq() % 100);
         Long eventId = testData.eventoRecurrente(academic.subjectId(), academic.commissionId(), first.getDayOfWeek(),
                 LocalTime.of(8, 0), 90, first, first.plusWeeks(classes - 1), 30);
         List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId).stream()

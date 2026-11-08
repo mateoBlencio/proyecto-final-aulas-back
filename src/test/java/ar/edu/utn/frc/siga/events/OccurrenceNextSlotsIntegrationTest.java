@@ -36,8 +36,8 @@ class OccurrenceNextSlotsIntegrationTest extends AbstractIntegrationTest {
     }
 
     private LocalDate firstMonday() {
-        return LocalDate.now().plusYears(2).with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY))
-                .plusWeeks(IntegrationTestData.nextSeq() % 400);
+        return LocalDate.now().plusYears(3).with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY))
+                .plusWeeks(IntegrationTestData.nextSeq() % 90);
     }
 
     private Long weeklyEvent(LocalDate first, int weeks) {

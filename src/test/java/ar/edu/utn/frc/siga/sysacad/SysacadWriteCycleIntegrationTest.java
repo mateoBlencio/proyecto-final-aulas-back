@@ -152,7 +152,7 @@ class SysacadWriteCycleIntegrationTest extends AbstractIntegrationTest {
 
         SubjectAndCommission academic = testData.materiaYComision();
         LocalDate date = LocalDate.now().plusYears(1).with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY))
-                .plusWeeks(IntegrationTestData.nextSeq() % 500);
+                .plusWeeks(IntegrationTestData.nextSeq() % 100);
         Long eventId = testData.eventoRecurrente(academic.subjectId(), academic.commissionId(), date.getDayOfWeek(),
                 START, 90, date, date, 30);
         jdbc.update("UPDATE evento_academico SET hash_raw = 'h-' || id_evento_academico, habilitado_sysacad = TRUE "

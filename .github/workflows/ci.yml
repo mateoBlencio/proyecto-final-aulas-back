@@ -3,7 +3,6 @@ name: CI
 on:
   push:
     branches:
-      - 'feature/**'
       - 'hotfix/**'
   pull_request:
     branches:
@@ -97,15 +96,10 @@ jobs:
           sarif_file: trivy-results.sarif
 
       - name: Fail on fixable CRITICAL vulnerabilities
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        env:
-          TRIVY_CACHE_DIR: ${{ runner.temp }}/trivy-cache
-        with:
-          image-ref: ${{ env.IMAGE }}
-          format: table
-          severity: CRITICAL
-          ignore-unfixed: true
-          exit-code: '1'
+        run: |
+          n=$(jq '[.runs[].tool.driver.rules[]? | select((.properties["security-severity"] // "0" | tonumber) >= 9)] | length' trivy-results.sarif)
+          echo "Vulnerabilidades CRITICAL con fix: $n"
+          [ "$n" -eq 0 ]
 
       - name: Free disk space
         if: always()

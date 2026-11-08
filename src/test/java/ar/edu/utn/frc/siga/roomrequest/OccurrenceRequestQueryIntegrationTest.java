@@ -51,8 +51,8 @@ class OccurrenceRequestQueryIntegrationTest extends AbstractIntegrationTest {
             academic = testData.materiaYComision();
             classroom = testData.aula(testData.edificio());
         }
-        LocalDate date = LocalDate.now().plusYears(1).with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY))
-                .plusWeeks(IntegrationTestData.nextSeq() % 500);
+        LocalDate date = LocalDate.now().plusYears(10).with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY))
+                .plusWeeks(IntegrationTestData.nextSeq() % 150);
         Long eventId = testData.eventoRecurrente(academic.subjectId(), academic.commissionId(), DayOfWeek.MONDAY,
                 LocalTime.of(8, 0), 60, date, date, 30);
         Occurrence occurrence = occurrenceRepository.findByEvent_Id(eventId).getFirst();

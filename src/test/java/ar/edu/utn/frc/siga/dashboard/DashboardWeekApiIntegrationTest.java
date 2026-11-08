@@ -54,9 +54,11 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
     private AcademicEventService academicEventService;
 
     private String weekDump(LocalDate monday) {
-        return jdbc.queryForList("SELECT a.id_asignacion, a.id_aula, a.origen, o.id_ocurrencia, o.fecha, o.estado, "
-                + "o.id_evento_academico FROM asignacion_aula a JOIN ocurrencia o ON o.id_ocurrencia = a.id_ocurrencia "
-                + "WHERE o.fecha BETWEEN ? AND ?", monday, monday.plusDays(6)).toString();
+        return jdbc.queryForList("SELECT o.id_ocurrencia, o.fecha, o.estado, o.id_evento_academico, a.id_aula, "
+                + "e.creado_en, e.habilitado_sysacad FROM ocurrencia o JOIN evento_academico e "
+                + "ON e.id_evento_academico = o.id_evento_academico LEFT JOIN asignacion_aula a "
+                + "ON a.id_ocurrencia = o.id_ocurrencia WHERE o.fecha BETWEEN ? AND ?", monday, monday.plusDays(6))
+                .toString();
     }
 
     private JsonNode weekOf(LocalDate day) throws Exception {
@@ -164,7 +166,7 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
         JsonNode nodeA = byId(root.get("buildings"), "buildingId", a.getId());
         assertThat(nodeA.get("allocationStatus").get("total").asLong()).isEqualTo(2);
         assertThat(nodeA.get("occupancy").get("occupiedHours").asDouble()).isEqualTo(2.0);
-        assertThat(root.get("campus").get("unallocatedClasses").asLong()).isEqualTo(1);
+        assertThat(root.get("campus").get("unallocatedClasses").asLong()).as(weekDump(monday)).isEqualTo(1);
     }
 
     @Test
@@ -182,7 +184,7 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
 
         JsonNode nodeA = byId(root.get("buildings"), "buildingId", a.getId());
         assertThat(nodeA.get("allocationStatus").get("total").asLong()).isEqualTo(1);
-        assertThat(root.get("campus").get("unallocatedClasses").asLong()).isEqualTo(1);
+        assertThat(root.get("campus").get("unallocatedClasses").asLong()).as(weekDump(monday)).isEqualTo(1);
     }
 
     @Test
@@ -255,7 +257,7 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
         assertThat(campus.get("occupancy")).isEqualTo(root.get("buildings").get(0).get("occupancy"));
         assertThat(campus.get("openRoomRequests").get("count").asLong()).isEqualTo(1);
         assertThat(global.get("restrictedScope").asBoolean()).isFalse();
-        assertThat(global.get("campus").get("unallocatedClasses").asLong()).isEqualTo(1);
+        assertThat(global.get("campus").get("unallocatedClasses").asLong()).as(weekDump(monday)).isEqualTo(1);
         assertThat(global.get("campus").get("allocationStatus").get("total").asLong()).as(weekDump(monday)).isEqualTo(2);
         assertThat(global.get("campus").get("openRoomRequests").get("count").asLong()).isGreaterThanOrEqualTo(2);
     }
