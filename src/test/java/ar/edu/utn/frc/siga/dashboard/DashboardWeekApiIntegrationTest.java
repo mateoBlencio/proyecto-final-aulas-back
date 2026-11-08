@@ -290,7 +290,7 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
     @Test
     @DisplayName("a week without events answers 200 with zero counters and null percentages")
     void weekWithoutDataIsEmpty() throws Exception {
-        LocalDate monday = week(9);
+        LocalDate monday = week(120);
         Building a = building();
         room(a, 30);
 
