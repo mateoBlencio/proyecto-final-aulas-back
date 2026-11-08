@@ -478,7 +478,8 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     public List<SysacadRecurringEventRefDto> findSysacadRecurringEvents() {
         return recurringEventRepository.findBySysacadHashIsNotNull().stream()
                 .map(r -> new SysacadRecurringEventRefDto(r.getId(), r.getSubjectId(), r.getCommissionId(),
-                        r.getDayOfWeek(), r.getStartTime(), r.getStartDate(), r.getEndDate()))
+                        r.getDayOfWeek(), r.getStartTime(), r.getStartDate(), r.getEndDate(),
+                        !Boolean.FALSE.equals(r.getSysacadEnabled())))
                 .toList();
     }
 

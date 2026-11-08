@@ -23,6 +23,9 @@ public interface UserService {
 
     List<UserResponseDto> findByRoleForBuilding(SystemRole role, Long buildingId);
 
+    /** Usuarios habilitados con ese rol, con cualquier alcance. */
+    List<UserResponseDto> findByRole(SystemRole role);
+
     /** Subconjunto de buildingIds cubierto por algún usuario habilitado con ese rol (alcance GLOBAL o al edificio puntual). */
     Set<Long> findBuildingIdsCoveredByRole(SystemRole role, Collection<Long> buildingIds);
 

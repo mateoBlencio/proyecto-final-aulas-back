@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.sysacad.internal.service.impl;
 
 import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadUnavailableException;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadResyncOutcome;
+import ar.edu.utn.frc.siga.sysacad.internal.service.SysacadSyncLock;
 
 import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
@@ -19,8 +20,10 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
@@ -29,6 +32,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -53,6 +57,7 @@ class SysacadSyncOrchestratorImplTest {
     private SysacadSyncStateService syncStateService;
 
     private final SysacadCatalogReader snapshot = mock(SysacadCatalogReader.class);
+    private final SysacadSyncLock syncLock = spy(new SysacadSyncLock());
 
     private SysacadSyncOrchestratorImpl orchestrator;
 
@@ -66,7 +71,8 @@ class SysacadSyncOrchestratorImplTest {
         when(snapshotFactory.newSnapshot()).thenReturn(snapshot);
         // El orden de registro es el inverso al de FK para probar que no lo define la inyección.
         orchestrator = new SysacadSyncOrchestratorImpl(
-                List.of(commissions, subjects, specialties, classrooms, buildings), snapshotFactory, syncStateService);
+                List.of(commissions, subjects, specialties, classrooms, buildings), snapshotFactory, syncStateService,
+                syncLock);
     }
 
     @Test
@@ -200,6 +206,79 @@ class SysacadSyncOrchestratorImplTest {
         verify(buildings, times(2)).sync(any());
     }
 
+    @Test
+    @DisplayName("resyncAll toma el lock antes de leer y lo suelta al terminar")
+    void resyncAll_takesAndReleasesLock() {
+        orchestrator.resyncAll();
+
+        InOrder order = inOrder(syncLock, snapshotFactory);
+        order.verify(syncLock).lock();
+        order.verify(snapshotFactory).newSnapshot();
+        order.verify(syncLock).unlock();
+        assertThat(isLockedByAnotherThread()).isFalse();
+    }
+
+    @Test
+    @DisplayName("resyncAll suelta el lock aunque newSnapshot lance")
+    void resyncAll_releasesLockWhenSnapshotThrows() {
+        when(snapshotFactory.newSnapshot()).thenThrow(new IllegalStateException("sin conexión"));
+
+        assertThatThrownBy(() -> orchestrator.resyncAll()).isInstanceOf(IllegalStateException.class);
+
+        verify(syncLock).lock();
+        verify(syncLock).unlock();
+        assertThat(isLockedByAnotherThread()).isFalse();
+        org.mockito.Mockito.doReturn(snapshot).when(snapshotFactory).newSnapshot();
+        orchestrator.resyncAll();
+        verify(buildings).sync(any());
+    }
+
+    @Test
+    @DisplayName("una segunda llamada concurrente ignorada no toma ni suelta el lock del primero")
+    void resyncAll_ignoredConcurrentCallDoesNotTouchLock() throws Exception {
+        CountDownLatch firstRunStarted = new CountDownLatch(1);
+        CountDownLatch firstRunReleased = new CountDownLatch(1);
+        AtomicBoolean lockedWhileFirstRuns = new AtomicBoolean();
+        doAnswer(invocation -> {
+            lockedWhileFirstRuns.set(isLockedByAnotherThread());
+            firstRunStarted.countDown();
+            firstRunReleased.await();
+            return null;
+        }).when(buildings).sync(any());
+
+        Thread firstRun = new Thread(orchestrator::resyncAll);
+        firstRun.start();
+        firstRunStarted.await();
+
+        orchestrator.resyncAll();
+
+        assertThat(isLockedByAnotherThread()).isTrue();
+        firstRunReleased.countDown();
+        firstRun.join();
+
+        assertThat(lockedWhileFirstRuns).isTrue();
+        verify(syncLock, times(1)).lock();
+        verify(syncLock, times(1)).unlock();
+        assertThat(isLockedByAnotherThread()).isFalse();
+    }
+
+    private boolean isLockedByAnotherThread() {
+        AtomicBoolean acquired = new AtomicBoolean();
+        Thread probe = new Thread(() -> {
+            if (syncLock.tryLock()) {
+                acquired.set(true);
+                syncLock.unlock();
+            }
+        });
+        probe.start();
+        try {
+            probe.join();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        return !acquired.get();
+    }
+
     private Map<SysacadView, SysacadViewSyncer> allSyncers() {
         Map<SysacadView, SysacadViewSyncer> all = new EnumMap<>(SysacadView.class);
         for (SysacadView view : SysacadView.values()) {
@@ -211,7 +290,8 @@ class SysacadSyncOrchestratorImplTest {
     }
 
     private SysacadSyncOrchestratorImpl orchestratorOf(Map<SysacadView, SysacadViewSyncer> all) {
-        return new SysacadSyncOrchestratorImpl(List.copyOf(all.values()), snapshotFactory, syncStateService);
+        return new SysacadSyncOrchestratorImpl(List.copyOf(all.values()), snapshotFactory, syncStateService,
+                syncLock);
     }
 
     @Test

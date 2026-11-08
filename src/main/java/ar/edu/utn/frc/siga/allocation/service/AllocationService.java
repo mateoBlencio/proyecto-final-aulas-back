@@ -4,16 +4,21 @@ import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ReleasedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
+import ar.edu.utn.frc.siga.allocation.dto.response.AllocationLastRevisionDto;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.ReleaseCommand;
+import ar.edu.utn.frc.siga.allocation.service.command.SysacadDirectChangeCommand;
+import ar.edu.utn.frc.siga.allocation.service.command.SysacadDirectChangeResult;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.modulith.NamedInterface;
 
@@ -63,12 +68,27 @@ public interface AllocationService {
      * <ul>
      *   <li>sin asignación existente → crea, {@code source=SYSACAD}, observación "Recuperado de SysAcad".</li>
      *   <li>asignación existente con {@code source=SYSACAD} → actualiza el aula, observación neutra
-     *   "Actualizado por sync de SysAcad".</li>
+     *   "Actualizado por sync de SysAcad", solo si el evento está en {@code eventIdsToUpdate} y la
+     *   ocurrencia no es pasada; las pasadas no se tocan nunca.</li>
      *   <li>asignación existente con cualquier otro origen (humano o import de Excel) → no se toca; WARN.</li>
      * </ul>
-     * Las ocurrencias pasadas no se descartan (primer sync a mitad de año) y no se valida solapamiento
+     * Las ocurrencias pasadas sin asignación no se descartan (primer sync a mitad de año) y no se valida solapamiento
      * para este origen (se importa tal cual, ver supuestos-sync-horarios.md §3). Devuelve la cantidad de
      * ocurrencias afectadas (creadas+actualizadas).
      */
-    int syncFromSysacad(List<AllocationItem> items);
+    int syncFromSysacad(List<AllocationItem> items, Set<Long> eventIdsToUpdate);
+
+    /** Aula asignada por ocurrencia, solo de las que tienen asignación. No pasa por el composer. */
+    Map<Long, Long> findClassroomIdsByOccurrences(Collection<Long> occurrenceIds);
+
+    /**
+     * Aplica un cambio de aula hecho directamente en SysAcad a las clases futuras principales de los
+     * eventos: pisa cualquier origen y deja {@code source=SYSACAD}. Las pasadas y las liberadas no se tocan.
+     * Si el aula está ocupada devuelve {@code Occupied} sin escribir nada. Publica los movimientos con
+     * actor y origen {@code SYSACAD}.
+     */
+    SysacadDirectChangeResult applySysacadDirectChange(SysacadDirectChangeCommand command);
+
+    /** Usuario y operación de la última revisión de auditoría de la asignación de la ocurrencia. */
+    Optional<AllocationLastRevisionDto> findLastRevision(Long occurrenceId);
 }

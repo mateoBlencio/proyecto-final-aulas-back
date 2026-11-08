@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadUnavailableExceptio
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.ViewResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
@@ -36,7 +37,7 @@ public class SysacadClient {
     private final Consumer<Duration> sleeper;
 
     @Autowired
-    public SysacadClient(RestClient sysacadRestClient, SysacadProperties properties) {
+    public SysacadClient(@Qualifier("sysacadRestClient") RestClient sysacadRestClient, SysacadProperties properties) {
         this(sysacadRestClient, properties.getMaxRetries(), SysacadClient::sleep);
     }
 
@@ -80,7 +81,7 @@ public class SysacadClient {
         return backoff.compareTo(MAX_BACKOFF) > 0 ? MAX_BACKOFF : backoff;
     }
 
-    private static URI buildUri(UriBuilder uriBuilder, String view, ViewQuery query) {
+    static URI buildUri(UriBuilder uriBuilder, String view, ViewQuery query) {
         uriBuilder.path(VIEW_PATH);
         query.filters().forEach(uriBuilder::queryParam);
         if (query.sort() != null) {
@@ -93,7 +94,7 @@ public class SysacadClient {
         return uriBuilder.build(view);
     }
 
-    private static Duration parseRetryAfter(HttpHeaders headers) {
+    static Duration parseRetryAfter(HttpHeaders headers) {
         if (headers == null) {
             return null;
         }
@@ -108,7 +109,7 @@ public class SysacadClient {
         }
     }
 
-    private static void sleep(Duration backoff) {
+    static void sleep(Duration backoff) {
         try {
             Thread.sleep(backoff);
         } catch (InterruptedException e) {

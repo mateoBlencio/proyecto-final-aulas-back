@@ -149,7 +149,7 @@ class SysacadCatalogMapperTest {
                 5, "Ingeniería en Sistemas de Información", 2008, 115, "Sistemas de Representación", 0));
 
         assertThat(allocation).isEqualTo(new SysacadAllocationDto(
-                "1H90SR", 115, 5, 2008, DayOfWeek.TUESDAY, LocalTime.of(10, 30), 135, 0, 805, 15));
+                "1H90SR", 115, 5, 2008, DayOfWeek.TUESDAY, LocalTime.of(10, 30), 135, LocalTime.of(12, 45), 90, 0, 805, 15));
     }
 
     @Test
@@ -179,6 +179,31 @@ class SysacadCatalogMapperTest {
 
         SysacadAllocationDto allocation = mapper.toAllocation(row);
 
+        assertThat(allocation.durationMinutes()).isEqualTo(135);
+    }
+
+    @Test
+    @DisplayName("toAllocation: mapea HoraFin a endTime y Comision a commissionNumber")
+    void mapeaHoraFinYComision() {
+        SysacadAllocationDto allocation = mapper.toAllocation(scheduleWithCourse("1H90SR"));
+
+        assertThat(allocation.endTime()).isEqualTo(LocalTime.of(12, 45));
+        assertThat(allocation.commissionNumber()).isEqualTo(90);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"  ", "no-es-hora", "25:00"})
+    @DisplayName("toAllocation: HoraFin inválida o vacía deja endTime en null sin descartar la fila")
+    void horaFinInvalidaNoDescartaLaFila(String horaFin) {
+        RawSchedule row = new RawSchedule("1H90SR", 90, 805, 15, "Edif. X", 2, 0, "A", "A",
+                "10:30", horaFin, "10:30-12:45", 135, 5, "Especialidad", 2008, 115, "Materia", 30);
+
+        SysacadAllocationDto allocation = mapper.toAllocation(row);
+
+        assertThat(allocation).isNotNull();
+        assertThat(allocation.endTime()).isNull();
+        assertThat(allocation.startTime()).isEqualTo(LocalTime.of(10, 30));
         assertThat(allocation.durationMinutes()).isEqualTo(135);
     }
 

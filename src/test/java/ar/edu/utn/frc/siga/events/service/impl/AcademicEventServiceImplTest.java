@@ -609,7 +609,7 @@ class AcademicEventServiceImplTest {
     }
 
     @Test
-    @DisplayName("findSysacadRecurringEvents: mapea cada evento sync-owned a una ref liviana, campo por campo")
+    @DisplayName("findSysacadRecurringEvents: mapea cada evento sync-owned a una ref liviana, campo por campo, con su vigencia en SysAcad")
     void findSysacadRecurringEventsMapeaCampoPorCampo() {
         RecurringEvent first = RecurringEvent.builder()
                 .id(10L)
@@ -622,6 +622,7 @@ class AcademicEventServiceImplTest {
                 .subjectId(1L)
                 .commissionId(2L)
                 .sysacadHash(Hashes.sha256Hex(90))
+                .sysacadEnabled(true)
                 .build();
         RecurringEvent second = RecurringEvent.builder()
                 .id(11L)
@@ -641,9 +642,9 @@ class AcademicEventServiceImplTest {
 
         assertThat(result).containsExactly(
                 new SysacadRecurringEventRefDto(10L, 1L, 2L, DayOfWeek.MONDAY, LocalTime.of(8, 0),
-                        LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31)),
+                        LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31), true),
                 new SysacadRecurringEventRefDto(11L, 3L, 4L, DayOfWeek.WEDNESDAY, LocalTime.of(14, 30),
-                        LocalDate.of(2026, 8, 1), LocalDate.of(2026, 12, 15)));
+                        LocalDate.of(2026, 8, 1), LocalDate.of(2026, 12, 15), false));
     }
 
     @Test

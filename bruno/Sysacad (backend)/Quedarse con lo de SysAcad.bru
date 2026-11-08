@@ -1,0 +1,25 @@
+meta {
+  name: Quedarse con lo de SysAcad
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/v1/sysacad/schedules/1/review/keep-sysacad
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "observation": "Cómputos cambió el aula directamente en SysAcad"
+  }
+}
+
+docs {
+  Aplica en SIGA el aula que muestra SysAcad en las clases futuras del horario,
+  con la regla manual de solapamiento. observation es obligatoria. Pisa los
+  pedidos de esas clases. Con el aula 999 o 0, las clases futuras quedan sin
+  aula, sin liberarlas. Responde 409 si el horario no está en revisión, si SIGA
+  no tiene el aula o si corre el job o el sync. Requiere PERM_SYSACAD_SYNC.
+}

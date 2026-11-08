@@ -24,6 +24,7 @@ import ar.edu.utn.frc.siga.space.model.ClassroomPermission;
 import ar.edu.utn.frc.siga.space.model.PermissionTargetKind;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomPermissionTargetRequestDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomSubjectPermissionDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomSysacadRefDto;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomPermissionRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
@@ -123,6 +124,17 @@ public class ClassroomServiceImpl implements ClassroomService {
     public List<ClassroomResponseDto> findByIdsIncludingDeactivated(Collection<Long> ids) {
         return classroomRepository.findAllById(ids).stream()
                 .map(classroomMapper::toDto)
+                .toList();
+    }
+
+    @Override
+    public List<ClassroomSysacadRefDto> findSysacadRefs(Collection<Long> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return classroomRepository.findAllByIdWithBuilding(ids).stream()
+                .map(c -> new ClassroomSysacadRefDto(c.getId(), c.getRoomNumber(), c.getBuilding().getBuildingCode(),
+                        c.isCurrentInSysacad() && c.isEnabledInSysacad() && c.getBuilding().isCurrentInSysacad()))
                 .toList();
     }
 

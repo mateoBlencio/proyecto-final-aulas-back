@@ -21,6 +21,7 @@ import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -73,7 +74,7 @@ class AllocationSyncFromSysacadIntegrationTest extends AbstractIntegrationTest {
 
         // 1) Primer sync: ninguna ocurrencia tenía asignación -> crea las dos, source=SYSACAD.
         int affectedFirstSync = SystemScope.call(() -> allocationService.syncFromSysacad(
-                List.of(new AllocationItem(new AllocationTarget.Event(eventId), sysacadClassroom.getId()))));
+                List.of(new AllocationItem(new AllocationTarget.Event(eventId), sysacadClassroom.getId())), Set.of(eventId)));
 
         assertThat(affectedFirstSync).isEqualTo(2);
         assertThat(allocationByOccurrence(firstOccurrenceId)).satisfies(a -> {
@@ -92,7 +93,7 @@ class AllocationSyncFromSysacadIntegrationTest extends AbstractIntegrationTest {
         // 3) Segundo sync de SysAcad, con un aula distinta para todo el evento: la ocurrencia MANUAL
         //    no se toca; la que seguía siendo SYSACAD se actualiza.
         int affectedSecondSync = SystemScope.call(() -> allocationService.syncFromSysacad(
-                List.of(new AllocationItem(new AllocationTarget.Event(eventId), sysacadClassroomV2.getId()))));
+                List.of(new AllocationItem(new AllocationTarget.Event(eventId), sysacadClassroomV2.getId())), Set.of(eventId)));
 
         assertThat(affectedSecondSync).isEqualTo(1);
 
@@ -120,11 +121,11 @@ class AllocationSyncFromSysacadIntegrationTest extends AbstractIntegrationTest {
                 LocalTime.of(18, 0), 90, monday, monday.plusWeeks(1), 30);
         Long occurrenceId = occurrenceRepository.findByEvent_Id(vanishedEventId).getFirst().getId();
         SystemScope.call(() -> allocationService.syncFromSysacad(
-                List.of(new AllocationItem(new AllocationTarget.Event(vanishedEventId), classroom.getId()))));
+                List.of(new AllocationItem(new AllocationTarget.Event(vanishedEventId), classroom.getId())), Set.of(vanishedEventId)));
         assertThat(allocationByOccurrence(occurrenceId).getSource()).isEqualTo(AllocationSource.SYSACAD);
 
         SystemScope.call(() -> allocationService.syncFromSysacad(
-                List.of(new AllocationItem(new AllocationTarget.Event(otherEventId), classroom.getId()))));
+                List.of(new AllocationItem(new AllocationTarget.Event(otherEventId), classroom.getId())), Set.of(otherEventId)));
 
         Allocation kept = allocationByOccurrence(occurrenceId);
         assertThat(kept.getSource()).isEqualTo(AllocationSource.SYSACAD);

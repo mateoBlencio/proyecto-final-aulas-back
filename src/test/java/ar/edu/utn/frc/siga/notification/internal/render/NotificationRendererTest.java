@@ -181,6 +181,40 @@ class NotificationRendererTest {
                 .doesNotContain("@frc");
     }
 
+    @Test
+    void rendersSysacadAlertWithSubjectSummaryAndLines() {
+        Map<String, Object> model = new HashMap<>();
+        model.put("asunto", "SysAcad: novedades en los envíos de aula");
+        model.put("resumen", "2 horarios necesitan atención de Subsecretaría tras la última corrida.");
+        model.put("lineas", List.of("curso 1K1, materia 115, lunes: el aula que puso SysAcad está ocupada en SIGA",
+                "curso 2K2, materia 120, martes: se agotaron los intentos de envío"));
+        model.put("restantes", 3);
+
+        RenderedNotification rendered = renderer.render(NotificationTemplate.SYSACAD_ALERT, model);
+
+        assertThat(rendered.subject()).isEqualTo("SysAcad: novedades en los envíos de aula");
+        assertThat(rendered.body())
+                .contains("2 horarios necesitan atención")
+                .contains("curso 1K1, materia 115, lunes")
+                .contains("se agotaron los intentos de envío")
+                .contains("y 3 más, que podés ver en SIGA");
+    }
+
+    @Test
+    void sysacadAlertWithoutRemainingOmitsMoreLineAndEscapesLines() {
+        Map<String, Object> model = new HashMap<>();
+        model.put("asunto", "SysAcad: el envío de aulas no puede comunicarse");
+        model.put("resumen", "El job no logra comunicarse con SysAcad desde el 10/03/2026 11:00.");
+        model.put("lineas", List.of("<b>x</b>"));
+        model.put("restantes", 0);
+
+        RenderedNotification rendered = renderer.render(NotificationTemplate.SYSACAD_ALERT, model);
+
+        assertThat(rendered.subject()).isEqualTo("SysAcad: el envío de aulas no puede comunicarse");
+        assertThat(rendered.body()).contains("desde el 10/03/2026 11:00").contains("&lt;b&gt;x&lt;/b&gt;")
+                .doesNotContain("que podés ver en SIGA");
+    }
+
     private static int occurrences(String text, String needle) {
         Matcher matcher = Pattern.compile(Pattern.quote(needle)).matcher(text);
         int count = 0;

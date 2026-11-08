@@ -1,10 +1,12 @@
 package ar.edu.utn.frc.siga.audit.service;
 
+import ar.edu.utn.frc.siga.audit.dto.RevisionMetadata;
 import ar.edu.utn.frc.siga.audit.dto.response.RevisionDto;
 import org.springframework.modulith.NamedInterface;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -19,4 +21,7 @@ public interface RevisionReader {
     <E, S> List<RevisionDto<S>> readById(Class<E> entityClass, Object id, Function<E, S> toSnapshot);
 
     <E, S> List<RevisionDto<S>> read(Class<E> entityClass, String property, Collection<?> values, Function<E, S> toSnapshot);
+
+    /** Metadatos de la revisión más reciente de las filas de la entidad con esa propiedad. */
+    <E> Optional<RevisionMetadata> readLatest(Class<E> entityClass, String property, Object value);
 }

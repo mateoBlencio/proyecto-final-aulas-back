@@ -31,6 +31,7 @@ import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -159,7 +160,7 @@ class ReleaseWithReasonApiIntegrationTest extends AbstractIntegrationTest {
         Fixture f = eventWithSecondOccurrenceReleased();
 
         int affected = SystemScope.call(() -> allocationService.syncFromSysacad(
-                List.of(new AllocationItem(new AllocationTarget.Event(f.eventId()), f.other().getId()))));
+                List.of(new AllocationItem(new AllocationTarget.Event(f.eventId()), f.other().getId())), Set.of(f.eventId())));
 
         assertThat(affected).isZero();
         assertThat(allocationRepository.findByOccurrenceId(f.firstOccurrenceId()).orElseThrow().getSource())

@@ -13,8 +13,8 @@ post {
 body:json {
   {
     "params": {
-      "@LegajoPublica": 89765,
-      "@IdTipoUsuarioPublica": "",
+      "@LegajoPublica": 0,
+      "@IdTipoUsuarioPublica": "S",
       "@FechaHasta": "2026-11-01",
       "@AnioAcademico": 2026,
       "@Especialidad": "COMPLETAR",
@@ -31,4 +31,5 @@ docs {
   Ejecuta el procedimiento EnviarMensajeComision. Tipos: @LegajoPublica INT,
   @IdTipoUsuarioPublica VARCHAR(10), @FechaHasta DATE, @AnioAcademico INT,
   @Especialidad INT, @Plan INT, @Materia INT, @Comision INT, @Nota VARCHAR(150).
+  Para usar este endpoint: @LegajoPublica = 0 y @IdTipoUsuarioPublica = "S".
 }

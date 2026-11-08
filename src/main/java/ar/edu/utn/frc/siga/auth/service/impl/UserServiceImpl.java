@@ -115,6 +115,13 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public List<UserResponseDto> findByRole(SystemRole role) {
+        List<UserResponseDto> users = userRepository.findEnabledByRole(role).stream().map(this::toDto).toList();
+        log.info("Usuarios habilitados con rol {}: count={}", role, users.size());
+        return users;
+    }
+
+    @Override
     public Set<Long> findBuildingIdsCoveredByRole(SystemRole role, Collection<Long> buildingIds) {
         if (buildingIds.isEmpty()) {
             return Set.of();

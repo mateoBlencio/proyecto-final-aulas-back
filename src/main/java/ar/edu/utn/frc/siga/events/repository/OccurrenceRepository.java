@@ -24,6 +24,23 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
     @Query("select o.id as id, o.date as date from Occurrence o where o.id in :ids")
     List<OccurrenceDate> findDatesByIdIn(Collection<Long> ids);
 
+    @Query(value = """
+            select x.id_ocurrencia from (
+                select o.id_ocurrencia,
+                       row_number() over (partition by o.id_evento_academico order by o.fecha, o.orden_aula) as rn
+                from ocurrencia o
+                where o.id_evento_academico in (:eventIds)
+                  and o.fecha >= :from
+                  and o.id_ocurrencia_principal is null
+                  and o.fecha <> all (:excludedDates)
+            ) x
+            where x.rn <= :limit
+            """, nativeQuery = true)
+    List<Long> findNextIdsPerEvent(Collection<Long> eventIds, LocalDate from, LocalDate[] excludedDates, int limit);
+
+    @EntityGraph(attributePaths = "event")
+    List<Occurrence> findByIdIn(Collection<Long> ids);
+
     List<Occurrence> findByEvent_Id(Long eventId);
 
     List<Occurrence> findByEvent_IdAndDate(Long eventId, LocalDate date);

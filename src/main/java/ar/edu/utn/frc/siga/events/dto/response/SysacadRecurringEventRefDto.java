@@ -13,5 +13,6 @@ public record SysacadRecurringEventRefDto(
         DayOfWeek dayOfWeek,
         LocalTime startTime,
         LocalDate startDate,
-        LocalDate endDate) {
+        LocalDate endDate,
+        boolean sysacadEnabled) {
 }

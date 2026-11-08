@@ -42,6 +42,7 @@ import java.util.stream.IntStream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -239,6 +240,90 @@ class ClassroomMovementsListenerTest {
 
         assertThat(linesOf(savedActivities(1).getFirst())).extracting(ActivityLine::eventLabel)
                 .containsExactly("Fisica I · Parcial", "Clase");
+    }
+
+    @Test
+    @DisplayName("origen SYSACAD: no consulta el rol del actor y registra la actividad de cada edificio con el actor SYSACAD")
+    void sysacadSourceSkipsRoleCheckAndRecordsActivity() {
+        when(repository.existsByOperationId("op-9")).thenReturn(false);
+        stubClassrooms(classroom(5L, 101, CENTRAL, "Central"), classroom(7L, 201, ANNEX, "Anexo"));
+        when(userService.findByRoleForBuilding(any(), any())).thenReturn(List.of());
+
+        listener.on(sysacadEvent("op-9", change(10L, 5L, 7L)));
+
+        verify(userService, never()).hasRole(any(), any());
+        List<BuildingActivity> saved = savedActivities(2);
+        assertThat(saved).extracting(BuildingActivity::getBuildingId).containsExactlyInAnyOrder(CENTRAL, ANNEX);
+        assertThat(saved).allSatisfy(activity -> {
+            assertThat(activity.getActor()).isEqualTo("SYSACAD");
+            assertThat(activity.getSource()).isEqualTo(AllocationSource.SYSACAD);
+        });
+    }
+
+    @Test
+    @DisplayName("origen SYSACAD: manda un mail a auxiliares y a Subsecretaría del edificio, sin repetir direcciones")
+    @SuppressWarnings("unchecked")
+    void sysacadSourceMailsAuxiliariesAndSubsecretariaWithoutDuplicates() {
+        when(repository.existsByOperationId("op-9")).thenReturn(false);
+        stubClassrooms(classroom(5L, 101, CENTRAL, "Central"), classroom(6L, 102, CENTRAL, "Central"));
+        when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, CENTRAL))
+                .thenReturn(List.of(user("ana@utn.edu.ar", "Ana", "Perez"), user("dos@utn.edu.ar", "Dos", "Veces")));
+        when(userService.findByRoleForBuilding(SystemRole.SUBSECRETARIA, CENTRAL))
+                .thenReturn(List.of(user("dos@utn.edu.ar", "Dos", "Veces"), user("sub@utn.edu.ar", "Sub", "Secre")));
+
+        listener.on(sysacadEvent("op-9", change(10L, 5L, 6L)));
+
+        ArgumentCaptor<NotificationRequest> captor = ArgumentCaptor.forClass(NotificationRequest.class);
+        verify(notificationSender).send(captor.capture());
+        NotificationRequest request = captor.getValue();
+        assertThat(request.template()).isEqualTo(NotificationTemplate.BUILDING_ACTIVITY);
+        assertThat(request.recipients()).extracting(NotificationRecipient::email)
+                .containsExactly("ana@utn.edu.ar", "dos@utn.edu.ar", "sub@utn.edu.ar");
+        assertThat((String) request.model().get("resumen")).contains("cambio directo en SysAcad")
+                .doesNotContain("Subsecretaría");
+        assertThat((List<String>) request.model().get("lineas")).allSatisfy(line ->
+                assertThat(line).doesNotContain("Subsecretaría"));
+    }
+
+    @Test
+    @DisplayName("origen SYSACAD sin auxiliares: igual avisa a Subsecretaría del edificio")
+    void sysacadSourceMailsSubsecretariaWhenThereAreNoAuxiliaries() {
+        when(repository.existsByOperationId("op-9")).thenReturn(false);
+        stubClassrooms(classroom(5L, 101, CENTRAL, "Central"), classroom(6L, 102, CENTRAL, "Central"));
+        when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, CENTRAL)).thenReturn(List.of());
+        when(userService.findByRoleForBuilding(SystemRole.SUBSECRETARIA, CENTRAL))
+                .thenReturn(List.of(user("sub@utn.edu.ar", "Sub", "Secre")));
+
+        listener.on(sysacadEvent("op-9", change(10L, 5L, 6L)));
+
+        ArgumentCaptor<NotificationRequest> captor = ArgumentCaptor.forClass(NotificationRequest.class);
+        verify(notificationSender).send(captor.capture());
+        assertThat(captor.getValue().recipients()).extracting(NotificationRecipient::email)
+                .containsExactly("sub@utn.edu.ar");
+    }
+
+    @Test
+    @DisplayName("otro origen: sigue consultando el rol, avisa solo a auxiliares y el texto nombra a Subsecretaría")
+    void nonSysacadSourceKeepsPreviousBehavior() {
+        subsecretariaActs();
+        stubClassrooms(classroom(5L, 101, CENTRAL, "Central"), classroom(6L, 102, CENTRAL, "Central"));
+        when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, CENTRAL))
+                .thenReturn(List.of(user("ana@utn.edu.ar", "Ana", "Perez")));
+
+        listener.on(event("op-1", change(10L, 5L, 6L)));
+
+        verify(userService).hasRole(ACTOR, SystemRole.SUBSECRETARIA);
+        verify(userService, never()).findByRoleForBuilding(eq(SystemRole.SUBSECRETARIA), any());
+        ArgumentCaptor<NotificationRequest> captor = ArgumentCaptor.forClass(NotificationRequest.class);
+        verify(notificationSender).send(captor.capture());
+        assertThat(captor.getValue().recipients()).extracting(NotificationRecipient::email)
+                .containsExactly("ana@utn.edu.ar");
+        assertThat((String) captor.getValue().model().get("resumen")).startsWith("Subsecretaría registró");
+    }
+
+    private ClassroomMovements sysacadEvent(String operationId, Change... changes) {
+        return new ClassroomMovements(operationId, "SYSACAD", AllocationSource.SYSACAD, "Cambio directo en SysAcad",
+                Instant.parse("2026-10-17T12:00:00Z"), List.of(changes));
     }
 
     private void subsecretariaActs() {

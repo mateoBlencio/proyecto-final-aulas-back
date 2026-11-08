@@ -53,6 +53,12 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
     @Autowired
     private AcademicEventService academicEventService;
 
+    private String weekDump(LocalDate monday) {
+        return jdbc.queryForList("SELECT a.id_asignacion, a.id_aula, a.origen, o.id_ocurrencia, o.fecha, o.estado, "
+                + "o.id_evento_academico FROM asignacion_aula a JOIN ocurrencia o ON o.id_ocurrencia = a.id_ocurrencia "
+                + "WHERE o.fecha BETWEEN ? AND ?", monday, monday.plusDays(6)).toString();
+    }
+
     private JsonNode weekOf(LocalDate day) throws Exception {
         return getJson(mockMvc, "/v1/dashboard/week", "weekOf", day.toString());
     }
@@ -193,7 +199,7 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
 
         assertThat(byId(root.get("buildings"), "buildingId", deactivated.getId())).isNull();
         assertThat(byId(root.get("buildings"), "buildingId", active.getId())).isNotNull();
-        assertThat(root.get("campus").get("allocationStatus").get("total").asLong()).isEqualTo(1);
+        assertThat(root.get("campus").get("allocationStatus").get("total").asLong()).as(weekDump(monday)).isEqualTo(1);
         assertThat(root.get("campus").get("occupancy").get("occupiedHours").asDouble()).isEqualTo(1.0);
     }
 
@@ -250,7 +256,7 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
         assertThat(campus.get("openRoomRequests").get("count").asLong()).isEqualTo(1);
         assertThat(global.get("restrictedScope").asBoolean()).isFalse();
         assertThat(global.get("campus").get("unallocatedClasses").asLong()).isEqualTo(1);
-        assertThat(global.get("campus").get("allocationStatus").get("total").asLong()).isEqualTo(2);
+        assertThat(global.get("campus").get("allocationStatus").get("total").asLong()).as(weekDump(monday)).isEqualTo(2);
         assertThat(global.get("campus").get("openRoomRequests").get("count").asLong()).isGreaterThanOrEqualTo(2);
     }
 
@@ -290,7 +296,7 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
     @Test
     @DisplayName("a week without events answers 200 with zero counters and null percentages")
     void weekWithoutDataIsEmpty() throws Exception {
-        LocalDate monday = week(9);
+        LocalDate monday = week(120);
         Building a = building();
         room(a, 30);
 
@@ -301,7 +307,7 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
         assertThat(nodeA.get("allocationStatus").get("overlapPercent").isNull()).isTrue();
         assertThat(nodeA.get("occupancy").get("occupiedHours").asDouble()).isZero();
         assertThat(nodeA.get("occupancy").get("occupancyPercent").asDouble()).isZero();
-        assertThat(root.get("campus").get("allocationStatus").get("total").asLong()).isZero();
+        assertThat(root.get("campus").get("allocationStatus").get("total").asLong()).as(weekDump(monday)).isZero();
         assertThat(root.get("campus").get("unallocatedClasses").asLong()).isZero();
         assertThat(root.get("campus").get("occupancy").get("occupiedHours").asDouble()).isZero();
     }

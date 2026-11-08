@@ -1,0 +1,16 @@
+package ar.edu.utn.frc.siga.sysacad.internal.model;
+
+public enum SysacadReviewReason {
+    ROOM_OCCUPIED,
+    NO_ROOM_IN_SYSACAD,
+    ROOM_UNKNOWN_IN_SIGA,
+    REQUEST_ON_FUTURE_CLASS,
+    RELEASED_FUTURE_CLASS,
+    HOUR_MISMATCH,
+    HOURS_CHANGED_AFTER_SEND,
+    NOT_CONFIRMED,
+    MAX_ATTEMPTS,
+    SCHEDULE_NOT_FOUND,
+    ROOM_NOT_IN_SYSACAD,
+    ROWS_DIVERGED
+}

@@ -41,6 +41,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
                                                  @Param("buildingId") Long buildingId);
 
     @Query("""
+            select distinct u from User u
+            join u.roleAssignments ra
+            where u.enabled = true and ra.role = :role
+            """)
+    List<User> findEnabledByRole(@Param("role") SystemRole role);
+
+    @Query("""
             select (count(ra) > 0) from RoleAssignment ra
             where ra.user.enabled = true and ra.role = :role
               and ra.scopeType = ar.edu.utn.frc.siga.common.security.ScopeType.GLOBAL
