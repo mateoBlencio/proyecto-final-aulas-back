@@ -147,8 +147,19 @@ public class SysacadCatalogMapper {
                 raw.plan(),
                 dayOfWeek,
                 startTime,
-                raw.duracion(),
+                eventDurationMinutes(raw, curso, startTime),
                 raw.horarioCuatrimestre());
+    }
+
+    // DURACION de SysAcad no incluye el recreo; la clase real va de HoraComienzo a HoraFin.
+    private Integer eventDurationMinutes(RawSchedule raw, String curso, LocalTime startTime) {
+        LocalTime endTime = parseEndTime(raw, curso);
+        if (endTime != null && endTime.isAfter(startTime)) {
+            return (int) Duration.between(startTime, endTime).toMinutes();
+        }
+        log.warn("HoraFin ausente, inválida o no posterior a HoraComienzo para curso={} materia={}: se usa DURACION={}",
+                curso, raw.materia(), raw.duracion());
+        return raw.duracion();
     }
 
     public SysacadAllocationDto toAllocation(RawSchedule raw) {
@@ -167,7 +178,6 @@ public class SysacadCatalogMapper {
             return null;
         }
         LocalTime endTime = parseEndTime(raw, curso);
-        warnIfDurationInconsistent(raw, curso, startTime, endTime);
         return new SysacadAllocationDto(
                 curso,
                 raw.materia(),
@@ -215,18 +225,6 @@ public class SysacadCatalogMapper {
         } catch (DateTimeParseException e) {
             log.warn("HoraFin inválida para curso={} materia={}: '{}'", curso, raw.materia(), horaFin);
             return null;
-        }
-    }
-
-    private void warnIfDurationInconsistent(RawSchedule raw, String curso, LocalTime startTime, LocalTime endTime) {
-        if (raw.duracion() == null || endTime == null) {
-            return;
-        }
-        long computedMinutes = Duration.between(startTime, endTime).toMinutes();
-        if (computedMinutes != raw.duracion()) {
-            log.warn("DURACION inconsistente para curso={} materia={}: columna={} min, "
-                            + "HoraComienzo-HoraFin={} min",
-                    curso, raw.materia(), raw.duracion(), computedMinutes);
         }
     }
 

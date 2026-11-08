@@ -69,7 +69,8 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
             CommissionResponseDto commission = resolved.get().commission();
             SubjectCommissionResponseDto link = resolved.get().link();
             if (row.durationMinutes() == null) {
-                log.warn("DURACION nula para curso={} materia={}: fila de evento salteada",
+                log.warn("Sin duración (HoraFin inválida o ausente y DURACION nula) para curso={} materia={}: "
+                                + "fila de evento salteada",
                         row.courseCode(), row.subjectCode());
                 unresolvedCommissionIds.add(commission.id());
                 continue;
