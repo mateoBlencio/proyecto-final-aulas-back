@@ -102,6 +102,21 @@ public class OccurrenceServiceImpl implements OccurrenceService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<OccurrenceSlotDto> findNextSlotsByEvents(Collection<Long> eventIds, LocalDate from,
+            Collection<LocalDate> excludedDates, int limitPerEvent) {
+        if (eventIds.isEmpty()) {
+            return List.of();
+        }
+        List<Long> ids = occurrenceRepository.findNextIdsPerEvent(eventIds, from,
+                excludedDates.toArray(LocalDate[]::new), limitPerEvent);
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return occurrenceRepository.findByIdIn(ids).stream().map(OccurrenceServiceImpl::toSlot).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<OccurrenceSlotDto> findSlotsByStatusBetween(OccurrenceStatus status, LocalDate from, LocalDate to) {
         return occurrenceRepository.findByStatusAndDateBetweenOrderByEvent_IdAscDateAsc(status, from, to).stream()
                 .map(OccurrenceServiceImpl::toSlot).toList();

@@ -61,10 +61,14 @@ public class SysacadWritePlanner {
         Set<Long> eventIds = schedules.stream()
                 .flatMap(s -> eventIdsOf(s, currentEventIds).stream())
                 .collect(Collectors.toSet());
+        LocalDate today = now.toLocalDate();
+        Set<LocalDate> holidays = holidayService.findBetween(today, today.plusYears(1)).stream()
+                .map(HolidayResponseDto::date)
+                .collect(Collectors.toSet());
+        // Se piden 2 porque la clase de hoy puede haber terminado; hay a lo sumo una principal por evento y día.
         Map<Long, List<OccurrenceSlotDto>> slotsByEvent = occurrenceService
-                .findSlotsByEvents(eventIds, now.toLocalDate()).stream()
+                .findNextSlotsByEvents(eventIds, today, holidays, 2).stream()
                 .collect(Collectors.groupingBy(OccurrenceSlotDto::eventId));
-        Set<LocalDate> holidays = holidaysFor(slotsByEvent);
 
         List<Candidate> candidates = new ArrayList<>();
         for (SysacadSchedule schedule : schedules) {
@@ -87,21 +91,6 @@ public class SysacadWritePlanner {
                         classroomByOccurrence, refs, states, holidays, now)))
                 .filter(p -> !(p.decision() instanceof NextClassDecision.Unchanged))
                 .toList();
-    }
-
-    private Set<LocalDate> holidaysFor(Map<Long, List<OccurrenceSlotDto>> slotsByEvent) {
-        List<LocalDate> dates = slotsByEvent.values().stream()
-                .flatMap(List::stream)
-                .map(OccurrenceSlotDto::date)
-                .toList();
-        if (dates.isEmpty()) {
-            return Set.of();
-        }
-        LocalDate from = dates.stream().min(Comparator.naturalOrder()).orElseThrow();
-        LocalDate to = dates.stream().max(Comparator.naturalOrder()).orElseThrow();
-        return holidayService.findBetween(from, to).stream()
-                .map(HolidayResponseDto::date)
-                .collect(Collectors.toSet());
     }
 
     private static Set<Long> eventIdsOf(SysacadSchedule schedule, Set<Long> currentEventIds) {

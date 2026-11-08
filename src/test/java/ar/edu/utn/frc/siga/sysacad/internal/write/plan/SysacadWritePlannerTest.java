@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -152,18 +151,17 @@ class SysacadWritePlannerTest {
     }
 
     @Test
-    @DisplayName("Sin ocurrencias futuras no consulta feriados y devuelve lista vacía")
-    void noSlotsDoesNotQueryHolidays() {
+    @DisplayName("Sin ocurrencias futuras devuelve lista vacía")
+    void noSlotsReturnsEmpty() {
         stubEvents(eventRef(10, true));
         stubSchedules(schedule(1, 10L, null));
-        when(occurrenceService.findSlotsByEvents(any(), any(LocalDate.class))).thenReturn(List.of());
+        when(occurrenceService.findNextSlotsByEvents(any(), any(LocalDate.class), any(), eq(2))).thenReturn(List.of());
         when(allocationService.findClassroomIdsByOccurrences(anyCollection())).thenReturn(Map.of());
         when(classroomService.findSysacadRefs(anyCollection())).thenReturn(List.of());
         when(occurrenceRequestQuery.findStates(anyCollection())).thenReturn(Map.of());
+        when(holidayService.findBetween(any(), any())).thenReturn(List.of());
 
         assertThat(planner.plan(NOW)).isEmpty();
-
-        verify(holidayService, never()).findBetween(any(), any());
     }
 
     @Test
@@ -171,7 +169,7 @@ class SysacadWritePlannerTest {
     void annualScheduleUsesOnlyCurrentEvents() {
         stubEvents(eventRef(10, true), eventRef(12, false));
         stubSchedules(schedule(1, 10L, 12L));
-        when(occurrenceService.findSlotsByEvents(any(), any(LocalDate.class))).thenReturn(List.of(
+        when(occurrenceService.findNextSlotsByEvents(any(), any(LocalDate.class), any(), eq(2))).thenReturn(List.of(
                 slot(1, 12, D1), slot(2, 10, D2)));
         stubDownstream(Map.of(2L, 229L));
 
@@ -179,7 +177,7 @@ class SysacadWritePlannerTest {
 
         assertThat(plan).hasSize(1);
         assertThat(plan.get(0).decision()).isEqualTo(new Send(1, 229, 2L, D2, LocalTime.of(8, 0), LocalTime.of(10, 15)));
-        verify(occurrenceService).findSlotsByEvents(eq(Set.of(10L)), eq(D1));
+        verify(occurrenceService).findNextSlotsByEvents(eq(Set.of(10L)), eq(D1), any(), eq(2));
         verify(allocationService).findClassroomIdsByOccurrences(Set.of(2L));
     }
 
@@ -188,7 +186,7 @@ class SysacadWritePlannerTest {
     void discardsUnchanged() {
         stubEvents(eventRef(10, true), eventRef(11, true));
         stubSchedules(schedule(1, 10L, null), schedule(2, 11L, null));
-        when(occurrenceService.findSlotsByEvents(any(), any(LocalDate.class))).thenReturn(List.of(
+        when(occurrenceService.findNextSlotsByEvents(any(), any(LocalDate.class), any(), eq(2))).thenReturn(List.of(
                 slot(1, 10, D1), slot(2, 11, D1)));
         stubDownstream(Map.of(1L, 228L, 2L, 229L));
 
@@ -204,7 +202,7 @@ class SysacadWritePlannerTest {
         stubEvents(eventRef(10, true), eventRef(11, true), eventRef(12, true), eventRef(13, true));
         stubSchedules(schedule(1, 10L, null), schedule(2, 11L, null), schedule(3, 12L, null),
                 schedule(4, 13L, null));
-        when(occurrenceService.findSlotsByEvents(any(), any(LocalDate.class))).thenReturn(List.of(
+        when(occurrenceService.findNextSlotsByEvents(any(), any(LocalDate.class), any(), eq(2))).thenReturn(List.of(
                 slot(1, 10, D3), slot(2, 11, D1, LocalTime.of(10, 0)), slot(3, 12, D2),
                 slot(4, 13, D1, LocalTime.of(8, 0))));
         stubDownstream(Map.of(1L, 229L, 2L, 229L, 3L, 229L, 4L, 229L));
@@ -219,7 +217,7 @@ class SysacadWritePlannerTest {
     void queriesOnlyNextOccurrencesInOneBatch() {
         stubEvents(eventRef(10, true), eventRef(11, true), eventRef(12, true));
         stubSchedules(schedule(1, 10L, null), schedule(2, 11L, null), schedule(3, 12L, null));
-        when(occurrenceService.findSlotsByEvents(any(), any(LocalDate.class))).thenReturn(List.of(
+        when(occurrenceService.findNextSlotsByEvents(any(), any(LocalDate.class), any(), eq(2))).thenReturn(List.of(
                 slot(1, 10, D1), slot(2, 10, D2), slot(3, 10, D3),
                 slot(4, 11, D2), slot(5, 11, D3),
                 slot(6, 12, D4)));
@@ -230,24 +228,25 @@ class SysacadWritePlannerTest {
         verify(allocationService, times(1)).findClassroomIdsByOccurrences(Set.of(1L, 4L, 6L));
         verify(classroomService, times(1)).findSysacadRefs(Set.of(229L, 230L));
         verify(occurrenceRequestQuery, times(1)).findStates(Set.of(1L, 4L, 6L));
-        verify(occurrenceService, times(1)).findSlotsByEvents(any(), any(LocalDate.class));
+        verify(occurrenceService, times(1)).findNextSlotsByEvents(any(), any(LocalDate.class), any(), eq(2));
         verify(academicEventService, times(1)).findSysacadRecurringEvents();
         verify(holidayService, times(1)).findBetween(any(), any());
     }
 
     @Test
-    @DisplayName("Pide las ocurrencias desde la fecha de ahora y los feriados entre la primera y la última fecha traídas")
-    void queriesHolidaysForTheSlotRange() {
+    @DisplayName("Pide 2 clases por evento desde hoy, excluyendo los feriados del año siguiente")
+    void queriesNextTwoSlotsExcludingHolidaysOfNextYear() {
         stubEvents(eventRef(10, true));
         stubSchedules(schedule(1, 10L, null));
-        when(occurrenceService.findSlotsByEvents(any(), any(LocalDate.class))).thenReturn(List.of(
-                slot(2, 10, D2), slot(3, 10, D4), slot(1, 10, D1)));
+        when(occurrenceService.findNextSlotsByEvents(any(), any(LocalDate.class), any(), eq(2))).thenReturn(List.of(
+                slot(1, 10, D1), slot(2, 10, D2)));
         stubDownstream(Map.of(1L, 229L));
+        when(holidayService.findBetween(D1, D1.plusYears(1))).thenReturn(List.of(new HolidayResponseDto(D4, "Feriado")));
 
         planner.plan(NOW);
 
-        verify(occurrenceService).findSlotsByEvents(Set.of(10L), D1);
-        verify(holidayService).findBetween(D1, D4);
+        verify(holidayService).findBetween(D1, D1.plusYears(1));
+        verify(occurrenceService).findNextSlotsByEvents(Set.of(10L), D1, Set.of(D4), 2);
     }
 
     @Test
@@ -255,10 +254,10 @@ class SysacadWritePlannerTest {
     void holidayMakesPlannerTakeTheFollowingClass() {
         stubEvents(eventRef(10, true));
         stubSchedules(schedule(1, 10L, null));
-        when(occurrenceService.findSlotsByEvents(any(), any(LocalDate.class))).thenReturn(List.of(
+        when(occurrenceService.findNextSlotsByEvents(any(), any(LocalDate.class), any(), eq(2))).thenReturn(List.of(
                 slot(1, 10, D1), slot(2, 10, D2)));
         stubDownstream(Map.of(2L, 229L));
-        when(holidayService.findBetween(D1, D2)).thenReturn(List.of(new HolidayResponseDto(D1, "Feriado")));
+        when(holidayService.findBetween(D1, D1.plusYears(1))).thenReturn(List.of(new HolidayResponseDto(D1, "Feriado")));
 
         List<PlannedSchedule> plan = planner.plan(NOW);
 
