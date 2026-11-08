@@ -42,7 +42,7 @@ class AllocationFindClassroomIdsByOccurrencesIntegrationTest extends AbstractInt
     private List<Occurrence> threeWeeklyOccurrences() {
         SubjectAndCommission academic = testData.materiaYComision();
         LocalDate start = LocalDate.now().plusYears(1).with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY))
-                .plusWeeks(IntegrationTestData.nextSeq() % 500);
+                .plusWeeks(IntegrationTestData.nextSeq() % 100);
         Long eventId = testData.eventoRecurrente(academic.subjectId(), academic.commissionId(), DayOfWeek.MONDAY,
                 LocalTime.of(8, 0), 90, start, start.plusWeeks(2), 30);
         return occurrenceRepository.findByEvent_Id(eventId);
