@@ -37,7 +37,7 @@ public class CommissionMessageSender {
 
     // No propaga errores: el aula ya quedó confirmada y un fallo del mensaje no es un fallo del envío.
     public void sendAfterConfirmation(SysacadSchedule schedule, Send decision, RequestPacer pacer) {
-        if (!properties.isCommissionMessageEnabled() || decision.room() == RELEASED_ROOM) {
+        if (decision.room() == RELEASED_ROOM || !enabledFor(schedule)) {
             return;
         }
         String note = null;
@@ -53,6 +53,17 @@ public class CommissionMessageSender {
             result = new CommissionMessageResult(false, e.toString());
         }
         record(schedule, decision, note, result);
+    }
+
+    // EnviarMensajeComision no tiene entorno de pruebas y llega a alumnos reales: en TEST_COMMISSIONS solo se avisa
+    // a las comisiones de prueba listadas.
+    private boolean enabledFor(SysacadSchedule schedule) {
+        return switch (properties.getCommissionMessageMode()) {
+            case OFF -> false;
+            case ON -> true;
+            case TEST_COMMISSIONS -> properties.getCommissionMessageTestCommissions().stream().anyMatch(c -> c.matches(
+                    schedule.getSpecialty(), schedule.getPlan(), schedule.getSubject(), schedule.getCommission()));
+        };
     }
 
     private void record(SysacadSchedule schedule, Send decision, String note, CommissionMessageResult result) {

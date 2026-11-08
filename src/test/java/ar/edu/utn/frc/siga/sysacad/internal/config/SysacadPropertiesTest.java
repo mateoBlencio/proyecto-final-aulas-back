@@ -89,6 +89,23 @@ class SysacadPropertiesTest {
         assertThat(bound.getSync().zone()).isEqualTo(java.time.ZoneId.of("America/Argentina/Buenos_Aires"));
         assertThat(bound.getCommissionMessagePublisherLegajo()).isZero();
         assertThat(bound.getCommissionMessagePublisherUserType()).isEqualTo("S");
+        assertThat(bound.getCommissionMessageMode()).isEqualTo(CommissionMessageMode.OFF);
+        assertThat(bound.getCommissionMessageTestCommissions())
+                .containsExactly(new SysacadProperties.MessageCommission(5, 2023, 581, 5));
+    }
+
+    @Test
+    @DisplayName("el mensaje viene en OFF y sin comisiones de prueba; una comisión con un campo nulo se rechaza")
+    void messageDefaultsAndRejectNulls() {
+        assertThat(valid().getCommissionMessageMode()).isEqualTo(CommissionMessageMode.OFF);
+        assertThat(valid().getCommissionMessageTestCommissions()).isEmpty();
+
+        SysacadProperties properties = valid();
+        properties.setCommissionMessageTestCommissions(
+                List.of(new SysacadProperties.MessageCommission(5, 2023, 581, null)));
+
+        assertThat(validator.validate(properties)).extracting(v -> v.getPropertyPath().toString())
+                .containsExactly("commissionMessageTestCommissions[0].commission");
     }
 
     @Test
