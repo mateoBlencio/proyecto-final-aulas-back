@@ -229,8 +229,13 @@ public class SysacadSendCycle {
         if (decision.endTime() == null || read.durationMinutes() == null) {
             return false;
         }
-        long sigaMinutes = Duration.between(decision.startTime(), decision.endTime()).toMinutes();
-        return Objects.equals(read.startTime(), decision.startTime()) && read.durationMinutes() == sigaMinutes;
+        if (!Objects.equals(read.startTime(), decision.startTime())) {
+            return false;
+        }
+        if (read.endTime() != null) {
+            return read.endTime().equals(decision.endTime());
+        }
+        return read.durationMinutes() == Duration.between(decision.startTime(), decision.endTime()).toMinutes();
     }
 
     private Reading read(SysacadSchedule schedule, RequestPacer pacer) {

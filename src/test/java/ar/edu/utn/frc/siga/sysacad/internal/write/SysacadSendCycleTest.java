@@ -469,9 +469,10 @@ class SysacadSendCycleTest {
     @ParameterizedTest(name = "vista {0}-{1} dur {2}")
     @CsvSource({
             "08:30, 10:45, 135",
-            "08:00, 10:00, 120"
+            "08:00, 10:00, 120",
+            "08:00, 10:00, 135"
     })
-    @DisplayName("Control previo: hora o duración de la vista distinta de la de SIGA pasa a revisión HOUR_MISMATCH sin POST")
+    @DisplayName("Control previo: comienzo o fin de la vista distinto del de SIGA pasa a revisión HOUR_MISMATCH sin POST")
     void hourMismatchOpensReviewWithoutPost(String start, String end, int duration) {
         readsReturn(rows(raw(KNOWN_ROOM, start, end, duration)));
 
@@ -482,6 +483,55 @@ class SysacadSendCycleTest {
         verify(stateWriter).toReview(SCHEDULE_ID, SysacadReviewReason.HOUR_MISMATCH, List.of(OCCURRENCE_ID));
         verify(client, never()).updateRoom(any());
         verify(stateWriter, never()).markIntent(any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Control previo: con HoraFin igual a la de SIGA la DURACION de la vista (sin recreo) no bloquea y se reenvía tal cual")
+    void viewDurationShorterThanRangeStillSends() {
+        readsReturn(rows(raw(KNOWN_ROOM, "08:00", "10:15", 120)), rows(raw(NEW_ROOM, "08:00", "10:15", 120)));
+        postReturns(new UpdateRoomResult.Applied("ok"));
+
+        SendOutcome outcome = send();
+
+        assertThat(outcome.kind()).isEqualTo(Kind.CONFIRMED);
+        ArgumentCaptor<UpdateRoomCommand> command = ArgumentCaptor.forClass(UpdateRoomCommand.class);
+        verify(client).updateRoom(command.capture());
+        assertThat(command.getValue()).isEqualTo(new UpdateRoomCommand(YEAR, SPECIALTY, PLAN, SUBJECT, COMMISSION,
+                DAY, SEMESTER, 800, 120, BUILDING, NEW_ROOM));
+    }
+
+    @Test
+    @DisplayName("Control previo: sin HoraFin en la vista y DURACION igual a los minutos de SIGA, se envía")
+    void viewWithoutEndTimeAndMatchingDurationSends() {
+        readsReturn(rows(raw(KNOWN_ROOM, "08:00", null, 135)), rows(raw(NEW_ROOM, "08:00", null, 135)));
+        postReturns(new UpdateRoomResult.Applied("ok"));
+
+        SendOutcome outcome = send();
+
+        assertThat(outcome.kind()).isEqualTo(Kind.CONFIRMED);
+        verify(client).updateRoom(any());
+    }
+
+    @Test
+    @DisplayName("Control previo: sin HoraFin en la vista y DURACION distinta de los minutos de SIGA, HOUR_MISMATCH sin POST")
+    void viewWithoutEndTimeAndOtherDurationIsHourMismatch() {
+        readsReturn(rows(raw(KNOWN_ROOM, "08:00", null, 120)));
+
+        SendOutcome outcome = send();
+
+        assertThat(outcome.reviewReason()).isEqualTo(SysacadReviewReason.HOUR_MISMATCH);
+        verify(client, never()).updateRoom(any());
+    }
+
+    @Test
+    @DisplayName("Control previo: con HoraFin pero sin DURACION en la vista es HOUR_MISMATCH y no se envía")
+    void viewWithEndTimeButNoDurationIsHourMismatch() {
+        readsReturn(rows(raw(KNOWN_ROOM, "08:00", "10:15", null)));
+
+        SendOutcome outcome = send();
+
+        assertThat(outcome.reviewReason()).isEqualTo(SysacadReviewReason.HOUR_MISMATCH);
+        verify(client, never()).updateRoom(any());
     }
 
     @Test
