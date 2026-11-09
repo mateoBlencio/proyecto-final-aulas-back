@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import ar.edu.utn.frc.siga.sysacad.internal.client.SysacadWriteClient;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.CommissionMessageCommand;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.CommissionMessageResult;
+import ar.edu.utn.frc.siga.sysacad.internal.config.CommissionMessageMode;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties.MessageCommission;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
@@ -19,6 +20,8 @@ import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Component;
@@ -69,10 +72,22 @@ public class CommissionMessageSender {
     private boolean enabledFor(SysacadSchedule schedule) {
         return switch (runtimeSettings.commissionMessageMode()) {
             case OFF -> false;
-            case ON -> environment.acceptsProfiles(Profiles.of("prod")) || properties
+            case ON -> isProduction() || properties
                     .getCommissionMessageTestCommissions().stream().anyMatch(c -> c.matches(
                             schedule.getSpecialty(), schedule.getPlan(), schedule.getSubject(), schedule.getCommission()));
         };
+    }
+
+    private boolean isProduction() {
+        return environment.acceptsProfiles(Profiles.of("prod"));
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    void warnIfLimitedToTestCommissions() {
+        if (runtimeSettings.commissionMessageMode() == CommissionMessageMode.ON && !isProduction()) {
+            log.warn("Mensaje de autogestión en ON fuera del perfil prod: solo llega a las comisiones de "
+                    + "commission-message-test-commissions");
+        }
     }
 
     private void record(SysacadSchedule schedule, Send decision, String note, CommissionMessageResult result) {

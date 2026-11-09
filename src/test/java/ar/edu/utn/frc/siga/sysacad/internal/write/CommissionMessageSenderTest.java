@@ -34,7 +34,12 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.BeforeEach;
+import org.slf4j.LoggerFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -254,5 +259,36 @@ class CommissionMessageSenderTest {
                 .doesNotThrowAnyException();
 
         verify(stateWriter, never()).recordCommissionMessage(any(), any(), any(), any(), any(), eq(false), any());
+    }
+
+    @Test
+    @DisplayName("Con ON fuera de prod avisa al arrancar que solo llega a las comisiones de prueba")
+    void warnsOnStartupWhenOnOutsideProd() {
+        environment.setActiveProfiles("dev");
+        ListAppender<ILoggingEvent> logs = captureLogs();
+
+        sender.warnIfLimitedToTestCommissions();
+
+        assertThat(logs.list).extracting(ILoggingEvent::getLevel).containsExactly(Level.WARN);
+    }
+
+    @Test
+    @DisplayName("No avisa al arrancar con ON en prod ni con OFF fuera de prod")
+    void doesNotWarnInProdOrWhenOff() {
+        ListAppender<ILoggingEvent> logs = captureLogs();
+        sender.warnIfLimitedToTestCommissions();
+
+        environment.setActiveProfiles("dev");
+        when(runtimeSettings.commissionMessageMode()).thenReturn(CommissionMessageMode.OFF);
+        sender.warnIfLimitedToTestCommissions();
+
+        assertThat(logs.list).isEmpty();
+    }
+
+    private static ListAppender<ILoggingEvent> captureLogs() {
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        ((Logger) LoggerFactory.getLogger(CommissionMessageSender.class)).addAppender(appender);
+        return appender;
     }
 }
