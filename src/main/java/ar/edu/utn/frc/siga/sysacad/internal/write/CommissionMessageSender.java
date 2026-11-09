@@ -1,7 +1,6 @@
 package ar.edu.utn.frc.siga.sysacad.internal.write;
 
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
-import ar.edu.utn.frc.siga.common.exception.InvalidSelectionException;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import ar.edu.utn.frc.siga.sysacad.internal.client.SysacadWriteClient;
@@ -9,7 +8,6 @@ import ar.edu.utn.frc.siga.sysacad.internal.client.dto.CommissionMessageCommand;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.CommissionMessageResult;
 import ar.edu.utn.frc.siga.sysacad.internal.config.CommissionMessageMode;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
-import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties.MessageCommission;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Send;
@@ -98,26 +96,6 @@ public class CommissionMessageSender {
             log.error("No se pudo registrar el mensaje a la comisión del horario {}", schedule.getId(), e);
         }
     }
-
-    // Prueba manual, descartable: el mismo texto y el mismo procedure que tras un envío confirmado, sin horario ni
-    // registro, porque la comisión de prueba no tiene horario en SysAcad. Ignora el modo y solo acepta las
-    // comisiones de prueba listadas.
-    public TestMessageResult sendTestMessage(MessageCommission target, int year, LocalDate classDate, int building,
-            int room) {
-        boolean listed = properties.getCommissionMessageTestCommissions().stream().anyMatch(c -> c.matches(
-                target.specialty(), target.plan(), target.subject(), target.commission()));
-        if (!listed) {
-            throw new InvalidSelectionException("La comisión no está en commission-message-test-commissions");
-        }
-        String note = note(target.specialty(), target.plan(), target.subject(), classDate, building, room);
-        CommissionMessageResult result = client.sendCommissionMessage(new CommissionMessageCommand(classDate, year,
-                target.specialty(), target.plan(), target.subject(), target.commission(), note));
-        log.info("Mensaje de prueba a la comisión {}: entregado={}, respuesta={}", target, result.delivered(),
-                result.response());
-        return new TestMessageResult(note, result.delivered(), result.response());
-    }
-
-    public record TestMessageResult(String note, boolean delivered, String response) {}
 
     private String note(int specialty, int plan, int subjectCode, LocalDate date, int building, int room) {
         String subject = subjectService.findByCodeAndStudyPlan(subjectCode, plan, specialty).name();

@@ -2,10 +2,6 @@ package ar.edu.utn.frc.siga.sysacad.controller;
 
 import ar.edu.utn.frc.siga.sysacad.api.SysacadWritePreviewItemDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadWriteStatusDto;
-import ar.edu.utn.frc.siga.sysacad.api.TestCommissionMessageRequestDto;
-import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties.MessageCommission;
-import ar.edu.utn.frc.siga.sysacad.internal.write.CommissionMessageSender;
-import ar.edu.utn.frc.siga.sysacad.internal.write.CommissionMessageSender.TestMessageResult;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.write.RunReport;
 import ar.edu.utn.frc.siga.sysacad.internal.write.SysacadWriteJob;
@@ -15,7 +11,6 @@ import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadScheduleQuery;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.SysacadWritePlanner;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +20,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -40,7 +34,6 @@ public class SysacadWriteController {
     private final SysacadWritePlanner planner;
     private final SysacadScheduleQuery query;
     private final SysacadWriteJob job;
-    private final CommissionMessageSender commissionMessageSender;
 
     @GetMapping("/preview")
     @PreAuthorize("hasAuthority('PERM_SYSACAD_READ')")
@@ -76,21 +69,6 @@ public class SysacadWriteController {
     public ResponseEntity<RunReport> run() {
         log.info("POST /v1/sysacad/write/run: corrida manual del job de envío");
         return ResponseEntity.ok(job.runNow());
-    }
-
-    @PostMapping("/test-commission-message")
-    @PreAuthorize("hasAuthority('PERM_SYSACAD_SYNC')")
-    @Operation(summary = "Prueba manual del mensaje de autogestión (descartable)",
-               description = "Arma el mismo texto que sale tras un envío confirmado, con la fecha, el edificio y el "
-                       + "aula indicados, y lo publica con EnviarMensajeComision. Llega a alumnos reales: solo acepta "
-                       + "las comisiones de commission-message-test-commissions (400 con otra). Ignora el modo de "
-                       + "mensaje y no deja registro en la base.")
-    public ResponseEntity<TestMessageResult> testCommissionMessage(
-            @Valid @RequestBody TestCommissionMessageRequestDto request) {
-        log.info("POST /v1/sysacad/write/test-commission-message: {}", request);
-        return ResponseEntity.ok(commissionMessageSender.sendTestMessage(
-                new MessageCommission(request.specialty(), request.plan(), request.subject(), request.commission()),
-                request.year(), request.classDate(), request.building(), request.room()));
     }
 
     private static SysacadWritePreviewItemDto toItem(PlannedSchedule planned) {
