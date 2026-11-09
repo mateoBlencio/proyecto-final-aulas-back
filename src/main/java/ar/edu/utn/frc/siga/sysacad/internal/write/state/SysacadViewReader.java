@@ -11,7 +11,6 @@ import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleRepository;
 import ar.edu.utn.frc.siga.sysacad.internal.sync.ReconcileOutcome;
 import ar.edu.utn.frc.siga.sysacad.internal.sync.SysacadViewReconciler;
-import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -38,7 +37,6 @@ public class SysacadViewReader {
     private final SysacadCatalogMapper mapper;
     private final SysacadScheduleRepository scheduleRepository;
     private final SysacadViewReconciler reconciler;
-    private final SysacadRuntimeSettings runtimeSettings;
     private final PlatformTransactionManager transactionManager;
     private final Clock clock;
 

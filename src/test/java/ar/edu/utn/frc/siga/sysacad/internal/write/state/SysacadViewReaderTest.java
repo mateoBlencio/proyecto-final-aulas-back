@@ -1,6 +1,5 @@
 package ar.edu.utn.frc.siga.sysacad.internal.write.state;
 
-import ar.edu.utn.frc.siga.sysacad.SysacadTestSettings;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -13,8 +12,6 @@ import static org.mockito.Mockito.when;
 
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.ScheduleViewFetcher;
-import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
-import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
 import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadEmptyViewException;
 import ar.edu.utn.frc.siga.sysacad.internal.mapper.SysacadCatalogMapper;
 import ar.edu.utn.frc.siga.sysacad.internal.model.NotSendableReason;
@@ -50,14 +47,12 @@ class SysacadViewReaderTest {
     @Mock
     private PlatformTransactionManager transactionManager;
 
-    private SysacadRuntimeSettings runtimeSettings;
     private SysacadViewReader reader;
 
     @BeforeEach
     void setUp() {
-        runtimeSettings = SysacadTestSettings.with(SysacadWriteMode.ON);
         reader = new SysacadViewReader(fetcher, new SysacadCatalogMapper(), scheduleRepository, reconciler,
-                runtimeSettings, transactionManager, Clock.fixed(NOW, ZoneOffset.UTC));
+                transactionManager, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private static SysacadSchedule schedule(long id, int subject) {
