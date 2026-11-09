@@ -215,7 +215,7 @@ siga:
         options: ["OFF", SANDBOX, "ON"]
       - key: sysacad.autogestion.mode
         default-value: ${AUTOGESTION_MESSAGE_MODE:OFF}
-        options: ["OFF", TEST_COMMISSIONS, "ON"]
+        options: ["OFF", "ON"]
       - key: sysacad.write.jobDelayMinutes
         default-value: "5"
         min: "1"

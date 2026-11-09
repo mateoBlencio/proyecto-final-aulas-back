@@ -19,6 +19,8 @@ import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -39,6 +41,7 @@ public class CommissionMessageSender {
     private final ClassroomService classroomService;
     private final SysacadProperties properties;
     private final SysacadRuntimeSettings runtimeSettings;
+    private final Environment environment;
 
     // No propaga errores: el aula ya quedó confirmada y un fallo del mensaje no es un fallo del envío.
     public void sendAfterConfirmation(SysacadSchedule schedule, Send decision, RequestPacer pacer) {
@@ -61,14 +64,14 @@ public class CommissionMessageSender {
         record(schedule, decision, note, result);
     }
 
-    // EnviarMensajeComision no tiene entorno de pruebas y llega a alumnos reales: en TEST_COMMISSIONS solo se avisa
-    // a las comisiones de prueba listadas.
+    // EnviarMensajeComision no tiene entorno de pruebas y llega a alumnos reales: fuera de prod solo se avisa a las
+    // comisiones de prueba listadas.
     private boolean enabledFor(SysacadSchedule schedule) {
         return switch (runtimeSettings.commissionMessageMode()) {
             case OFF -> false;
-            case ON -> true;
-            case TEST_COMMISSIONS -> properties.getCommissionMessageTestCommissions().stream().anyMatch(c -> c.matches(
-                    schedule.getSpecialty(), schedule.getPlan(), schedule.getSubject(), schedule.getCommission()));
+            case ON -> environment.acceptsProfiles(Profiles.of("prod")) || properties
+                    .getCommissionMessageTestCommissions().stream().anyMatch(c -> c.matches(
+                            schedule.getSpecialty(), schedule.getPlan(), schedule.getSubject(), schedule.getCommission()));
         };
     }
 

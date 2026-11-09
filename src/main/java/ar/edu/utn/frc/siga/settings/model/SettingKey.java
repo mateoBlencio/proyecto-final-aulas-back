@@ -66,8 +66,8 @@ public enum SettingKey {
                     + "ON modifica aulas reales en SysAcad: dev y test comparten la misma base de SysAcad."),
     SYSACAD_AUTOGESTION_MODE(
             "sysacad.autogestion.mode", SettingType.ENUM, RiskLevel.ADVANCED, "sysacad",
-            "ON publica el mensaje de autogestión a los alumnos de todas las comisiones afectadas. "
-                    + "TEST_COMMISSIONS lo limita a las comisiones de prueba."),
+            "ON publica el mensaje de autogestión. En producción llega a los alumnos de todas las comisiones afectadas; "
+                    + "en cualquier otro entorno, solo a las comisiones de prueba declaradas en siga.sysacad.commission-message-test-commissions."),
     SYSACAD_WRITE_JOB_DELAY_MINUTES(
             "sysacad.write.jobDelayMinutes", SettingType.LONG, RiskLevel.SAFE, "sysacad", null),
     SYSACAD_WRITE_VIEW_READ_INTERVAL_MINUTES(

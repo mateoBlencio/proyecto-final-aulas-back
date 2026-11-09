@@ -38,9 +38,9 @@ class SysacadRuntimeSettingsTest {
     @Test
     @DisplayName("commissionMessageMode parsea el string del setting de autogestión")
     void commissionMessageModeParsesString() {
-        when(reader.getString(SettingKey.SYSACAD_AUTOGESTION_MODE)).thenReturn("TEST_COMMISSIONS");
+        when(reader.getString(SettingKey.SYSACAD_AUTOGESTION_MODE)).thenReturn("ON");
 
-        assertThat(settings.commissionMessageMode()).isEqualTo(CommissionMessageMode.TEST_COMMISSIONS);
+        assertThat(settings.commissionMessageMode()).isEqualTo(CommissionMessageMode.ON);
     }
 
     @Test

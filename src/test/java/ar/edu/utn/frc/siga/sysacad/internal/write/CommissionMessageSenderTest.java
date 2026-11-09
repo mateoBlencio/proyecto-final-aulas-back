@@ -43,6 +43,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.env.MockEnvironment;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CommissionMessageSender")
@@ -68,14 +69,17 @@ class CommissionMessageSenderTest {
     private CommissionMessageSender sender;
     private RequestPacer pacer;
     private SysacadSchedule schedule;
+    private MockEnvironment environment;
 
     @BeforeEach
     void setUp() {
         properties = new SysacadProperties();
         runtimeSettings = SysacadTestSettings.with(SysacadWriteMode.ON);
         lenient().when(runtimeSettings.commissionMessageMode()).thenReturn(CommissionMessageMode.ON);
+        environment = new MockEnvironment();
+        environment.setActiveProfiles("prod");
         sender = new CommissionMessageSender(client, stateWriter, subjectService, classroomService, properties,
-                runtimeSettings);
+                runtimeSettings, environment);
         pacer = new RequestPacer(Clock.systemUTC(), wait -> { }, 30);
         schedule = SysacadSchedule.builder().id(SCHEDULE_ID)
                 .year(2026).specialty(9).plan(2023).subject(101).commission(1).build();
@@ -113,9 +117,22 @@ class CommissionMessageSenderTest {
     }
 
     @Test
-    @DisplayName("En TEST_COMMISSIONS manda a una comisión listada")
-    void testModeSendsToListedCommission() {
-        when(runtimeSettings.commissionMessageMode()).thenReturn(CommissionMessageMode.TEST_COMMISSIONS);
+    @DisplayName("En ON con perfil prod manda a una comisión que no está listada")
+    void onInProdSendsToUnlistedCommission() {
+        properties.setCommissionMessageTestCommissions(List.of(new MessageCommission(27, 2008, 581, 5)));
+        subjectIs("Física I");
+        buildingIs("Maders");
+        when(client.sendCommissionMessage(any())).thenReturn(new CommissionMessageResult(true, "ok"));
+
+        sender.sendAfterConfirmation(schedule, decision(ROOM), pacer);
+
+        assertThat(sentCommand().commission()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("En ON sin perfil prod manda a una comisión listada")
+    void onOutsideProdSendsToListedCommission() {
+        environment.setActiveProfiles("dev");
         properties.setCommissionMessageTestCommissions(List.of(new MessageCommission(9, 2023, 101, 1)));
         subjectIs("Física I");
         buildingIs("Maders");
@@ -127,9 +144,9 @@ class CommissionMessageSenderTest {
     }
 
     @Test
-    @DisplayName("En TEST_COMMISSIONS sin comisiones listadas no avisa a nadie")
-    void testModeWithoutListSendsToNobody() {
-        when(runtimeSettings.commissionMessageMode()).thenReturn(CommissionMessageMode.TEST_COMMISSIONS);
+    @DisplayName("En ON sin perfil prod y sin comisiones listadas no avisa a nadie")
+    void onOutsideProdWithoutListSendsToNobody() {
+        environment.setActiveProfiles("dev");
 
         sender.sendAfterConfirmation(schedule, decision(ROOM), pacer);
 
@@ -138,9 +155,9 @@ class CommissionMessageSenderTest {
 
     @ParameterizedTest(name = "especialidad {0}, plan {1}, materia {2}, comisión {3}")
     @CsvSource({"27, 2023, 101, 1", "9, 2008, 101, 1", "9, 2023, 581, 1", "9, 2023, 101, 2"})
-    @DisplayName("En TEST_COMMISSIONS, un horario que difiere de la comisión listada en un solo campo no recibe el mensaje")
-    void testModeSkipsUnlistedCommission(int specialty, int plan, int subject, int commission) {
-        when(runtimeSettings.commissionMessageMode()).thenReturn(CommissionMessageMode.TEST_COMMISSIONS);
+    @DisplayName("En ON sin perfil prod, un horario que difiere de la comisión listada en un solo campo no recibe el mensaje")
+    void onOutsideProdSkipsUnlistedCommission(int specialty, int plan, int subject, int commission) {
+        environment.setActiveProfiles("dev");
         properties.setCommissionMessageTestCommissions(List.of(new MessageCommission(9, 2023, 101, 1)));
         schedule = SysacadSchedule.builder().id(SCHEDULE_ID).year(2026)
                 .specialty(specialty).plan(plan).subject(subject).commission(commission).build();

@@ -87,8 +87,7 @@ class SettingValueValidatorTest {
     @DisplayName("ENUM con una opción del catálogo se acepta")
     void enumValidOptionIsAccepted() {
         assertThat(validator.validate(SettingKey.SYSACAD_WRITE_MODE, "SANDBOX")).isEqualTo("SANDBOX");
-        assertThat(validator.validate(SettingKey.SYSACAD_AUTOGESTION_MODE, "TEST_COMMISSIONS"))
-                .isEqualTo("TEST_COMMISSIONS");
+        assertThat(validator.validate(SettingKey.SYSACAD_AUTOGESTION_MODE, "ON")).isEqualTo("ON");
     }
 
     @Test
@@ -114,7 +113,7 @@ class SettingValueValidatorTest {
     void enumIsCaseSensitive() {
         assertThatThrownBy(() -> validator.validate(SettingKey.SYSACAD_WRITE_MODE, "on"))
                 .isInstanceOf(InvalidSettingValueException.class);
-        assertThatThrownBy(() -> validator.validate(SettingKey.SYSACAD_AUTOGESTION_MODE, "test_commissions"))
+        assertThatThrownBy(() -> validator.validate(SettingKey.SYSACAD_AUTOGESTION_MODE, "on"))
                 .isInstanceOf(InvalidSettingValueException.class);
     }
 
