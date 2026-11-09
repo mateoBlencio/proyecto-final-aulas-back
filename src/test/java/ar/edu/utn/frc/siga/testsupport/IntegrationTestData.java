@@ -172,6 +172,11 @@ public class IntegrationTestData {
     public record SubjectAndCommission(Long subjectId, Long commissionId) {}
 
     public SubjectAndCommission materiaYComision() {
+        return materiaYComision(2100 + (int) (nextSeq() % 500));
+    }
+
+    /** En un año propio, fuera del rango aleatorio de {@link #materiaYComision()}: los listeners que recalculan por período no ven estos eventos. */
+    public SubjectAndCommission materiaYComision(int year) {
         int specialtyCode = (int) nextSeq();
         int planCode = (int) nextSeq();
         int subjectCode = (int) nextSeq();
@@ -179,7 +184,6 @@ public class IntegrationTestData {
         StudyPlan plan = planDeEstudio(planCode, specialty);
         Subject subject = materia(subjectCode, "Materia-IT", plan, TermType.ANUAL.getLabel());
 
-        int year = 2100 + (int) (nextSeq() % 500);
         AcademicPeriod period = periodoAcademico(year, TermType.ANUAL);
         LocalDate today = LocalDate.now();
         period.setStartDate(today.minusYears(5));

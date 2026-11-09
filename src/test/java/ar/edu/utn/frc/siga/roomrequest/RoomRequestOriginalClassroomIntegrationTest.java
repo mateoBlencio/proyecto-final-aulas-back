@@ -54,6 +54,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class RoomRequestOriginalClassroomIntegrationTest extends AbstractIntegrationTest {
 
     private static final LocalTime START = LocalTime.of(18, 0);
+    /** Período propio: dejan pedidos con ocurrencias sin aula que el recálculo por período de otros tests no puede borrar. */
+    private static final int OWN_PERIOD_YEAR = 3900;
 
     @Autowired
     private IntegrationTestData testData;
@@ -84,7 +86,7 @@ class RoomRequestOriginalClassroomIntegrationTest extends AbstractIntegrationTes
     }
 
     private Series series(LocalDate start, int weeks) {
-        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision(OWN_PERIOD_YEAR);
         Long eventId = testData.eventoRecurrente(academic.subjectId(), academic.commissionId(), start.getDayOfWeek(),
                 START, 90, start, start.plusWeeks(weeks - 1), 30);
         List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId).stream()
@@ -311,7 +313,7 @@ class RoomRequestOriginalClassroomIntegrationTest extends AbstractIntegrationTes
         Classroom b = room();
         RoomRequest request = RoomRequest.builder().type(RoomRequestType.FINAL_EXAM).scope(AcademicScope.GRADO)
                 .teacherName("Ada Lovelace").teacherEmail("ada@frc.utn.edu.ar").teacherPhone("351-1234567")
-                .subjectId(testData.materiaYComision().subjectId()).build();
+                .subjectId(testData.materiaYComision(OWN_PERIOD_YEAR).subjectId()).build();
         RoomRequestItem item = RoomRequestItem.builder().date(LocalDate.now().plusDays(30)).startTime(LocalTime.of(9, 0))
                 .duration(Duration.ofMinutes(90)).estimated(30).classroomCount(1).build();
         request.addItem(item);
