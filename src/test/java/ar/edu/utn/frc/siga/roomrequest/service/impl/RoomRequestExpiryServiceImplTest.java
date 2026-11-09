@@ -5,9 +5,15 @@ import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.model.EventType;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.roomrequest.event.RoomRequestItemAccepted;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
+import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItemAllocation;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -38,12 +44,13 @@ class RoomRequestExpiryServiceImplTest {
     private RoomRequestItemRepository itemRepository;
     @Mock
     private AcademicEventService academicEventService;
-
+    @Mock
+    private OccurrenceService occurrenceService;
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
     private RoomRequestExpiryServiceImpl newService() {
-        return new RoomRequestExpiryServiceImpl(itemRepository, academicEventService, eventPublisher);
+        return new RoomRequestExpiryServiceImpl(itemRepository, academicEventService, occurrenceService, eventPublisher);
     }
 
     @Test
@@ -193,9 +200,118 @@ class RoomRequestExpiryServiceImplTest {
 
     private RoomRequestItem inEvaluationWithRoom(Long id, int round) {
         RoomRequestItem item = RoomRequestItem.builder().id(id).status(RoomRequestStatus.IN_EVALUATION)
+                .request(RoomRequest.builder().type(RoomRequestType.ONE_TIME_ROOM_CHANGE).build())
                 .date(LocalDate.now().minusDays(1)).notificationRound(round).build();
-        item.getAllocations().add(RoomRequestItemAllocation.builder().classroomId(1L).position(1).build());
+        item.getAllocations().add(RoomRequestItemAllocation.builder().occurrenceId(id * 10).classroomId(1L)
+                .originalCaptured(true).originalClassroomId(1L).position(1).build());
         return item;
+    }
+
+    private RoomRequestItem reopenedRegular(Long id, RoomRequestType type, LocalDate reopenedOn,
+            RoomRequestItemAllocation... rows) {
+        return reopened(id, type, reopenedOn, 1, rows);
+    }
+
+    private RoomRequestItem reopened(Long id, RoomRequestType type, LocalDate reopenedOn, int round,
+            RoomRequestItemAllocation... rows) {
+        RoomRequestItem item = RoomRequestItem.builder().id(id).status(RoomRequestStatus.IN_EVALUATION)
+                .request(RoomRequest.builder().type(type).build())
+                .date(LocalDate.now().minusDays(1)).notificationRound(round).reopenedFromNotifiedOn(reopenedOn).build();
+        item.getAllocations().addAll(List.of(rows));
+        when(itemRepository.findExpiredByDate(any())).thenReturn(List.of(item));
+        when(itemRepository.findActiveRegularRoomChangeItems()).thenReturn(List.of());
+        return item;
+    }
+
+    private static RoomRequestItemAllocation row(Long occurrenceId, Long classroomId, Long originalClassroomId) {
+        return RoomRequestItemAllocation.builder().occurrenceId(occurrenceId).classroomId(classroomId)
+                .originalCaptured(true).originalClassroomId(originalClassroomId)
+                .originalSource(AllocationSource.MANUAL).position(1).build();
+    }
+
+    private static OccurrenceSlotDto slot(Long occurrenceId, LocalDate date) {
+        return new OccurrenceSlotDto(occurrenceId, 1L, date, java.time.LocalTime.of(9, 0),
+                java.time.LocalTime.of(10, 30), OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
+    }
+
+    @Test
+    @DisplayName("reabierto que se quedó en el aula notificada en una fecha desde la reapertura: pasa a RESOLVED y publica la aceptación")
+    void acceptsReopenedItemThatStayedInNotifiedClassroom() {
+        LocalDate reopenedOn = LocalDate.now().minusDays(3);
+        RoomRequestItem item = reopenedRegular(20L, RoomRequestType.REGULAR_ROOM_CHANGE, reopenedOn,
+                row(1L, 200L, 100L), row(2L, 100L, 100L));
+        when(occurrenceService.findSlots(List.of(1L, 2L))).thenReturn(List.of(
+                slot(1L, reopenedOn.plusDays(1)), slot(2L, reopenedOn.plusDays(2))));
+
+        newService().expireOverdueItems();
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.RESOLVED);
+        assertThat(item.getAcceptedBy()).isEqualTo("SISTEMA");
+        verify(eventPublisher).publishEvent(org.mockito.ArgumentMatchers.any(RoomRequestItemAccepted.class));
+    }
+
+    @Test
+    @DisplayName("reabierto cuyas fechas volvieron todas al original: pasa a CANCELLED con el motivo general")
+    void cancelsReopenedItemWhoseDatesAllReturned() {
+        LocalDate reopenedOn = LocalDate.now().minusDays(3);
+        RoomRequestItem item = reopenedRegular(21L, RoomRequestType.ONE_TIME_ROOM_CHANGE, reopenedOn,
+                row(1L, 100L, 100L));
+        when(occurrenceService.findSlots(List.of(1L))).thenReturn(List.of(slot(1L, reopenedOn.plusDays(1))));
+
+        newService().expireOverdueItems();
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.CANCELLED);
+        assertThat(item.getDecisionReason()).isEqualTo("Vencido: la fecha del pedido ya pasó");
+        verify(eventPublisher, org.mockito.Mockito.never()).publishEvent(any(RoomRequestItemAccepted.class));
+    }
+
+    @Test
+    @DisplayName("reabierto cuya única fila distinta del original es anterior a la reapertura: pasa a CANCELLED")
+    void cancelsReopenedItemWhenOnlyPastRowsDiffer() {
+        LocalDate reopenedOn = LocalDate.now().minusDays(3);
+        RoomRequestItem item = reopenedRegular(22L, RoomRequestType.REGULAR_ROOM_CHANGE, reopenedOn,
+                row(1L, 200L, 100L), row(2L, 100L, 100L));
+        when(occurrenceService.findSlots(List.of(1L, 2L))).thenReturn(List.of(
+                slot(1L, reopenedOn.minusDays(7)), slot(2L, reopenedOn.plusDays(1))));
+
+        newService().expireOverdueItems();
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.CANCELLED);
+    }
+
+    @Test
+    @DisplayName("reasignado sin renotificar (reabierto_desde nulo): pasa a CANCELLED sin consultar las ocurrencias")
+    void cancelsReopenedItemReassignedWithoutRenotify() {
+        RoomRequestItem item = reopenedRegular(23L, RoomRequestType.REGULAR_ROOM_CHANGE, null,
+                row(1L, 200L, 100L));
+
+        newService().expireOverdueItems();
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.CANCELLED);
+        org.mockito.Mockito.verifyNoInteractions(occurrenceService);
+    }
+
+    @Test
+    @DisplayName("IN_EVALUATION que nunca se notificó (ronda 0) con reabierto_desde fijado: sigue cancelándose")
+    void cancelsNeverNotifiedItemEvenWithReopenedMarker() {
+        RoomRequestItem item = reopened(24L, RoomRequestType.REGULAR_ROOM_CHANGE, LocalDate.now().minusDays(3), 0,
+                row(1L, 200L, 100L));
+
+        newService().expireOverdueItems();
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.CANCELLED);
+        assertThat(item.getDecisionReason()).isEqualTo("Vencido sin notificar al docente");
+    }
+
+    @Test
+    @DisplayName("reabierto de un tipo creado por SIGA: pasa a CANCELLED aunque la fila difiera del original")
+    void cancelsReopenedItemOfTypeWithoutOriginal() {
+        RoomRequestItem item = reopenedRegular(25L, RoomRequestType.FINAL_EXAM, LocalDate.now().minusDays(3),
+                row(1L, 200L, 100L));
+
+        newService().expireOverdueItems();
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.CANCELLED);
     }
 
     @ParameterizedTest

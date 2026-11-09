@@ -20,7 +20,11 @@ import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
+import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceConflictDto;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
+import ar.edu.utn.frc.siga.allocation.service.command.RestoreCommand;
+import ar.edu.utn.frc.siga.allocation.service.command.RestoreResult;
+import ar.edu.utn.frc.siga.allocation.validator.OverlapReview;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationCandidate;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.audit.internal.AuditDescriptionProbe;
@@ -1346,6 +1350,145 @@ class AllocationServiceImplTest {
         return LocalDate.now().plusDays(daysFromNow);
     }
 
+
+    // ---------- restoreClassrooms ----------
+
+    private OccurrenceSlotDto pastSlot(long id) {
+        return new OccurrenceSlotDto(id, 1L, LocalDate.now().minusDays(2), LocalTime.of(8, 0), LocalTime.of(9, 30),
+                OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
+    }
+
+    private OccurrenceConflictDto conflictOf(long occurrenceId, long classroomId) {
+        return new OccurrenceConflictDto(occurrenceId, futureDate(8), LocalTime.of(8, 0), LocalTime.of(9, 30),
+                classroomId, 99L, 98L, 97L, 90);
+    }
+
+    private void stubRestorable(OccurrenceSlotDto... slots) {
+        when(occurrenceService.findSlots(any())).thenReturn(List.of(slots));
+        when(classroomService.findByIds(any())).thenReturn(List.of(classroomIn(5L, 1L, "Edificio 1"),
+                classroomIn(6L, 1L, "Edificio 1")));
+    }
+
+    @Test
+    @DisplayName("restoreClassrooms: con todo o nada y una fecha ocupada no escribe nada y devuelve la ocupada")
+    void restoreAllOrNothingConOcupadaNoEscribe() {
+        OccurrenceSlotDto free = occurrenceSlot(10L, 1L, futureDate(1));
+        OccurrenceSlotDto busy = occurrenceSlot(11L, 1L, futureDate(8));
+        stubRestorable(free, busy);
+        OccurrenceConflictDto conflict = conflictOf(11L, 6L);
+        when(validator.reviewManualOverlaps(any())).thenReturn(new OverlapReview(List.of(conflict), List.of()));
+        RestoreCommand command = new RestoreCommand(List.of(
+                new RestoreCommand.RestoreItem(10L, 5L, AllocationSource.SYSACAD),
+                new RestoreCommand.RestoreItem(11L, 6L, AllocationSource.MANUAL)), "obs", true);
+
+        RestoreResult result = service.restoreClassrooms(command);
+
+        assertThat(result.restored()).isEmpty();
+        assertThat(result.occupied()).containsExactly(conflict);
+        verify(writer, never()).restore(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("restoreClassrooms: sin todo o nada restaura las libres, agrupadas por origen, y devuelve las ocupadas")
+    void restoreSinAllOrNothingRestauraLasLibres() {
+        OccurrenceSlotDto free = occurrenceSlot(10L, 1L, futureDate(1));
+        OccurrenceSlotDto freeManual = occurrenceSlot(12L, 1L, futureDate(15));
+        OccurrenceSlotDto busy = occurrenceSlot(11L, 1L, futureDate(8));
+        stubRestorable(free, busy, freeManual);
+        OccurrenceConflictDto conflict = conflictOf(11L, 6L);
+        when(validator.reviewManualOverlaps(any())).thenReturn(new OverlapReview(List.of(conflict), List.of()));
+        RestoreCommand command = new RestoreCommand(List.of(
+                new RestoreCommand.RestoreItem(10L, 5L, AllocationSource.SYSACAD),
+                new RestoreCommand.RestoreItem(11L, 6L, AllocationSource.MANUAL),
+                new RestoreCommand.RestoreItem(12L, 5L, AllocationSource.MANUAL)), "obs", false);
+
+        RestoreResult result = service.restoreClassrooms(command);
+
+        assertThat(result.restored()).containsExactly(10L, 12L);
+        assertThat(result.occupied()).containsExactly(conflict);
+        verify(writer).restore(Map.of(free, 5L), "obs", AllocationSource.SYSACAD);
+        verify(writer).restore(Map.of(freeManual, 5L), "obs", AllocationSource.MANUAL);
+        verify(writer, never()).restore(any(), any(), eq(AllocationSource.AUTOMATIC));
+    }
+
+    @Test
+    @DisplayName("restoreClassrooms: todo libre restaura todas aun con todo o nada")
+    void restoreAllOrNothingTodoLibreRestauraTodo() {
+        OccurrenceSlotDto a = occurrenceSlot(10L, 1L, futureDate(1));
+        OccurrenceSlotDto b = occurrenceSlot(11L, 1L, futureDate(8));
+        stubRestorable(a, b);
+        when(validator.reviewManualOverlaps(any())).thenReturn(new OverlapReview(List.of(), List.of()));
+        RestoreCommand command = new RestoreCommand(List.of(
+                new RestoreCommand.RestoreItem(10L, 5L, AllocationSource.MANUAL),
+                new RestoreCommand.RestoreItem(11L, 5L, AllocationSource.MANUAL)), "obs", true);
+
+        RestoreResult result = service.restoreClassrooms(command);
+
+        assertThat(result.restored()).containsExactly(10L, 11L);
+        assertThat(result.occupied()).isEmpty();
+        verify(writer).restore(Map.of(a, 5L, b, 5L), "obs", AllocationSource.MANUAL);
+    }
+
+    @Test
+    @DisplayName("restoreClassrooms: un aula desactivada no se escribe ni cuenta como ocupada, y no bloquea el todo o nada")
+    void restoreAulaDesactivadaSeInformaAparte() {
+        OccurrenceSlotDto ok = occurrenceSlot(10L, 1L, futureDate(1));
+        OccurrenceSlotDto deactivated = occurrenceSlot(11L, 1L, futureDate(8));
+        when(occurrenceService.findSlots(any())).thenReturn(List.of(ok, deactivated));
+        when(classroomService.findByIds(any())).thenReturn(List.of(classroomIn(5L, 1L, "Edificio 1")));
+        when(validator.reviewManualOverlaps(any())).thenReturn(new OverlapReview(List.of(), List.of()));
+        RestoreCommand command = new RestoreCommand(List.of(
+                new RestoreCommand.RestoreItem(10L, 5L, AllocationSource.MANUAL),
+                new RestoreCommand.RestoreItem(11L, 6L, AllocationSource.MANUAL)), "obs", true);
+
+        RestoreResult result = service.restoreClassrooms(command);
+
+        assertThat(result.restored()).containsExactly(10L);
+        assertThat(result.deactivated()).containsExactly(11L);
+        assertThat(result.occupied()).isEmpty();
+        verify(writer).restore(Map.of(ok, 5L), "obs", AllocationSource.MANUAL);
+        ArgumentCaptor<List<AllocationCandidate>> captor = ArgumentCaptor.forClass(List.class);
+        verify(validator).reviewManualOverlaps(captor.capture());
+        assertThat(captor.getValue()).containsExactly(new AllocationCandidate(ok, 5L));
+    }
+
+    @Test
+    @DisplayName("restoreClassrooms: ignora ocurrencias pasadas, liberadas y espejos, sin lock ni escritura")
+    void restoreIgnoraPasadasLiberadasYEspejos() {
+        OccurrenceSlotDto released = new OccurrenceSlotDto(11L, 1L, futureDate(8), LocalTime.of(8, 0),
+                LocalTime.of(9, 30), OccurrenceStatus.ROOM_RELEASED, 30, 1, null, null, null, null);
+        OccurrenceSlotDto mirror = new OccurrenceSlotDto(12L, 1L, futureDate(9), LocalTime.of(8, 0),
+                LocalTime.of(9, 30), OccurrenceStatus.NEEDS_ROOM, 30, 2, null, null, null, 10L);
+        when(occurrenceService.findSlots(any())).thenReturn(List.of(pastSlot(10L), released, mirror));
+        RestoreCommand command = new RestoreCommand(List.of(
+                new RestoreCommand.RestoreItem(10L, 5L, AllocationSource.MANUAL),
+                new RestoreCommand.RestoreItem(11L, 5L, AllocationSource.MANUAL),
+                new RestoreCommand.RestoreItem(12L, 5L, AllocationSource.MANUAL)), "obs", false);
+
+        RestoreResult result = service.restoreClassrooms(command);
+
+        assertThat(result.restored()).isEmpty();
+        assertThat(result.occupied()).isEmpty();
+        verifyNoInteractions(classroomLock, writer, validator);
+    }
+
+    @Test
+    @DisplayName("restoreClassrooms: una ocurrencia con dos ítems cuenta una vez y una ocupada se informa una sola vez")
+    void restoreNoDuplicaOcupadas() {
+        OccurrenceSlotDto busy = occurrenceSlot(11L, 1L, futureDate(8));
+        stubRestorable(busy);
+        OccurrenceConflictDto conflict = conflictOf(11L, 6L);
+        when(validator.reviewManualOverlaps(any())).thenReturn(new OverlapReview(List.of(conflict, conflict), List.of()));
+        RestoreCommand command = new RestoreCommand(List.of(
+                new RestoreCommand.RestoreItem(11L, 6L, AllocationSource.MANUAL),
+                new RestoreCommand.RestoreItem(11L, 6L, AllocationSource.MANUAL)), "obs", false);
+
+        RestoreResult result = service.restoreClassrooms(command);
+
+        assertThat(result.occupied()).containsExactly(conflict);
+        assertThat(result.restored()).isEmpty();
+        verify(writer, never()).restore(any(), any(), any());
+    }
 
     // ---------- findClassroomIdsByOccurrences / findLastRevision ----------
 

@@ -21,8 +21,27 @@ docs {
   Un pedido RESOLVED (aceptado) no se cancela: primero hay que reabrirlo.
   Requiere autenticación (hasAnyRole SUBSECRETARIA, AUXILIAR_AULICO).
 
-  Si el pedido tenía aulas asignadas, las libera (en un cambio regular, solo las de clases futuras). `reason` es obligatorio.
+  `reason` es obligatorio.
 
-  Errores: 400 si falta `reason`; 409 si ya estaba CANCELLED o está RESOLVED; 404 si el id
-  no existe.
+  Cambios de aula (ONE_TIME_ROOM_CHANGE, REGULAR_ROOM_CHANGE, PARTIAL_EXAM_IN_CLASS): las clases futuras
+  vuelven al aula que tenían antes del pedido, con su origen original (SYSACAD, MANUAL...). Es todo o
+  nada: si el aula original está ocupada en alguna fecha, responde 409 con `code`
+  `ORIGINAL_CLASSROOM_OCCUPIED` y `conflicts`, y no cambia nada. Ejemplo de 409:
+  {
+    "status": 409,
+    "title": "Original classroom occupied",
+    "code": "ORIGINAL_CLASSROOM_OCCUPIED",
+    "itemId": 1,
+    "conflicts": [{
+      "date": "2026-11-24",
+      "originalClassroom": { "id": 101, "roomNumber": 101, "buildingName": "Central" },
+      "occupiedBy": { "subjectName": "Análisis Matemático", "commissionCode": "2K3" }
+    }]
+  }
+  Si el aula original está desactivada no bloquea: esa fecha se libera. Las aulas extra (espejos) se retiran siempre.
+
+  Tipos que crea SIGA (PARTIAL_EXAM_OFF_SCHEDULE, FINAL_EXAM, CONFERENCE, OTHER): libera las aulas.
+
+  Errores: 400 si falta `reason`; 409 si ya estaba CANCELLED, está RESOLVED o el aula original está
+  ocupada; 404 si el id no existe.
 }

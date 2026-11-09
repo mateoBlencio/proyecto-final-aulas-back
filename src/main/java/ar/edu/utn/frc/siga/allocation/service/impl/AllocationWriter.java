@@ -43,7 +43,17 @@ class AllocationWriter {
         return write(classroomByOccurrence, observation, source);
     }
 
+    /** Persiste el origen original, pero el movimiento sale como cambio manual del usuario: SYSACAD dispararía el aviso de cambio directo en SysAcad. */
+    List<Allocation> restore(Map<OccurrenceSlotDto, Long> classroomByOccurrence, String observation, AllocationSource source) {
+        return write(classroomByOccurrence, observation, source, AllocationSource.MANUAL);
+    }
+
     private List<Allocation> write(Map<OccurrenceSlotDto, Long> classroomByOccurrence, String observation, AllocationSource source) {
+        return write(classroomByOccurrence, observation, source, source);
+    }
+
+    private List<Allocation> write(Map<OccurrenceSlotDto, Long> classroomByOccurrence, String observation,
+            AllocationSource source, AllocationSource eventSource) {
         if (classroomByOccurrence.isEmpty()) return List.of();
 
         List<Long> occurrenceIds = classroomByOccurrence.keySet().stream().map(OccurrenceSlotDto::occurrenceId).toList();
@@ -77,7 +87,7 @@ class AllocationWriter {
             }
             saved.add(allocation);
         }
-        movementPublisher.publish(source, observation, changes);
+        movementPublisher.publish(eventSource, observation, changes);
         return saved;
     }
 

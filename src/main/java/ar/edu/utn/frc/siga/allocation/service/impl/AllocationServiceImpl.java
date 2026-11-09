@@ -18,6 +18,8 @@ import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.ReleaseCommand;
+import ar.edu.utn.frc.siga.allocation.service.command.RestoreCommand;
+import ar.edu.utn.frc.siga.allocation.service.command.RestoreResult;
 import ar.edu.utn.frc.siga.allocation.service.command.SysacadDirectChangeCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.SysacadDirectChangeResult;
 import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceConflictDto;
@@ -47,6 +49,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.Collection;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -317,6 +321,123 @@ public class AllocationServiceImpl implements AllocationService {
                 + Plurals.count(changes.size(), "clase cambiada", "clases cambiadas") + reasonSuffix(command));
         log.info("Cambio directo de SysAcad aplicado: clases={}", changes.size());
         return new SysacadDirectChangeResult.Applied(changes);
+    }
+
+    @Override
+    @Transactional
+    @AuditOperation("Restauración de aulas originales")
+    public RestoreResult restoreClassrooms(RestoreCommand command) {
+        Map<Long, RestoreCommand.RestoreItem> itemByOccurrence = new LinkedHashMap<>();
+        command.items().forEach(item -> itemByOccurrence.putIfAbsent(item.occurrenceId(), item));
+        List<OccurrenceSlotDto> occurrences = itemByOccurrence.isEmpty() ? List.of()
+                : occurrenceService.findSlots(List.copyOf(itemByOccurrence.keySet())).stream()
+                        .filter(o -> !o.isPast())
+                        .filter(o -> o.mirrorOfOccurrenceId() == null)
+                        .filter(o -> o.status() != OccurrenceStatus.ROOM_RELEASED)
+                        .toList();
+        if (occurrences.isEmpty()) {
+            return new RestoreResult(List.of(), List.of(), List.of(), Map.of());
+        }
+
+        // Si un espejo del principal ocupa el aula original, intercambian: el espejo toma el aula que el principal deja.
+        Map<Long, OccurrenceSlotDto> mirrorById = occurrenceService
+                .findMirrors(occurrences.stream().map(OccurrenceSlotDto::occurrenceId).toList()).stream()
+                .filter(o -> !o.isPast())
+                .filter(o -> o.status() != OccurrenceStatus.ROOM_RELEASED)
+                .collect(Collectors.toMap(OccurrenceSlotDto::occurrenceId, o -> o));
+        Map<Long, Allocation> currentByOccurrence = new LinkedHashMap<>();
+        List<Long> involvedIds = new ArrayList<>(itemByOccurrence.keySet());
+        involvedIds.addAll(mirrorById.keySet());
+        allocationRepository.findByOccurrenceIdIn(involvedIds)
+                .forEach(a -> currentByOccurrence.put(a.getOccurrenceId(), a));
+        Map<Long, Long> principalByMirror = new LinkedHashMap<>();
+        Map<Long, Long> swapClassroomByMirror = new LinkedHashMap<>();
+        for (OccurrenceSlotDto occurrence : occurrences) {
+            Allocation principal = currentByOccurrence.get(occurrence.occurrenceId());
+            Long original = itemByOccurrence.get(occurrence.occurrenceId()).classroomId();
+            if (principal == null || principal.getClassroomId().equals(original)) {
+                continue;
+            }
+            for (OccurrenceSlotDto mirror : mirrorById.values()) {
+                Allocation mirrorAllocation = currentByOccurrence.get(mirror.occurrenceId());
+                if (occurrence.occurrenceId().equals(mirror.mirrorOfOccurrenceId()) && mirrorAllocation != null
+                        && mirrorAllocation.getClassroomId().equals(original)) {
+                    principalByMirror.put(mirror.occurrenceId(), occurrence.occurrenceId());
+                    swapClassroomByMirror.put(mirror.occurrenceId(), principal.getClassroomId());
+                }
+            }
+        }
+
+        Set<Long> classroomIds = occurrences.stream()
+                .map(o -> itemByOccurrence.get(o.occurrenceId()).classroomId())
+                .collect(Collectors.toSet());
+        Set<Long> lockIds = new HashSet<>(classroomIds);
+        lockIds.addAll(swapClassroomByMirror.values());
+        classroomLock.lock(lockIds);
+        Set<Long> availableIds = classroomService.findByIds(classroomIds).stream()
+                .map(ClassroomResponseDto::id).collect(Collectors.toSet());
+
+        List<Long> deactivated = new ArrayList<>();
+        List<AllocationCandidate> candidates = new ArrayList<>();
+        for (OccurrenceSlotDto occurrence : occurrences) {
+            Long classroomId = itemByOccurrence.get(occurrence.occurrenceId()).classroomId();
+            if (availableIds.contains(classroomId)) {
+                candidates.add(new AllocationCandidate(occurrence, classroomId));
+            } else {
+                deactivated.add(occurrence.occurrenceId());
+            }
+        }
+        Set<Long> candidatePrincipalIds = candidates.stream().map(c -> c.occurrence().occurrenceId())
+                .collect(Collectors.toSet());
+        principalByMirror.entrySet().removeIf(e -> !candidatePrincipalIds.contains(e.getValue()));
+        principalByMirror.keySet().forEach(mirrorId -> candidates.add(
+                new AllocationCandidate(mirrorById.get(mirrorId), swapClassroomByMirror.get(mirrorId))));
+
+        Set<Long> occupiedIds = new HashSet<>();
+        List<OccurrenceConflictDto> occupied = validator.reviewManualOverlaps(candidates).blocking().stream()
+                .filter(conflict -> occupiedIds.add(conflict.occurrenceId()))
+                .toList();
+        principalByMirror.forEach((mirrorId, principalId) -> {
+            if (occupiedIds.contains(mirrorId) || occupiedIds.contains(principalId)) {
+                occupiedIds.add(mirrorId);
+                occupiedIds.add(principalId);
+            }
+        });
+
+        if (command.allOrNothing() && !occupied.isEmpty()) {
+            AuditOperations.describe("Restauración de aulas originales: "
+                    + Plurals.count(occupied.size(), "fecha ocupada", "fechas ocupadas") + ", sin cambios");
+            return new RestoreResult(List.of(), occupied, deactivated, Map.of());
+        }
+
+        Map<AllocationSource, Map<OccurrenceSlotDto, Long>> bySource = new LinkedHashMap<>();
+        List<Long> restored = new ArrayList<>();
+        Map<Long, Long> swappedMirrors = new LinkedHashMap<>();
+        for (AllocationCandidate candidate : candidates) {
+            Long occurrenceId = candidate.occurrence().occurrenceId();
+            if (occupiedIds.contains(occurrenceId)) {
+                continue;
+            }
+            RestoreCommand.RestoreItem item = itemByOccurrence.get(occurrenceId);
+            AllocationSource source;
+            if (item != null) {
+                source = item.source();
+                restored.add(occurrenceId);
+            } else {
+                source = currentByOccurrence.get(occurrenceId).getSource();
+                swappedMirrors.put(occurrenceId, candidate.classroomId());
+            }
+            bySource.computeIfAbsent(source, s -> new LinkedHashMap<>())
+                    .put(candidate.occurrence(), candidate.classroomId());
+        }
+        bySource.forEach((source, classroomByOccurrence) ->
+                writer.restore(classroomByOccurrence, command.observation(), source));
+        AuditOperations.describe("Restauración de aulas originales: "
+                + Plurals.count(restored.size(), "fecha restaurada", "fechas restauradas")
+                + (occupied.isEmpty() ? "" : ", " + Plurals.count(occupied.size(), "ocupada", "ocupadas")));
+        log.info("Aulas originales restauradas: restauradas={}, ocupadas={}, desactivadas={}, espejosIntercambiados={}",
+                restored.size(), occupied.size(), deactivated.size(), swappedMirrors.size());
+        return new RestoreResult(restored, occupied, deactivated, swappedMirrors);
     }
 
     private static String reasonSuffix(SysacadDirectChangeCommand command) {

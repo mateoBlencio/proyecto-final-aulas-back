@@ -18,6 +18,7 @@ import ar.edu.utn.frc.siga.notification.api.NotificationTemplate;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.ReversionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.event.RoomRequestItemAccepted;
 import ar.edu.utn.frc.siga.roomrequest.event.RoomRequestItemReopened;
@@ -25,6 +26,7 @@ import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestTransitionException;
 import ar.edu.utn.frc.siga.roomrequest.exception.PartialAssignmentReasonRequiredException;
 import ar.edu.utn.frc.siga.roomrequest.exception.RoomRequestAlreadyNotifiedException;
+import ar.edu.utn.frc.siga.roomrequest.exception.RoomRequestOriginalOccupiedException;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestComposer;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestNotificationModel;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
@@ -52,6 +54,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 
 @Slf4j
@@ -75,6 +78,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
     private final ClassroomService classroomService;
     private final AcceptanceDeadlineCalculator deadlineCalculator;
     private final ApplicationEventPublisher eventPublisher;
+    private final RoomRequestOriginalRestorer originalRestorer;
 
     @Override
     @Transactional
@@ -142,10 +146,14 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         List<List<Long>> occurrencesBySlot = occurrenceResolver.resolveOccurrencesBySlot(item, ids.size(), reassigning);
 
         RoomRequestType type = item.getRequest().getType();
-        if (type == RoomRequestType.ONE_TIME_ROOM_CHANGE || type == RoomRequestType.REGULAR_ROOM_CHANGE) {
-            Long principalOccurrenceId = occurrencesBySlot.get(0).getFirst();
-            allocationService.findClassroomIdByOccurrence(principalOccurrenceId)
-                    .ifPresent(item::rememberPreviousClassroom);
+        Map<Long, RoomRequestItemAllocation.Original> originalByOccurrence = Map.of();
+        if (RoomRequestOriginalRestorer.hasOriginalClassroom(type)) {
+            // Se lee antes del reallocate: el upsert pisa el origen (SYSACAD pasa a MANUAL).
+            originalByOccurrence = originalRestorer.captureOriginals(occurrencesBySlot.getFirst());
+            RoomRequestItemAllocation.Original first = originalByOccurrence.get(occurrencesBySlot.get(0).getFirst());
+            if (first != null) {
+                item.rememberPreviousClassroom(first.classroomId());
+            }
         }
 
         // Reactivar explícitamente las fechas liberadas (D7): sin esto reallocate las saltea y el
@@ -160,7 +168,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         }
         allocationService.reallocate(commandFactory.apply(allocationItems));
 
-        item.assignClassrooms(ids, occurrencesBySlot, retiredOccurrenceIds);
+        item.assignClassrooms(ids, occurrencesBySlot, retiredOccurrenceIds, originalByOccurrence);
         item.decide(RoomRequestStatus.IN_EVALUATION, actor, reason, Instant.now());
 
         log.info("Pedido de aula asignado: itemId={}, aulas={}, ocurrencias={}",
@@ -193,18 +201,31 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.CANCELLED);
         accessControl.authorize(item, actor, Action.CANCEL);
 
-        List<Long> occurrenceIds = occurrenceResolver.onlyFuture(item, item.getAllocations().stream()
-                .map(RoomRequestItemAllocation::getOccurrenceId)
-                .toList());
-        if (!occurrenceIds.isEmpty()) {
+        String observation = "Solicitud de aula cancelada: " + reason;
+        List<Long> deallocatedIds;
+        if (RoomRequestOriginalRestorer.hasOriginalClassroom(item.getRequest().getType())) {
+            occurrenceResolver.releaseOldMirrors(item);
+            RoomRequestOriginalRestorer.Restoration restoration = originalRestorer.restore(item, observation, true);
+            if (!restoration.occupied().isEmpty()) {
+                throw new RoomRequestOriginalOccupiedException(itemId, originalRestorer.toConflicts(restoration));
+            }
+            item.moveToOriginal(restoration.restored());
+            deallocatedIds = restoration.toDeallocate();
+        } else {
+            occurrenceResolver.releaseOldMirrors(item);
+            deallocatedIds = occurrenceResolver.onlyFuture(item, item.getAllocations().stream()
+                    .filter(allocation -> allocation.getPosition() == 1)
+                    .map(RoomRequestItemAllocation::getOccurrenceId)
+                    .toList());
+        }
+        if (!deallocatedIds.isEmpty()) {
             allocationService.deallocate(new DeallocationCommand(
-                    List.of(new AllocationTarget.Occurrences(occurrenceIds)),
-                    "Solicitud de aula cancelada: " + reason));
+                    List.of(new AllocationTarget.Occurrences(deallocatedIds)), observation));
         }
 
         item.decide(RoomRequestStatus.CANCELLED, actor, reason, Instant.now());
 
-        log.info("Pedido de aula cancelado: itemId={}, aulasLiberadas={}", itemId, occurrenceIds.size());
+        log.info("Pedido de aula cancelado: itemId={}, aulasLiberadas={}", itemId, deallocatedIds.size());
         return composer.composeItem(item);
     }
 
@@ -349,12 +370,25 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         }
 
         RoomRequestStatus previous = item.getStatus();
+        ReversionDto reversion = null;
+        if (previous == RoomRequestStatus.NOTIFIED
+                && RoomRequestOriginalRestorer.hasOriginalClassroom(item.getRequest().getType())) {
+            RoomRequestOriginalRestorer.Restoration restoration = originalRestorer.restore(item,
+                    "Reapertura de pedido de aula #" + itemId + ": vuelve al aula original", false);
+            item.moveToOriginal(restoration.restored());
+            item.moveMirrors(restoration.swappedMirrors());
+            reversion = originalRestorer.toReversion(item, restoration);
+        }
         Instant now = Instant.now();
         item.reopen(reason, actor, now);
+        if (previous == RoomRequestStatus.NOTIFIED) {
+            item.markReopenedFromNotified(LocalDate.now(AcceptanceDeadlineCalculator.ZONE));
+        }
         eventPublisher.publishEvent(new RoomRequestItemReopened(itemId, previous, reason, actor, now));
 
         log.info("Pedido de aula reabierto: itemId={}, desde={}", itemId, previous);
-        return composer.composeItem(item);
+        RoomRequestItemResponseDto response = composer.composeItem(item);
+        return reversion == null ? response : RoomRequestItemResponseDto.withReversion(response, reversion);
     }
 
     private List<String> replyToFor(RoomRequestItem item) {

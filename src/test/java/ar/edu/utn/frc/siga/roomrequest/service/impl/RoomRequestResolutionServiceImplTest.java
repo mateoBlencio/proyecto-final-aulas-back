@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
 import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
+import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceConflictDto;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
@@ -13,6 +14,9 @@ import ar.edu.utn.frc.siga.notification.api.NotificationRequest;
 import ar.edu.utn.frc.siga.notification.api.NotificationSender;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.OriginalConflictDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RevertedDateDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.ReversionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailHeaderDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
@@ -23,6 +27,7 @@ import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestTransitionExc
 import ar.edu.utn.frc.siga.roomrequest.exception.PartialAssignmentReasonRequiredException;
 import ar.edu.utn.frc.siga.roomrequest.exception.RoomRequestAlreadyNotifiedException;
 import ar.edu.utn.frc.siga.roomrequest.exception.RoomRequestForbiddenException;
+import ar.edu.utn.frc.siga.roomrequest.exception.RoomRequestOriginalOccupiedException;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestComposer;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestNotificationModel;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
@@ -50,6 +55,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -60,6 +66,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -101,6 +108,8 @@ class RoomRequestResolutionServiceImplTest {
     private AcceptanceDeadlineCalculator deadlineCalculator;
     @Mock
     private ApplicationEventPublisher eventPublisher;
+    @Mock
+    private RoomRequestOriginalRestorer originalRestorer;
 
     @InjectMocks
     private RoomRequestResolutionServiceImpl service;
@@ -131,7 +140,8 @@ class RoomRequestResolutionServiceImplTest {
     @EnumSource(value = RoomRequestStatus.class, names = {"CANCELLED", "RESOLVED"}, mode = EnumSource.Mode.EXCLUDE)
     @DisplayName("se puede cancelar desde cualquier estado no final salvo RESOLVED")
     void cancelaDesdeCualquierEstadoNoFinal(RoomRequestStatus status) {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(status).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(status)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         when(composer.composeItem(item)).thenReturn(mockResponse());
 
@@ -168,13 +178,14 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     @Test
-    @DisplayName("ítem con aulas asignadas: libera todas las ocurrencias en una sola llamada")
+    @DisplayName("tipo sin aula original con aulas asignadas: retira los espejos y libera solo las principales")
     void liberaAulasAsignadas() {
         RoomRequestItemAllocation allocation1 = RoomRequestItemAllocation.builder()
                 .occurrenceId(10L).classroomId(100L).position(1).build();
         RoomRequestItemAllocation allocation2 = RoomRequestItemAllocation.builder()
                 .occurrenceId(11L).classroomId(101L).position(2).build();
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.IN_EVALUATION)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM))
                 .allocations(List.of(allocation1, allocation2)).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         when(occurrenceResolver.onlyFuture(eq(item), any())).thenAnswer(inv -> inv.getArgument(1));
@@ -182,16 +193,20 @@ class RoomRequestResolutionServiceImplTest {
 
         service.cancel(1L, "se cayó el laboratorio", "subsecretaria@frc.utn.edu.ar");
 
+        InOrder order = org.mockito.Mockito.inOrder(occurrenceResolver, allocationService);
+        order.verify(occurrenceResolver).releaseOldMirrors(item);
         ArgumentCaptor<DeallocationCommand> captor = ArgumentCaptor.forClass(DeallocationCommand.class);
-        verify(allocationService).deallocate(captor.capture());
+        order.verify(allocationService).deallocate(captor.capture());
         AllocationTarget.Occurrences target = (AllocationTarget.Occurrences) captor.getValue().targets().getFirst();
-        assertThat(target.occurrenceIds()).containsExactlyInAnyOrder(10L, 11L);
+        assertThat(target.occurrenceIds()).containsExactly(10L);
+        verifyNoInteractions(originalRestorer);
     }
 
     @Test
     @DisplayName("ítem sin nada asignado (NEW): no llama a deallocate")
     void sinAsignacionesNoLiberaNada() {
-        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         when(composer.composeItem(item)).thenReturn(mockResponse());
 
@@ -753,8 +768,8 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     @Test
-    @DisplayName("cancel: un cambio regular libera solo las ocurrencias futuras que devuelve el resolver")
-    void cancel_cambioRegularLiberaSoloFuturas() {
+    @DisplayName("cancel: un cambio regular libera solo las fechas futuras sin original guardado")
+    void cancel_cambioRegularLiberaSoloFuturasSinOriginal() {
         RoomRequestItemAllocation past = RoomRequestItemAllocation.builder()
                 .occurrenceId(10L).classroomId(100L).position(1).build();
         RoomRequestItemAllocation future = RoomRequestItemAllocation.builder()
@@ -763,7 +778,8 @@ class RoomRequestResolutionServiceImplTest {
                 .request(requestOfType(RoomRequestType.REGULAR_ROOM_CHANGE))
                 .allocations(List.of(past, future)).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
-        when(occurrenceResolver.onlyFuture(item, List.of(10L, 11L))).thenReturn(List.of(11L));
+        when(originalRestorer.restore(eq(item), any(), eq(true)))
+                .thenReturn(restoration(List.of(), List.of(), List.of(), List.of(11L)));
         when(composer.composeItem(item)).thenReturn(mockResponse());
 
         service.cancel(1L, "motivo", "subsecretaria@frc.utn.edu.ar");
@@ -772,6 +788,188 @@ class RoomRequestResolutionServiceImplTest {
         verify(allocationService).deallocate(captor.capture());
         AllocationTarget.Occurrences target = (AllocationTarget.Occurrences) captor.getValue().targets().getFirst();
         assertThat(target.occurrenceIds()).containsExactly(11L);
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.CANCELLED);
+    }
+
+    @Test
+    @DisplayName("cancel: con el original libre retira espejos, restaura todo o nada, no libera y mueve las filas al original")
+    void cancel_conOriginalLibreRestauraYNoLibera() {
+        RoomRequestItemAllocation row = RoomRequestItemAllocation.builder().occurrenceId(10L).classroomId(200L)
+                .position(1).originalCaptured(true).originalClassroomId(100L)
+                .originalSource(AllocationSource.SYSACAD).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.IN_EVALUATION)
+                .request(requestOfType(RoomRequestType.ONE_TIME_ROOM_CHANGE))
+                .allocations(List.of(row)).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(originalRestorer.restore(eq(item), any(), eq(true)))
+                .thenReturn(restoration(List.of(10L), List.of(), List.of(), List.of()));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.cancel(1L, "motivo", "subsecretaria@frc.utn.edu.ar");
+
+        InOrder order = inOrder(occurrenceResolver, originalRestorer);
+        order.verify(occurrenceResolver).releaseOldMirrors(item);
+        order.verify(originalRestorer).restore(eq(item), any(), eq(true));
+        verify(allocationService, never()).deallocate(any());
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.CANCELLED);
+        assertThat(row.getClassroomId()).isEqualTo(100L);
+    }
+
+    @Test
+    @DisplayName("cancel: con una fecha ocupada lanza 409 con los conflictos y deja el ítem, las filas y las aulas como estaban")
+    void cancel_conOriginalOcupadoLanza409SinCambios() {
+        RoomRequestItemAllocation row = RoomRequestItemAllocation.builder().occurrenceId(10L).classroomId(200L)
+                .position(1).originalCaptured(true).originalClassroomId(100L)
+                .originalSource(AllocationSource.MANUAL).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NOTIFIED)
+                .request(requestOfType(RoomRequestType.REGULAR_ROOM_CHANGE))
+                .allocations(List.of(row)).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        OccurrenceConflictDto conflict = new OccurrenceConflictDto(10L, LocalDate.of(2027, 3, 9), null, null, 100L,
+                5L, 6L, 7L, 90);
+        RoomRequestOriginalRestorer.Restoration restoration = restoration(List.of(), List.of(conflict), List.of(), List.of());
+        OriginalConflictDto conflictDto = new OriginalConflictDto(LocalDate.of(2027, 3, 9), null, null);
+        when(originalRestorer.restore(eq(item), any(), eq(true))).thenReturn(restoration);
+        when(originalRestorer.toConflicts(restoration)).thenReturn(List.of(conflictDto));
+
+        assertThatThrownBy(() -> service.cancel(1L, "motivo", "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOfSatisfying(RoomRequestOriginalOccupiedException.class, e -> {
+                    assertThat(e.getStatus()).isEqualTo(org.springframework.http.HttpStatus.CONFLICT);
+                    assertThat(e.getProperties()).containsEntry("code", "ORIGINAL_CLASSROOM_OCCUPIED")
+                            .containsEntry("itemId", 1L).containsEntry("conflicts", List.of(conflictDto));
+                });
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.NOTIFIED);
+        assertThat(row.getClassroomId()).isEqualTo(200L);
+        verify(allocationService, never()).deallocate(any());
+        verifyNoInteractions(composer);
+    }
+
+    @Test
+    @DisplayName("cancel: libera además las fechas cuyo aula original está desactivada")
+    void cancel_liberaLasFechasConOriginalDesactivado() {
+        RoomRequestItemAllocation restored = RoomRequestItemAllocation.builder().occurrenceId(10L).classroomId(200L)
+                .position(1).originalCaptured(true).originalClassroomId(100L).build();
+        RoomRequestItemAllocation deactivated = RoomRequestItemAllocation.builder().occurrenceId(11L).classroomId(200L)
+                .position(1).originalCaptured(true).originalClassroomId(101L).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.IN_EVALUATION)
+                .request(requestOfType(RoomRequestType.REGULAR_ROOM_CHANGE))
+                .allocations(List.of(restored, deactivated)).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(originalRestorer.restore(eq(item), any(), eq(true)))
+                .thenReturn(restoration(List.of(10L), List.of(), List.of(11L), List.of()));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.cancel(1L, "motivo", "subsecretaria@frc.utn.edu.ar");
+
+        ArgumentCaptor<DeallocationCommand> captor = ArgumentCaptor.forClass(DeallocationCommand.class);
+        verify(allocationService).deallocate(captor.capture());
+        AllocationTarget.Occurrences target = (AllocationTarget.Occurrences) captor.getValue().targets().getFirst();
+        assertThat(target.occurrenceIds()).containsExactly(11L);
+        assertThat(restored.getClassroomId()).isEqualTo(100L);
+        assertThat(deactivated.getClassroomId()).isEqualTo(200L);
+    }
+
+    @Test
+    @DisplayName("reopen: NOTIFIED de un cambio regular restaura sin todo o nada, mueve las filas, fija reabierto_desde y devuelve la reversión")
+    void reopen_notificadoRestauraYDevuelveReversion() {
+        RoomRequestItemAllocation row = RoomRequestItemAllocation.builder().occurrenceId(10L).classroomId(200L)
+                .position(1).originalCaptured(true).originalClassroomId(100L).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NOTIFIED)
+                .request(requestOfType(RoomRequestType.REGULAR_ROOM_CHANGE)).notificationRound(1)
+                .allocations(List.of(row)).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        RoomRequestOriginalRestorer.Restoration restoration = restoration(List.of(10L), List.of(), List.of(), List.of());
+        ReversionDto reversion = new ReversionDto(List.of(new RevertedDateDto(LocalDate.of(2027, 3, 9), null)), List.of());
+        when(originalRestorer.restore(eq(item), any(), eq(false))).thenReturn(restoration);
+        when(originalRestorer.toReversion(item, restoration)).thenReturn(reversion);
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        RoomRequestItemResponseDto response = service.reopen(1L, "la 204 queda lejos", "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(response.reversion()).isSameAs(reversion);
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.IN_EVALUATION);
+        assertThat(row.getClassroomId()).isEqualTo(100L);
+        assertThat(item.getReopenedFromNotifiedOn()).isNotNull();
+        verify(allocationService, never()).deallocate(any());
+    }
+
+    @Test
+    @DisplayName("reopen: RESOLVED de un cambio regular no toca el calendario ni devuelve reversión")
+    void reopen_resueltoNoRestauraNiDevuelveReversion() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.RESOLVED)
+                .request(requestOfType(RoomRequestType.REGULAR_ROOM_CHANGE)).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(occurrenceResolver.nextClassDate(item)).thenReturn(Optional.of(LocalDate.now().plusDays(7)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        RoomRequestItemResponseDto response = service.reopen(1L, "motivo", "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(response.reversion()).isNull();
+        assertThat(item.getReopenedFromNotifiedOn()).isNull();
+        verifyNoInteractions(originalRestorer, allocationService);
+    }
+
+    @Test
+    @DisplayName("reopen: NOTIFIED de un tipo creado por SIGA no restaura ni devuelve reversión")
+    void reopen_tipoSinAulaOriginalNoRestaura() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NOTIFIED)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).notificationRound(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        RoomRequestItemResponseDto response = service.reopen(1L, "motivo", "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(response.reversion()).isNull();
+        verifyNoInteractions(originalRestorer, allocationService);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = RoomRequestType.class, names = {"ONE_TIME_ROOM_CHANGE", "REGULAR_ROOM_CHANGE", "PARTIAL_EXAM_IN_CLASS"})
+    @DisplayName("assign: en los tipos con aula original la lee antes del reallocate, la guarda en la fila y completa el aula anterior")
+    void assign_capturaElOriginalAntesDeReasignar(RoomRequestType type) {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(type)).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findByIds(List.of(104L))).thenReturn(List.of(classroom(104L, 1L, "A")));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 1, false)).thenReturn(List.of(List.of(9000L)));
+        when(originalRestorer.captureOriginals(List.of(9000L)))
+                .thenReturn(Map.of(9000L, new RoomRequestItemAllocation.Original(77L, AllocationSource.SYSACAD)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(104L), null, "sub@frc.utn.edu.ar");
+
+        InOrder order = inOrder(originalRestorer, allocationService);
+        order.verify(originalRestorer).captureOriginals(List.of(9000L));
+        order.verify(allocationService).reallocate(any());
+        assertThat(item.getPreviousClassroomId()).isEqualTo(77L);
+        RoomRequestItemAllocation row = item.getAllocations().getFirst();
+        assertThat(row.getClassroomId()).isEqualTo(104L);
+        assertThat(row.getOriginalClassroomId()).isEqualTo(77L);
+        assertThat(row.getOriginalSource()).isEqualTo(AllocationSource.SYSACAD);
+        assertThat(row.isOriginalCaptured()).isTrue();
+    }
+
+    @Test
+    @DisplayName("assign: en un tipo creado por SIGA no consulta el original")
+    void assign_tipoSinAulaOriginalNoCaptura() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findByIds(List.of(104L))).thenReturn(List.of(classroom(104L, 1L, "A")));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 1, false)).thenReturn(List.of(List.of(9000L)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(104L), null, "sub@frc.utn.edu.ar");
+
+        verifyNoInteractions(originalRestorer);
+        assertThat(item.getPreviousClassroomId()).isNull();
+    }
+
+    private static RoomRequestOriginalRestorer.Restoration restoration(List<Long> restored,
+            List<OccurrenceConflictDto> occupied, List<Long> deactivated, List<Long> withoutOriginal) {
+        return new RoomRequestOriginalRestorer.Restoration(restored, occupied, deactivated, withoutOriginal,
+                java.util.Map.of());
     }
 
     @Test
@@ -1261,7 +1459,7 @@ class RoomRequestResolutionServiceImplTest {
     private static RoomRequestItemResponseDto mockResponse() {
         return new RoomRequestItemResponseDto(1L, 1, RoomRequestStatus.CANCELLED, "subsecretaria@frc.utn.edu.ar",
                 null, "motivo", List.of(), null, null, null, null, null, null, null, 1, false, false, null,
-                false, null, null, List.of(), null, List.of(), null, null, null, null, null, null, null, null, null, List.of());
+                false, null, null, List.of(), null, List.of(), null, null, null, null, null, null, null, null, null, List.of(), null);
     }
 
     private static RoomRequestItemDetailDto mockDetail() {

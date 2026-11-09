@@ -291,7 +291,7 @@ class RoomRequestNotificationModelTest {
         RoomRequestItemResponseDto item = new RoomRequestItemResponseDto(
                 itemId, 1, null, null, null, decisionReason, commissions, date, dayOfWeek, startTime, endTime,
                 null, null, null, classroomCount, null, null, null, null, null, observations,
-                List.of(), null, assignedClassrooms, previousClassroom, null, acceptanceDeadline, null, null, null, null, null, null, List.of());
+                List.of(), null, assignedClassrooms, previousClassroom, null, acceptanceDeadline, null, null, null, null, null, null, List.of(), null);
         return new RoomRequestItemDetailDto(header, item, List.of(), List.of());
     }
 }

@@ -176,7 +176,7 @@ class RoomRequestItemNotifyApiIntegrationTest extends AbstractIntegrationTest {
                 .decidedBy("subsecretaria@frc.utn.edu.ar")
                 .decidedAt(Instant.now())
                 .build();
-        item.assignClassrooms(List.of(classroomId), List.of(List.of(occurrenceId)), List.of());
+        item.assignClassrooms(List.of(classroomId), List.of(List.of(occurrenceId)), List.of(), Map.of());
         request.addItem(item);
         roomRequestRepository.save(request);
         return item;
