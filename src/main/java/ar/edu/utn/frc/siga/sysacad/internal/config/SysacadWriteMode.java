@@ -1,7 +1,7 @@
 package ar.edu.utn.frc.siga.sysacad.internal.config;
 
 public enum SysacadWriteMode {
-    OFF, DRY_RUN, SANDBOX, ON;
+    OFF, SANDBOX, ON;
 
     public boolean sendsToSysacad() {
         return this == ON;

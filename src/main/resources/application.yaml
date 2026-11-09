@@ -212,7 +212,7 @@ siga:
         max: "720"
       - key: sysacad.write.mode
         default-value: ${SYSACAD_WRITE_MODE:OFF}
-        options: ["OFF", DRY_RUN, SANDBOX, "ON"]
+        options: ["OFF", SANDBOX, "ON"]
       - key: sysacad.autogestion.mode
         default-value: ${AUTOGESTION_MESSAGE_MODE:OFF}
         options: ["OFF", TEST_COMMISSIONS, "ON"]
@@ -224,11 +224,6 @@ siga:
         default-value: "60"
         min: "5"
         max: "1440"
-      - key: sysacad.sync.dayOfWeek
-        default-value: SUN
-        options: [MON, TUE, WED, THU, FRI, SAT, SUN]
-      - key: sysacad.sync.time
-        default-value: "03:00"
   optimizer:
     parallel-solver-count: AUTO
     environment-mode: NO_ASSERT
@@ -269,6 +264,7 @@ siga:
     commission-message-publisher-legajo: 0
     commission-message-publisher-user-type: "S"
     sync:
+      cron: "0 0 3 * * SUN"
       min-valid-rows-percent: 50
       zone: America/Argentina/Buenos_Aires
     write:

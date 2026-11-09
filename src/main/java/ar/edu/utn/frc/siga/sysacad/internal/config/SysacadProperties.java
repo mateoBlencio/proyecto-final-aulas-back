@@ -51,7 +51,7 @@ public class SysacadProperties {
     private String commissionMessagePublisherUserType = "S";
 
     @Valid
-    private Sync sync = new Sync(DEFAULT_MIN_VALID_ROWS_PERCENT, Sync.DEFAULT_ZONE);
+    private Sync sync = new Sync(null, DEFAULT_MIN_VALID_ROWS_PERCENT, Sync.DEFAULT_ZONE);
 
     @Valid
     private Write write = Write.defaults();
@@ -74,6 +74,7 @@ public class SysacadProperties {
      * view to deactivate what is absent. 0 disables the threshold (zero valid rows always aborts).
      */
     public record Sync(
+            String cron,
             @DefaultValue("50") @Min(0) @Max(100) int minValidRowsPercent,
             @DefaultValue("America/Argentina/Buenos_Aires") @NotNull ZoneId zone
     ) {

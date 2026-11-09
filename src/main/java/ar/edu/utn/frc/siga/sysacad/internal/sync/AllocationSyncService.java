@@ -203,14 +203,6 @@ public class AllocationSyncService implements SysacadViewSyncer {
                 log.error("No se pudo procesar el cambio directo del horario {}", scheduleId, e);
             }
         }
-        for (SysacadScheduleLoader.DryRunChange change : loadResult.dryRunChanges()) {
-            try {
-                directChangeHandler.recordDryRun(change.scheduleId(), change.fromBuilding(), change.fromRoom(),
-                        change.toBuilding(), change.toRoom());
-            } catch (RuntimeException e) {
-                log.error("No se pudo registrar el cambio directo simulado del horario {}", change.scheduleId(), e);
-            }
-        }
     }
 
     private static boolean isSentinel(Integer roomNumber) {

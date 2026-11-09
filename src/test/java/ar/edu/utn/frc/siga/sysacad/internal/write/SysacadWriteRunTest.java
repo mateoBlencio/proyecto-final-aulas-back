@@ -24,7 +24,6 @@ import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadScheduleStatus;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadWriteState;
 import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleRepository;
-import ar.edu.utn.frc.siga.sysacad.internal.sync.SysacadScheduleLoader.DryRunChange;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NoRoomAfterCancel;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NotSendable;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Send;
@@ -138,9 +137,9 @@ class SysacadWriteRunTest {
     }
 
     @Test
-    @DisplayName("DRY_RUN nunca llama al ciclo de envío: solo deja la fila DRY_RUN_SEND de cada horario")
-    void dryRunNeverSends() {
-        configure(SysacadWriteMode.DRY_RUN, 5, 3, 30, List.of(Duration.ofMinutes(5)));
+    @DisplayName("SANDBOX nunca llama al ciclo de envío: solo deja la fila SANDBOX_SEND de cada horario")
+    void sandboxNeverSends() {
+        configure(SysacadWriteMode.SANDBOX, 5, 3, 30, List.of(Duration.ofMinutes(5)));
         SysacadSchedule first = schedule(1);
         SysacadSchedule second = schedule(2);
         planReturns(send(first), send(second));
@@ -149,26 +148,14 @@ class SysacadWriteRunTest {
 
         assertThat(report.result()).isEqualTo(Result.OK);
         verifyNoInteractions(sendCycle);
-        verify(scheduleWriter).recordEvent(1L, ScheduleLogType.DRY_RUN_SEND, 5, 229, 1001L, null, null);
-        verify(scheduleWriter).recordEvent(2L, ScheduleLogType.DRY_RUN_SEND, 5, 229, 1002L, null, null);
+        verify(scheduleWriter).recordEvent(1L, ScheduleLogType.SANDBOX_SEND, 5, 229, 1001L, null, null);
+        verify(scheduleWriter).recordEvent(2L, ScheduleLogType.SANDBOX_SEND, 5, 229, 1002L, null, null);
     }
 
     @Test
     @DisplayName("OFF no envía ni registra el envío simulado")
     void offDoesNotApply() {
         configure(SysacadWriteMode.OFF, 5, 3, 30, List.of(Duration.ofMinutes(5)));
-        planReturns(send(schedule(1)));
-
-        run.run(NOW);
-
-        verifyNoInteractions(sendCycle);
-        verify(scheduleWriter, never()).recordEvent(anyLong(), any(), any(), any(), any(), any(), any());
-    }
-
-    @Test
-    @DisplayName("SANDBOX no envía ni registra el envío simulado")
-    void sandboxDoesNotSend() {
-        configure(SysacadWriteMode.SANDBOX, 5, 3, 30, List.of(Duration.ofMinutes(5)));
         planReturns(send(schedule(1)));
 
         run.run(NOW);
@@ -264,7 +251,7 @@ class SysacadWriteRunTest {
     @DisplayName("Lee la vista cuando pasó exactamente viewReadInterval y registra la lectura")
     void readsViewWhenIntervalElapsed() {
         state.setLastViewReadAt(NOW.minus(Duration.ofHours(1)));
-        when(viewReader.read()).thenReturn(new ViewReadResult(List.of(), List.of()));
+        when(viewReader.read()).thenReturn(new ViewReadResult(List.of()));
         planReturns();
 
         run.run(NOW);
@@ -277,7 +264,7 @@ class SysacadWriteRunTest {
     @DisplayName("Lee la vista si nunca se leyó")
     void readsViewWhenNeverRead() {
         state.setLastViewReadAt(null);
-        when(viewReader.read()).thenReturn(new ViewReadResult(List.of(), List.of()));
+        when(viewReader.read()).thenReturn(new ViewReadResult(List.of()));
         planReturns();
 
         run.run(NOW);
@@ -302,18 +289,16 @@ class SysacadWriteRunTest {
     }
 
     @Test
-    @DisplayName("Los cambios directos y simulados que devuelve la lectura de la vista pasan al handler")
+    @DisplayName("Los cambios directos que devuelve la lectura de la vista pasan al handler")
     void viewReadResultsGoToHandler() {
         state.setLastViewReadAt(null);
-        DryRunChange dryRun = new DryRunChange(8L, 5, 228, 5, 230);
-        when(viewReader.read()).thenReturn(new ViewReadResult(List.of(4L, 5L), List.of(dryRun)));
+        when(viewReader.read()).thenReturn(new ViewReadResult(List.of(4L, 5L)));
         doThrow(new IllegalStateException("boom")).when(directChangeHandler).handle(4L);
         planReturns();
 
         RunReport report = run.run(NOW);
 
         verify(directChangeHandler).handle(5L);
-        verify(directChangeHandler).recordDryRun(8L, 5, 228, 5, 230);
         assertThat(report.errors()).singleElement().asString().contains("horario 4");
     }
 

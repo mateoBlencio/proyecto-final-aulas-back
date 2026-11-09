@@ -210,7 +210,7 @@ class SysacadScheduleLoaderTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = SysacadWriteMode.class, names = {"OFF", "DRY_RUN"})
+    @EnumSource(value = SysacadWriteMode.class, names = {"OFF"})
     @DisplayName("load: sin escritura activa, otra aula en un horario existente actualiza hora, vínculo, conocido y base")
     void existingScheduleWithOtherRoomFollowsViewWhenWriteNotOn(SysacadWriteMode mode) {
         SysacadSchedule schedule = existing();
@@ -380,7 +380,7 @@ class SysacadScheduleLoaderTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = SysacadWriteMode.class, names = {"OFF", "DRY_RUN"})
+    @EnumSource(value = SysacadWriteMode.class, names = {"OFF"})
     @DisplayName("load: sin escritura activa, un horario nuevo manda sus eventos a actualizar")
     void newScheduleSendsEventsToUpdateWhenWriteNotOn(SysacadWriteMode mode) {
         when(repository.findAll()).thenReturn(List.of());
@@ -391,7 +391,7 @@ class SysacadScheduleLoaderTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = SysacadWriteMode.class, names = {"OFF", "DRY_RUN"})
+    @EnumSource(value = SysacadWriteMode.class, names = {"OFF"})
     @DisplayName("load: sin escritura activa, un cambio externo de aula manda sus eventos a actualizar")
     void externalChangeSendsEventsToUpdateWhenWriteNotOn(SysacadWriteMode mode) {
         when(repository.findAll()).thenReturn(List.of(existing()));
@@ -402,7 +402,7 @@ class SysacadScheduleLoaderTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = SysacadWriteMode.class, names = {"OFF", "DRY_RUN"})
+    @EnumSource(value = SysacadWriteMode.class, names = {"OFF"})
     @DisplayName("load: sin escritura activa, KEY_CONFLICT manda sus eventos a actualizar")
     void keyConflictSendsEventsToUpdateWhenWriteNotOn(SysacadWriteMode mode) {
         when(repository.findAll()).thenReturn(List.of(existing()));
@@ -414,7 +414,7 @@ class SysacadScheduleLoaderTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = SysacadWriteMode.class, names = {"OFF", "DRY_RUN"})
+    @EnumSource(value = SysacadWriteMode.class, names = {"OFF"})
     @DisplayName("load: sin escritura activa, conocido igual a base sigue a la vista y repara una propagación fallida")
     void viewEqualToKnownAndBaseSendsEventsToUpdate(SysacadWriteMode mode) {
         when(repository.findAll()).thenReturn(List.of(existing()));
@@ -425,7 +425,7 @@ class SysacadScheduleLoaderTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = SysacadWriteMode.class, names = {"OFF", "DRY_RUN"})
+    @EnumSource(value = SysacadWriteMode.class, names = {"OFF"})
     @DisplayName("load: sin escritura activa, un puntual de SIGA (conocido distinto de base) no se propaga a las clases")
     void punctualRoomSentBySigaSendsNoEventsToUpdate(SysacadWriteMode mode) {
         SysacadSchedule punctual = existing();

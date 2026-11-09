@@ -10,10 +10,8 @@ import ar.edu.utn.frc.siga.sysacad.internal.model.NotSendableReason;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleRepository;
 import ar.edu.utn.frc.siga.sysacad.internal.sync.ReconcileOutcome;
-import ar.edu.utn.frc.siga.sysacad.internal.sync.SysacadScheduleLoader.DryRunChange;
 import ar.edu.utn.frc.siga.sysacad.internal.sync.SysacadViewReconciler;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadRuntimeSettings;
-import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadWriteMode;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -44,7 +42,7 @@ public class SysacadViewReader {
     private final PlatformTransactionManager transactionManager;
     private final Clock clock;
 
-    public record ViewReadResult(List<Long> directChangeScheduleIds, List<DryRunChange> dryRunChanges) {
+    public record ViewReadResult(List<Long> directChangeScheduleIds) {
     }
 
     private record RowKey(Integer specialty, Integer plan, Integer subject, Integer commission, Integer dayOfWeek,
@@ -80,9 +78,7 @@ public class SysacadViewReader {
 
     private ViewReadResult reconcileAll(Map<RowKey, List<SysacadAllocationDto>> rowsByKey) {
         Instant now = clock.instant();
-        boolean dryRun = runtimeSettings.writeMode() == SysacadWriteMode.DRY_RUN;
         List<Long> directChanges = new ArrayList<>();
-        List<DryRunChange> dryRunChanges = new ArrayList<>();
         for (SysacadSchedule schedule : scheduleRepository.findByPresentInViewTrue()) {
             if (schedule.getNotSendableReason() == NotSendableReason.KEY_CONFLICT) {
                 continue;
@@ -99,16 +95,11 @@ public class SysacadViewReader {
                 continue;
             }
             Room room = rooms.iterator().next();
-            Integer previousBuilding = schedule.getKnownBuilding();
-            Integer previousRoom = schedule.getKnownRoom();
             ReconcileOutcome outcome = reconciler.reconcile(schedule, room.building(), room.room(), now);
             if (outcome == ReconcileOutcome.DIRECT_CHANGE) {
                 directChanges.add(schedule.getId());
-            } else if (outcome == ReconcileOutcome.EXTERNAL_CHANGE_APPLIED && dryRun) {
-                dryRunChanges.add(new DryRunChange(schedule.getId(), previousBuilding, previousRoom,
-                        room.building(), room.room()));
             }
         }
-        return new ViewReadResult(directChanges, dryRunChanges);
+        return new ViewReadResult(directChanges);
     }
 }

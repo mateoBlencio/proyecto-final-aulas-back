@@ -240,21 +240,8 @@ public class SysacadScheduleStateWriter {
         return schedule.getDifferentRoom() != null ? schedule.getDifferentRoom() : schedule.getKnownRoom();
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordDirectChangeDryRun(Long scheduleId, Integer fromBuilding, Integer fromRoom,
-            Integer toBuilding, Integer toRoom, List<AffectedOccurrence> wouldAnnul) {
-        SysacadSchedule schedule = load(scheduleId);
-        logRepository.save(entry(schedule, ScheduleLogType.DIRECT_CHANGE_DRY_RUN)
-                .previousBuilding(fromBuilding)
-                .previousRoom(fromRoom)
-                .newBuilding(toBuilding)
-                .newRoom(toRoom)
-                .occurrences(wouldAnnul.isEmpty() ? null : json(wouldAnnul))
-                .build());
-    }
-
     /**
-     * Fila suelta de un evento sin cambio de estado (DRY_RUN_SEND, NO_ROOM_AFTER_CANCEL,
+     * Fila suelta de un evento sin cambio de estado (SANDBOX_SEND, NO_ROOM_AFTER_CANCEL,
      * DESTINATION_NOT_SENDABLE). No repite la fila si la última de ese tipo del horario dice lo mismo.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)

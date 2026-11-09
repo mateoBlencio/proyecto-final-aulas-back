@@ -21,7 +21,6 @@ import ar.edu.utn.frc.siga.sysacad.internal.model.NotSendableReason;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleRepository;
 import ar.edu.utn.frc.siga.sysacad.internal.sync.ReconcileOutcome;
-import ar.edu.utn.frc.siga.sysacad.internal.sync.SysacadScheduleLoader.DryRunChange;
 import ar.edu.utn.frc.siga.sysacad.internal.sync.SysacadViewReconciler;
 import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadViewReader.ViewReadResult;
 import java.time.Clock;
@@ -85,7 +84,6 @@ class SysacadViewReaderTest {
         verify(transactionManager).getTransaction(any());
         verify(transactionManager).commit(any());
         assertThat(result.directChangeScheduleIds()).isEmpty();
-        assertThat(result.dryRunChanges()).isEmpty();
     }
 
     @Test
@@ -111,35 +109,6 @@ class SysacadViewReaderTest {
         ViewReadResult result = reader.read();
 
         assertThat(result.directChangeScheduleIds()).containsExactly(1L);
-    }
-
-    @Test
-    @DisplayName("En DRY_RUN un cambio externo aplicado se devuelve con el aula previa, tomada antes de reconciliar")
-    void dryRunReturnsExternalChangeWithPreviousRoom() {
-        when(runtimeSettings.writeMode()).thenReturn(SysacadWriteMode.DRY_RUN);
-        SysacadSchedule schedule = schedule(1, 115);
-        when(fetcher.fetch()).thenReturn(List.of(raw(115, 5, 229)));
-        when(scheduleRepository.findByPresentInViewTrue()).thenReturn(List.of(schedule));
-        when(reconciler.reconcile(schedule, 5, 229, NOW)).thenAnswer(invocation -> {
-            schedule.setKnownRoom(229);
-            return ReconcileOutcome.EXTERNAL_CHANGE_APPLIED;
-        });
-
-        ViewReadResult result = reader.read();
-
-        assertThat(result.dryRunChanges()).containsExactly(new DryRunChange(1L, 5, 228, 5, 229));
-        assertThat(result.directChangeScheduleIds()).isEmpty();
-    }
-
-    @Test
-    @DisplayName("En ON un cambio externo aplicado no se devuelve como simulado")
-    void onDoesNotReturnDryRunChanges() {
-        SysacadSchedule schedule = schedule(1, 115);
-        when(fetcher.fetch()).thenReturn(List.of(raw(115, 5, 229)));
-        when(scheduleRepository.findByPresentInViewTrue()).thenReturn(List.of(schedule));
-        when(reconciler.reconcile(schedule, 5, 229, NOW)).thenReturn(ReconcileOutcome.EXTERNAL_CHANGE_APPLIED);
-
-        assertThat(reader.read().dryRunChanges()).isEmpty();
     }
 
     @Test

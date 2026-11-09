@@ -241,15 +241,15 @@ class SysacadAlertServiceTest {
     }
 
     @Test
-    @DisplayName("en DRY_RUN no sale ningún aviso: los avisos corren solo en ON")
-    void dryRunSendsNoAlert() {
+    @DisplayName("en SANDBOX no sale ningún aviso: los avisos corren solo en ON")
+    void sandboxSendsNoAlert() {
         SysacadProperties properties = new SysacadProperties();
-        SysacadAlertService dryRun = new SysacadAlertService(logRepository, scheduleRepository, stateService,
+        SysacadAlertService sandbox = new SysacadAlertService(logRepository, scheduleRepository, stateService,
                 occurrenceService, userService, notificationSender, properties,
-                SysacadTestSettings.with(SysacadWriteMode.DRY_RUN), JsonMapper.builder().build(),
+                SysacadTestSettings.with(SysacadWriteMode.SANDBOX), JsonMapper.builder().build(),
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
-        dryRun.alert(PREVIOUS_END);
+        sandbox.alert(PREVIOUS_END);
 
         verifyNoInteractions(notificationSender, logRepository);
     }

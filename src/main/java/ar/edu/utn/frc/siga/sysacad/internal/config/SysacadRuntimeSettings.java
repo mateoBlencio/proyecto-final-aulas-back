@@ -3,7 +3,6 @@ package ar.edu.utn.frc.siga.sysacad.internal.config;
 import ar.edu.utn.frc.siga.settings.api.SettingsReader;
 import ar.edu.utn.frc.siga.settings.model.SettingKey;
 import java.time.Duration;
-import java.time.LocalTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -27,11 +26,5 @@ public class SysacadRuntimeSettings {
 
     public Duration viewReadInterval() {
         return Duration.ofMinutes(settings.getLong(SettingKey.SYSACAD_WRITE_VIEW_READ_INTERVAL_MINUTES));
-    }
-
-    public String syncCron() {
-        LocalTime time = settings.getTime(SettingKey.SYSACAD_SYNC_TIME);
-        return "0 " + time.getMinute() + " " + time.getHour() + " * * "
-                + settings.getString(SettingKey.SYSACAD_SYNC_DAY_OF_WEEK);
     }
 }

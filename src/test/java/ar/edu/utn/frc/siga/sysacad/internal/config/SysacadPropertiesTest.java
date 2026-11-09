@@ -51,13 +51,13 @@ class SysacadPropertiesTest {
     void rejectsThresholdOutOfRange() {
         SysacadProperties properties = valid();
 
-        properties.setSync(new SysacadProperties.Sync(101, SysacadProperties.Sync.DEFAULT_ZONE));
+        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", 101, SysacadProperties.Sync.DEFAULT_ZONE));
         assertThat(validator.validate(properties)).hasSize(1);
-        properties.setSync(new SysacadProperties.Sync(-1, SysacadProperties.Sync.DEFAULT_ZONE));
+        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", -1, SysacadProperties.Sync.DEFAULT_ZONE));
         assertThat(validator.validate(properties)).hasSize(1);
-        properties.setSync(new SysacadProperties.Sync(0, SysacadProperties.Sync.DEFAULT_ZONE));
+        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", 0, SysacadProperties.Sync.DEFAULT_ZONE));
         assertThat(validator.validate(properties)).isEmpty();
-        properties.setSync(new SysacadProperties.Sync(100, SysacadProperties.Sync.DEFAULT_ZONE));
+        properties.setSync(new SysacadProperties.Sync("0 0 3 * * SUN", 100, SysacadProperties.Sync.DEFAULT_ZONE));
         assertThat(validator.validate(properties)).isEmpty();
     }
 

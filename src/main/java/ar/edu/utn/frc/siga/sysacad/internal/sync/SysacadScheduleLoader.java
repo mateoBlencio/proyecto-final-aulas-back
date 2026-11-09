@@ -39,12 +39,7 @@ public class SysacadScheduleLoader {
             NotSendableReason skipReason) {
     }
 
-    public record LoadResult(Set<Long> eventIdsToUpdate, List<Long> directChangeScheduleIds,
-            List<DryRunChange> dryRunChanges) {
-    }
-
-    public record DryRunChange(Long scheduleId, Integer fromBuilding, Integer fromRoom, Integer toBuilding,
-            Integer toRoom) {
+    public record LoadResult(Set<Long> eventIdsToUpdate, List<Long> directChangeScheduleIds) {
     }
 
     public record BaseRoom(Integer building, Integer room) {
@@ -78,7 +73,6 @@ public class SysacadScheduleLoader {
         SysacadWriteMode mode = runtimeSettings.writeMode();
         Set<Long> eventIdsToUpdate = new TreeSet<>();
         List<Long> directChangeScheduleIds = new ArrayList<>();
-        List<DryRunChange> dryRunChanges = new ArrayList<>();
         Map<ScheduleKey, List<ResolvedScheduleRow>> groups = new LinkedHashMap<>();
         for (ResolvedScheduleRow resolved : rows) {
             groups.computeIfAbsent(keyOf(resolved), k -> new ArrayList<>()).add(resolved);
@@ -100,9 +94,6 @@ public class SysacadScheduleLoader {
             if (result.directChange()) {
                 directChangeScheduleIds.add(schedule.getId());
             }
-            if (result.dryRunChange() != null) {
-                dryRunChanges.add(result.dryRunChange());
-            }
             if (result.followView() && !mode.keepsSigaChanges()) {
                 eventIdsToUpdate.addAll(result.eventIds());
             }
@@ -117,11 +108,10 @@ public class SysacadScheduleLoader {
                 }
             });
         }
-        return new LoadResult(eventIdsToUpdate, directChangeScheduleIds, dryRunChanges);
+        return new LoadResult(eventIdsToUpdate, directChangeScheduleIds);
     }
 
-    private record ApplyResult(Set<Long> eventIds, boolean followView, boolean directChange,
-            DryRunChange dryRunChange) {
+    private record ApplyResult(Set<Long> eventIds, boolean followView, boolean directChange) {
     }
 
     private ApplyResult apply(SysacadSchedule schedule, List<ResolvedScheduleRow> group, Instant now) {
@@ -153,7 +143,6 @@ public class SysacadScheduleLoader {
 
         boolean followView = keyConflict;
         boolean directChange = false;
-        DryRunChange dryRunChange = null;
         if (!keyConflict) {
             schedule.setCourseCode(first.courseCode());
             schedule.setStartTime(first.startTime());
@@ -166,19 +155,12 @@ public class SysacadScheduleLoader {
                 schedule.setBaseRoom(first.roomNumber());
                 followView = true;
             } else {
-                Integer previousBuilding = schedule.getKnownBuilding();
-                Integer previousRoom = schedule.getKnownRoom();
                 ReconcileOutcome outcome = reconciler.reconcile(schedule, first.buildingCode(), first.roomNumber(),
                         now);
                 // Conocido igual a base repara una propagación fallida en el sync anterior; distinto es un puntual de SIGA.
                 followView = Objects.equals(schedule.getKnownBuilding(), schedule.getBaseBuilding())
                         && Objects.equals(schedule.getKnownRoom(), schedule.getBaseRoom());
                 directChange = outcome == ReconcileOutcome.DIRECT_CHANGE;
-                if (outcome == ReconcileOutcome.EXTERNAL_CHANGE_APPLIED
-                        && runtimeSettings.writeMode() == SysacadWriteMode.DRY_RUN) {
-                    dryRunChange = new DryRunChange(schedule.getId(), previousBuilding, previousRoom,
-                            first.buildingCode(), first.roomNumber());
-                }
             }
         }
 
@@ -189,7 +171,7 @@ public class SysacadScheduleLoader {
         schedule.setNotSendableReason(reason);
         schedule.setPresentInView(true);
         schedule.setLastReadAt(now);
-        return new ApplyResult(eventIds, followView, directChange, dryRunChange);
+        return new ApplyResult(eventIds, followView, directChange);
     }
 
     private static SysacadSchedule newSchedule(ScheduleKey key) {

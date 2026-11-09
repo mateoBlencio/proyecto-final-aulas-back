@@ -96,7 +96,7 @@ class AllocationSyncServiceTest {
     @BeforeEach
     void setUp() {
         service = serviceIn(SysacadWriteMode.OFF);
-        lenient().when(scheduleLoader.load(anyList())).thenReturn(new LoadResult(Set.of(), List.of(), List.of()));
+        lenient().when(scheduleLoader.load(anyList())).thenReturn(new LoadResult(Set.of(), List.of()));
     }
 
     private AllocationSyncService serviceIn(SysacadWriteMode mode) {
@@ -769,7 +769,7 @@ class AllocationSyncServiceTest {
         when(catalogReader.findAllocations()).thenReturn(List.of(row("101", 55, 1, 200, 5)));
         stubResolvedEvent();
         when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
-        when(scheduleLoader.load(anyList())).thenReturn(new LoadResult(Set.of(100L), List.of(4L), List.of()));
+        when(scheduleLoader.load(anyList())).thenReturn(new LoadResult(Set.of(100L), List.of(4L)));
 
         service.sync(catalogReader);
 
@@ -779,27 +779,12 @@ class AllocationSyncServiceTest {
     }
 
     @Test
-    @DisplayName("sync: registra los cambios directos simulados que devuelve el loader")
-    void syncRecordsDryRunChanges() {
-        when(catalogReader.findAllocations()).thenReturn(List.of(row("101", 55, 1, 200, 5)));
-        stubResolvedEvent();
-        when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
-        when(scheduleLoader.load(anyList())).thenReturn(new LoadResult(Set.of(), List.of(),
-                List.of(new SysacadScheduleLoader.DryRunChange(8L, 5, 200, 5, 229))));
-
-        service.sync(catalogReader);
-
-        verify(directChangeHandler).recordDryRun(8L, 5, 200, 5, 229);
-        verify(directChangeHandler, never()).handle(any());
-    }
-
-    @Test
     @DisplayName("sync: un fallo del handler en un horario no corta los demás ni el sync")
     void syncKeepsGoingWhenHandlerFails() {
         when(catalogReader.findAllocations()).thenReturn(List.of(row("101", 55, 1, 200, 5)));
         stubResolvedEvent();
         when(classroomService.findByRoomNumberAndBuildingCode(200, 5)).thenReturn(Optional.of(classroom(50L)));
-        when(scheduleLoader.load(anyList())).thenReturn(new LoadResult(Set.of(), List.of(4L, 5L), List.of()));
+        when(scheduleLoader.load(anyList())).thenReturn(new LoadResult(Set.of(), List.of(4L, 5L)));
         org.mockito.Mockito.doThrow(new IllegalStateException("boom")).when(directChangeHandler).handle(4L);
 
         service.sync(catalogReader);

@@ -292,44 +292,4 @@ class DirectChangeHandlerTest {
                 List.of(new AffectedOccurrence(2L, FUTURE, 40L)));
         verify(stateWriter, never()).toReview(anyLong(), any(), anyCollection());
     }
-
-    @Test
-    @DisplayName("recordDryRun deja las clases que se anularían sin tocar SIGA: excluye las del aula leída, las sin asignación y las liberadas")
-    void dryRunRecordsWouldBeAnnulledClasses() {
-        knownClassroom();
-        slotsAre(slot(1, FUTURE), slot(2, FUTURE), slot(3, FUTURE),
-                slot(4, 10L, FUTURE, OccurrenceStatus.ROOM_RELEASED, null), slot(5, PAST));
-        when(allocationService.findClassroomIdsByOccurrences(anyCollection())).thenReturn(Map.of(
-                1L, 40L, 2L, CLASSROOM_ID, 4L, 41L));
-
-        handler.recordDryRun(SCHEDULE_ID, 5, 228, 5, 229);
-
-        verify(stateWriter).recordDirectChangeDryRun(SCHEDULE_ID, 5, 228, 5, 229,
-                List.of(new AffectedOccurrence(1L, FUTURE, 40L)));
-        verify(allocationService, never()).applySysacadDirectChange(any());
-        verifyNoMoreInteractions(allocationService);
-    }
-
-    @Test
-    @DisplayName("recordDryRun con aula centinela anula todas las clases asignadas y no consulta el aula")
-    void dryRunWithSentinelRoomAnnulsAllAssigned() {
-        slotsAre(slot(1, FUTURE), slot(2, FUTURE));
-        when(allocationService.findClassroomIdsByOccurrences(anyCollection())).thenReturn(Map.of(1L, 40L, 2L, 41L));
-
-        handler.recordDryRun(SCHEDULE_ID, 5, 228, 5, 999);
-
-        verifyNoInteractions(classroomService);
-        verify(stateWriter).recordDirectChangeDryRun(SCHEDULE_ID, 5, 228, 5, 999,
-                List.of(new AffectedOccurrence(1L, FUTURE, 40L), new AffectedOccurrence(2L, FUTURE, 41L)));
-    }
-
-    @Test
-    @DisplayName("recordDryRun de un horario que no existe no hace nada")
-    void dryRunOfUnknownScheduleDoesNothing() {
-        when(scheduleRepository.findById(99L)).thenReturn(Optional.empty());
-
-        handler.recordDryRun(99L, 5, 228, 5, 229);
-
-        verifyNoInteractions(stateWriter, allocationService, classroomService);
-    }
 }
