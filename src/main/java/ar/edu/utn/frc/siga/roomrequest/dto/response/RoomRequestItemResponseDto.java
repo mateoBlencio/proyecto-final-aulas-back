@@ -43,5 +43,19 @@ public record RoomRequestItemResponseDto(
         Instant derivedAt,
         BuildingOptionDto returnedFromBuilding,
         String returnedReason,
-        List<ReleasedDateDto> releasedTargetDates
-) {}
+        List<ReleasedDateDto> releasedTargetDates,
+        ReversionDto reversion
+) {
+
+    /** Solo lo llena la reapertura; el composer deja {@code reversion} nulo. Estático para que MapStruct no lo tome por setter. */
+    public static RoomRequestItemResponseDto withReversion(RoomRequestItemResponseDto base, ReversionDto reversion) {
+        return new RoomRequestItemResponseDto(base.id, base.position, base.status, base.decidedBy, base.decidedAt,
+                base.decisionReason, base.commissions, base.date, base.dayOfWeek, base.startTime, base.endTime,
+                base.durationMinutes, base.estimated, base.enrolled, base.classroomCount, base.requiresProjector,
+                base.requiresComputers, base.computerCount, base.requiresExamUsers, base.requiredSoftware,
+                base.observations, base.preferredClassrooms, base.currentClassrooms, base.assignedClassrooms,
+                base.previousClassroom, base.notifiedAt, base.acceptanceDeadline, base.acceptedAt, base.acceptedBy,
+                base.derivedBuilding, base.derivedAt, base.returnedFromBuilding, base.returnedReason,
+                base.releasedTargetDates, reversion);
+    }
+}

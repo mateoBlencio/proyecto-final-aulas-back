@@ -240,7 +240,7 @@ class RoomRequestSuggestionInputLoaderTest {
     @Test
     void ocupacionDescartaLaDelEventoRecurrenteDeOrigenYLasOcurrenciasPropias() {
         RoomRequestItem item = item(RoomRequestType.ONE_TIME_ROOM_CHANGE).sourceRecurringEventId(100L).build();
-        item.assignClassrooms(List.of(10L), List.of(List.of(900L)), List.of());
+        item.assignClassrooms(List.of(10L), List.of(List.of(900L)), List.of(), Map.of());
         stubItem(item);
         stubCandidates(item, List.of(room(11L, 30, 1L)));
         stubPermissions(Map.of());

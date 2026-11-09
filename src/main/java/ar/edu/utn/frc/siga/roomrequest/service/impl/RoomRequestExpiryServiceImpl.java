@@ -4,7 +4,10 @@ import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.audit.AuditOperations;
 import ar.edu.utn.frc.siga.common.util.Plurals;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItemAllocation;
 import ar.edu.utn.frc.siga.roomrequest.event.RoomRequestItemAccepted;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
@@ -36,6 +39,7 @@ public class RoomRequestExpiryServiceImpl implements RoomRequestExpiryService {
 
     private final RoomRequestItemRepository itemRepository;
     private final AcademicEventService academicEventService;
+    private final OccurrenceService occurrenceService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Override
@@ -50,7 +54,7 @@ public class RoomRequestExpiryServiceImpl implements RoomRequestExpiryService {
         Instant now = Instant.now();
         int accepted = 0;
         for (RoomRequestItem item : expired) {
-            if (item.getStatus() == RoomRequestStatus.NOTIFIED) {
+            if (item.getStatus() == RoomRequestStatus.NOTIFIED || staysInNotifiedClassroom(item)) {
                 accept(item, now);
                 accepted++;
             } else {
@@ -82,6 +86,28 @@ public class RoomRequestExpiryServiceImpl implements RoomRequestExpiryService {
     private void accept(RoomRequestItem item, Instant now) {
         item.accept(SYSTEM_ACTOR, now);
         eventPublisher.publishEvent(new RoomRequestItemAccepted(item.getId(), SYSTEM_ACTOR, now));
+    }
+
+    /** Pedido reabierto cuya clase se quedó en el aula notificada: el docente ya la había visto, así que se acepta en vez de cancelar. */
+    private boolean staysInNotifiedClassroom(RoomRequestItem item) {
+        LocalDate reopenedOn = item.getReopenedFromNotifiedOn();
+        if (item.getStatus() != RoomRequestStatus.IN_EVALUATION || item.getNotificationRound() < 1
+                || reopenedOn == null
+                || !RoomRequestOriginalRestorer.hasOriginalClassroom(item.getRequest().getType())) {
+            return false;
+        }
+        List<Long> principalIds = item.getAllocations().stream()
+                .filter(a -> a.getPosition() == 1)
+                .map(RoomRequestItemAllocation::getOccurrenceId)
+                .toList();
+        if (principalIds.isEmpty()) {
+            return false;
+        }
+        Set<Long> relevantIds = occurrenceService.findSlots(principalIds).stream()
+                .filter(slot -> !slot.date().isBefore(reopenedOn))
+                .map(OccurrenceSlotDto::occurrenceId)
+                .collect(Collectors.toSet());
+        return item.keepsNotifiedClassroom(relevantIds);
     }
 
     private static String cancellationReason(RoomRequestItem item) {

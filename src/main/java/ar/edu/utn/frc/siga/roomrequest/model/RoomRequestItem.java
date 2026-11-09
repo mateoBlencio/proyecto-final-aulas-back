@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.roomrequest.model;
 
+import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.common.converter.DurationMinutesConverter;
 import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import jakarta.persistence.CascadeType;
@@ -170,6 +171,10 @@ public class RoomRequestItem extends TimestampedEntity {
     @Column(name = "id_aula_anterior")
     private Long previousClassroomId;
 
+    /** Día en que se reabrió desde NOTIFIED. Nulo si no se reabrió así o si después se reasignó: reasignar anula el aula que el docente ya vio. */
+    @Column(name = "reabierto_desde")
+    private LocalDate reopenedFromNotifiedOn;
+
     /** Lock optimista: dos resoluciones concurrentes sobre el mismo ítem (assign/notify/cancel a la vez) chocan en el commit en vez de pisarse. */
     @Version
     @Column(name = "version", nullable = false)
@@ -242,6 +247,11 @@ public class RoomRequestItem extends TimestampedEntity {
         this.acceptanceDeadline = null;
         this.acceptedAt = null;
         this.acceptedBy = null;
+        this.reopenedFromNotifiedOn = null;
+    }
+
+    public void markReopenedFromNotified(LocalDate today) {
+        this.reopenedFromNotifiedOn = today;
     }
 
     private static Instant truncateToMicros(Instant value) {
@@ -260,7 +270,8 @@ public class RoomRequestItem extends TimestampedEntity {
      *  classroomIds[i] cubre occurrencesBySlot.get(i): una fila por ocurrencia real, orden = i+1. Solo se borran las filas
      *  de los espejos que se retiraron; las demás (clases pasadas de un cambio regular) quedan con su aula. */
     public void assignClassrooms(List<Long> classroomIds, List<List<Long>> occurrencesBySlot,
-                                 Collection<Long> retiredOccurrenceIds) {
+                                 Collection<Long> retiredOccurrenceIds,
+                                 Map<Long, RoomRequestItemAllocation.Original> originalByOccurrence) {
         Map<Long, RoomRequestItemAllocation> existingByOccurrence = allocations.stream()
                 .collect(java.util.stream.Collectors.toMap(RoomRequestItemAllocation::getOccurrenceId, a -> a));
         Set<Long> keptOccurrenceIds = new HashSet<>();
@@ -270,6 +281,7 @@ public class RoomRequestItem extends TimestampedEntity {
             int position = i + 1;
             for (Long occurrenceId : occurrencesBySlot.get(i)) {
                 keptOccurrenceIds.add(occurrenceId);
+                RoomRequestItemAllocation.Original original = position == 1 ? originalByOccurrence.get(occurrenceId) : null;
                 RoomRequestItemAllocation existing = existingByOccurrence.get(occurrenceId);
                 if (existing != null) {
                     existing.update(classroomId, position);
@@ -279,12 +291,44 @@ public class RoomRequestItem extends TimestampedEntity {
                             .occurrenceId(occurrenceId)
                             .classroomId(classroomId)
                             .position(position)
+                            .originalCaptured(position == 1)
+                            .originalClassroomId(original == null ? null : original.classroomId())
+                            .originalSource(original == null ? null : original.source())
                             .build());
                 }
             }
         }
+        this.reopenedFromNotifiedOn = null;
         allocations.removeIf(a -> !keptOccurrenceIds.contains(a.getOccurrenceId())
                 && retiredOccurrenceIds.contains(a.getOccurrenceId()));
+    }
+
+    /** Solo las filas anteriores a V60 no guardaron el original: sirve el aula anterior del ítem, con origen MANUAL. */
+    public Long originalClassroomOf(RoomRequestItemAllocation allocation) {
+        return allocation.isOriginalCaptured() ? allocation.getOriginalClassroomId() : previousClassroomId;
+    }
+
+    public AllocationSource originalSourceOf(RoomRequestItemAllocation allocation) {
+        return allocation.isOriginalCaptured() ? allocation.getOriginalSource() : AllocationSource.MANUAL;
+    }
+
+    public void moveToOriginal(Collection<Long> occurrenceIds) {
+        allocations.stream()
+                .filter(a -> a.getPosition() == 1 && occurrenceIds.contains(a.getOccurrenceId()))
+                .forEach(a -> a.moveTo(originalClassroomOf(a)));
+    }
+
+    /** Espejos que tomaron el aula que dejó su principal al volver a la original. */
+    public void moveMirrors(Map<Long, Long> classroomByOccurrence) {
+        allocations.stream()
+                .filter(a -> classroomByOccurrence.containsKey(a.getOccurrenceId()))
+                .forEach(a -> a.moveTo(classroomByOccurrence.get(a.getOccurrenceId())));
+    }
+
+    public boolean keepsNotifiedClassroom(Collection<Long> relevantOccurrenceIds) {
+        return allocations.stream()
+                .filter(a -> a.getPosition() == 1 && relevantOccurrenceIds.contains(a.getOccurrenceId()))
+                .anyMatch(a -> !a.getClassroomId().equals(originalClassroomOf(a)));
     }
 
     public void addPreferences(List<Long> classroomIds) {

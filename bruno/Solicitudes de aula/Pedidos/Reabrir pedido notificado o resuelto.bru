@@ -21,7 +21,23 @@ docs {
   AUXILIAR_AULICO (pedidos derivados a su edificio).
 
   Vuelve el pedido de `NOTIFIED` o `RESOLVED` a `IN_EVALUATION`. `reason` es obligatorio y
-  queda en `decisionReason`. Las aulas siguen reservadas hasta que se reasigne con `assign`.
+  queda en `decisionReason`.
+
+  Desde `NOTIFIED` en un cambio de aula (ONE_TIME_ROOM_CHANGE, REGULAR_ROOM_CHANGE,
+  PARTIAL_EXAM_IN_CLASS): cada clase futura vuelve al aula original si está libre; si no, queda en la
+  notificada. Las aulas extra (espejos) siguen asignadas hasta que se reasigne con `assign`. La respuesta
+  trae `reversion`:
+  "reversion": {
+    "reverted": [{ "date": "2026-11-10", "classroom": { "id": 101, "roomNumber": 101, "buildingName": "Central" } }],
+    "kept": [{
+      "date": "2026-11-24",
+      "originalClassroom": { "id": 101, "roomNumber": 101, "buildingName": "Central" },
+      "occupiedBy": { "subjectName": "Análisis Matemático", "commissionCode": "2K3" }
+    }]
+  }
+  En un `kept` sin aula original guardada, `originalClassroom` y `occupiedBy` son null.
+  `reversion` es null desde `RESOLVED` y en los tipos que crea SIGA: ahí las aulas siguen reservadas
+  hasta que se reasigne con `assign`.
   Conserva `notifiedAt`: el front reconoce un pedido reabierto por `IN_EVALUATION` con
   `notifiedAt` no nulo. Limpia `acceptanceDeadline`, `acceptedAt` y `acceptedBy`.
 

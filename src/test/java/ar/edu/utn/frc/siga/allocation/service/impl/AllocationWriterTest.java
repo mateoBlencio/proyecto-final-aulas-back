@@ -244,6 +244,23 @@ class AllocationWriterTest {
     }
 
     @Test
+    @DisplayName("restore: persiste el origen SYSACAD pero publica el movimiento como MANUAL")
+    void restorePersistsOriginalSourceButPublishesAsManual() {
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 3L);
+        Allocation existing = allocation(100L, 10L, 5L, AllocationSource.MANUAL);
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of(existing));
+
+        writer.restore(mapOf(occ, 7L), "reapertura", AllocationSource.SYSACAD);
+
+        assertThat(existing.getClassroomId()).isEqualTo(7L);
+        assertThat(existing.getSource()).isEqualTo(AllocationSource.SYSACAD);
+        assertThat(publishedChanges(AllocationSource.MANUAL, "reapertura")).containsExactly(
+                new Change(10L, 3L, occ.date(), occ.startTime(), occ.endTime(), 5L, 7L));
+        verify(movementPublisher, never()).publish(eq(AllocationSource.SYSACAD), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     @DisplayName("create: ocurrencia sin asignación previa publica Change con from nulo")
     void createPublishesChangeWithNullFrom() {
         OccurrenceSlotDto occ = occurrenceSlot(10L, 3L);

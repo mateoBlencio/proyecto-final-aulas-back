@@ -40,6 +40,7 @@ public interface RoomRequestMapper {
     @Mapping(target = "returnedFromBuilding", source = "returnedFromBuilding")
     @Mapping(target = "enrolled", source = "enrolled")
     @Mapping(target = "releasedTargetDates", source = "releasedTargetDates")
+    @Mapping(target = "reversion", ignore = true)
     @Mapping(target = "endTime", expression = "java(item.endTime())")
     @Mapping(target = "durationMinutes",
              expression = "java(item.getDuration() == null ? null : item.getDuration().toMinutes())")

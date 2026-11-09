@@ -9,6 +9,8 @@ import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.ReleaseCommand;
+import ar.edu.utn.frc.siga.allocation.service.command.RestoreCommand;
+import ar.edu.utn.frc.siga.allocation.service.command.RestoreResult;
 import ar.edu.utn.frc.siga.allocation.service.command.SysacadDirectChangeCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.SysacadDirectChangeResult;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
@@ -88,6 +90,9 @@ public interface AllocationService {
      * actor y origen {@code SYSACAD}.
      */
     SysacadDirectChangeResult applySysacadDirectChange(SysacadDirectChangeCommand command);
+
+    /** No revisa el alcance por edificio: la autorización la hace quien llama. */
+    RestoreResult restoreClassrooms(RestoreCommand command);
 
     /** Usuario y operación de la última revisión de auditoría de la asignación de la ocurrencia. */
     Optional<AllocationLastRevisionDto> findLastRevision(Long occurrenceId);
