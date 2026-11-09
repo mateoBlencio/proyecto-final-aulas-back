@@ -34,7 +34,12 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.BeforeEach;
+import org.slf4j.LoggerFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,6 +48,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.env.MockEnvironment;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CommissionMessageSender")
@@ -68,14 +74,17 @@ class CommissionMessageSenderTest {
     private CommissionMessageSender sender;
     private RequestPacer pacer;
     private SysacadSchedule schedule;
+    private MockEnvironment environment;
 
     @BeforeEach
     void setUp() {
         properties = new SysacadProperties();
         runtimeSettings = SysacadTestSettings.with(SysacadWriteMode.ON);
         lenient().when(runtimeSettings.commissionMessageMode()).thenReturn(CommissionMessageMode.ON);
+        environment = new MockEnvironment();
+        environment.setActiveProfiles("prod");
         sender = new CommissionMessageSender(client, stateWriter, subjectService, classroomService, properties,
-                runtimeSettings);
+                runtimeSettings, environment);
         pacer = new RequestPacer(Clock.systemUTC(), wait -> { }, 30);
         schedule = SysacadSchedule.builder().id(SCHEDULE_ID)
                 .year(2026).specialty(9).plan(2023).subject(101).commission(1).build();
@@ -113,9 +122,22 @@ class CommissionMessageSenderTest {
     }
 
     @Test
-    @DisplayName("En TEST_COMMISSIONS manda a una comisión listada")
-    void testModeSendsToListedCommission() {
-        when(runtimeSettings.commissionMessageMode()).thenReturn(CommissionMessageMode.TEST_COMMISSIONS);
+    @DisplayName("En ON con perfil prod manda a una comisión que no está listada")
+    void onInProdSendsToUnlistedCommission() {
+        properties.setCommissionMessageTestCommissions(List.of(new MessageCommission(27, 2008, 581, 5)));
+        subjectIs("Física I");
+        buildingIs("Maders");
+        when(client.sendCommissionMessage(any())).thenReturn(new CommissionMessageResult(true, "ok"));
+
+        sender.sendAfterConfirmation(schedule, decision(ROOM), pacer);
+
+        assertThat(sentCommand().commission()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("En ON sin perfil prod manda a una comisión listada")
+    void onOutsideProdSendsToListedCommission() {
+        environment.setActiveProfiles("dev");
         properties.setCommissionMessageTestCommissions(List.of(new MessageCommission(9, 2023, 101, 1)));
         subjectIs("Física I");
         buildingIs("Maders");
@@ -127,9 +149,9 @@ class CommissionMessageSenderTest {
     }
 
     @Test
-    @DisplayName("En TEST_COMMISSIONS sin comisiones listadas no avisa a nadie")
-    void testModeWithoutListSendsToNobody() {
-        when(runtimeSettings.commissionMessageMode()).thenReturn(CommissionMessageMode.TEST_COMMISSIONS);
+    @DisplayName("En ON sin perfil prod y sin comisiones listadas no avisa a nadie")
+    void onOutsideProdWithoutListSendsToNobody() {
+        environment.setActiveProfiles("dev");
 
         sender.sendAfterConfirmation(schedule, decision(ROOM), pacer);
 
@@ -138,9 +160,9 @@ class CommissionMessageSenderTest {
 
     @ParameterizedTest(name = "especialidad {0}, plan {1}, materia {2}, comisión {3}")
     @CsvSource({"27, 2023, 101, 1", "9, 2008, 101, 1", "9, 2023, 581, 1", "9, 2023, 101, 2"})
-    @DisplayName("En TEST_COMMISSIONS, un horario que difiere de la comisión listada en un solo campo no recibe el mensaje")
-    void testModeSkipsUnlistedCommission(int specialty, int plan, int subject, int commission) {
-        when(runtimeSettings.commissionMessageMode()).thenReturn(CommissionMessageMode.TEST_COMMISSIONS);
+    @DisplayName("En ON sin perfil prod, un horario que difiere de la comisión listada en un solo campo no recibe el mensaje")
+    void onOutsideProdSkipsUnlistedCommission(int specialty, int plan, int subject, int commission) {
+        environment.setActiveProfiles("dev");
         properties.setCommissionMessageTestCommissions(List.of(new MessageCommission(9, 2023, 101, 1)));
         schedule = SysacadSchedule.builder().id(SCHEDULE_ID).year(2026)
                 .specialty(specialty).plan(plan).subject(subject).commission(commission).build();
@@ -237,5 +259,36 @@ class CommissionMessageSenderTest {
                 .doesNotThrowAnyException();
 
         verify(stateWriter, never()).recordCommissionMessage(any(), any(), any(), any(), any(), eq(false), any());
+    }
+
+    @Test
+    @DisplayName("Con ON fuera de prod avisa al arrancar que solo llega a las comisiones de prueba")
+    void warnsOnStartupWhenOnOutsideProd() {
+        environment.setActiveProfiles("dev");
+        ListAppender<ILoggingEvent> logs = captureLogs();
+
+        sender.warnIfLimitedToTestCommissions();
+
+        assertThat(logs.list).extracting(ILoggingEvent::getLevel).containsExactly(Level.WARN);
+    }
+
+    @Test
+    @DisplayName("No avisa al arrancar con ON en prod ni con OFF fuera de prod")
+    void doesNotWarnInProdOrWhenOff() {
+        ListAppender<ILoggingEvent> logs = captureLogs();
+        sender.warnIfLimitedToTestCommissions();
+
+        environment.setActiveProfiles("dev");
+        when(runtimeSettings.commissionMessageMode()).thenReturn(CommissionMessageMode.OFF);
+        sender.warnIfLimitedToTestCommissions();
+
+        assertThat(logs.list).isEmpty();
+    }
+
+    private static ListAppender<ILoggingEvent> captureLogs() {
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        ((Logger) LoggerFactory.getLogger(CommissionMessageSender.class)).addAppender(appender);
+        return appender;
     }
 }

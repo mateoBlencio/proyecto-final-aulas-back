@@ -205,7 +205,7 @@ class SettingsApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.sysacad[?(@.key=='sysacad.write.mode')].type").value("ENUM"))
                 .andExpect(jsonPath("$.sysacad[?(@.key=='sysacad.write.mode')].options")
                         .value(org.hamcrest.Matchers.contains(
-                                org.hamcrest.Matchers.contains("OFF", "DRY_RUN", "SANDBOX", "ON"))))
+                                org.hamcrest.Matchers.contains("OFF", "SANDBOX", "ON"))))
                 .andExpect(jsonPath("$.allocation[?(@.key=='allocation.maxOverlapMinutes')].options")
                         .value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.empty())));
     }
@@ -218,22 +218,6 @@ class SettingsApiIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(settingRepository.findById("sysacad.write.mode"))
                 .get().extracting(Setting::getValue).isEqualTo("OFF");
-    }
-
-    @Test
-    @DisplayName("PUT de sysacad.write.mode=DRY_RUN persiste y se vuelve a OFF al final")
-    void put_enumValidOption_persists() throws Exception {
-        try {
-            putValue("sysacad.write.mode", "DRY_RUN")
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.value").value("DRY_RUN"));
-
-            assertThat(settingRepository.findById("sysacad.write.mode"))
-                    .get().extracting(Setting::getValue).isEqualTo("DRY_RUN");
-        } finally {
-            new TransactionTemplate(transactionManager).executeWithoutResult(tx ->
-                    settingsStore.write(SettingKey.SYSACAD_WRITE_MODE, "OFF"));
-        }
     }
 
     @Test

@@ -18,7 +18,6 @@ import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadScheduleStatus;
 import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleRepository;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -94,29 +93,6 @@ public class DirectChangeHandler {
                                     change.fromClassroomId()))
                             .toList());
         }
-    }
-
-    /** DRY_RUN: deja en el registro las clases que un cambio directo habría anulado, sin tocar SIGA. */
-    public void recordDryRun(Long scheduleId, Integer fromBuilding, Integer fromRoom, Integer toBuilding,
-            Integer toRoom) {
-        SysacadSchedule schedule = scheduleRepository.findById(scheduleId).orElse(null);
-        if (schedule == null) {
-            return;
-        }
-        Long readClassroomId = SENTINEL_ROOM_NUMBERS.contains(toRoom) ? null
-                : classroomService.findByRoomNumberAndBuildingCode(toRoom, toBuilding)
-                        .map(ClassroomResponseDto::id).orElse(null);
-        List<OccurrenceSlotDto> futureClasses = futureClasses(eventIdsOf(schedule)).stream()
-                .filter(o -> o.status() != OccurrenceStatus.ROOM_RELEASED)
-                .toList();
-        Map<Long, Long> classroomByOccurrence = allocationService.findClassroomIdsByOccurrences(
-                futureClasses.stream().map(OccurrenceSlotDto::occurrenceId).toList());
-        List<AffectedOccurrence> wouldAnnul = futureClasses.stream()
-                .filter(o -> classroomByOccurrence.containsKey(o.occurrenceId()))
-                .filter(o -> !classroomByOccurrence.get(o.occurrenceId()).equals(readClassroomId))
-                .map(o -> new AffectedOccurrence(o.occurrenceId(), o.date(), classroomByOccurrence.get(o.occurrenceId())))
-                .toList();
-        stateWriter.recordDirectChangeDryRun(scheduleId, fromBuilding, fromRoom, toBuilding, toRoom, wouldAnnul);
     }
 
     private List<OccurrenceSlotDto> futureClasses(Set<Long> eventIds) {

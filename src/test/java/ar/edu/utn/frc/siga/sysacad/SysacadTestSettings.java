@@ -19,7 +19,6 @@ public final class SysacadTestSettings {
         lenient().when(settings.commissionMessageMode()).thenReturn(CommissionMessageMode.OFF);
         lenient().when(settings.jobDelay()).thenReturn(Duration.ofMinutes(5));
         lenient().when(settings.viewReadInterval()).thenReturn(Duration.ofHours(1));
-        lenient().when(settings.syncCron()).thenReturn("0 0 3 * * SUN");
         return settings;
     }
 }

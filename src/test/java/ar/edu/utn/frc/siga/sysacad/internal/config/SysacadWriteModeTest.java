@@ -10,7 +10,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 class SysacadWriteModeTest {
 
     @ParameterizedTest
-    @CsvSource({"OFF,false", "DRY_RUN,false", "SANDBOX,true", "ON,true"})
+    @CsvSource({"OFF,false", "SANDBOX,true", "ON,true"})
     @DisplayName("keepsSigaChanges: solo SANDBOX y ON conservan en SIGA los cambios de aula")
     void keepsSigaChanges(SysacadWriteMode mode, boolean expected) {
         assertThat(mode.keepsSigaChanges()).isEqualTo(expected);

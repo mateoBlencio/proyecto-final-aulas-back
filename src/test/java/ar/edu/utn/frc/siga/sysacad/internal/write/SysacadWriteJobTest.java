@@ -94,11 +94,11 @@ class SysacadWriteJobTest {
     }
 
     @Test
-    @DisplayName("Con el modo DRY_RUN también agenda la corrida")
-    void dryRunAlsoSchedules() {
+    @DisplayName("Con el modo SANDBOX también agenda la corrida")
+    void sandboxAlsoSchedules() {
         when(run.run(NOW)).thenReturn(OK);
 
-        jobIn(SysacadWriteMode.DRY_RUN).start();
+        jobIn(SysacadWriteMode.SANDBOX).start();
 
         assertThat(job.isRunning()).isTrue();
         verify(run, timeout(2000).atLeastOnce()).run(NOW);
@@ -291,10 +291,10 @@ class SysacadWriteJobTest {
     }
 
     @Test
-    @DisplayName("runNow en DRY_RUN también corre")
-    void runNowInDryRunRuns() {
+    @DisplayName("runNow en SANDBOX también corre")
+    void runNowInSandboxRuns() {
         when(run.run(NOW)).thenReturn(OK);
-        jobIn(SysacadWriteMode.DRY_RUN);
+        jobIn(SysacadWriteMode.SANDBOX);
 
         assertThat(job.runNow()).isSameAs(OK);
     }

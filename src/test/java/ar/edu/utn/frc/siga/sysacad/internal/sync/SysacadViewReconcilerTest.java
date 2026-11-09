@@ -194,7 +194,7 @@ class SysacadViewReconcilerTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = SysacadWriteMode.class, names = {"OFF", "DRY_RUN"})
+    @EnumSource(value = SysacadWriteMode.class, names = {"OFF"})
     @DisplayName("sin escritura activa: EXTERNAL_CHANGE_APPLIED y actualiza el conocido y la base")
     void writeNotOnAppliesExternalChange(SysacadWriteMode mode) {
         SysacadSchedule schedule = schedule();

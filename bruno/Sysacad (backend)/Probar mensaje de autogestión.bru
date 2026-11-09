@@ -1,0 +1,34 @@
+meta {
+  name: Probar mensaje de autogestión
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/v1/sysacad/write/test-commission-message
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "specialty": 5,
+    "plan": 2023,
+    "subject": 581,
+    "commission": 5,
+    "year": 2026,
+    "classDate": "2026-11-12",
+    "building": 4,
+    "room": 301
+  }
+}
+
+docs {
+  ADVERTENCIA: publica un mensaje real en autogestión. Endpoint descartable.
+  Arma el mismo texto que sale tras un envío confirmado y lo publica con
+  EnviarMensajeComision, visible hasta classDate. Solo acepta las comisiones de
+  siga.sysacad.commission-message-test-commissions (hoy el curso TEST de
+  Gestión de la Calidad (Elec.), 5/2023/581/5); otra responde 400. Ignora el
+  setting sysacad.autogestion.mode y no deja registro en la base. Requiere
+  PERM_SYSACAD_SYNC y siga.sysacad.enabled=true.
+}

@@ -9,7 +9,6 @@ import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadScheduleStatus;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadWriteState;
 import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleRepository;
-import ar.edu.utn.frc.siga.sysacad.internal.sync.SysacadScheduleLoader.DryRunChange;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NoRoom;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NoRoomAfterCancel;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NotSendable;
@@ -123,8 +122,8 @@ public class SysacadWriteRun {
                     case NotSendable notSendable -> scheduleWriter.recordEvent(schedule.getId(),
                             ScheduleLogType.DESTINATION_NOT_SENDABLE, null, null, notSendable.occurrenceId(), null,
                             notSendable.reason().name());
-                    case Send send when mode == SysacadWriteMode.DRY_RUN -> scheduleWriter.recordEvent(
-                            schedule.getId(), ScheduleLogType.DRY_RUN_SEND, send.building(), send.room(),
+                    case Send send when mode == SysacadWriteMode.SANDBOX -> scheduleWriter.recordEvent(
+                            schedule.getId(), ScheduleLogType.SANDBOX_SEND, send.building(), send.room(),
                             send.occurrenceId(), null, null);
                     case Send send -> {
                         if (!mode.sendsToSysacad()
@@ -172,15 +171,6 @@ public class SysacadWriteRun {
             } catch (RuntimeException e) {
                 log.error("No se pudo procesar el cambio directo del horario {}", scheduleId, e);
                 execution.errors.add("Cambio directo del horario " + scheduleId + ": " + e);
-            }
-        }
-        for (DryRunChange change : result.dryRunChanges()) {
-            try {
-                directChangeHandler.recordDryRun(change.scheduleId(), change.fromBuilding(), change.fromRoom(),
-                        change.toBuilding(), change.toRoom());
-            } catch (RuntimeException e) {
-                log.error("No se pudo registrar el cambio directo simulado del horario {}", change.scheduleId(), e);
-                execution.errors.add("Cambio directo simulado del horario " + change.scheduleId() + ": " + e);
             }
         }
         return true;

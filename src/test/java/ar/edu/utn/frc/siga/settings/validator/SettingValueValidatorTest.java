@@ -86,8 +86,8 @@ class SettingValueValidatorTest {
     @Test
     @DisplayName("ENUM con una opción del catálogo se acepta")
     void enumValidOptionIsAccepted() {
-        assertThat(validator.validate(SettingKey.SYSACAD_WRITE_MODE, "DRY_RUN")).isEqualTo("DRY_RUN");
-        assertThat(validator.validate(SettingKey.SYSACAD_SYNC_DAY_OF_WEEK, "WED")).isEqualTo("WED");
+        assertThat(validator.validate(SettingKey.SYSACAD_WRITE_MODE, "SANDBOX")).isEqualTo("SANDBOX");
+        assertThat(validator.validate(SettingKey.SYSACAD_AUTOGESTION_MODE, "ON")).isEqualTo("ON");
     }
 
     @Test
@@ -96,7 +96,7 @@ class SettingValueValidatorTest {
         assertThatThrownBy(() -> validator.validate(SettingKey.SYSACAD_WRITE_MODE, "MAYBE"))
                 .isInstanceOf(InvalidSettingValueException.class)
                 .hasMessageContaining("MAYBE")
-                .hasMessageContaining("DRY_RUN");
+                .hasMessageContaining("SANDBOX");
     }
 
     @Test
@@ -113,7 +113,7 @@ class SettingValueValidatorTest {
     void enumIsCaseSensitive() {
         assertThatThrownBy(() -> validator.validate(SettingKey.SYSACAD_WRITE_MODE, "on"))
                 .isInstanceOf(InvalidSettingValueException.class);
-        assertThatThrownBy(() -> validator.validate(SettingKey.SYSACAD_SYNC_DAY_OF_WEEK, "Sun"))
+        assertThatThrownBy(() -> validator.validate(SettingKey.SYSACAD_AUTOGESTION_MODE, "on"))
                 .isInstanceOf(InvalidSettingValueException.class);
     }
 

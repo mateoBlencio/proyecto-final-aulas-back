@@ -336,7 +336,7 @@ class SysacadWriteCycleIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("SANDBOX no llama a SysAcad y deja el horario sin enviar; al pasar a ON se envía una sola vez")
+    @DisplayName("SANDBOX no llama a SysAcad, registra el envío que haría y deja el horario sin enviar; al pasar a ON se envía una sola vez")
     void sandboxHoldsTheSendUntilOn() {
         Seeded seeded = seed(true, true);
         viewShows(seeded, 228);
@@ -353,7 +353,7 @@ class SysacadWriteCycleIntegrationTest extends AbstractIntegrationTest {
         SysacadSchedule held = schedule(seeded);
         assertThat(held.getKnownRoom()).isEqualTo(228);
         assertThat(held.getStatus()).isEqualTo(SysacadScheduleStatus.SYNCED);
-        assertThat(logTypes(seeded)).isEmpty();
+        assertThat(logTypes(seeded)).containsExactly(ScheduleLogType.SANDBOX_SEND.name());
         assertThat(allocationRepository.findByOccurrenceId(seeded.occurrenceId()).orElseThrow().getClassroomId())
                 .isEqualTo(seeded.target().getId());
 
@@ -364,7 +364,8 @@ class SysacadWriteCycleIntegrationTest extends AbstractIntegrationTest {
         verify(writeClient, times(1)).updateRoom(any());
         SysacadSchedule sent = schedule(seeded);
         assertThat(sent.getKnownRoom()).isEqualTo(229);
-        assertThat(logTypes(seeded)).containsExactly(ScheduleLogType.SEND_INTENT.name(),
+        assertThat(logTypes(seeded)).containsExactly(ScheduleLogType.SANDBOX_SEND.name(),
+                ScheduleLogType.SEND_INTENT.name(),
                 ScheduleLogType.SEND_CONFIRMED.name());
     }
 

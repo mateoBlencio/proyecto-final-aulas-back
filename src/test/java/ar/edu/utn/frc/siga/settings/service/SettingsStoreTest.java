@@ -92,8 +92,8 @@ class SettingsStoreTest {
             return null;
         }).when(eventPublisher).publishEvent(any(SettingChangedEvent.class));
 
-        store.write(key, "DRY_RUN");
+        store.write(key, "SANDBOX");
 
-        assertThat(seenByListener.get()).isEqualTo("DRY_RUN");
+        assertThat(seenByListener.get()).isEqualTo("SANDBOX");
     }
 }

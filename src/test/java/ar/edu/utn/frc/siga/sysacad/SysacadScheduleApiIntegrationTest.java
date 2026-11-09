@@ -52,7 +52,7 @@ class SysacadScheduleApiIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void useWriteMode() {
-        SysacadModeSupport.use(settingsStore, SysacadWriteMode.DRY_RUN);
+        SysacadModeSupport.use(settingsStore, SysacadWriteMode.SANDBOX);
     }
 
     @AfterEach
@@ -214,7 +214,7 @@ class SysacadScheduleApiIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/v1/sysacad/write/status"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.mode").value("DRY_RUN"))
+                .andExpect(jsonPath("$.mode").value("SANDBOX"))
                 .andExpect(jsonPath("$.reviewCount").value(1))
                 .andExpect(jsonPath("$.waitingCount").value(0));
     }
