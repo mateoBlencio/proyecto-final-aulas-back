@@ -9,15 +9,20 @@ import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.service.BuildingService;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -27,6 +32,7 @@ import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -36,6 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -65,6 +72,12 @@ class RoomRequestCandidateResolverTest {
 
     @InjectMocks
     private RoomRequestCandidateResolver resolver;
+
+    @BeforeEach
+    void ownOccurrencesWithoutMirrors() {
+        lenient().when(occurrenceResolver.withMirrors(any(), any(), any()))
+                .thenAnswer(invocation -> new HashSet<Long>(invocation.getArgument(1)));
+    }
 
     @Test
     @DisplayName("findAllowedClassrooms: ítem inexistente → 404")
@@ -96,9 +109,9 @@ class RoomRequestCandidateResolverTest {
     @DisplayName("findAllowedClassrooms: requiresComputers acepta cualquier aula con al menos 1 PC y expone sus PCs")
     void findAllowedClassrooms_filtraPorComputadoras() {
         LocalDate date = LocalDate.of(2026, 3, 10);
-        RoomRequestItem item = RoomRequestItem.builder()
+        RoomRequestItem item = onRequest(RoomRequestType.FINAL_EXAM, RoomRequestItem.builder()
                 .date(date).startTime(LocalTime.of(10, 0)).duration(Duration.ofMinutes(60))
-                .requiresComputers(true).computerCount(20).build();
+                .requiresComputers(true).computerCount(20).build());
         when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
         when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(101L), classroom(102L)));
         when(classroomService.findIdsWithResourceAtLeast("Cantidad de PC", 1)).thenReturn(Set.of(101L));
@@ -115,9 +128,9 @@ class RoomRequestCandidateResolverTest {
     @DisplayName("findAllowedClassrooms: requiresProjector filtra por ese recurso")
     void findAllowedClassrooms_filtraPorProyector() {
         LocalDate date = LocalDate.of(2026, 3, 10);
-        RoomRequestItem item = RoomRequestItem.builder()
+        RoomRequestItem item = onRequest(RoomRequestType.FINAL_EXAM, RoomRequestItem.builder()
                 .date(date).startTime(LocalTime.of(10, 0)).duration(Duration.ofMinutes(60))
-                .requiresProjector(true).build();
+                .requiresProjector(true).build());
         when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
         when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(101L), classroom(102L)));
         when(classroomService.findIdsWithResourceAtLeast("Proyector", 1)).thenReturn(Set.of(102L));
@@ -138,6 +151,160 @@ class RoomRequestCandidateResolverTest {
         when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of());
 
         assertThat(resolver.findAllowedClassrooms(1L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("findAllowedClassrooms: cambio regular marca current el aula de las clases propias y la deja available")
+    void findAllowedClassrooms_regularMarcaAulaActual() {
+        RoomRequestItem item = regularItem();
+        givenOwnMondays(item);
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(215L), classroom(230L), classroom(300L)));
+        when(allocationOccupancyService.findOccupancy(MONDAY_1, MONDAY_3)).thenReturn(List.of(
+                busy(215L, MONDAY_1, "19:55", "22:55", 100L),
+                busy(215L, MONDAY_2, "19:55", "22:55", 101L),
+                busy(215L, MONDAY_3, "19:55", "22:55", 102L),
+                busy(230L, MONDAY_2, "20:00", "21:00", 55L)));
+
+        List<AllowedClassroomDto> result = resolver.findAllowedClassrooms(1L);
+
+        assertThat(result).extracting(AllowedClassroomDto::id, AllowedClassroomDto::current, AllowedClassroomDto::available)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(215L, true, true),
+                        org.assertj.core.groups.Tuple.tuple(230L, false, false),
+                        org.assertj.core.groups.Tuple.tuple(300L, false, true));
+    }
+
+    @Test
+    @DisplayName("findAllowedClassrooms: cambio regular con las clases en aulas distintas marca current todas esas aulas")
+    void findAllowedClassrooms_regularMarcaVariasAulasActuales() {
+        RoomRequestItem item = regularItem();
+        givenOwnMondays(item);
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(215L), classroom(216L), classroom(300L)));
+        when(allocationOccupancyService.findOccupancy(MONDAY_1, MONDAY_3)).thenReturn(List.of(
+                busy(215L, MONDAY_1, "19:55", "22:55", 100L),
+                busy(216L, MONDAY_2, "19:55", "22:55", 101L),
+                busy(216L, MONDAY_3, "19:55", "22:55", 102L)));
+
+        List<AllowedClassroomDto> result = resolver.findAllowedClassrooms(1L);
+
+        assertThat(result).filteredOn(AllowedClassroomDto::current).extracting(AllowedClassroomDto::id)
+                .containsExactlyInAnyOrder(215L, 216L);
+        assertThat(result).extracting(AllowedClassroomDto::available).containsOnly(true);
+    }
+
+    @Test
+    @DisplayName("findAllowedClassrooms: cambio puntual marca current solo el aula de la clase de esa fecha")
+    void findAllowedClassrooms_puntualMarcaAulaActual() {
+        LocalDate date = LocalDate.of(2026, 10, 20);
+        RoomRequestItem item = itemFor(RoomRequestType.ONE_TIME_ROOM_CHANGE, date, LocalTime.of(19, 55), 180);
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(occurrenceResolver.findOptionalOccurrenceOnDate(item)).thenReturn(Optional.of(100L));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(215L), classroom(230L), classroom(300L)));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of(
+                busy(215L, date, "19:55", "22:55", 100L),
+                busy(230L, date, "20:00", "21:00", 55L)));
+
+        List<AllowedClassroomDto> result = resolver.findAllowedClassrooms(1L);
+
+        assertThat(result).extracting(AllowedClassroomDto::id, AllowedClassroomDto::current, AllowedClassroomDto::available)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(215L, true, true),
+                        org.assertj.core.groups.Tuple.tuple(230L, false, false),
+                        org.assertj.core.groups.Tuple.tuple(300L, false, true));
+    }
+
+    @Test
+    @DisplayName("findAllowedClassrooms: parcial en clase marca current el aula de la clase de esa fecha")
+    void findAllowedClassrooms_parcialEnClaseMarcaAulaActual() {
+        LocalDate date = LocalDate.of(2026, 10, 20);
+        RoomRequestItem item = itemFor(RoomRequestType.PARTIAL_EXAM_IN_CLASS, date, LocalTime.of(19, 55), 180);
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(occurrenceResolver.findOptionalOccurrenceOnDate(item)).thenReturn(Optional.of(100L));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(215L), classroom(300L)));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of(
+                busy(215L, date, "19:55", "22:55", 100L)));
+
+        List<AllowedClassroomDto> result = resolver.findAllowedClassrooms(1L);
+
+        assertThat(result).filteredOn(AllowedClassroomDto::current).extracting(AllowedClassroomDto::id)
+                .containsExactly(215L);
+        assertThat(result.getFirst().available()).isTrue();
+    }
+
+    @Test
+    @DisplayName("findAllowedClassrooms: cambio puntual con otra clase en la misma aula y franja sigue available=false")
+    void findAllowedClassrooms_puntualOtraOcupacionEnElAulaActual() {
+        LocalDate date = LocalDate.of(2026, 10, 20);
+        RoomRequestItem item = itemFor(RoomRequestType.ONE_TIME_ROOM_CHANGE, date, LocalTime.of(19, 55), 180);
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(occurrenceResolver.findOptionalOccurrenceOnDate(item)).thenReturn(Optional.of(100L));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(215L)));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of(
+                busy(215L, date, "19:55", "22:55", 100L),
+                busy(215L, date, "21:00", "22:00", 77L)));
+
+        AllowedClassroomDto result = resolver.findAllowedClassrooms(1L).getFirst();
+
+        assertThat(result.current()).isTrue();
+        assertThat(result.available()).isFalse();
+    }
+
+    @Test
+    @DisplayName("findAllowedClassrooms: las aulas de los espejos de la clase también son current y available")
+    void findAllowedClassrooms_puntualConEspejos() {
+        LocalDate date = LocalDate.of(2026, 10, 20);
+        RoomRequestItem item = itemFor(RoomRequestType.ONE_TIME_ROOM_CHANGE, date, LocalTime.of(19, 55), 180);
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(occurrenceResolver.findOptionalOccurrenceOnDate(item)).thenReturn(Optional.of(100L));
+        when(occurrenceResolver.withMirrors(item, Set.of(100L), date)).thenReturn(Set.of(100L, 200L));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(215L), classroom(216L), classroom(300L)));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of(
+                busy(215L, date, "19:55", "22:55", 100L),
+                busy(216L, date, "19:55", "22:55", 200L)));
+
+        List<AllowedClassroomDto> result = resolver.findAllowedClassrooms(1L);
+
+        assertThat(result).extracting(AllowedClassroomDto::id, AllowedClassroomDto::current, AllowedClassroomDto::available)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(215L, true, true),
+                        org.assertj.core.groups.Tuple.tuple(216L, true, true),
+                        org.assertj.core.groups.Tuple.tuple(300L, false, true));
+    }
+
+    @Test
+    @DisplayName("findAllowedClassrooms: si la clase de esa fecha no existe no falla y ninguna aula es current")
+    void findAllowedClassrooms_puntualSinClaseEnLaFecha() {
+        LocalDate date = LocalDate.of(2026, 10, 20);
+        RoomRequestItem item = itemFor(RoomRequestType.ONE_TIME_ROOM_CHANGE, date, LocalTime.of(19, 55), 180);
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(occurrenceResolver.findOptionalOccurrenceOnDate(item)).thenReturn(Optional.empty());
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(215L), classroom(300L)));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of(
+                busy(215L, date, "19:55", "22:55", 100L)));
+
+        List<AllowedClassroomDto> result = resolver.findAllowedClassrooms(1L);
+
+        assertThat(result).extracting(AllowedClassroomDto::current).containsOnly(false);
+        assertThat(result).extracting(AllowedClassroomDto::available).containsExactly(false, true);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = RoomRequestType.class, names = {"PARTIAL_EXAM_OFF_SCHEDULE", "FINAL_EXAM", "CONFERENCE", "OTHER"})
+    @DisplayName("findAllowedClassrooms: los pedidos que crean un evento nuevo no marcan ninguna aula como current")
+    void findAllowedClassrooms_eventoNuevoNingunaCurrent(RoomRequestType type) {
+        LocalDate date = LocalDate.of(2026, 10, 20);
+        RoomRequestItem item = itemFor(type, date, LocalTime.of(19, 55), 180);
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findAllAvailable()).thenReturn(List.of(classroom(215L)));
+        when(allocationOccupancyService.findOccupancy(date, date)).thenReturn(List.of(
+                busy(215L, date, "19:55", "22:55", 100L)));
+
+        List<AllowedClassroomDto> result = resolver.findAllowedClassrooms(1L);
+
+        assertThat(result).extracting(AllowedClassroomDto::current).containsOnly(false);
+        verifyNoInteractions(occurrenceResolver);
     }
 
     @Test
@@ -260,9 +427,9 @@ class RoomRequestCandidateResolverTest {
     @DisplayName("findAllowedClassrooms: laboratorio derivado devuelve solo las aulas del edificio derivado")
     void findAllowedClassrooms_laboratorioDerivado() {
         LocalDate date = LocalDate.of(2026, 3, 10);
-        RoomRequestItem item = RoomRequestItem.builder()
+        RoomRequestItem item = onRequest(RoomRequestType.FINAL_EXAM, RoomRequestItem.builder()
                 .date(date).startTime(LocalTime.of(10, 0)).duration(Duration.ofMinutes(60))
-                .requiresComputers(true).computerCount(67).derivedBuildingId(1L).build();
+                .requiresComputers(true).computerCount(67).derivedBuildingId(1L).build());
         when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
         when(classroomService.findAllAvailable()).thenReturn(
                 List.of(classroom(101L, 1L, "A"), classroom(301L, 3L, "C")));
@@ -276,9 +443,9 @@ class RoomRequestCandidateResolverTest {
     @DisplayName("findAllowedClassrooms: pedido sin computadoras derivado también devuelve solo el edificio derivado")
     void findAllowedClassrooms_derivadoSinComputadoras() {
         LocalDate date = LocalDate.of(2026, 3, 10);
-        RoomRequestItem item = RoomRequestItem.builder()
+        RoomRequestItem item = onRequest(RoomRequestType.FINAL_EXAM, RoomRequestItem.builder()
                 .date(date).startTime(LocalTime.of(10, 0)).duration(Duration.ofMinutes(60))
-                .requiresComputers(false).derivedBuildingId(1L).build();
+                .requiresComputers(false).derivedBuildingId(1L).build());
         when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
         when(classroomService.findAllAvailable()).thenReturn(
                 List.of(classroom(101L, 1L, "A"), classroom(301L, 3L, "C")));
@@ -425,9 +592,9 @@ class RoomRequestCandidateResolverTest {
     }
 
     private static RoomRequestItem regularItem() {
-        return RoomRequestItem.builder()
+        return onRequest(RoomRequestType.REGULAR_ROOM_CHANGE, RoomRequestItem.builder()
                 .dayOfWeek(DayOfWeek.MONDAY).startTime(LocalTime.of(19, 55)).duration(Duration.ofHours(3))
-                .build();
+                .build());
     }
 
     private void givenOwnMondays(RoomRequestItem item) {
@@ -445,9 +612,19 @@ class RoomRequestCandidateResolverTest {
     }
 
     private static RoomRequestItem itemFor(LocalDate date, LocalTime startTime, int durationMinutes) {
-        return RoomRequestItem.builder()
+        return itemFor(RoomRequestType.FINAL_EXAM, date, startTime, durationMinutes);
+    }
+
+    private static RoomRequestItem itemFor(RoomRequestType type, LocalDate date, LocalTime startTime,
+                                           int durationMinutes) {
+        return onRequest(type, RoomRequestItem.builder()
                 .date(date).startTime(startTime).duration(Duration.ofMinutes(durationMinutes))
-                .build();
+                .build());
+    }
+
+    private static RoomRequestItem onRequest(RoomRequestType type, RoomRequestItem item) {
+        RoomRequest.builder().type(type).build().addItem(item);
+        return item;
     }
 
     private static ClassroomResponseDto classroom(Long id) {
