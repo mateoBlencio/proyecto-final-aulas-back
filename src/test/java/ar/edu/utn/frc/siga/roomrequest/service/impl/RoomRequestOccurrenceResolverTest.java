@@ -32,6 +32,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -106,6 +107,37 @@ class RoomRequestOccurrenceResolverTest {
 
         assertThatThrownBy(() -> resolver.resolveOccurrencesBySlot(item, 1, false))
                 .isInstanceOf(InvalidRoomRequestException.class);
+    }
+
+    @Test
+    @DisplayName("findOptionalOccurrenceOnDate: sin clase en la fecha o con solo un espejo devuelve vacío sin fallar")
+    void findOptionalOccurrenceOnDate_vacio() {
+        LocalDate date = LocalDate.of(2026, 3, 12);
+        RoomRequestItem item = RoomRequestItem.builder().id(1L)
+                .request(requestOfType(RoomRequestType.ONE_TIME_ROOM_CHANGE))
+                .sourceRecurringEventId(50L).date(date).build();
+        OccurrenceSlotDto mirror = new OccurrenceSlotDto(499L, 50L, date, LocalTime.of(10, 0), LocalTime.of(11, 0),
+                OccurrenceStatus.ROOM_RELEASED, 30, 1, null, null, null, 500L);
+        when(occurrenceService.findSlotsByEvent(50L, null)).thenReturn(List.of(mirror));
+
+        assertThat(resolver.findOptionalOccurrenceOnDate(item)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("withMirrors: suma los espejos de las ocurrencias principales y deja afuera los de otras")
+    void withMirrors_sumaEspejosPropios() {
+        LocalDate date = LocalDate.of(2026, 3, 12);
+        RoomRequestItem item = RoomRequestItem.builder().id(1L)
+                .request(requestOfType(RoomRequestType.ONE_TIME_ROOM_CHANGE))
+                .sourceRecurringEventId(50L).date(date).build();
+        OccurrenceSlotDto ownMirror = new OccurrenceSlotDto(501L, 50L, date, LocalTime.of(10, 0), LocalTime.of(11, 0),
+                OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, 500L);
+        OccurrenceSlotDto otherMirror = new OccurrenceSlotDto(601L, 50L, date.plusDays(7), LocalTime.of(10, 0),
+                LocalTime.of(11, 0), OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, 600L);
+        when(occurrenceService.findSlotsByEvent(50L, date)).thenReturn(List.of(
+                occurrenceSlot(500L, 50L, date), ownMirror, otherMirror));
+
+        assertThat(resolver.withMirrors(item, Set.of(500L), date)).containsExactlyInAnyOrder(500L, 501L);
     }
 
     @Test

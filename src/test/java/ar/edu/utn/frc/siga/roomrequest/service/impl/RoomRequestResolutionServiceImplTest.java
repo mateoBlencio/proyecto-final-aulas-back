@@ -227,7 +227,7 @@ class RoomRequestResolutionServiceImplTest {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         List<AllowedClassroomDto> expected = List.of(
-                new AllowedClassroomDto(101L, 101, 1L, "Edificio Central", 40, true, null, List.of()));
+                new AllowedClassroomDto(101L, 101, 1L, "Edificio Central", 40, true, null, List.of(), false));
         when(candidateResolver.findAllowedClassrooms(1L)).thenReturn(expected);
 
         assertThat(service.findAllowedClassrooms(1L, AUXILIAR)).isSameAs(expected);

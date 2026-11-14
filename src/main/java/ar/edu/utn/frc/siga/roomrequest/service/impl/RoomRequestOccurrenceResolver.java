@@ -20,6 +20,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Comparator;
@@ -113,13 +114,29 @@ class RoomRequestOccurrenceResolver {
     }
 
     private Long findOccurrenceOnDate(RoomRequestItem item) {
+        return findOptionalOccurrenceOnDate(item)
+                .orElseThrow(() -> new InvalidRoomRequestException(
+                        "No se encontró la clase de este pedido en el calendario."));
+    }
+
+    Optional<Long> findOptionalOccurrenceOnDate(RoomRequestItem item) {
         return occurrenceService.findSlotsByEvent(item.getSourceRecurringEventId(), null).stream()
                 .filter(slot -> slot.mirrorOfOccurrenceId() == null)
                 .filter(slot -> slot.date().equals(item.getDate()))
                 .findFirst()
-                .map(OccurrenceSlotDto::occurrenceId)
-                .orElseThrow(() -> new InvalidRoomRequestException(
-                        "No se encontró la clase de este pedido en el calendario."));
+                .map(OccurrenceSlotDto::occurrenceId);
+    }
+
+    Set<Long> withMirrors(RoomRequestItem item, Set<Long> principalIds, LocalDate from) {
+        if (principalIds.isEmpty()) {
+            return principalIds;
+        }
+        Set<Long> ids = new HashSet<>(principalIds);
+        occurrenceService.findSlotsByEvent(item.getSourceRecurringEventId(), from).stream()
+                .filter(slot -> slot.mirrorOfOccurrenceId() != null)
+                .filter(slot -> principalIds.contains(slot.mirrorOfOccurrenceId()))
+                .forEach(slot -> ids.add(slot.occurrenceId()));
+        return ids;
     }
 
     List<LocalDate> futureDatesOnDayOfWeek(RoomRequestItem item) {

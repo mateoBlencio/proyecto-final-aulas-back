@@ -59,7 +59,8 @@ class RoomRequestCandidateResolver {
         List<ClassroomResponseDto> candidates = candidateClassrooms(item).stream()
                 .filter(c -> item.getDerivedBuildingId() == null || item.getDerivedBuildingId().equals(c.buildingId()))
                 .toList();
-        return toAllowed(candidates, occupiedClassroomIds(item), item.getRequiresComputers());
+        Occupancy occupancy = occupancyOf(item);
+        return toAllowed(candidates, occupancy.occupied(), occupancy.current(), item.getRequiresComputers());
     }
 
     @Transactional(readOnly = true)
@@ -158,10 +159,13 @@ class RoomRequestCandidateResolver {
                     }
                     return new AllowedClassroomDto(classroom.id(), classroom.roomNumber(), classroom.buildingId(),
                             classroom.buildingName(), classroom.capacity(), !occupied.contains(classroom.id()),
-                            computersByClassroom.get(classroom.id()), missing);
+                            computersByClassroom.get(classroom.id()), missing, false);
                 })
                 .sorted(Comparator.comparing((AllowedClassroomDto c) -> !c.missingRequirements().isEmpty()))
                 .toList();
+    }
+
+    private record Occupancy(Set<Long> occupied, Set<Long> current) {
     }
 
     Set<Long> occupiedClassroomIds(RoomRequestItem item) {
@@ -178,12 +182,45 @@ class RoomRequestCandidateResolver {
         return occupiedClassroomIds(Set.of(needs.date()), Collections.emptySet(), needs.startTime(), needs.endTime());
     }
 
+    private Occupancy occupancyOf(RoomRequestItem item) {
+        switch (item.getRequest().getType()) {
+            case REGULAR_ROOM_CHANGE -> {
+                List<OccurrenceSlotDto> own = occurrenceResolver.futureSlotsOnDayOfWeek(item);
+                Set<LocalDate> dates = own.stream().map(OccurrenceSlotDto::date).collect(Collectors.toSet());
+                Set<Long> ownIds = occurrenceResolver.withMirrors(item,
+                        own.stream().map(OccurrenceSlotDto::occurrenceId).collect(Collectors.toSet()),
+                        Collections.min(dates));
+                List<OccupiedSlot> slots = allocationOccupancyService.findOccupancy(
+                        Collections.min(dates), Collections.max(dates));
+                return new Occupancy(
+                        occupiedIn(slots, dates, ownIds, item.getStartTime(), item.endTime()),
+                        classroomsOf(slots, ownIds));
+            }
+            case ONE_TIME_ROOM_CHANGE, PARTIAL_EXAM_IN_CLASS -> {
+                Set<Long> ownIds = occurrenceResolver.withMirrors(item,
+                        occurrenceResolver.findOptionalOccurrenceOnDate(item).map(Set::of).orElse(Set.of()),
+                        item.getDate());
+                List<OccupiedSlot> slots = allocationOccupancyService.findOccupancy(item.getDate(), item.getDate());
+                return new Occupancy(
+                        occupiedIn(slots, Set.of(item.getDate()), ownIds, item.getStartTime(), item.endTime()),
+                        classroomsOf(slots, ownIds));
+            }
+            default -> {
+                return new Occupancy(occupiedClassroomIds(item), Set.of());
+            }
+        }
+    }
+
     private Set<Long> occupiedClassroomIds(Set<LocalDate> dates, Set<Long> ownOccurrenceIds,
                                            LocalTime startTime, LocalTime endTime) {
-        LocalDate min = Collections.min(dates);
-        LocalDate max = Collections.max(dates);
+        List<OccupiedSlot> slots = allocationOccupancyService.findOccupancy(
+                Collections.min(dates), Collections.max(dates));
+        return occupiedIn(slots, dates, ownOccurrenceIds, startTime, endTime);
+    }
 
-        return allocationOccupancyService.findOccupancy(min, max).stream()
+    private static Set<Long> occupiedIn(List<OccupiedSlot> slots, Set<LocalDate> dates, Set<Long> ownOccurrenceIds,
+                                        LocalTime startTime, LocalTime endTime) {
+        return slots.stream()
                 .filter(slot -> dates.contains(slot.date()))
                 .filter(slot -> !ownOccurrenceIds.contains(slot.occurrenceId()))
                 .filter(slot -> TimeRanges.overlaps(startTime, endTime, slot.startTime(), slot.endTime()))
@@ -191,8 +228,16 @@ class RoomRequestCandidateResolver {
                 .collect(Collectors.toSet());
     }
 
+    private static Set<Long> classroomsOf(List<OccupiedSlot> slots, Set<Long> occurrenceIds) {
+        return slots.stream()
+                .filter(slot -> occurrenceIds.contains(slot.occurrenceId()))
+                .map(OccupiedSlot::classroomId)
+                .collect(Collectors.toSet());
+    }
+
     private List<AllowedClassroomDto> toAllowed(List<ClassroomResponseDto> candidates,
-                                                Set<Long> occupiedClassroomIds, boolean requiresComputers) {
+                                                Set<Long> occupiedClassroomIds, Set<Long> currentClassroomIds,
+                                                boolean requiresComputers) {
         Map<Long, Integer> computersByClassroom = requiresComputers
                 ? computersByClassroom(candidates.stream().map(ClassroomResponseDto::id).toList())
                 : Map.of();
@@ -200,7 +245,8 @@ class RoomRequestCandidateResolver {
                 .map(classroom -> new AllowedClassroomDto(classroom.id(), classroom.roomNumber(),
                         classroom.buildingId(), classroom.buildingName(), classroom.capacity(),
                         !occupiedClassroomIds.contains(classroom.id()),
-                        computersByClassroom.get(classroom.id()), List.of()))
+                        computersByClassroom.get(classroom.id()), List.of(),
+                        currentClassroomIds.contains(classroom.id())))
                 .toList();
     }
 }

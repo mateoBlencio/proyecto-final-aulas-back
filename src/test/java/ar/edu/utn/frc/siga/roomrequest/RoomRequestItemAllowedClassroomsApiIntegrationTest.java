@@ -1,7 +1,12 @@
 package ar.edu.utn.frc.siga.roomrequest;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
+import ar.edu.utn.frc.siga.allocation.model.Allocation;
+import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
+import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
+import ar.edu.utn.frc.siga.events.model.Occurrence;
+import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.common.security.ScopeType;
 import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
@@ -21,11 +26,16 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.temporal.TemporalAdjusters;
+import java.util.Comparator;
+import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -35,6 +45,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("GET /v1/room-requests/items/{id}/allowed-classrooms (integración)")
 class RoomRequestItemAllowedClassroomsApiIntegrationTest extends AbstractIntegrationTest {
 
+    private static final LocalTime START = LocalTime.of(18, 0);
+    private static final int OWN_PERIOD_YEAR = 3900;
+
     @Autowired
     private WebApplicationContext webApplicationContext;
     @Autowired
@@ -43,6 +56,10 @@ class RoomRequestItemAllowedClassroomsApiIntegrationTest extends AbstractIntegra
     private RoomRequestRepository roomRequestRepository;
     @Autowired
     private RoomRequestItemRepository roomRequestItemRepository;
+    @Autowired
+    private OccurrenceRepository occurrenceRepository;
+    @Autowired
+    private AllocationRepository allocationRepository;
 
     @Test
     @DisplayName("aula activa disponible: aparece con available=true")
@@ -53,7 +70,46 @@ class RoomRequestItemAllowedClassroomsApiIntegrationTest extends AbstractIntegra
 
         mockMvc.perform(get("/v1/room-requests/items/" + item.getId() + "/allowed-classrooms"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.id == " + classroom.getId() + ")].available").value(true));
+                .andExpect(jsonPath("$[?(@.id == " + classroom.getId() + ")].available").value(true))
+                .andExpect(jsonPath("$[?(@.id == " + classroom.getId() + ")].current").value(false));
+    }
+
+    @Test
+    @DisplayName("cambio regular: marca current solo el aula donde cursa la comisión, y sigue disponible")
+    void findAllowedClassrooms_regular_marcaAulaActual() throws Exception {
+        Building building = testData.edificio();
+        Classroom actual = testData.aula(building);
+        Classroom otra = testData.aula(building);
+        LocalDate start = firstFutureMonday();
+        Series series = series(start, 2);
+        series.occurrences().forEach(o -> allocate(o, actual));
+        RoomRequestItem item = seedRecurringItem(RoomRequestType.REGULAR_ROOM_CHANGE, series, null);
+
+        mockMvc.perform(get("/v1/room-requests/items/" + item.getId() + "/allowed-classrooms"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == " + actual.getId() + ")].current").value(true))
+                .andExpect(jsonPath("$[?(@.id == " + actual.getId() + ")].available").value(true))
+                .andExpect(jsonPath("$[?(@.id == " + otra.getId() + ")].current").value(false));
+    }
+
+    @Test
+    @DisplayName("cambio puntual: marca current el aula de esa fecha; otra clase en la misma franja sigue dejando un aula no disponible")
+    void findAllowedClassrooms_puntual_marcaAulaActual() throws Exception {
+        Building building = testData.edificio();
+        Classroom actual = testData.aula(building);
+        Classroom ocupadaPorOtro = testData.aula(building);
+        LocalDate date = firstFutureMonday();
+        Series series = series(date, 1);
+        allocate(series.at(0), actual);
+        allocate(series(date, 1).at(0), ocupadaPorOtro);
+        RoomRequestItem item = seedRecurringItem(RoomRequestType.ONE_TIME_ROOM_CHANGE, series, date);
+
+        mockMvc.perform(get("/v1/room-requests/items/" + item.getId() + "/allowed-classrooms"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == " + actual.getId() + ")].current").value(true))
+                .andExpect(jsonPath("$[?(@.id == " + actual.getId() + ")].available").value(true))
+                .andExpect(jsonPath("$[?(@.id == " + ocupadaPorOtro.getId() + ")].current").value(false))
+                .andExpect(jsonPath("$[?(@.id == " + ocupadaPorOtro.getId() + ")].available").value(false));
     }
 
     @Test
@@ -126,6 +182,55 @@ class RoomRequestItemAllowedClassroomsApiIntegrationTest extends AbstractIntegra
                 SystemRole.AUXILIAR_AULICO, ScopeType.BUILDING, derivedTo.getId())
                 .perform(get("/v1/room-requests/items/" + item.getId() + "/allowed-classrooms"))
                 .andExpect(status().isOk());
+    }
+
+    private record Series(Long eventId, IntegrationTestData.SubjectAndCommission academic, List<Occurrence> occurrences) {
+        Occurrence at(int index) {
+            return occurrences.get(index);
+        }
+    }
+
+    private LocalDate firstFutureMonday() {
+        return LocalDate.now().plusDays(10).with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY))
+                .plusWeeks(IntegrationTestData.nextSeq() % 200);
+    }
+
+    private Series series(LocalDate start, int weeks) {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision(OWN_PERIOD_YEAR);
+        Long eventId = testData.eventoRecurrente(academic.subjectId(), academic.commissionId(), start.getDayOfWeek(),
+                START, 90, start, start.plusWeeks(weeks - 1), 30);
+        List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId).stream()
+                .sorted(Comparator.comparing(Occurrence::getDate)).toList();
+        assertThat(occurrences).hasSize(weeks);
+        return new Series(eventId, academic, occurrences);
+    }
+
+    private void allocate(Occurrence occurrence, Classroom classroom) {
+        allocationRepository.save(Allocation.builder().occurrenceId(occurrence.getId())
+                .classroomId(classroom.getId()).source(AllocationSource.MANUAL).build());
+    }
+
+    private RoomRequestItem seedRecurringItem(RoomRequestType type, Series series, LocalDate date) {
+        RoomRequest request = RoomRequest.builder()
+                .type(type)
+                .scope(AcademicScope.GRADO)
+                .teacherName("Ada Lovelace")
+                .teacherEmail("ada@frc.utn.edu.ar")
+                .teacherPhone("351-1234567")
+                .subjectId(series.academic().subjectId())
+                .build();
+        RoomRequestItem item = RoomRequestItem.builder()
+                .commissionId(series.academic().commissionId())
+                .sourceRecurringEventId(series.eventId())
+                .date(date)
+                .dayOfWeek(date == null ? series.at(0).getDate().getDayOfWeek() : null)
+                .startTime(START)
+                .duration(Duration.ofMinutes(90))
+                .classroomCount(1)
+                .build();
+        request.addItem(item);
+        roomRequestRepository.save(request);
+        return item;
     }
 
     private void derive(RoomRequestItem item, Building building) {
