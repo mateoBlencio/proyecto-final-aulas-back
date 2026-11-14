@@ -46,6 +46,8 @@ import ar.edu.utn.frc.siga.sysacad.internal.write.review.DirectChangeHandler;
 @ConditionalOnProperty(prefix = "siga.sysacad", name = "enabled", havingValue = "true")
 public class SysacadWriteRun {
 
+    private static final int RELEASED_ROOM = 999;
+
     private final SysacadWriteStateService stateService;
     private final SysacadViewReader viewReader;
     private final SysacadWritePlanner planner;
@@ -125,9 +127,13 @@ public class SysacadWriteRun {
                     case NotSendable notSendable -> scheduleWriter.recordEvent(schedule.getId(),
                             ScheduleLogType.DESTINATION_NOT_SENDABLE, null, null, notSendable.occurrenceId(), null,
                             notSendable.reason().name());
-                    case Send send when mode == SysacadWriteMode.SANDBOX -> scheduleWriter.recordEvent(
-                            schedule.getId(), ScheduleLogType.SANDBOX_SEND, send.building(), send.room(),
-                            send.occurrenceId(), null, null);
+                    case Send send when mode == SysacadWriteMode.SANDBOX -> {
+                        scheduleWriter.recordEvent(schedule.getId(), ScheduleLogType.SANDBOX_SEND, send.building(),
+                                send.room(), send.occurrenceId(), null, null);
+                        if (send.room() != RELEASED_ROOM) {
+                            commissionMessageSender.logSandboxPreview(schedule, send.date(), send.rooms());
+                        }
+                    }
                     case Send send -> {
                         if (!mode.sendsToSysacad()
                                 || schedule.getNextAttemptAt() != null && schedule.getNextAttemptAt().isAfter(now)
@@ -139,9 +145,12 @@ public class SysacadWriteRun {
                             return;
                         }
                     }
-                    case NotifyOnly notify when mode == SysacadWriteMode.SANDBOX -> scheduleWriter.recordEvent(
-                            schedule.getId(), ScheduleLogType.SANDBOX_MESSAGE, notify.rooms().get(0).building(),
-                            notify.rooms().get(0).room(), notify.occurrenceId(), null, RoomRef.key(notify.rooms()));
+                    case NotifyOnly notify when mode == SysacadWriteMode.SANDBOX -> {
+                        scheduleWriter.recordEvent(schedule.getId(), ScheduleLogType.SANDBOX_MESSAGE,
+                                notify.rooms().get(0).building(), notify.rooms().get(0).room(),
+                                notify.occurrenceId(), null, RoomRef.key(notify.rooms()));
+                        commissionMessageSender.logSandboxPreview(schedule, notify.date(), notify.rooms());
+                    }
                     case NotifyOnly notify -> {
                         if (!mode.sendsToSysacad()) {
                             continue;

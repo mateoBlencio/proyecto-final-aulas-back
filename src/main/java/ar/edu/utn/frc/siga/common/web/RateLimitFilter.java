@@ -19,7 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @RequiredArgsConstructor
-public class RateLimitFilter extends OncePerRequestFilter {
+public class git add -A && git commit -m "feat(sysacad): mostrar en el log el mensaje a autogestión en dev-snapshot"RateLimitFilter extends OncePerRequestFilter {
 
     private final GeneralRateLimitProperties properties;
     private final CorsProperties corsProperties;

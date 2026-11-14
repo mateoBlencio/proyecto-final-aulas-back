@@ -389,6 +389,28 @@ class CommissionMessageSenderTest {
         assertThat(sentCommand().note()).endsWith("será en las aulas 910 y 920 de Possetto.");
     }
 
+    @Test
+    @DisplayName("logSandboxPreview solo loguea en dev-snapshot, una vez por texto, y no manda ni registra nada")
+    void sandboxPreviewLogsOnlyInDevSnapshot() {
+        subjectIs("Física I");
+        buildingIs(BUILDING, 910, "Possetto");
+        List<RoomRef> rooms = List.of(new RoomRef(BUILDING, 910), new RoomRef(BUILDING, 920));
+        ListAppender<ILoggingEvent> logs = captureLogs();
+
+        environment.setActiveProfiles("dev");
+        sender.logSandboxPreview(schedule, CLASS_DATE, rooms);
+        assertThat(logs.list).isEmpty();
+
+        environment.setActiveProfiles("dev-snapshot");
+        sender.logSandboxPreview(schedule, CLASS_DATE, rooms);
+        sender.logSandboxPreview(schedule, CLASS_DATE, rooms);
+
+        assertThat(logs.list).hasSize(1);
+        assertThat(logs.list.get(0).getFormattedMessage())
+                .contains("La clase de Física I del martes 17/11 será en las aulas 910 y 920 de Possetto.");
+        verifyNoInteractions(client, stateWriter);
+    }
+
     private static ListAppender<ILoggingEvent> captureLogs() {
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
         appender.start();

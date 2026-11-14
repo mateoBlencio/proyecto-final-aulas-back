@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -49,6 +50,7 @@ public class CommissionMessageSender {
     private final SysacadProperties properties;
     private final SysacadRuntimeSettings runtimeSettings;
     private final Environment environment;
+    private final Map<Long, String> sandboxPreviews = new ConcurrentHashMap<>();
 
     // No propaga errores: el aula ya quedó confirmada y un fallo del mensaje no es un fallo del envío.
     public void sendAfterConfirmation(SysacadSchedule schedule, Send decision, RequestPacer pacer) {
@@ -56,6 +58,23 @@ public class CommissionMessageSender {
             return;
         }
         deliver(schedule, decision.occurrenceId(), decision.date(), decision.rooms(), pacer);
+    }
+
+    // Solo en dev-snapshot y solo al log: es una ayuda para programadores, no se guarda ni se expone.
+    public void logSandboxPreview(SysacadSchedule schedule, LocalDate date, List<RoomRef> rooms) {
+        if (!environment.acceptsProfiles(Profiles.of("dev-snapshot"))) {
+            return;
+        }
+        String text;
+        try {
+            text = note(schedule.getSpecialty(), schedule.getPlan(), schedule.getSubject(), date, rooms);
+        } catch (RuntimeException e) {
+            text = "no se pudo armar el mensaje: " + e.getMessage();
+        }
+        if (!text.equals(sandboxPreviews.put(schedule.getId(), text))) {
+            log.info("[SANDBOX] Mensaje a autogestión del horario {} (comisión {}): {}", schedule.getId(),
+                    schedule.getCommission(), text);
+        }
     }
 
     // Mismo flujo que el mensaje posterior a un envío, pero sin cambio de aula principal: solo cambió el conjunto.

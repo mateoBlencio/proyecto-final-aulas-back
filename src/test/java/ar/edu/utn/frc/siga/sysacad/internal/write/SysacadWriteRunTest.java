@@ -155,6 +155,8 @@ class SysacadWriteRunTest {
         verifyNoInteractions(sendCycle);
         verify(scheduleWriter).recordEvent(1L, ScheduleLogType.SANDBOX_SEND, 5, 229, 1001L, null, null);
         verify(scheduleWriter).recordEvent(2L, ScheduleLogType.SANDBOX_SEND, 5, 229, 1002L, null, null);
+        verify(commissionMessageSender, org.mockito.Mockito.times(2)).logSandboxPreview(any(), any(), any());
+        verify(commissionMessageSender, never()).sendAfterConfirmation(any(), any(), any());
     }
 
     @Test
@@ -724,7 +726,9 @@ class SysacadWriteRunTest {
 
         verify(scheduleWriter).recordEvent(1L, ScheduleLogType.SANDBOX_MESSAGE, 5, 228, 1001L, null,
                 "5-228,5-229");
-        verifyNoInteractions(commissionMessageSender, sendCycle);
+        verify(commissionMessageSender).logSandboxPreview(any(), any(), any());
+        verify(commissionMessageSender, never()).sendRoomsUpdate(any(), any(), any());
+        verifyNoInteractions(sendCycle);
         verify(scheduleWriter, never()).recordAnnouncedRooms(anyLong(), any());
     }
 
