@@ -111,16 +111,46 @@ class RoomRequestOccurrenceResolverTest {
     @Test
     @DisplayName("REGULAR_ROOM_CHANGE: resuelve todas las ocurrencias futuras del dayOfWeek del ítem")
     void regularRoomChange() {
+        LocalDate first = LocalDate.now().plusDays(1);
         RoomRequestItem item = RoomRequestItem.builder().id(1L)
                 .request(requestOfType(RoomRequestType.REGULAR_ROOM_CHANGE))
-                .sourceRecurringEventId(70L).dayOfWeek(java.time.DayOfWeek.THURSDAY).build();
+                .sourceRecurringEventId(70L).dayOfWeek(first.getDayOfWeek()).build();
         when(occurrenceService.findSlotsByEvent(eq(70L), any(LocalDate.class))).thenReturn(List.of(
-                occurrenceSlot(701L, 70L, LocalDate.of(2026, 5, 7)),
-                occurrenceSlot(702L, 70L, LocalDate.of(2026, 5, 14)),
-                occurrenceSlot(703L, 70L, LocalDate.of(2026, 5, 8))));
+                occurrenceSlot(701L, 70L, first),
+                occurrenceSlot(702L, 70L, first.plusDays(7)),
+                occurrenceSlot(703L, 70L, first.plusDays(1))));
 
         assertThat(resolver.resolveOccurrencesBySlot(item, 1, false))
                 .containsExactly(List.of(701L, 702L));
+    }
+
+    @Test
+    @DisplayName("REGULAR_ROOM_CHANGE: la clase de hoy ya empezada se omite y rige desde la siguiente")
+    void regularRoomChange_omiteClaseDeHoyYaEmpezada() {
+        LocalDate today = LocalDate.now();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L)
+                .request(requestOfType(RoomRequestType.REGULAR_ROOM_CHANGE))
+                .sourceRecurringEventId(70L).dayOfWeek(today.getDayOfWeek()).build();
+        when(occurrenceService.findSlotsByEvent(eq(70L), any(LocalDate.class))).thenReturn(List.of(
+                startedToday(701L, 70L), occurrenceSlot(702L, 70L, today.plusDays(7))));
+
+        assertThat(resolver.resolveOccurrencesBySlot(item, 1, false)).containsExactly(List.of(702L));
+        assertThat(resolver.nextClassDate(item)).contains(today.plusDays(7));
+    }
+
+    @Test
+    @DisplayName("REGULAR_ROOM_CHANGE: si solo queda la clase de hoy ya empezada se rechaza")
+    void regularRoomChange_soloQuedaClaseDeHoyYaEmpezada() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L)
+                .request(requestOfType(RoomRequestType.REGULAR_ROOM_CHANGE))
+                .sourceRecurringEventId(70L).dayOfWeek(LocalDate.now().getDayOfWeek()).build();
+        when(occurrenceService.findSlotsByEvent(eq(70L), any(LocalDate.class)))
+                .thenReturn(List.of(startedToday(701L, 70L)));
+
+        assertThatThrownBy(() -> resolver.resolveOccurrencesBySlot(item, 1, false))
+                .isInstanceOf(InvalidRoomRequestException.class)
+                .hasMessageContaining("No quedan clases futuras");
+        assertThat(resolver.nextClassDate(item)).isEmpty();
     }
 
     @Test
@@ -280,6 +310,17 @@ class RoomRequestOccurrenceResolverTest {
     }
 
     @Test
+    @DisplayName("onlyFuture: descarta la clase de hoy que ya empezó")
+    void onlyFuture_descartaClaseDeHoyYaEmpezada() {
+        RoomRequestItem regular = RoomRequestItem.builder().id(1L)
+                .request(requestOfType(RoomRequestType.REGULAR_ROOM_CHANGE)).sourceRecurringEventId(50L).build();
+        when(occurrenceService.findSlotsByEvent(eq(50L), any(LocalDate.class))).thenReturn(List.of(
+                startedToday(10L, 50L), occurrenceSlot(11L, 50L, LocalDate.now().plusDays(7))));
+
+        assertThat(resolver.onlyFuture(regular, List.of(10L, 11L))).containsExactly(11L);
+    }
+
+    @Test
     @DisplayName("nextClassDate: la fecha más próxima del día de dictado, o vacío si no quedan clases")
     void nextClassDate() {
         LocalDate first = LocalDate.now().plusDays(1);
@@ -308,6 +349,11 @@ class RoomRequestOccurrenceResolverTest {
 
     private static OccurrenceSlotDto occurrenceSlot(Long occurrenceId, Long eventId, LocalDate date) {
         return new OccurrenceSlotDto(occurrenceId, eventId, date, LocalTime.of(10, 0), LocalTime.of(11, 0),
+                OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
+    }
+
+    private static OccurrenceSlotDto startedToday(Long occurrenceId, Long eventId) {
+        return new OccurrenceSlotDto(occurrenceId, eventId, LocalDate.now(), LocalTime.MIN, LocalTime.of(1, 0),
                 OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
     }
 

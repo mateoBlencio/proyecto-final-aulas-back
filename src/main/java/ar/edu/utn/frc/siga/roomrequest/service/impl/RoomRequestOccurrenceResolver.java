@@ -82,6 +82,7 @@ class RoomRequestOccurrenceResolver {
         }
         Set<Long> futureIds = occurrenceService.findSlotsByEvent(item.getSourceRecurringEventId(), LocalDate.now())
                 .stream()
+                .filter(slot -> !slot.isPast())
                 .map(OccurrenceSlotDto::occurrenceId)
                 .collect(Collectors.toSet());
         return occurrenceIds.stream().filter(futureIds::contains).toList();
@@ -142,6 +143,7 @@ class RoomRequestOccurrenceResolver {
                 .stream()
                 .filter(slot -> slot.mirrorOfOccurrenceId() == null)
                 .filter(slot -> slot.date().getDayOfWeek() == item.getDayOfWeek())
+                .filter(slot -> !slot.isPast())
                 .toList();
     }
 

@@ -136,18 +136,34 @@ class AllocationTargetResolverTest {
     }
 
     @Test
-    @DisplayName("rango que arranca hoy con una clase que ya empezó → 409 sobre esa ocurrencia")
-    void rangoQueArrancaHoyConClaseYaEmpezada() {
+    @DisplayName("rango que arranca hoy con una clase que ya empezó → se omite y se aplican las siguientes")
+    void rangoQueArrancaHoyOmiteClaseYaEmpezada() {
+        LocalDate today = LocalDate.now();
+        realValidateRange();
+        OccurrenceSlotDto yaEmpezo = new OccurrenceSlotDto(
+                1L, EVENT_ID, today, LocalTime.MIN, LocalTime.MIN.plusHours(2), OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
+        when(occurrenceService.findSlotsByEvent(EVENT_ID, today)).thenReturn(List.of(yaEmpezo, slot(2L, today.plusDays(7))));
+
+        Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
+                List.of(rangeItem(today, null)), today).classroomByOccurrence();
+
+        assertThat(resolved.keySet()).extracting(OccurrenceSlotDto::occurrenceId).containsExactly(2L);
+        verify(validator, never()).validateNotPast(any());
+    }
+
+    @Test
+    @DisplayName("resolveAll — rango de hoy con solo la clase ya empezada queda vacío, sin error")
+    void resolveAllRangoDeHoySoloConClaseYaEmpezadaQuedaVacio() {
         LocalDate today = LocalDate.now();
         realValidateRange();
         OccurrenceSlotDto yaEmpezo = new OccurrenceSlotDto(
                 1L, EVENT_ID, today, LocalTime.MIN, LocalTime.MIN.plusHours(2), OccurrenceStatus.NEEDS_ROOM, 30, 1, null, null, null, null);
         when(occurrenceService.findSlotsByEvent(EVENT_ID, today)).thenReturn(List.of(yaEmpezo));
-        doThrowConflict(yaEmpezo);
 
-        assertThatThrownBy(() -> resolver.resolveClassroomByOccurrence(
-                List.of(rangeItem(today, null)), today))
-                .isInstanceOf(AllocationConflictException.class);
+        List<OccurrenceSlotDto> resolved = resolver.resolveAll(
+                List.of(new AllocationTarget.EventRange(EVENT_ID, today, today)), null);
+
+        assertThat(resolved).isEmpty();
     }
 
     @Test
