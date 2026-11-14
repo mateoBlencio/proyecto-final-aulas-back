@@ -11,9 +11,11 @@ import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadWriteState;
 import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleRepository;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NoRoom;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NoRoomAfterCancel;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NotifyOnly;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NotSendable;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Send;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Waiting;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.RoomRef;
 import ar.edu.utn.frc.siga.sysacad.internal.write.RunReport.ClassWithoutRoom;
 import ar.edu.utn.frc.siga.sysacad.internal.write.RunReport.Result;
 import ar.edu.utn.frc.siga.sysacad.internal.write.RunReport.ReviewedSchedule;
@@ -44,10 +46,13 @@ import ar.edu.utn.frc.siga.sysacad.internal.write.review.DirectChangeHandler;
 @ConditionalOnProperty(prefix = "siga.sysacad", name = "enabled", havingValue = "true")
 public class SysacadWriteRun {
 
+    private static final int RELEASED_ROOM = 999;
+
     private final SysacadWriteStateService stateService;
     private final SysacadViewReader viewReader;
     private final SysacadWritePlanner planner;
     private final SysacadSendCycle sendCycle;
+    private final CommissionMessageSender commissionMessageSender;
     private final SysacadScheduleStateWriter scheduleWriter;
     private final DirectChangeHandler directChangeHandler;
     private final SysacadScheduleRepository scheduleRepository;
@@ -122,9 +127,13 @@ public class SysacadWriteRun {
                     case NotSendable notSendable -> scheduleWriter.recordEvent(schedule.getId(),
                             ScheduleLogType.DESTINATION_NOT_SENDABLE, null, null, notSendable.occurrenceId(), null,
                             notSendable.reason().name());
-                    case Send send when mode == SysacadWriteMode.SANDBOX -> scheduleWriter.recordEvent(
-                            schedule.getId(), ScheduleLogType.SANDBOX_SEND, send.building(), send.room(),
-                            send.occurrenceId(), null, null);
+                    case Send send when mode == SysacadWriteMode.SANDBOX -> {
+                        scheduleWriter.recordEvent(schedule.getId(), ScheduleLogType.SANDBOX_SEND, send.building(),
+                                send.room(), send.occurrenceId(), null, null);
+                        if (send.room() != RELEASED_ROOM) {
+                            commissionMessageSender.logSandboxPreview(schedule, send.date(), send.rooms());
+                        }
+                    }
                     case Send send -> {
                         if (!mode.sendsToSysacad()
                                 || schedule.getNextAttemptAt() != null && schedule.getNextAttemptAt().isAfter(now)
@@ -135,6 +144,19 @@ public class SysacadWriteRun {
                         if (handle(schedule, sendCycle.send(schedule, send, pacer), now, execution)) {
                             return;
                         }
+                    }
+                    case NotifyOnly notify when mode == SysacadWriteMode.SANDBOX -> {
+                        scheduleWriter.recordEvent(schedule.getId(), ScheduleLogType.SANDBOX_MESSAGE,
+                                notify.rooms().get(0).building(), notify.rooms().get(0).room(),
+                                notify.occurrenceId(), null, RoomRef.key(notify.rooms()));
+                        commissionMessageSender.logSandboxPreview(schedule, notify.date(), notify.rooms());
+                    }
+                    case NotifyOnly notify -> {
+                        if (!mode.sendsToSysacad()) {
+                            continue;
+                        }
+                        commissionMessageSender.sendRoomsUpdate(schedule, notify, pacer);
+                        scheduleWriter.recordAnnouncedRooms(schedule.getId(), RoomRef.key(notify.rooms()));
                     }
                     case NoRoom ignored -> {
                     }

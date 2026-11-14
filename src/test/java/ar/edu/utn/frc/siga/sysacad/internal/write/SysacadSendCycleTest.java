@@ -46,6 +46,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.RoomRef;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.ScheduleTimes;
 import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadScheduleStateWriter;
 import ar.edu.utn.frc.siga.sysacad.internal.write.review.DirectChangeHandler;
@@ -121,7 +122,8 @@ class SysacadSendCycleTest {
     }
 
     private static Send decision() {
-        return new Send(BUILDING, NEW_ROOM, OCCURRENCE_ID, CLASS_DATE, START, END);
+        return new Send(BUILDING, NEW_ROOM, OCCURRENCE_ID, CLASS_DATE, START, END,
+                List.of(new RoomRef(BUILDING, NEW_ROOM)));
     }
 
     private void readsReturn(ScheduleReadResult first, ScheduleReadResult... next) {
@@ -151,7 +153,7 @@ class SysacadSendCycleTest {
         order.verify(stateWriter).markIntent(SCHEDULE_ID, BUILDING, NEW_ROOM, OCCURRENCE_ID, null, TIMES, START, 135);
         order.verify(client).updateRoom(any());
         order.verify(stateWriter).confirm(SCHEDULE_ID, OCCURRENCE_ID, null, "subsecretaria@frc.utn.edu.ar", "op-1",
-                TIMES);
+                TIMES, BUILDING + "-" + NEW_ROOM);
         ArgumentCaptor<UpdateRoomCommand> command = ArgumentCaptor.forClass(UpdateRoomCommand.class);
         verify(client).updateRoom(command.capture());
         assertThat(command.getValue()).isEqualTo(new UpdateRoomCommand(YEAR, SPECIALTY, PLAN, SUBJECT, COMMISSION,
@@ -168,8 +170,39 @@ class SysacadSendCycleTest {
         send();
 
         InOrder order = inOrder(stateWriter, commissionMessageSender);
-        order.verify(stateWriter).confirm(SCHEDULE_ID, OCCURRENCE_ID, null, null, null, TIMES);
+        order.verify(stateWriter).confirm(SCHEDULE_ID, OCCURRENCE_ID, null, null, null, TIMES,
+                BUILDING + "-" + NEW_ROOM);
         order.verify(commissionMessageSender).sendAfterConfirmation(schedule, decision(), pacer);
+    }
+
+    @Test
+    @DisplayName("Envío confirmado con espejos: confirma con la clave ordenada de todo el conjunto")
+    void confirmedSendWithMirrorsPassesSetKey() {
+        readsReturn(rows(rawSiga(KNOWN_ROOM)), rows(rawSiga(NEW_ROOM)));
+        postReturns(new UpdateRoomResult.Applied("ok"));
+        when(allocationService.findLastRevision(OCCURRENCE_ID)).thenReturn(Optional.empty());
+        Send withMirror = new Send(BUILDING, NEW_ROOM, OCCURRENCE_ID, CLASS_DATE, START, END,
+                List.of(new RoomRef(BUILDING, NEW_ROOM), new RoomRef(BUILDING, NEW_ROOM - 1)));
+
+        cycle.send(schedule, withMirror, pacer);
+
+        verify(stateWriter).confirm(SCHEDULE_ID, OCCURRENCE_ID, null, null, null, TIMES,
+                BUILDING + "-" + (NEW_ROOM - 1) + "," + BUILDING + "-" + NEW_ROOM);
+    }
+
+    @Test
+    @DisplayName("Envío confirmado con aula 999: confirma con el conjunto avisado en null")
+    void confirmedReleasedSendPassesNullAnnouncedRooms() {
+        readsReturn(rows(rawSiga(KNOWN_ROOM)), rows(rawSiga(999)));
+        postReturns(new UpdateRoomResult.Applied("ok"));
+        when(allocationService.findLastRevision(OCCURRENCE_ID)).thenReturn(Optional.empty());
+        Send released = new Send(BUILDING, 999, OCCURRENCE_ID, CLASS_DATE, START, END,
+                List.of(new RoomRef(BUILDING, 999)));
+
+        cycle.send(schedule, released, pacer);
+
+        verify(stateWriter).confirm(eq(SCHEDULE_ID), eq(OCCURRENCE_ID), isNull(), isNull(), isNull(), eq(TIMES),
+                isNull());
     }
 
     @Test
@@ -181,7 +214,8 @@ class SysacadSendCycleTest {
 
         send();
 
-        verify(stateWriter).confirm(SCHEDULE_ID, OCCURRENCE_ID, null, null, null, TIMES);
+        verify(stateWriter).confirm(SCHEDULE_ID, OCCURRENCE_ID, null, null, null, TIMES,
+                BUILDING + "-" + NEW_ROOM);
     }
 
     @Test
@@ -191,7 +225,8 @@ class SysacadSendCycleTest {
         postReturns(new UpdateRoomResult.Applied("ok"));
 
         SendOutcome outcome = cycle.send(schedule,
-                new Send(BUILDING, NEW_ROOM, OCCURRENCE_ID, CLASS_DATE, LocalTime.of(9, 40), LocalTime.of(11, 55)),
+                new Send(BUILDING, NEW_ROOM, OCCURRENCE_ID, CLASS_DATE, LocalTime.of(9, 40), LocalTime.of(11, 55),
+                        List.of(new RoomRef(BUILDING, NEW_ROOM))),
                 pacer);
 
         assertThat(outcome.kind()).isEqualTo(Kind.CONFIRMED);
@@ -210,7 +245,7 @@ class SysacadSendCycleTest {
 
         assertThat(outcome.kind()).isEqualTo(Kind.CONFIRMED);
         verify(client, times(1)).updateRoom(any());
-        verify(stateWriter).confirm(eq(SCHEDULE_ID), eq(OCCURRENCE_ID), isNull(), any(), any(), eq(TIMES));
+        verify(stateWriter).confirm(eq(SCHEDULE_ID), eq(OCCURRENCE_ID), isNull(), any(), any(), eq(TIMES), any());
     }
 
     @Test
@@ -225,7 +260,7 @@ class SysacadSendCycleTest {
         verify(client, times(1)).updateRoom(any());
         verify(stateWriter).recordFailure(SCHEDULE_ID, "CONNECTION_FAILED", false, null, "CONNECTION_FAILED", null,
                 null);
-        verify(stateWriter, never()).confirm(any(), any(), any(), any(), any(), any());
+        verify(stateWriter, never()).confirm(any(), any(), any(), any(), any(), any(), any());
         verify(stateWriter, never()).toReview(any(), any(), anyCollection());
     }
 
@@ -239,7 +274,7 @@ class SysacadSendCycleTest {
 
         assertThat(outcome.kind()).isEqualTo(Kind.STOP_CONNECTION);
         verify(client, times(1)).updateRoom(any());
-        verify(stateWriter, never()).confirm(any(), any(), any(), any(), any(), any());
+        verify(stateWriter, never()).confirm(any(), any(), any(), any(), any(), any(), any());
     }
 
     @ParameterizedTest(name = "relectura con hora {0}, duración {1} y fin {2}")
@@ -264,7 +299,7 @@ class SysacadSendCycleTest {
                 COMMISSION, DAY, SEMESTER, 800, 135, BUILDING, KNOWN_ROOM));
         verify(stateWriter).toReviewAfterRevert(SCHEDULE_ID, List.of(OCCURRENCE_ID),
                 new ScheduleTimes(LocalTime.parse(start), duration, LocalTime.parse(end)), "APPLIED");
-        verify(stateWriter, never()).confirm(any(), any(), any(), any(), any(), any());
+        verify(stateWriter, never()).confirm(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -339,7 +374,7 @@ class SysacadSendCycleTest {
 
         assertThat(outcome.kind()).isEqualTo(Kind.STOP_RATE_LIMITED);
         assertThat(outcome.retryAfter()).isEqualTo(Duration.ofSeconds(90));
-        verify(stateWriter, never()).confirm(any(), any(), any(), any(), any(), any());
+        verify(stateWriter, never()).confirm(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -349,7 +384,7 @@ class SysacadSendCycleTest {
         postReturns(new UpdateRoomResult.Applied("ok"));
 
         assertThat(send().kind()).isEqualTo(Kind.STOP_UNAUTHORIZED);
-        verify(stateWriter, never()).confirm(any(), any(), any(), any(), any(), any());
+        verify(stateWriter, never()).confirm(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -359,7 +394,7 @@ class SysacadSendCycleTest {
         postReturns(new UpdateRoomResult.Applied("ok"));
 
         assertThat(send().kind()).isEqualTo(Kind.STOP_CONNECTION);
-        verify(stateWriter, never()).confirm(any(), any(), any(), any(), any(), any());
+        verify(stateWriter, never()).confirm(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -372,7 +407,7 @@ class SysacadSendCycleTest {
 
         assertThat(outcome.kind()).isEqualTo(Kind.SCHEDULE_FAILED);
         assertThat(outcome.failure().result()).isEqualTo("NOT_CONFIRMED");
-        verify(stateWriter, never()).confirm(any(), any(), any(), any(), any(), any());
+        verify(stateWriter, never()).confirm(any(), any(), any(), any(), any(), any(), any());
         verifyNoInteractions(commissionMessageSender);
     }
 
@@ -385,7 +420,7 @@ class SysacadSendCycleTest {
         SendOutcome outcome = send();
 
         assertThat(outcome.kind()).isEqualTo(Kind.SCHEDULE_FAILED);
-        verify(stateWriter, never()).confirm(any(), any(), any(), any(), any(), any());
+        verify(stateWriter, never()).confirm(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -550,7 +585,8 @@ class SysacadSendCycleTest {
         readsReturn(rows(rawSiga(KNOWN_ROOM)));
 
         SendOutcome outcome = cycle.send(schedule,
-                new Send(BUILDING, NEW_ROOM, OCCURRENCE_ID, CLASS_DATE, START, null), pacer);
+                new Send(BUILDING, NEW_ROOM, OCCURRENCE_ID, CLASS_DATE, START, null,
+                        List.of(new RoomRef(BUILDING, NEW_ROOM))), pacer);
 
         assertThat(outcome.reviewReason()).isEqualTo(SysacadReviewReason.HOUR_MISMATCH);
         verify(client, never()).updateRoom(any());

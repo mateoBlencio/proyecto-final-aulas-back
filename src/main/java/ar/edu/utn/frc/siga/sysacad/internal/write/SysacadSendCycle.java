@@ -31,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Component;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.RoomRef;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.ScheduleTimes;
 import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadScheduleStateWriter;
 import ar.edu.utn.frc.siga.sysacad.internal.write.review.DirectChangeHandler;
@@ -154,7 +155,8 @@ public class SysacadSendCycle {
                     .orElse(null);
             stateWriter.confirm(schedule.getId(), decision.occurrenceId(), null,
                     revision == null ? null : revision.user(), revision == null ? null : revision.operationId(),
-                    snapshots.get(0).times());
+                    snapshots.get(0).times(),
+                    decision.room() == 999 ? null : RoomRef.key(decision.rooms()));
             commissionMessageSender.sendAfterConfirmation(schedule, decision, pacer);
             return SendOutcome.of(Kind.CONFIRMED);
         }

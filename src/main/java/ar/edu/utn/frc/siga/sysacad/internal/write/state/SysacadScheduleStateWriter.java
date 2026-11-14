@@ -73,7 +73,7 @@ public class SysacadScheduleStateWriter {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void confirm(Long scheduleId, Long occurrenceId, Long itemId, String revisionUser,
-            String revisionOperation, ScheduleTimes reread) {
+            String revisionOperation, ScheduleTimes reread, String announcedRooms) {
         SysacadSchedule schedule = load(scheduleId);
         Integer building = schedule.getSendingBuilding();
         Integer room = schedule.getSendingRoom();
@@ -93,6 +93,7 @@ public class SysacadScheduleStateWriter {
                 .build());
         schedule.setKnownBuilding(building);
         schedule.setKnownRoom(room);
+        schedule.setAnnouncedRooms(announcedRooms);
         clearSend(schedule);
         schedule.setStatus(SysacadScheduleStatus.SYNCED);
     }
@@ -106,6 +107,11 @@ public class SysacadScheduleStateWriter {
                 .reason(truncate(note, REASON_MAX))
                 .response(response)
                 .build());
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordAnnouncedRooms(Long scheduleId, String announcedRooms) {
+        load(scheduleId).setAnnouncedRooms(announcedRooms);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

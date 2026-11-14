@@ -13,6 +13,7 @@ import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NoNextC
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NoRoom;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NoRoomAfterCancel;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NotSendable;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NotifyOnly;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Send;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Unchanged;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Waiting;
@@ -94,8 +95,18 @@ class NextClassCalculatorTest {
 
     private static NextClassDecision calc(SysacadSchedule schedule, List<OccurrenceSlotDto> slots,
             Map<Long, Long> classroomByOccurrence, LocalDateTime now) {
-        return NextClassCalculator.calculate(schedule, slots, classroomByOccurrence, refs(227, 228, 229, 230),
+        return calc(schedule, slots, classroomByOccurrence, Map.of(), refs(227, 228, 229, 230), now);
+    }
+
+    private static NextClassDecision calc(SysacadSchedule schedule, List<OccurrenceSlotDto> slots,
+            Map<Long, Long> classroomByOccurrence, Map<Long, List<Long>> mirrorClassrooms,
+            Map<Long, ClassroomSysacadRefDto> refs, LocalDateTime now) {
+        return NextClassCalculator.calculate(schedule, slots, classroomByOccurrence, mirrorClassrooms, refs,
                 Map.of(), Set.of(), now);
+    }
+
+    private static Send send(int building, int room, long occurrenceId, LocalDate date) {
+        return new Send(building, room, occurrenceId, date, START, END, List.of(new RoomRef(building, room)));
     }
 
     @Test
@@ -118,7 +129,7 @@ class NextClassCalculatorTest {
         assertThat(calc(known(228), slots, rooms, D1.atTime(8, 30))).isEqualTo(new Unchanged(1L, D1));
         assertThat(calc(known(228), slots, rooms, D1.atTime(10, 14))).isEqualTo(new Unchanged(1L, D1));
         assertThat(calc(known(228), slots, rooms, D1.atTime(10, 15)))
-                .isEqualTo(new Send(BUILDING, 229, 2L, D2, START, END));
+                .isEqualTo(send(BUILDING, 229, 2L, D2));
     }
 
     @Test
@@ -129,7 +140,7 @@ class NextClassCalculatorTest {
 
         assertThat(calc(known(229), slots, rooms, D2.atTime(10, 14))).isEqualTo(new Unchanged(2L, D2));
         assertThat(calc(known(229), slots, rooms, D2.atTime(10, 15)))
-                .isEqualTo(new Send(BUILDING, 228, 3L, D3, START, END));
+                .isEqualTo(send(BUILDING, 228, 3L, D3));
     }
 
     @Test
@@ -139,9 +150,9 @@ class NextClassCalculatorTest {
         Map<Long, Long> rooms = rooms(229L, 228L, 228L);
 
         assertThat(calc(known(228), slots, rooms, D1.atTime(7, 0)))
-                .isEqualTo(new Send(BUILDING, 229, 1L, D1, START, END));
+                .isEqualTo(send(BUILDING, 229, 1L, D1));
         assertThat(calc(known(229), slots, rooms, D1.atTime(10, 15)))
-                .isEqualTo(new Send(BUILDING, 228, 2L, D2, START, END));
+                .isEqualTo(send(BUILDING, 228, 2L, D2));
     }
 
     @Test
@@ -151,10 +162,10 @@ class NextClassCalculatorTest {
         Map<Long, Long> rooms = rooms(228L, 229L, 229L, 228L);
 
         assertThat(calc(known(228), slots, rooms, D1.atTime(10, 15)))
-                .isEqualTo(new Send(BUILDING, 229, 2L, D2, START, END));
+                .isEqualTo(send(BUILDING, 229, 2L, D2));
         assertThat(calc(known(229), slots, rooms, D2.atTime(10, 15))).isEqualTo(new Unchanged(3L, D3));
         assertThat(calc(known(229), slots, rooms, D3.atTime(10, 15)))
-                .isEqualTo(new Send(BUILDING, 228, 4L, D4, START, END));
+                .isEqualTo(send(BUILDING, 228, 4L, D4));
     }
 
     @Test
@@ -164,7 +175,7 @@ class NextClassCalculatorTest {
         Map<Long, Long> rooms = rooms(228L, 229L, 229L);
 
         assertThat(calc(known(228), slots, rooms, D1.atTime(10, 15)))
-                .isEqualTo(new Send(BUILDING, 229, 2L, D2, START, END));
+                .isEqualTo(send(BUILDING, 229, 2L, D2));
         assertThat(calc(known(229), slots, rooms, D2.atTime(10, 15))).isEqualTo(new Unchanged(3L, D3));
         assertThat(calc(known(229), slots, rooms, D3.atTime(10, 15))).isEqualTo(new NoNextClass());
     }
@@ -182,7 +193,7 @@ class NextClassCalculatorTest {
         assertThat(calc(known(228), slots, rooms, lastOfFirstTerm.atTime(10, 14)))
                 .isEqualTo(new Unchanged(2L, lastOfFirstTerm));
         assertThat(calc(known(228), slots, rooms, lastOfFirstTerm.atTime(10, 15)))
-                .isEqualTo(new Send(BUILDING, 229, 3L, firstOfSecondTerm, START, END));
+                .isEqualTo(send(BUILDING, 229, 3L, firstOfSecondTerm));
     }
 
     @Test
@@ -196,7 +207,7 @@ class NextClassCalculatorTest {
         Map<Long, Long> rooms = rooms(228L, 229L, 228L);
 
         assertThat(calc(known(229), slots, rooms, lastOfFirstTerm.atTime(10, 15)))
-                .isEqualTo(new Send(BUILDING, 228, 3L, firstOfSecondTerm, START, END));
+                .isEqualTo(send(BUILDING, 228, 3L, firstOfSecondTerm));
     }
 
     @Test
@@ -205,7 +216,7 @@ class NextClassCalculatorTest {
         List<OccurrenceSlotDto> slots = List.of(slot(1, D1), slot(2, D2), slot(3, D3));
         Map<Long, Long> rooms = rooms(228L, 229L, 228L);
 
-        NextClassDecision decision = NextClassCalculator.calculate(known(228), slots, rooms, refs(228, 229),
+        NextClassDecision decision = NextClassCalculator.calculate(known(228), slots, rooms, Map.of(), refs(228, 229),
                 Map.of(), Set.of(D2), D1.atTime(11, 0));
 
         assertThat(decision).isEqualTo(new Unchanged(3L, D3));
@@ -241,7 +252,7 @@ class NextClassCalculatorTest {
         Map<Long, Long> rooms = Map.of(1L, 229L, 11L, 230L);
 
         assertThat(calc(known(228), slots, rooms, D1.atTime(7, 0)))
-                .isEqualTo(new Send(BUILDING, 229, 1L, D1, START, END));
+                .isEqualTo(send(BUILDING, 229, 1L, D1));
         assertThat(calc(known(229), slots, rooms, D1.atTime(7, 0))).isEqualTo(new Unchanged(1L, D1));
     }
 
@@ -252,7 +263,7 @@ class NextClassCalculatorTest {
         Map<Long, OccurrenceRequestStateDto> states =
                 Map.of(1L, new OccurrenceRequestStateDto(1L, 77L, OccurrenceRequestState.PENDING));
 
-        NextClassDecision decision = NextClassCalculator.calculate(known(228), slots, rooms(229L),
+        NextClassDecision decision = NextClassCalculator.calculate(known(228), slots, rooms(229L), Map.of(),
                 refs(228, 229), states, Set.of(), D1.atTime(7, 59));
 
         assertThat(decision).isEqualTo(new Waiting(1L, 77L, D1, START)).isNotInstanceOf(Send.class);
@@ -265,10 +276,10 @@ class NextClassCalculatorTest {
         Map<Long, OccurrenceRequestStateDto> states =
                 Map.of(1L, new OccurrenceRequestStateDto(1L, 77L, OccurrenceRequestState.ACCEPTED));
 
-        NextClassDecision decision = NextClassCalculator.calculate(known(228), slots, rooms(229L),
+        NextClassDecision decision = NextClassCalculator.calculate(known(228), slots, rooms(229L), Map.of(),
                 refs(228, 229), states, Set.of(), D1.atTime(7, 59));
 
-        assertThat(decision).isEqualTo(new Send(BUILDING, 229, 1L, D1, START, END));
+        assertThat(decision).isEqualTo(send(BUILDING, 229, 1L, D1));
     }
 
     @Test
@@ -288,7 +299,7 @@ class NextClassCalculatorTest {
         Map<Long, OccurrenceRequestStateDto> states =
                 Map.of(1L, new OccurrenceRequestStateDto(1L, 88L, OccurrenceRequestState.CANCELLED));
 
-        NextClassDecision decision = NextClassCalculator.calculate(known(228), slots, Map.of(), refs(228), states,
+        NextClassDecision decision = NextClassCalculator.calculate(known(228), slots, Map.of(), Map.of(), refs(228), states,
                 Set.of(), D1.atTime(7, 0));
 
         assertThat(decision).isEqualTo(new NoRoomAfterCancel(1L, 88L, D1));
@@ -300,7 +311,7 @@ class NextClassCalculatorTest {
         List<OccurrenceSlotDto> slots = List.of(slotWithStatus(1, D1, OccurrenceStatus.ROOM_RELEASED));
 
         assertThat(calc(known(228), slots, Map.of(), D1.atTime(7, 0)))
-                .isEqualTo(new Send(BUILDING, 999, 1L, D1, START, END));
+                .isEqualTo(send(BUILDING, 999, 1L, D1));
     }
 
     @Test
@@ -368,7 +379,7 @@ class NextClassCalculatorTest {
             refs.put(229L, destination);
         }
 
-        NextClassDecision decision = NextClassCalculator.calculate(known(228), List.of(slot(1, D1)), rooms(229L),
+        NextClassDecision decision = NextClassCalculator.calculate(known(228), List.of(slot(1, D1)), rooms(229L), Map.of(),
                 refs, Map.of(), Set.of(), D1.atTime(7, 0));
 
         assertThat(decision).isEqualTo(new NotSendable(1L, D1, reason));
@@ -379,10 +390,10 @@ class NextClassCalculatorTest {
     void sameRoomNumberInAnotherBuildingIsSent() {
         Map<Long, ClassroomSysacadRefDto> refs = Map.of(500L, new ClassroomSysacadRefDto(500L, 228, 2, true, true, true));
 
-        NextClassDecision decision = NextClassCalculator.calculate(known(228), List.of(slot(1, D1)), rooms(500L),
+        NextClassDecision decision = NextClassCalculator.calculate(known(228), List.of(slot(1, D1)), rooms(500L), Map.of(),
                 refs, Map.of(), Set.of(), D1.atTime(7, 0));
 
-        assertThat(decision).isEqualTo(new Send(2, 228, 1L, D1, START, END));
+        assertThat(decision).isEqualTo(send(2, 228, 1L, D1));
     }
 
     @Test
@@ -394,7 +405,7 @@ class NextClassCalculatorTest {
         assertThat(calc(known(228), slots, rooms, D1.atTime(START))).isEqualTo(new Unchanged(1L, D1));
         assertThat(calc(known(228), slots, rooms, D1.atTime(9, 0))).isEqualTo(new Unchanged(1L, D1));
         assertThat(calc(known(228), slots, rooms, D1.atTime(START).minusSeconds(1)))
-                .isEqualTo(new Send(BUILDING, 229, 1L, D1, START, END));
+                .isEqualTo(send(BUILDING, 229, 1L, D1));
     }
 
     @Test
@@ -406,7 +417,7 @@ class NextClassCalculatorTest {
         assertThat(calc(known(229), slots, rooms, D1.atTime(END).minusSeconds(1)))
                 .isEqualTo(new Unchanged(1L, D1));
         assertThat(calc(known(229), slots, rooms, D1.atTime(END)))
-                .isEqualTo(new Send(BUILDING, 230, 2L, D2, START, END));
+                .isEqualTo(send(BUILDING, 230, 2L, D2));
     }
 
     @Test
@@ -417,7 +428,7 @@ class NextClassCalculatorTest {
         assertThat(calc(known(228), slots, rooms(null, 228L), D1.atTime(START))).isEqualTo(new Unchanged(1L, D1));
         assertThat(calc(known(228), slots, rooms(null, 228L), D1.atTime(9, 0))).isEqualTo(new Unchanged(1L, D1));
         assertThat(calc(known(228), slots, rooms(null, 228L), D1.atTime(START).minusSeconds(1)))
-                .isEqualTo(new Send(BUILDING, 999, 1L, D1, START, END));
+                .isEqualTo(send(BUILDING, 999, 1L, D1));
     }
 
     @Test
@@ -427,10 +438,10 @@ class NextClassCalculatorTest {
         Map<Long, OccurrenceRequestStateDto> pending =
                 Map.of(1L, new OccurrenceRequestStateDto(1L, 77L, OccurrenceRequestState.PENDING));
 
-        assertThat(NextClassCalculator.calculate(known(228), List.of(slot(1, D1)), rooms(229L),
+        assertThat(NextClassCalculator.calculate(known(228), List.of(slot(1, D1)), rooms(229L), Map.of(),
                 refs(228, 229), pending, Set.of(), inProgress)).isEqualTo(new Waiting(1L, 77L, D1, START));
         assertThat(calc(known(228), List.of(slot(1, D1)), Map.of(), inProgress)).isEqualTo(new NoRoom(1L, D1));
-        assertThat(NextClassCalculator.calculate(known(228), List.of(slot(1, D1)), rooms(500L),
+        assertThat(NextClassCalculator.calculate(known(228), List.of(slot(1, D1)), rooms(500L), Map.of(),
                 Map.of(500L, new ClassroomSysacadRefDto(500L, 0, BUILDING, true, true, true)), Map.of(), Set.of(), inProgress))
                 .isEqualTo(new NotSendable(1L, D1, DestinationNotSendableReason.CLASSROOM_RESERVED_NUMBER));
     }
@@ -444,5 +455,137 @@ class NextClassCalculatorTest {
 
         assertThat(calc(known(229), slots, rooms, inProgress)).isEqualTo(new Unchanged(1L, D1));
         assertThat(calc(known(229), slots, rooms, D1.atTime(END))).isEqualTo(new Unchanged(2L, D2));
+    }
+
+    private static SysacadSchedule announced(int room, String announcedRooms) {
+        return SysacadSchedule.builder()
+                .knownBuilding(BUILDING)
+                .knownRoom(room)
+                .announcedRooms(announcedRooms)
+                .endTime(END)
+                .build();
+    }
+
+    private static List<RoomRef> roomRefs(int... rooms) {
+        return java.util.Arrays.stream(rooms).mapToObj(room -> new RoomRef(BUILDING, room)).toList();
+    }
+
+    private static NextClassDecision calcWithMirrors(SysacadSchedule schedule, Map<Long, Long> classrooms,
+            Map<Long, List<Long>> mirrors, LocalDateTime now) {
+        return calc(schedule, List.of(slot(1, D1), mirror(11, 1, D1)), classrooms, mirrors,
+                refs(227, 228, 229, 230), now);
+    }
+
+    @Test
+    @DisplayName("Con espejo y sin aviso previo, la principal igual a la conocida da NotifyOnly con ambas aulas")
+    void mirrorAddedWithoutAnnouncementNotifiesOnly() {
+        NextClassDecision decision = calcWithMirrors(known(228), Map.of(1L, 228L), Map.of(1L, List.of(229L)),
+                D1.atTime(7, 0));
+
+        assertThat(decision).isEqualTo(new NotifyOnly(1L, D1, roomRefs(228, 229)));
+    }
+
+    @Test
+    @DisplayName("Conjunto ya avisado: Unchanged")
+    void alreadyAnnouncedSetIsUnchanged() {
+        NextClassDecision decision = calcWithMirrors(announced(228, "1-228,1-229"), Map.of(1L, 228L),
+                Map.of(1L, List.of(229L)), D1.atTime(7, 0));
+
+        assertThat(decision).isEqualTo(new Unchanged(1L, D1));
+    }
+
+    @Test
+    @DisplayName("Reordenar principal y espejo no cuenta como cambio")
+    void reorderedSetIsUnchanged() {
+        NextClassDecision decision = calcWithMirrors(announced(229, "1-228,1-229"), Map.of(1L, 229L),
+                Map.of(1L, List.of(228L)), D1.atTime(7, 0));
+
+        assertThat(decision).isEqualTo(new Unchanged(1L, D1));
+    }
+
+    @Test
+    @DisplayName("Se sacó el espejo: NotifyOnly con la principal sola")
+    void mirrorRemovedNotifiesOnly() {
+        NextClassDecision decision = calcWithMirrors(announced(228, "1-228,1-229"), Map.of(1L, 228L), Map.of(),
+                D1.atTime(7, 0));
+
+        assertThat(decision).isEqualTo(new NotifyOnly(1L, D1, roomRefs(228)));
+    }
+
+    @Test
+    @DisplayName("Cambia solo el aula del espejo: NotifyOnly con el conjunto nuevo")
+    void mirrorRoomChangedNotifiesOnly() {
+        NextClassDecision decision = calcWithMirrors(announced(228, "1-228,1-229"), Map.of(1L, 228L),
+                Map.of(1L, List.of(230L)), D1.atTime(7, 0));
+
+        assertThat(decision).isEqualTo(new NotifyOnly(1L, D1, roomRefs(228, 230)));
+    }
+
+    @Test
+    @DisplayName("Cambia la principal con espejos: Send con la principal primero y los espejos")
+    void principalChangedSendsWithMirrors() {
+        NextClassDecision decision = calcWithMirrors(known(228), Map.of(1L, 229L), Map.of(1L, List.of(230L)),
+                D1.atTime(7, 0));
+
+        assertThat(decision).isEqualTo(new Send(BUILDING, 229, 1L, D1, START, END, roomRefs(229, 230)));
+    }
+
+    @Test
+    @DisplayName("Send lleva los espejos en el orden recibido, después de la principal")
+    void sendKeepsMirrorOrder() {
+        NextClassDecision decision = calcWithMirrors(known(228), Map.of(1L, 227L),
+                Map.of(1L, List.of(230L, 229L)), D1.atTime(7, 0));
+
+        assertThat(decision).isInstanceOfSatisfying(Send.class,
+                send -> assertThat(send.rooms()).containsExactlyElementsOf(roomRefs(227, 230, 229)));
+    }
+
+    @Test
+    @DisplayName("Un espejo sin asignación no entra al conjunto: Unchanged")
+    void mirrorWithoutAllocationIsIgnored() {
+        NextClassDecision decision = calcWithMirrors(known(228), Map.of(1L, 228L), Map.of(), D1.atTime(7, 0));
+
+        assertThat(decision).isEqualTo(new Unchanged(1L, D1));
+    }
+
+    @Test
+    @DisplayName("Un espejo cuyo ref no tiene número queda fuera del conjunto")
+    void mirrorWithoutNumberIsLeftOut() {
+        Map<Long, ClassroomSysacadRefDto> refs = refs(228);
+        refs.put(500L, new ClassroomSysacadRefDto(500L, null, BUILDING, true, true, true));
+        List<OccurrenceSlotDto> slots = List.of(slot(1, D1), mirror(11, 1, D1), mirror(12, 1, D1));
+
+        NextClassDecision decision = calc(known(228), slots, Map.of(1L, 228L),
+                Map.of(1L, List.of(500L, 229L)), refs, D1.atTime(7, 0));
+
+        assertThat(decision).isEqualTo(new Unchanged(1L, D1));
+        assertThat(calc(announced(228, "1-228"), slots, Map.of(1L, 228L), Map.of(1L, List.of(500L)), refs,
+                D1.atTime(7, 0))).isEqualTo(new Unchanged(1L, D1));
+        refs.put(229L, ref(229));
+        assertThat(calc(known(228), slots, Map.of(1L, 228L), Map.of(1L, List.of(500L, 229L)), refs,
+                D1.atTime(7, 0))).isEqualTo(new NotifyOnly(1L, D1, roomRefs(228, 229)));
+    }
+
+    @Test
+    @DisplayName("NotifyOnly no sale si la clase ya empezó, y sí un segundo antes")
+    void notifyOnlyDoesNotLeaveOnceClassStarted() {
+        Map<Long, List<Long>> mirrors = Map.of(1L, List.of(229L));
+
+        assertThat(calcWithMirrors(known(228), Map.of(1L, 228L), mirrors, D1.atTime(START)))
+                .isEqualTo(new Unchanged(1L, D1));
+        assertThat(calcWithMirrors(known(228), Map.of(1L, 228L), mirrors, D1.atTime(START).minusSeconds(1)))
+                .isEqualTo(new NotifyOnly(1L, D1, roomRefs(228, 229)));
+    }
+
+    @Test
+    @DisplayName("Principal ROOM_RELEASED: Send con 999 y solo esa aula, sin mirar los espejos")
+    void releasedPrincipalSendsReleasedRoomIgnoringMirrors() {
+        List<OccurrenceSlotDto> slots = List.of(slotWithStatus(1, D1, OccurrenceStatus.ROOM_RELEASED),
+                mirror(11, 1, D1));
+
+        NextClassDecision decision = calc(known(228), slots, Map.of(), Map.of(1L, List.of(229L)),
+                refs(228, 229), D1.atTime(7, 0));
+
+        assertThat(decision).isEqualTo(new Send(BUILDING, 999, 1L, D1, START, END, roomRefs(999)));
     }
 }

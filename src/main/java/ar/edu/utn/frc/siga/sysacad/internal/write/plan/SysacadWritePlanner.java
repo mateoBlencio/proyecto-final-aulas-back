@@ -80,15 +80,25 @@ public class SysacadWritePlanner {
         }
         Set<Long> nextIds = candidates.stream().map(c -> c.next().occurrenceId()).collect(Collectors.toSet());
         Map<Long, Long> classroomByOccurrence = allocationService.findClassroomIdsByOccurrences(nextIds);
+        List<OccurrenceSlotDto> mirrors = occurrenceService.findMirrors(nextIds);
+        Map<Long, Long> mirrorClassrooms = allocationService.findClassroomIdsByOccurrences(
+                mirrors.stream().map(OccurrenceSlotDto::occurrenceId).collect(Collectors.toSet()));
+        Map<Long, List<Long>> mirrorClassroomsByPrincipal = mirrors.stream()
+                .filter(m -> mirrorClassrooms.containsKey(m.occurrenceId()))
+                .sorted(Comparator.comparing(OccurrenceSlotDto::roomSlot,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .collect(Collectors.groupingBy(OccurrenceSlotDto::mirrorOfOccurrenceId,
+                        Collectors.mapping(m -> mirrorClassrooms.get(m.occurrenceId()), Collectors.toList())));
+        Set<Long> classroomIds = new HashSet<>(classroomByOccurrence.values());
+        classroomIds.addAll(mirrorClassrooms.values());
         Map<Long, ClassroomSysacadRefDto> refs = Maps.byId(
-                classroomService.findSysacadRefs(new HashSet<>(classroomByOccurrence.values())),
-                ClassroomSysacadRefDto::classroomId);
+                classroomService.findSysacadRefs(classroomIds), ClassroomSysacadRefDto::classroomId);
         Map<Long, OccurrenceRequestStateDto> states = occurrenceRequestQuery.findStates(nextIds);
 
         return candidates.stream()
                 .sorted(Comparator.comparing((Candidate c) -> c.next().date()).thenComparing(c -> c.next().startTime()))
                 .map(c -> new PlannedSchedule(c.schedule(), NextClassCalculator.calculate(c.schedule(), c.slots(),
-                        classroomByOccurrence, refs, states, holidays, now)))
+                        classroomByOccurrence, mirrorClassroomsByPrincipal, refs, states, holidays, now)))
                 .filter(p -> !(p.decision() instanceof NextClassDecision.Unchanged))
                 .toList();
     }
