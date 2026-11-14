@@ -23,6 +23,7 @@ import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadScheduleStatus;
 import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleRepository;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NotifyOnly;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Send;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -176,7 +177,8 @@ class SysacadWritePlannerTest {
         List<PlannedSchedule> plan = planner.plan(NOW);
 
         assertThat(plan).hasSize(1);
-        assertThat(plan.get(0).decision()).isEqualTo(new Send(1, 229, 2L, D2, LocalTime.of(8, 0), LocalTime.of(10, 15)));
+        assertThat(plan.get(0).decision()).isEqualTo(new Send(1, 229, 2L, D2, LocalTime.of(8, 0), LocalTime.of(10, 15),
+                List.of(new RoomRef(1, 229))));
         verify(occurrenceService).findNextSlotsByEvents(eq(Set.of(10L)), eq(D1), any(), eq(2));
         verify(allocationService).findClassroomIdsByOccurrences(Set.of(2L));
     }
@@ -262,6 +264,38 @@ class SysacadWritePlannerTest {
         List<PlannedSchedule> plan = planner.plan(NOW);
 
         assertThat(plan).hasSize(1);
-        assertThat(plan.get(0).decision()).isEqualTo(new Send(1, 229, 2L, D2, LocalTime.of(8, 0), LocalTime.of(10, 15)));
+        assertThat(plan.get(0).decision()).isEqualTo(new Send(1, 229, 2L, D2, LocalTime.of(8, 0), LocalTime.of(10, 15),
+                List.of(new RoomRef(1, 229))));
+    }
+
+    private static OccurrenceSlotDto mirrorSlot(long occurrenceId, long principalId, Integer roomSlot) {
+        return new OccurrenceSlotDto(occurrenceId, 10L, D1, LocalTime.of(8, 0), LocalTime.of(10, 15),
+                OccurrenceStatus.NEEDS_ROOM, 30, roomSlot, null, null, null, principalId);
+    }
+
+    @Test
+    @DisplayName("Pide los espejos de las próximas, carga sus aulas en una sola llamada de refs y arma el conjunto por roomSlot")
+    void loadsMirrorsAndBuildsRoomSetOrderedByRoomSlot() {
+        stubEvents(eventRef(10, true));
+        stubSchedules(schedule(1, 10L, null));
+        when(occurrenceService.findNextSlotsByEvents(any(), any(LocalDate.class), any(), eq(2))).thenReturn(List.of(
+                slot(1, 10, D1), slot(2, 10, D2)));
+        when(allocationService.findClassroomIdsByOccurrences(Set.of(1L))).thenReturn(Map.of(1L, 228L));
+        when(occurrenceService.findMirrors(Set.of(1L))).thenReturn(List.of(
+                mirrorSlot(11, 1, 4), mirrorSlot(12, 1, 3), mirrorSlot(13, 1, 2)));
+        when(allocationService.findClassroomIdsByOccurrences(Set.of(11L, 12L, 13L)))
+                .thenReturn(Map.of(11L, 230L, 12L, 229L));
+        when(classroomService.findSysacadRefs(Set.of(228L, 229L, 230L)))
+                .thenReturn(List.of(room(228), room(229), room(230)));
+        when(occurrenceRequestQuery.findStates(anyCollection())).thenReturn(Map.of());
+        when(holidayService.findBetween(any(), any())).thenReturn(List.of());
+
+        List<PlannedSchedule> plan = planner.plan(NOW);
+
+        assertThat(plan).hasSize(1);
+        assertThat(plan.get(0).decision()).isEqualTo(new NotifyOnly(1L, D1,
+                List.of(new RoomRef(1, 228), new RoomRef(1, 229), new RoomRef(1, 230))));
+        verify(classroomService, times(1)).findSysacadRefs(anyCollection());
+        verify(occurrenceService).findMirrors(Set.of(1L));
     }
 }

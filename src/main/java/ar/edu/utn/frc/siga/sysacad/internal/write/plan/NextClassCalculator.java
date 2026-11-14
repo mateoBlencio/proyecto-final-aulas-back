@@ -10,6 +10,7 @@ import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NoNextClass;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NoRoom;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NoRoomAfterCancel;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NotifyOnly;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NotSendable;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Send;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Unchanged;
@@ -18,12 +19,16 @@ import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Collection;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public final class NextClassCalculator {
 
     static final int RELEASED_ROOM = 999;
@@ -45,8 +50,8 @@ public final class NextClassCalculator {
     }
 
     public static NextClassDecision calculate(SysacadSchedule schedule, Collection<OccurrenceSlotDto> slots,
-            Map<Long, Long> classroomByOccurrence, Map<Long, ClassroomSysacadRefDto> refsByClassroom,
-            Map<Long, OccurrenceRequestStateDto> requestStates, Set<LocalDate> holidays, LocalDateTime now) {
+            Map<Long, Long> classroomByOccurrence, Map<Long, List<Long>> mirrorClassroomsByPrincipal,
+            Map<Long, ClassroomSysacadRefDto> refsByClassroom, Map<Long, OccurrenceRequestStateDto> requestStates, Set<LocalDate> holidays, LocalDateTime now) {
         Optional<OccurrenceSlotDto> next = findNext(schedule, slots, holidays, now);
         if (next.isEmpty()) {
             return new NoNextClass();
@@ -65,7 +70,8 @@ public final class NextClassCalculator {
             }
             return Objects.equals(schedule.getKnownRoom(), RELEASED_ROOM)
                     ? new Unchanged(occurrenceId, slot.date())
-                    : sendUnlessStarted(slot, now, schedule.getKnownBuilding(), RELEASED_ROOM);
+                    : sendUnlessStarted(slot, now, schedule.getKnownBuilding(), RELEASED_ROOM,
+                            List.of(new RoomRef(schedule.getKnownBuilding(), RELEASED_ROOM)));
         }
         Long classroomId = classroomByOccurrence.get(occurrenceId);
         if (classroomId == null) {
@@ -78,20 +84,41 @@ public final class NextClassCalculator {
         if (invalid != null) {
             return new NotSendable(occurrenceId, slot.date(), invalid);
         }
-        return Objects.equals(ref.buildingCode(), schedule.getKnownBuilding())
-                && Objects.equals(ref.roomNumber(), schedule.getKnownRoom())
-                ? new Unchanged(occurrenceId, slot.date())
-                : sendUnlessStarted(slot, now, ref.buildingCode(), ref.roomNumber());
+        List<RoomRef> rooms = new ArrayList<>();
+        rooms.add(new RoomRef(ref.buildingCode(), ref.roomNumber()));
+        for (Long mirrorClassroomId : mirrorClassroomsByPrincipal.getOrDefault(occurrenceId, List.of())) {
+            ClassroomSysacadRefDto mirror = refsByClassroom.get(mirrorClassroomId);
+            if (mirror == null || mirror.roomNumber() == null || mirror.buildingCode() == null) {
+                log.warn("Aula espejo {} de la ocurrencia {} sin número o edificio: queda fuera del mensaje",
+                        mirrorClassroomId, occurrenceId);
+                continue;
+            }
+            rooms.add(new RoomRef(mirror.buildingCode(), mirror.roomNumber()));
+        }
+        if (!(Objects.equals(ref.buildingCode(), schedule.getKnownBuilding())
+                && Objects.equals(ref.roomNumber(), schedule.getKnownRoom()))) {
+            return sendUnlessStarted(slot, now, ref.buildingCode(), ref.roomNumber(), rooms);
+        }
+        String announced = schedule.getAnnouncedRooms() != null ? schedule.getAnnouncedRooms()
+                : RoomRef.keyOf(schedule.getKnownBuilding(), schedule.getKnownRoom());
+        if (RoomRef.key(rooms).equals(announced) || !startsAfter(slot, now)) {
+            return new Unchanged(occurrenceId, slot.date());
+        }
+        return new NotifyOnly(occurrenceId, slot.date(), rooms);
+    }
+
+    private static boolean startsAfter(OccurrenceSlotDto slot, LocalDateTime now) {
+        return slot.date().atTime(slot.startTime()).isAfter(now);
     }
 
     // La clase empezada sigue siendo la próxima hasta su HoraFin y SIGA no puede cambiarla: sin esto un cambio
     // directo en SysAcad se revertiría hasta que termine la clase.
     private static NextClassDecision sendUnlessStarted(OccurrenceSlotDto slot, LocalDateTime now, Integer building,
-            Integer room) {
-        if (!slot.date().atTime(slot.startTime()).isAfter(now)) {
+            Integer room, List<RoomRef> rooms) {
+        if (!startsAfter(slot, now)) {
             return new Unchanged(slot.occurrenceId(), slot.date());
         }
-        return new Send(building, room, slot.occurrenceId(), slot.date(), slot.startTime(), slot.endTime());
+        return new Send(building, room, slot.occurrenceId(), slot.date(), slot.startTime(), slot.endTime(), rooms);
     }
 
     private static DestinationNotSendableReason invalidReason(ClassroomSysacadRefDto ref) {

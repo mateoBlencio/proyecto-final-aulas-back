@@ -11,9 +11,11 @@ import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadWriteState;
 import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleRepository;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NoRoom;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NoRoomAfterCancel;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NotifyOnly;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NotSendable;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Send;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Waiting;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.RoomRef;
 import ar.edu.utn.frc.siga.sysacad.internal.write.RunReport.ClassWithoutRoom;
 import ar.edu.utn.frc.siga.sysacad.internal.write.RunReport.Result;
 import ar.edu.utn.frc.siga.sysacad.internal.write.RunReport.ReviewedSchedule;
@@ -48,6 +50,7 @@ public class SysacadWriteRun {
     private final SysacadViewReader viewReader;
     private final SysacadWritePlanner planner;
     private final SysacadSendCycle sendCycle;
+    private final CommissionMessageSender commissionMessageSender;
     private final SysacadScheduleStateWriter scheduleWriter;
     private final DirectChangeHandler directChangeHandler;
     private final SysacadScheduleRepository scheduleRepository;
@@ -135,6 +138,16 @@ public class SysacadWriteRun {
                         if (handle(schedule, sendCycle.send(schedule, send, pacer), now, execution)) {
                             return;
                         }
+                    }
+                    case NotifyOnly notify when mode == SysacadWriteMode.SANDBOX -> scheduleWriter.recordEvent(
+                            schedule.getId(), ScheduleLogType.SANDBOX_MESSAGE, notify.rooms().get(0).building(),
+                            notify.rooms().get(0).room(), notify.occurrenceId(), null, RoomRef.key(notify.rooms()));
+                    case NotifyOnly notify -> {
+                        if (!mode.sendsToSysacad()) {
+                            continue;
+                        }
+                        commissionMessageSender.sendRoomsUpdate(schedule, notify, pacer);
+                        scheduleWriter.recordAnnouncedRooms(schedule.getId(), RoomRef.key(notify.rooms()));
                     }
                     case NoRoom ignored -> {
                     }

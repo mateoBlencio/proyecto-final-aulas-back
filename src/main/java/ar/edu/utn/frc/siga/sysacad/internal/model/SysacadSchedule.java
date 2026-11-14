@@ -71,6 +71,9 @@ public class SysacadSchedule extends TimestampedEntity {
     @Column(name = "aula_conocida")
     private Integer knownRoom;
 
+    @Column(name = "aulas_avisadas", length = 200)
+    private String announcedRooms;
+
     @Builder.Default
     @Column(name = "presente_en_vista", nullable = false)
     private boolean presentInView = true;

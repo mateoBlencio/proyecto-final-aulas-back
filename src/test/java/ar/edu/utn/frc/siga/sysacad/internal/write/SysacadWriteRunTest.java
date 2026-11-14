@@ -26,6 +26,8 @@ import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadWriteState;
 import ar.edu.utn.frc.siga.sysacad.internal.repository.SysacadScheduleRepository;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NoRoomAfterCancel;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NotSendable;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NotifyOnly;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.RoomRef;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Send;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Waiting;
 import ar.edu.utn.frc.siga.sysacad.internal.write.RunReport.Result;
@@ -72,6 +74,8 @@ class SysacadWriteRunTest {
     @Mock
     private SysacadSendCycle sendCycle;
     @Mock
+    private CommissionMessageSender commissionMessageSender;
+    @Mock
     private SysacadScheduleStateWriter scheduleWriter;
     @Mock
     private DirectChangeHandler directChangeHandler;
@@ -91,7 +95,7 @@ class SysacadWriteRunTest {
                 Duration.ofMinutes(30), Duration.ofHours(1)));
         state = new SysacadWriteState();
         state.setLastViewReadAt(NOW.minus(Duration.ofMinutes(10)));
-        run = new SysacadWriteRun(stateService, viewReader, planner, sendCycle, scheduleWriter, directChangeHandler,
+        run = new SysacadWriteRun(stateService, viewReader, planner, sendCycle, commissionMessageSender, scheduleWriter, directChangeHandler,
                 scheduleRepository, properties, runtimeSettings, Clock.fixed(NOW, ZoneOffset.UTC));
         lenient().when(stateService.current()).thenAnswer(invocation -> state);
     }
@@ -117,7 +121,8 @@ class SysacadWriteRunTest {
     }
 
     private static Send sendDecision(long id) {
-        return new Send(5, 229, 1000 + id, CLASS_DATE, LocalTime.of(8, 0), LocalTime.of(10, 15));
+        return new Send(5, 229, 1000 + id, CLASS_DATE, LocalTime.of(8, 0), LocalTime.of(10, 15),
+                List.of(new RoomRef(5, 229)));
     }
 
     private void planReturns(PlannedSchedule... plan) {
@@ -677,5 +682,62 @@ class SysacadWriteRunTest {
         run.run(NOW.minus(Duration.ofMinutes(3)));
 
         verify(stateService).pauseUntil(NOW.plusSeconds(90));
+    }
+
+    private static NotifyOnly notifyDecision(long id) {
+        return new NotifyOnly(1000 + id, CLASS_DATE, List.of(new RoomRef(5, 228), new RoomRef(5, 229)));
+    }
+
+    @Test
+    @DisplayName("NotifyOnly en ON manda el aviso de aulas y guarda el conjunto, sin pasar por el ciclo de envío")
+    void notifyOnlyOnSendsMessageAndRecordsRooms() {
+        SysacadSchedule schedule = schedule(1);
+        NotifyOnly notify = notifyDecision(1);
+        planReturns(new PlannedSchedule(schedule, notify));
+
+        run.run(NOW);
+
+        InOrder order = inOrder(commissionMessageSender, scheduleWriter);
+        order.verify(commissionMessageSender).sendRoomsUpdate(eq(schedule), eq(notify), any());
+        order.verify(scheduleWriter).recordAnnouncedRooms(1L, "5-228,5-229");
+        verifyNoInteractions(sendCycle);
+    }
+
+    @Test
+    @DisplayName("NotifyOnly en ON guarda el conjunto aunque el sender no mande nada")
+    void notifyOnlyOnRecordsRoomsEvenIfSenderSendsNothing() {
+        SysacadSchedule schedule = schedule(1);
+        planReturns(new PlannedSchedule(schedule, notifyDecision(1)));
+
+        run.run(NOW);
+
+        verify(scheduleWriter).recordAnnouncedRooms(1L, "5-228,5-229");
+    }
+
+    @Test
+    @DisplayName("NotifyOnly en SANDBOX deja SANDBOX_MESSAGE con el conjunto como motivo y no manda nada")
+    void notifyOnlySandboxRecordsEvent() {
+        configure(SysacadWriteMode.SANDBOX, 5, 3, 30, List.of(Duration.ofMinutes(5)));
+        planReturns(new PlannedSchedule(schedule(1), notifyDecision(1)));
+
+        run.run(NOW);
+
+        verify(scheduleWriter).recordEvent(1L, ScheduleLogType.SANDBOX_MESSAGE, 5, 228, 1001L, null,
+                "5-228,5-229");
+        verifyNoInteractions(commissionMessageSender, sendCycle);
+        verify(scheduleWriter, never()).recordAnnouncedRooms(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("NotifyOnly en OFF no hace nada")
+    void notifyOnlyOffDoesNothing() {
+        configure(SysacadWriteMode.OFF, 5, 3, 30, List.of(Duration.ofMinutes(5)));
+        planReturns(new PlannedSchedule(schedule(1), notifyDecision(1)));
+
+        run.run(NOW);
+
+        verifyNoInteractions(commissionMessageSender, sendCycle);
+        verify(scheduleWriter, never()).recordEvent(anyLong(), any(), any(), any(), any(), any(), any());
+        verify(scheduleWriter, never()).recordAnnouncedRooms(anyLong(), any());
     }
 }

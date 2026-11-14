@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.sysacad.internal.write.plan;
 import ar.edu.utn.frc.siga.sysacad.internal.model.DestinationNotSendableReason;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 public sealed interface NextClassDecision {
 
@@ -10,7 +11,10 @@ public sealed interface NextClassDecision {
     }
 
     record Send(Integer building, Integer room, Long occurrenceId, LocalDate date, LocalTime startTime,
-            LocalTime endTime) implements NextClassDecision {
+            LocalTime endTime, List<RoomRef> rooms) implements NextClassDecision {
+    }
+
+    record NotifyOnly(Long occurrenceId, LocalDate date, List<RoomRef> rooms) implements NextClassDecision {
     }
 
     record Waiting(Long occurrenceId, Long itemId, LocalDate date, LocalTime startTime)

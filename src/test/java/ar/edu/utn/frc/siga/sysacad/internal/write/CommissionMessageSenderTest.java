@@ -27,7 +27,9 @@ import ar.edu.utn.frc.siga.sysacad.internal.config.CommissionMessageMode;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
 import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties.MessageCommission;
 import ar.edu.utn.frc.siga.sysacad.internal.model.SysacadSchedule;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.NotifyOnly;
 import ar.edu.utn.frc.siga.sysacad.internal.write.plan.NextClassDecision.Send;
+import ar.edu.utn.frc.siga.sysacad.internal.write.plan.RoomRef;
 import ar.edu.utn.frc.siga.sysacad.internal.write.state.SysacadScheduleStateWriter;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -91,7 +93,8 @@ class CommissionMessageSenderTest {
     }
 
     private static Send decision(int room) {
-        return new Send(BUILDING, room, OCCURRENCE_ID, CLASS_DATE, LocalTime.of(8, 0), LocalTime.of(10, 15));
+        return new Send(BUILDING, room, OCCURRENCE_ID, CLASS_DATE, LocalTime.of(8, 0), LocalTime.of(10, 15),
+                List.of(new RoomRef(BUILDING, room)));
     }
 
     private void subjectIs(String name) {
@@ -181,7 +184,7 @@ class CommissionMessageSenderTest {
 
         sender.sendAfterConfirmation(schedule, decision(ROOM), pacer);
 
-        String note = "Cambio de aula: tu clase de Física I del martes 17/11 será en el aula 229 de Maders.";
+        String note = "La clase de Física I del martes 17/11 será en el aula 229 de Maders.";
         assertThat(sentCommand()).isEqualTo(new CommissionMessageCommand(CLASS_DATE, 2026, 9, 2023, 101, 1, note));
         verify(stateWriter).recordCommissionMessage(SCHEDULE_ID, OCCURRENCE_ID, BUILDING, ROOM, note, true, "ok");
     }
@@ -216,7 +219,7 @@ class CommissionMessageSenderTest {
         sender.sendAfterConfirmation(schedule, decision(ROOM), pacer);
 
         verify(stateWriter).recordCommissionMessage(SCHEDULE_ID, OCCURRENCE_ID, BUILDING, ROOM,
-                "Cambio de aula: tu clase de Física I del martes 17/11 será en el aula 229 de Maders.", false,
+                "La clase de Física I del martes 17/11 será en el aula 229 de Maders.", false,
                 "HTTP 500: error");
     }
 
@@ -283,6 +286,107 @@ class CommissionMessageSenderTest {
         sender.warnIfLimitedToTestCommissions();
 
         assertThat(logs.list).isEmpty();
+    }
+
+    private void buildingIs(int building, int room, String name) {
+        when(classroomService.findByRoomNumberAndBuildingCode(room, building)).thenReturn(Optional.of(
+                new ClassroomResponseDto(1L, room, 40, 1L, name, 1L, "Aula", null, true)));
+    }
+
+    private static NotifyOnly notify(RoomRef... rooms) {
+        return new NotifyOnly(OCCURRENCE_ID, CLASS_DATE, List.of(rooms));
+    }
+
+    @Test
+    @DisplayName("Dos aulas en el mismo edificio: 'las aulas 910 y 920 de X'")
+    void twoRoomsInSameBuilding() {
+        subjectIs("Física I");
+        buildingIs(BUILDING, 910, "Possetto");
+        when(client.sendCommissionMessage(any())).thenReturn(new CommissionMessageResult(true, "ok"));
+
+        sender.sendRoomsUpdate(schedule, notify(new RoomRef(BUILDING, 910), new RoomRef(BUILDING, 920)), pacer);
+
+        assertThat(sentCommand().note())
+                .isEqualTo("La clase de Física I del martes 17/11 será en las aulas 910 y 920 de Possetto.");
+    }
+
+    @Test
+    @DisplayName("Tres aulas en el mismo edificio: 'las aulas 910, 920 y 922 de X'")
+    void threeRoomsInSameBuilding() {
+        subjectIs("Física I");
+        buildingIs(BUILDING, 910, "Possetto");
+        when(client.sendCommissionMessage(any())).thenReturn(new CommissionMessageResult(true, "ok"));
+
+        sender.sendRoomsUpdate(schedule,
+                notify(new RoomRef(BUILDING, 910), new RoomRef(BUILDING, 920), new RoomRef(BUILDING, 922)), pacer);
+
+        assertThat(sentCommand().note())
+                .isEqualTo("La clase de Física I del martes 17/11 será en las aulas 910, 920 y 922 de Possetto.");
+    }
+
+    @Test
+    @DisplayName("Edificios distintos: 'el aula 3 de A y el aula 5 de B'")
+    void roomsInDifferentBuildings() {
+        subjectIs("Física I");
+        buildingIs(2, 3, "Maders");
+        buildingIs(BUILDING, 5, "Possetto");
+        when(client.sendCommissionMessage(any())).thenReturn(new CommissionMessageResult(true, "ok"));
+
+        sender.sendRoomsUpdate(schedule, notify(new RoomRef(2, 3), new RoomRef(BUILDING, 5)), pacer);
+
+        assertThat(sentCommand().note()).isEqualTo(
+                "La clase de Física I del martes 17/11 será en el aula 3 de Maders y el aula 5 de Possetto.");
+    }
+
+    @Test
+    @DisplayName("Materia larga con dos aulas: recorta la materia, queda en 150 y conserva la cola")
+    void longSubjectWithTwoRoomsKeepsTail() {
+        subjectIs("M".repeat(200));
+        buildingIs(BUILDING, 910, "Possetto");
+        when(client.sendCommissionMessage(any())).thenReturn(new CommissionMessageResult(true, "ok"));
+
+        sender.sendRoomsUpdate(schedule, notify(new RoomRef(BUILDING, 910), new RoomRef(BUILDING, 920)), pacer);
+
+        assertThat(sentCommand().note()).hasSize(150).startsWith("La clase de MMM")
+                .endsWith(" del martes 17/11 será en las aulas 910 y 920 de Possetto.");
+    }
+
+    @Test
+    @DisplayName("sendRoomsUpdate en OFF no consulta nada, no llama a SysAcad y no registra")
+    void roomsUpdateOffDoesNothing() {
+        when(runtimeSettings.commissionMessageMode()).thenReturn(CommissionMessageMode.OFF);
+
+        sender.sendRoomsUpdate(schedule, notify(new RoomRef(BUILDING, 910), new RoomRef(BUILDING, 920)), pacer);
+
+        verifyNoInteractions(client, stateWriter, subjectService, classroomService);
+    }
+
+    @Test
+    @DisplayName("sendRoomsUpdate en ON manda con la fecha de la clase y registra con la aula principal")
+    void roomsUpdateOnSendsAndRecords() {
+        subjectIs("Física I");
+        buildingIs(BUILDING, 910, "Possetto");
+        when(client.sendCommissionMessage(any())).thenReturn(new CommissionMessageResult(true, "ok"));
+
+        sender.sendRoomsUpdate(schedule, notify(new RoomRef(BUILDING, 910), new RoomRef(BUILDING, 920)), pacer);
+
+        String note = "La clase de Física I del martes 17/11 será en las aulas 910 y 920 de Possetto.";
+        assertThat(sentCommand()).isEqualTo(new CommissionMessageCommand(CLASS_DATE, 2026, 9, 2023, 101, 1, note));
+        verify(stateWriter).recordCommissionMessage(SCHEDULE_ID, OCCURRENCE_ID, BUILDING, 910, note, true, "ok");
+    }
+
+    @Test
+    @DisplayName("sendAfterConfirmation con Send de dos aulas nombra ambas")
+    void sendAfterConfirmationNamesAllRooms() {
+        subjectIs("Física I");
+        buildingIs(BUILDING, 910, "Possetto");
+        when(client.sendCommissionMessage(any())).thenReturn(new CommissionMessageResult(true, "ok"));
+        Send send = new Send(BUILDING, 910, OCCURRENCE_ID, CLASS_DATE, LocalTime.of(8, 0), LocalTime.of(10, 15),
+                List.of(new RoomRef(BUILDING, 910), new RoomRef(BUILDING, 920)));
+
+        sender.sendAfterConfirmation(schedule, send, pacer);
+
+        assertThat(sentCommand().note()).endsWith("será en las aulas 910 y 920 de Possetto.");
     }
 
     private static ListAppender<ILoggingEvent> captureLogs() {

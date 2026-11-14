@@ -76,6 +76,8 @@ public class SysacadWriteController {
         return switch (planned.decision()) {
             case NextClassDecision.Send d -> item(s, "SEND", d.building(), d.room(), d.occurrenceId(), d.date(),
                     null, null);
+            case NextClassDecision.NotifyOnly d -> item(s, "NOTIFY_ONLY", d.rooms().get(0).building(),
+                    d.rooms().get(0).room(), d.occurrenceId(), d.date(), null, null);
             case NextClassDecision.Waiting d -> item(s, "WAITING", null, null, d.occurrenceId(), d.date(),
                     d.itemId(), null);
             case NextClassDecision.NoRoom d -> item(s, "NO_ROOM", null, null, d.occurrenceId(), d.date(),
