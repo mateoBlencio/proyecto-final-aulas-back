@@ -288,6 +288,28 @@ class RoomRequestOriginalClassroomIntegrationTest extends AbstractIntegrationTes
     }
 
     @Test
+    @DisplayName("assign de un cambio regular con la clase de hoy ya empezada: hoy conserva su aula y rige desde la siguiente")
+    void assign_regularConClaseDeHoyYaEmpezada() throws Exception {
+        Classroom a = room();
+        Classroom b = room();
+        LocalDate today = LocalDate.now();
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision(OWN_PERIOD_YEAR);
+        Long eventId = testData.eventoRecurrente(academic.subjectId(), academic.commissionId(), today.getDayOfWeek(),
+                LocalTime.MIN, 90, today, today.plusWeeks(2), 30);
+        List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId).stream()
+                .sorted(Comparator.comparing(Occurrence::getDate)).toList();
+        Series series = new Series(eventId, academic, occurrences);
+        allocateAll(series, a, AllocationSource.MANUAL);
+        RoomRequestItem item = regularItem(series);
+
+        assign(item, b);
+
+        assertThat(classroomOf(series.at(0))).as("hoy, ya empezada").isEqualTo(a.getId());
+        assertThat(classroomOf(series.at(1))).isEqualTo(b.getId());
+        assertThat(classroomOf(series.at(2))).isEqualTo(b.getId());
+    }
+
+    @Test
     @DisplayName("reopen desde RESOLVED no cambia el calendario ni devuelve reversión")
     void reopen_desdeResueltoNoCambiaNada() throws Exception {
         Classroom a = room();

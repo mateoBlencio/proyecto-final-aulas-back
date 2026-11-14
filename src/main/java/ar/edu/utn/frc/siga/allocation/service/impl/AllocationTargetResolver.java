@@ -95,11 +95,11 @@ class AllocationTargetResolver {
                 validator.validateRange(from, to);
                 // Se ignora el clamp del comando: el rango trae su propio 'desde', ya validado.
                 // El 'hasta' se filtra acá (no en la base) porque es un solo evento acotado.
-                List<OccurrenceSlotDto> occurrences = occurrenceService.findSlotsByEvent(eventId, from).stream()
+                // Un cambio "desde hoy" omite la clase de hoy si ya empezó, igual que el target Event.
+                yield occurrenceService.findSlotsByEvent(eventId, from).stream()
                         .filter(o -> to == null || !o.date().isAfter(to))
+                        .filter(o -> !o.isPast())
                         .toList();
-                occurrences.forEach(validator::validateNotPast);
-                yield occurrences;
             }
         };
     }
