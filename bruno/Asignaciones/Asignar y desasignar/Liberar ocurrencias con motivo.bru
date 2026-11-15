@@ -24,7 +24,8 @@ body:json {
 
 docs {
   Marca las ocurrencias como ROOM_RELEASED con motivo (VIRTUAL_CLASS, CANCELLED, OTHER) y borra
-  sus asignaciones. OTHER exige nota. Arrastra los espejos. Atómico.
+  sus asignaciones. OTHER exige nota. Arrastra los espejos, salvo los retirados por un pedido de
+  aula (MIRROR_RETIRED), que no se tocan. Atómico.
 
   Respuesta 200: [ { occurrenceId, eventId, date, freedClassroomId, reason } ].
   400 motivo faltante, MIRROR_RETIRED u OTHER sin nota; 403 sin alcance sobre el edificio; 409 ocurrencia pasada.

@@ -20,6 +20,11 @@ body:json {
 }
 
 docs {
-  Devuelve las ocurrencias liberadas a NEEDS_ROOM y limpia motivo y nota. No asigna aula ni recrea espejos.
-  Respuesta 200: lista de ids revertidos.
+  Devuelve a NEEDS_ROOM las ocurrencias liberadas del lote y sus espejos liberados, y limpia motivo
+  y nota. Con el id de la principal alcanza: el back suma sus espejos. Un id de espejo enviado solo
+  revierte solo ese espejo. Los espejos MIRROR_RETIRED (retirados por un pedido de aula) no vuelven.
+  No asigna aula; cada ocurrencia conserva su aula anterior.
+  Respuesta 200: lista de ids revertidos, espejos incluidos.
+  403 si alguna aula anterior (o actual), incluida la de un espejo, está fuera del alcance: rechaza
+  todo el lote. 409 si alguna ocurrencia ya pasó. Atómico.
 }
