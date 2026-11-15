@@ -198,7 +198,6 @@ class ReleaseWithReasonApiIntegrationTest extends AbstractIntegrationTest {
     private record MirrorFixture(Long principalId, Long activeMirrorId, Long retiredMirrorId, Classroom principalRoom,
                                  Classroom mirrorRoom) {}
 
-    /** Principal y espejo activo con aula, y un segundo espejo ya retirado (lapida). */
     private MirrorFixture principalWithActiveAndRetiredMirror() throws Exception {
         var sc = testData.materiaYComision();
         var building = testData.edificio();

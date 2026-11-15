@@ -76,7 +76,6 @@ class OccurrenceBoardApiIntegrationTest extends AbstractIntegrationTest {
 
     private record Seeded(Long eventId, Long occurrenceId) {}
 
-    /** Ventana de 10 dias propia de cada llamada: ningun otro test siembra fechas en ella. */
     private static Window freshWindow() {
         LocalDate from = LocalDate.now().plusYears(2).plusDays(100 + 10L * WINDOWS.getAndIncrement());
         return new Window(from, from.plusDays(9));

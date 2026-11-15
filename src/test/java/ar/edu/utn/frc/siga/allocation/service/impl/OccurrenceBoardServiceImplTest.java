@@ -541,6 +541,25 @@ class OccurrenceBoardServiceImplTest {
     }
 
     @Test
+    @DisplayName("alcance: si todas las aulas asignadas de la fecha son de otro edificio, la fecha se ve por el espejo sin aula y sin OVERCROWDED")
+    void scopeDropsOvercrowdingWhenNoVisibleSlotHasRoom() {
+        event(1, 50);
+        needsRoom(10, 1, DATE, 1);
+        needsRoom(11, 1, DATE, 2);
+        room(6, 20, 2);
+        assigned(10, 6);
+        lenient().when(buildingScopeResolver.scopeFor(Permission.CONFLICT_READ))
+                .thenReturn(BuildingScope.of(Set.of(1L)));
+
+        OccurrenceBoardEventDto result = single(board(NO_FILTER));
+
+        OccurrenceBoardDateDto date = result.occurrences().getFirst();
+        assertThat(occurrenceIdsOf(date)).containsExactly(11L);
+        assertThat(date.issues()).containsExactly(new UnallocatedIssueDto(1));
+        assertThat(result.summary().overcrowded()).isZero();
+    }
+
+    @Test
     @DisplayName("alcance: una fecha con un único slot en otro edificio no aparece y no cuenta en summary.total")
     void scopeHidesDatesWithOnlyForeignSlots() {
         event(1, 20);
