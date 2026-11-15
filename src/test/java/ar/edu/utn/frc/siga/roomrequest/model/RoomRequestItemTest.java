@@ -75,6 +75,44 @@ class RoomRequestItemTest {
     }
 
     @Test
+    @DisplayName("takeOverFromBuilding: mueve la derivación a returnedFrom* y deja estado, aulas y plazo intactos")
+    void takeOverConservaEstadoAulasYPlazo() {
+        RoomRequestItem item = RoomRequestItem.builder().status(RoomRequestStatus.IN_EVALUATION)
+                .allocations(new ArrayList<>()).build();
+        Instant now = Instant.parse("2027-03-10T12:00:00Z");
+        Instant deadline = Instant.parse("2027-03-12T12:00:00Z");
+        item.deriveTo(7L, "sub@frc.utn.edu.ar", now);
+        item.assignClassrooms(List.of(100L), List.of(List.of(500L)), List.of(), Map.of());
+        item.notifyTeacher("aux@frc.utn.edu.ar", now.plusSeconds(60), deadline);
+
+        item.takeOverFromBuilding("hay que resolverlo desde subsecretaría");
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.NOTIFIED);
+        assertThat(item.getAllocations()).hasSize(1);
+        assertThat(item.getAcceptanceDeadline()).isEqualTo(deadline);
+        assertThat(item.getNotificationRound()).isEqualTo(1);
+        assertThat(item.getDerivedBuildingId()).isNull();
+        assertThat(item.getDerivedAt()).isNull();
+        assertThat(item.getReturnedFromBuildingId()).isEqualTo(7L);
+        assertThat(item.getReturnedReason()).isEqualTo("hay que resolverlo desde subsecretaría");
+    }
+
+    @Test
+    @DisplayName("returnFromBuilding: reusa takeOverFromBuilding y además vuelve a NEW")
+    void returnFromBuildingPasaANew() {
+        RoomRequestItem item = RoomRequestItem.builder().build();
+        item.deriveTo(7L, "sub@frc.utn.edu.ar", Instant.parse("2027-03-10T12:00:00Z"));
+
+        item.returnFromBuilding("el laboratorio se bloqueó");
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.NEW);
+        assertThat(item.getReturnedFromBuildingId()).isEqualTo(7L);
+        assertThat(item.getReturnedReason()).isEqualTo("el laboratorio se bloqueó");
+        assertThat(item.getDerivedBuildingId()).isNull();
+        assertThat(item.getDerivedAt()).isNull();
+    }
+
+    @Test
     @DisplayName("assignClassrooms: conserva las filas de clases pasadas y solo borra los espejos retirados")
     void assignClassroomsConservaPasadas() {
         RoomRequestItem item = RoomRequestItem.builder().allocations(new ArrayList<>()).build();

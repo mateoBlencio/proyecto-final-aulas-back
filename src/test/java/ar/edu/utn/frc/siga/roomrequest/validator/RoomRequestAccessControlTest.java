@@ -106,14 +106,52 @@ class RoomRequestAccessControlTest {
     }
 
     @Test
-    @DisplayName("subsecretaría en CANCELLED, o en NOTIFIED/RESOLVED de un pedido derivado: nada")
-    void subsecretariaEnEstadoTerminalOEnDerivado() {
+    @DisplayName("subsecretaría en CANCELLED, con o sin edificio: nada, ni retomar")
+    void subsecretariaEnCancelado() {
         asSubsecretaria();
-        for (RoomRequestStatus status : Set.of(RoomRequestStatus.NOTIFIED, RoomRequestStatus.RESOLVED,
-                RoomRequestStatus.CANCELLED)) {
-            assertForbidden(item(status, SU_BUILDING), SUBSECRETARIA_EMAIL, Action.values());
-        }
+        assertForbidden(item(RoomRequestStatus.CANCELLED, SU_BUILDING), SUBSECRETARIA_EMAIL, Action.values());
         assertForbidden(item(RoomRequestStatus.CANCELLED, null), SUBSECRETARIA_EMAIL, Action.values());
+    }
+
+    @Test
+    @DisplayName("subsecretaría en NOTIFIED/RESOLVED de un pedido derivado: solo retoma")
+    void subsecretariaEnNotificadoOResueltoDerivado() {
+        asSubsecretaria();
+        for (RoomRequestStatus status : Set.of(RoomRequestStatus.NOTIFIED, RoomRequestStatus.RESOLVED)) {
+            RoomRequestItem derivado = item(status, SU_BUILDING);
+            assertAllowed(derivado, SUBSECRETARIA_EMAIL, Action.TAKE_OVER);
+            assertForbidden(derivado, SUBSECRETARIA_EMAIL, Action.ASSIGN, Action.DERIVE, Action.RETURN, Action.CANCEL,
+                    Action.NOTIFY, Action.CONFIRM, Action.REOPEN);
+        }
+    }
+
+    @Test
+    @DisplayName("TAKE_OVER solo con edificio derivado: sin edificio no se retoma en ningún estado")
+    void takeOverSinEdificioNoSePermite() {
+        asSubsecretaria();
+        for (RoomRequestStatus status : RoomRequestStatus.values()) {
+            assertForbidden(item(status, null), SUBSECRETARIA_EMAIL, Action.TAKE_OVER);
+        }
+    }
+
+    @Test
+    @DisplayName("TAKE_OVER en IN_EVALUATION derivado: la subsecretaría retoma; en DERIVED_TO_BUILDING y NEW no (se usa return)")
+    void takeOverSegunEstado() {
+        asSubsecretaria();
+        assertAllowed(item(RoomRequestStatus.IN_EVALUATION, SU_BUILDING), SUBSECRETARIA_EMAIL, Action.TAKE_OVER);
+        assertForbidden(item(RoomRequestStatus.DERIVED_TO_BUILDING, SU_BUILDING), SUBSECRETARIA_EMAIL, Action.TAKE_OVER);
+        assertForbidden(item(RoomRequestStatus.NEW, SU_BUILDING), SUBSECRETARIA_EMAIL, Action.TAKE_OVER);
+    }
+
+    @Test
+    @DisplayName("TAKE_OVER nunca es del auxiliar, ni del edificio derivado ni global, en ningún estado")
+    void takeOverNuncaDelAuxiliar() {
+        for (Runnable perfil : List.<Runnable>of(() -> asAuxiliar(SU_BUILDING), this::asAuxiliarGlobal)) {
+            perfil.run();
+            for (RoomRequestStatus status : RoomRequestStatus.values()) {
+                assertForbidden(item(status, SU_BUILDING), AUXILIAR_EMAIL, Action.TAKE_OVER);
+            }
+        }
     }
 
     @Test
@@ -181,6 +219,24 @@ class RoomRequestAccessControlTest {
         assertThat(accessControl.allowedActions(future, actor)).containsExactly(Action.REOPEN);
         assertThat(accessControl.allowedActions(regular, actor)).containsExactly(Action.REOPEN);
         assertAllowed(past, SUBSECRETARIA_EMAIL, Action.REOPEN);
+    }
+
+    @Test
+    @DisplayName("allowedActions oculta TAKE_OVER en un RESOLVED derivado con fecha pasada, pero authorize sí lo permite")
+    void allowedActionsOcultaTakeOverConFechaPasada() {
+        asSubsecretaria();
+        RoomRequestAccessControl.Actor actor = accessControl.resolveActor(SUBSECRETARIA_EMAIL);
+        RoomRequestItem past = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.RESOLVED)
+                .derivedBuildingId(SU_BUILDING).date(java.time.LocalDate.now().minusDays(1)).build();
+        RoomRequestItem future = RoomRequestItem.builder().id(2L).status(RoomRequestStatus.RESOLVED)
+                .derivedBuildingId(SU_BUILDING).date(java.time.LocalDate.now().plusDays(1)).build();
+        RoomRequestItem notifiedPast = RoomRequestItem.builder().id(3L).status(RoomRequestStatus.NOTIFIED)
+                .derivedBuildingId(SU_BUILDING).date(java.time.LocalDate.now().minusDays(1)).build();
+
+        assertThat(accessControl.allowedActions(past, actor)).isEmpty();
+        assertThat(accessControl.allowedActions(future, actor)).containsExactly(Action.TAKE_OVER);
+        assertThat(accessControl.allowedActions(notifiedPast, actor)).containsExactly(Action.TAKE_OVER);
+        assertAllowed(past, SUBSECRETARIA_EMAIL, Action.TAKE_OVER);
     }
 
     // ---------- auxiliar áulico ----------
@@ -320,13 +376,13 @@ class RoomRequestAccessControlTest {
     }
 
     @Test
-    @DisplayName("allowedActions: subsecretaría en IN_EVALUATION con edificio derivado devuelve solo [CANCEL]")
+    @DisplayName("allowedActions: subsecretaría en IN_EVALUATION con edificio derivado devuelve [TAKE_OVER, CANCEL]")
     void allowedActionsSubsecretariaEnEvaluacionConEdificio() {
         asSubsecretaria();
         RoomRequestAccessControl.Actor actor = accessControl.resolveActor(SUBSECRETARIA_EMAIL);
 
         assertThat(accessControl.allowedActions(item(RoomRequestStatus.IN_EVALUATION, SU_BUILDING), actor))
-                .containsExactly(Action.CANCEL);
+                .containsExactly(Action.TAKE_OVER, Action.CANCEL);
     }
 
     @Test

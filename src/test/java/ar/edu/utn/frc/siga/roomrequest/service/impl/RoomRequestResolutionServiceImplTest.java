@@ -442,6 +442,140 @@ class RoomRequestResolutionServiceImplTest {
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
+    // ---------- takeOver ----------
+
+    private RoomRequestItem derivedItem(RoomRequestStatus status, LocalDate date) {
+        return RoomRequestItem.builder().id(1L).status(status)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).date(date)
+                .derivedBuildingId(1L).derivedAt(Instant.parse("2027-03-10T12:00:00.123Z")).build();
+    }
+
+    @Test
+    @DisplayName("takeOver: reason vacío o nulo → 400, sin tocar el repositorio")
+    void takeOver_reasonObligatorio() {
+        assertThatThrownBy(() -> service.takeOver(1L, " ", "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestException.class);
+        assertThatThrownBy(() -> service.takeOver(1L, null, "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestException.class);
+
+        verifyNoInteractions(itemRepository, accessControl, notificationSender, composer);
+    }
+
+    @Test
+    @DisplayName("takeOver: ítem inexistente → 404")
+    void takeOver_itemInexistente() {
+        when(itemRepository.findWithRequestById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.takeOver(99L, "motivo", "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("takeOver: sin permiso TAKE_OVER no cambia el ítem ni manda mail")
+    void takeOver_sinPermiso() {
+        RoomRequestItem item = derivedItem(RoomRequestStatus.IN_EVALUATION, LocalDate.now().plusDays(5));
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        org.mockito.Mockito.doThrow(new RoomRequestForbiddenException("no"))
+                .when(accessControl).authorize(item, "auxiliar@frc.utn.edu.ar", RoomRequestAccessControl.Action.TAKE_OVER);
+
+        assertThatThrownBy(() -> service.takeOver(1L, "motivo", "auxiliar@frc.utn.edu.ar"))
+                .isInstanceOf(RoomRequestForbiddenException.class);
+
+        assertThat(item.getDerivedBuildingId()).isEqualTo(1L);
+        verifyNoInteractions(notificationSender, composer);
+    }
+
+    @Test
+    @DisplayName("takeOver: RESOLVED sin fechas futuras → 400 y el ítem queda derivado")
+    void takeOver_resueltoConFechaPasada() {
+        RoomRequestItem item = derivedItem(RoomRequestStatus.RESOLVED, LocalDate.now().minusDays(1));
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> service.takeOver(1L, "motivo", "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(InvalidRoomRequestException.class);
+
+        assertThat(item.getDerivedBuildingId()).isEqualTo(1L);
+        verifyNoInteractions(notificationSender);
+    }
+
+    @Test
+    @DisplayName("takeOver: RESOLVED con fecha de hoy se retoma (el corte es estricto hacia el pasado)")
+    void takeOver_resueltoConFechaDeHoy() {
+        RoomRequestItem item = derivedItem(RoomRequestStatus.RESOLVED, LocalDate.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires")));
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true, null));
+        when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of());
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.takeOver(1L, "motivo", "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(item.getDerivedBuildingId()).isNull();
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.RESOLVED);
+    }
+
+    @Test
+    @DisplayName("takeOver con auxiliares: retoma sin cambiar el estado y encola un mail con la clave de idempotencia de la derivación")
+    @SuppressWarnings("unchecked")
+    void takeOver_conAuxiliares_mandaMail() {
+        RoomRequestItem item = derivedItem(RoomRequestStatus.NOTIFIED, LocalDate.now().plusDays(5));
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true, null));
+        when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of(
+                new UserResponseDto(1L, "ana@utn.edu.ar", "Ana", "Perez", List.of()),
+                new UserResponseDto(2L, "luis@utn.edu.ar", "Luis", "Gomez", List.of())));
+        when(composer.composeDetail(item)).thenReturn(mockDetail());
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.takeOver(1L, "se resuelve desde subsecretaría", "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.NOTIFIED);
+        assertThat(item.getDerivedBuildingId()).isNull();
+        assertThat(item.getReturnedFromBuildingId()).isEqualTo(1L);
+        ArgumentCaptor<NotificationRequest> captor = ArgumentCaptor.forClass(NotificationRequest.class);
+        verify(notificationSender).send(captor.capture());
+        NotificationRequest request = captor.getValue();
+        assertThat(request.template()).isEqualTo(ar.edu.utn.frc.siga.notification.api.NotificationTemplate.ROOM_REQUEST_TAKEN_OVER);
+        assertThat(request.idempotencyKey()).isEqualTo("room-request-item:1:TAKEN_OVER:"
+                + Instant.parse("2027-03-10T12:00:00.123Z").toEpochMilli());
+        assertThat(request.recipients()).extracting(ar.edu.utn.frc.siga.notification.api.NotificationRecipient::email)
+                .containsExactly("ana@utn.edu.ar", "luis@utn.edu.ar");
+        assertThat(request.model().get("edificio")).isEqualTo("Edificio Central");
+        assertThat(request.model().get("motivo")).isEqualTo("se resuelve desde subsecretaría");
+        assertThat((String) request.model().get("resumen")).contains("#1").contains("notificado al docente");
+    }
+
+    @Test
+    @DisplayName("takeOver sin auxiliares en el edificio: retoma y no encola ningún mail")
+    void takeOver_sinAuxiliares_noMandaMail() {
+        RoomRequestItem item = derivedItem(RoomRequestStatus.IN_EVALUATION, LocalDate.now().plusDays(5));
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true, null));
+        when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of());
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.takeOver(1L, "motivo", "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(item.getDerivedBuildingId()).isNull();
+        verifyNoInteractions(notificationSender);
+    }
+
+    @Test
+    @DisplayName("takeOver: si falla el encolado del mail, el retomado igual se concreta")
+    void takeOver_falloElMail_seConcreta() {
+        RoomRequestItem item = derivedItem(RoomRequestStatus.IN_EVALUATION, LocalDate.now().plusDays(5));
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true, null));
+        when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of(auxiliar()));
+        when(composer.composeDetail(item)).thenReturn(mockDetail());
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+        doThrow(new IllegalStateException("smtp caído")).when(notificationSender).send(any());
+
+        service.takeOver(1L, "motivo", "subsecretaria@frc.utn.edu.ar");
+
+        assertThat(item.getDerivedBuildingId()).isNull();
+        assertThat(item.getReturnedFromBuildingId()).isEqualTo(1L);
+    }
+
     // ---------- notify ----------
 
     @Test

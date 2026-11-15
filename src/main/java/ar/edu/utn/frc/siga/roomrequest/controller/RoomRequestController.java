@@ -8,6 +8,7 @@ import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.DeriveRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.ReopenRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.ReturnRoomRequestItemDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.request.TakeOverRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.SuggestRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AllowedClassroomDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CandidateBuildingDto;
@@ -194,6 +195,22 @@ public class RoomRequestController {
         RoomRequestItemResponseDto response =
                 roomRequestResolutionService.derive(id, dto.buildingId(), principal.getName());
         log.info("Pedido de aula derivado vía controller: id={}, buildingId={}", id, dto.buildingId());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/items/{id}/take-over")
+    @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
+    @Operation(summary = "Retomar un pedido derivado",
+               description = "Subsecretaría saca el pedido de la cola del edificio sin cambiar su estado, aulas "
+                       + "ni plazo. Desde IN_EVALUATION, NOTIFIED o RESOLVED (con fechas futuras), con motivo "
+                       + "obligatorio. Avisa por mail a los auxiliares del edificio.")
+    public ResponseEntity<RoomRequestItemResponseDto> takeOverItem(@PathVariable Long id,
+                                                                    @Valid @RequestBody TakeOverRoomRequestItemDto dto,
+                                                                    Principal principal) {
+        log.debug("POST /v1/room-requests/items/{}/take-over", id);
+        RoomRequestItemResponseDto response =
+                roomRequestResolutionService.takeOver(id, dto.reason(), principal.getName());
+        log.info("Pedido de aula retomado vía controller: id={}", id);
         return ResponseEntity.ok(response);
     }
 

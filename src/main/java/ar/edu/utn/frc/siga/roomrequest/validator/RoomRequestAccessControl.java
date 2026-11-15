@@ -21,7 +21,7 @@ public class RoomRequestAccessControl {
 
     private static final ZoneId ZONE = ZoneId.of("America/Argentina/Buenos_Aires");
 
-    public enum Action { ASSIGN, DERIVE, RETURN, CANCEL, NOTIFY, CONFIRM, REOPEN }
+    public enum Action { ASSIGN, DERIVE, RETURN, TAKE_OVER, CANCEL, NOTIFY, CONFIRM, REOPEN }
 
     private final UserService userService;
 
@@ -48,13 +48,13 @@ public class RoomRequestAccessControl {
                 : auxiliarAllows(item, action, actor.ownsBuilding(item.getDerivedBuildingId()));
     }
 
-    /** Pista de UI: oculta REOPEN en un RESOLVED con fecha pasada. En el cambio regular no hay fecha propia y lo decide {@code reopen}. */
+    /** Pista de UI: oculta REOPEN y TAKE_OVER en un RESOLVED con fecha pasada. En el cambio regular no hay fecha propia y lo deciden {@code reopen} y {@code takeOver}. */
     public List<Action> allowedActions(RoomRequestItem item, Actor actor) {
         boolean pastDate = item.getStatus() == RoomRequestStatus.RESOLVED
                 && item.getDate() != null && item.getDate().isBefore(LocalDate.now(ZONE));
         return Arrays.stream(Action.values())
                 .filter(action -> allows(item, actor, action))
-                .filter(action -> !(pastDate && action == Action.REOPEN))
+                .filter(action -> !(pastDate && (action == Action.REOPEN || action == Action.TAKE_OVER)))
                 .toList();
     }
 
@@ -81,14 +81,16 @@ public class RoomRequestAccessControl {
     }
 
     private boolean subsecretariaAllows(RoomRequestItem item, Action action) {
+        boolean derived = item.getDerivedBuildingId() != null;
         return switch (item.getStatus()) {
             case NEW -> action == Action.ASSIGN || action == Action.DERIVE || action == Action.CANCEL;
             case DERIVED_TO_BUILDING -> action == Action.RETURN || action == Action.CANCEL;
             case IN_EVALUATION -> action == Action.CANCEL
-                    || (item.getDerivedBuildingId() == null && (action == Action.ASSIGN || action == Action.NOTIFY));
-            case NOTIFIED -> item.getDerivedBuildingId() == null
-                    && (action == Action.CANCEL || action == Action.CONFIRM || action == Action.REOPEN);
-            case RESOLVED -> item.getDerivedBuildingId() == null && action == Action.REOPEN;
+                    || (derived ? action == Action.TAKE_OVER : (action == Action.ASSIGN || action == Action.NOTIFY));
+            case NOTIFIED -> derived
+                    ? action == Action.TAKE_OVER
+                    : (action == Action.CANCEL || action == Action.CONFIRM || action == Action.REOPEN);
+            case RESOLVED -> derived ? action == Action.TAKE_OVER : action == Action.REOPEN;
             case CANCELLED -> false;
         };
     }

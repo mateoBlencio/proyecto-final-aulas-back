@@ -259,7 +259,12 @@ public class RoomRequestItem extends TimestampedEntity {
     }
 
     public void returnFromBuilding(String reason) {
+        takeOverFromBuilding(reason);
         this.status = RoomRequestStatus.NEW;
+    }
+
+    /** Saca el pedido de la cola del edificio sin tocar estado, aulas ni plazo: no libera lo que el docente ya recibió. */
+    public void takeOverFromBuilding(String reason) {
         this.returnedFromBuildingId = this.derivedBuildingId;
         this.returnedReason = reason;
         this.derivedBuildingId = null;

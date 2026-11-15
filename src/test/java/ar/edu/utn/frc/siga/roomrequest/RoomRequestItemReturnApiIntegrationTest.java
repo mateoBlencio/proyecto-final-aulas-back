@@ -36,7 +36,7 @@ class RoomRequestItemReturnApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("DERIVED_TO_BUILDING con motivo: vuelve a NEW y deja returnedFromBuildingId + returnedReason")
     void return_derivado_returnsPending() throws Exception {
-        RoomRequestItem item = seedDerivedItem(9L);
+        RoomRequestItem item = seedDerivedItem(testData.edificio().getId());
 
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/return")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -48,7 +48,7 @@ class RoomRequestItemReturnApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("sin reason: 400 Invalid room request")
     void return_sinReason_returnsBadRequest() throws Exception {
-        RoomRequestItem item = seedDerivedItem(9L);
+        RoomRequestItem item = seedDerivedItem(testData.edificio().getId());
 
         mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/return")
                         .contentType(MediaType.APPLICATION_JSON)

@@ -22,6 +22,8 @@ public interface RoomRequestResolutionService {
 
     RoomRequestItemResponseDto returnItem(Long itemId, String reason, String actor);
 
+    RoomRequestItemResponseDto takeOver(Long itemId, String reason, String actor);
+
     RoomRequestItemResponseDto notify(Long itemId, String actor);
 
     RoomRequestItemResponseDto confirm(Long itemId, String actor);
