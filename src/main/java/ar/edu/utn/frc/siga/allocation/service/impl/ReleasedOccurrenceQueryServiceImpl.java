@@ -1,13 +1,10 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
-import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
-import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
 import ar.edu.utn.frc.siga.allocation.dto.response.ReleasedOccurrenceItemDto;
 import ar.edu.utn.frc.siga.allocation.service.ReleasedOccurrenceQueryService;
 import ar.edu.utn.frc.siga.common.security.BuildingScope;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.Permission;
-import ar.edu.utn.frc.siga.common.util.DateRanges;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import ar.edu.utn.frc.siga.common.util.Paging;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
@@ -49,7 +46,7 @@ public class ReleasedOccurrenceQueryServiceImpl implements ReleasedOccurrenceQue
 
     private final OccurrenceService occurrenceService;
     private final AcademicEventService academicEventService;
-    private final AcademicPeriodService academicPeriodService;
+    private final ConflictDateRange dateRange;
     private final ClassroomService classroomService;
     private final BuildingScopeResolver buildingScopeResolver;
 
@@ -57,14 +54,12 @@ public class ReleasedOccurrenceQueryServiceImpl implements ReleasedOccurrenceQue
     public Page<ReleasedOccurrenceItemDto> findReleased(ReleaseReason reason, LocalDate from, LocalDate to,
                                                         String q, DayOfWeek dayOfWeek, String specialty,
                                                         Pageable pageable) {
-        LocalDate effectiveFrom = DateRanges.defaultFrom(from);
-        LocalDate effectiveTo = to != null ? to : defaultTo(effectiveFrom);
-        DateRanges.requireNotBefore(effectiveTo, effectiveFrom);
+        ConflictDateRange.Range range = dateRange.resolve(from, to);
 
         UnallocatedConflictComparator.validate(pageable.getSort());
 
         List<OccurrenceSlotDto> slots = occurrenceService
-                .findSlotsByStatusBetween(OccurrenceStatus.ROOM_RELEASED, effectiveFrom, effectiveTo).stream()
+                .findSlotsByStatusBetween(OccurrenceStatus.ROOM_RELEASED, range.from(), range.to()).stream()
                 .filter(o -> reason == null || o.releaseReason() == reason)
                 .filter(o -> dayOfWeek == null || o.date().getDayOfWeek() == dayOfWeek)
                 .sorted(BY_DATE_TIME_ID)
@@ -110,13 +105,5 @@ public class ReleasedOccurrenceQueryServiceImpl implements ReleasedOccurrenceQue
 
     private static Set<Long> ids(List<OccurrenceSlotDto> slots, java.util.function.Function<OccurrenceSlotDto, Long> id) {
         return slots.stream().map(id).filter(Objects::nonNull).collect(Collectors.toSet());
-    }
-
-    private LocalDate defaultTo(LocalDate from) {
-        return academicPeriodService.findActive().stream()
-                .map(AcademicPeriodResponseDto::endDate)
-                .filter(Objects::nonNull)
-                .max(Comparator.naturalOrder())
-                .orElseGet(() -> from.plusMonths(6));
     }
 }
