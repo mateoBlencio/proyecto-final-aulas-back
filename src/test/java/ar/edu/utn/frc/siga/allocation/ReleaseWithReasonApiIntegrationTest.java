@@ -11,6 +11,7 @@ import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.preview.dto.request.ConfirmPreviewRequestDto;
 import ar.edu.utn.frc.siga.preview.dto.request.PreviewAllocationDto;
 import ar.edu.utn.frc.siga.preview.dto.request.PreviewRequestDto;
@@ -52,6 +53,8 @@ class ReleaseWithReasonApiIntegrationTest extends AbstractIntegrationTest {
     private AllocationRepository allocationRepository;
     @Autowired
     private AllocationService allocationService;
+    @Autowired
+    private OccurrenceService occurrenceService;
     @Autowired
     private ObjectMapper objectMapper;
 
@@ -190,5 +193,98 @@ class ReleaseWithReasonApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(allocationRepository.findByOccurrenceId(f.firstOccurrenceId()).orElseThrow().getClassroomId())
                 .isEqualTo(proposedRoom);
         assertStillReleasedWithoutRoom(f);
+    }
+
+    private record MirrorFixture(Long principalId, Long activeMirrorId, Long retiredMirrorId, Classroom principalRoom,
+                                 Classroom mirrorRoom) {}
+
+    /** Principal y espejo activo con aula, y un segundo espejo ya retirado (lapida). */
+    private MirrorFixture principalWithActiveAndRetiredMirror() throws Exception {
+        var sc = testData.materiaYComision();
+        var building = testData.edificio();
+        Classroom principalRoom = testData.aula(building);
+        Classroom mirrorRoom = testData.aula(building);
+        LocalDate monday = LocalDate.now().plusYears(2).with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY));
+        Long eventId = testData.eventoRecurrente(sc.subjectId(), sc.commissionId(), DayOfWeek.MONDAY,
+                LocalTime.of(18, 0), 90, monday, monday, 30);
+        Long principalId = occurrenceRepository.findByEvent_Id(eventId).getFirst().getId();
+        List<Long> mirrors = occurrenceService.createSimultaneous(principalId, 2);
+        Long activeMirrorId = mirrors.get(0);
+        Long retiredMirrorId = mirrors.get(1);
+
+        mockMvc.perform(post("/v1/allocations").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"items\":[{\"occurrenceIds\":[" + principalId + "],\"classroomId\":"
+                                + principalRoom.getId() + "}]}"))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/v1/allocations").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"items\":[{\"occurrenceIds\":[" + activeMirrorId + "],\"classroomId\":"
+                                + mirrorRoom.getId() + "}]}"))
+                .andExpect(status().isCreated());
+
+        Occurrence retired = occurrenceRepository.findById(retiredMirrorId).orElseThrow();
+        retired.setStatus(OccurrenceStatus.ROOM_RELEASED);
+        retired.setReleaseReason(ReleaseReason.MIRROR_RETIRED);
+        occurrenceRepository.save(retired);
+        return new MirrorFixture(principalId, activeMirrorId, retiredMirrorId, principalRoom, mirrorRoom);
+    }
+
+    private void assertRetiredMirrorUntouched(MirrorFixture f) {
+        Occurrence retired = occurrenceRepository.findById(f.retiredMirrorId()).orElseThrow();
+        assertThat(retired.getStatus()).isEqualTo(OccurrenceStatus.ROOM_RELEASED);
+        assertThat(retired.getReleaseReason()).isEqualTo(ReleaseReason.MIRROR_RETIRED);
+        assertThat(retired.getReleaseNote()).isNull();
+        assertThat(retired.getPreviousClassroomId()).isNull();
+    }
+
+    @Test
+    @DisplayName("liberar la principal libera el espejo activo y deja el espejo MIRROR_RETIRED como estaba")
+    void releaseLeavesRetiredMirrorUntouched() throws Exception {
+        MirrorFixture f = principalWithActiveAndRetiredMirror();
+
+        mockMvc.perform(post("/v1/allocations/releases").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"items\":[{\"occurrenceIds\":[" + f.principalId() + "]}],\"reason\":\"VIRTUAL_CLASS\","
+                                + "\"note\":\"cursado virtual\"}"))
+                .andExpect(status().isOk());
+
+        Occurrence principal = occurrenceRepository.findById(f.principalId()).orElseThrow();
+        assertThat(principal.getStatus()).isEqualTo(OccurrenceStatus.ROOM_RELEASED);
+        assertThat(principal.getReleaseReason()).isEqualTo(ReleaseReason.VIRTUAL_CLASS);
+        assertThat(principal.getPreviousClassroomId()).isEqualTo(f.principalRoom().getId());
+        Occurrence mirror = occurrenceRepository.findById(f.activeMirrorId()).orElseThrow();
+        assertThat(mirror.getStatus()).isEqualTo(OccurrenceStatus.ROOM_RELEASED);
+        assertThat(mirror.getReleaseReason()).isEqualTo(ReleaseReason.VIRTUAL_CLASS);
+        assertThat(mirror.getPreviousClassroomId()).isEqualTo(f.mirrorRoom().getId());
+        assertThat(allocationRepository.findByOccurrenceId(f.principalId())).isEmpty();
+        assertThat(allocationRepository.findByOccurrenceId(f.activeMirrorId())).isEmpty();
+        assertRetiredMirrorUntouched(f);
+    }
+
+    @Test
+    @DisplayName("revertir con el id de la principal devuelve a NEEDS_ROOM la principal y el espejo liberado, sin tocar la lapida")
+    void cancelRevertsMirrorButNotRetiredMirror() throws Exception {
+        MirrorFixture f = principalWithActiveAndRetiredMirror();
+        mockMvc.perform(post("/v1/allocations/releases").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"items\":[{\"occurrenceIds\":[" + f.principalId() + "]}],\"reason\":\"VIRTUAL_CLASS\","
+                                + "\"note\":\"cursado virtual\"}"))
+                .andExpect(status().isOk());
+
+        MvcResult result = mockMvc.perform(delete("/v1/allocations/releases").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"items\":[{\"occurrenceIds\":[" + f.principalId() + "]}]}"))
+                .andExpect(status().isOk()).andReturn();
+
+        Long[] reverted = objectMapper.readValue(result.getResponse().getContentAsString(), Long[].class);
+        assertThat(reverted).containsExactlyInAnyOrder(f.principalId(), f.activeMirrorId());
+        for (Long id : List.of(f.principalId(), f.activeMirrorId())) {
+            Occurrence occurrence = occurrenceRepository.findById(id).orElseThrow();
+            assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM);
+            assertThat(occurrence.getReleaseReason()).isNull();
+            assertThat(occurrence.getReleaseNote()).isNull();
+            assertThat(allocationRepository.findByOccurrenceId(id)).isEmpty();
+        }
+        assertThat(occurrenceRepository.findById(f.principalId()).orElseThrow().getPreviousClassroomId())
+                .isEqualTo(f.principalRoom().getId());
+        assertThat(occurrenceRepository.findById(f.activeMirrorId()).orElseThrow().getPreviousClassroomId())
+                .isEqualTo(f.mirrorRoom().getId());
+        assertRetiredMirrorUntouched(f);
     }
 }
