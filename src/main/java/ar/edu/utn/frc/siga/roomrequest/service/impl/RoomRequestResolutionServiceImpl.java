@@ -53,6 +53,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -287,6 +288,71 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
         log.info("Pedido de aula devuelto: itemId={}", itemId);
         return composer.composeItem(item);
+    }
+
+    @Override
+    @Transactional
+    @AuditOperation("Retomado de solicitud de aula derivada")
+    public RoomRequestItemResponseDto takeOver(Long itemId, String reason, String actor) {
+        log.debug("Retomando pedido de aula derivado: itemId={}", itemId);
+
+        if (reason == null || reason.isBlank()) {
+            throw new InvalidRoomRequestException("El motivo para retomar el pedido es obligatorio.");
+        }
+
+        RoomRequestItem item = itemRepository.findWithRequestById(itemId)
+                .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
+        accessControl.authorize(item, actor, Action.TAKE_OVER);
+        if (item.getStatus() == RoomRequestStatus.RESOLVED && !hasFutureDates(item)) {
+            throw new InvalidRoomRequestException("El pedido no se puede retomar: ya no le quedan fechas futuras.");
+        }
+
+        Long buildingId = item.getDerivedBuildingId();
+        long derivedAtMillis = item.getDerivedAt().toEpochMilli();
+        String buildingName = buildingService.findById(buildingId).name();
+        List<NotificationRecipient> recipients = userService
+                .findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, buildingId).stream()
+                .map(user -> new NotificationRecipient(user.firstName() + " " + user.lastName(), user.email()))
+                .toList();
+        RoomRequestItemDetailDto before = recipients.isEmpty() ? null : composer.composeDetail(item);
+
+        item.takeOverFromBuilding(reason);
+
+        if (before != null) {
+            sendTakenOverMail(itemId, buildingName, before, item.getStatus(), reason, recipients, derivedAtMillis);
+        }
+
+        log.info("Pedido de aula retomado por subsecretaría: itemId={}, buildingId={}", itemId, buildingId);
+        return composer.composeItem(item);
+    }
+
+    private void sendTakenOverMail(Long itemId, String buildingName, RoomRequestItemDetailDto detail,
+                                   RoomRequestStatus status, String reason, List<NotificationRecipient> recipients,
+                                   long derivedAtMillis) {
+        String subject = detail.request().subject() == null ? null : detail.request().subject().name();
+        StringBuilder summary = new StringBuilder("Subsecretaría retomó el pedido #").append(itemId)
+                .append(" de ").append(detail.request().teacherName());
+        if (subject != null) {
+            summary.append(" (").append(subject).append(")");
+        }
+        summary.append(", que estaba ").append(statusLabel(status)).append(" en ").append(buildingName)
+                .append(". Ya no aparece en tu bandeja.");
+        Map<String, Object> model = new HashMap<>();
+        model.put("edificio", buildingName);
+        model.put("resumen", summary.toString());
+        model.put("motivo", reason);
+        notificationSender.send(new NotificationRequest(
+                NotificationTemplate.ROOM_REQUEST_TAKEN_OVER, recipients, model,
+                "room-request-item:" + itemId + ":TAKEN_OVER:" + derivedAtMillis));
+    }
+
+    private static String statusLabel(RoomRequestStatus status) {
+        return switch (status) {
+            case IN_EVALUATION -> "en evaluación";
+            case NOTIFIED -> "notificado al docente";
+            case RESOLVED -> "resuelto";
+            default -> status.name();
+        };
     }
 
     @Override
