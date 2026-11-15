@@ -560,20 +560,18 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     @Test
-    @DisplayName("takeOver: si falla el encolado del mail, el retomado igual se concreta")
-    void takeOver_falloElMail_seConcreta() {
+    @DisplayName("takeOver: si falla el encolado del mail, el error se propaga para que se deshaga el retomado")
+    void takeOver_falloElMail_sePropaga() {
         RoomRequestItem item = derivedItem(RoomRequestStatus.IN_EVALUATION, LocalDate.now().plusDays(5));
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true, null));
         when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of(auxiliar()));
         when(composer.composeDetail(item)).thenReturn(mockDetail());
-        when(composer.composeItem(item)).thenReturn(mockResponse());
         doThrow(new IllegalStateException("smtp caído")).when(notificationSender).send(any());
 
-        service.takeOver(1L, "motivo", "subsecretaria@frc.utn.edu.ar");
-
-        assertThat(item.getDerivedBuildingId()).isNull();
-        assertThat(item.getReturnedFromBuildingId()).isEqualTo(1L);
+        assertThatThrownBy(() -> service.takeOver(1L, "motivo", "subsecretaria@frc.utn.edu.ar"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("smtp caído");
     }
 
     // ---------- notify ----------

@@ -341,13 +341,9 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         model.put("edificio", buildingName);
         model.put("resumen", summary.toString());
         model.put("motivo", reason);
-        try {
-            notificationSender.send(new NotificationRequest(
-                    NotificationTemplate.ROOM_REQUEST_TAKEN_OVER, recipients, model,
-                    "room-request-item:" + itemId + ":TAKEN_OVER:" + derivedAtMillis));
-        } catch (RuntimeException e) {
-            log.error("No se pudo encolar el aviso de pedido retomado: itemId={}", itemId, e);
-        }
+        notificationSender.send(new NotificationRequest(
+                NotificationTemplate.ROOM_REQUEST_TAKEN_OVER, recipients, model,
+                "room-request-item:" + itemId + ":TAKEN_OVER:" + derivedAtMillis));
     }
 
     private static String statusLabel(RoomRequestStatus status) {
