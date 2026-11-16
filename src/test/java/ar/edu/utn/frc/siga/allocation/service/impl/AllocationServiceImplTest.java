@@ -108,13 +108,16 @@ class AllocationServiceImplTest {
     private ClassroomAllocationLock classroomLock;
     @Mock
     private RevisionReader revisionReader;
+    @Mock
+    private OccurrenceBoardCache boardCache;
 
     private AllocationServiceImpl service;
 
     @BeforeEach
     void setUp() {
         service = new AllocationServiceImpl(allocationRepository, occurrenceService, composer, validator, targetResolver,
-                writer, classroomService, buildingScopeResolver, classroomLock, revisionReader);
+                writer, classroomService, buildingScopeResolver, classroomLock, revisionReader,
+                boardCache);
         lenient().when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of());
         lenient().when(buildingScopeResolver.scopeFor(any())).thenReturn(BuildingScope.unrestricted());
     }
@@ -772,7 +775,31 @@ class AllocationServiceImplTest {
         verify(occurrenceService, never()).release(any(), any(), any());
     }
 
+    @Test
+    @DisplayName("release: vacía la caché del tablero aunque ninguna ocurrencia tuviera asignación que borrar")
+    void releaseInvalidatesBoardCache() {
+        ReleaseCommand command = releaseCommand(10L);
+        when(targetResolver.resolveAll(command.targets(), LocalDate.now()))
+                .thenReturn(List.of(occurrenceSlot(10L, 1L, futureDate(1))));
+
+        service.release(command);
+
+        verify(boardCache).invalidate();
+    }
+
     // ---------- cancelRelease ----------
+
+    @Test
+    @DisplayName("cancelRelease: vacía la caché del tablero")
+    void cancelReleaseInvalidatesBoardCache() {
+        DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(10L))), null);
+        when(targetResolver.resolveAll(command.targets(), LocalDate.now()))
+                .thenReturn(List.of(releasedSlot(10L, null, ReleaseReason.VIRTUAL_CLASS)));
+
+        service.cancelRelease(command);
+
+        verify(boardCache).invalidate();
+    }
 
     @Test
     @DisplayName("cancelRelease: revierte la principal y sus espejos liberados con motivo activo")

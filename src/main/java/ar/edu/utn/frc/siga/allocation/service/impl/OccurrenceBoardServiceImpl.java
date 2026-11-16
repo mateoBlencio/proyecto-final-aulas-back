@@ -56,6 +56,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -70,6 +71,7 @@ public class OccurrenceBoardServiceImpl implements OccurrenceBoardService {
     private final ClassroomService classroomService;
     private final BuildingScopeResolver buildingScopeResolver;
     private final ConflictDateRange dateRange;
+    private final OccurrenceBoardCache cache;
 
     @Override
     public Page<OccurrenceBoardEventDto> findBoard(LocalDate from, LocalDate to, boolean onlyFuture,
@@ -78,37 +80,11 @@ public class OccurrenceBoardServiceImpl implements OccurrenceBoardService {
         UnallocatedConflictComparator.validate(pageable.getSort());
         ConflictDateRange.Range range = onlyFuture
                 ? dateRange.resolve(from, to) : dateRange.resolveFromPeriodStart(from, to);
+        BuildingScope scope = buildingScopeResolver.scopeFor(Permission.CONFLICT_READ);
+        OccurrenceBoardCache.Key key = new OccurrenceBoardCache.Key(scope, range.from(), range.to(), onlyFuture,
+                issues, q, dayOfWeek, specialty);
 
-        List<OccurrenceSlotDto> slots = occurrenceService.findSlotsBetween(range.from(), range.to()).stream()
-                .filter(o -> !(o.status() == OccurrenceStatus.ROOM_RELEASED
-                        && o.releaseReason() == ReleaseReason.MIRROR_RETIRED))
-                .toList();
-        Map<Long, AcademicEventResponseDto> eventById = Maps.byId(
-                academicEventService.findByIds(ids(slots, OccurrenceSlotDto::eventId)),
-                AcademicEventResponseDto::id);
-        Set<Long> matchingEventIds = eventById.values().stream()
-                .filter(e -> AcademicEventMatcher.matches(e, q, dayOfWeek, specialty))
-                .map(AcademicEventResponseDto::id)
-                .collect(Collectors.toSet());
-        Board board = loadBoard(slots, eventById);
-
-        Map<Long, Map<LocalDate, List<OccurrenceSlotDto>>> slotsByEventDate = slots.stream()
-                .filter(o -> matchingEventIds.contains(o.eventId()))
-                .filter(o -> !(onlyFuture && o.isPast()))
-                .collect(Collectors.groupingBy(OccurrenceSlotDto::eventId, LinkedHashMap::new,
-                        Collectors.groupingBy(OccurrenceSlotDto::date, TreeMap::new, Collectors.toList())));
-
-        List<OccurrenceBoardEventDto> items = new ArrayList<>();
-        slotsByEventDate.forEach((eventId, slotsByDate) -> {
-            AcademicEventResponseDto event = eventById.get(eventId);
-            List<OccurrenceBoardDateDto> dates = slotsByDate.values().stream()
-                    .flatMap(group -> buildDate(group, event, board).stream())
-                    .toList();
-            List<OccurrenceBoardDateDto> shown = dates.stream().filter(d -> matchesIssues(d, issues)).toList();
-            if (!shown.isEmpty()) {
-                items.add(new OccurrenceBoardEventDto(event, summarize(dates), shown));
-            }
-        });
+        List<OccurrenceBoardEventDto> items = new ArrayList<>(cache.get(key, () -> computeBoard(key)));
         items.sort(UnallocatedConflictComparator.of(pageable.getSort(), OccurrenceBoardEventDto::event));
 
         log.info("Tablero de ocurrencias listado: onlyFuture={}, issues={}, eventos={}",
@@ -116,10 +92,100 @@ public class OccurrenceBoardServiceImpl implements OccurrenceBoardService {
         return Paging.of(items, PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()));
     }
 
-    private Board loadBoard(List<OccurrenceSlotDto> slots, Map<Long, AcademicEventResponseDto> eventById) {
-        Map<Long, Allocation> allocationByOccurrence = Maps.byId(
-                allocationRepository.findByOccurrenceIdIn(ids(slots, OccurrenceSlotDto::occurrenceId)),
+    @Override
+    public void invalidateCache() {
+        cache.invalidate();
+    }
+
+    private List<OccurrenceBoardEventDto> computeBoard(OccurrenceBoardCache.Key key) {
+        BoardInput input = key.issues().equals(Set.of(OccurrenceIssueType.UNALLOCATED))
+                ? loadUnallocatedCandidates(key) : loadWholeRange(key);
+
+        Map<Long, Map<LocalDate, List<OccurrenceSlotDto>>> slotsByEventDate = input.slots().stream()
+                .filter(o -> input.matchingEventIds().contains(o.eventId()))
+                .filter(o -> !(key.onlyFuture() && o.isPast()))
+                .collect(Collectors.groupingBy(OccurrenceSlotDto::eventId, LinkedHashMap::new,
+                        Collectors.groupingBy(OccurrenceSlotDto::date, TreeMap::new, Collectors.toList())));
+
+        List<OccurrenceBoardEventDto> items = new ArrayList<>();
+        slotsByEventDate.forEach((eventId, slotsByDate) -> {
+            AcademicEventResponseDto event = input.eventById().get(eventId);
+            List<OccurrenceBoardDateDto> dates = slotsByDate.values().stream()
+                    .flatMap(group -> buildDate(group, event, input.board()).stream())
+                    .toList();
+            List<OccurrenceBoardDateDto> shown = dates.stream()
+                    .filter(d -> matchesIssues(d, key.issues()))
+                    .toList();
+            if (!shown.isEmpty()) {
+                items.add(new OccurrenceBoardEventDto(event, summarize(dates), shown));
+            }
+        });
+        return items;
+    }
+
+    private BoardInput loadWholeRange(OccurrenceBoardCache.Key key) {
+        List<OccurrenceSlotDto> slots = shownOnBoard(occurrenceService.findSlotsBetween(key.from(), key.to()));
+        Map<Long, AcademicEventResponseDto> eventById = Maps.byId(
+                academicEventService.findByIds(ids(slots, OccurrenceSlotDto::eventId)),
+                AcademicEventResponseDto::id);
+        Map<Long, Allocation> allocationByOccurrence = allocationsOf(slots);
+        Map<Long, List<OverlapIssueDto>> overlaps = overlapsByOccurrence(
+                occupancy(slots, allocationByOccurrence), slot -> true, ids -> eventById);
+        return new BoardInput(slots, eventById, matching(eventById, key),
+                loadBoard(slots, allocationByOccurrence, overlaps, key.scope()));
+    }
+
+    private BoardInput loadUnallocatedCandidates(OccurrenceBoardCache.Key key) {
+        Map<Long, AcademicEventResponseDto> eventById = Maps.byId(
+                academicEventService.findByIds(allocationRepository
+                        .findEventIdsWithUnallocatedOccurrencesBetween(key.from(), key.to())),
+                AcademicEventResponseDto::id);
+        Set<Long> matchingEventIds = matching(eventById, key);
+        List<OccurrenceSlotDto> slots = shownOnBoard(occurrenceService.findSlotsByEvents(matchingEventIds, key.from()))
+                .stream()
+                .filter(o -> !o.date().isAfter(key.to()))
+                .toList();
+        Map<Long, Allocation> allocationByOccurrence = allocationsOf(slots);
+        List<OccupiedSlot> own = occupancy(slots, allocationByOccurrence);
+        Set<Long> ownOccurrenceIds = ids(slots, OccurrenceSlotDto::occurrenceId);
+        List<OccupiedSlot> occupancy = new ArrayList<>(own);
+        occupancy.addAll(sharingRoomAndDate(own, ownOccurrenceIds));
+        Map<Long, List<OverlapIssueDto>> overlaps = overlapsByOccurrence(occupancy,
+                slot -> ownOccurrenceIds.contains(slot.occurrenceId()),
+                ids -> Maps.byId(academicEventService.findByIds(ids), AcademicEventResponseDto::id));
+        return new BoardInput(slots, eventById, matchingEventIds,
+                loadBoard(slots, allocationByOccurrence, overlaps, key.scope()));
+    }
+
+    private List<OccupiedSlot> sharingRoomAndDate(List<OccupiedSlot> own, Set<Long> ownOccurrenceIds) {
+        List<RoomDate> roomDates = own.stream()
+                .map(slot -> new RoomDate(slot.classroomId(), slot.date()))
+                .distinct()
+                .toList();
+        if (roomDates.isEmpty()) {
+            return List.of();
+        }
+        List<Long> occurrenceIds = allocationRepository.findOccurrenceIdsAllocatedAt(
+                        roomDates.stream().map(RoomDate::classroomId).toArray(Long[]::new),
+                        roomDates.stream().map(RoomDate::date).toArray(LocalDate[]::new))
+                .stream()
+                .filter(id -> !ownOccurrenceIds.contains(id))
+                .distinct()
+                .toList();
+        if (occurrenceIds.isEmpty()) {
+            return List.of();
+        }
+        List<OccurrenceSlotDto> slots = shownOnBoard(occurrenceService.findSlots(occurrenceIds));
+        return occupancy(slots, allocationsOf(slots));
+    }
+
+    private Map<Long, Allocation> allocationsOf(List<OccurrenceSlotDto> slots) {
+        return Maps.byId(allocationRepository.findByOccurrenceIdIn(ids(slots, OccurrenceSlotDto::occurrenceId)),
                 Allocation::getOccurrenceId);
+    }
+
+    private Board loadBoard(List<OccurrenceSlotDto> slots, Map<Long, Allocation> allocationByOccurrence,
+                            Map<Long, List<OverlapIssueDto>> overlapsByOccurrence, BuildingScope scope) {
         Set<Long> allocatedClassroomIds = allocationByOccurrence.values().stream()
                 .map(Allocation::getClassroomId)
                 .collect(Collectors.toSet());
@@ -133,28 +199,54 @@ public class OccurrenceBoardServiceImpl implements OccurrenceBoardService {
         return new Board(allocationByOccurrence,
                 Maps.byId(classroomService.findByIdsIncludingDeactivated(classroomIds), ClassroomResponseDto::id),
                 classroomService.findSubjectPermissions(allocatedClassroomIds),
-                overlapsByOccurrence(slots, allocationByOccurrence, eventById),
-                buildingScopeResolver.scopeFor(Permission.CONFLICT_READ));
+                overlapsByOccurrence,
+                scope);
     }
 
-    private static Map<Long, List<OverlapIssueDto>> overlapsByOccurrence(List<OccurrenceSlotDto> slots,
-            Map<Long, Allocation> allocationByOccurrence, Map<Long, AcademicEventResponseDto> eventById) {
-        List<OccupiedSlot> occupancy = slots.stream()
+    private static List<OccurrenceSlotDto> shownOnBoard(List<OccurrenceSlotDto> slots) {
+        return slots.stream()
+                .filter(o -> !(o.status() == OccurrenceStatus.ROOM_RELEASED
+                        && o.releaseReason() == ReleaseReason.MIRROR_RETIRED))
+                .toList();
+    }
+
+    private static Set<Long> matching(Map<Long, AcademicEventResponseDto> eventById, OccurrenceBoardCache.Key key) {
+        return eventById.values().stream()
+                .filter(e -> AcademicEventMatcher.matches(e, key.q(), key.dayOfWeek(), key.specialty()))
+                .map(AcademicEventResponseDto::id)
+                .collect(Collectors.toSet());
+    }
+
+    private static List<OccupiedSlot> occupancy(List<OccurrenceSlotDto> slots,
+                                                Map<Long, Allocation> allocationByOccurrence) {
+        return slots.stream()
                 .filter(o -> allocationByOccurrence.containsKey(o.occurrenceId()))
                 .map(o -> OccupiedSlot.from(allocationByOccurrence.get(o.occurrenceId()), o))
                 .toList();
-        return Clashes.within(occupancy,
-                        slot -> List.of(new RoomDate(slot.classroomId(), slot.date())),
-                        (a, b) -> !a.eventId().equals(b.eventId()),
-                        (a, b, key) -> List.of(overlap(a, b, eventById), overlap(b, a, eventById)))
-                .stream()
-                .flatMap(List::stream)
-                .collect(Collectors.groupingBy(OverlapIssueDto::occurrenceId));
     }
 
-    private static OverlapIssueDto overlap(OccupiedSlot slot, OccupiedSlot other,
-                                           Map<Long, AcademicEventResponseDto> eventById) {
-        return new OverlapIssueDto(slot.occurrenceId(), slot.classroomId(), eventById.get(other.eventId()));
+    private static Map<Long, List<OverlapIssueDto>> overlapsByOccurrence(List<OccupiedSlot> occupancy,
+            Predicate<OccupiedSlot> reported,
+            Function<Set<Long>, Map<Long, AcademicEventResponseDto>> eventsById) {
+        List<Clash> clashes = Clashes.within(
+                        occupancy.stream().sorted(Comparator.comparing(OccupiedSlot::occurrenceId)).toList(),
+                        slot -> List.of(new RoomDate(slot.classroomId(), slot.date())),
+                        (a, b) -> !a.eventId().equals(b.eventId()),
+                        (a, b, key) -> List.of(new Clash(a, b), new Clash(b, a)))
+                .stream()
+                .flatMap(List::stream)
+                .filter(clash -> reported.test(clash.slot()))
+                .toList();
+        if (clashes.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, AcademicEventResponseDto> eventById = eventsById.apply(clashes.stream()
+                .map(clash -> clash.other().eventId())
+                .collect(Collectors.toSet()));
+        return clashes.stream()
+                .map(clash -> new OverlapIssueDto(clash.slot().occurrenceId(), clash.slot().classroomId(),
+                        eventById.get(clash.other().eventId())))
+                .collect(Collectors.groupingBy(OverlapIssueDto::occurrenceId));
     }
 
     private static Optional<OccurrenceBoardDateDto> buildDate(List<OccurrenceSlotDto> group,
@@ -185,7 +277,7 @@ public class OccurrenceBoardServiceImpl implements OccurrenceBoardService {
         OccurrenceSlotDto first = sorted.getFirst();
         int requiredRooms = (int) sorted.stream().filter(o -> o.status() == OccurrenceStatus.NEEDS_ROOM).count();
         return Optional.of(new OccurrenceBoardDateDto(first.date(), first.startTime(), first.endTime(),
-                first.isPast(), requiredRooms, visible.stream().map(board::toSlot).toList(), issues));
+                first.isPast(), requiredRooms, visible.stream().map(board::toSlot).toList(), List.copyOf(issues)));
     }
 
     private static Optional<OccurrenceIssueDto> overcrowded(List<OccurrenceSlotDto> group,
@@ -257,6 +349,13 @@ public class OccurrenceBoardServiceImpl implements OccurrenceBoardService {
 
     private static Set<Long> ids(List<OccurrenceSlotDto> slots, Function<OccurrenceSlotDto, Long> id) {
         return slots.stream().map(id).filter(Objects::nonNull).collect(Collectors.toSet());
+    }
+
+    private record Clash(OccupiedSlot slot, OccupiedSlot other) {
+    }
+
+    private record BoardInput(List<OccurrenceSlotDto> slots, Map<Long, AcademicEventResponseDto> eventById,
+                              Set<Long> matchingEventIds, Board board) {
     }
 
     private record Board(Map<Long, Allocation> allocationByOccurrence,

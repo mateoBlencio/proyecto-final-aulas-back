@@ -48,11 +48,14 @@ class AllocationWriterTest {
     @Mock
     private ClassroomMovementPublisher movementPublisher;
 
+    @Mock
+    private OccurrenceBoardCache boardCache;
+
     private AllocationWriter writer;
 
     @BeforeEach
     void setUp() {
-        writer = new AllocationWriter(allocationRepository, movementPublisher);
+        writer = new AllocationWriter(allocationRepository, movementPublisher, boardCache);
     }
 
     @Test
@@ -447,5 +450,29 @@ class AllocationWriterTest {
 
         assertThat(affected).isZero();
         assertThat(existing.getClassroomId()).isEqualTo(5L);
+    }
+
+    enum WriteOperation { CREATE, UPSERT, RESTORE, SYNC_FROM_SYSACAD, OVERWRITE_FROM_SYSACAD, REMOVE_FROM_SYSACAD, DELETE }
+
+    @ParameterizedTest
+    @EnumSource(WriteOperation.class)
+    @DisplayName("cada escritura que cambia asignaciones vacía la caché del tablero")
+    void everyWriteInvalidatesBoardCache(WriteOperation operation) {
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 1L);
+        List<Allocation> existing = operation == WriteOperation.CREATE
+                ? List.of() : List.of(allocation(100L, 10L, 5L, AllocationSource.SYSACAD));
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(existing);
+
+        switch (operation) {
+            case CREATE -> writer.create(mapOf(occ, 7L), "obs", AllocationSource.MANUAL);
+            case UPSERT -> writer.upsert(mapOf(occ, 7L), "obs", AllocationSource.MANUAL);
+            case RESTORE -> writer.restore(mapOf(occ, 7L), "obs", AllocationSource.MANUAL);
+            case SYNC_FROM_SYSACAD -> writer.syncFromSysacad(mapOf(occ, 7L), Set.of(1L));
+            case OVERWRITE_FROM_SYSACAD -> writer.overwriteFromSysacad(mapOf(occ, 7L), "obs", "SYSACAD");
+            case REMOVE_FROM_SYSACAD -> writer.removeFromSysacad(List.of(occ), "obs", "SYSACAD");
+            case DELETE -> writer.delete(List.of(occ), "obs");
+        }
+
+        verify(boardCache).invalidate();
     }
 }

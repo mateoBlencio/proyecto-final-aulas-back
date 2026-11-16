@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.allocation;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
+import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
@@ -57,6 +58,8 @@ class OccurrenceBoardApiIntegrationTest extends AbstractIntegrationTest {
     private OccurrenceService occurrenceService;
     @Autowired
     private OccurrenceRepository occurrenceRepository;
+    @Autowired
+    private AllocationRepository allocationRepository;
     @Autowired
     private ObjectMapper objectMapper;
     @Autowired
@@ -373,5 +376,98 @@ class OccurrenceBoardApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(isNullOrAbsent(revertedSlot, "releaseReason")).isTrue();
         assertThat(revertedSlot.get("previousClassroom").get("classroomId").asLong()).isEqualTo(room.getId());
         assertThat(issueTypes(reverted)).containsExactly("UNALLOCATED");
+    }
+
+    private void release(Long occurrenceId) throws Exception {
+        mockMvc.perform(post("/v1/allocations/releases").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"items\":[{\"occurrenceIds\":[" + occurrenceId
+                                + "]}],\"reason\":\"VIRTUAL_CLASS\",\"note\":\"cursado virtual\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("findEventIdsWithUnallocatedOccurrencesBetween: incluye los bordes from y to, excluye el día anterior y el posterior, las ocurrencias con aula y las liberadas, y no repite eventos")
+    void unallocatedCandidatesQueryRespectsRangeAndStatus() throws Exception {
+        Window w = freshWindow();
+        Classroom room = testData.aula(testData.edificio(), testData.tipoAulaPorDefecto(), 100);
+        Seeded beforeFrom = seed(testData.materiaYComision(), w.day(0), 20);
+        Seeded atFrom = seed(testData.materiaYComision(), w.day(1), 20);
+        occurrenceService.createSimultaneous(atFrom.occurrenceId(), 1);
+        Seeded atTo = seed(testData.materiaYComision(), w.day(5), 20);
+        Seeded afterTo = seed(testData.materiaYComision(), w.day(6), 20);
+        Seeded allocated = seed(testData.materiaYComision(), w.day(3), 20);
+        allocate(allocated.occurrenceId(), room);
+        Seeded released = seed(testData.materiaYComision(), w.day(3), LocalTime.of(14, 0), 20);
+        allocate(released.occurrenceId(), room);
+        release(released.occurrenceId());
+
+        List<Long> eventIds = allocationRepository.findEventIdsWithUnallocatedOccurrencesBetween(w.day(1), w.day(5));
+
+        assertThat(eventIds).contains(atFrom.eventId(), atTo.eventId())
+                .doesNotContain(beforeFrom.eventId(), afterTo.eventId(), allocated.eventId(), released.eventId());
+        assertThat(eventIds).filteredOn(atFrom.eventId()::equals).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("findOccurrenceIdsAllocatedAt: cruza aula y fecha por posición (aula A el día 1, aula B el día 2), no como producto cartesiano")
+    void occurrencesAllocatedAtZipsClassroomsAndDates() throws Exception {
+        Window w = freshWindow();
+        Building building = testData.edificio();
+        Classroom roomA = testData.aula(building, testData.tipoAulaPorDefecto(), 100);
+        Classroom roomB = testData.aula(building, testData.tipoAulaPorDefecto(), 100);
+        Seeded a1 = seed(testData.materiaYComision(), w.day(1), 20);
+        Seeded a2 = seed(testData.materiaYComision(), w.day(2), 20);
+        Seeded b1 = seed(testData.materiaYComision(), w.day(1), 20);
+        Seeded b2 = seed(testData.materiaYComision(), w.day(2), 20);
+        allocate(a1.occurrenceId(), roomA);
+        allocate(a2.occurrenceId(), roomA);
+        allocate(b1.occurrenceId(), roomB);
+        allocate(b2.occurrenceId(), roomB);
+
+        List<Long> ids = allocationRepository.findOccurrenceIdsAllocatedAt(
+                new Long[]{roomA.getId(), roomB.getId()}, new LocalDate[]{w.day(1), w.day(2)});
+
+        assertThat(ids).containsExactlyInAnyOrder(a1.occurrenceId(), b2.occurrenceId());
+    }
+
+    @Test
+    @DisplayName("findOccurrenceIdsAllocatedAt: un par aula/fecha repetido no duplica las ocurrencias")
+    void occurrencesAllocatedAtWithRepeatedPair() throws Exception {
+        Window w = freshWindow();
+        Classroom room = testData.aula(testData.edificio(), testData.tipoAulaPorDefecto(), 100);
+        Seeded seeded = seed(testData.materiaYComision(), w.day(1), 20);
+        allocate(seeded.occurrenceId(), room);
+
+        List<Long> ids = allocationRepository.findOccurrenceIdsAllocatedAt(
+                new Long[]{room.getId(), room.getId()}, new LocalDate[]{w.day(1), w.day(1)});
+
+        assertThat(ids).containsExactly(seeded.occurrenceId());
+    }
+
+    @Test
+    @DisplayName("issues=UNALLOCATED: OVERLAP contra un evento sin fechas sin aula, con withEvent completo e igual al del tablero sin filtro")
+    void unallocatedFilterShowsOverlapAgainstNonCandidateEvent() throws Exception {
+        Window w = freshWindow();
+        Classroom room = testData.aula(testData.edificio(), testData.tipoAulaPorDefecto(), 100);
+        Seeded candidate = seed(testData.materiaYComision(), w.day(1), LocalTime.of(9, 0), 20);
+        allocate(candidate.occurrenceId(), room);
+        occurrenceService.createSimultaneous(candidate.occurrenceId(), 1);
+        Seeded other = seed(testData.materiaYComision(), w.day(1), LocalTime.of(9, 30), 20);
+        allocate(mockMvc, other.occurrenceId(), room, "solape tolerado, autorizado para este caso");
+
+        JsonNode onlyUnallocated = board(w, "issues", "UNALLOCATED");
+        JsonNode unfiltered = board(w);
+
+        assertThat(eventNode(onlyUnallocated, other.eventId())).isNull();
+        JsonNode event = eventNode(onlyUnallocated, candidate.eventId());
+        JsonNode date = event.get("occurrences").get(0);
+        assertThat(issueTypes(date)).containsExactly("UNALLOCATED", "OVERLAP");
+        JsonNode overlap = date.get("issues").get(1);
+        assertThat(overlap.get("occurrenceId").asLong()).isEqualTo(candidate.occurrenceId());
+        assertThat(overlap.get("classroomId").asLong()).isEqualTo(room.getId());
+        assertThat(overlap.get("withEvent").get("id").asLong()).isEqualTo(other.eventId());
+        assertThat(overlap.get("withEvent").get("subject").get("id").isNull()).isFalse();
+        assertThat(event.get("summary").get("overlap").asInt()).isEqualTo(1);
+        assertThat(event).isEqualTo(eventNode(unfiltered, candidate.eventId()));
     }
 }

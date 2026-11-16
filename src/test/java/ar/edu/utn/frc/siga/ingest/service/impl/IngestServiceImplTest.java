@@ -29,6 +29,7 @@ import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.model.EventType;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
+import ar.edu.utn.frc.siga.allocation.service.OccurrenceBoardService;
 import ar.edu.utn.frc.siga.audit.internal.AuditDescriptionProbe;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.ingest.ExcelTestWorkbooks;
@@ -79,6 +80,9 @@ class IngestServiceImplTest {
     private AcademicEventService academicEventService;
     @Mock
     private AllocationService allocationService;
+
+    @Mock
+    private OccurrenceBoardService occurrenceBoardService;
     @Mock
     private BuildingService buildingService;
     @Mock
@@ -93,7 +97,7 @@ class IngestServiceImplTest {
             buildingService, classroomService);
         IngestRowBatchProcessor batchProcessor = new IngestRowBatchProcessor(rowResolver, academicEventService);
         ExcelIngestSource excelSource = new ExcelIngestSource(new ExcelTemplateValidator(), new ExcelRowMapper());
-        service = new IngestServiceImpl(List.of(excelSource), batchProcessor, allocationService);
+        service = new IngestServiceImpl(List.of(excelSource), batchProcessor, allocationService, occurrenceBoardService);
     }
 
     @Test

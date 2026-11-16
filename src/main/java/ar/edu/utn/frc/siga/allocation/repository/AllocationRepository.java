@@ -2,12 +2,33 @@ package ar.edu.utn.frc.siga.allocation.repository;
 
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface AllocationRepository extends JpaRepository<Allocation, Long>, AllocationRepositoryCustom {
 
     Optional<Allocation> findByOccurrenceId(Long occurrenceId);
+
+    @Query(value = """
+            select distinct o.id_evento_academico
+            from ocurrencia o
+            where o.fecha between :from and :to
+              and o.estado = 'NEEDS_ROOM'
+              and not exists (select 1 from asignacion_aula a where a.id_ocurrencia = o.id_ocurrencia)
+            """, nativeQuery = true)
+    List<Long> findEventIdsWithUnallocatedOccurrencesBetween(LocalDate from, LocalDate to);
+
+    @Query(value = """
+            select distinct a.id_ocurrencia
+            from asignacion_aula a
+            join ocurrencia o on o.id_ocurrencia = a.id_ocurrencia
+            join unnest(cast(:classroomIds as bigint[]), cast(:dates as date[])) as k(id_aula, fecha)
+              on k.id_aula = a.id_aula and k.fecha = o.fecha
+            """, nativeQuery = true)
+    List<Long> findOccurrenceIdsAllocatedAt(Long[] classroomIds, LocalDate[] dates);
 }

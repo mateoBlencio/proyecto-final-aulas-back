@@ -75,6 +75,7 @@ public class AllocationServiceImpl implements AllocationService {
     private final BuildingScopeResolver buildingScopeResolver;
     private final ClassroomAllocationLock classroomLock;
     private final RevisionReader revisionReader;
+    private final OccurrenceBoardCache boardCache;
 
     @Override
     @Transactional(readOnly = true)
@@ -225,6 +226,7 @@ public class AllocationServiceImpl implements AllocationService {
         requireAccessToOwningBuildings(occurrences, classroomByOccurrence);
 
         writer.delete(occurrences, command.note());
+        boardCache.invalidate();
         occurrenceService.release(
                 occurrences.stream()
                         .map(o -> new OccurrenceRelease(o.occurrenceId(),
@@ -252,6 +254,7 @@ public class AllocationServiceImpl implements AllocationService {
 
         List<Long> ids = released.stream().map(OccurrenceSlotDto::occurrenceId).toList();
         occurrenceService.requestRoom(ids);
+        boardCache.invalidate();
         log.info("Liberación revertida: count={}", ids.size());
         return ids;
     }

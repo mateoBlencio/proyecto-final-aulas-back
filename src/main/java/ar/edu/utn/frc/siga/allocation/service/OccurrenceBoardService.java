@@ -16,4 +16,6 @@ public interface OccurrenceBoardService {
     Page<OccurrenceBoardEventDto> findBoard(LocalDate from, LocalDate to, boolean onlyFuture,
                                             Set<OccurrenceIssueType> issues, String q, DayOfWeek dayOfWeek,
                                             String specialty, Pageable pageable);
+
+    void invalidateCache();
 }

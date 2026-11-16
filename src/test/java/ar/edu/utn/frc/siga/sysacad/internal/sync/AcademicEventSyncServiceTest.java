@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
+import ar.edu.utn.frc.siga.allocation.service.OccurrenceBoardService;
 import ar.edu.utn.frc.siga.audit.internal.AuditDescriptionProbe;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
@@ -33,6 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -45,6 +47,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.ArgumentMatchers.startsWith;
@@ -65,6 +68,9 @@ class AcademicEventSyncServiceTest {
     private AcademicEventService academicEventService;
     @Mock
     private SysacadSyncStateService syncStateService;
+
+    @Mock
+    private OccurrenceBoardService occurrenceBoardService;
     @Captor
     private ArgumentCaptor<List<SyncRecurringEventCommand>> commandsCaptor;
 
@@ -74,7 +80,7 @@ class AcademicEventSyncServiceTest {
     void setUp() {
         service = new AcademicEventSyncService(
                 commissionService, subjectCommissionService, academicEventService, syncStateService,
-                new SysacadProperties());
+                new SysacadProperties(), occurrenceBoardService);
     }
 
     @Test
@@ -432,5 +438,43 @@ class AcademicEventSyncServiceTest {
         verify(academicEventService, never()).markRecurringEventsAbsent(anySet(), anySet(), eq(50));
         verify(syncStateService).recordFailure(eq(SysacadView.EVENTOS), anyString());
         verify(syncStateService, never()).recordSuccess(any(), anyInt());
+        verify(occurrenceBoardService, never()).invalidateCache();
+    }
+
+    @Test
+    @DisplayName("sync: después de dar de baja los ausentes invalida la caché del tablero de ocurrencias")
+    void syncInvalidatesBoardCacheAfterMarkingAbsent() {
+        SysacadAcademicEventDto row = new SysacadAcademicEventDto(
+                "101", 55, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
+        when(catalogReader.findAcademicEvents()).thenReturn(List.of(row));
+        when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 1, 2024)).thenReturn(link(9L, 1L, 30));
+        when(academicEventService.syncRecurringEvents(anyList())).thenReturn(List.of(created(1L)));
+
+        service.sync(catalogReader);
+
+        InOrder inOrder = inOrder(academicEventService, occurrenceBoardService);
+        inOrder.verify(academicEventService).markRecurringEventsAbsent(anySet(), anySet(), eq(50));
+        inOrder.verify(occurrenceBoardService).invalidateCache();
+    }
+
+    @Test
+    @DisplayName("sync: si markRecurringEventsAbsent aborta, igual invalida la caché por lo que ya escribió syncRecurringEvents")
+    void syncInvalidatesBoardCacheWhenMarkingAbsentAborts() {
+        SysacadAcademicEventDto row = new SysacadAcademicEventDto(
+                "101", 55, 1, 2024, DayOfWeek.MONDAY, LocalTime.of(8, 0), 90, 1);
+        when(catalogReader.findAcademicEvents()).thenReturn(List.of(row));
+        when(commissionService.findActiveByCourseCode("101")).thenReturn(commission(1L, "101", 2026));
+        when(subjectCommissionService.findByCommissionAndSubjectCode(1L, 55, 1, 2024)).thenReturn(link(9L, 1L, 30));
+        when(academicEventService.syncRecurringEvents(anyList())).thenReturn(List.of(created(1L)));
+        when(academicEventService.markRecurringEventsAbsent(anySet(), anySet(), eq(50)))
+                .thenThrow(new SyncAbortedException("se aborta el sync sin dar de baja nada"));
+
+        assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(SyncAbortedException.class);
+
+        InOrder inOrder = inOrder(academicEventService, occurrenceBoardService);
+        inOrder.verify(academicEventService).syncRecurringEvents(anyList());
+        inOrder.verify(occurrenceBoardService).invalidateCache();
+        inOrder.verify(academicEventService).markRecurringEventsAbsent(anySet(), anySet(), eq(50));
     }
 }
