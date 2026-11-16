@@ -28,6 +28,7 @@ class AllocationWriter {
 
     private final AllocationRepository allocationRepository;
     private final ClassroomMovementPublisher movementPublisher;
+    private final OccurrenceBoardCache boardCache;
 
     List<Allocation> create(Map<OccurrenceSlotDto, Long> classroomByOccurrence, String observation, AllocationSource source) {
         List<Long> occurrenceIds = classroomByOccurrence.keySet().stream().map(OccurrenceSlotDto::occurrenceId).toList();
@@ -55,6 +56,7 @@ class AllocationWriter {
     private List<Allocation> write(Map<OccurrenceSlotDto, Long> classroomByOccurrence, String observation,
             AllocationSource source, AllocationSource eventSource) {
         if (classroomByOccurrence.isEmpty()) return List.of();
+        boardCache.invalidate();
 
         List<Long> occurrenceIds = classroomByOccurrence.keySet().stream().map(OccurrenceSlotDto::occurrenceId).toList();
         Map<Long, Allocation> existingByOccurrence = Maps.byId(
@@ -101,6 +103,7 @@ class AllocationWriter {
      */
     int syncFromSysacad(Map<OccurrenceSlotDto, Long> classroomByOccurrence, Set<Long> eventIdsToUpdate) {
         if (classroomByOccurrence.isEmpty()) return 0;
+        boardCache.invalidate();
 
         List<Long> occurrenceIds = classroomByOccurrence.keySet().stream().map(OccurrenceSlotDto::occurrenceId).toList();
         Map<Long, Allocation> existingByOccurrence = Maps.byId(
@@ -140,6 +143,7 @@ class AllocationWriter {
     List<Change> overwriteFromSysacad(Map<OccurrenceSlotDto, Long> classroomByOccurrence, String observation,
             String actor) {
         if (classroomByOccurrence.isEmpty()) return List.of();
+        boardCache.invalidate();
 
         List<Long> occurrenceIds = classroomByOccurrence.keySet().stream().map(OccurrenceSlotDto::occurrenceId).toList();
         Map<Long, Allocation> existingByOccurrence = Maps.byId(
@@ -178,6 +182,7 @@ class AllocationWriter {
         List<Long> occurrenceIds = occurrences.stream().map(OccurrenceSlotDto::occurrenceId).toList();
         List<Allocation> existing = allocationRepository.findByOccurrenceIdIn(occurrenceIds);
         if (existing.isEmpty()) return List.of();
+        boardCache.invalidate();
 
         allocationRepository.deleteAll(existing);
         Map<Long, OccurrenceSlotDto> slotById = Maps.byId(occurrences, OccurrenceSlotDto::occurrenceId, (a, b) -> a);
@@ -194,6 +199,7 @@ class AllocationWriter {
         List<Long> occurrenceIds = occurrences.stream().map(OccurrenceSlotDto::occurrenceId).toList();
         List<Allocation> existing = allocationRepository.findByOccurrenceIdIn(occurrenceIds);
         if (existing.isEmpty()) return List.of();
+        boardCache.invalidate();
 
         allocationRepository.deleteAll(existing);
         Map<Long, OccurrenceSlotDto> slotById = Maps.byId(occurrences, OccurrenceSlotDto::occurrenceId, (a, b) -> a);

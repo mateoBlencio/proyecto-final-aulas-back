@@ -32,7 +32,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
@@ -76,11 +75,13 @@ class AllocationConflictServiceImplTest {
     @Mock
     private BuildingScopeResolver buildingScopeResolver;
 
-    @InjectMocks
     private AllocationConflictServiceImpl service;
 
     @BeforeEach
     void setUp() {
+        service = new AllocationConflictServiceImpl(classroomService, academicEventService,
+                new ConflictDateRange(academicPeriodService), occupancyReader, occurrenceService,
+                allocationRepository, buildingScopeResolver);
         lenient().when(occupancyReader.loadAllocated(any(), any())).thenReturn(List.of());
         lenient().when(academicEventService.findByIds(any())).thenReturn(List.of());
         lenient().when(academicPeriodService.findActive()).thenReturn(List.of());

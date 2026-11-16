@@ -26,6 +26,7 @@ import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceConflictDto;
 import ar.edu.utn.frc.siga.allocation.model.ClassroomMovements.Change;
 import ar.edu.utn.frc.siga.allocation.validator.OverlapReview;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.service.command.OccurrenceRelease;
 import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.audit.AuditOperations;
@@ -74,6 +75,7 @@ public class AllocationServiceImpl implements AllocationService {
     private final BuildingScopeResolver buildingScopeResolver;
     private final ClassroomAllocationLock classroomLock;
     private final RevisionReader revisionReader;
+    private final OccurrenceBoardCache boardCache;
 
     @Override
     @Transactional(readOnly = true)
@@ -214,11 +216,8 @@ public class AllocationServiceImpl implements AllocationService {
     @Transactional
     @AuditOperation("Liberación de ocurrencias con motivo")
     public List<ReleasedOccurrenceDto> release(ReleaseCommand command) {
-        Map<Long, OccurrenceSlotDto> byId = new LinkedHashMap<>();
-        List<OccurrenceSlotDto> principals = targetResolver.resolveAll(command.targets(), LocalDate.now());
-        principals.forEach(o -> byId.put(o.occurrenceId(), o));
-        occurrenceService.findMirrors(byId.keySet()).forEach(o -> byId.putIfAbsent(o.occurrenceId(), o));
-        List<OccurrenceSlotDto> occurrences = List.copyOf(byId.values());
+        List<OccurrenceSlotDto> occurrences =
+                withActiveMirrors(targetResolver.resolveAll(command.targets(), LocalDate.now()));
         AuditOperations.describe("Liberación de " + Plurals.count(occurrences.size(), "ocurrencia", "ocurrencias")
                 + " (" + command.reason() + ")");
         occurrences.forEach(validator::validateNotPast);
@@ -227,6 +226,7 @@ public class AllocationServiceImpl implements AllocationService {
         requireAccessToOwningBuildings(occurrences, classroomByOccurrence);
 
         writer.delete(occurrences, command.note());
+        boardCache.invalidate();
         occurrenceService.release(
                 occurrences.stream()
                         .map(o -> new OccurrenceRelease(o.occurrenceId(),
@@ -244,10 +244,9 @@ public class AllocationServiceImpl implements AllocationService {
     @Transactional
     @AuditOperation("Reversión de liberación de ocurrencias")
     public List<Long> cancelRelease(DeallocationCommand command) {
-        // Los espejos nunca vuelven a pedir aula solos: los recrea la resolución de un pedido.
-        List<OccurrenceSlotDto> released = targetResolver.resolveAll(command.targets(), LocalDate.now()).stream()
+        List<OccurrenceSlotDto> released = withActiveMirrors(targetResolver.resolveAll(command.targets(), LocalDate.now()))
+                .stream()
                 .filter(o -> o.status() == OccurrenceStatus.ROOM_RELEASED)
-                .filter(o -> o.mirrorOfOccurrenceId() == null)
                 .toList();
         AuditOperations.describe("Reversión de liberación de "
                 + Plurals.count(released.size(), "ocurrencia", "ocurrencias"));
@@ -255,8 +254,18 @@ public class AllocationServiceImpl implements AllocationService {
 
         List<Long> ids = released.stream().map(OccurrenceSlotDto::occurrenceId).toList();
         occurrenceService.requestRoom(ids);
+        boardCache.invalidate();
         log.info("Liberación revertida: count={}", ids.size());
         return ids;
+    }
+
+    private List<OccurrenceSlotDto> withActiveMirrors(List<OccurrenceSlotDto> resolved) {
+        Map<Long, OccurrenceSlotDto> byId = new LinkedHashMap<>();
+        resolved.forEach(o -> byId.put(o.occurrenceId(), o));
+        occurrenceService.findMirrors(byId.keySet()).forEach(o -> byId.putIfAbsent(o.occurrenceId(), o));
+        return byId.values().stream()
+                .filter(o -> o.releaseReason() != ReleaseReason.MIRROR_RETIRED)
+                .toList();
     }
 
     @Override

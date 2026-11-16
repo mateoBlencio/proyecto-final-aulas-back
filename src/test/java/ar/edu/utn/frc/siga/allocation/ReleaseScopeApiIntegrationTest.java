@@ -208,4 +208,34 @@ class ReleaseScopeApiIntegrationTest extends AbstractIntegrationTest {
 
         assertUntouched(s.occurrenceInA());
     }
+
+    @Test
+    @DisplayName("revertir con el id de la principal da 403 si el espejo se libero desde un aula de otro edificio, y no revierte ninguno")
+    void cancelRejectsWholeBatchWhenMirrorRoomIsOutOfScope() throws Exception {
+        Building a = testData.edificio();
+        Building b = testData.edificio();
+        Classroom classroomA = testData.aula(a);
+        Classroom classroomB = testData.aula(b);
+        LocalDate date = LocalDate.now().plusYears(2).with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY));
+        Long principalId = singleOccurrenceAllocatedIn(classroomA, date);
+        Long mirrorId = occurrenceService.createSimultaneous(principalId, 1).getFirst();
+        mockMvc.perform(post("/v1/allocations").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"items\":[{\"occurrenceIds\":[" + mirrorId + "],\"classroomId\":"
+                                + classroomB.getId() + "}]}"))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/v1/allocations/releases").contentType(MediaType.APPLICATION_JSON)
+                        .content(releaseBody(principalId, "VIRTUAL_CLASS", null)))
+                .andExpect(status().isOk());
+
+        auxiliaryOf(a).perform(delete("/v1/allocations/releases").contentType(MediaType.APPLICATION_JSON)
+                        .content(targetBody(principalId)))
+                .andExpect(status().isForbidden());
+
+        Occurrence principal = occurrenceRepository.findById(principalId).orElseThrow();
+        assertThat(principal.getStatus()).isEqualTo(OccurrenceStatus.ROOM_RELEASED);
+        assertThat(principal.getPreviousClassroomId()).isEqualTo(classroomA.getId());
+        Occurrence mirror = occurrenceRepository.findById(mirrorId).orElseThrow();
+        assertThat(mirror.getStatus()).isEqualTo(OccurrenceStatus.ROOM_RELEASED);
+        assertThat(mirror.getPreviousClassroomId()).isEqualTo(classroomB.getId());
+    }
 }

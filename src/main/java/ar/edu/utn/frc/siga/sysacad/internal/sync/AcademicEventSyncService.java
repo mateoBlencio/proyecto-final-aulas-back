@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
+import ar.edu.utn.frc.siga.allocation.service.OccurrenceBoardService;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.command.SyncRecurringEventCommand;
 import ar.edu.utn.frc.siga.events.service.command.UpsertRecurringEventResult;
@@ -41,6 +42,7 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
     private final AcademicEventService academicEventService;
     private final SysacadSyncStateService syncStateService;
     private final SysacadProperties properties;
+    private final OccurrenceBoardService occurrenceBoardService;
 
     @Override
     public SysacadView view() {
@@ -100,6 +102,7 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
                     + "de eventos sin dar de baja nada");
         }
         List<UpsertRecurringEventResult> results = academicEventService.syncRecurringEvents(commands);
+        occurrenceBoardService.invalidateCache();
         Set<Long> presentEventIds = results.stream()
                 .map(UpsertRecurringEventResult::eventId)
                 .collect(Collectors.toSet());
@@ -107,6 +110,7 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
         long updated = results.stream().filter(UpsertRecurringEventResult::updated).count();
         int absent = academicEventService.markRecurringEventsAbsent(presentEventIds, unresolvedCommissionIds,
                 properties.getSync().minValidRowsPercent());
+        occurrenceBoardService.invalidateCache();
 
         AuditOperations.describe("Sincronización de eventos desde SysAcad: " + Plurals.count(created, "alta", "altas")
                 + ", " + Plurals.count(updated, "cambio", "cambios") + ", " + Plurals.count(absent, "baja", "bajas"));

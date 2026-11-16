@@ -1,7 +1,6 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
-import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
-import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
+import ar.edu.utn.frc.siga.allocation.service.impl.ConflictDateRange.Range;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationConflictDto;
@@ -21,7 +20,6 @@ import ar.edu.utn.frc.siga.common.security.BuildingScope;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.common.util.Clashes;
-import ar.edu.utn.frc.siga.common.util.DateRanges;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import ar.edu.utn.frc.siga.common.util.Overcrowding;
 import ar.edu.utn.frc.siga.common.util.Paging;
@@ -41,7 +39,6 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -60,7 +57,7 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
 
     private final ClassroomService classroomService;
     private final AcademicEventService academicEventService;
-    private final AcademicPeriodService academicPeriodService;
+    private final ConflictDateRange dateRange;
     private final AllocationOccupancyReader occupancyReader;
     private final OccurrenceService occurrenceService;
     private final AllocationRepository allocationRepository;
@@ -72,7 +69,7 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
                                                        String specialty, Pageable pageable) {
         Set<ConflictType> effectiveTypes = (types == null || types.isEmpty())
                 ? EnumSet.allOf(ConflictType.class) : types;
-        Range range = resolveRange(from, to);
+        Range range = dateRange.resolve(from, to);
 
         List<AllocationConflictDto> merged = new ArrayList<>();
         if (effectiveTypes.contains(ConflictType.UNALLOCATED)) {
@@ -121,7 +118,7 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
 
     @Override
     public List<Long> resolveAllUnallocatedEventIds() {
-        Range range = resolveRange(null, null);
+        Range range = dateRange.resolve(null, null);
         List<Long> ids = List.copyOf(unallocatedEventIds(range, false));
         log.info("Resolución de selección masiva: eventos sin aula count={}", ids.size());
         return ids;
@@ -255,22 +252,6 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
         return Maps.byId(classroomService.findByIdsIncludingDeactivated(ids), ClassroomResponseDto::id);
     }
 
-    private Range resolveRange(LocalDate from, LocalDate to) {
-        LocalDate effectiveFrom = DateRanges.defaultFrom(from);
-        LocalDate effectiveTo = to != null ? to : resolveDefaultTo(effectiveFrom);
-        DateRanges.requireNotBefore(effectiveTo, effectiveFrom);
-        log.debug("Rango de conflictos de asignación: from={}, to={}", effectiveFrom, effectiveTo);
-        return new Range(effectiveFrom, effectiveTo);
-    }
-
-    private LocalDate resolveDefaultTo(LocalDate from) {
-        return academicPeriodService.findActive().stream()
-                .map(AcademicPeriodResponseDto::endDate)
-                .filter(Objects::nonNull)
-                .max(Comparator.naturalOrder())
-                .orElseGet(() -> from.plusMonths(6));
-    }
-
     private record OverlapHit(OverlapKey key, LocalDate date) {
     }
 
@@ -324,9 +305,6 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
                     List.copyOf(acc.dates)));
         }
         return overlaps;
-    }
-
-    private record Range(LocalDate from, LocalDate to) {
     }
 
     private record EventRoomKey(Long eventId, Long classroomId) {

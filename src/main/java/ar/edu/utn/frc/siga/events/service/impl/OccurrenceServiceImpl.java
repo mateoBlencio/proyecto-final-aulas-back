@@ -42,7 +42,7 @@ public class OccurrenceServiceImpl implements OccurrenceService {
     @Override
     @Transactional(readOnly = true)
     public List<OccurrenceSlotDto> findSlots(Collection<Long> occurrenceIds) {
-        return occurrenceRepository.findAllById(occurrenceIds).stream().map(OccurrenceServiceImpl::toSlot).toList();
+        return occurrenceRepository.findByIdIn(occurrenceIds).stream().map(OccurrenceServiceImpl::toSlot).toList();
     }
 
     @Override
