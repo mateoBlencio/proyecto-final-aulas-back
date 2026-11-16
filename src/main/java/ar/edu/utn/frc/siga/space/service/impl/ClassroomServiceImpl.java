@@ -6,6 +6,8 @@ import ar.edu.utn.frc.siga.space.dto.request.ClassroomDetailsUpdateDto;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomListItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
+import ar.edu.utn.frc.siga.space.dto.response.DeactivationImpactDto;
+import ar.edu.utn.frc.siga.space.model.DeactivationTarget;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.search.FuzzySearch;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
@@ -72,6 +74,7 @@ public class ClassroomServiceImpl implements ClassroomService {
     private final ScopedClassroomFinder scopedClassroom;
     private final ClassroomPermissionRepository classroomPermissionRepository;
     private final ClassroomResourceRepository classroomResourceRepository;
+    private final ClassroomDeactivationCoordinator deactivationCoordinator;
 
     @Override
     @Transactional
@@ -244,6 +247,7 @@ public class ClassroomServiceImpl implements ClassroomService {
         log.debug("Eliminando (soft-delete) aula: id={}", id);
         Classroom classroom = scopedClassroom.requireActiveInScope(id, Permission.CLASSROOM_DELETE);
         classroomRepository.softDelete(classroom);
+        deactivationCoordinator.apply(DeactivationTarget.CLASSROOM, Set.of(id));
         log.info("Aula eliminada: id={}", id);
     }
 
@@ -270,9 +274,21 @@ public class ClassroomServiceImpl implements ClassroomService {
     @Override
     @Transactional
     @AuditOperation("Baja de aula")
-    public void deactivate(Long id) {
+    public DeactivationImpactDto deactivate(Long id) {
         Classroom classroom = scopedClassroom.requireAnyInScope(id, Permission.CLASSROOM_ACTIVATE);
         classroomRepository.softDelete(classroom);
+        return deactivationCoordinator.apply(DeactivationTarget.CLASSROOM, Set.of(id));
+    }
+
+    @Override
+    public DeactivationImpactDto deactivationImpact(Long id) {
+        scopedClassroom.requireAnyInScope(id, Permission.CLASSROOM_ACTIVATE);
+        return deactivationCoordinator.preview(DeactivationTarget.CLASSROOM, Set.of(id));
+    }
+
+    @Override
+    public List<ClassroomResponseDto> findDeactivatedInSiga() {
+        return classroomRepository.findDeactivatedInSiga().stream().map(classroomMapper::toDto).toList();
     }
 
     @Override

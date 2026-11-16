@@ -2,7 +2,9 @@ package ar.edu.utn.frc.siga.roomrequest.mapper;
 
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
+import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.AssignedClassroomDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailHeaderDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
@@ -18,6 +20,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /** Arma el modelo del mail "aula asignada" (template {@code room-request-resolved}) a partir del
  *  {@link RoomRequestItemDetailDto} que ya compone {@link RoomRequestComposer}. Una clave ausente del
@@ -75,6 +79,7 @@ public class RoomRequestNotificationModel {
             model.put("motivoMenosAulas", "Pediste %d aulas y asignamos %d: %s"
                     .formatted(item.classroomCount(), item.assignedClassrooms().size(), item.decisionReason()));
         }
+        putUnavailablePreferred(model, item);
         if (roomChange && item.previousClassroom() != null) {
             model.put("aulaAnterior", formatClassroom(item.previousClassroom()));
         }
@@ -87,6 +92,24 @@ public class RoomRequestNotificationModel {
                     .formatted(item.acceptanceDeadline().atZone(LOCAL_ZONE).format(DEADLINE)));
         }
         return model;
+    }
+
+    private void putUnavailablePreferred(Map<String, Object> model, RoomRequestItemResponseDto item) {
+        List<ClassroomOptionDto> unavailable = item.preferredClassrooms().stream()
+                .filter(c -> c.unavailableReason() == UnavailableReason.DEACTIVATED
+                        || c.unavailableReason() == UnavailableReason.PARENT_DEACTIVATED)
+                .toList();
+        Set<Long> preferredIds = item.preferredClassrooms().stream().map(ClassroomOptionDto::id)
+                .collect(Collectors.toSet());
+        boolean assignedPreferred = item.assignedClassrooms().stream().anyMatch(a -> preferredIds.contains(a.id()));
+        if (unavailable.isEmpty() || assignedPreferred) {
+            return;
+        }
+        String classrooms = joinSpanish(unavailable.stream()
+                .map(c -> "%d (%s)".formatted(c.roomNumber(), c.buildingName())).toList());
+        model.put("aulasPedidasNoDisponibles", unavailable.size() == 1
+                ? "El aula %s que pediste no está disponible por el momento.".formatted(classrooms)
+                : "Las aulas %s que pediste no están disponibles por el momento.".formatted(classrooms));
     }
 
     private void putPorTipo(Map<String, Object> model, RoomRequestType type, Long itemId, Long requestId,

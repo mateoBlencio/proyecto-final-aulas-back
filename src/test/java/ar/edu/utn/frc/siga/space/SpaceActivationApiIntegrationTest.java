@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultMatcher;
 
 @Import(IntegrationTestData.class)
 @DisplayName("Space – endpoints de activación (integración)")
@@ -39,7 +40,7 @@ class SpaceActivationApiIntegrationTest extends AbstractIntegrationTest {
     private ClassroomTypeRepository classroomTypeRepository;
 
     @Test
-    @DisplayName("Building: PUT/DELETE /v1/buildings/{id}/activation (204, idempotente, 404, 403)")
+    @DisplayName("Building: PUT/DELETE /v1/buildings/{id}/activation (200 con impacto, idempotente, 404, 403)")
     void building_activationLifecycle() throws Exception {
         Building building = testData.edificio();
         long id = building.getId();
@@ -48,11 +49,11 @@ class SpaceActivationApiIntegrationTest extends AbstractIntegrationTest {
                 "/v1/buildings/999999999/activation",
                 () -> buildingRepository.findActiveById(id).isPresent(),
                 mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar"),
-                true);
+                true, status().isOk());
     }
 
     @Test
-    @DisplayName("Classroom: PUT/DELETE /v1/classrooms/{id}/activation (204, idempotente, 404, 403)")
+    @DisplayName("Classroom: PUT/DELETE /v1/classrooms/{id}/activation (200 con impacto, idempotente, 404, 403)")
     void classroom_activationLifecycle() throws Exception {
         Building building = testData.edificio();
         Classroom classroom = testData.aula(building);
@@ -64,7 +65,7 @@ class SpaceActivationApiIntegrationTest extends AbstractIntegrationTest {
                 "/v1/classrooms/999999999/activation",
                 () -> classroomRepository.findActiveById(id).isPresent(),
                 auxiliarOfBuilding,
-                false);
+                false, status().isOk());
     }
 
     @Test
@@ -78,16 +79,17 @@ class SpaceActivationApiIntegrationTest extends AbstractIntegrationTest {
                 "/v1/classroom-types/999999999/activation",
                 () -> classroomTypeRepository.findActiveById(id).isPresent(),
                 mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar"),
-                true);
+                true, status().isNoContent());
     }
 
     private void assertActivationLifecycle(String activationPath, String missingPath, BooleanSupplier active,
-            MockMvc auxiliarMockMvc, boolean auxiliarForbidden) throws Exception {
+            MockMvc auxiliarMockMvc, boolean auxiliarForbidden,
+            ResultMatcher deactivationStatus) throws Exception {
         assertThat(active.getAsBoolean()).isTrue();
 
-        mockMvc.perform(delete(activationPath)).andExpect(status().isNoContent());
+        mockMvc.perform(delete(activationPath)).andExpect(deactivationStatus);
         assertThat(active.getAsBoolean()).isFalse();
-        mockMvc.perform(delete(activationPath)).andExpect(status().isNoContent());
+        mockMvc.perform(delete(activationPath)).andExpect(deactivationStatus);
         assertThat(active.getAsBoolean()).isFalse();
 
         mockMvc.perform(put(activationPath)).andExpect(status().isNoContent());

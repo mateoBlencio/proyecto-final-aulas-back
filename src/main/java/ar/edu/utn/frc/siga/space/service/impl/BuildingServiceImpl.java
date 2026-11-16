@@ -12,6 +12,9 @@ import ar.edu.utn.frc.siga.common.util.SyncGuard;
 import ar.edu.utn.frc.siga.space.dto.BuildingFilter;
 import ar.edu.utn.frc.siga.space.dto.request.BuildingActiveBatchItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
+import ar.edu.utn.frc.siga.space.dto.response.DeactivationImpactDto;
+import ar.edu.utn.frc.siga.space.model.DeactivationTarget;
+import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
 import ar.edu.utn.frc.siga.space.mapper.BuildingMapper;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
@@ -45,6 +48,8 @@ public class BuildingServiceImpl implements BuildingService {
     private final BuildingRepository buildingRepository;
     private final BuildingMapper buildingMapper;
     private final BuildingScopeResolver buildingScopeResolver;
+    private final ClassroomRepository classroomRepository;
+    private final ClassroomDeactivationCoordinator deactivationCoordinator;
 
     @Override
     public Page<BuildingResponseDto> findAll(BuildingFilter filter, Pageable pageable, boolean includeDeactivated) {
@@ -90,6 +95,9 @@ public class BuildingServiceImpl implements BuildingService {
             building.deactivate();
         }
         Building saved = buildingRepository.save(building);
+        if (!Boolean.TRUE.equals(active)) {
+            deactivationCoordinator.apply(DeactivationTarget.BUILDING, classroomRepository.findIdsByBuildingId(id));
+        }
         log.info("Edificio {} {}", id, active ? "activado" : "desactivado");
 
         return buildingMapper.toDto(saved);
@@ -105,8 +113,15 @@ public class BuildingServiceImpl implements BuildingService {
     @Override
     @Transactional
     @AuditOperation("Baja de edificio")
-    public void deactivate(Long id) {
+    public DeactivationImpactDto deactivate(Long id) {
         buildingRepository.softDelete(Finder.orThrow(buildingRepository::findById, id, "Building"));
+        return deactivationCoordinator.apply(DeactivationTarget.BUILDING, classroomRepository.findIdsByBuildingId(id));
+    }
+
+    @Override
+    public DeactivationImpactDto deactivationImpact(Long id) {
+        Finder.orThrow(buildingRepository::findById, id, "Building");
+        return deactivationCoordinator.preview(DeactivationTarget.BUILDING, classroomRepository.findIdsByBuildingId(id));
     }
 
     @Override

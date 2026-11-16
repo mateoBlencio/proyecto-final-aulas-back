@@ -1,0 +1,25 @@
+meta {
+  name: Ver impacto de desactivar edificio
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/v1/buildings/1/deactivation-impact
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+  res.body.releasedClasses: isNumber
+  res.body.mergedClasses: isNumber
+  res.body.affectedRoomRequests: isNumber
+  res.body.visibleRoomRequests: isArray
+}
+
+docs {
+  GET /v1/buildings/{id}/deactivation-impact. Permiso: PERM_BUILDING_ACTIVATE (global).
+  Calcula lo mismo que devuelve la baja (DELETE /v1/buildings/{id}/activation) sin aplicar nada.
+  404 si el edificio no existe. Sobre un edificio ya dado de baja devuelve 0.
+}

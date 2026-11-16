@@ -14,8 +14,22 @@ params:path {
   id: 1
 }
 
+assert {
+  res.status: eq 200
+  res.body.releasedClasses: isNumber
+  res.body.mergedClasses: isNumber
+  res.body.affectedRoomRequests: isNumber
+  res.body.visibleRoomRequests: isArray
+}
+
 docs {
   DELETE /v1/classrooms/{id}/activation. Roles: SUBSECRETARIA, AUXILIAR_AULICO
-  (acotado a sus edificios). Soft-delete idempotente. 204 si queda inactiva;
-  404 si el aula no existe.
+  (acotado a sus edificios). Soft-delete idempotente. Libera las clases futuras asignadas
+  al aula (releaseReason CLASSROOM_DEACTIVATED, nota "Aula deshabilitada") y fusiona las que
+  tienen espejo en otra aula. 404 si el aula no existe.
+
+  Respuesta 200 (antes 204), siempre con cuerpo:
+  { releasedClasses, mergedClasses, affectedRoomRequests,
+    visibleRoomRequests: [ { itemId, requestId, status, teacherName, subjectName, classroomIds } ] }
+  Repetir la baja devuelve 0 y 0.
 }

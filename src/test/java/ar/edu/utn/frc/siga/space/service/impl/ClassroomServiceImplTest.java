@@ -90,6 +90,8 @@ class ClassroomServiceImplTest {
     private ClassroomPermissionRepository classroomPermissionRepository;
     @Mock
     private ClassroomResourceRepository classroomResourceRepository;
+    @Mock
+    private ClassroomDeactivationCoordinator deactivationCoordinator;
 
     private ClassroomServiceImpl service;
 
@@ -100,7 +102,7 @@ class ClassroomServiceImplTest {
         service = new ClassroomServiceImpl(
                 classroomRepository, buildingRepository, classroomTypeService, classroomTypeRepository,
                 classroomMapper, classroomListComposer, classroomFeatureWriter, buildingScopeResolver,
-                scopedClassroom, classroomPermissionRepository, classroomResourceRepository);
+                scopedClassroom, classroomPermissionRepository, classroomResourceRepository, deactivationCoordinator);
         lenient().when(buildingScopeResolver.scopeFor(any())).thenReturn(BuildingScope.unrestricted());
     }
 

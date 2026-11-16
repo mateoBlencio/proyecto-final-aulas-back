@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.space.dto.request.ClassroomDetailsUpdateDto;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomListItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
+import ar.edu.utn.frc.siga.space.dto.response.DeactivationImpactDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -114,7 +115,7 @@ public class ClassroomController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('PERM_CLASSROOM_DELETE')")
-    @Operation(summary = "Eliminar aula", description = "Soft-delete. 404 si el aula no existe.")
+    @Operation(summary = "Eliminar aula", description = "Soft-delete. Libera las clases futuras asignadas al aula igual que DELETE /{id}/activation. 204; 404 si el aula no existe.")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.debug("DELETE /v1/classrooms/{}", id);
         classroomService.delete(id);
@@ -137,12 +138,25 @@ public class ClassroomController {
     @DeleteMapping("/{id}/activation")
     @PreAuthorize("hasAuthority('PERM_CLASSROOM_ACTIVATE')")
     @Operation(summary = "Desactivar aula",
-               description = "Soft-delete idempotente. 204 si queda inactiva; 404 si el aula no existe.")
-    public ResponseEntity<Void> deactivate(@PathVariable Long id) {
+               description = "Soft-delete idempotente. Libera las clases futuras asignadas al aula (motivo "
+                       + "CLASSROOM_DEACTIVATED) y fusiona las que tienen espejo en otra aula. 200 con el impacto "
+                       + "(clases liberadas y fusionadas, pedidos de aula afectados); 404 si el aula no existe.")
+    public ResponseEntity<DeactivationImpactDto> deactivate(@PathVariable Long id) {
         log.debug("DELETE /v1/classrooms/{}/activation", id);
-        classroomService.deactivate(id);
+        DeactivationImpactDto impact = classroomService.deactivate(id);
         log.info("Aula desactivada vía controller: id={}", id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(impact);
+    }
+
+    @GetMapping("/{id}/deactivation-impact")
+    @PreAuthorize("hasAuthority('PERM_CLASSROOM_ACTIVATE')")
+    @Operation(summary = "Ver impacto de desactivar aula",
+               description = "Calcula qué pasaría al desactivar el aula sin aplicar nada: clases futuras que "
+                       + "quedarían sin aula, clases que se fusionarían y pedidos de aula que piden el aula. "
+                       + "403 si el aula está fuera del alcance del usuario; 404 si no existe.")
+    public ResponseEntity<DeactivationImpactDto> deactivationImpact(@PathVariable Long id) {
+        log.debug("GET /v1/classrooms/{}/deactivation-impact", id);
+        return ResponseEntity.ok(classroomService.deactivationImpact(id));
     }
 
 }

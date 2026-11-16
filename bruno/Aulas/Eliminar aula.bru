@@ -13,3 +13,8 @@ delete {
 params:path {
   id: 34
 }
+
+docs {
+  DELETE /v1/classrooms/{id}. Permiso: PERM_CLASSROOM_DELETE. Soft-delete. Libera las clases futuras
+  asignadas al aula igual que DELETE /v1/classrooms/{id}/activation. Responde 204; 404 si no existe.
+}
