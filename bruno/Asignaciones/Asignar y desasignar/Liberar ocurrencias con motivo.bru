@@ -28,5 +28,5 @@ docs {
   aula (MIRROR_RETIRED), que no se tocan. Atómico.
 
   Respuesta 200: [ { occurrenceId, eventId, date, freedClassroomId, reason } ].
-  400 motivo faltante, MIRROR_RETIRED u OTHER sin nota; 403 sin alcance sobre el edificio; 409 ocurrencia pasada.
+  400 motivo faltante, MIRROR_RETIRED o CLASSROOM_DEACTIVATED (motivos internos, errors.reasonSelectable) u OTHER sin nota; 403 sin alcance sobre el edificio; 409 ocurrencia pasada.
 }

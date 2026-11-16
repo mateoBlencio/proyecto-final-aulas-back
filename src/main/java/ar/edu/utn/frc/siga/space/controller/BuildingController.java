@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.space.controller;
 import ar.edu.utn.frc.siga.space.dto.BuildingFilter;
 import ar.edu.utn.frc.siga.space.dto.request.BuildingActiveBatchRequestDto;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
+import ar.edu.utn.frc.siga.space.dto.response.DeactivationImpactDto;
 import ar.edu.utn.frc.siga.space.service.BuildingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -71,12 +72,26 @@ public class BuildingController {
     @PreAuthorize("hasAuthority('PERM_BUILDING_ACTIVATE')")
     @Operation(summary = "Desactivar edificio",
                description = "Soft-delete idempotente. Pensado para ocultar edificios que sincroniza SysAcad "
-                       + "pero que la facultad no usa. 204 si queda inactivo; 404 si el edificio no existe.")
-    public ResponseEntity<Void> deactivate(@PathVariable Long id) {
+                       + "pero que la facultad no usa. Libera las clases futuras asignadas a sus aulas "
+                       + "(motivo CLASSROOM_DEACTIVATED) y fusiona las que tienen espejo en otra aula. "
+                       + "200 con el impacto (clases liberadas y fusionadas, pedidos de aula afectados); "
+                       + "404 si el edificio no existe.")
+    public ResponseEntity<DeactivationImpactDto> deactivate(@PathVariable Long id) {
         log.debug("DELETE /v1/buildings/{}/activation", id);
-        buildingService.deactivate(id);
+        DeactivationImpactDto impact = buildingService.deactivate(id);
         log.info("Edificio desactivado vía controller: id={}", id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(impact);
+    }
+
+    @GetMapping("/{id}/deactivation-impact")
+    @PreAuthorize("hasAuthority('PERM_BUILDING_ACTIVATE')")
+    @Operation(summary = "Ver impacto de desactivar edificio",
+               description = "Calcula qué pasaría al desactivar el edificio sin aplicar nada: clases futuras que "
+                       + "quedarían sin aula, clases que se fusionarían y pedidos de aula que piden sus aulas. "
+                       + "404 si el edificio no existe.")
+    public ResponseEntity<DeactivationImpactDto> deactivationImpact(@PathVariable Long id) {
+        log.debug("GET /v1/buildings/{}/deactivation-impact", id);
+        return ResponseEntity.ok(buildingService.deactivationImpact(id));
     }
 
     @PatchMapping("/activation")
@@ -84,7 +99,8 @@ public class BuildingController {
     @Operation(summary = "Activar/desactivar edificios en lote",
                description = "Aplica el cambio de estado activo a varios edificios en una única transacción: si "
                        + "alguno falla (ej. 404), no se aplica ninguno. Pensado para desactivar de una los "
-                       + "edificios que sincroniza SysAcad pero que la facultad no usa.")
+                       + "edificios que sincroniza SysAcad pero que la facultad no usa. Al desactivar, libera las "
+                       + "clases futuras de sus aulas igual que DELETE /{id}/activation.")
     public ResponseEntity<List<BuildingResponseDto>> setActiveBatch(
             @Valid @RequestBody BuildingActiveBatchRequestDto dto) {
         log.debug("PATCH /v1/buildings/activation (batch): count={}", dto.buildings().size());

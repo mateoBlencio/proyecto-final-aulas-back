@@ -4,10 +4,10 @@ import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomDetailsUpdateDto;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomListItemDto;
+import ar.edu.utn.frc.siga.space.dto.response.DeactivationImpactDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomSubjectPermissionDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomSysacadRefDto;
-import ar.edu.utn.frc.siga.common.service.ActivationService;
 import ar.edu.utn.frc.siga.space.service.command.ClassroomSyncCommand;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,7 +20,7 @@ import java.util.Optional;
 import java.util.Set;
 
 @NamedInterface("api")
-public interface ClassroomService extends ActivationService<Long> {
+public interface ClassroomService {
 
     String DEFAULT_CLASSROOM_TYPE = "Aula común";
 
@@ -69,6 +69,14 @@ public interface ClassroomService extends ActivationService<Long> {
     ClassroomListItemDto updateDetails(Long id, ClassroomDetailsUpdateDto dto);
 
     void delete(Long id);
+
+    void activate(Long id);
+
+    DeactivationImpactDto deactivate(Long id);
+
+    DeactivationImpactDto deactivationImpact(Long id);
+
+    List<ClassroomResponseDto> findDeactivatedInSiga();
 
     ClassroomResponseDto findByRoomNumberAndBuilding(Integer roomNumber, Long buildingId);
 

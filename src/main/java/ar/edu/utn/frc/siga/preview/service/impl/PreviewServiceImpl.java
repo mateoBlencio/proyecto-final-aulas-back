@@ -12,7 +12,6 @@ import ar.edu.utn.frc.siga.allocation.validator.AllocationCandidate;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.common.exception.InvalidSelectionException;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
-import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.preview.dto.request.ConfirmPreviewRequestDto;
 import ar.edu.utn.frc.siga.preview.dto.request.PreviewAllocationDto;
@@ -132,7 +131,7 @@ public class PreviewServiceImpl implements PreviewService {
         Map<PlanningKey, List<OccurrenceSlotDto>> occurrencesByKey = occurrenceService
                 .findSlotsByEvents(eventIdsWithClassroom, LocalDate.now())
                 .stream()
-                .filter(o -> o.status() == OccurrenceStatus.NEEDS_ROOM && !o.isPast())
+                .filter(o -> !o.blocksAllocation() && !o.isPast())
                 .collect(Collectors.groupingBy(o -> new PlanningKey(o.eventId(), o.roomSlot())));
 
         List<AllocationCandidate> candidates = new ArrayList<>();
@@ -169,7 +168,7 @@ public class PreviewServiceImpl implements PreviewService {
                 ? new AllocationTarget.EventRange(request.eventId(), request.from(), request.to())
                 : new AllocationTarget.Occurrences(request.occurrenceIds());
         List<OccurrenceSlotDto> slots = allocationService.resolveOccurrences(target).stream()
-                .filter(o -> o.status() != OccurrenceStatus.ROOM_RELEASED)
+                .filter(o -> !o.blocksAllocation())
                 .toList();
         if (slots.isEmpty()) {
             throw new AllocationConflictException("el target no tiene ocurrencias pendientes de asignación");

@@ -7,5 +7,6 @@ public enum ReleaseReason {
     VIRTUAL_CLASS,
     CANCELLED,
     MIRROR_RETIRED,
-    OTHER
+    OTHER,
+    CLASSROOM_DEACTIVATED
 }

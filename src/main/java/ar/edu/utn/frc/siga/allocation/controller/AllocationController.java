@@ -180,7 +180,7 @@ public class AllocationController {
                description = "Devuelve, paginados por evento, los eventos con sus fechas. Cada fecha trae sus aulas "
                        + "('slots': ocurrencia principal y espejos, con estado, motivo de liberación, asignación y "
                        + "aula anterior) y sus problemas en 'issues', cada uno con discriminador 'type': UNALLOCATED "
-                       + "(slots NEEDS_ROOM sin aula), OVERCROWDED (inscriptos contra la suma de capacidades de las "
+                       + "(slots sin aula: NEEDS_ROOM o liberados por baja de aula, CLASSROOM_DEACTIVATED), OVERCROWDED (inscriptos contra la suma de capacidades de las "
                        + "aulas de la fecha), OVERLAP (misma aula y fecha que otro evento, incluida la superposición "
                        + "tolerada) y NOT_PERMITTED (el aula no habilita la materia). Rango: 'to' por defecto es el "
                        + "fin del período académico activo (o 'from' + 6 meses); con 'onlyFuture=true' (default) "
@@ -219,7 +219,8 @@ public class AllocationController {
                        + "'occurrenceIds' (fechas puntuales), 'eventId' solo (todas las ocurrencias futuras "
                        + "del evento) o 'eventId' + 'from' [+ 'to'] (rango de fechas, ambos bordes inclusive). "
                        + "409 si alguna occurrence del lote ya tiene asignación, si algún aula no existe/no está "
-                       + "disponible, o si hay solapamiento de horario con otra asignación. Atómico.")
+                       + "disponible, o si hay solapamiento de horario con otra asignación. Asigna también las clases "
+                       + "liberadas por baja de aula (CLASSROOM_DEACTIVATED) y las saca de liberadas. Atómico.")
     public ResponseEntity<List<AllocationResponseDto>> allocate(@Valid @RequestBody AllocationBatchRequestDto dto) {
         log.debug("POST /v1/allocations: items={}", dto.items().size());
         List<AllocationResponseDto> response = allocationService.allocate(commandMapper.toManualCommand(dto));
@@ -286,9 +287,9 @@ public class AllocationController {
                description = "Marca las ocurrencias del lote como ROOM_RELEASED con motivo (VIRTUAL_CLASS, "
                        + "CANCELLED u OTHER, este último con nota obligatoria) y borra sus asignaciones. Cada item "
                        + "apunta con 'occurrenceIds', 'eventId' (ocurrencias futuras del evento) o 'eventId' + "
-                       + "'from' [+ 'to']. Arrastra las ocurrencias espejo con el mismo motivo, salvo las retiradas "
-                       + "por un pedido de aula (MIRROR_RETIRED). 400 si falta el "
-                       + "motivo, es MIRROR_RETIRED u OTHER sin nota; 403 sin alcance sobre el edificio del aula; "
+                       + "'from' [+ 'to']. Arrastra las ocurrencias espejo con el mismo motivo, salvo las ya retiradas "
+                       + "(MIRROR_RETIRED, por un pedido de aula o una baja de aula). 400 si falta el motivo, es "
+                       + "MIRROR_RETIRED o CLASSROOM_DEACTIVATED u OTHER sin nota; 403 sin alcance sobre el edificio del aula; "
                        + "409 si alguna ocurrencia ya pasó. Atómico.")
     public ResponseEntity<List<ReleasedOccurrenceDto>> release(@Valid @RequestBody ReleaseBatchRequestDto dto) {
         log.debug("POST /v1/allocations/releases: items={}, reason={}", dto.items().size(), dto.reason());

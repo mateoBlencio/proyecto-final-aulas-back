@@ -1,0 +1,30 @@
+meta {
+  name: Ver impacto de desactivar aula
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/v1/classrooms/:id/deactivation-impact
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: 1
+}
+
+assert {
+  res.status: eq 200
+  res.body.releasedClasses: isNumber
+  res.body.mergedClasses: isNumber
+  res.body.affectedRoomRequests: isNumber
+  res.body.visibleRoomRequests: isArray
+}
+
+docs {
+  GET /v1/classrooms/{id}/deactivation-impact. Permiso: PERM_CLASSROOM_ACTIVATE, acotado al edificio
+  del aula (403 fuera de alcance; 404 si no existe).
+  Calcula lo mismo que devuelve la baja (DELETE /v1/classrooms/{id}/activation) sin aplicar nada.
+  Sobre un aula ya dada de baja devuelve 0.
+}

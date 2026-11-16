@@ -75,7 +75,7 @@ class AllocationTargetResolverTest {
                 slot(4L, to.plusDays(7))));     // afuera: no entra
 
         Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
-                List.of(rangeItem(from, to)), LocalDate.now()).classroomByOccurrence();
+                List.of(rangeItem(from, to)), LocalDate.now(), false).classroomByOccurrence();
 
         assertThat(resolved.keySet()).extracting(OccurrenceSlotDto::occurrenceId)
                 .containsExactly(1L, 2L, 3L);
@@ -91,7 +91,7 @@ class AllocationTargetResolverTest {
                 slot(2L, from.plusMonths(2))));
 
         Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
-                List.of(rangeItem(from, null)), LocalDate.now()).classroomByOccurrence();
+                List.of(rangeItem(from, null)), LocalDate.now(), false).classroomByOccurrence();
 
         assertThat(resolved.keySet()).extracting(OccurrenceSlotDto::occurrenceId)
                 .containsExactly(1L, 2L);
@@ -104,7 +104,7 @@ class AllocationTargetResolverTest {
         realValidateRange();
         when(occurrenceService.findSlotsByEvent(EVENT_ID, from)).thenReturn(List.of(slot(1L, from)));
 
-        resolver.resolveClassroomByOccurrence(List.of(rangeItem(from, null)), LocalDate.now());
+        resolver.resolveClassroomByOccurrence(List.of(rangeItem(from, null)), LocalDate.now(), false);
 
         verify(occurrenceService).findSlotsByEvent(EVENT_ID, from);
         verify(occurrenceService, never()).findSlotsByEvent(EVENT_ID, LocalDate.now());
@@ -116,7 +116,7 @@ class AllocationTargetResolverTest {
         realValidateRange();
 
         assertThatThrownBy(() -> resolver.resolveClassroomByOccurrence(
-                List.of(rangeItem(LocalDate.now().minusDays(1), null)), LocalDate.now()))
+                List.of(rangeItem(LocalDate.now().minusDays(1), null)), LocalDate.now(), false))
                 .isInstanceOf(InvalidDateRangeException.class);
 
         verifyNoInteractions(occurrenceService);
@@ -129,7 +129,7 @@ class AllocationTargetResolverTest {
         realValidateRange();
 
         assertThatThrownBy(() -> resolver.resolveClassroomByOccurrence(
-                List.of(rangeItem(from, from.minusDays(1))), LocalDate.now()))
+                List.of(rangeItem(from, from.minusDays(1))), LocalDate.now(), false))
                 .isInstanceOf(InvalidDateRangeException.class);
 
         verifyNoInteractions(occurrenceService);
@@ -145,7 +145,7 @@ class AllocationTargetResolverTest {
         when(occurrenceService.findSlotsByEvent(EVENT_ID, today)).thenReturn(List.of(yaEmpezo, slot(2L, today.plusDays(7))));
 
         Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
-                List.of(rangeItem(today, null)), today).classroomByOccurrence();
+                List.of(rangeItem(today, null)), today, false).classroomByOccurrence();
 
         assertThat(resolved.keySet()).extracting(OccurrenceSlotDto::occurrenceId).containsExactly(2L);
         verify(validator, never()).validateNotPast(any());
@@ -174,7 +174,7 @@ class AllocationTargetResolverTest {
         when(occurrenceService.findSlotsByEvent(EVENT_ID, from)).thenReturn(List.of());
 
         Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
-                List.of(rangeItem(from, from.plusDays(1))), LocalDate.now()).classroomByOccurrence();
+                List.of(rangeItem(from, from.plusDays(1))), LocalDate.now(), false).classroomByOccurrence();
 
         assertThat(resolved).isEmpty();
     }
@@ -189,7 +189,7 @@ class AllocationTargetResolverTest {
         when(occurrenceService.findSlotsByEvents(anyCollection())).thenReturn(List.of(s55, s56, s57));
 
         Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
-                List.of(eventItem(55L, 100L), eventItem(56L, 200L), eventItem(57L, 300L)), null).classroomByOccurrence();
+                List.of(eventItem(55L, 100L), eventItem(56L, 200L), eventItem(57L, 300L)), null, false).classroomByOccurrence();
 
         assertThat(resolved).containsExactly(
                 org.assertj.core.api.Assertions.entry(s55, 100L),
@@ -209,7 +209,7 @@ class AllocationTargetResolverTest {
         when(occurrenceService.findSlotsByEvents(anyCollection(), any())).thenReturn(List.of(pasada, futura));
 
         Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
-                List.of(eventItem(55L, 100L)), today).classroomByOccurrence();
+                List.of(eventItem(55L, 100L)), today, false).classroomByOccurrence();
 
         assertThat(resolved.keySet()).extracting(OccurrenceSlotDto::occurrenceId).containsExactly(2L);
     }
@@ -222,7 +222,7 @@ class AllocationTargetResolverTest {
         when(occurrenceService.findSlotsByEvents(anyCollection())).thenReturn(List.of(shared));
 
         assertThatThrownBy(() -> resolver.resolveClassroomByOccurrence(
-                List.of(eventItem(55L, 100L), eventItem(55L, 200L)), null))
+                List.of(eventItem(55L, 100L), eventItem(55L, 200L)), null, false))
                 .isInstanceOf(AllocationConflictException.class);
     }
 
@@ -234,7 +234,7 @@ class AllocationTargetResolverTest {
         when(occurrenceService.findSlotsByEvents(anyCollection())).thenReturn(List.of(shared));
 
         Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
-                List.of(eventItem(55L, 100L), eventItem(55L, 100L)), null).classroomByOccurrence();
+                List.of(eventItem(55L, 100L), eventItem(55L, 100L)), null, false).classroomByOccurrence();
 
         assertThat(resolved).containsExactly(
                 org.assertj.core.api.Assertions.entry(shared, 100L));
@@ -249,7 +249,7 @@ class AllocationTargetResolverTest {
 
         Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
                 List.of(new AllocationItem(new AllocationTarget.Occurrences(List.of(1L, 2L)), CLASSROOM_ID)),
-                LocalDate.now()).classroomByOccurrence();
+                LocalDate.now(), false).classroomByOccurrence();
 
         assertThat(resolved.keySet()).extracting(OccurrenceSlotDto::occurrenceId).containsExactly(1L, 2L);
         verify(occurrenceService, never()).findSlotsByEvents(anyCollection());
@@ -306,7 +306,7 @@ class AllocationTargetResolverTest {
 
         AllocationTargetResolver.ResolvedAssignments resolved = resolver.resolveClassroomByOccurrence(
                 List.of(new AllocationItem(new AllocationTarget.Occurrences(List.of(1L, 2L)), CLASSROOM_ID)),
-                LocalDate.now());
+                LocalDate.now(), false);
 
         assertThat(resolved.classroomByOccurrence().keySet()).containsExactly(libre);
         assertThat(resolved.skippedReleased()).containsExactly(liberada);
@@ -320,7 +320,7 @@ class AllocationTargetResolverTest {
         when(occurrenceService.findSlotsByEvents(anyCollection(), any())).thenReturn(List.of(libre, liberada));
 
         AllocationTargetResolver.ResolvedAssignments resolved = resolver.resolveClassroomByOccurrence(
-                List.of(eventItem(EVENT_ID, CLASSROOM_ID)), LocalDate.now());
+                List.of(eventItem(EVENT_ID, CLASSROOM_ID)), LocalDate.now(), false);
 
         assertThat(resolved.classroomByOccurrence().keySet()).containsExactly(libre);
         assertThat(resolved.skippedReleased()).containsExactly(liberada);
@@ -336,7 +336,7 @@ class AllocationTargetResolverTest {
         when(occurrenceService.findSlotsByEvent(EVENT_ID, from)).thenReturn(List.of(libre, liberada));
 
         AllocationTargetResolver.ResolvedAssignments resolved = resolver.resolveClassroomByOccurrence(
-                List.of(rangeItem(from, null)), LocalDate.now());
+                List.of(rangeItem(from, null)), LocalDate.now(), false);
 
         assertThat(resolved.classroomByOccurrence().keySet()).containsExactly(libre);
         assertThat(resolved.skippedReleased()).containsExactly(liberada);

@@ -60,8 +60,11 @@ class AllocationImpactServiceImpl implements AllocationImpactService {
     @Transactional(readOnly = true)
     public AllocationImpactResponseDto analyze(AllocationCommand command) {
         LocalDate clampFrom = command.source() == AllocationSource.IMPORTED ? null : LocalDate.now();
-        Map<OccurrenceSlotDto, Long> classroomByOccurrence =
-                targetResolver.resolveClassroomByOccurrence(command.items(), clampFrom).classroomByOccurrence();
+        boolean reassignDeactivationReleases = command.source() == AllocationSource.MANUAL
+                || command.source() == AllocationSource.AUTOMATIC;
+        Map<OccurrenceSlotDto, Long> classroomByOccurrence = targetResolver
+                .resolveClassroomByOccurrence(command.items(), clampFrom, reassignDeactivationReleases)
+                .classroomByOccurrence();
 
         if (classroomByOccurrence.isEmpty()) {
             return EMPTY;

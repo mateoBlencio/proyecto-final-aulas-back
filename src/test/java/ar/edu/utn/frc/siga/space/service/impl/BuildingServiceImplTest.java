@@ -13,6 +13,7 @@ import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.mapper.BuildingMapper;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
+import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
 import ar.edu.utn.frc.siga.space.service.command.BuildingSyncCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -48,12 +49,17 @@ class BuildingServiceImplTest {
     private BuildingMapper buildingMapper;
     @Mock
     private BuildingScopeResolver buildingScopeResolver;
+    @Mock
+    private ClassroomRepository classroomRepository;
+    @Mock
+    private ClassroomDeactivationCoordinator deactivationCoordinator;
 
     private BuildingServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new BuildingServiceImpl(buildingRepository, buildingMapper, buildingScopeResolver);
+        service = new BuildingServiceImpl(buildingRepository, buildingMapper, buildingScopeResolver,
+                classroomRepository, deactivationCoordinator);
         lenient().when(buildingScopeResolver.scopeFor(Permission.BUILDING_READ)).thenReturn(BuildingScope.unrestricted());
     }
 

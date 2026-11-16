@@ -33,4 +33,8 @@ public record OccurrenceSlotDto(
     public boolean isPast() {
         return LocalDateTime.now().isAfter(date.atTime(startTime));
     }
+
+    public boolean blocksAllocation() {
+        return status == OccurrenceStatus.ROOM_RELEASED && releaseReason != ReleaseReason.CLASSROOM_DEACTIVATED;
+    }
 }

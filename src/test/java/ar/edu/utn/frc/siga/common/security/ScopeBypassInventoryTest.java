@@ -26,6 +26,8 @@ class ScopeBypassInventoryTest {
     private static final Path SRC_MAIN = Path.of("src/main/java");
 
     private static final Map<String, Integer> EXPECTED_SYSTEM_SCOPE = Map.of(
+            // Reconciliación al arrancar de aulas dadas de baja (sin usuario, D4 de la baja de aula).
+            "ar/edu/utn/frc/siga/allocation/service/impl/DeactivatedClassroomReconciler.java", 1,
             "ar/edu/utn/frc/siga/ingest/service/impl/IngestServiceImpl.java", 1,
             "ar/edu/utn/frc/siga/notification/internal/service/NotificationRetryScheduler.java", 1,
             "ar/edu/utn/frc/siga/roomrequest/service/impl/RoomRequestCatalogServiceImpl.java", 1,

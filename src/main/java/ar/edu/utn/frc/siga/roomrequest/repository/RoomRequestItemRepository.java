@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.roomrequest.repository;
 
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -56,4 +57,13 @@ public interface RoomRequestItemRepository
             + "where i.status = ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.NOTIFIED "
             + "and i.acceptanceDeadline <= :now")
     List<RoomRequestItem> findNotifiedWithDeadlineUntil(@Param("now") Instant now);
+
+    @Query("""
+            select distinct i from RoomRequestItem i join fetch i.request
+            left join i.preferences p left join i.allocations a
+            where i.status in :statuses and (p.classroomId in :classroomIds or a.classroomId in :classroomIds)
+            order by i.id
+            """)
+    List<RoomRequestItem> findOpenRequestingClassrooms(@Param("statuses") Collection<RoomRequestStatus> statuses,
+                                                       @Param("classroomIds") Collection<Long> classroomIds);
 }

@@ -65,6 +65,7 @@ final class FieldLabels {
             Map.entry("NEEDS_ROOM", "Necesita aula"), Map.entry("ROOM_RELEASED", "Aula liberada"),
             Map.entry("VIRTUAL_CLASS", "Clase virtual"), Map.entry("CANCELLED", "Cancelada"),
             Map.entry("MIRROR_RETIRED", "Espejo retirado"), Map.entry("OTHER", "Otro"),
+            Map.entry("CLASSROOM_DEACTIVATED", "Aula o edificio deshabilitado"),
             Map.entry("SUBSECRETARIA", "Subsecretaría"), Map.entry("AUXILIAR_AULICO", "Auxiliar áulico"),
             Map.entry("CONSULTA", "Consulta"), Map.entry("GLOBAL", "Global"), Map.entry("BUILDING", "Edificio"),
             Map.entry("NEW", "Nuevo"), Map.entry("DERIVED_TO_BUILDING", "Derivado a edificio"),

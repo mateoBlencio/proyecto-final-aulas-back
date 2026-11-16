@@ -141,7 +141,7 @@ class OccurrenceBoardServiceImplTest {
         Set<Long> allocated = allocations.stream().map(Allocation::getOccurrenceId).collect(Collectors.toSet());
         return slots.stream()
                 .filter(o -> !o.date().isBefore(from) && !o.date().isAfter(to))
-                .filter(o -> o.status() == OccurrenceStatus.NEEDS_ROOM && !allocated.contains(o.occurrenceId()))
+                .filter(o -> !o.blocksAllocation() && !allocated.contains(o.occurrenceId()))
                 .map(OccurrenceSlotDto::eventId)
                 .distinct()
                 .toList();
@@ -316,6 +316,25 @@ class OccurrenceBoardServiceImplTest {
         assertThat(unfiltered.summary().unallocated()).isZero();
         assertThat(releasedOnly).hasSize(1);
         assertThat(unallocatedOnly).isEmpty();
+    }
+
+    @Test
+    @DisplayName("slot liberado por baja de aula (CLASSROOM_DEACTIVATED): UNALLOCATED con 1 aula, requiredRooms 1, sale con issues=UNALLOCATED y con issues=RELEASED")
+    void deactivationReleaseIsUnallocated() {
+        event(1, 20);
+        released(10, 1, DATE, 1, ReleaseReason.CLASSROOM_DEACTIVATED, null);
+
+        OccurrenceBoardEventDto unfiltered = single(board(NO_FILTER));
+        List<OccurrenceBoardEventDto> unallocatedOnly = board(UNALLOCATED_ONLY);
+        List<OccurrenceBoardEventDto> releasedOnly = board(Set.of(OccurrenceIssueType.RELEASED));
+
+        OccurrenceBoardDateDto date = unfiltered.occurrences().getFirst();
+        assertThat(date.issues()).containsExactly(new UnallocatedIssueDto(1));
+        assertThat(date.requiredRooms()).isEqualTo(1);
+        assertThat(unfiltered.summary().unallocated()).isEqualTo(1);
+        assertThat(unfiltered.summary().released()).isEqualTo(1);
+        assertThat(unallocatedOnly).hasSize(1);
+        assertThat(releasedOnly).hasSize(1);
     }
 
     @Test

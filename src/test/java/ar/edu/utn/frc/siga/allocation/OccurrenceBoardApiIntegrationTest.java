@@ -386,6 +386,28 @@ class OccurrenceBoardApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("una clase liberada por la baja de su aula sale con issues=UNALLOCATED, slot ROOM_RELEASED con CLASSROOM_DEACTIVATED y requiredRooms 1")
+    void deactivationReleaseIsListedAsUnallocated() throws Exception {
+        Window w = freshWindow();
+        Classroom room = testData.aula(testData.edificio(), testData.tipoAulaPorDefecto(), 100);
+        Seeded seeded = seed(testData.materiaYComision(), w.day(2), 20);
+        allocate(seeded.occurrenceId(), room);
+
+        mockMvc.perform(delete("/v1/classrooms/{id}/activation", room.getId())).andExpect(status().isOk());
+
+        assertThat(allocationRepository.findEventIdsWithUnallocatedOccurrencesBetween(w.from(), w.to()))
+                .contains(seeded.eventId());
+        JsonNode event = eventNode(board(w, "issues", "UNALLOCATED"), seeded.eventId());
+        assertThat(event).isNotNull();
+        JsonNode date = event.get("occurrences").get(0);
+        assertThat(issueTypes(date)).containsExactly("UNALLOCATED");
+        assertThat(date.get("requiredRooms").asInt()).isEqualTo(1);
+        JsonNode slot = date.get("slots").get(0);
+        assertThat(slot.get("status").asText()).isEqualTo("ROOM_RELEASED");
+        assertThat(slot.get("releaseReason").asText()).isEqualTo("CLASSROOM_DEACTIVATED");
+    }
+
+    @Test
     @DisplayName("findEventIdsWithUnallocatedOccurrencesBetween: incluye los bordes from y to, excluye el día anterior y el posterior, las ocurrencias con aula y las liberadas, y no repite eventos")
     void unallocatedCandidatesQueryRespectsRangeAndStatus() throws Exception {
         Window w = freshWindow();

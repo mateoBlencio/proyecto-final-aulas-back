@@ -105,6 +105,21 @@ class DashboardBadgesApiIntegrationTest extends DashboardIntegrationSupport {
     }
 
     @Test
+    @DisplayName("unallocatedClassesNext7Days counts a class released by a classroom deactivation, not one released for another reason")
+    void unallocatedBadgeCountsDeactivationReleases() throws Exception {
+        LocalDate inside = workday(LocalDate.now().plusDays(5));
+        long before = badges(mockMvc).get("unallocatedClassesNext7Days").asLong();
+
+        Placed deactivation = unallocated(inside, bandStart(), 60, 20);
+        Placed other = unallocated(inside, bandStart(), 60, 20);
+        jdbc.update("UPDATE ocurrencia SET estado = 'ROOM_RELEASED', motivo_liberacion = 'CLASSROOM_DEACTIVATED' "
+                + "WHERE id_ocurrencia = ?", deactivation.occurrenceId());
+        releaseRoom(other.occurrenceId());
+
+        assertThat(badges(mockMvc).get("unallocatedClassesNext7Days").asLong() - before).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("a restricted user gets unallocatedClassesNext7Days null, an unrestricted one counts only the next 7 days")
     void unallocatedBadgeIsNullWhenRestricted() throws Exception {
         LocalDate today = LocalDate.now();
