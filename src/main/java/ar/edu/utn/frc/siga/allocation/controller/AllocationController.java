@@ -180,7 +180,7 @@ public class AllocationController {
                description = "Devuelve, paginados por evento, los eventos con sus fechas. Cada fecha trae sus aulas "
                        + "('slots': ocurrencia principal y espejos, con estado, motivo de liberación, asignación y "
                        + "aula anterior) y sus problemas en 'issues', cada uno con discriminador 'type': UNALLOCATED "
-                       + "(slots NEEDS_ROOM sin aula), OVERCROWDED (inscriptos contra la suma de capacidades de las "
+                       + "(slots sin aula: NEEDS_ROOM o liberados por baja de aula, CLASSROOM_DEACTIVATED), OVERCROWDED (inscriptos contra la suma de capacidades de las "
                        + "aulas de la fecha), OVERLAP (misma aula y fecha que otro evento, incluida la superposición "
                        + "tolerada) y NOT_PERMITTED (el aula no habilita la materia). Rango: 'to' por defecto es el "
                        + "fin del período académico activo (o 'from' + 6 meses); con 'onlyFuture=true' (default) "

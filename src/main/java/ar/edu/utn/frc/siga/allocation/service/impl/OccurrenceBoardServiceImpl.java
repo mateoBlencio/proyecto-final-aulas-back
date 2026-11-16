@@ -259,9 +259,10 @@ public class OccurrenceBoardServiceImpl implements OccurrenceBoardService {
             return Optional.empty();
         }
 
+        // Una liberada por baja de aula (CLASSROOM_DEACTIVATED) se reasigna directo: cuenta como sin aula.
         List<OccurrenceIssueDto> issues = new ArrayList<>();
         long missingRooms = sorted.stream()
-                .filter(o -> o.status() == OccurrenceStatus.NEEDS_ROOM && board.allocationOf(o) == null)
+                .filter(o -> !o.blocksAllocation() && board.allocationOf(o) == null)
                 .count();
         if (missingRooms > 0) {
             issues.add(new UnallocatedIssueDto((int) missingRooms));
@@ -275,7 +276,7 @@ public class OccurrenceBoardServiceImpl implements OccurrenceBoardService {
         }
 
         OccurrenceSlotDto first = sorted.getFirst();
-        int requiredRooms = (int) sorted.stream().filter(o -> o.status() == OccurrenceStatus.NEEDS_ROOM).count();
+        int requiredRooms = (int) sorted.stream().filter(o -> !o.blocksAllocation()).count();
         return Optional.of(new OccurrenceBoardDateDto(first.date(), first.startTime(), first.endTime(),
                 first.isPast(), requiredRooms, visible.stream().map(board::toSlot).toList(), List.copyOf(issues)));
     }
