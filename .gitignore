@@ -197,6 +197,7 @@ buildNumber.properties
 # graphify
 graphify-out/
 .graphifyignore
+.venv/
 
 # VSCode
 .vscode

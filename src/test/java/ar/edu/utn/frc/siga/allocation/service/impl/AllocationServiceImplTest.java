@@ -109,13 +109,16 @@ class AllocationServiceImplTest {
     private ClassroomAllocationLock classroomLock;
     @Mock
     private RevisionReader revisionReader;
+    @Mock
+    private OccurrenceBoardCache boardCache;
 
     private AllocationServiceImpl service;
 
     @BeforeEach
     void setUp() {
         service = new AllocationServiceImpl(allocationRepository, occurrenceService, composer, validator, targetResolver,
-                writer, classroomService, buildingScopeResolver, classroomLock, revisionReader);
+                writer, classroomService, buildingScopeResolver, classroomLock, revisionReader,
+                boardCache);
         lenient().when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of());
         lenient().when(buildingScopeResolver.scopeFor(any())).thenReturn(BuildingScope.unrestricted());
     }
@@ -629,6 +632,41 @@ class AllocationServiceImplTest {
     }
 
     @Test
+    @DisplayName("release: un espejo MIRROR_RETIRED de findMirrors no se libera ni se intenta borrar")
+    void releaseNoTocaLapidaDeLaExpansion() {
+        ReleaseCommand command = releaseCommand(10L);
+        OccurrenceSlotDto principal = occurrenceSlot(10L, 1L, futureDate(1));
+        OccurrenceSlotDto activeMirror = occurrenceSlot(11L, 1L, futureDate(1));
+        OccurrenceSlotDto tombstone = releasedSlot(12L, 10L, ReleaseReason.MIRROR_RETIRED);
+        when(targetResolver.resolveAll(command.targets(), LocalDate.now())).thenReturn(List.of(principal));
+        when(occurrenceService.findMirrors(Set.of(10L))).thenReturn(List.of(activeMirror, tombstone));
+
+        List<ReleasedOccurrenceDto> result = service.release(command);
+
+        ArgumentCaptor<List<OccurrenceRelease>> captor = ArgumentCaptor.forClass(List.class);
+        verify(occurrenceService).release(captor.capture(), eq(ReleaseReason.VIRTUAL_CLASS), eq("cursado virtual"));
+        assertThat(captor.getValue()).extracting(OccurrenceRelease::occurrenceId).containsExactly(10L, 11L);
+        verify(writer).delete(eq(List.of(principal, activeMirror)), any());
+        verify(validator, never()).validateNotPast(tombstone);
+        assertThat(result).extracting(ReleasedOccurrenceDto::occurrenceId).containsExactly(10L, 11L);
+    }
+
+    @Test
+    @DisplayName("release: un espejo MIRROR_RETIRED pedido por id no se libera")
+    void releaseNoTocaLapidaPedidaPorId() {
+        ReleaseCommand command = releaseCommand(10L, 12L);
+        OccurrenceSlotDto principal = occurrenceSlot(10L, 1L, futureDate(1));
+        OccurrenceSlotDto tombstone = releasedSlot(12L, 10L, ReleaseReason.MIRROR_RETIRED);
+        when(targetResolver.resolveAll(command.targets(), LocalDate.now())).thenReturn(List.of(principal, tombstone));
+
+        service.release(command);
+
+        verify(occurrenceService).release(List.of(new OccurrenceRelease(10L, null)),
+                ReleaseReason.VIRTUAL_CLASS, "cursado virtual");
+        verify(writer).delete(eq(List.of(principal)), any());
+    }
+
+    @Test
     @DisplayName("release: guarda el aula que tenia asignada como aula anterior y la devuelve como freedClassroomId")
     void releaseGuardaElAulaAnterior() {
         ReleaseCommand command = releaseCommand(10L);
@@ -738,14 +776,68 @@ class AllocationServiceImplTest {
         verify(occurrenceService, never()).release(any(), any(), any());
     }
 
+    @Test
+    @DisplayName("release: vacía la caché del tablero aunque ninguna ocurrencia tuviera asignación que borrar")
+    void releaseInvalidatesBoardCache() {
+        ReleaseCommand command = releaseCommand(10L);
+        when(targetResolver.resolveAll(command.targets(), LocalDate.now()))
+                .thenReturn(List.of(occurrenceSlot(10L, 1L, futureDate(1))));
+
+        service.release(command);
+
+        verify(boardCache).invalidate();
+    }
+
     // ---------- cancelRelease ----------
 
     @Test
-    @DisplayName("cancelRelease: no revierte espejos (ni lapidas) aunque la principal este en el conjunto")
-    void cancelReleaseExcluyeEspejos() {
+    @DisplayName("cancelRelease: vacía la caché del tablero")
+    void cancelReleaseInvalidatesBoardCache() {
+        DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(10L))), null);
+        when(targetResolver.resolveAll(command.targets(), LocalDate.now()))
+                .thenReturn(List.of(releasedSlot(10L, null, ReleaseReason.VIRTUAL_CLASS)));
+
+        service.cancelRelease(command);
+
+        verify(boardCache).invalidate();
+    }
+
+    @Test
+    @DisplayName("cancelRelease: revierte la principal y sus espejos liberados con motivo activo")
+    void cancelReleaseRevierteEspejos() {
         DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Event(1L)), null);
         when(targetResolver.resolveAll(command.targets(), LocalDate.now()))
-                .thenReturn(List.of(releasedSlot(10L, null), releasedSlot(11L, 10L)));
+                .thenReturn(List.of(releasedSlot(10L, null, ReleaseReason.VIRTUAL_CLASS)));
+        when(occurrenceService.findMirrors(Set.of(10L)))
+                .thenReturn(List.of(releasedSlot(11L, 10L, ReleaseReason.VIRTUAL_CLASS)));
+
+        List<Long> result = service.cancelRelease(command);
+
+        assertThat(result).containsExactly(10L, 11L);
+        verify(occurrenceService).requestRoom(List.of(10L, 11L));
+    }
+
+    @Test
+    @DisplayName("cancelRelease: un espejo pedido explicitamente por occurrenceIds se revierte solo")
+    void cancelReleaseRevierteEspejoPedidoExplicitamente() {
+        DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(11L))), null);
+        when(targetResolver.resolveAll(command.targets(), LocalDate.now()))
+                .thenReturn(List.of(releasedSlot(11L, 10L, ReleaseReason.VIRTUAL_CLASS)));
+
+        List<Long> result = service.cancelRelease(command);
+
+        assertThat(result).containsExactly(11L);
+        verify(occurrenceService).requestRoom(List.of(11L));
+    }
+
+    @Test
+    @DisplayName("cancelRelease: el espejo MIRROR_RETIRED que devuelve findMirrors no se revierte")
+    void cancelReleaseNoRevierteLapidaDeLaExpansion() {
+        DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(10L))), null);
+        when(targetResolver.resolveAll(command.targets(), LocalDate.now()))
+                .thenReturn(List.of(releasedSlot(10L, null, ReleaseReason.VIRTUAL_CLASS)));
+        when(occurrenceService.findMirrors(Set.of(10L)))
+                .thenReturn(List.of(releasedSlot(11L, 10L, ReleaseReason.MIRROR_RETIRED)));
 
         List<Long> result = service.cancelRelease(command);
 
@@ -754,20 +846,50 @@ class AllocationServiceImplTest {
     }
 
     @Test
-    @DisplayName("cancelRelease: un espejo pedido explicitamente por occurrenceIds tampoco se revierte")
-    void cancelReleaseNoRevierteEspejoPedidoExplicitamente() {
-        DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(11L))), null);
-        when(targetResolver.resolveAll(command.targets(), LocalDate.now())).thenReturn(List.of(releasedSlot(11L, 10L)));
+    @DisplayName("cancelRelease: el espejo MIRROR_RETIRED pedido por id tampoco se revierte")
+    void cancelReleaseNoRevierteLapidaPedidaPorId() {
+        DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(10L, 11L))), null);
+        when(targetResolver.resolveAll(command.targets(), LocalDate.now()))
+                .thenReturn(List.of(releasedSlot(10L, null, ReleaseReason.VIRTUAL_CLASS),
+                        releasedSlot(11L, 10L, ReleaseReason.MIRROR_RETIRED)));
 
         List<Long> result = service.cancelRelease(command);
 
-        assertThat(result).isEmpty();
-        verify(occurrenceService).requestRoom(List.of());
+        assertThat(result).containsExactly(10L);
+        verify(occurrenceService).requestRoom(List.of(10L));
     }
 
-    private OccurrenceSlotDto releasedSlot(long id, Long mirrorOf) {
+    @Test
+    @DisplayName("cancelRelease: un espejo que ya venia en el pedido y en findMirrors no se duplica")
+    void cancelReleaseNoDuplicaEspejoPedidoExplicitamente() {
+        DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(10L, 11L))), null);
+        OccurrenceSlotDto mirror = releasedSlot(11L, 10L, ReleaseReason.VIRTUAL_CLASS);
+        when(targetResolver.resolveAll(command.targets(), LocalDate.now()))
+                .thenReturn(List.of(releasedSlot(10L, null, ReleaseReason.VIRTUAL_CLASS), mirror));
+        when(occurrenceService.findMirrors(Set.of(10L, 11L))).thenReturn(List.of(mirror));
+
+        List<Long> result = service.cancelRelease(command);
+
+        assertThat(result).containsExactly(10L, 11L);
+        verify(occurrenceService).requestRoom(List.of(10L, 11L));
+    }
+
+    @Test
+    @DisplayName("cancelRelease: ignora los espejos de la expansion que no estan liberados")
+    void cancelReleaseIgnoraEspejosNoLiberados() {
+        DeallocationCommand command = new DeallocationCommand(List.of(new AllocationTarget.Occurrences(List.of(10L))), null);
+        when(targetResolver.resolveAll(command.targets(), LocalDate.now()))
+                .thenReturn(List.of(releasedSlot(10L, null, ReleaseReason.VIRTUAL_CLASS)));
+        when(occurrenceService.findMirrors(Set.of(10L))).thenReturn(List.of(occurrenceSlot(11L, 1L, futureDate(1))));
+
+        List<Long> result = service.cancelRelease(command);
+
+        assertThat(result).containsExactly(10L);
+    }
+
+    private OccurrenceSlotDto releasedSlot(long id, Long mirrorOf, ReleaseReason reason) {
         return new OccurrenceSlotDto(id, 1L, futureDate(1), LocalTime.of(8, 0), LocalTime.of(9, 30),
-                OccurrenceStatus.ROOM_RELEASED, 30, 1, null, null, null, mirrorOf);
+                OccurrenceStatus.ROOM_RELEASED, 30, mirrorOf == null ? 1 : 2, reason, null, null, mirrorOf);
     }
 
     // ---------- deallocate ----------

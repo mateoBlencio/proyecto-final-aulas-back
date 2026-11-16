@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.ingest.service.impl;
 import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.audit.AuditOperations;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
+import ar.edu.utn.frc.siga.allocation.service.OccurrenceBoardService;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.ingest.dto.IngestResultDto;
 import ar.edu.utn.frc.siga.ingest.exception.InvalidFileFormatException;
@@ -22,6 +23,7 @@ public class IngestServiceImpl implements IngestService {
     private final List<IngestSource> sources;
     private final IngestRowBatchProcessor batchProcessor;
     private final AllocationService allocationService;
+    private final OccurrenceBoardService occurrenceBoardService;
 
     @Override
     @AuditOperation("Importación de eventos desde archivo")
@@ -37,6 +39,7 @@ public class IngestServiceImpl implements IngestService {
 
         IngestSource.ParsedContent parsed = source.parse(file);
         IngestRowBatchProcessor.BatchResult result = batchProcessor.process(parsed.rows(), parsed.year());
+        occurrenceBoardService.invalidateCache();
 
         if (!result.pendingAllocations().isEmpty()) {
             ar.edu.utn.frc.siga.common.security.SystemScope.run(() ->

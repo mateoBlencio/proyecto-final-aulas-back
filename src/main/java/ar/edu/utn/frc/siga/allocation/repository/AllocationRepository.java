@@ -23,4 +23,22 @@ public interface AllocationRepository extends JpaRepository<Allocation, Long>, A
             """, nativeQuery = true)
     List<Allocation> findByClassroomIdInFromDate(@Param("classroomIds") Collection<Long> classroomIds,
                                                  @Param("from") LocalDate from);
+
+    @Query(value = """
+            select distinct o.id_evento_academico
+            from ocurrencia o
+            where o.fecha between :from and :to
+              and o.estado = 'NEEDS_ROOM'
+              and not exists (select 1 from asignacion_aula a where a.id_ocurrencia = o.id_ocurrencia)
+            """, nativeQuery = true)
+    List<Long> findEventIdsWithUnallocatedOccurrencesBetween(LocalDate from, LocalDate to);
+
+    @Query(value = """
+            select distinct a.id_ocurrencia
+            from asignacion_aula a
+            join ocurrencia o on o.id_ocurrencia = a.id_ocurrencia
+            join unnest(cast(:classroomIds as bigint[]), cast(:dates as date[])) as k(id_aula, fecha)
+              on k.id_aula = a.id_aula and k.fecha = o.fecha
+            """, nativeQuery = true)
+    List<Long> findOccurrenceIdsAllocatedAt(Long[] classroomIds, LocalDate[] dates);
 }
