@@ -14,9 +14,9 @@ public record ReleaseBatchRequestDto(
         @NotNull ReleaseReason reason,
         @Size(max = 255) String note
 ) {
-    @AssertTrue(message = "MIRROR_RETIRED es un motivo interno y no se puede elegir")
+    @AssertTrue(message = "MIRROR_RETIRED y CLASSROOM_DEACTIVATED son motivos internos y no se pueden elegir")
     private boolean isReasonSelectable() {
-        return reason != ReleaseReason.MIRROR_RETIRED;
+        return reason != ReleaseReason.MIRROR_RETIRED && reason != ReleaseReason.CLASSROOM_DEACTIVATED;
     }
 
     @AssertTrue(message = "El motivo OTHER requiere una nota")

@@ -177,7 +177,8 @@ public class AllocationController {
                        + "'occurrenceIds' (fechas puntuales), 'eventId' solo (todas las ocurrencias futuras "
                        + "del evento) o 'eventId' + 'from' [+ 'to'] (rango de fechas, ambos bordes inclusive). "
                        + "409 si alguna occurrence del lote ya tiene asignación, si algún aula no existe/no está "
-                       + "disponible, o si hay solapamiento de horario con otra asignación. Atómico.")
+                       + "disponible, o si hay solapamiento de horario con otra asignación. Asigna también las clases "
+                       + "liberadas por baja de aula (CLASSROOM_DEACTIVATED) y las saca de liberadas. Atómico.")
     public ResponseEntity<List<AllocationResponseDto>> allocate(@Valid @RequestBody AllocationBatchRequestDto dto) {
         log.debug("POST /v1/allocations: items={}", dto.items().size());
         List<AllocationResponseDto> response = allocationService.allocate(commandMapper.toManualCommand(dto));
@@ -245,7 +246,7 @@ public class AllocationController {
                        + "CANCELLED u OTHER, este último con nota obligatoria) y borra sus asignaciones. Cada item "
                        + "apunta con 'occurrenceIds', 'eventId' (ocurrencias futuras del evento) o 'eventId' + "
                        + "'from' [+ 'to']. Arrastra las ocurrencias espejo con el mismo motivo. 400 si falta el "
-                       + "motivo, es MIRROR_RETIRED u OTHER sin nota; 403 sin alcance sobre el edificio del aula; "
+                       + "motivo, es MIRROR_RETIRED o CLASSROOM_DEACTIVATED u OTHER sin nota; 403 sin alcance sobre el edificio del aula; "
                        + "409 si alguna ocurrencia ya pasó. Atómico.")
     public ResponseEntity<List<ReleasedOccurrenceDto>> release(@Valid @RequestBody ReleaseBatchRequestDto dto) {
         log.debug("POST /v1/allocations/releases: items={}, reason={}", dto.items().size(), dto.reason());

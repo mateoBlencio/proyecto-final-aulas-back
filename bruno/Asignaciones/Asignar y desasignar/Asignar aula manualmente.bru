@@ -51,4 +51,7 @@ docs {
   queda guardado en cada fila y en el historial de auditoría.
 
   Respuesta 201: List<AllocationResponseDto> con el/los item(s) creados.
+
+  Asigna también las clases liberadas por baja de aula (releaseReason CLASSROOM_DEACTIVATED) y las
+  saca de liberadas. Las liberadas por otro motivo y los espejos MIRROR_RETIRED se saltean en silencio.
 }

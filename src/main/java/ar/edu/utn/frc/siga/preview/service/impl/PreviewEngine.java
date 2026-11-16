@@ -9,7 +9,6 @@ import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
-import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.UniqueEventResponseDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
@@ -220,7 +219,7 @@ class PreviewEngine {
     private Map<PlanningKey, List<LocalDate>> datesByKey(Set<Long> eventIds) {
         return occurrenceService.findSlotsByEvents(eventIds, LocalDate.now())
                 .stream()
-                .filter(o -> o.status() == OccurrenceStatus.NEEDS_ROOM && !o.isPast())
+                .filter(o -> !o.blocksAllocation() && !o.isPast())
                 .collect(Collectors.groupingBy(
                         o -> new PlanningKey(o.eventId(), o.roomSlot()),
                         Collectors.mapping(OccurrenceSlotDto::date,
