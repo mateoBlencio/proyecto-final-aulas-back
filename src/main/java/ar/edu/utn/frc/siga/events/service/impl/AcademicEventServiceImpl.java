@@ -8,6 +8,7 @@ import ar.edu.utn.frc.siga.events.dto.request.UpdateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.ScheduleStatus;
 import ar.edu.utn.frc.siga.events.dto.response.SysacadRecurringEventRefDto;
 import ar.edu.utn.frc.siga.events.mapper.AcademicEventComposer;
 import ar.edu.utn.frc.siga.events.mapper.OccurrenceMapper;
@@ -130,6 +131,24 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         return composer.compose(events).stream()
                 .map(RecurringEventResponseDto.class::cast)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ScheduleStatus recurringScheduleStatus(Long subjectId, Long commissionId) {
+        List<RecurringEvent> events = recurringEventRepository.findBySubjectIdAndCommissionId(subjectId, commissionId);
+        if (events.isEmpty()) {
+            return ScheduleStatus.NO_SCHEDULE;
+        }
+        LocalDate today = LocalDate.now();
+        List<RecurringEvent> owned = events.stream()
+                .filter(e -> Boolean.TRUE.equals(e.getSysacadEnabled()) || e.getSysacadHash() == null)
+                .toList();
+        if (owned.isEmpty()) {
+            return ScheduleStatus.DISABLED_IN_SYSACAD;
+        }
+        boolean current = owned.stream().anyMatch(e -> e.getEndDate() == null || !e.getEndDate().isBefore(today));
+        return current ? ScheduleStatus.ACTIVE : ScheduleStatus.ENDED;
     }
 
     @Override

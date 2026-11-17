@@ -29,6 +29,8 @@ public interface RecurringEventRepository extends JpaRepository<RecurringEvent, 
     List<RecurringEvent> findBySubjectIdInAndCommissionIdIn(Collection<Long> subjectIds,
             Collection<Long> commissionIds);
 
+    List<RecurringEvent> findBySubjectIdAndCommissionId(Long subjectId, Long commissionId);
+
     /**
      * Cursado vigente de una comisión en una materia: eventos que SysAcad tiene activos
      * ({@code sysacadEnabled}) o que se cargaron a mano ({@code sysacadHash} nulo, nunca los toca el sync),

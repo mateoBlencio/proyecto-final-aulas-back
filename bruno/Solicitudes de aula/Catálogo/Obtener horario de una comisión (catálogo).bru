@@ -30,5 +30,8 @@ docs {
   clase de ese día, { date, slots: [{ startTime, endTime }] } en formato "HH:mm"
   (sin segundos), ordenados por hora. Con más de un slot en la fecha, el
   formulario pide elegir cuál.
-  404 si la comisión no pertenece a la materia; [] si no tiene cursado cargado.
+  emptyReason: null si hay slots. Si no hay, dice por qué: ENDED (la cursada
+  terminó), DISABLED_IN_SYSACAD (SysAcad deshabilitó los días) o NO_SCHEDULE
+  (nunca tuvo días cargados).
+  404 si la comisión no pertenece a la materia.
 }

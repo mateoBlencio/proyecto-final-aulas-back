@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.roomrequest.validator;
 
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.ScheduleStatus;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassDateSlotsDto;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
@@ -54,6 +55,10 @@ public class ClassScheduleService {
         return byDate.entrySet().stream()
                 .map(e -> new ClassDateSlotsDto(e.getKey(), List.copyOf(e.getValue())))
                 .toList();
+    }
+
+    public ScheduleStatus scheduleStatus(Long subjectId, Long commissionId) {
+        return academicEventService.recurringScheduleStatus(subjectId, commissionId);
     }
 
     public List<ClassSlot> distinctSlots(Long subjectId, Long commissionId) {
