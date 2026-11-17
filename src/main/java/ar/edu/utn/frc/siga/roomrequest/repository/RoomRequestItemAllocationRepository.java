@@ -29,4 +29,7 @@ public interface RoomRequestItemAllocationRepository extends JpaRepository<RoomR
             + "a.occurrenceId, i.id, i.status) "
             + "from RoomRequestItemAllocation a join a.item i where a.occurrenceId in :occurrenceIds")
     List<OccurrenceItemStatus> findItemStatuses(@Param("occurrenceIds") Collection<Long> occurrenceIds);
+
+    @Query("select distinct a.occurrenceId from RoomRequestItemAllocation a where a.occurrenceId in :occurrenceIds")
+    List<Long> findReferencedOccurrenceIds(@Param("occurrenceIds") Collection<Long> occurrenceIds);
 }

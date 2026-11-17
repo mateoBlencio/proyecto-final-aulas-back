@@ -1,12 +1,14 @@
 package ar.edu.utn.frc.siga.events.service.impl;
 
 import ar.edu.utn.frc.siga.common.service.OccurrenceAllocationQuery;
+import ar.edu.utn.frc.siga.common.service.OccurrenceRequestReferenceQuery;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.model.OccurrenceWindow;
 import ar.edu.utn.frc.siga.events.model.RecurringEvent;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
 import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -18,8 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Reconcilia las ocurrencias de un evento recurrente contra la ventana efectiva del período: agrega
- * las fechas deseadas que faltan y borra las sobrantes, tocando sólo ocurrencias futuras y no
- * asignadas. Idempotente: reconciliar dos veces con la misma ventana no cambia nada.
+ * las fechas deseadas que faltan y borra las sobrantes, tocando sólo ocurrencias futuras sin aula y sin
+ * pedido de aula que las referencie. Idempotente: reconciliar dos veces con la misma ventana no cambia nada.
  */
 @Slf4j
 @Component
@@ -28,18 +30,15 @@ class RecurringEventReconciler {
 
     private final OccurrenceRepository occurrenceRepository;
     private final OccurrenceAllocationQuery occurrenceAllocationQuery;
+    private final OccurrenceRequestReferenceQuery occurrenceRequestReferenceQuery;
 
     @Transactional
     void retireFuture(RecurringEvent event) {
         List<Occurrence> future = occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(
                 event.getId(), LocalDate.now());
-        Set<Long> allocated = occurrenceAllocationQuery.allocatedAmong(
-                future.stream().map(Occurrence::getId).toList());
-        List<Occurrence> deletable = future.stream()
-                .filter(occurrence -> !allocated.contains(occurrence.getId()))
-                .toList();
+        List<Occurrence> deletable = withoutReferences(future);
         occurrenceRepository.deleteAll(deletable);
-        log.info("Ocurrencias retiradas del evento {}: -{} borradas, {} asignadas conservadas",
+        log.info("Ocurrencias retiradas del evento {}: -{} borradas, {} conservadas por aula o pedido",
                 event.getId(), deletable.size(), future.size() - deletable.size());
     }
 
@@ -59,11 +58,7 @@ class RecurringEventReconciler {
         List<Occurrence> surplus = existingFuture.stream()
                 .filter(occurrence -> !desiredFuture.contains(occurrence.getDate()))
                 .toList();
-        Set<Long> allocated = occurrenceAllocationQuery.allocatedAmong(
-                surplus.stream().map(Occurrence::getId).toList());
-        List<Occurrence> deletable = surplus.stream()
-                .filter(occurrence -> !allocated.contains(occurrence.getId()))
-                .toList();
+        List<Occurrence> deletable = withoutReferences(surplus);
         occurrenceRepository.deleteAll(deletable);
 
         List<Occurrence> missing = desiredFuture.stream()
@@ -76,7 +71,16 @@ class RecurringEventReconciler {
                 .toList();
         occurrenceRepository.saveAll(missing);
 
-        log.info("Recálculo de ocurrencias del evento {}: +{} creadas, -{} borradas, {} asignadas conservadas",
+        log.info("Recálculo de ocurrencias del evento {}: +{} creadas, -{} borradas, {} conservadas por aula o pedido",
                 event.getId(), missing.size(), deletable.size(), surplus.size() - deletable.size());
+    }
+
+    private List<Occurrence> withoutReferences(List<Occurrence> occurrences) {
+        List<Long> ids = occurrences.stream().map(Occurrence::getId).toList();
+        Set<Long> referenced = new HashSet<>(occurrenceAllocationQuery.allocatedAmong(ids));
+        referenced.addAll(occurrenceRequestReferenceQuery.referencedAmong(ids));
+        return occurrences.stream()
+                .filter(occurrence -> !referenced.contains(occurrence.getId()))
+                .toList();
     }
 }

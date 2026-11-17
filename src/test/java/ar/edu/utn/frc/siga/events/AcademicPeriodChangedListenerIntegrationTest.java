@@ -8,6 +8,11 @@ import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
+import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestRepository;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,6 +43,11 @@ import static org.awaitility.Awaitility.await;
 @DisplayName("AcademicPeriodChangedListener (integración): operación de auditoría en el hilo del listener")
 class AcademicPeriodChangedListenerIntegrationTest extends AbstractIntegrationTest {
 
+    // Años propios: el listener recalcula todos los eventos del período, y con el año aleatorio de
+    // materiaYComision() pisaría (y se trabaría con) eventos de otros tests.
+    private static final int OPERATION_YEAR = 4100;
+    private static final int REQUEST_REFERENCE_YEAR = 4101;
+
     @Autowired
     private IntegrationTestData testData;
     @Autowired
@@ -54,11 +64,13 @@ class AcademicPeriodChangedListenerIntegrationTest extends AbstractIntegrationTe
     private JdbcTemplate jdbcTemplate;
     @Autowired
     private NamedParameterJdbcTemplate namedJdbc;
+    @Autowired
+    private RoomRequestRepository roomRequestRepository;
 
     @Test
     @DisplayName("acortar el período borra ocurrencias futuras bajo una sola operación con la descripción de la tabla")
     void recalculatedOccurrencesShareOneOperation() {
-        var sc = testData.materiaYComision();
+        var sc = testData.materiaYComision(OPERATION_YEAR);
         LocalDate start = LocalDate.now().plusDays(8);
         var dto = new CreateRecurringEventRequestDto(30, LocalTime.of(8, 0), 90, start.getDayOfWeek(),
                 start, start.plusWeeks(5), sc.subjectId(), sc.commissionId());
@@ -83,5 +95,48 @@ class AcademicPeriodChangedListenerIntegrationTest extends AbstractIntegrationTe
                 .containsOnly("Recálculo de ocurrencias por cambio de período académico");
         Set<Object> operations = deletions.stream().map(row -> row.get("operacion_id")).collect(Collectors.toSet());
         assertThat(operations).hasSize(1).doesNotContainNull();
+    }
+
+    @Test
+    @DisplayName("regresión: una ocurrencia sin aula que un pedido todavía referencia se conserva y no frena el recálculo")
+    void occurrenceReferencedByRoomRequestDoesNotBlockRecalculation() {
+        var sc = testData.materiaYComision(REQUEST_REFERENCE_YEAR);
+        LocalDate start = LocalDate.now().plusDays(8);
+        var dto = new CreateRecurringEventRequestDto(30, LocalTime.of(8, 0), 90, start.getDayOfWeek(),
+                start, start.plusWeeks(5), sc.subjectId(), sc.commissionId());
+        Long eventId = academicEventService.createRecurringEvent(dto).id();
+        List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId);
+        assertThat(occurrences).hasSize(6);
+        Long referencedId = occurrences.stream()
+                .filter(occurrence -> occurrence.getDate().equals(start.plusWeeks(2)))
+                .findFirst().orElseThrow().getId();
+        List<Long> freeIds = occurrences.stream()
+                .filter(occurrence -> occurrence.getDate().isAfter(start))
+                .map(Occurrence::getId)
+                .filter(id -> !id.equals(referencedId))
+                .toList();
+        assertThat(freeIds).hasSize(4);
+        cancelledRequestReferencing(sc.subjectId(), sc.commissionId(), referencedId);
+        AcademicPeriodResponseDto period = commissionService.findByIds(List.of(sc.commissionId()))
+                .getFirst().academicPeriod();
+
+        new TransactionTemplate(transactionManager).executeWithoutResult(tx ->
+                eventPublisher.publishEvent(new AcademicPeriodChanged(1L, period.year(), period.semester(),
+                        LocalDate.now().minusYears(5), start, null, null)));
+
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() ->
+                assertThat(occurrenceRepository.findAllById(freeIds)).isEmpty());
+        assertThat(occurrenceRepository.findById(referencedId)).isPresent();
+    }
+
+    /** Estado que deja cancelar un pedido ya asignado: la fila del pedido queda y la asignación de aula no. */
+    private void cancelledRequestReferencing(Long subjectId, Long commissionId, Long occurrenceId) {
+        RoomRequest request = testData.solicitudDeAula(RoomRequestType.ONE_TIME_ROOM_CHANGE, subjectId);
+        RoomRequestItem item = testData.itemDePedido(request, commissionId, LocalDate.now().plusDays(22),
+                RoomRequestStatus.CANCELLED);
+        roomRequestRepository.save(request);
+        Long classroomId = testData.aula(testData.edificio()).getId();
+        jdbcTemplate.update("INSERT INTO solicitud_item_asignacion (id_item, id_ocurrencia, id_aula, orden) VALUES (?, ?, ?, 1)",
+                item.getId(), occurrenceId, classroomId);
     }
 }
