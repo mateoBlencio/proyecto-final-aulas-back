@@ -11,6 +11,7 @@ import ar.edu.utn.frc.siga.events.dto.request.UpdateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.ScheduleStatus;
 import ar.edu.utn.frc.siga.events.dto.response.SysacadRecurringEventRefDto;
 import ar.edu.utn.frc.siga.events.dto.response.UniqueEventResponseDto;
 import ar.edu.utn.frc.siga.events.exception.InvalidCommissionForSubjectException;
@@ -978,6 +979,48 @@ class AcademicEventServiceImplTest {
         assertThat(result.getFirst().id()).isEqualTo(10L);
     }
 
+
+    private static RecurringEvent scheduleEvent(LocalDate endDate, String hash, boolean enabled) {
+        return RecurringEvent.builder().subjectId(1L).commissionId(2L).dayOfWeek(DayOfWeek.MONDAY)
+                .startTime(LocalTime.of(8, 0)).duration(Duration.ofMinutes(90))
+                .startDate(LocalDate.of(2026, 3, 1)).endDate(endDate)
+                .sysacadHash(hash).sysacadEnabled(enabled).build();
+    }
+
+    @Test
+    @DisplayName("recurringScheduleStatus: sin eventos es NO_SCHEDULE")
+    void scheduleStatusSinEventos() {
+        when(recurringEventRepository.findBySubjectIdAndCommissionId(1L, 2L)).thenReturn(List.of());
+
+        assertThat(service.recurringScheduleStatus(1L, 2L)).isEqualTo(ScheduleStatus.NO_SCHEDULE);
+    }
+
+    @Test
+    @DisplayName("recurringScheduleStatus: habilitado con fecha de fin pasada es ENDED")
+    void scheduleStatusTerminado() {
+        when(recurringEventRepository.findBySubjectIdAndCommissionId(1L, 2L))
+                .thenReturn(List.of(scheduleEvent(LocalDate.of(2020, 7, 31), "h", true)));
+
+        assertThat(service.recurringScheduleStatus(1L, 2L)).isEqualTo(ScheduleStatus.ENDED);
+    }
+
+    @Test
+    @DisplayName("recurringScheduleStatus: todos deshabilitados por SysAcad es DISABLED_IN_SYSACAD aunque sigan vigentes")
+    void scheduleStatusDeshabilitado() {
+        when(recurringEventRepository.findBySubjectIdAndCommissionId(1L, 2L))
+                .thenReturn(List.of(scheduleEvent(LocalDate.of(2999, 7, 31), "h", false)));
+
+        assertThat(service.recurringScheduleStatus(1L, 2L)).isEqualTo(ScheduleStatus.DISABLED_IN_SYSACAD);
+    }
+
+    @Test
+    @DisplayName("recurringScheduleStatus: uno vigente (o cargado a mano sin fecha de fin) es ACTIVE")
+    void scheduleStatusVigente() {
+        when(recurringEventRepository.findBySubjectIdAndCommissionId(1L, 2L)).thenReturn(List.of(
+                scheduleEvent(LocalDate.of(2020, 7, 31), "h", true), scheduleEvent(null, null, false)));
+
+        assertThat(service.recurringScheduleStatus(1L, 2L)).isEqualTo(ScheduleStatus.ACTIVE);
+    }
 
     private CreateRecurringEventRequestDto recurringDto(DayOfWeek dayOfWeek, LocalDate startDate, LocalDate endDate) {
         return new CreateRecurringEventRequestDto(30, LocalTime.of(8, 0), 90, dayOfWeek, startDate, endDate, 1L, 1L);

@@ -10,11 +10,20 @@ import org.junit.jupiter.api.Test;
 class AvailabilityTest {
 
     private static Specialty specialty(boolean active) {
-        Specialty specialty = Specialty.builder().id(1L).build();
+        Specialty specialty = Specialty.builder().id(1L).sysacadHash("h").build();
         if (!active) {
             specialty.deactivate();
         }
         return specialty;
+    }
+
+    @Test
+    @DisplayName("Specialty.unavailableReason: de baja y sin hash (nunca vino de SysAcad) es NOT_IN_SYSACAD")
+    void specialtyStubNotInSysacad() {
+        Specialty stub = Specialty.builder().id(1L).build();
+        assertThat(stub.unavailableReason()).isNull();
+        stub.deactivate();
+        assertThat(stub.unavailableReason()).isEqualTo(UnavailableReason.NOT_IN_SYSACAD);
     }
 
     private static StudyPlan plan(boolean active) {

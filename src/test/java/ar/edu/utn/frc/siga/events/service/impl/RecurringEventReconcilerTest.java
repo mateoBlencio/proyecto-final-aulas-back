@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ar.edu.utn.frc.siga.common.service.OccurrenceAllocationQuery;
+import ar.edu.utn.frc.siga.common.service.OccurrenceRequestReferenceQuery;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.model.OccurrenceWindow;
@@ -34,6 +35,8 @@ class RecurringEventReconcilerTest {
     private OccurrenceRepository occurrenceRepository;
     @Mock
     private OccurrenceAllocationQuery occurrenceAllocationQuery;
+    @Mock
+    private OccurrenceRequestReferenceQuery occurrenceRequestReferenceQuery;
 
     @InjectMocks
     private RecurringEventReconciler reconciler;
@@ -75,6 +78,42 @@ class RecurringEventReconcilerTest {
         when(occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eq(event.getId()), any()))
                 .thenReturn(List.of(allocated, free));
         when(occurrenceAllocationQuery.allocatedAmong(any())).thenReturn(Set.of(1L));
+
+        reconciler.retireFuture(event);
+
+        ArgumentCaptor<List<Occurrence>> deleted = ArgumentCaptor.forClass(List.class);
+        verify(occurrenceRepository).deleteAll(deleted.capture());
+        assertThat(deleted.getValue()).extracting(Occurrence::getId).containsExactly(2L);
+    }
+
+    @Test
+    @DisplayName("regresión: conserva la sobrante sin aula que un pedido de aula todavía referencia (la FK impide borrarla)")
+    void keepsSurplusReferencedByRoomRequest() {
+        LocalDate nextMonday = LocalDate.now().with(java.time.temporal.TemporalAdjusters.next(DayOfWeek.MONDAY));
+        RecurringEvent event = event(nextMonday, nextMonday);
+        Occurrence referenced = occurrence(1L, event, nextMonday.plusWeeks(1));
+        Occurrence free = occurrence(2L, event, nextMonday.plusWeeks(2));
+        when(occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eq(event.getId()), any()))
+                .thenReturn(List.of(referenced, free));
+        when(occurrenceRequestReferenceQuery.referencedAmong(any())).thenReturn(Set.of(1L));
+
+        reconciler.reconcileFuture(event, new OccurrenceWindow(nextMonday, nextMonday, null, null));
+
+        ArgumentCaptor<List<Occurrence>> deleted = ArgumentCaptor.forClass(List.class);
+        verify(occurrenceRepository).deleteAll(deleted.capture());
+        assertThat(deleted.getValue()).extracting(Occurrence::getId).containsExactly(2L);
+    }
+
+    @Test
+    @DisplayName("retireFuture: conserva la ocurrencia sin aula que un pedido de aula todavía referencia")
+    void retireKeepsOccurrenceReferencedByRoomRequest() {
+        LocalDate nextMonday = LocalDate.now().with(java.time.temporal.TemporalAdjusters.next(DayOfWeek.MONDAY));
+        RecurringEvent event = event(nextMonday, nextMonday.plusWeeks(1));
+        Occurrence referenced = occurrence(1L, event, nextMonday);
+        Occurrence free = occurrence(2L, event, nextMonday.plusWeeks(1));
+        when(occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eq(event.getId()), any()))
+                .thenReturn(List.of(referenced, free));
+        when(occurrenceRequestReferenceQuery.referencedAmong(any())).thenReturn(Set.of(1L));
 
         reconciler.retireFuture(event);
 

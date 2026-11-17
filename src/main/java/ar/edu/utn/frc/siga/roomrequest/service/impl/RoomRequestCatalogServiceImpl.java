@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CommissionOptionDto;
+import ar.edu.utn.frc.siga.events.dto.response.ScheduleStatus;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CommissionScheduleDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassSlotDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestFormSettingsDto;
@@ -86,9 +87,11 @@ public class RoomRequestCatalogServiceImpl implements RoomRequestCatalogService 
                 .map(slot -> new ClassSlotDto(slot.recurringEventId(), slot.dayOfWeek(),
                         slot.startTime(), slot.endTime()))
                 .toList();
+        ScheduleStatus status = slots.isEmpty() ? classScheduleService.scheduleStatus(subjectId, commissionId) : null;
         return new CommissionScheduleDto(slots,
                 classScheduleService.classDates(subjectId, commissionId, LocalDate.now()),
-                classScheduleService.classDateSlots(subjectId, commissionId, LocalDate.now()));
+                classScheduleService.classDateSlots(subjectId, commissionId, LocalDate.now()),
+                status);
     }
 
     @Override

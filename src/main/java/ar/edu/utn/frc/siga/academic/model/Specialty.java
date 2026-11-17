@@ -57,7 +57,11 @@ public class Specialty extends SoftDeletableEntity {
     private Long version;
 
     public UnavailableReason unavailableReason() {
-        return isActive() ? null : UnavailableReason.DEACTIVATED;
+        if (isActive()) {
+            return null;
+        }
+        // Las que se crean solo para colgar un plan nacen de baja y sin hash: SysAcad nunca las mandó.
+        return sysacadHash == null ? UnavailableReason.NOT_IN_SYSACAD : UnavailableReason.DEACTIVATED;
     }
 
     public boolean isAvailable() {

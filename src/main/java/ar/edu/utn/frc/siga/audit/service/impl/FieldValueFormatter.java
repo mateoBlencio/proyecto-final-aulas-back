@@ -2,9 +2,12 @@ package ar.edu.utn.frc.siga.audit.service.impl;
 
 import ar.edu.utn.frc.siga.audit.service.AuditedEntity.AuditedColumn;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
@@ -14,6 +17,9 @@ public final class FieldValueFormatter {
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
+
+    // Los Instant se guardan en UTC, pero fecha_revision queda en hora local: se igualan para mostrar.
+    private static final ZoneId LOCAL_ZONE = ZoneId.of("America/Argentina/Buenos_Aires");
 
     public record ReferenceKey(Class<?> type, String id) {
     }
@@ -43,6 +49,8 @@ public final class FieldValueFormatter {
         return switch (value) {
             case Boolean flag -> flag ? "Sí" : "No";
             case LocalDate date -> DATE.format(date);
+            case LocalDateTime dateTime when column.valueType() == Instant.class ->
+                    DATE_TIME.format(dateTime.toInstant(ZoneOffset.UTC).atZone(LOCAL_ZONE));
             case LocalDateTime dateTime -> DATE_TIME.format(dateTime);
             case LocalTime time -> TIME.format(time);
             case String text when isEnum(column) -> FieldLabels.constant(text);

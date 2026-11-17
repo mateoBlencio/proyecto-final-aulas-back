@@ -7,6 +7,7 @@ import ar.edu.utn.frc.siga.events.dto.request.UpdateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.ScheduleStatus;
 import ar.edu.utn.frc.siga.events.dto.response.SysacadRecurringEventRefDto;
 import ar.edu.utn.frc.siga.events.service.command.SyncRecurringEventCommand;
 import ar.edu.utn.frc.siga.events.service.command.UpsertRecurringEventResult;
@@ -33,6 +34,8 @@ public interface AcademicEventService {
     List<OccurrenceResponseDto> findOccurrencesByEventIds(Collection<Long> eventIds);
 
     List<RecurringEventResponseDto> findRecurringEventsBySubjectAndCommission(Long subjectId, Long commissionId);
+
+    ScheduleStatus recurringScheduleStatus(Long subjectId, Long commissionId);
 
     List<RecurringEventResponseDto> findRecurringEventsBySubject(Long subjectId, LocalDate onDate);
 

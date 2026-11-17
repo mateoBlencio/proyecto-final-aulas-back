@@ -18,7 +18,7 @@ final class FieldLabels {
             Map.entry("abbreviation", "Abreviatura"), Map.entry("planCode", "Código de plan"),
             Map.entry("specialty", "Especialidad"), Map.entry("subject", "Materia"),
             Map.entry("commission", "Comisión"), Map.entry("enrolledCount", "Inscriptos"),
-            Map.entry("inPerson", "Presencial"), Map.entry("deactivationReason", "Motivo de baja"),
+            Map.entry("inPerson", "Presencial"), Map.entry("deactivationReason", "Motivo de baja"), Map.entry("deletedAt", "Fecha de baja"),
             Map.entry("code", "Código"), Map.entry("studyPlan", "Plan de estudio"), Map.entry("term", "Cursada"),
             Map.entry("occurrenceId", "Ocurrencia"), Map.entry("classroomId", "Aula"),
             Map.entry("source", "Origen"), Map.entry("observation", "Observación"),

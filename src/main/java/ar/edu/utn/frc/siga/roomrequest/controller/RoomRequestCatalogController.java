@@ -66,7 +66,9 @@ public class RoomRequestCatalogController {
     @GetMapping("/commission-schedule")
     @Operation(summary = "Días y horarios de cursado de una comisión",
                description = "Slots de cursado (día + horario) y fechas de cursado futuras de la comisión, "
-                       + "para el calendario y los checkboxes de día del formulario. 404 si la comisión no "
+                       + "para el calendario y los checkboxes de día del formulario. emptyReason (null si hay slots) "
+                       + "dice por qué no hay: ENDED (la cursada terminó), DISABLED_IN_SYSACAD (SysAcad "
+                       + "deshabilitó los días) o NO_SCHEDULE (nunca tuvo días). 404 si la comisión no "
                        + "pertenece a la materia.")
     public ResponseEntity<CommissionScheduleDto> findCommissionSchedule(
             @RequestParam Long subjectId, @RequestParam Long commissionId) {
