@@ -38,6 +38,8 @@ jobs:
           cache: maven
 
       - name: Build and test
+        env:
+          MAVEN_OPTS: -Xmx1g
         run: ./mvnw -B --no-transfer-progress verify
 
       - name: Upload reports
