@@ -613,6 +613,49 @@ class RoomRequestOriginalClassroomIntegrationTest extends AbstractIntegrationTes
         assertThat(classroomOf(mirrorsOf(series).getFirst())).isEqualTo(m.getId());
     }
 
+    @Test
+    @DisplayName("assign de un cambio regular con 2 aulas sobre varias semanas: cada fecha queda con principal y espejo")
+    void assign_regularConDosAulasEnVariasSemanas() throws Exception {
+        Classroom a = room();
+        Classroom b = room();
+        Classroom m = room();
+        Series series = futureSeries(3);
+        allocateAll(series, a, AllocationSource.MANUAL);
+        RoomRequestItem item = regularItem(series);
+
+        assign(item, b, m);
+
+        series.occurrences().forEach(o -> assertThat(classroomOf(o)).isEqualTo(b.getId()));
+        List<Occurrence> mirrors = mirrorsOf(series);
+        assertThat(mirrors).hasSize(3);
+        mirrors.forEach(mirror -> assertThat(classroomOf(mirror)).isEqualTo(m.getId()));
+        assertThat(jdbc.queryForList("select count(*) from solicitud_item_asignacion where id_item = ?",
+                Long.class, item.getId())).containsExactly(6L);
+    }
+
+    @Test
+    @DisplayName("assign de un cambio regular con 2 aulas, una ocupada en una fecha: 409 con esa aula y no queda nada aplicado")
+    void assign_regularConDosAulasUnaOcupadaEnUnaFecha() throws Exception {
+        Classroom a = room();
+        Classroom b = room();
+        Classroom m = room();
+        Series series = futureSeries(3);
+        allocateAll(series, a, AllocationSource.MANUAL);
+        RoomRequestItem item = regularItem(series);
+        occupantIn(m, series.at(2).getDate());
+
+        call(item, "assign", "{\"classroomIds\":[" + b.getId() + "," + m.getId() + "],\"reason\":\"motivo de prueba\"}")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ALLOCATION_CONFLICT"))
+                .andExpect(jsonPath("$.classroomIds.length()").value(1))
+                .andExpect(jsonPath("$.classroomIds[0]").value(m.getId().intValue()));
+
+        series.occurrences().forEach(o -> assertThat(classroomOf(o)).isEqualTo(a.getId()));
+        assertThat(mirrorsOf(series)).isEmpty();
+        assertThat(jdbc.queryForList("select id_ocurrencia from solicitud_item_asignacion where id_item = ?",
+                Long.class, item.getId())).isEmpty();
+    }
+
     // ---------- reversión nula en las demás acciones ----------
 
     @Test
