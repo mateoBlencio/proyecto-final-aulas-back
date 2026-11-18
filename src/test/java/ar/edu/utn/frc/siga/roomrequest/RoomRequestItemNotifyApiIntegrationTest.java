@@ -71,7 +71,8 @@ class RoomRequestItemNotifyApiIntegrationTest extends AbstractIntegrationTest {
         Map<String, Object> notification = rows.getFirst();
         assertThat(notification.get("destinatario")).isEqualTo("ada@frc.utn.edu.ar");
         assertThat(notification.get("plantilla")).isEqualTo("ROOM_REQUEST_RESOLVED");
-        assertThat((String) notification.get("asunto")).startsWith("Aula asignada");
+        assertThat((String) notification.get("asunto")).startsWith("Propuesta de aula — ")
+                .doesNotContainIgnoringCase("asign");
     }
 
     @Test

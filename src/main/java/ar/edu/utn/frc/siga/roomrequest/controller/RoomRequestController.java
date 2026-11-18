@@ -231,7 +231,7 @@ public class RoomRequestController {
 
     @PostMapping("/items/{id}/notify")
     @PreAuthorize("hasAuthority('PERM_ROOM_REQUEST_WRITE')")
-    @Operation(summary = "Avisar al docente las aulas asignadas",
+    @Operation(summary = "Mandar al docente la propuesta de aulas",
                description = "Deja el pedido en NOTIFIED, calcula el plazo de aceptación automática "
                        + "(acceptanceDeadline) y encola el mail al docente. Idempotente: llamarlo de nuevo "
                        + "sobre un pedido NOTIFIED o RESOLVED devuelve 200 sin volver a avisar. Un pedido "

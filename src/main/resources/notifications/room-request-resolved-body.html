@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-<title th:text="${tituloBanner}">Aula asignada</title>
+<title th:text="${tituloBanner}">Propuesta de aula</title>
 <style>
   body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
   table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
@@ -48,12 +48,24 @@
 
           <tr>
             <td class="px-32" style="padding:28px 32px 4px 32px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:22px;color:#191919;">
-              Hola, <span th:text="${docente}">Docente</span>:
+              Estimado/a <span th:text="${docente}">Docente</span>:
             </td>
           </tr>
           <tr>
             <td class="px-32" style="padding:8px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#374151;" th:text="${parrafoConfirmacion}">
               Párrafo de confirmación
+            </td>
+          </tr>
+
+          <tr th:if="${not #strings.isEmpty(plazoRespuesta)}">
+            <td class="px-32" style="padding:20px 32px 0 32px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#fff7e6;border-left:4px solid #b45309;border-radius:8px;">
+                <tr>
+                  <td style="padding:14px 16px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#191919;" th:text="${plazoRespuesta}">
+                    Plazo de respuesta
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 
@@ -107,18 +119,6 @@
             </td>
           </tr>
 
-          <tr th:if="${not #strings.isEmpty(plazoRespuesta)}">
-            <td class="px-32" style="padding:0 32px 4px 32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#374151;" th:text="${plazoRespuesta}">
-              Plazo de respuesta
-            </td>
-          </tr>
-
-          <tr th:if="${not #strings.isEmpty(pedidoRespuesta)}">
-            <td class="px-32" style="padding:0 32px 4px 32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#374151;" th:text="${pedidoRespuesta}">
-              Cómo responder
-            </td>
-          </tr>
-
           <tr th:if="${not #strings.isEmpty(motivoMenosAulas)}">
             <td class="px-32" style="padding:0 32px 4px 32px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0f4ff;border-radius:8px;">
@@ -143,6 +143,12 @@
             </td>
           </tr>
 
+          <tr th:if="${not #strings.isEmpty(pedidoRespuesta)}">
+            <td class="px-32" style="padding:8px 32px 4px 32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#374151;" th:text="${pedidoRespuesta}">
+              Cómo responder
+            </td>
+          </tr>
+
           <tr th:if="${not #strings.isEmpty(observaciones)}">
             <td class="px-32" style="padding:20px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#374151;">
               <strong style="color:#191919;">Observaciones:</strong> <span th:text="${observaciones}">Observaciones</span>
@@ -156,7 +162,7 @@
           </tr>
           <tr>
             <td class="px-32" style="padding:16px 32px 32px 32px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#6b7280;">
-              Si hay algún problema con tu pedido, respondé este mail.
+              Ante cualquier consulta, responda este correo.
             </td>
           </tr>
 

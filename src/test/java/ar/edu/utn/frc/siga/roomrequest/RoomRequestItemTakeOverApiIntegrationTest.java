@@ -253,7 +253,9 @@ class RoomRequestItemTakeOverApiIntegrationTest extends AbstractIntegrationTest 
         assertThat(rows.getFirst().get("plantilla")).isEqualTo("ROOM_REQUEST_TAKEN_OVER");
         assertThat(rows.getFirst().get("clave_idempotencia"))
                 .isEqualTo("room-request-item:" + item.getId() + ":TAKEN_OVER:" + derivedAtMillis);
-        assertThat((String) rows.getFirst().get("cuerpo")).contains("lo resuelve subsecretaría");
+        assertThat((String) rows.getFirst().get("cuerpo")).contains("lo resuelve subsecretaría")
+                .contains("Estimado/a:").contains("Ya no aparece en su bandeja.")
+                .contains("Ante cualquier consulta, responda este correo.");
     }
 
     @Test
