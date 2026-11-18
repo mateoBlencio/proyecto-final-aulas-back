@@ -96,6 +96,25 @@ class ChannelResolverTest {
     }
 
     @Test
+    void addsTheConfiguredReplyToAfterTheRequestAddresses() {
+        properties.getEmail().setReplyTo("secacad-gestionaulas@frc.utn.edu.ar");
+
+        Notification saved = queueWith(List.of("aux1@frc.utn.edu.ar", "aux2@frc.utn.edu.ar"));
+
+        assertThat(saved.getReplyTo())
+                .isEqualTo("aux1@frc.utn.edu.ar,aux2@frc.utn.edu.ar,secacad-gestionaulas@frc.utn.edu.ar");
+    }
+
+    @Test
+    void doesNotRepeatTheConfiguredReplyToWhenTheRequestAlreadyHasIt() {
+        properties.getEmail().setReplyTo(" secacad-gestionaulas@frc.utn.edu.ar ");
+
+        Notification saved = queueWith(List.of("Secacad-GestionAulas@frc.utn.edu.ar", "aux1@frc.utn.edu.ar"));
+
+        assertThat(saved.getReplyTo()).isEqualTo("Secacad-GestionAulas@frc.utn.edu.ar,aux1@frc.utn.edu.ar");
+    }
+
+    @Test
     void usesTheConfiguredReplyToWhenTheRequestHasNone() {
         properties.getEmail().setReplyTo("subsecretaria@frc.utn.edu.ar");
 
