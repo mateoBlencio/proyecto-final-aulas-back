@@ -29,6 +29,7 @@ import ar.edu.utn.frc.siga.events.model.UniqueEvent;
 import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
 import ar.edu.utn.frc.siga.events.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.events.repository.SuspendedEventRepository;
 import ar.edu.utn.frc.siga.events.repository.RecurringEventRepository;
 import ar.edu.utn.frc.siga.events.repository.UniqueEventRepository;
 import ar.edu.utn.frc.siga.events.service.command.SyncRecurringEventCommand;
@@ -84,6 +85,8 @@ class AcademicEventServiceImplTest {
     @Mock
     private OccurrenceRepository occurrenceRepository;
     @Mock
+    private SuspendedEventRepository suspendedEventRepository;
+    @Mock
     private AcademicEventComposer composer;
     @Mock
     private OccurrenceMapper occurrenceMapper;
@@ -101,7 +104,7 @@ class AcademicEventServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new AcademicEventServiceImpl(eventRepository, recurringEventRepository, uniqueEventRepository,
-                occurrenceRepository, composer, occurrenceMapper, subjectService, commissionService, eventScheduleValidator,
+                occurrenceRepository, suspendedEventRepository, composer, occurrenceMapper, subjectService, commissionService, eventScheduleValidator,
                 recurringEventReconciler);
     }
 

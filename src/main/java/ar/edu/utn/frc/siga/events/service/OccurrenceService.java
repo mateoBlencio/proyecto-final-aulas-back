@@ -39,10 +39,13 @@ public interface OccurrenceService {
     List<OccurrenceSlotDto> findNextSlotsByEvents(Collection<Long> eventIds, LocalDate from,
             Collection<LocalDate> excludedDates, int limitPerEvent);
 
+    /** Excluye las ocurrencias suspendidas: desde la fecha de baja de la materia, comisión, plan o especialidad del evento. */
     List<OccurrenceSlotDto> findSlotsByStatusBetween(OccurrenceStatus status, LocalDate from, LocalDate to);
 
+    /** Excluye las ocurrencias suspendidas: desde la fecha de baja de la materia, comisión, plan o especialidad del evento. */
     List<OccurrenceSlotDto> findSlotsBetween(LocalDate from, LocalDate to);
 
+    /** Excluye las ocurrencias suspendidas: desde la fecha de baja de la materia, comisión, plan o especialidad del evento. */
     List<OccurrenceSlotDto> findSlotsByDate(LocalDate date);
 
     boolean existsOccurrence(Long occurrenceId);

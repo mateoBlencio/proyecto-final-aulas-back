@@ -52,6 +52,8 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
 
     @Autowired
     private AcademicEventService academicEventService;
+    @Autowired
+    private ar.edu.utn.frc.siga.academic.service.SubjectService subjectService;
 
     private String weekDump(LocalDate monday) {
         return jdbc.queryForList("SELECT o.id_ocurrencia, o.fecha, o.estado, o.id_evento_academico, a.id_aula, "
@@ -341,5 +343,35 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
     void weekOfOutOfRangeIsRejected() throws Exception {
         mockMvc.perform(get("/v1/dashboard/week").param("weekOf", "+999999999-12-31")).andExpect(status().isBadRequest());
         mockMvc.perform(get("/v1/dashboard/week").param("weekOf", "1990-01-01")).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("an allocation or unallocated class of a suspended event (subject deactivated) is not counted in the week")
+    void suspendedEventIsNotCounted() throws Exception {
+        LocalDate monday = week(30);
+        Building a = building();
+        Classroom roomA = room(a, 100);
+        allocated(roomA, monday, bandStart(), 60, 50);
+        unallocated(monday.plusDays(1), bandStart(), 60, 20);
+        var scSuspended = testData.materiaYComision();
+        Long allocatedEvent = testData.eventoRecurrente(scSuspended.subjectId(), scSuspended.commissionId(),
+                monday.plusDays(2).getDayOfWeek(), bandStart(), 60, monday.plusDays(2), monday.plusDays(2), 50);
+        allocationRepository.save(Allocation.builder()
+                .occurrenceId(occurrenceRepository.findByEvent_Id(allocatedEvent).getFirst().getId())
+                .classroomId(roomA.getId()).source(AllocationSource.MANUAL).build());
+        testData.eventoRecurrente(scSuspended.subjectId(), scSuspended.commissionId(),
+                monday.plusDays(3).getDayOfWeek(), bandStart(), 60, monday.plusDays(3), monday.plusDays(3), 20);
+        JsonNode before = weekOf(monday);
+        assertThat(byId(before.get("buildings"), "buildingId", a.getId()).get("occupancy").get("occupiedHours")
+                .asDouble()).isEqualTo(2.0);
+        assertThat(before.get("campus").get("unallocatedClasses").asLong()).isEqualTo(2);
+
+        subjectService.deactivate(scSuspended.subjectId());
+
+        JsonNode root = weekOf(monday);
+        JsonNode nodeA = byId(root.get("buildings"), "buildingId", a.getId());
+        assertThat(nodeA.get("allocationStatus").get("total").asLong()).isEqualTo(1);
+        assertThat(nodeA.get("occupancy").get("occupiedHours").asDouble()).isEqualTo(1.0);
+        assertThat(root.get("campus").get("unallocatedClasses").asLong()).isEqualTo(1);
     }
 }

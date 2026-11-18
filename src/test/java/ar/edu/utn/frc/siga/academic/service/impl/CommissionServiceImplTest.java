@@ -46,6 +46,8 @@ import static org.mockito.Mockito.when;
 class CommissionServiceImplTest {
 
     @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+    @Mock
     private CommissionRepository commissionRepository;
     @Mock
     private AcademicPeriodRepository academicPeriodRepository;
@@ -64,7 +66,7 @@ class CommissionServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new CommissionServiceImpl(commissionRepository, academicPeriodRepository, subjectRepository,
+        service = new CommissionServiceImpl(eventPublisher, commissionRepository, academicPeriodRepository, subjectRepository,
                 subjectCommissionRepository, studyPlanResolver, commissionMapper);
     }
 
@@ -664,5 +666,17 @@ class CommissionServiceImplTest {
                 .thenReturn(Optional.of(link.getCommission().getAcademicPeriod()));
 
         service.syncCommissions(List.of(new CommissionSyncCommand("101", 1, 2024, 55, 2026, enrolledCount)), 0);
+    }
+
+    @Test
+    @DisplayName("deactivate y activate publican CatalogAvailabilityChanged, una vez cada uno")
+    void deactivateAndActivatePublishCatalogAvailabilityChanged() {
+        when(commissionRepository.findById(3L)).thenReturn(java.util.Optional.of(Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build()));
+        service.deactivate(3L);
+        verify(eventPublisher, org.mockito.Mockito.times(1))
+                .publishEvent(new ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged());
+        service.activate(3L);
+        verify(eventPublisher, org.mockito.Mockito.times(2))
+                .publishEvent(new ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged());
     }
 }

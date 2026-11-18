@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.academic.dto.CommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SpecialtySummaryDto;
 import ar.edu.utn.frc.siga.academic.mapper.CommissionMapper;
+import ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged;
 import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
 import ar.edu.utn.frc.siga.academic.model.Commission;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
@@ -42,6 +43,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +53,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class CommissionServiceImpl implements CommissionService {
 
+    private final ApplicationEventPublisher eventPublisher;
     private final CommissionRepository commissionRepository;
     private final AcademicPeriodRepository academicPeriodRepository;
     private final SubjectRepository subjectRepository;
@@ -71,6 +74,7 @@ public class CommissionServiceImpl implements CommissionService {
     @AuditOperation("Reactivación de comisión")
     public void activate(Long id) {
         commissionRepository.restore(Finder.orThrow(commissionRepository::findById, id, "Commission"));
+        eventPublisher.publishEvent(new CatalogAvailabilityChanged());
     }
 
     @Override
@@ -78,6 +82,7 @@ public class CommissionServiceImpl implements CommissionService {
     @AuditOperation("Baja de comisión")
     public void deactivate(Long id) {
         commissionRepository.softDelete(Finder.orThrow(commissionRepository::findById, id, "Commission"));
+        eventPublisher.publishEvent(new CatalogAvailabilityChanged());
     }
 
     @Override

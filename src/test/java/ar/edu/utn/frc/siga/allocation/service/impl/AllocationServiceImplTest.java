@@ -34,6 +34,7 @@ import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
@@ -94,6 +95,8 @@ class AllocationServiceImplTest {
     @Mock
     private OccurrenceService occurrenceService;
     @Mock
+    private AcademicEventService academicEventService;
+    @Mock
     private AllocationComposer composer;
     @Mock
     private AllocationValidator validator;
@@ -116,7 +119,7 @@ class AllocationServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new AllocationServiceImpl(allocationRepository, occurrenceService, composer, validator, targetResolver,
+        service = new AllocationServiceImpl(allocationRepository, occurrenceService, academicEventService, composer, validator, targetResolver,
                 writer, classroomService, buildingScopeResolver, classroomLock, revisionReader,
                 boardCache);
         lenient().when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of());
@@ -1648,5 +1651,69 @@ class AllocationServiceImplTest {
         when(revisionReader.readLatest(Allocation.class, "occurrenceId", 10L)).thenReturn(Optional.empty());
 
         assertThat(service.findLastRevision(10L)).isEmpty();
+    }
+
+    // ---------- eventos suspendidos ----------
+
+    @Test
+    @DisplayName("allocate manual con un evento suspendido lanza SuspendedEventAllocationException (422) y no escribe")
+    void allocateManualConEventoSuspendidoLanza() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 7L, futureDate(1));
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), any(), anyBoolean()))
+                .thenReturn(assignments(mapOf(occ, 5)));
+        when(academicEventService.findSuspendedIds(Set.of(7L))).thenReturn(Set.of(7L));
+
+        assertThatThrownBy(() -> service.allocate(command))
+                .isInstanceOf(ar.edu.utn.frc.siga.allocation.exception.SuspendedEventAllocationException.class)
+                .satisfies(e -> assertThat(((ar.edu.utn.frc.siga.common.exception.SigaAppException) e).getStatus())
+                        .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY));
+        verify(writer, never()).create(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("reallocate manual con un evento suspendido lanza SuspendedEventAllocationException")
+    void reallocateManualConEventoSuspendidoLanza() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 7L, futureDate(1));
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), any(), anyBoolean()))
+                .thenReturn(assignments(mapOf(occ, 5)));
+        when(academicEventService.findSuspendedIds(Set.of(7L))).thenReturn(Set.of(7L));
+
+        assertThatThrownBy(() -> service.reallocateExisting(command))
+                .isInstanceOf(ar.edu.utn.frc.siga.allocation.exception.SuspendedEventAllocationException.class);
+    }
+
+    @Test
+    @DisplayName("allocate manual sin eventos suspendidos (findSuspendedIds vacío) no lanza y escribe")
+    void allocateManualSinSuspendidosNoLanza() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 7L, futureDate(1));
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), any(), anyBoolean()))
+                .thenReturn(assignments(resolved));
+        when(academicEventService.findSuspendedIds(Set.of(7L))).thenReturn(Set.of());
+        Allocation saved = allocation(100L, 10L, 5, AllocationSource.MANUAL);
+        when(writer.create(resolved, "obs", AllocationSource.MANUAL)).thenReturn(List.of(saved));
+        when(composer.composeAll(List.of(saved))).thenReturn(List.of(dummyResponseDto()));
+
+        assertThat(service.allocate(command)).hasSize(1);
+        verify(writer).create(resolved, "obs", AllocationSource.MANUAL);
+    }
+
+    @Test
+    @DisplayName("syncFromSysacad no consulta eventos suspendidos: el origen SYSACAD no se rechaza")
+    void syncFromSysacadNoConsultaSuspendidos() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(7L), 5L);
+        OccurrenceSlotDto occ = occurrenceSlot(10L, 7L, futureDate(1));
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occ, 5);
+        when(targetResolver.resolveClassroomByOccurrence(List.of(item), null, false)).thenReturn(assignments(resolved));
+        when(writer.syncFromSysacad(resolved, Set.of(7L))).thenReturn(1);
+
+        assertThat(service.syncFromSysacad(List.of(item), Set.of(7L))).isEqualTo(1);
+        verifyNoInteractions(academicEventService);
     }
 }

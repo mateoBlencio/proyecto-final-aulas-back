@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.events.repository.SuspendedEventRepository;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.events.service.command.OccurrenceRelease;
 import ar.edu.utn.frc.siga.common.exception.InvalidSelectionException;
@@ -32,6 +33,7 @@ public class OccurrenceServiceImpl implements OccurrenceService {
 
     private final OccurrenceRepository occurrenceRepository;
     private final EventScheduleValidator eventScheduleValidator;
+    private final SuspendedEventRepository suspendedEventRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -118,21 +120,37 @@ public class OccurrenceServiceImpl implements OccurrenceService {
     @Override
     @Transactional(readOnly = true)
     public List<OccurrenceSlotDto> findSlotsByStatusBetween(OccurrenceStatus status, LocalDate from, LocalDate to) {
-        return occurrenceRepository.findByStatusAndDateBetweenOrderByEvent_IdAscDateAsc(status, from, to).stream()
-                .map(OccurrenceServiceImpl::toSlot).toList();
+        return visible(occurrenceRepository.findByStatusAndDateBetweenOrderByEvent_IdAscDateAsc(status, from, to)
+                .stream().map(OccurrenceServiceImpl::toSlot).toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<OccurrenceSlotDto> findSlotsBetween(LocalDate from, LocalDate to) {
-        return occurrenceRepository.findByDateBetween(from, to).stream()
-                .map(OccurrenceServiceImpl::toSlot).toList();
+        return visible(occurrenceRepository.findByDateBetween(from, to).stream()
+                .map(OccurrenceServiceImpl::toSlot).toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<OccurrenceSlotDto> findSlotsByDate(LocalDate date) {
-        return occurrenceRepository.findByDate(date).stream().map(OccurrenceServiceImpl::toSlot).toList();
+        return visible(occurrenceRepository.findByDate(date).stream().map(OccurrenceServiceImpl::toSlot).toList());
+    }
+
+    private List<OccurrenceSlotDto> visible(List<OccurrenceSlotDto> slots) {
+        if (slots.isEmpty()) {
+            return slots;
+        }
+        Map<Long, LocalDate> suspendedFrom = suspendedEventRepository.findAllSuspendedFrom();
+        if (suspendedFrom.isEmpty()) {
+            return slots;
+        }
+        return slots.stream().filter(slot -> !isSuspended(slot, suspendedFrom)).toList();
+    }
+
+    private static boolean isSuspended(OccurrenceSlotDto slot, Map<Long, LocalDate> suspendedFrom) {
+        LocalDate from = suspendedFrom.get(slot.eventId());
+        return from != null && !slot.date().isBefore(from);
     }
 
     @Override

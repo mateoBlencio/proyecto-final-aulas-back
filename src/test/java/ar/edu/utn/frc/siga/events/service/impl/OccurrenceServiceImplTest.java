@@ -10,6 +10,7 @@ import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.service.command.OccurrenceRelease;
 import ar.edu.utn.frc.siga.common.exception.InvalidSelectionException;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.events.repository.SuspendedEventRepository;
 import ar.edu.utn.frc.siga.events.validator.EventScheduleValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,12 +45,14 @@ class OccurrenceServiceImplTest {
     private OccurrenceRepository occurrenceRepository;
     @Mock
     private EventScheduleValidator eventScheduleValidator;
+    @Mock
+    private SuspendedEventRepository suspendedEventRepository;
 
     private OccurrenceServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new OccurrenceServiceImpl(occurrenceRepository, eventScheduleValidator);
+        service = new OccurrenceServiceImpl(occurrenceRepository, eventScheduleValidator, suspendedEventRepository);
     }
 
     private Occurrence occurrence(Long id, OccurrenceStatus status) {

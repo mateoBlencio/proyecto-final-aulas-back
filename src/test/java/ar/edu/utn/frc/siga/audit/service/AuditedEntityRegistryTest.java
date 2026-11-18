@@ -198,12 +198,12 @@ class AuditedEntityRegistryTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("SubjectCommission audita la baja y el motivo, pero no la cantidad de inscriptos")
+    @DisplayName("SubjectCommission audita la baja, sin motivo (V66) y sin la cantidad de inscriptos")
     void subjectCommissionAuditsDeactivationButNotEnrolledCount() {
         assertThat(tableAndColumn("SubjectCommission")).containsExactly("materia_comision_aud", "id_materia_comision");
         assertThat(entity("SubjectCommission").columns()).extracting(AuditedColumn::property)
-                .contains("deletedAt", "deactivationReason", "inPerson")
-                .doesNotContain("enrolledCount");
+                .contains("deletedAt", "inPerson")
+                .doesNotContain("enrolledCount", "deactivationReason");
     }
 
     private AuditedEntity entity(String jpaName) {

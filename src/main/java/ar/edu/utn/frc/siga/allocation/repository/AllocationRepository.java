@@ -30,6 +30,8 @@ public interface AllocationRepository extends JpaRepository<Allocation, Long>, A
             where o.fecha between :from and :to
               and (o.estado = 'NEEDS_ROOM' or o.motivo_liberacion = 'CLASSROOM_DEACTIVATED')
               and not exists (select 1 from asignacion_aula a where a.id_ocurrencia = o.id_ocurrencia)
+              and not exists (select 1 from evento_academico_suspendido s
+                              where s.id_evento_academico = o.id_evento_academico and o.fecha >= s.fecha_baja)
             """, nativeQuery = true)
     List<Long> findEventIdsWithUnallocatedOccurrencesBetween(LocalDate from, LocalDate to);
 
@@ -39,6 +41,8 @@ public interface AllocationRepository extends JpaRepository<Allocation, Long>, A
             join ocurrencia o on o.id_ocurrencia = a.id_ocurrencia
             join unnest(cast(:classroomIds as bigint[]), cast(:dates as date[])) as k(id_aula, fecha)
               on k.id_aula = a.id_aula and k.fecha = o.fecha
+            where not exists (select 1 from evento_academico_suspendido s
+                              where s.id_evento_academico = o.id_evento_academico and o.fecha >= s.fecha_baja)
             """, nativeQuery = true)
     List<Long> findOccurrenceIdsAllocatedAt(Long[] classroomIds, LocalDate[] dates);
 }

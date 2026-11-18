@@ -12,6 +12,7 @@ import ar.edu.utn.frc.siga.allocation.validator.AllocationCandidate;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.common.exception.InvalidSelectionException;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
+import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.preview.dto.request.ConfirmPreviewRequestDto;
 import ar.edu.utn.frc.siga.preview.dto.request.PreviewAllocationDto;
@@ -60,6 +61,7 @@ public class PreviewServiceImpl implements PreviewService {
     private final AllocationService allocationService;
     private final AllocationConflictService allocationConflictService;
     private final OccurrenceService occurrenceService;
+    private final AcademicEventService academicEventService;
     private final PreviewSettings previewSettings;
 
     @Override
@@ -233,7 +235,9 @@ public class PreviewServiceImpl implements PreviewService {
                     "Debe indicar eventIds o selectAll=true, pero no ambos ni ninguno");
         }
         if (!selectAll) {
-            return Set.copyOf(request.eventIds());
+            Set<Long> requested = Set.copyOf(request.eventIds());
+            Set<Long> suspended = academicEventService.findSuspendedIds(requested);
+            return requested.stream().filter(id -> !suspended.contains(id)).collect(Collectors.toSet());
         }
 
         Set<Long> excludedIds = request.excludedIds() != null ? Set.copyOf(request.excludedIds()) : Set.of();

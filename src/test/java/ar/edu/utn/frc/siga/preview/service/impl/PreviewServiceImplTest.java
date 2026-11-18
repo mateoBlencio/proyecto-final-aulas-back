@@ -14,6 +14,7 @@ import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.common.exception.InvalidSelectionException;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizationResult;
 import ar.edu.utn.frc.siga.optimizer.model.OptimizerAllocation;
@@ -82,6 +83,8 @@ class PreviewServiceImplTest {
     @Mock
     private OccurrenceService occurrenceService;
     @Mock
+    private AcademicEventService academicEventService;
+    @Mock
     private PreviewSettings previewSettings;
 
     private PreviewServiceImpl service;
@@ -89,7 +92,7 @@ class PreviewServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new PreviewServiceImpl(previewEngine, previewStore, previewComposer, previewValidator,
-                validator, allocationService, allocationConflictService, occurrenceService, previewSettings);
+                validator, allocationService, allocationConflictService, occurrenceService, academicEventService, previewSettings);
         lenient().when(previewSettings.getDefaultTimeLimitSeconds()).thenReturn(30);
         lenient().when(previewSettings.getSuggestionTimeLimitSeconds()).thenReturn(2);
         lenient().when(previewEngine.loadInputs(any())).thenReturn(

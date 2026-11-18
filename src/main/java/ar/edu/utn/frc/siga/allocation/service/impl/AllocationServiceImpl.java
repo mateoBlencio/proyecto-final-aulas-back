@@ -32,7 +32,9 @@ import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.audit.AuditOperations;
 import ar.edu.utn.frc.siga.audit.service.RevisionReader;
 import ar.edu.utn.frc.siga.common.util.Plurals;
+import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.allocation.exception.SuspendedEventAllocationException;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationCandidate;
@@ -67,6 +69,7 @@ public class AllocationServiceImpl implements AllocationService {
 
     private final AllocationRepository allocationRepository;
     private final OccurrenceService occurrenceService;
+    private final AcademicEventService academicEventService;
     private final AllocationComposer composer;
     private final AllocationValidator validator;
     private final AllocationTargetResolver targetResolver;
@@ -481,12 +484,26 @@ public class AllocationServiceImpl implements AllocationService {
         LocalDate clampFrom = command.source().allowsPastOccurrences() ? null : LocalDate.now();
         AllocationTargetResolver.ResolvedAssignments resolved =
                 targetResolver.resolveClassroomByOccurrence(command.items(), clampFrom, reassignDeactivationReleases);
+        requireNoSuspendedEvents(command, resolved);
         List<OccurrenceSlotDto> skipped = resolved.skippedReleased();
         if (!skipped.isEmpty()) {
             log.warn("Ocurrencias liberadas salteadas: source={}, count={}, ids={}", command.source(),
                     skipped.size(), skipped.stream().map(OccurrenceSlotDto::occurrenceId).toList());
         }
         return resolved;
+    }
+
+    private void requireNoSuspendedEvents(AllocationCommand command,
+            AllocationTargetResolver.ResolvedAssignments resolved) {
+        if (command.source() == AllocationSource.SYSACAD) {
+            return;
+        }
+        Set<Long> eventIds = resolved.classroomByOccurrence().keySet().stream()
+                .map(OccurrenceSlotDto::eventId)
+                .collect(Collectors.toSet());
+        if (!academicEventService.findSuspendedIds(eventIds).isEmpty()) {
+            throw new SuspendedEventAllocationException();
+        }
     }
 
     /** Locks and validates the target classrooms; returns them (empty if there is nothing to allocate). */

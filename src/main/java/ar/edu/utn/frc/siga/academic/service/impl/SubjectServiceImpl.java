@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.academic.dto.SubjectFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SubjectMapper;
+import ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
@@ -30,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class SubjectServiceImpl implements SubjectService {
 
+    private final ApplicationEventPublisher eventPublisher;
     private final SubjectRepository subjectRepository;
     private final StudyPlanRepository studyPlanRepository;
     private final SpecialtyRepository specialtyRepository;
@@ -66,6 +69,7 @@ public class SubjectServiceImpl implements SubjectService {
     @AuditOperation("Reactivación de materia")
     public void activate(Long id) {
         subjectRepository.restore(Finder.orThrow(subjectRepository::findById, id, "Subject"));
+        eventPublisher.publishEvent(new CatalogAvailabilityChanged());
     }
 
     @Override
@@ -73,6 +77,7 @@ public class SubjectServiceImpl implements SubjectService {
     @AuditOperation("Baja de materia")
     public void deactivate(Long id) {
         subjectRepository.softDelete(Finder.orThrow(subjectRepository::findById, id, "Subject"));
+        eventPublisher.publishEvent(new CatalogAvailabilityChanged());
     }
 
     @Override

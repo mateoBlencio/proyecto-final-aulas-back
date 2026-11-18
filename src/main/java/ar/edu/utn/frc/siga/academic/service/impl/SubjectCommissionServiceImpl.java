@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.academic.dto.SubjectCommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SubjectCommissionMapper;
+import ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged;
 import ar.edu.utn.frc.siga.academic.model.Commission;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
@@ -23,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class SubjectCommissionServiceImpl implements SubjectCommissionService {
 
+    private final ApplicationEventPublisher eventPublisher;
     private final SubjectCommissionRepository subjectCommissionRepository;
     private final SubjectRepository subjectRepository;
     private final CommissionRepository commissionRepository;
@@ -52,6 +55,7 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
     @AuditOperation("Reactivación de materia-comisión")
     public void activate(SubjectCommissionId id) {
         subjectCommissionRepository.restore(requireLink(id));
+        eventPublisher.publishEvent(new CatalogAvailabilityChanged());
     }
 
     @Override
@@ -59,6 +63,7 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
     @AuditOperation("Baja de materia-comisión")
     public void deactivate(SubjectCommissionId id) {
         subjectCommissionRepository.softDelete(requireLink(id));
+        eventPublisher.publishEvent(new CatalogAvailabilityChanged());
     }
 
     private SubjectCommission requireLink(SubjectCommissionId id) {

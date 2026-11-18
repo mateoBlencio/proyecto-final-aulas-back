@@ -76,6 +76,8 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
     private AllocationConflictService allocationConflictService;
     @Autowired
     private ObjectMapper objectMapper;
+    @Autowired
+    private ar.edu.utn.frc.siga.academic.service.SubjectService subjectService;
 
     private Long createEvent(IntegrationTestData.SubjectAndCommission sc, LocalDate date) {
         var dto = new CreateRecurringEventRequestDto(
@@ -459,5 +461,73 @@ class PreviewFlowIntegrationTest extends AbstractIntegrationTest {
         assertThat(allocationRepository.findByOccurrenceId(releasedId)).isEmpty();
         assertThat(occurrenceRepository.findById(releasedId).orElseThrow().getStatus())
                 .isEqualTo(OccurrenceStatus.ROOM_RELEASED);
+    }
+
+    private void suspendSubject(Long subjectId) {
+        subjectService.deactivate(subjectId);
+    }
+
+    @Test
+    @DisplayName("POST /v1/previews con eventIds explícitos: el evento suspendido no se planifica y su aula cuenta como libre para otro evento")
+    void autoPreview_explicitIdsWithSuspendedEvent_skipsItAndFreesItsRoom() throws Exception {
+        LocalDate date = LocalDate.now().plusDays(150);
+        blockAllAvailableRooms(date);
+        Classroom onlyFreeRoom = testData.aula(testData.edificio());
+        var scSuspended = testData.materiaYComision();
+        Long suspendedId = createEvent(scSuspended, date);
+        allocateDirect(occurrenceOf(suspendedId), onlyFreeRoom.getId());
+        Long normalId = createEvent(testData.materiaYComision(), date);
+        suspendSubject(scSuspended.subjectId());
+
+        PreviewResponseDto preview = autoPreview(List.of(suspendedId, normalId));
+
+        assertThat(preview.allocations()).extracting(i -> i.event().id()).containsExactly(normalId);
+        assertThat(preview.allocations().getFirst().classroom().id()).isEqualTo(onlyFreeRoom.getId());
+        assertThat(preview.unresolved()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("POST /v1/previews solo con el evento normal: la ocupación del evento suspendido no bloquea su aula")
+    void autoPreview_suspendedOccupancyDoesNotBlockRoom() throws Exception {
+        LocalDate date = LocalDate.now().plusDays(151);
+        blockAllAvailableRooms(date);
+        Classroom onlyFreeRoom = testData.aula(testData.edificio());
+        var scSuspended = testData.materiaYComision();
+        Long suspendedId = createEvent(scSuspended, date);
+        allocateDirect(occurrenceOf(suspendedId), onlyFreeRoom.getId());
+        Long normalId = createEvent(testData.materiaYComision(), date);
+
+        PreviewResponseDto blocked = autoPreview(List.of(normalId));
+        assertThat(blocked.unresolved()).extracting(i -> i.event().id()).containsExactly(normalId);
+
+        suspendSubject(scSuspended.subjectId());
+        PreviewResponseDto free = autoPreview(List.of(normalId));
+
+        assertThat(free.allocations()).hasSize(1);
+        assertThat(free.allocations().getFirst().classroom().id()).isEqualTo(onlyFreeRoom.getId());
+    }
+
+    @Test
+    @DisplayName("POST /v1/previews con selectAll: el evento suspendido sin aula no entra a la selección ni al preview")
+    void autoPreview_selectAllSkipsSuspendedEvent() throws Exception {
+        LocalDate date = LocalDate.now().plusDays(152);
+        testData.aula(testData.edificio());
+        var scSuspended = testData.materiaYComision();
+        Long suspendedId = createEvent(scSuspended, date);
+        Long normalId = createEvent(testData.materiaYComision(), date);
+        assertThat(asFixtureUser(allocationConflictService::resolveAllUnallocatedEventIds)).contains(suspendedId);
+        suspendSubject(scSuspended.subjectId());
+        List<Long> all = asFixtureUser(allocationConflictService::resolveAllUnallocatedEventIds);
+        assertThat(all).contains(normalId).doesNotContain(suspendedId);
+        List<Long> excluded = all.stream().filter(id -> !id.equals(normalId)).toList();
+
+        MvcResult result = mockMvc.perform(post("/v1/previews").contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new PreviewRequestDto(null, true, excluded, 2))))
+                .andExpect(status().isOk()).andReturn();
+        PreviewResponseDto preview = objectMapper.readValue(result.getResponse().getContentAsString(),
+                PreviewResponseDto.class);
+
+        assertThat(preview.allocations()).extracting(i -> i.event().id()).containsExactly(normalId);
+        assertThat(preview.unresolved()).isEmpty();
     }
 }

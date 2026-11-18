@@ -19,6 +19,7 @@ import ar.edu.utn.frc.siga.events.model.RecurringEvent;
 import ar.edu.utn.frc.siga.events.model.UniqueEvent;
 import ar.edu.utn.frc.siga.events.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.events.repository.SuspendedEventRepository;
 import ar.edu.utn.frc.siga.events.repository.RecurringEventRepository;
 import ar.edu.utn.frc.siga.events.repository.UniqueEventRepository;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
@@ -73,6 +74,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     private final RecurringEventRepository recurringEventRepository;
     private final UniqueEventRepository uniqueEventRepository;
     private final OccurrenceRepository occurrenceRepository;
+    private final SuspendedEventRepository suspendedEventRepository;
     private final AcademicEventComposer composer;
     private final OccurrenceMapper occurrenceMapper;
     private final SubjectService subjectService;
@@ -93,6 +95,12 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     @Transactional(readOnly = true)
     public AcademicEventResponseDto findById(Long eventId) {
         return composer.compose(Finder.orThrow(eventRepository::findById, eventId, "AcademicEvent"));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Set<Long> findSuspendedIds(Collection<Long> eventIds) {
+        return suspendedEventRepository.findIdsAmong(eventIds);
     }
 
     @Override
