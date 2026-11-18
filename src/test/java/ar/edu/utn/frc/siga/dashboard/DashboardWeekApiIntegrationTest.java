@@ -148,8 +148,8 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
     }
 
     @Test
-    @DisplayName("an event dropped from Sysacad (hash present, not enabled) is not counted, one without hash is")
-    void eventDroppedFromSysacadIsNotCounted() throws Exception {
+    @DisplayName("an event dropped from Sysacad (hash present, not enabled) is counted like any other: allocation and unallocated class")
+    void eventDroppedFromSysacadIsStillCounted() throws Exception {
         LocalDate monday = week(2);
         Building a = building();
         Classroom roomA = room(a, 100);
@@ -166,9 +166,9 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
         JsonNode root = weekOf(monday);
 
         JsonNode nodeA = byId(root.get("buildings"), "buildingId", a.getId());
-        assertThat(nodeA.get("allocationStatus").get("total").asLong()).isEqualTo(2);
-        assertThat(nodeA.get("occupancy").get("occupiedHours").asDouble()).isEqualTo(2.0);
-        assertThat(root.get("campus").get("unallocatedClasses").asLong()).as(weekDump(monday)).isEqualTo(1);
+        assertThat(nodeA.get("allocationStatus").get("total").asLong()).isEqualTo(3);
+        assertThat(nodeA.get("occupancy").get("occupiedHours").asDouble()).isEqualTo(3.0);
+        assertThat(root.get("campus").get("unallocatedClasses").asLong()).as(weekDump(monday)).isEqualTo(2);
     }
 
     @Test
@@ -373,5 +373,34 @@ class DashboardWeekApiIntegrationTest extends DashboardIntegrationSupport {
         assertThat(nodeA.get("allocationStatus").get("total").asLong()).isEqualTo(1);
         assertThat(nodeA.get("occupancy").get("occupiedHours").asDouble()).isEqualTo(1.0);
         assertThat(root.get("campus").get("unallocatedClasses").asLong()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("an event dropped from Sysacad and suspended by a manual deactivation is not counted; the dropped one without suspension is")
+    void droppedEventIsCountedUnlessSuspended() throws Exception {
+        LocalDate monday = week(31);
+        Building a = building();
+        Classroom roomA = room(a, 100);
+        var droppedOnly = allocated(roomA, monday, bandStart(), 60, 50);
+        dropFromSysacad(droppedOnly.eventId());
+        dropFromSysacad(unallocated(monday.plusDays(1), bandStart(), 60, 20).eventId());
+        var sc = testData.materiaYComision();
+        Long suspendedAllocated = testData.eventoRecurrente(sc.subjectId(), sc.commissionId(),
+                monday.plusDays(2).getDayOfWeek(), bandStart(), 60, monday.plusDays(2), monday.plusDays(2), 50);
+        allocationRepository.save(Allocation.builder()
+                .occurrenceId(occurrenceRepository.findByEvent_Id(suspendedAllocated).getFirst().getId())
+                .classroomId(roomA.getId()).source(AllocationSource.MANUAL).build());
+        Long suspendedUnallocated = testData.eventoRecurrente(sc.subjectId(), sc.commissionId(),
+                monday.plusDays(3).getDayOfWeek(), bandStart(), 60, monday.plusDays(3), monday.plusDays(3), 20);
+        dropFromSysacad(suspendedAllocated);
+        dropFromSysacad(suspendedUnallocated);
+
+        subjectService.deactivate(sc.subjectId());
+
+        JsonNode root = weekOf(monday);
+        JsonNode nodeA = byId(root.get("buildings"), "buildingId", a.getId());
+        assertThat(nodeA.get("allocationStatus").get("total").asLong()).isEqualTo(1);
+        assertThat(nodeA.get("occupancy").get("occupiedHours").asDouble()).isEqualTo(1.0);
+        assertThat(root.get("campus").get("unallocatedClasses").asLong()).as(weekDump(monday)).isEqualTo(1);
     }
 }

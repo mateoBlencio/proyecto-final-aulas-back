@@ -17,6 +17,7 @@ public interface ClassroomMapper {
     @Mapping(target = "classroomTypeDescription", source = "classroomType.description")
     @Mapping(target = "unavailableReason", expression = "java(entity.unavailableReason())")
     @Mapping(target = "currentInSysacad", expression = "java(entity.isCurrentInSysacad())")
+    @Mapping(target = "enabledInSysacad", expression = "java(entity.isEnabledInSysacad())")
     @Mapping(target = "canUpdate", source = ".", qualifiedByName = "canUpdateClassroom")
     @Mapping(target = "canActivate", source = "building.id", qualifiedByName = "canActivateClassroom")
     @Mapping(target = "canAllocate", source = ".", qualifiedByName = "canAllocateClassroom")

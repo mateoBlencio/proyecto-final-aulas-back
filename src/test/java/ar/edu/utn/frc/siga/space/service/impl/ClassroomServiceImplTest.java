@@ -291,7 +291,7 @@ class ClassroomServiceImplTest {
         Classroom classroom = SpaceTestData.classroom().build();
         Page<Classroom> page = new PageImpl<>(List.of(classroom), pageable, 1);
         ClassroomListItemDto item = new ClassroomListItemDto(1L, 101, 1L, "Edificio Central", 1L, "Normal", 40,
-                List.of(), null, true, null, "Todas", List.of(), null, true, false, false, false);
+                List.of(), null, true, null, "Todas", List.of(), null, true, true, false, false, false);
         Page<ClassroomListItemDto> composed = new PageImpl<>(List.of(item), pageable, 1);
         when(classroomRepository.findAll(ArgumentMatchers.<Specification<Classroom>>any(), any(Pageable.class)))
                 .thenReturn(page);
@@ -563,16 +563,32 @@ class ClassroomServiceImplTest {
     }
 
     @Test
-    @DisplayName("findByRoomNumberAndBuilding: si el aula existe en un edificio no vigente en SysAcad, no hace fallback al aula de otro edificio")
+    @DisplayName("findByRoomNumberAndBuilding: si el aula existe en un edificio dado de baja en SIGA, no hace fallback al aula de otro edificio")
     void findByRoomNumberAndBuildingWithUnavailableClassroomDoesNotFallBack() {
         Building informedBuilding = SpaceTestData.building().id(2L).name("Edif. Ing.Inchaurrondo")
                 .sysacadHash("hash").sysacadEnabled(false).build();
-        Classroom inNotCurrentBuilding = SpaceTestData.classroom().building(informedBuilding).build();
+        informedBuilding.deactivate();
+        Classroom inDeactivatedBuilding = SpaceTestData.classroom().building(informedBuilding).build();
         when(buildingRepository.findActiveById(2L)).thenReturn(Optional.of(informedBuilding));
-        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, informedBuilding)).thenReturn(Optional.of(inNotCurrentBuilding));
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, informedBuilding)).thenReturn(Optional.of(inDeactivatedBuilding));
 
         assertThatThrownBy(() -> service.findByRoomNumberAndBuilding(101, 2L))
                 .isInstanceOf(ResourceNotFoundException.class);
+        verify(classroomRepository, never()).findAllByRoomNumberAndDeletedAtIsNull(any());
+    }
+
+    @Test
+    @DisplayName("findByRoomNumberAndBuilding: un aula de un edificio ausente de SysAcad (activo en SIGA) se devuelve sin fallback")
+    void findByRoomNumberAndBuildingReturnsClassroomOfBuildingAbsentFromSysacad() {
+        Building informedBuilding = SpaceTestData.building().id(2L).name("Edif. Ing.Inchaurrondo")
+                .sysacadHash("hash").sysacadEnabled(false).build();
+        Classroom inAbsentBuilding = SpaceTestData.classroom().building(informedBuilding).build();
+        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 2L, "Edif. Ing.Inchaurrondo", 1L, "Normal", null, true);
+        when(buildingRepository.findActiveById(2L)).thenReturn(Optional.of(informedBuilding));
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, informedBuilding)).thenReturn(Optional.of(inAbsentBuilding));
+        when(classroomMapper.toDto(inAbsentBuilding)).thenReturn(dto);
+
+        assertThat(service.findByRoomNumberAndBuilding(101, 2L)).isEqualTo(dto);
         verify(classroomRepository, never()).findAllByRoomNumberAndDeletedAtIsNull(any());
     }
 

@@ -49,10 +49,14 @@ public class RoomRequestComposer {
     private final RoomRequestItemRepository itemRepository;
 
     public RoomRequestResponseDto compose(RoomRequest request) {
-        return compose(List.of(request)).getFirst();
+        return compose(List.of(request), false).getFirst();
     }
 
     public List<RoomRequestResponseDto> compose(Collection<RoomRequest> requests) {
+        return compose(requests, true);
+    }
+
+    private List<RoomRequestResponseDto> compose(Collection<RoomRequest> requests, boolean includeSysacad) {
         Set<Long> subjectIds = new LinkedHashSet<>();
         Set<Long> commissionIds = new LinkedHashSet<>();
         Set<Long> classroomIds = new LinkedHashSet<>();
@@ -70,9 +74,11 @@ public class RoomRequestComposer {
             items.addAll(request.getItems());
         }
 
-        Catalogs catalogs = catalogsResolver.resolve(subjectIds, commissionIds, classroomIds, buildingIds, activeCommissionsKeys);
+        Catalogs resolved = catalogsResolver.resolve(subjectIds, commissionIds, classroomIds, buildingIds, activeCommissionsKeys);
+        Catalogs catalogs = includeSysacad ? resolved : resolved.withoutSysacad();
         Map<Long, Integer> enrolledByEventId = catalogsResolver.resolveEnrolledByEventId(collectSourceRecurringEventIds(items));
-        Map<Long, List<ClassroomOptionDto>> currentClassroomsByItemId = catalogsResolver.resolveCurrentClassroomsByItemId(items);
+        Map<Long, List<ClassroomOptionDto>> currentClassroomsByItemId = withoutSysacadUnless(
+                includeSysacad, catalogsResolver.resolveCurrentClassroomsByItemId(items));
 
         Map<Long, List<ReleasedDateDto>> releasedDatesByItemId = catalogsResolver.resolveReleasedTargetDatesByItemId(items);
 
@@ -344,6 +350,17 @@ public class RoomRequestComposer {
                 .map(catalogs.commissionsById()::get)
                 .filter(Objects::nonNull)
                 .toList();
+    }
+
+    private static Map<Long, List<ClassroomOptionDto>> withoutSysacadUnless(
+            boolean includeSysacad, Map<Long, List<ClassroomOptionDto>> optionsByItemId) {
+        if (includeSysacad) {
+            return optionsByItemId;
+        }
+        Map<Long, List<ClassroomOptionDto>> result = new LinkedHashMap<>();
+        optionsByItemId.forEach((itemId, options) ->
+                result.put(itemId, options.stream().map(ClassroomOptionDto::withoutSysacad).toList()));
+        return result;
     }
 
     private List<ClassroomOptionDto> resolvePreferredClassrooms(RoomRequestItem item, Catalogs catalogs) {

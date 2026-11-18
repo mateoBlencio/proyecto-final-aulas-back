@@ -187,9 +187,9 @@ class RoomRequestOriginalRestorerTest {
         ReversionDto reversion = restorer().toReversion(item, restoration);
 
         assertThat(reversion.reverted()).containsExactly(
-                new RevertedDateDto(DATE_1, new ClassroomOptionDto(100L, 4, "Edificio 100")));
+                new RevertedDateDto(DATE_1, new ClassroomOptionDto(100L, 4, "Edificio 100", null, true)));
         assertThat(reversion.kept()).containsExactly(
-                new KeptDateDto(DATE_2, new ClassroomOptionDto(101L, 5, "Edificio 101"), null),
+                new KeptDateDto(DATE_2, new ClassroomOptionDto(101L, 5, "Edificio 101", null, true), null),
                 new KeptDateDto(date3, null, null));
     }
 

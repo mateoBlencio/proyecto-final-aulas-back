@@ -48,6 +48,9 @@ docs {
   abuso la da el RateLimitFilter general por IP; queda pendiente sumar una
   validación de humanidad (captcha).
 
+  La respuesta no trae campos de SysAcad (enabledInSysacad se omite en las aulas
+  preferidas); solo el personal los recibe en las respuestas autenticadas.
+
   ESTRUCTURA: cabecera + N ítems. La cabecera lleva "requester" (ámbito y
   datos de contacto), el tipo y la materia; cada ítem es un pedido concreto.
   El cuerpo es polimórfico por "type" (@JsonSubTypes): según el tipo cambian

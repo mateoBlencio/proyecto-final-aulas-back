@@ -66,6 +66,13 @@ class RoomRequestCatalogsResolver {
             Map<Long, AssignedClassroomDto> assignedClassroomsById,
             Map<Long, BuildingOptionDto> buildingsById,
             Map<ActiveCommissionsKey, List<Long>> activeCommissionIdsByKey) {
+
+        Catalogs withoutSysacad() {
+            Map<Long, ClassroomOptionDto> stripped = new LinkedHashMap<>();
+            classroomsById.forEach((id, option) -> stripped.put(id, option.withoutSysacad()));
+            return new Catalogs(subjectsById, commissionsById, stripped, assignedClassroomsById, buildingsById,
+                    activeCommissionIdsByKey);
+        }
     }
 
     Catalogs resolve(Set<Long> subjectIds, Set<Long> commissionIds, Set<Long> classroomIds,

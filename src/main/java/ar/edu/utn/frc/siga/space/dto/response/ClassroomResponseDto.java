@@ -15,6 +15,7 @@ public record ClassroomResponseDto(
         String classroomTypeDescription,
         UnavailableReason unavailableReason,
         boolean currentInSysacad,
+        boolean enabledInSysacad,
         @Schema(description = "Pista de UI: el usuario puede editar el aula (false si está desactivada). El back valida igual en cada endpoint.")
         boolean canUpdate,
         @Schema(description = "Pista de UI: el usuario puede activar/desactivar el aula. El back valida igual en cada endpoint.")
@@ -28,6 +29,6 @@ public record ClassroomResponseDto(
                                 Long classroomTypeId, String classroomTypeDescription,
                                 UnavailableReason unavailableReason, boolean currentInSysacad) {
         this(id, roomNumber, capacity, buildingId, buildingName, classroomTypeId, classroomTypeDescription,
-                unavailableReason, currentInSysacad, false, false, false);
+                unavailableReason, currentInSysacad, true, false, false, false);
     }
 }

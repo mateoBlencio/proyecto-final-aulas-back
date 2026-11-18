@@ -18,5 +18,6 @@ public record AllowedClassroomDto(
         boolean available,
         Integer computerCount,
         List<String> missingRequirements,
-        boolean current
+        boolean current,
+        boolean enabledInSysacad
 ) {}

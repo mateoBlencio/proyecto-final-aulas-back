@@ -11,6 +11,7 @@ public interface BuildingMapper {
 
     @Mapping(target = "active", expression = "java(building.isActive())")
     @Mapping(target = "unavailableReason", expression = "java(building.unavailableReason())")
+    @Mapping(target = "currentInSysacad", expression = "java(building.isCurrentInSysacad())")
     @Mapping(target = "canActivate", source = "id", qualifiedByName = "canActivateBuilding")
     @Mapping(target = "canCreateClassroom", source = ".", qualifiedByName = "canCreateClassroom")
     BuildingResponseDto toDto(Building building);

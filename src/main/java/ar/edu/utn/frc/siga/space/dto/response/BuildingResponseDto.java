@@ -10,6 +10,7 @@ public record BuildingResponseDto(
         String name,
         Boolean active,
         UnavailableReason unavailableReason,
+        boolean currentInSysacad,
         @Schema(description = "Pista de UI: el usuario puede activar/desactivar el edificio. El back valida igual en cada endpoint.")
         boolean canActivate,
         @Schema(description = "Pista de UI: el usuario puede crear aulas en el edificio (false si está desactivado). El back valida igual en cada endpoint.")
@@ -18,6 +19,6 @@ public record BuildingResponseDto(
 
     /** Constructor sin flags (en false) para quien arma el DTO a mano. */
     public BuildingResponseDto(Long id, String name, Boolean active, UnavailableReason unavailableReason) {
-        this(id, name, active, unavailableReason, false, false);
+        this(id, name, active, unavailableReason, true, false, false);
     }
 }

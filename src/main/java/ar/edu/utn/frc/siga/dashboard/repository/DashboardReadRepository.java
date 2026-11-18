@@ -59,7 +59,6 @@ public class DashboardReadRepository {
                 FROM asignacion_aula a
                 JOIN ocurrencia o ON o.id_ocurrencia = a.id_ocurrencia AND o.estado <> 'ROOM_RELEASED'
                 JOIN evento_academico e ON e.id_evento_academico = o.id_evento_academico
-                     AND NOT (e.hash_raw IS NOT NULL AND e.habilitado_sysacad = FALSE)
                 JOIN aula c ON c.id_aula = a.id_aula AND c.eliminado_en IS NULL
                 JOIN edificio b ON b.id_edificio = c.id_edificio AND b.eliminado_en IS NULL
                 WHERE o.fecha BETWEEN :from AND :to
@@ -69,14 +68,13 @@ public class DashboardReadRepository {
                 (rs, i) -> toUnit(rs));
     }
 
-    /** Classes without a room (not released, or released by a classroom deactivation; event not dropped from Sysacad) per date. */
+    /** Classes without a room (not released, or released by a classroom deactivation) per date. */
     public Map<LocalDate, Long> countUnallocatedByDate(LocalDate from, LocalDate to) {
         Map<LocalDate, Long> result = new HashMap<>();
         jdbc.query("""
                 SELECT o.fecha, COUNT(*) AS total
                 FROM ocurrencia o
                 JOIN evento_academico e ON e.id_evento_academico = o.id_evento_academico
-                     AND NOT (e.hash_raw IS NOT NULL AND e.habilitado_sysacad = FALSE)
                 WHERE (o.estado <> 'ROOM_RELEASED' OR o.motivo_liberacion = 'CLASSROOM_DEACTIVATED')
                   AND o.fecha BETWEEN :from AND :to
                   AND NOT EXISTS (SELECT 1 FROM asignacion_aula a WHERE a.id_ocurrencia = o.id_ocurrencia)

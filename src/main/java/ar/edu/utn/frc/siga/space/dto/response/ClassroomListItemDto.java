@@ -21,6 +21,7 @@ public record ClassroomListItemDto(
         List<ClassroomPermissionTargetDto> permissionTargets,
         UnavailableReason unavailableReason,
         boolean currentInSysacad,
+        boolean enabledInSysacad,
         @Schema(description = "Pista de UI: el usuario puede editar el aula (false si está desactivada). El back valida igual en cada endpoint.")
         boolean canUpdate,
         @Schema(description = "Pista de UI: el usuario puede activar/desactivar el aula. El back valida igual en cada endpoint.")

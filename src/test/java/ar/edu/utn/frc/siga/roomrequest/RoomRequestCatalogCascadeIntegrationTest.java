@@ -271,8 +271,8 @@ class RoomRequestCatalogCascadeIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("aulas: un aula vigente de un edificio no vigente en SysAcad deja de ofrecerse y reaparece al volver a marcar el edificio vigente")
-    void classroomsCatalog_hidesClassroomOfBuildingNotInSysacad() throws Exception {
+    @DisplayName("aulas: un aula de un edificio no vigente en SysAcad se sigue ofreciendo, sin enabledInSysacad en el JSON público")
+    void classroomsCatalog_keepsClassroomOfBuildingNotInSysacad() throws Exception {
         Building building = testData.edificio();
         Classroom classroom = testData.aula(building);
 
@@ -280,11 +280,36 @@ class RoomRequestCatalogCascadeIntegrationTest extends AbstractIntegrationTest {
 
         anonymousMockMvc.perform(get("/v1/room-requests/catalog/classrooms"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].id", not(hasItem(idOf(classroom.getId())))));
+                .andExpect(jsonPath("$[*].id", hasItem(idOf(classroom.getId()))))
+                .andExpect(jsonPath("$[?(@.id==" + idOf(classroom.getId()) + ")].enabledInSysacad").doesNotExist());
+    }
 
-        setBuildingCurrent(building.getId(), true);
+    @Test
+    @DisplayName("aulas: un aula con habilitada = N en SysAcad se ofrece, sin enabledInSysacad en el JSON público")
+    void classroomsCatalog_offersDisabledClassroomWithFlag() throws Exception {
+        Classroom classroom = testData.aula(testData.edificio());
+        setClassroomCurrent(classroom.getId(), true);
+        Classroom fresh = classroomRepository.findById(classroom.getId()).orElseThrow();
+        fresh.setSysacadEnabled(false);
+        fresh.setSysacadHash("hash-" + fresh.getId());
+        classroomRepository.save(fresh);
+        notCurrentClassroomIds.add(fresh.getId());
 
         anonymousMockMvc.perform(get("/v1/room-requests/catalog/classrooms"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id==" + idOf(classroom.getId()) + ")].enabledInSysacad").doesNotExist())
                 .andExpect(jsonPath("$[*].id", hasItem(idOf(classroom.getId()))));
+    }
+
+    @Test
+    @DisplayName("aulas: un aula dada de baja en SIGA no se ofrece aunque SysAcad la tenga habilitada")
+    void classroomsCatalog_hidesManuallyDeactivatedClassroom() throws Exception {
+        Classroom classroom = testData.aula(testData.edificio());
+        classroom.deactivate();
+        classroomRepository.save(classroom);
+
+        anonymousMockMvc.perform(get("/v1/room-requests/catalog/classrooms"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].id", not(hasItem(idOf(classroom.getId())))));
     }
 }
