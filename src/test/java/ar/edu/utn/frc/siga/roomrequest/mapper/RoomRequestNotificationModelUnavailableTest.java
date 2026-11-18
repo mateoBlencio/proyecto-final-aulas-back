@@ -31,7 +31,7 @@ class RoomRequestNotificationModelUnavailableTest {
                 List.of(new ClassroomOptionDto(1L, 204, "Central", UnavailableReason.DEACTIVATED)),
                 List.of(new AssignedClassroomDto(2L, 301, "Norte", 40))));
 
-        assertThat(result).containsEntry(KEY, "El aula 204 (Central) que pediste no está disponible por el momento.");
+        assertThat(result).containsEntry(KEY, "El aula 204 (Central) que solicitó no está disponible por el momento.");
     }
 
     @Test
@@ -43,7 +43,7 @@ class RoomRequestNotificationModelUnavailableTest {
                 List.of(new AssignedClassroomDto(2L, 301, "Sur", 40))));
 
         assertThat(result).containsEntry(KEY,
-                "Las aulas 204 (Central) y 305 (Norte) que pediste no están disponibles por el momento.");
+                "Las aulas 204 (Central) y 305 (Norte) que solicitó no están disponibles por el momento.");
     }
 
     @Test

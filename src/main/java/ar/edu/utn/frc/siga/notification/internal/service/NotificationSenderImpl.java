@@ -21,7 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Slf4j
@@ -83,13 +85,22 @@ class NotificationSenderImpl implements NotificationSender {
         return new NotificationResult(queuedIds.size(), skipped);
     }
 
+    /** Las direcciones del pedido más la casilla configurada ({@code MAIL_REPLY_TO}), sin repetir: la casilla
+     *  siempre recibe la respuesta, también cuando el llamador manda las suyas (auxiliares de un edificio). */
     private String resolveReplyTo(NotificationRequest request) {
-        List<String> addresses = request.replyTo() == null ? List.of() : request.replyTo();
-        if (addresses.isEmpty()) {
-            String fallback = properties.getEmail().getReplyTo();
-            return fallback == null || fallback.isBlank() ? null : fallback.strip();
+        Map<String, String> addresses = new LinkedHashMap<>();
+        List<String> requested = request.replyTo() == null ? List.of() : request.replyTo();
+        for (String address : requested) {
+            addAddress(addresses, address);
         }
-        return String.join(",", addresses);
+        addAddress(addresses, properties.getEmail().getReplyTo());
+        return addresses.isEmpty() ? null : String.join(",", addresses.values());
+    }
+
+    private static void addAddress(Map<String, String> addresses, String address) {
+        if (address != null && !address.isBlank()) {
+            addresses.putIfAbsent(address.strip().toLowerCase(Locale.ROOT), address.strip());
+        }
     }
 
     private static Notification newNotification(

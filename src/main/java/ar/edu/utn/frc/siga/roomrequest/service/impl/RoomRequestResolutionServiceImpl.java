@@ -336,7 +336,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
             summary.append(" (").append(subject).append(")");
         }
         summary.append(", que estaba ").append(statusLabel(status)).append(" en ").append(buildingName)
-                .append(". Ya no aparece en tu bandeja.");
+                .append(". Ya no aparece en su bandeja.");
         Map<String, Object> model = new HashMap<>();
         model.put("edificio", buildingName);
         model.put("resumen", summary.toString());

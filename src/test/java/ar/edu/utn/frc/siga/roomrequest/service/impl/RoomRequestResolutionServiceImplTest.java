@@ -541,7 +541,8 @@ class RoomRequestResolutionServiceImplTest {
                 .containsExactly("ana@utn.edu.ar", "luis@utn.edu.ar");
         assertThat(request.model().get("edificio")).isEqualTo("Edificio Central");
         assertThat(request.model().get("motivo")).isEqualTo("se resuelve desde subsecretaría");
-        assertThat((String) request.model().get("resumen")).contains("#1").contains("notificado al docente");
+        assertThat((String) request.model().get("resumen")).contains("#1").contains("notificado al docente")
+                .endsWith("Ya no aparece en su bandeja.");
     }
 
     @Test

@@ -71,7 +71,7 @@ public class Notification extends TimestampedEntity {
     @Column(name = "ultimo_error", length = MAX_ERROR_LENGTH)
     private String lastError;
 
-    @Column(name = "responder_a", length = 1000)
+    @Column(name = "responder_a", columnDefinition = "text")
     private String replyTo;
 
     @Column(name = "clave_idempotencia", nullable = false, length = 120)

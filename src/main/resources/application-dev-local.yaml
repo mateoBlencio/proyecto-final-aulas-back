@@ -59,6 +59,7 @@ siga:
     email:
       enabled: true
       from: no-reply@siga.local
+      reply-to: subsecretaria@siga.local
 
 logging:
   level:

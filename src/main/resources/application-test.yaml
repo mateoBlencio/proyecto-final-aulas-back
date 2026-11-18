@@ -39,6 +39,8 @@ siga:
     email:
       enabled: ${MAIL_ENABLED:true}
       from: ${MAIL_FROM:no-reply@siga.local}
+      # MailHog captura todo: alcanza una casilla ficticia para pasar el chequeo de arranque.
+      reply-to: ${MAIL_REPLY_TO:subsecretaria@siga.local}
 
 logging:
   level:

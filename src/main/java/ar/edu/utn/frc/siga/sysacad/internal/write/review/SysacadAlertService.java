@@ -101,7 +101,7 @@ public class SysacadAlertService {
         String count = news.size() + (news.size() == 1 ? " horario necesita" : " horarios necesitan");
         Map<String, Object> model = new HashMap<>();
         model.put("asunto", "SysAcad: novedades en los envíos de aula");
-        model.put("resumen", count + " atención de Subsecretaría tras la última corrida de envío a SysAcad.");
+        model.put("resumen", count + " atención de Subsecretaría tras la última ejecución del envío a SysAcad.");
         model.put("lineas", lines);
         model.put("restantes", news.size() - lines.size());
         notificationSender.send(new NotificationRequest(NotificationTemplate.SYSACAD_ALERT, recipients, model,
@@ -121,9 +121,9 @@ public class SysacadAlertService {
         if (!recipients.isEmpty()) {
             Map<String, Object> model = new HashMap<>();
             model.put("asunto", "SysAcad: el envío de aulas no puede comunicarse");
-            model.put("resumen", "El job de envío de aulas no logra comunicarse con SysAcad desde el "
+            model.put("resumen", "El proceso de envío de aulas no logra comunicarse con SysAcad desde el "
                     + DATE.format(since.atZone(clock.getZone())) + ". Los cambios de aula quedan en SIGA hasta que "
-                    + "vuelva la conexión.");
+                    + "se restablezca la conexión.");
             model.put("lineas", List.of());
             model.put("restantes", 0);
             notificationSender.send(new NotificationRequest(NotificationTemplate.SYSACAD_ALERT, recipients, model,
@@ -145,9 +145,9 @@ public class SysacadAlertService {
         List<NotificationRecipient> recipients = recipients();
         if (!recipients.isEmpty()) {
             Map<String, Object> model = new HashMap<>();
-            model.put("asunto", "SysAcad: el envío de aulas está frenado");
-            model.put("resumen", "Un envío cambió la hora de un horario en SysAcad. El job no envía nada hasta que "
-                    + "Subsecretaría resuelva ese horario en la lista de revisión.");
+            model.put("asunto", "SysAcad: el envío de aulas está detenido");
+            model.put("resumen", "Un envío cambió la hora de un horario en SysAcad. El proceso no realiza "
+                    + "envíos hasta que Subsecretaría resuelva ese horario en la lista de revisión.");
             model.put("lineas", List.of());
             model.put("restantes", 0);
             notificationSender.send(new NotificationRequest(NotificationTemplate.SYSACAD_ALERT, recipients, model,
@@ -204,9 +204,9 @@ public class SysacadAlertService {
             return destinationText(DestinationNotSendableReason.valueOf(entry.getReason()));
         }
         return switch (SysacadReviewReason.valueOf(entry.getReason())) {
-            case ROOM_OCCUPIED -> "el aula que puso SysAcad está ocupada en SIGA";
-            case NO_ROOM_IN_SYSACAD -> "SysAcad dejó el horario sin aula";
-            case ROOM_UNKNOWN_IN_SIGA -> "SIGA no tiene el aula que puso SysAcad";
+            case ROOM_OCCUPIED -> "el aula que figura en SysAcad está ocupada en SIGA";
+            case NO_ROOM_IN_SYSACAD -> "el horario figura sin aula en SysAcad";
+            case ROOM_UNKNOWN_IN_SIGA -> "SIGA no tiene el aula que figura en SysAcad";
             case REQUEST_ON_FUTURE_CLASS -> "hay un pedido de aula en una clase futura";
             case RELEASED_FUTURE_CLASS -> "hay una clase futura con el aula liberada";
             case HOUR_MISMATCH -> "la hora en SysAcad no coincide con la de SIGA";
@@ -215,14 +215,14 @@ public class SysacadAlertService {
             case MAX_ATTEMPTS -> "se agotaron los intentos de envío";
             case SCHEDULE_NOT_FOUND -> "SysAcad no encuentra el horario";
             case ROOM_NOT_IN_SYSACAD -> "SysAcad no tiene el aula de SIGA";
-            case ROWS_DIVERGED -> "las filas del horario en SysAcad no coinciden entre sí";
+            case ROWS_DIVERGED -> "los registros del horario en SysAcad no coinciden entre sí";
         };
     }
 
     private static String destinationText(DestinationNotSendableReason reason) {
         return switch (reason) {
-            case BUILDING_NOT_IN_SYSACAD -> "SysAcad ya no lista el edificio del aula de SIGA";
-            case CLASSROOM_NOT_IN_SYSACAD -> "SysAcad ya no lista el aula de SIGA";
+            case BUILDING_NOT_IN_SYSACAD -> "SysAcad ya no incluye el edificio del aula de SIGA";
+            case CLASSROOM_NOT_IN_SYSACAD -> "SysAcad ya no incluye el aula de SIGA";
             case CLASSROOM_DISABLED_IN_SYSACAD -> "el aula de SIGA está inhabilitada en SysAcad";
             case CLASSROOM_WITHOUT_NUMBER -> "el aula de SIGA no tiene número en SysAcad";
             case CLASSROOM_RESERVED_NUMBER -> "el aula de SIGA usa un número reservado en SysAcad";

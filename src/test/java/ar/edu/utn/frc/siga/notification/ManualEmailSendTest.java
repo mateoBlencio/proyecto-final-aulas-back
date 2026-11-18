@@ -35,6 +35,7 @@ class ManualEmailSendTest {
         registry.add("spring.mail.host", mailhog::getHost);
         registry.add("spring.mail.port", () -> mailhog.getMappedPort(1025));
         registry.add("siga.notifications.email.enabled", () -> "true");
+        registry.add("siga.notifications.email.reply-to", () -> "subsecretaria@siga.local");
     }
 
     @Autowired
@@ -46,12 +47,18 @@ class ManualEmailSendTest {
                 NotificationTemplate.ROOM_REQUEST_RESOLVED,
                 List.of(new NotificationRecipient("Vos", "TU_EMAIL_REAL@gmail.com")),
                 Map.of(
-                        "asuntoTitulo", "Aula confirmada",
+                        "asuntoTitulo", "Propuesta de aula",
                         "asuntoPartes", List.of("Prueba manual"),
-                        "tituloBanner", "Aula confirmada",
+                        "tituloBanner", "Propuesta de aula",
                         "docente", "Vos",
-                        "parrafoConfirmacion", "Confirmamos el aula para tu pedido de prueba #999.",
-                        "aulasLabel", "Aula",
+                        "parrafoConfirmacion",
+                        "Para su pedido #999, le proponemos la siguiente aula. "
+                                + "Le solicitamos que confirme si resulta adecuada.",
+                        "plazoRespuesta", "Si no recibimos respuesta antes del lunes 23/11/2026 a las 18:00, "
+                                + "consideraremos aceptada la propuesta y la reserva quedará confirmada.",
+                        "pedidoRespuesta", "Si el aula propuesta es adecuada, no es necesario que responda. "
+                                + "En caso contrario, responda este correo e indique el motivo.",
+                        "aulasLabel", "Aula propuesta",
                         "aulas", List.of("Aula de prueba (Edificio de prueba)")),
                 "manual-test-" + System.currentTimeMillis()));
 

@@ -1,5 +1,5 @@
 meta {
-  name: Notificar al docente que el pedido quedó resuelto
+  name: Mandar al docente la propuesta de aulas
   type: http
   seq: 12
 }
@@ -13,7 +13,7 @@ post {
 docs {
   POST /v1/room-requests/items/{id}/notify. Rol: SUBSECRETARIA, AUXILIAR_AULICO.
 
-  Avisa al docente las aulas asignadas y deja el pedido en `NOTIFIED`. Calcula
+  Manda al docente la propuesta de aulas y deja el pedido en `NOTIFIED`. Calcula
   `acceptanceDeadline`: el menor entre `roomRequests.acceptance.businessHours` horas
   hábiles desde ahora (cada día hábil suma 24 h, sin fines de semana ni feriados, en hora
   argentina) y el inicio del evento menos `roomRequests.acceptance.hoursBeforeEvent` horas.

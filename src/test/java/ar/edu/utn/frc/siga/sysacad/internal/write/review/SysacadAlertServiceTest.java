@@ -17,6 +17,7 @@ import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.service.UserService;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.notification.InformalRegister;
 import ar.edu.utn.frc.siga.notification.api.NotificationRequest;
 import ar.edu.utn.frc.siga.notification.api.NotificationSender;
 import ar.edu.utn.frc.siga.notification.api.NotificationTemplate;
@@ -98,8 +99,12 @@ class SysacadAlertServiceTest {
     }
 
     private static SysacadScheduleLogEntry reviewEntry(long scheduleId) {
+        return reviewEntry(scheduleId, SysacadReviewReason.ROOM_OCCUPIED);
+    }
+
+    private static SysacadScheduleLogEntry reviewEntry(long scheduleId, SysacadReviewReason reason) {
         return SysacadScheduleLogEntry.builder().scheduleId(scheduleId).type(ScheduleLogType.REVIEW_OPENED)
-                .reason(SysacadReviewReason.ROOM_OCCUPIED.name()).occurredAt(RUN_END).build();
+                .reason(reason.name()).occurredAt(RUN_END).build();
     }
 
     private void newsInWindow(SysacadScheduleLogEntry... entries) {
@@ -125,7 +130,9 @@ class SysacadAlertServiceTest {
         assertThat(request.template()).isEqualTo(NotificationTemplate.SYSACAD_ALERT);
         assertThat(request.recipients()).extracting(r -> r.email()).containsExactly("sub@utn.edu.ar");
         assertThat((List<String>) request.model().get("lineas")).singleElement().asString()
-                .contains("1K1").contains("115").contains("ocupada");
+                .contains("1K1").contains("115").contains("el aula que figura en SysAcad está ocupada en SIGA");
+        assertThat(request.model().get("resumen"))
+                .isEqualTo("1 horario necesita atención de Subsecretaría tras la última ejecución del envío a SysAcad.");
         verify(userService, never()).findByRoleForBuilding(any(), any());
         verify(userService, never()).findByRole(SystemRole.AUXILIAR_AULICO);
     }
@@ -198,7 +205,9 @@ class SysacadAlertServiceTest {
         ArgumentCaptor<NotificationRequest> captor = ArgumentCaptor.forClass(NotificationRequest.class);
         verify(notificationSender).send(captor.capture());
         assertThat(captor.getValue().template()).isEqualTo(NotificationTemplate.SYSACAD_ALERT);
-        assertThat((String) captor.getValue().model().get("resumen")).contains("no logra comunicarse");
+        assertThat((String) captor.getValue().model().get("resumen"))
+                .startsWith("El proceso de envío de aulas no logra comunicarse con SysAcad desde el ")
+                .endsWith("Los cambios de aula quedan en SIGA hasta que se restablezca la conexión.");
         verify(stateService).recordOutageAlert(NOW);
     }
 
@@ -263,7 +272,12 @@ class SysacadAlertServiceTest {
 
         service.alert(null);
 
-        verify(notificationSender).send(any());
+        ArgumentCaptor<NotificationRequest> captor = ArgumentCaptor.forClass(NotificationRequest.class);
+        verify(notificationSender).send(captor.capture());
+        assertThat(captor.getValue().model())
+                .containsEntry("asunto", "SysAcad: el envío de aulas está detenido")
+                .containsEntry("resumen", "Un envío cambió la hora de un horario en SysAcad. El proceso no realiza "
+                        + "envíos hasta que Subsecretaría resuelva ese horario en la lista de revisión.");
         verify(stateService).recordOutageAlert(NOW);
 
         state.setLastOutageAlertAt(NOW.minusSeconds(3600));
@@ -332,6 +346,80 @@ class SysacadAlertServiceTest {
 
         assertThatCode(() -> service.alert(PREVIOUS_END)).doesNotThrowAnyException();
 
-        assertThat(sentLines()).singleElement().asString().contains("1K1").doesNotContain(reason.name());
+        assertThat(sentLines()).singleElement().asString().contains("1K1").doesNotContain(reason.name())
+                .satisfies(line -> assertThat(InformalRegister.find(line)).isEmpty());
+    }
+
+    @ParameterizedTest
+    @EnumSource(SysacadReviewReason.class)
+    @DisplayName("cada motivo de revisión tiene texto en registro formal")
+    void everyReviewReasonHasFormalText(SysacadReviewReason reason) {
+        finishedRun();
+        newsInWindow(reviewEntry(1L, reason));
+        subsecretaria("sub@utn.edu.ar");
+
+        service.alert(PREVIOUS_END);
+
+        assertThat(sentLines()).singleElement().asString().contains("1K1").doesNotContain(reason.name())
+                .satisfies(line -> assertThat(InformalRegister.find(line)).isEmpty());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @org.junit.jupiter.params.provider.CsvSource(delimiter = '|', value = {
+            "ROOM_OCCUPIED|el aula que figura en SysAcad está ocupada en SIGA",
+            "NO_ROOM_IN_SYSACAD|el horario figura sin aula en SysAcad",
+            "ROOM_UNKNOWN_IN_SIGA|SIGA no tiene el aula que figura en SysAcad",
+            "ROWS_DIVERGED|los registros del horario en SysAcad no coinciden entre sí"
+    })
+    @DisplayName("motivos de revisión reescritos: texto exacto")
+    void rewrittenReviewReasonTexts(SysacadReviewReason reason, String expected) {
+        finishedRun();
+        newsInWindow(reviewEntry(1L, reason));
+        subsecretaria("sub@utn.edu.ar");
+
+        service.alert(PREVIOUS_END);
+
+        assertThat(sentLines()).singleElement().asString().endsWith(": " + expected);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @org.junit.jupiter.params.provider.CsvSource(delimiter = '|', value = {
+            "BUILDING_NOT_IN_SYSACAD|SysAcad ya no incluye el edificio del aula de SIGA",
+            "CLASSROOM_NOT_IN_SYSACAD|SysAcad ya no incluye el aula de SIGA"
+    })
+    @DisplayName("motivos de destino reescritos: texto exacto")
+    void rewrittenDestinationReasonTexts(DestinationNotSendableReason reason, String expected) {
+        finishedRun();
+        newsInWindow(notSendableEntry(1L, reason));
+        slot77();
+        subsecretaria("sub@utn.edu.ar");
+
+        service.alert(PREVIOUS_END);
+
+        assertThat(sentLines()).singleElement().asString().contains(": " + expected + " (clase: 12/03/2026 18:30)");
+    }
+
+    @Test
+    @DisplayName("asunto y resumen de los tres avisos no usan tuteo, voseo ni 'mail'")
+    void summariesAreFormal() {
+        state.setOutageSince(NOW.minus(Duration.ofDays(1)));
+        subsecretaria("sub@utn.edu.ar");
+        service.alert(null);
+        state.setOutageSince(null);
+        state.setLastOutageAlertAt(null);
+        when(scheduleRepository.existsByStatusAndReviewReason(SysacadScheduleStatus.REVIEW,
+                SysacadReviewReason.HOURS_CHANGED_AFTER_SEND)).thenReturn(true);
+        service.alert(null);
+        finishedRun();
+        newsInWindow(reviewEntry(1L));
+        state.setLastOutageAlertAt(NOW);
+        service.alert(PREVIOUS_END);
+
+        ArgumentCaptor<NotificationRequest> captor = ArgumentCaptor.forClass(NotificationRequest.class);
+        verify(notificationSender, org.mockito.Mockito.times(3)).send(captor.capture());
+        for (NotificationRequest request : captor.getAllValues()) {
+            assertThat(InformalRegister.find((String) request.model().get("asunto"))).isEmpty();
+            assertThat(InformalRegister.find((String) request.model().get("resumen"))).isEmpty();
+        }
     }
 }
