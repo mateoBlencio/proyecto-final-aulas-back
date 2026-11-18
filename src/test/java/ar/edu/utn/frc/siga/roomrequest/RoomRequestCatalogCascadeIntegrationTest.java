@@ -222,8 +222,8 @@ class RoomRequestCatalogCascadeIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("comisiones de una materia: una comisión no vigente en SysAcad deja de aparecer y reaparece al volver a marcarla vigente")
-    void commissionsCatalog_hidesCommissionNotInSysacad() throws Exception {
+    @DisplayName("comisiones de una materia: una comisión no vigente en SysAcad se sigue ofreciendo")
+    void commissionsCatalog_keepsCommissionNotInSysacad() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
 
         setCommissionCurrent(academic.commissionId(), false);
@@ -231,25 +231,19 @@ class RoomRequestCatalogCascadeIntegrationTest extends AbstractIntegrationTest {
         anonymousMockMvc.perform(get("/v1/room-requests/catalog/commissions")
                         .param("subjectId", String.valueOf(academic.subjectId())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].id", not(hasItem(idOf(academic.commissionId())))));
-
-        setCommissionCurrent(academic.commissionId(), true);
-
-        anonymousMockMvc.perform(get("/v1/room-requests/catalog/commissions")
-                        .param("subjectId", String.valueOf(academic.subjectId())))
                 .andExpect(jsonPath("$[*].id", hasItem(idOf(academic.commissionId()))));
     }
 
     @Test
-    @DisplayName("horario de una comisión no vigente en SysAcad: 404")
-    void commissionSchedule_ofCommissionNotInSysacad_returnsNotFound() throws Exception {
+    @DisplayName("horario de una comisión no vigente en SysAcad: se resuelve con 200")
+    void commissionSchedule_ofCommissionNotInSysacad_isResolved() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
         setCommissionCurrent(academic.commissionId(), false);
 
         anonymousMockMvc.perform(get("/v1/room-requests/catalog/commission-schedule")
                         .param("subjectId", String.valueOf(academic.subjectId()))
                         .param("commissionId", String.valueOf(academic.commissionId())))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk());
     }
 
     @Test

@@ -34,14 +34,12 @@ class StudyPlanResolver {
         Specialty specialty = specialtyCache.computeIfAbsent(specialtyCode, code ->
                 specialtyRepository.findBySpecialtyCode(code)
                         .orElseGet(() -> {
-                            log.info("Creando Specialty sin nombre y dada de baja: especialidad={}", code);
-                            Specialty stub = Specialty.builder()
+                            log.info("Creando Specialty sin nombre: especialidad={}", code);
+                            return specialtyRepository.save(Specialty.builder()
                                     .specialtyCode(code)
                                     .syncedAt(syncedAt)
                                     .sysacadHash(null)
-                                    .build();
-                            stub.deactivate(syncedAt);
-                            return specialtyRepository.save(stub);
+                                    .build());
                         }));
         return Optional.of(FindOrCreateResult.resolve(
                 studyPlanRepository.findByPlanCodeAndSpecialty(planCode, specialty),

@@ -662,4 +662,53 @@ class AcademicSpecificationsTest {
                     .map(sc -> sc.getSubject().getId()).toList();
         }
     }
+
+    @Nested
+    @DisplayName("Comisión fuera de SysAcad (informativo, no oculta)")
+    class CommissionNotInSysacad {
+        private Long notInSysacadId;
+
+        @BeforeEach
+        void linkCommissionNotInSysacad() {
+            Subject analisis = subjectRepository.findById(analisisId).orElseThrow();
+            AcademicPeriod period = academicPeriodRepository.findById(period2099s1Id).orElseThrow();
+            Commission commission = commissionRepository.save(Commission.builder()
+                    .courseCode("ZZK6006").academicPeriod(period).sysacadEnabled(false).sysacadHash("zz-hash").build());
+            subjectCommissionRepository.save(SubjectCommission.builder()
+                    .subject(analisis).commission(commission).enrolledCount(0).build());
+            notInSysacadId = commission.getId();
+        }
+
+        @Test
+        void laSpecificationAvailableYElFiltroPorEspecialidadLaIncluyen() {
+            assertThat(commissionRepository.findAll(CommissionSpecification.available()))
+                    .extracting(Commission::getId).contains(notInSysacadId);
+            assertThat(commissionRepository.findAll(CommissionSpecification.withFilter(
+                    new CommissionFilter(null, null, 99017, null), false)))
+                    .extracting(Commission::getId).contains(notInSysacadId);
+        }
+
+        @Test
+        void elVinculoSigueDisponibleAunqueTengaCeroInscriptos() {
+            assertThat(subjectCommissionRepository.findAll(SubjectCommissionSpecification.available()))
+                    .extracting(sc -> sc.getCommission().getId()).contains(notInSysacadId);
+        }
+
+        @Test
+        void ambosConteosPorEspecialidadLaCuentan() {
+            var ids = List.of(sistemas.getId());
+            assertThat(subjectCommissionRepository.countCommissionsBySpecialtyIds(ids, "%", null, false))
+                    .singleElement().satisfies(row -> assertThat(row[1]).isEqualTo(3L));
+            assertThat(commissionCountSearch.countBySpecialtyIds(ids, "%", null, "zzk6006", false))
+                    .singleElement().satisfies(row -> assertThat(row[1]).isEqualTo(1L));
+        }
+
+        @Test
+        void laBusquedaDeEspecialidadPorElCodigoDeEsaComisionLaEncuentra() {
+            var page = specialtyRepository.findAll(SpecialtySpecification.withFilter(
+                    new SpecialtyFilter(null, null, null, null, null, null, null, null, "zzk6006"), false),
+                    org.springframework.data.domain.PageRequest.of(0, 500));
+            assertThat(page.stream().map(Specialty::getId)).contains(sistemas.getId());
+        }
+    }
 }

@@ -47,7 +47,6 @@ public class CommissionCountSearch {
         }
         if (!includeDeactivated) {
             where.add(cb.isNull(commission.get("deletedAt")));
-            where.add(cb.or(cb.isTrue(commission.get("sysacadEnabled")), cb.isNull(commission.get("sysacadHash"))));
             where.add(cb.isNull(period.get("deletedAt")));
             where.add(cb.isNull(plan.get("deletedAt")));
             where.add(cb.isNull(specialty.get("deletedAt")));

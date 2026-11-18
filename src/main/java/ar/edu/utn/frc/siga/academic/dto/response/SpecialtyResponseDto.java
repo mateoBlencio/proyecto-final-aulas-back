@@ -12,15 +12,16 @@ public record SpecialtyResponseDto(
         boolean enabled,
         UnavailableReason unavailableReason,
         Integer commissionCount,
-        Integer subjectCount
+        Integer subjectCount,
+        boolean currentInSysacad
 ) {
     public SpecialtyResponseDto(Integer specialtyCode, String name, String abbreviation) {
-        this(null, specialtyCode, name, abbreviation, true, null, null, null);
+        this(null, specialtyCode, name, abbreviation, true, null, null, null, true);
     }
 
     // Static so MapStruct does not read it as a fluent setter for the counts.
     public static SpecialtyResponseDto withCounts(SpecialtyResponseDto dto, int commissionCount, int subjectCount) {
         return new SpecialtyResponseDto(dto.id, dto.specialtyCode, dto.name, dto.abbreviation, dto.enabled,
-                dto.unavailableReason, commissionCount, subjectCount);
+                dto.unavailableReason, commissionCount, subjectCount, dto.currentInSysacad);
     }
 }

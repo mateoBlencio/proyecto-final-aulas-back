@@ -18,12 +18,20 @@ class AvailabilityTest {
     }
 
     @Test
-    @DisplayName("Specialty.unavailableReason: de baja y sin hash (nunca vino de SysAcad) es NOT_IN_SYSACAD")
-    void specialtyStubNotInSysacad() {
+    @DisplayName("Specialty: un stub sin hash y activo está disponible y fuera de SysAcad; dado de baja a mano da DEACTIVATED")
+    void specialtyStubIsAvailableButNotInSysacad() {
         Specialty stub = Specialty.builder().id(1L).build();
         assertThat(stub.unavailableReason()).isNull();
+        assertThat(stub.isAvailable()).isTrue();
+        assertThat(stub.isCurrentInSysacad()).isFalse();
         stub.deactivate();
-        assertThat(stub.unavailableReason()).isEqualTo(UnavailableReason.NOT_IN_SYSACAD);
+        assertThat(stub.unavailableReason()).isEqualTo(UnavailableReason.DEACTIVATED);
+    }
+
+    @Test
+    @DisplayName("Specialty.isCurrentInSysacad: con hash es true")
+    void specialtyWithHashIsCurrentInSysacad() {
+        assertThat(specialty(true).isCurrentInSysacad()).isTrue();
     }
 
     private static StudyPlan plan(boolean active) {
@@ -148,12 +156,13 @@ class AvailabilityTest {
     }
 
     @Test
-    @DisplayName("Commission.unavailableReason: con hash y flag apagado es NOT_IN_SYSACAD")
-    void commissionReasonNotInSysacad() {
+    @DisplayName("Commission: con hash y flag apagado sigue disponible y se informa fuera de SysAcad")
+    void commissionNotInSysacadStaysAvailable() {
         Commission commission = commission(period(true), true, false, "h");
 
-        assertThat(commission.unavailableReason()).isEqualTo(UnavailableReason.NOT_IN_SYSACAD);
-        assertThat(commission.isAvailable()).isFalse();
+        assertThat(commission.unavailableReason()).isNull();
+        assertThat(commission.isAvailable()).isTrue();
+        assertThat(commission.isCurrentInSysacad()).isFalse();
     }
 
     @Test
@@ -173,15 +182,15 @@ class AvailabilityTest {
     }
 
     @Test
-    @DisplayName("Commission.unavailableReason: baja del período gana sobre no estar vigente")
-    void commissionParentDeactivationWinsOverNotInSysacad() {
+    @DisplayName("Commission.unavailableReason: fuera de SysAcad con el período dado de baja da PARENT_DEACTIVATED")
+    void commissionParentDeactivationWithNotInSysacad() {
         assertThat(commission(period(false), true, false, "h").unavailableReason())
                 .isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
     }
 
     @Test
-    @DisplayName("Commission.unavailableReason: baja propia gana sobre no estar vigente")
-    void commissionOwnDeactivationWinsOverNotInSysacad() {
+    @DisplayName("Commission.unavailableReason: fuera de SysAcad con baja propia da DEACTIVATED")
+    void commissionOwnDeactivationWithNotInSysacad() {
         assertThat(commission(period(true), false, false, "h").unavailableReason())
                 .isEqualTo(UnavailableReason.DEACTIVATED);
     }
@@ -221,8 +230,9 @@ class AvailabilityTest {
                 .isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
         assertThat(link(subject, commission(period(false), true), true).unavailableReason())
                 .isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
-        assertThat(link(subject, commission(period(true), true, false, "h"), true).unavailableReason())
-                .isEqualTo(UnavailableReason.NOT_IN_SYSACAD);
+        assertThat(link(subject, commission(period(true), true, false, "h"), true).unavailableReason()).isNull();
+        assertThat(link(subject, commission(period(true), false, false, "h"), true).unavailableReason())
+                .isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
     }
 
     private static SubjectCommission link(Subject subject, Commission commission, boolean active) {

@@ -45,7 +45,7 @@ class StudyPlanResolverTest {
     }
 
     @Test
-    @DisplayName("findOrCreate: crea la especialidad sin nombre y dada de baja cuando no está sincronizada, y sigue")
+    @DisplayName("findOrCreate: crea la especialidad sin nombre, activa y sin hash cuando no está sincronizada, y sigue")
     void createsSpecialtyStubWhenUnresolved() {
         Instant syncedAt = Instant.now();
         when(specialtyRepository.findBySpecialtyCode(17)).thenReturn(Optional.empty());
@@ -60,7 +60,8 @@ class StudyPlanResolverTest {
         verify(specialtyRepository).save(stub.capture());
         assertThat(stub.getValue().getSpecialtyCode()).isEqualTo(17);
         assertThat(stub.getValue().getName()).isNull();
-        assertThat(stub.getValue().isDeleted()).isTrue();
+        assertThat(stub.getValue().isActive()).isTrue();
+        assertThat(stub.getValue().getDeletedAt()).isNull();
         assertThat(stub.getValue().getSysacadHash()).isNull();
         assertThat(stub.getValue().getSyncedAt()).isEqualTo(syncedAt);
         assertThat(result.get().getSpecialty()).isEqualTo(stub.getValue());

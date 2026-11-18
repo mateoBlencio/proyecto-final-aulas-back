@@ -11,6 +11,7 @@ public interface SpecialtyMapper {
 
     @Mapping(target = "enabled", expression = "java(specialty.isActive())")
     @Mapping(target = "unavailableReason", expression = "java(specialty.unavailableReason())")
+    @Mapping(target = "currentInSysacad", expression = "java(specialty.isCurrentInSysacad())")
     @Mapping(target = "commissionCount", ignore = true)
     @Mapping(target = "subjectCount", ignore = true)
     SpecialtyResponseDto toDto(Specialty specialty);
