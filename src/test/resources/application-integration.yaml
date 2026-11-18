@@ -44,3 +44,8 @@ siga:
     api-key: integration-test-unused
   camera-count:
     enabled: false
+  # Los contextos cacheados comparten el Postgres: con el intervalo por defecto (PT1M) el reintento de
+  # cualquiera de ellos puede reclamar filas que otro test está por reclamar. La corrida al arrancar
+  # el contexto sigue ocurriendo; el test que lo necesita mockea NotificationRetryScheduler.
+  notifications:
+    retry-interval: PT1H

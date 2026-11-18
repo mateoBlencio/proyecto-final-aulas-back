@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -105,6 +106,64 @@ class AuthServiceImplTest {
         when(authDomainProperties.isAllowedEmail("ajeno@gmail.com")).thenReturn(false);
 
         assertThatThrownBy(() -> service.login(loginRequest("ajeno@gmail.com"), httpRequest))
+                .isInstanceOf(InvalidCredentialsException.class);
+
+        verify(loginRateLimiter, never()).isRateLimited(any(), any(), any());
+        verify(authenticationManager, never()).authenticate(any());
+    }
+
+    @Test
+    @DisplayName("login con AuthDomainProperties real: subdominio institucional pasa el filtro y autentica")
+    void loginSubdominioInstitucionalConDominioReal() {
+        AuthServiceImpl serviceConDominioReal = new AuthServiceImpl(authenticationManager, userRepository,
+                jwtService, refreshTokenService, loginRateLimiter, new AuthDomainProperties());
+        String email = "jperez@sistemas.frc.utn.edu.ar";
+        when(loginRateLimiter.isRateLimited(any(), any(), any())).thenReturn(false);
+        SecurityUser securityUser = SecurityUser.fromUser(user(email));
+        when(authenticationManager.authenticate(any()))
+                .thenReturn(new UsernamePasswordAuthenticationToken(securityUser, null));
+        User user = user(email);
+        when(userRepository.findByEmailAndEnabledTrue(email)).thenReturn(Optional.of(user));
+        when(refreshTokenService.issue(user)).thenReturn(new IssuedRefreshToken("raw-token", 3600));
+        when(jwtService.generateAccessToken(email)).thenReturn("access-token");
+
+        TokenResponse result = serviceConDominioReal.login(loginRequest(email), httpRequest);
+
+        assertThat(result.getEmail()).isEqualTo(email);
+        assertThat(result.getAccessToken()).isEqualTo("access-token");
+        verify(authenticationManager).authenticate(any());
+    }
+
+    @Test
+    @DisplayName("login: email con espacios y mayúsculas → valida, autentica, limita y busca con el email normalizado")
+    void loginNormalizaEmail() {
+        String normalized = "jperez@sistemas.frc.utn.edu.ar";
+        when(authDomainProperties.isAllowedEmail(normalized)).thenReturn(true);
+        when(loginRateLimiter.isRateLimited(eq(normalized), any(), any())).thenReturn(false);
+        SecurityUser securityUser = SecurityUser.fromUser(user(normalized));
+        when(authenticationManager.authenticate(any()))
+                .thenReturn(new UsernamePasswordAuthenticationToken(securityUser, null));
+        User user = user(normalized);
+        when(userRepository.findByEmailAndEnabledTrue(normalized)).thenReturn(Optional.of(user));
+        when(refreshTokenService.issue(user)).thenReturn(new IssuedRefreshToken("raw-token", 3600));
+
+        TokenResponse result = service.login(loginRequest("  JPerez@Sistemas.FRC.utn.edu.ar  "), httpRequest);
+
+        assertThat(result.getEmail()).isEqualTo(normalized);
+        ArgumentCaptor<Authentication> captor = ArgumentCaptor.forClass(Authentication.class);
+        verify(authenticationManager).authenticate(captor.capture());
+        assertThat(captor.getValue().getPrincipal()).isEqualTo(normalized);
+        verify(loginRateLimiter).recordSuccess(eq(normalized), any());
+    }
+
+    @Test
+    @DisplayName("login con AuthDomainProperties real: dominio externo → InvalidCredentialsException sin autenticar")
+    void loginDominioExternoConDominioReal() {
+        AuthServiceImpl serviceConDominioReal = new AuthServiceImpl(authenticationManager, userRepository,
+                jwtService, refreshTokenService, loginRateLimiter, new AuthDomainProperties());
+
+        assertThatThrownBy(() -> serviceConDominioReal.login(
+                loginRequest("jperez@sistemas.frc.utn.edu.ar.evil.com"), httpRequest))
                 .isInstanceOf(InvalidCredentialsException.class);
 
         verify(loginRateLimiter, never()).isRateLimited(any(), any(), any());

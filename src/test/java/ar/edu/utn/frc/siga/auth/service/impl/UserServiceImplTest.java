@@ -15,6 +15,7 @@ import ar.edu.utn.frc.siga.auth.dto.response.UserResponseDto;
 import ar.edu.utn.frc.siga.auth.exception.UserDomainException;
 import ar.edu.utn.frc.siga.auth.mapper.RoleAssignmentComposer;
 import ar.edu.utn.frc.siga.auth.mapper.UserMapper;
+import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import ar.edu.utn.frc.siga.auth.service.RefreshTokenService;
@@ -22,6 +23,7 @@ import ar.edu.utn.frc.siga.auth.service.RoleAssignmentService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -117,6 +119,75 @@ class UserServiceImplTest {
     @DisplayName("create: dominio no institucional → UserDomainException y no consulta existencia")
     void createNonInstitutionalDomainThrows() {
         assertThatThrownBy(() -> service.create(createDto("ajeno@gmail.com"), CREATOR_EMAIL))
+                .isInstanceOf(UserDomainException.class);
+
+        verify(userRepository, never()).existsByEmail(any());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create con AuthDomainProperties real: subdominio institucional → guarda el usuario")
+    void createSubdomainWithRealDomainProperties() {
+        UserServiceImpl serviceWithRealDomain = new UserServiceImpl(userRepository, passwordEncoder,
+                refreshTokenService, userMapper, roleAssignmentComposer, roleAssignmentService,
+                new AuthDomainProperties());
+        String email = "jperez@sistemas.frc.utn.edu.ar";
+        when(userRepository.existsByEmail(email)).thenReturn(false);
+        when(passwordEncoder.encode("supersegura")).thenReturn("HASH");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(userMapper.toDto(any(User.class)))
+                .thenReturn(new UserResponseDto(1L, email, "Nombre", "Apellido", List.of()));
+
+        serviceWithRealDomain.create(createDto(email), CREATOR_EMAIL);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        assertThat(captor.getValue().getEmail()).isEqualTo(email);
+    }
+
+    @Test
+    @DisplayName("create: email con espacios y mayúsculas → valida, consulta existencia y guarda el email normalizado")
+    void createNormalizesEmail() {
+        String normalized = "jperez@sistemas.frc.utn.edu.ar";
+        when(authDomainProperties.isAllowedEmail(normalized)).thenReturn(true);
+        when(userRepository.existsByEmail(normalized)).thenReturn(false);
+        when(passwordEncoder.encode("supersegura")).thenReturn("HASH");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(userMapper.toDto(any(User.class)))
+                .thenReturn(new UserResponseDto(1L, normalized, "Nombre", "Apellido", List.of()));
+
+        service.create(createDto("  JPerez@Sistemas.FRC.utn.edu.ar "), CREATOR_EMAIL);
+
+        verify(userRepository).existsByEmail(normalized);
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        assertThat(captor.getValue().getEmail()).isEqualTo(normalized);
+    }
+
+    @Test
+    @DisplayName("hasRole, hasGlobalRole y findBuildingIdsForRole consultan el repositorio con el email normalizado")
+    void roleQueriesNormalizeEmail() {
+        String normalized = "jperez@sistemas.frc.utn.edu.ar";
+        String raw = " JPerez@Sistemas.FRC.utn.edu.ar ";
+        when(userRepository.existsEnabledRoleForUser(normalized, SystemRole.AUXILIAR_AULICO)).thenReturn(true);
+        when(userRepository.existsEnabledGlobalRoleForUser(normalized, SystemRole.SUBSECRETARIA)).thenReturn(true);
+        when(userRepository.findBuildingIdsForUserAndRole(normalized, SystemRole.AUXILIAR_AULICO))
+                .thenReturn(Set.of(3L));
+
+        assertThat(service.hasRole(raw, SystemRole.AUXILIAR_AULICO)).isTrue();
+        assertThat(service.hasGlobalRole(raw, SystemRole.SUBSECRETARIA)).isTrue();
+        assertThat(service.findBuildingIdsForRole(raw, SystemRole.AUXILIAR_AULICO)).containsExactly(3L);
+    }
+
+    @Test
+    @DisplayName("create con AuthDomainProperties real: dominio externo → UserDomainException y no guarda")
+    void createExternalDomainWithRealDomainProperties() {
+        UserServiceImpl serviceWithRealDomain = new UserServiceImpl(userRepository, passwordEncoder,
+                refreshTokenService, userMapper, roleAssignmentComposer, roleAssignmentService,
+                new AuthDomainProperties());
+
+        assertThatThrownBy(() -> serviceWithRealDomain.create(
+                createDto("jperez@sistemas.frc.utn.edu.ar.evil.com"), CREATOR_EMAIL))
                 .isInstanceOf(UserDomainException.class);
 
         verify(userRepository, never()).existsByEmail(any());

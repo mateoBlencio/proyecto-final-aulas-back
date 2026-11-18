@@ -33,7 +33,8 @@ public class User {
     @Column(name = "id_usuario")
     private Long id;
 
-    @Column(name = "correo", nullable = false, unique = true, length = 150)
+    // Unicidad sin distinguir mayúsculas: índice uq_usuario_correo_lower (V65), que JPA no puede declarar.
+    @Column(name = "correo", nullable = false, length = 150)
     private String email;
 
     @Column(name = "password_hash", nullable = false)

@@ -7,7 +7,7 @@ import ar.edu.utn.frc.siga.notification.internal.repository.NotificationReposito
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -15,9 +15,13 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@TestPropertySource(properties = "siga.notifications.retry-interval=PT1H")
 @DisplayName("Claim unificado antes de despachar (integración)")
 class NotificationClaimIntegrationTest extends AbstractIntegrationTest {
+
+    // Sin mock, el @Scheduled de este contexto corre claimDue en segundo plano (al arrancar y en cada
+    // intervalo) y puede reclamar la fila antes que el test. El mock deja ese run() vacío.
+    @MockitoBean
+    private NotificationRetryScheduler notificationRetryScheduler;
 
     @Autowired
     private NotificationRetryClaimer claimer;
