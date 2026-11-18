@@ -8,6 +8,8 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Date;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -102,12 +104,24 @@ public class AuditRecordStateRepository {
             Map<String, Object> current = new LinkedHashMap<>();
             Map<String, Object> previous = new LinkedHashMap<>();
             for (int i = 0; i < columns.size(); i++) {
-                current.put(columns.get(i).property(), normalize(rs.getObject("c" + i)));
-                previous.put(columns.get(i).property(), normalize(rs.getObject("p" + i)));
+                current.put(columns.get(i).property(), read(rs, "c" + i));
+                previous.put(columns.get(i).property(), read(rs, "p" + i));
             }
             RecordRevision key = keyByRecord.get(rs.getString("record_id") + "@" + rs.getInt("rev"));
             result.put(key, new RecordStates(current, previous));
         });
+    }
+
+    private static Object read(ResultSet rs, String label) throws SQLException {
+        Object value = rs.getObject(label);
+        if (value instanceof Timestamp timestamp && isTimestampWithTimeZone(rs, label)) {
+            return timestamp.toInstant();
+        }
+        return normalize(value);
+    }
+
+    private static boolean isTimestampWithTimeZone(ResultSet rs, String label) throws SQLException {
+        return "timestamptz".equals(rs.getMetaData().getColumnTypeName(rs.findColumn(label)));
     }
 
     private static Object normalize(Object value) {

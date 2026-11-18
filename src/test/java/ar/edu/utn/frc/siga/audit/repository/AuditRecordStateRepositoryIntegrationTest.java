@@ -11,6 +11,11 @@ import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.model.RecurringEvent;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.events.repository.RecurringEventRepository;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
+import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestRepository;
 import ar.edu.utn.frc.siga.settings.model.SettingKey;
 import ar.edu.utn.frc.siga.settings.service.SettingsStore;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
@@ -29,8 +34,10 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
+import java.sql.Timestamp;
 import java.time.DayOfWeek;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -60,6 +67,8 @@ class AuditRecordStateRepositoryIntegrationTest extends AbstractIntegrationTest 
     private RecurringEventRepository recurringEventRepository;
     @Autowired
     private OccurrenceRepository occurrenceRepository;
+    @Autowired
+    private RoomRequestRepository roomRequestRepository;
     @Autowired
     private SettingsStore settingsStore;
     @Autowired
@@ -144,6 +153,29 @@ class AuditRecordStateRepositoryIntegrationTest extends AbstractIntegrationTest 
         assertThat(states.previous()).isNotEmpty().containsOnlyKeys(states.current().keySet())
                 .containsValues((Object) null);
         assertThat(states.previous().values()).containsOnlyNulls();
+    }
+
+    @Test
+    @DisplayName("una columna timestamptz vuelve como el Instant guardado, sin pasar por la zona de la JVM")
+    void zonedTimestampIsReadAsInstant() {
+        AuditedEntity item = entity("RoomRequestItem");
+        Long[] itemId = new Long[1];
+        inTransaction(() -> {
+            RoomRequest request = testData.solicitudDeAula(RoomRequestType.ONE_TIME_ROOM_CHANGE,
+                    testData.materiaYComision().subjectId());
+            RoomRequestItem saved = testData.itemDePedido(request, testData.materiaYComision().commissionId(),
+                    LocalDate.now().plusDays(300), RoomRequestStatus.CANCELLED);
+            roomRequestRepository.save(request);
+            itemId[0] = saved.getId();
+        });
+        Instant stored = jdbcTemplate.queryForObject(
+                "SELECT fecha_decision FROM solicitud_aula_item WHERE " + item.idColumn() + " = ?",
+                Timestamp.class, itemId[0]).toInstant();
+        RecordRevision key = new RecordRevision(item, itemId[0].toString(), lastRevision(item, itemId[0]));
+
+        RecordStates states = stateRepository.load(List.of(key)).get(key);
+
+        assertThat(states.current().get("decidedAt")).isEqualTo(stored);
     }
 
     @Test

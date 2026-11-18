@@ -49,6 +49,7 @@ public final class FieldValueFormatter {
         return switch (value) {
             case Boolean flag -> flag ? "Sí" : "No";
             case LocalDate date -> DATE.format(date);
+            case Instant instant -> DATE_TIME.format(instant.atZone(LOCAL_ZONE));
             case LocalDateTime dateTime when column.valueType() == Instant.class ->
                     DATE_TIME.format(dateTime.toInstant(ZoneOffset.UTC).atZone(LOCAL_ZONE));
             case LocalDateTime dateTime -> DATE_TIME.format(dateTime);

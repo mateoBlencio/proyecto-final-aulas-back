@@ -45,7 +45,7 @@ final class FieldLabels {
             Map.entry("classroomCount", "Cantidad de aulas"), Map.entry("observations", "Observaciones"),
             Map.entry("derivedBuildingId", "Edificio derivado"), Map.entry("derivedAt", "Fecha de derivación"),
             Map.entry("returnedFromBuildingId", "Edificio que lo devolvió"),
-            Map.entry("returnedReason", "Motivo de devolución"), Map.entry("notifiedAt", "Fecha de notificación"),
+            Map.entry("returnedReason", "Motivo de devolución o retomado"), Map.entry("notifiedAt", "Fecha de notificación"),
             Map.entry("acceptanceDeadline", "Plazo de aceptación"), Map.entry("acceptedAt", "Fecha de aceptación"),
             Map.entry("acceptedBy", "Aceptado por"), Map.entry("notificationRound", "Ronda de notificación"),
             Map.entry("type", "Tipo"), Map.entry("scope", "Ámbito"), Map.entry("teacherName", "Docente"),
