@@ -43,7 +43,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public TokenResponse login(LoginRequest request, HttpServletRequest httpRequest) {
-        String email = request.email();
+        String email = AuthDomainProperties.normalizeEmail(request.email());
         String ip = httpRequest.getRemoteAddr();
 
         if (!authDomainProperties.isAllowedEmail(email)) {

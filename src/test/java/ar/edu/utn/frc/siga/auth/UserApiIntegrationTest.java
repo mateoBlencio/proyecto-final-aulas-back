@@ -87,6 +87,75 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("POST /v1/users con subdominio institucional (sistemas.frc.utn.edu.ar) crea el usuario (201)")
+    void create_institutionalSubdomain_returns201() throws Exception {
+        String email = "jperez" + System.nanoTime() + "@sistemas.frc.utn.edu.ar";
+
+        mockMvc.perform(post("/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(email, "supersegura")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.email").value(email));
+    }
+
+    @Test
+    @DisplayName("POST /v1/users con mayúsculas guarda y devuelve el email en minúsculas")
+    void create_mixedCaseEmail_persistsLowercase() throws Exception {
+        long n = System.nanoTime();
+        String lower = "jperez.mayus" + n + "@sistemas.frc.utn.edu.ar";
+        String mixed = "JPerez.Mayus" + n + "@Sistemas.FRC.utn.edu.ar";
+
+        MvcResult result = mockMvc.perform(post("/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(mixed, "supersegura")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.email").value(lower))
+                .andReturn();
+
+        long id = objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
+        assertThat(userRepository.findById(id).orElseThrow().getEmail()).isEqualTo(lower);
+    }
+
+    @Test
+    @DisplayName("POST /v1/users con un email que solo difiere en mayúsculas de uno existente responde 400 como duplicado")
+    void create_duplicateDifferingOnlyInCase_returns400() throws Exception {
+        String lower = "jperez.dup" + System.nanoTime() + "@frc.utn.edu.ar";
+        createUser(lower);
+
+        mockMvc.perform(post("/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(lower.toUpperCase(java.util.Locale.ROOT), "supersegura")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("User domain error"));
+
+        assertThat(userRepository.findAll().stream()
+                .filter(u -> u.getEmail().equalsIgnoreCase(lower))
+                .count()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("POST /v1/users con espacios alrededor del email responde 400 de validación y no crea el usuario")
+    void create_emailWithSurroundingSpaces_returns400() throws Exception {
+        // AuthControllerIntegrationTest siembra este usuario en la misma base: se compara antes y después.
+        String email = "subdominio.test@sistemas.frc.utn.edu.ar";
+        long before = usersMatching(email);
+
+        mockMvc.perform(post("/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody("  " + email + "  ", "supersegura")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.email").exists());
+
+        assertThat(usersMatching(email)).isEqualTo(before);
+    }
+
+    private long usersMatching(String email) {
+        return userRepository.findAll().stream()
+                .filter(saved -> saved.getEmail().strip().equalsIgnoreCase(email))
+                .count();
+    }
+
+    @Test
     @DisplayName("POST /v1/users con dominio no institucional responde 400")
     void create_nonInstitutionalDomain_returns400() throws Exception {
         mockMvc.perform(post("/v1/users")

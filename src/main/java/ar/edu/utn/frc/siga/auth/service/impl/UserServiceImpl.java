@@ -46,7 +46,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     @AuditOperation("Alta de usuario")
     public UserResponseDto create(CreateUserRequestDto dto, String currentUserEmail) {
-        String email = dto.email();
+        String email = AuthDomainProperties.normalizeEmail(dto.email());
         log.debug("Creando usuario: email={}", email);
 
         if (!authDomainProperties.isAllowedEmail(email)) {
@@ -134,17 +134,17 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public boolean hasRole(String email, SystemRole role) {
-        return userRepository.existsEnabledRoleForUser(email, role);
+        return userRepository.existsEnabledRoleForUser(AuthDomainProperties.normalizeEmail(email), role);
     }
 
     @Override
     public boolean hasGlobalRole(String email, SystemRole role) {
-        return userRepository.existsEnabledGlobalRoleForUser(email, role);
+        return userRepository.existsEnabledGlobalRoleForUser(AuthDomainProperties.normalizeEmail(email), role);
     }
 
     @Override
     public Set<Long> findBuildingIdsForRole(String email, SystemRole role) {
-        return userRepository.findBuildingIdsForUserAndRole(email, role);
+        return userRepository.findBuildingIdsForUserAndRole(AuthDomainProperties.normalizeEmail(email), role);
     }
 
     private User findExisting(Long id) {

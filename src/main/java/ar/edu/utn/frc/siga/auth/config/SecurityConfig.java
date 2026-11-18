@@ -25,7 +25,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-@EnableConfigurationProperties({JwtProperties.class, LoginRateLimitProperties.class, AuthDomainProperties.class})
+@EnableConfigurationProperties({JwtProperties.class, LoginRateLimitProperties.class})
 @RequiredArgsConstructor
 public class SecurityConfig {
 

@@ -27,6 +27,10 @@ WHERE u.correo = 'auxiliar.test@frc.utn.edu.ar'
   );
 
 INSERT INTO usuario (correo, password_hash, habilitado, nombre, apellido)
+SELECT 'subdominio.test@sistemas.frc.utn.edu.ar', '$2y$10$o7WlgInnrDPs6RaXEE.P8.u5kv/Z.q6MxDmfAobeVTp50itKh4Yoi', true, 'Subdominio', 'Test'
+WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE correo = 'subdominio.test@sistemas.frc.utn.edu.ar');
+
+INSERT INTO usuario (correo, password_hash, habilitado, nombre, apellido)
 SELECT 'disabled.test@frc.utn.edu.ar', '$2y$10$o7WlgInnrDPs6RaXEE.P8.u5kv/Z.q6MxDmfAobeVTp50itKh4Yoi', false, 'Disabled', 'Test'
 WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE correo = 'disabled.test@frc.utn.edu.ar');
 

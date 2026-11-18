@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.auth.security;
 
+import ar.edu.utn.frc.siga.auth.config.AuthDomainProperties;
 import ar.edu.utn.frc.siga.auth.config.LoginRateLimitProperties;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -7,7 +8,6 @@ import java.time.Duration;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.time.Instant;
-import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -28,7 +28,7 @@ public class LoginRateLimiter {
     // address) and ip alone with a higher cap (so one address cannot spray many emails). A third counter
     // per email never blocks: it only logs a WARN past a threshold, to detect distributed brute force.
     private static String emailKey(String email, String ip) {
-        return "e:" + normalizeEmail(email) + "|" + normalizeIp(ip);
+        return "e:" + AuthDomainProperties.normalizeEmail(email) + "|" + normalizeIp(ip);
     }
 
     private static String ipKey(String ip) {
@@ -36,11 +36,7 @@ public class LoginRateLimiter {
     }
 
     private static String alertKey(String email) {
-        return "a:" + normalizeEmail(email);
-    }
-
-    private static String normalizeEmail(String email) {
-        return email.trim().toLowerCase(Locale.ROOT);
+        return "a:" + AuthDomainProperties.normalizeEmail(email);
     }
 
     // IPv6 clients usually own a whole /64, so rotating the lower 64 bits must not evade the counter
