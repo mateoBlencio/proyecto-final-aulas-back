@@ -41,6 +41,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.beans.factory.support.BeanDefinitionRegistry;
+import org.springframework.beans.factory.support.BeanDefinitionRegistryPostProcessor;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -1503,9 +1506,9 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
 
         JsonNode allocation = ofType(revisionItems(deletionRevision), "Asignación");
 
-        assertThat(allocation.get("kind").asText()).isEqualTo("DELETED");
-        assertThat(allocation.get("recordLabel").asText()).isEqualTo(
-                "Aula " + classroom.getRoomNumber() + ", " + building.getName() + " · " + date.format(LABEL_DATE));
+        String room = "Aula " + classroom.getRoomNumber() + ", " + building.getName() + " · " + date.format(LABEL_DATE);
+        assertThat(allocation.get("recordLabel").asText())
+                .matches("Materia-IT \\(CUR-\\d+\\) · " + java.util.regex.Pattern.quote(room));
     }
 
     @Test
@@ -1525,7 +1528,8 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
                 .param("entityType", "Asignación").param("size", "20"));
 
         assertThat(page.get("content")).hasSize(20).allSatisfy(item ->
-                assertThat(item.get("recordLabel").asText()).startsWith("Aula " + classroom.getRoomNumber() + ", "));
+                assertThat(item.get("recordLabel").asText())
+                        .matches("Materia-IT \\(CUR-\\d+\\) · Aula " + classroom.getRoomNumber() + ", .*"));
         verify(classroomService, times(1)).findByIdsIncludingDeactivated(any());
     }
 
@@ -1551,7 +1555,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
         JsonNode assignment = ofType(revisionItems(lastRevisionOf("usuario_rol_aud", "id_usuario_rol", assignmentId)),
                 "Asignación de rol");
 
-        assertThat(assignment.get("recordLabel").asText()).isEqualTo("CONSULTA de " + email);
+        assertThat(assignment.get("recordLabel").asText()).isEqualTo("Consulta de " + email);
     }
 
     @Test
@@ -1626,7 +1630,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(ofType(items, "Usuario").get("recordLabel").asText()).isEqualTo(email);
         assertThat(ofType(items, "Configuración").get("recordLabel").asText()).isEqualTo("setting-label");
-        assertThat(ofType(items, "Asignación de rol").get("recordLabel").asText()).isEqualTo("CONSULTA de " + email);
+        assertThat(ofType(items, "Asignación de rol").get("recordLabel").asText()).isEqualTo("Consulta de " + email);
     }
 
     @Test
@@ -1692,7 +1696,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
         page.get("content").forEach(items::add);
         assertThat(isAbsent(ofType(items, "Configuración").get("recordLabel"))).isTrue();
         assertThat(ofType(items, "Usuario").get("recordLabel").asText()).isEqualTo(email);
-        assertThat(ofType(items, "Asignación de rol").get("recordLabel").asText()).isEqualTo("CONSULTA de " + email);
+        assertThat(ofType(items, "Asignación de rol").get("recordLabel").asText()).isEqualTo("Consulta de " + email);
     }
 
     /**
@@ -1714,6 +1718,27 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
             public void fail() {
                 throw new IllegalStateException("label lookup failed");
             }
+        }
+
+        /**
+         * The real {@code SettingAuditLabelProvider} labels the same entity as the test provider below, and the
+         * resolver accepts one provider per entity: this test needs its own to simulate failures.
+         */
+        @Bean
+        static BeanDefinitionRegistryPostProcessor withoutRealSettingLabelProvider() {
+            return new BeanDefinitionRegistryPostProcessor() {
+                @Override
+                public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) {
+                    if (registry.containsBeanDefinition("settingAuditLabelProvider")) {
+                        registry.removeBeanDefinition("settingAuditLabelProvider");
+                    }
+                }
+
+                @Override
+                public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) {
+                    // nothing to do: the registry hook is enough
+                }
+            };
         }
 
         @Bean

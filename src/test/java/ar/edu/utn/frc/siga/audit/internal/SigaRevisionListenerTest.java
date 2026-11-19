@@ -115,7 +115,7 @@ class SigaRevisionListenerTest {
     @Test
     @DisplayName("una operación abierta no cambia la clasificación del actor y se copia a la revisión")
     void operationDoesNotAffectActorType() {
-        AuditOperationContext.begin("Vencimiento automático", null);
+        AuditOperationContext.begin("Vencimiento automático", null, "");
 
         SigaRevision revision = newRevision();
 
@@ -127,7 +127,7 @@ class SigaRevisionListenerTest {
     @Test
     @DisplayName("la operación abierta con padre copia el padre a la revisión")
     void operationParentIsCopiedToRevision() {
-        AuditOperationContext.begin("Liberación", "parent-op-1");
+        AuditOperationContext.begin("Liberación", "parent-op-1", "");
 
         SigaRevision revision = newRevision();
 

@@ -106,4 +106,13 @@ class ClassroomAuditLabelProviderTest {
 
         assertThat(provider.labels(List.of(record("1", null, 2L)))).isEmpty();
     }
+
+    @Test
+    @DisplayName("summaryLabels: edificio entre paréntesis, sin coma; sin edificio, solo el aula")
+    void summaryLabels_buildingInParentheses() {
+        when(buildingRepository.findAllById(any())).thenReturn(List.of(building(2L, "Central")));
+
+        assertThat(provider.summaryLabels(List.of(record("1", 101, 2L), record("2", 5, null))))
+                .containsOnly(Map.entry("1", "Aula 101 (Central)"), Map.entry("2", "Aula 5"));
+    }
 }

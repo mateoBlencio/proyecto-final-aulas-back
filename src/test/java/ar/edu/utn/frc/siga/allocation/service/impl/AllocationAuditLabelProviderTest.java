@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.allocation.service.impl;
 
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.audit.AuditedRecord;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceAuditRefDto;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
@@ -50,6 +51,10 @@ class AllocationAuditLabelProviderTest {
         return new AuditedRecord(id, values);
     }
 
+    private static OccurrenceAuditRefDto ref(Long occurrenceId, String eventLabel, LocalDate date) {
+        return new OccurrenceAuditRefDto(occurrenceId, 100L + occurrenceId, eventLabel, date);
+    }
+
     private static ClassroomResponseDto classroom(Long id, int roomNumber, String building) {
         return new ClassroomResponseDto(id, roomNumber, 40, 1L, building, 1L, "Aula común", null, true);
     }
@@ -61,14 +66,14 @@ class AllocationAuditLabelProviderTest {
     }
 
     @Test
-    @DisplayName("formato completo: 'Aula {nro}, {edificio} · dd/MM/yyyy'")
+    @DisplayName("formato completo: '{materia} ({comisión}) · Aula {nro}, {edificio} · dd/MM/yyyy'")
     void labels_fullRecord_usesRoomAndDate() {
         when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 101, "Central")));
-        when(occurrenceService.findDatesByIds(any())).thenReturn(Map.of(8L, LocalDate.of(2026, 3, 4)));
+        when(occurrenceService.findAuditRefs(any())).thenReturn(Map.of(8L, ref(8L, "Análisis Matemático I (1K1)", LocalDate.of(2026, 3, 4))));
 
         Map<String, String> labels = provider.labels(List.of(record("1", 5L, 8L)));
 
-        assertThat(labels).containsExactly(Map.entry("1", "Aula 101, Central · 04/03/2026"));
+        assertThat(labels).containsExactly(Map.entry("1", "Análisis Matemático I (1K1) · Aula 101, Central · 04/03/2026"));
     }
 
     @Test
@@ -77,8 +82,8 @@ class AllocationAuditLabelProviderTest {
     void labels_severalRecords_oneBatchCallPerService() {
         when(classroomService.findByIdsIncludingDeactivated(any()))
                 .thenReturn(List.of(classroom(5L, 101, "Central"), classroom(6L, 202, "Anexo")));
-        when(occurrenceService.findDatesByIds(any()))
-                .thenReturn(Map.of(8L, LocalDate.of(2026, 3, 4), 9L, LocalDate.of(2026, 12, 31)));
+        when(occurrenceService.findAuditRefs(any()))
+                .thenReturn(Map.of(8L, ref(8L, "Álgebra (1K1)", LocalDate.of(2026, 3, 4)), 9L, ref(9L, "Física I (2K3)", LocalDate.of(2026, 12, 31))));
 
         Map<String, String> labels = provider.labels(List.of(
                 record("1", 5L, 8L), record("2", 5L, 9L), record("3", 6L, 9L)));
@@ -86,30 +91,30 @@ class AllocationAuditLabelProviderTest {
         ArgumentCaptor<Collection<Long>> classroomIds = ArgumentCaptor.forClass(Collection.class);
         ArgumentCaptor<Collection<Long>> occurrenceIds = ArgumentCaptor.forClass(Collection.class);
         verify(classroomService, times(1)).findByIdsIncludingDeactivated(classroomIds.capture());
-        verify(occurrenceService, times(1)).findDatesByIds(occurrenceIds.capture());
+        verify(occurrenceService, times(1)).findAuditRefs(occurrenceIds.capture());
         verify(classroomService, never()).findByIds(any());
         assertThat(classroomIds.getValue()).containsExactlyInAnyOrder(5L, 6L);
         assertThat(occurrenceIds.getValue()).containsExactlyInAnyOrder(8L, 9L);
         assertThat(labels).containsOnly(
-                Map.entry("1", "Aula 101, Central · 04/03/2026"),
-                Map.entry("2", "Aula 101, Central · 31/12/2026"),
-                Map.entry("3", "Aula 202, Anexo · 31/12/2026"));
+                Map.entry("1", "Álgebra (1K1) · Aula 101, Central · 04/03/2026"),
+                Map.entry("2", "Física I (2K3) · Aula 101, Central · 31/12/2026"),
+                Map.entry("3", "Física I (2K3) · Aula 202, Anexo · 31/12/2026"));
     }
 
     @Test
-    @DisplayName("sin el aula muestra solo la fecha")
+    @DisplayName("sin el aula muestra solo evento y fecha")
     void labels_missingClassroom_showsOnlyDate() {
         when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of());
-        when(occurrenceService.findDatesByIds(any())).thenReturn(Map.of(8L, LocalDate.of(2026, 3, 4)));
+        when(occurrenceService.findAuditRefs(any())).thenReturn(Map.of(8L, ref(8L, "Análisis Matemático I (1K1)", LocalDate.of(2026, 3, 4))));
 
-        assertThat(provider.labels(List.of(record("1", 5L, 8L)))).containsExactly(Map.entry("1", "04/03/2026"));
+        assertThat(provider.labels(List.of(record("1", 5L, 8L)))).containsExactly(Map.entry("1", "Análisis Matemático I (1K1) · 04/03/2026"));
     }
 
     @Test
     @DisplayName("con la ocurrencia borrada muestra solo 'Aula {nro}, {edificio}'")
     void labels_missingOccurrence_showsOnlyRoom() {
         when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 101, "Central")));
-        when(occurrenceService.findDatesByIds(any())).thenReturn(Map.of());
+        when(occurrenceService.findAuditRefs(any())).thenReturn(Map.of());
 
         assertThat(provider.labels(List.of(record("1", 5L, 8L)))).containsExactly(Map.entry("1", "Aula 101, Central"));
     }
@@ -118,7 +123,7 @@ class AllocationAuditLabelProviderTest {
     @DisplayName("sin aula ni ocurrencia el registro no tiene etiqueta")
     void labels_neitherFound_hasNoLabel() {
         when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of());
-        when(occurrenceService.findDatesByIds(any())).thenReturn(Map.of());
+        when(occurrenceService.findAuditRefs(any())).thenReturn(Map.of());
 
         assertThat(provider.labels(List.of(record("1", 5L, 8L)))).isEmpty();
     }
@@ -134,10 +139,50 @@ class AllocationAuditLabelProviderTest {
     @Test
     @DisplayName("un registro sin aula no consulta aulas pero sí etiqueta con la fecha")
     void labels_noClassroomId_skipsClassroomLookup() {
-        when(occurrenceService.findDatesByIds(any())).thenReturn(Map.of(8L, LocalDate.of(2026, 3, 4)));
+        when(occurrenceService.findAuditRefs(any())).thenReturn(Map.of(8L, ref(8L, "Análisis Matemático I (1K1)", LocalDate.of(2026, 3, 4))));
 
-        assertThat(provider.labels(List.of(record("1", null, 8L)))).containsExactly(Map.entry("1", "04/03/2026"));
+        assertThat(provider.labels(List.of(record("1", null, 8L)))).containsExactly(Map.entry("1", "Análisis Matemático I (1K1) · 04/03/2026"));
 
         verifyNoInteractions(classroomService);
+    }
+
+    @Test
+    @DisplayName("sin etiqueta de evento (evento sin materia ni comisión) el label sigue con aula y fecha")
+    void labels_eventWithoutLabel_showsRoomAndDate() {
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 101, "Central")));
+        when(occurrenceService.findAuditRefs(any())).thenReturn(Map.of(8L, ref(8L, null, LocalDate.of(2026, 3, 4))));
+
+        assertThat(provider.labels(List.of(record("1", 5L, 8L))))
+                .containsExactly(Map.entry("1", "Aula 101, Central · 04/03/2026"));
+    }
+
+    @Test
+    @DisplayName("summaryLabels es solo materia y comisión, sin aula ni fecha, y no consulta aulas")
+    void summaryLabels_isOnlySubjectAndCommission() {
+        when(occurrenceService.findAuditRefs(any())).thenReturn(Map.of(
+                8L, ref(8L, "Análisis Matemático I (1K1)", LocalDate.of(2026, 3, 4)),
+                9L, ref(9L, "Física I (2K3)", LocalDate.of(2026, 3, 5))));
+
+        Map<String, String> summaries = provider.summaryLabels(List.of(record("1", 5L, 8L), record("2", 6L, 9L)));
+
+        assertThat(summaries).containsOnly(
+                Map.entry("1", "Análisis Matemático I (1K1)"), Map.entry("2", "Física I (2K3)"));
+        verifyNoInteractions(classroomService);
+    }
+
+    @Test
+    @DisplayName("summaryLabels con la ocurrencia borrada no devuelve resumen para ese registro")
+    void summaryLabels_missingOccurrence_hasNoSummary() {
+        when(occurrenceService.findAuditRefs(any())).thenReturn(Map.of());
+
+        assertThat(provider.summaryLabels(List.of(record("1", 5L, 8L)))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("summaryLabels sin ids de ocurrencia no consulta ningún servicio")
+    void summaryLabels_noOccurrenceIds_queriesNothing() {
+        assertThat(provider.summaryLabels(List.of(record("1", 5L, null)))).isEmpty();
+
+        verifyNoInteractions(classroomService, occurrenceService);
     }
 }

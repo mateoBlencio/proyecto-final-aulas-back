@@ -48,4 +48,19 @@ class HolidayAuditLabelProviderTest {
     void labels_invalidDateId_hasNoLabel() {
         assertThat(provider.labels(List.of(record("09/07/2026", "Día de la Independencia")))).isEmpty();
     }
+
+    @Test
+    @DisplayName("summaryLabels: fecha y descripción entre paréntesis, sin la palabra Feriado; sin descripción, solo la fecha")
+    void summaryLabels_dateAndDescription() {
+        assertThat(provider.summaryLabels(List.of(record("2026-07-09", "Día de la Independencia"),
+                record("2026-05-25", null))))
+                .containsOnly(Map.entry("2026-07-09", "09/07/2026 (Día de la Independencia)"),
+                        Map.entry("2026-05-25", "25/05/2026"));
+    }
+
+    @Test
+    @DisplayName("summaryLabels: un id que no es fecha ISO deja el registro sin resumen")
+    void summaryLabels_invalidDateId_hasNoSummary() {
+        assertThat(provider.summaryLabels(List.of(record("09/07/2026", "x")))).isEmpty();
+    }
 }

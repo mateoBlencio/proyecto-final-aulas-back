@@ -21,4 +21,12 @@ public interface AuditLabelProvider {
 
     /** Labels by record id. A record missing from the result has no label. */
     Map<String, String> labels(List<AuditedRecord> records);
+
+    /**
+     * Short name of each record for the operation summary. It cannot contain commas: the summary lists the names
+     * separated by commas. Defaults to {@link #labels(List)}.
+     */
+    default Map<String, String> summaryLabels(List<AuditedRecord> records) {
+        return labels(records);
+    }
 }

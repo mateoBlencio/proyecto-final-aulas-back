@@ -18,10 +18,12 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, Long> {
         Long getId();
 
         LocalDate getDate();
+
+        Long getEventId();
     }
 
-    /** Id and date only: does not initialize the event. */
-    @Query("select o.id as id, o.date as date from Occurrence o where o.id in :ids")
+    /** Id, date and event id only: does not initialize the event. */
+    @Query("select o.id as id, o.date as date, o.event.id as eventId from Occurrence o where o.id in :ids")
     List<OccurrenceDate> findDatesByIdIn(Collection<Long> ids);
 
     @Query(value = """

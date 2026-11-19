@@ -64,13 +64,13 @@ class RoleAssignmentAuditLabelProviderTest {
     }
 
     @Test
-    @DisplayName("formato '{ROL} de {email}'")
+    @DisplayName("formato '{rol en español} de {email}'")
     void labels_roleAndEmail() {
         when(userRepository.findEmailsByIdIn(any())).thenReturn(List.of(new Email(7L, "ana@frc.utn.edu.ar")));
 
         Map<String, String> labels = provider.labels(List.of(record("1", "SUBSECRETARIA", 7L)));
 
-        assertThat(labels).containsExactly(Map.entry("1", "SUBSECRETARIA de ana@frc.utn.edu.ar"));
+        assertThat(labels).containsExactly(Map.entry("1", "Subsecretaría de ana@frc.utn.edu.ar"));
     }
 
     @Test
@@ -87,9 +87,9 @@ class RoleAssignmentAuditLabelProviderTest {
         verify(userRepository, times(1)).findEmailsByIdIn(ids.capture());
         assertThat(ids.getValue()).containsExactlyInAnyOrder(7L, 8L);
         assertThat(labels).containsOnly(
-                Map.entry("1", "CONSULTA de ana@frc.utn.edu.ar"),
-                Map.entry("2", "SUBSECRETARIA de ana@frc.utn.edu.ar"),
-                Map.entry("3", "CONSULTA de luis@frc.utn.edu.ar"));
+                Map.entry("1", "Consulta de ana@frc.utn.edu.ar"),
+                Map.entry("2", "Subsecretaría de ana@frc.utn.edu.ar"),
+                Map.entry("3", "Consulta de luis@frc.utn.edu.ar"));
     }
 
     @Test
@@ -97,13 +97,13 @@ class RoleAssignmentAuditLabelProviderTest {
     void labels_userNotFound_showsOnlyRole() {
         when(userRepository.findEmailsByIdIn(any())).thenReturn(List.of());
 
-        assertThat(provider.labels(List.of(record("1", "CONSULTA", 7L)))).containsExactly(Map.entry("1", "CONSULTA"));
+        assertThat(provider.labels(List.of(record("1", "CONSULTA", 7L)))).containsExactly(Map.entry("1", "Consulta"));
     }
 
     @Test
     @DisplayName("sin usuario en el estado muestra solo el rol y no consulta emails")
     void labels_noUserId_showsOnlyRoleWithoutLookup() {
-        assertThat(provider.labels(List.of(record("1", "CONSULTA", null)))).containsExactly(Map.entry("1", "CONSULTA"));
+        assertThat(provider.labels(List.of(record("1", "CONSULTA", null)))).containsExactly(Map.entry("1", "Consulta"));
 
         verifyNoInteractions(userRepository);
     }

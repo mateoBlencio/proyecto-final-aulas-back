@@ -25,6 +25,15 @@ class HolidayAuditLabelProvider implements AuditLabelProvider {
 
     @Override
     public Map<String, String> labels(List<AuditedRecord> records) {
+        return build(records, false);
+    }
+
+    @Override
+    public Map<String, String> summaryLabels(List<AuditedRecord> records) {
+        return build(records, true);
+    }
+
+    private Map<String, String> build(List<AuditedRecord> records, boolean summary) {
         Map<String, String> labels = new HashMap<>();
         for (AuditedRecord record : records) {
             String date = formatted(record.recordId());
@@ -32,8 +41,9 @@ class HolidayAuditLabelProvider implements AuditLabelProvider {
                 continue;
             }
             String description = record.text("description");
-            labels.put(record.recordId(), description == null || description.isBlank()
-                    ? "Feriado " + date : "Feriado " + date + " · " + description);
+            boolean hasDescription = description != null && !description.isBlank();
+            labels.put(record.recordId(), !hasDescription ? (summary ? date : "Feriado " + date)
+                    : summary ? date + " (" + description + ")" : "Feriado " + date + " · " + description);
         }
         return labels;
     }

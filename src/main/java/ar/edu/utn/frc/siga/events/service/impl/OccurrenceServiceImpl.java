@@ -1,6 +1,8 @@
 package ar.edu.utn.frc.siga.events.service.impl;
 
 import ar.edu.utn.frc.siga.audit.AuditOperation;
+import ar.edu.utn.frc.siga.common.util.Chunks;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceAuditRefDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
@@ -31,9 +33,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OccurrenceServiceImpl implements OccurrenceService {
 
+    private static final int AUDIT_REFS_CHUNK_SIZE = 10_000;
+
     private final OccurrenceRepository occurrenceRepository;
     private final EventScheduleValidator eventScheduleValidator;
     private final SuspendedEventRepository suspendedEventRepository;
+    private final EventLabels eventLabels;
 
     @Override
     @Transactional(readOnly = true)
@@ -49,10 +54,17 @@ public class OccurrenceServiceImpl implements OccurrenceService {
 
     @Override
     @Transactional(readOnly = true)
-    public Map<Long, LocalDate> findDatesByIds(Collection<Long> occurrenceIds) {
-        return occurrenceRepository.findDatesByIdIn(occurrenceIds).stream()
-                .collect(Collectors.toMap(OccurrenceRepository.OccurrenceDate::getId,
-                        OccurrenceRepository.OccurrenceDate::getDate));
+    public Map<Long, OccurrenceAuditRefDto> findAuditRefs(Collection<Long> occurrenceIds) {
+        List<OccurrenceRepository.OccurrenceDate> rows = Chunks.query(occurrenceIds, AUDIT_REFS_CHUNK_SIZE,
+                occurrenceRepository::findDatesByIdIn);
+        Map<Long, String> eventLabelsById = eventLabels.labelsOfEventIds(
+                rows.stream().map(OccurrenceRepository.OccurrenceDate::getEventId).collect(Collectors.toSet()));
+        Map<Long, OccurrenceAuditRefDto> refs = new HashMap<>();
+        for (OccurrenceRepository.OccurrenceDate row : rows) {
+            refs.put(row.getId(), new OccurrenceAuditRefDto(row.getId(), row.getEventId(),
+                    eventLabelsById.get(row.getEventId()), row.getDate()));
+        }
+        return refs;
     }
 
     @Override

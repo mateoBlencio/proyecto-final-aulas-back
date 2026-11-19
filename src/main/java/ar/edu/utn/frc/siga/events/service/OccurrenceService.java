@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.events.service;
 
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceAuditRefDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.model.ReleaseReason;
@@ -19,8 +20,8 @@ public interface OccurrenceService {
 
     List<OccurrenceSlotDto> findSlots(Collection<Long> occurrenceIds);
 
-    /** Fecha de cada ocurrencia por id, sin cargar el evento (para etiquetas de auditoría). */
-    Map<Long, LocalDate> findDatesByIds(Collection<Long> occurrenceIds);
+    /** Fecha, evento y etiqueta del evento de cada ocurrencia por id (para etiquetas de auditoría). */
+    Map<Long, OccurrenceAuditRefDto> findAuditRefs(Collection<Long> occurrenceIds);
 
     List<OccurrenceSlotDto> findSlotsByEvent(Long eventId, LocalDate from);
 

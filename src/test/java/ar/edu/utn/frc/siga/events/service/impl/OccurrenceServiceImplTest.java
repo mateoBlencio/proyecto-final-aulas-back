@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.events.service.impl;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.events.EventTestData;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceAuditRefDto;
 import ar.edu.utn.frc.siga.events.exception.OccurrenceAlreadyPastException;
 import ar.edu.utn.frc.siga.events.model.AcademicEvent;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
@@ -47,12 +48,15 @@ class OccurrenceServiceImplTest {
     private EventScheduleValidator eventScheduleValidator;
     @Mock
     private SuspendedEventRepository suspendedEventRepository;
+    @Mock
+    private EventLabels eventLabels;
 
     private OccurrenceServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new OccurrenceServiceImpl(occurrenceRepository, eventScheduleValidator, suspendedEventRepository);
+        service = new OccurrenceServiceImpl(occurrenceRepository, eventScheduleValidator, suspendedEventRepository,
+                eventLabels);
     }
 
     private Occurrence occurrence(Long id, OccurrenceStatus status) {
@@ -62,22 +66,28 @@ class OccurrenceServiceImplTest {
     }
 
     @Test
-    @DisplayName("findDatesByIds devuelve id -> fecha con una sola consulta de proyección, sin cargar entidades")
-    void findDatesByIds_mapsProjectionByIdWithOneQuery() {
+    @DisplayName("findAuditRefs arma fecha, evento y etiqueta con una consulta de proyección y una de etiquetas, sin cargar ocurrencias")
+    void findAuditRefs_mapsProjectionWithEventLabel() {
         OccurrenceRepository.OccurrenceDate first = org.mockito.Mockito.mock(OccurrenceRepository.OccurrenceDate.class);
         OccurrenceRepository.OccurrenceDate second = org.mockito.Mockito.mock(OccurrenceRepository.OccurrenceDate.class);
         when(first.getId()).thenReturn(1L);
         when(first.getDate()).thenReturn(LocalDate.of(2026, 3, 4));
+        when(first.getEventId()).thenReturn(10L);
         when(second.getId()).thenReturn(2L);
         when(second.getDate()).thenReturn(LocalDate.of(2026, 12, 31));
+        when(second.getEventId()).thenReturn(11L);
         when(occurrenceRepository.findDatesByIdIn(List.of(1L, 2L, 3L))).thenReturn(List.of(first, second));
+        when(eventLabels.labelsOfEventIds(any())).thenReturn(java.util.Map.of(10L, "Álgebra (1K1)"));
 
-        java.util.Map<Long, LocalDate> dates = service.findDatesByIds(List.of(1L, 2L, 3L));
+        java.util.Map<Long, OccurrenceAuditRefDto> refs = service.findAuditRefs(List.of(1L, 2L, 3L));
 
-        assertThat(dates).containsOnly(
-                java.util.Map.entry(1L, LocalDate.of(2026, 3, 4)), java.util.Map.entry(2L, LocalDate.of(2026, 12, 31)));
+        assertThat(refs).containsOnly(
+                java.util.Map.entry(1L, new OccurrenceAuditRefDto(1L, 10L, "Álgebra (1K1)", LocalDate.of(2026, 3, 4))),
+                java.util.Map.entry(2L, new OccurrenceAuditRefDto(2L, 11L, null, LocalDate.of(2026, 12, 31))));
         verify(occurrenceRepository, never()).findAllById(any());
+        verify(eventLabels, org.mockito.Mockito.times(1)).labelsOfEventIds(any());
     }
+
 
 
     @Test

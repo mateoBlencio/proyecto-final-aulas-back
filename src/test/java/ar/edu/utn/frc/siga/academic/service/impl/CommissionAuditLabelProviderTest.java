@@ -106,4 +106,13 @@ class CommissionAuditLabelProviderTest {
 
         assertThat(provider.labels(List.of(record("1", null, 5L)))).isEmpty();
     }
+
+    @Test
+    @DisplayName("summaryLabels: código con el período entre paréntesis, sin la palabra Comisión; sin período, solo el código")
+    void summaryLabels_codeAndPeriodInParentheses() {
+        when(academicPeriodRepository.findAllById(any())).thenReturn(List.of(period(5L, 2026, 1)));
+
+        assertThat(provider.summaryLabels(List.of(record("1", "5D1", 5L), record("2", "4K1", null))))
+                .containsOnly(Map.entry("1", "5D1 (2026/1)"), Map.entry("2", "4K1"));
+    }
 }
