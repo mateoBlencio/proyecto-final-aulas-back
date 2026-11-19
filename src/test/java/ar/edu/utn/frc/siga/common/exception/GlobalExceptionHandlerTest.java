@@ -46,8 +46,18 @@ class GlobalExceptionHandlerTest {
         ProblemDetail problem = handler.handleAppException(ResourceNotFoundException.of("Subject", 5L));
 
         assertThat(problem.getStatus()).isEqualTo(404);
-        assertThat(problem.getTitle()).isEqualTo("Resource not found");
-        assertThat(problem.getDetail()).isEqualTo("Subject not found with id: 5");
+        assertThat(problem.getTitle()).isEqualTo("Recurso no encontrado");
+        assertThat(problem.getDetail()).isEqualTo("No existe la materia 5.");
+    }
+
+    @Test
+    @DisplayName("ResourceNotFoundException con entidad desconocida usa el fallback \"el recurso\"")
+    void resourceNotFoundExceptionUnknownEntityUsesFallback() {
+        ProblemDetail problem = handler.handleAppException(ResourceNotFoundException.of("EntidadNueva", 7L));
+
+        assertThat(problem.getStatus()).isEqualTo(404);
+        assertThat(problem.getTitle()).isEqualTo("Recurso no encontrado");
+        assertThat(problem.getDetail()).isEqualTo("No existe el recurso 7.");
     }
 
     @Test

@@ -192,7 +192,7 @@ class AcademicPeriodServiceImplTest {
 
         assertThatThrownBy(() -> service.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("AcademicPeriod not found with id: 99");
+                .hasMessage("No existe el período académico 99.");
     }
 
     @Test

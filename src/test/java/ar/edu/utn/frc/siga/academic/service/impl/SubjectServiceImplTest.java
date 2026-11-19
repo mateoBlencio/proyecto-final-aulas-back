@@ -84,7 +84,7 @@ class SubjectServiceImplTest {
 
         assertThatThrownBy(() -> service.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Subject not found with id: 99");
+                .hasMessage("No existe la materia 99.");
     }
 
     @Test
@@ -168,7 +168,7 @@ class SubjectServiceImplTest {
 
         assertThatThrownBy(() -> service.findByCodeAndStudyPlan(101, 2020, 999))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Specialty not found with id: 999");
+                .hasMessage("No existe la especialidad 999.");
     }
 
     @Test
@@ -179,7 +179,7 @@ class SubjectServiceImplTest {
 
         assertThatThrownBy(() -> service.findByCodeAndStudyPlan(101, 2020, 10))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("StudyPlan not found with id: 2020");
+                .hasMessage("No existe el plan de estudio 2020.");
     }
 
     @Test
@@ -191,7 +191,7 @@ class SubjectServiceImplTest {
 
         assertThatThrownBy(() -> service.findByCodeAndStudyPlan(101, 2020, 10))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Subject not found with id: 101");
+                .hasMessage("No existe la materia 101.");
     }
 
     @Test

@@ -90,7 +90,7 @@ class CommissionServiceImplTest {
 
         assertThatThrownBy(() -> service.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Commission not found with id: 99");
+                .hasMessage("No existe la comisión 99.");
     }
 
     @Test
@@ -140,7 +140,7 @@ class CommissionServiceImplTest {
 
         assertThatThrownBy(() -> service.findByCourseAndPeriod("K1001", 2030, 2))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("AcademicPeriod not found with id: 2030-2");
+                .hasMessage("No existe el período académico 2030-2.");
         verify(commissionRepository, never()).findByCourseCodeAndAcademicPeriod(any(), any());
     }
 

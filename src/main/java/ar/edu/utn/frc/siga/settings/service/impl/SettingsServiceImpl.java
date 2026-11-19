@@ -96,7 +96,7 @@ public class SettingsServiceImpl implements SettingsService {
         try {
             return SettingKey.fromKey(key);
         } catch (IllegalArgumentException ex) {
-            throw new ResourceNotFoundException("Setting not found with id: " + key);
+            throw new ResourceNotFoundException("No existe la configuración " + key + ".");
         }
     }
 }

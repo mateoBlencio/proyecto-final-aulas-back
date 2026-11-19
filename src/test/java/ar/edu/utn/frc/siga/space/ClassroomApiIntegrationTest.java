@@ -93,7 +93,7 @@ class ClassroomApiIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(dto)))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.title").value("Resource not found"));
+                .andExpect(jsonPath("$.title").value("Recurso no encontrado"));
     }
 
     @Test

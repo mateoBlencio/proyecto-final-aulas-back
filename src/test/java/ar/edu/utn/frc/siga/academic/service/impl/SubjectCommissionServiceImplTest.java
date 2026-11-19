@@ -96,7 +96,7 @@ class SubjectCommissionServiceImplTest {
 
         assertThatThrownBy(() -> service.findBySubjectAndCommission(99L, 2L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Subject not found with id: 99");
+                .hasMessage("No existe la materia 99.");
     }
 
     private SubjectCommission linkOf(long subjectId, int specialtyCode, int planCode) {

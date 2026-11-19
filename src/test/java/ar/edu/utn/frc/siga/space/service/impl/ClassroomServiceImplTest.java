@@ -147,7 +147,7 @@ class ClassroomServiceImplTest {
 
         assertThatThrownBy(() -> service.create(dto))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Building not found with id: 1");
+                .hasMessage("No existe el edificio 1.");
         verify(classroomTypeService, never()).findById(any());
     }
 
@@ -159,7 +159,7 @@ class ClassroomServiceImplTest {
 
         assertThatThrownBy(() -> service.create(dto))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Building not found with id: 1");
+                .hasMessage("No existe el edificio 1.");
     }
 
     @Test
@@ -240,7 +240,7 @@ class ClassroomServiceImplTest {
 
         assertThatThrownBy(() -> service.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Classroom not found with id: 99");
+                .hasMessage("No existe el aula 99.");
     }
 
 
@@ -401,7 +401,7 @@ class ClassroomServiceImplTest {
 
         assertThatThrownBy(() -> service.update(1L, dto))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Classroom not found with id: 1");
+                .hasMessage("No existe el aula 1.");
     }
 
     @Test
@@ -414,7 +414,7 @@ class ClassroomServiceImplTest {
 
         assertThatThrownBy(() -> service.update(1L, dto))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Building not found with id: 1");
+                .hasMessage("No existe el edificio 1.");
     }
 
     @Test
@@ -450,7 +450,7 @@ class ClassroomServiceImplTest {
 
         assertThatThrownBy(() -> service.delete(1L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Classroom not found with id: 1");
+                .hasMessage("No existe el aula 1.");
     }
 
     @Test
@@ -630,7 +630,7 @@ class ClassroomServiceImplTest {
 
         assertThatThrownBy(() -> service.findByRoomNumberAndBuilding(999, 2L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Classroom not found with id: 999");
+                .hasMessage("No existe el aula 999.");
     }
 
     @Test
@@ -642,7 +642,7 @@ class ClassroomServiceImplTest {
 
         assertThatThrownBy(() -> service.findByRoomNumberAndBuilding(101, 1L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Classroom not found with id: 101");
+                .hasMessage("No existe el aula 101.");
     }
 
     @Test
@@ -652,7 +652,7 @@ class ClassroomServiceImplTest {
 
         assertThatThrownBy(() -> service.findByRoomNumberAndBuilding(101, 1L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Building not found with id: 1");
+                .hasMessage("No existe el edificio 1.");
     }
 
     @Test
