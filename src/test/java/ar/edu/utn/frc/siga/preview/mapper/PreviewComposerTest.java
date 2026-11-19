@@ -219,6 +219,81 @@ class PreviewComposerTest {
         assertThat(response.allocations()).extracting(PreviewItemDto::overcrowdedBy).containsExactly(60, 10);
     }
 
+    @Test
+    @DisplayName("el respaldo al aula previa no se ofrece si otra asignación efectiva la ocupa en fecha y horario solapados")
+    void respaldoAulaPreviaQueChocaQuedaSinResolver() {
+        RecurringEventResponseDto owner = recurring(RECURRING_ID);
+        UniqueEventResponseDto other = unique(UNIQUE_ID, 20, false, false, null, null, null);
+        PlanningKey ownerKey = new PlanningKey(RECURRING_ID, 1);
+        PlanningKey otherKey = new PlanningKey(UNIQUE_ID, 1);
+
+        PreviewResponseDto response = composer.compose(
+                result(new OptimizerAllocation("1", null), new OptimizerAllocation("3", 5L)),
+                List.of(owner, other),
+                Map.of(ownerKey, List.of(DATE), otherKey, List.of(DATE)),
+                Map.of(ownerKey, 5L), Map.of(), List.of(room(5L)), List.of());
+
+        assertThat(response.allocations()).extracting(item -> item.event().id()).containsExactly(UNIQUE_ID);
+        assertThat(response.unresolved()).extracting(item -> item.event().id()).containsExactly(RECURRING_ID);
+    }
+
+    @Test
+    @DisplayName("el respaldo al aula previa se ofrece si la otra asignación está en otra fecha")
+    void respaldoAulaPreviaSinChoqueSeOfrece() {
+        RecurringEventResponseDto owner = recurring(RECURRING_ID);
+        UniqueEventResponseDto other = unique(UNIQUE_ID, 20, false, false, null, null, null);
+        PlanningKey ownerKey = new PlanningKey(RECURRING_ID, 1);
+        PlanningKey otherKey = new PlanningKey(UNIQUE_ID, 1);
+
+        PreviewResponseDto response = composer.compose(
+                result(new OptimizerAllocation("1", null), new OptimizerAllocation("3", 5L)),
+                List.of(owner, other),
+                Map.of(ownerKey, List.of(DATE), otherKey, List.of(DATE.plusDays(1))),
+                Map.of(ownerKey, 5L), Map.of(), List.of(room(5L)), List.of());
+
+        assertThat(response.unresolved()).isEmpty();
+        assertThat(response.allocations()).extracting(item -> item.event().id())
+                .containsExactlyInAnyOrder(RECURRING_ID, UNIQUE_ID);
+        assertThat(response.allocations()).filteredOn(item -> item.event().id() == RECURRING_ID)
+                .singleElement().satisfies(item -> assertThat(item.classroom().id()).isEqualTo(5L));
+    }
+
+    @Test
+    @DisplayName("el respaldo al aula previa se ofrece si la otra asignación solapada está en otra aula")
+    void respaldoAulaPreviaConOtraAulaSeOfrece() {
+        RecurringEventResponseDto owner = recurring(RECURRING_ID);
+        UniqueEventResponseDto other = unique(UNIQUE_ID, 20, false, false, null, null, null);
+        PlanningKey ownerKey = new PlanningKey(RECURRING_ID, 1);
+        PlanningKey otherKey = new PlanningKey(UNIQUE_ID, 1);
+
+        PreviewResponseDto response = composer.compose(
+                result(new OptimizerAllocation("1", null), new OptimizerAllocation("3", 6L)),
+                List.of(owner, other),
+                Map.of(ownerKey, List.of(DATE), otherKey, List.of(DATE)),
+                Map.of(ownerKey, 5L), Map.of(), List.of(room(5L), room(6L)), List.of());
+
+        assertThat(response.unresolved()).isEmpty();
+        assertThat(response.allocations()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("el respaldo al aula previa no se ofrece si no hay datos del evento (queda sin resolver)")
+    void respaldoAulaPreviaSinDatosDelEventoQuedaSinResolver() {
+        UniqueEventResponseDto other = unique(UNIQUE_ID, 20, false, false, null, null, null);
+        PlanningKey ownerKey = new PlanningKey(RECURRING_ID, 1);
+        PlanningKey otherKey = new PlanningKey(UNIQUE_ID, 1);
+
+        PreviewResponseDto response = composer.compose(
+                result(new OptimizerAllocation("1", null), new OptimizerAllocation("3", 6L)),
+                List.of(other),
+                Map.of(ownerKey, List.of(DATE), otherKey, List.of(DATE.plusDays(1))),
+                Map.of(ownerKey, 5L), Map.of(), List.of(room(5L), room(6L)), List.of());
+
+        assertThat(response.allocations()).extracting(item -> item.event().id()).containsExactly(UNIQUE_ID);
+        assertThat(response.unresolved()).singleElement()
+                .satisfies(item -> assertThat(item.roomSlot()).isEqualTo(1));
+    }
+
     private List<UnmetRequirementDto> unmetOf(UniqueEventResponseDto unique, int slots, long roomId) {
         PreviewResponseDto response = composeUniqueInSlots(unique, slots, roomId);
         return response.allocations().getFirst().unmetRequirements();
