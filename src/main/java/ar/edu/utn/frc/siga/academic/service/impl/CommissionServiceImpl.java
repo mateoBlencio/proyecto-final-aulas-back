@@ -71,7 +71,7 @@ public class CommissionServiceImpl implements CommissionService {
 
     @Override
     @Transactional
-    @AuditOperation("Reactivación de comisión")
+    @AuditOperation(value = "Reactivación de comisión", subject = "Commission")
     public void activate(Long id) {
         commissionRepository.restore(Finder.orThrow(commissionRepository::findById, id, "Commission"));
         eventPublisher.publishEvent(new CatalogAvailabilityChanged());
@@ -79,7 +79,7 @@ public class CommissionServiceImpl implements CommissionService {
 
     @Override
     @Transactional
-    @AuditOperation("Baja de comisión")
+    @AuditOperation(value = "Baja de comisión", subject = "Commission")
     public void deactivate(Long id) {
         commissionRepository.softDelete(Finder.orThrow(commissionRepository::findById, id, "Commission"));
         eventPublisher.publishEvent(new CatalogAvailabilityChanged());
@@ -171,7 +171,7 @@ public class CommissionServiceImpl implements CommissionService {
 
     @Override
     @Transactional
-    @AuditOperation("Sincronización de comisiones desde SysAcad")
+    @AuditOperation(value = "Sincronización de comisiones desde SysAcad", subject = "Commission")
     public int syncCommissions(List<CommissionSyncCommand> commands, int minValidPercent) {
         Instant syncedAt = Instant.now();
         Map<CommissionKey, Commission> existingCommissions = commissionRepository.findAll().stream()

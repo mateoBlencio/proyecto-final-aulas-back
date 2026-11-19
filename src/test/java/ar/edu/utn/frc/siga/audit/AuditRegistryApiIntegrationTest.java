@@ -193,10 +193,15 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
         return total;
     }
 
-    private String latestOperationId(String description) {
+    /**
+     * Latest operation whose description is {@code base} or starts with it followed by a summary of the
+     * records ("{base}: A, B") or a parenthesis ("{base} (detail)").
+     */
+    private String latestOperationId(String base) {
         return jdbcTemplate.queryForObject(
-                "SELECT operacion_id FROM revinfo WHERE descripcion = ? AND operacion_id IS NOT NULL "
-                        + "ORDER BY rev DESC LIMIT 1", String.class, description);
+                "SELECT operacion_id FROM revinfo WHERE (descripcion = ? OR descripcion LIKE ? OR descripcion LIKE ?) "
+                        + "AND operacion_id IS NOT NULL ORDER BY rev DESC LIMIT 1",
+                String.class, base, base + ": %", base + " (%");
     }
 
     private long operationRows(String table, String operationId, Integer revtype) {
@@ -611,7 +616,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
         JsonNode listing = json(mockMvc, get("/v1/audit").param("size", "200").param("entityType", "Configuración"));
         JsonNode operation = operationEntry(listing, operationId);
         assertThat(operation.get("type").asText()).isEqualTo("OPERATION");
-        assertThat(operation.get("description").asText()).isEqualTo("Modificación de configuración");
+        assertThat(operation.get("description").asText()).isEqualTo("Modificación de configuración: setting-label");
 
         mockMvc.perform(get("/v1/audit/operations/{operationId}", operationId))
                 .andExpect(status().isOk())
@@ -1044,7 +1049,7 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
         long occurrenceId = jdbcTemplate.queryForObject(
                 "SELECT MAX(id_ocurrencia) FROM ocurrencia_aud WHERE revtype = 0", Long.class);
         mockMvc.perform(post("/v1/allocations/releases").contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"items\":[{\"occurrenceIds\":[" + occurrenceId + "]}],\"reason\":\"OTHER\",\"note\":\"test\"}")).andExpect(status().is2xxSuccessful());
-        String operationId = latestOperationId("Liberación de 1 ocurrencia (OTHER)");
+        String operationId = latestOperationId("Liberación de aulas (Otro)");
 
         List<JsonNode> items = operationItems(operationId);
 
@@ -1170,8 +1175,8 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("reallocate de 2 aulas del mismo edificio genera una OPERATION cuya descripción lleva '2 aulas' y el edificio")
-    void reallocateDescriptionCarriesClassroomCountAndBuilding() throws Exception {
+    @DisplayName("reallocate de 2 aulas genera una OPERATION con la descripción 'Reasignación: {materia} ({comisión})', sin conteo de aulas")
+    void reallocateDescriptionNamesTheEventWithoutCounts() throws Exception {
         var sc = testData.materiaYComision();
         LocalDate first = LocalDate.now().plusDays(71);
         var eventDto = new CreateRecurringEventRequestDto(30, LocalTime.of(8, 0), 90,
@@ -1199,11 +1204,12 @@ class AuditRegistryApiIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().is2xxSuccessful());
 
-        String expected = "Reasignación de 2 aulas, edificio " + building.getName();
+        String expected = "Reasignación";
         String operationId = latestOperationId(expected);
         JsonNode entry = operationEntry(json(mockMvc, get("/v1/audit").param("size", "200")), operationId);
         assertThat(entry.get("type").asText()).isEqualTo("OPERATION");
-        assertThat(entry.get("description").asText()).contains("2 aulas").contains(building.getName());
+        assertThat(entry.get("description").asText()).startsWith("Reasignación: Materia-IT (CUR-")
+                .doesNotContain("2 aulas").doesNotContain(building.getName());
     }
 
 

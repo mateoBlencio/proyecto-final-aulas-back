@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.roomrequest.direct;
 
+import ar.edu.utn.frc.siga.audit.AuditLabels;
 import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 
@@ -15,7 +16,7 @@ public final class DirectEventKinds {
             case CONFERENCE -> UniqueEventKind.CONFERENCIA;
             case OTHER -> UniqueEventKind.OTRO;
             case ONE_TIME_ROOM_CHANGE, REGULAR_ROOM_CHANGE ->
-                    throw new IllegalArgumentException("El tipo " + type + " no crea un evento único.");
+                    throw new IllegalArgumentException("El tipo " + AuditLabels.constant(type) + " no crea un evento único.");
         };
     }
 }

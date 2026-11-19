@@ -23,8 +23,10 @@ public interface AuditLabelProvider {
     Map<String, String> labels(List<AuditedRecord> records);
 
     /**
-     * Short name of each record for the operation summary. It cannot contain commas: the summary lists the names
-     * separated by commas. Defaults to {@link #labels(List)}.
+     * Short name of each record for the operation summary. Write an inner detail in parentheses ("Aula 101 (Central)"),
+     * not after a comma: the summary lists the names
+     * separated by commas (the summary also turns any comma that comes from free text into a space). Defaults to
+     * {@link #labels(List)}.
      */
     default Map<String, String> summaryLabels(List<AuditedRecord> records) {
         return labels(records);

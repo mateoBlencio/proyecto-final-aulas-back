@@ -26,7 +26,7 @@ public class IngestServiceImpl implements IngestService {
     private final OccurrenceBoardService occurrenceBoardService;
 
     @Override
-    @AuditOperation("Importación de eventos desde archivo")
+    @AuditOperation(value = "Importación de eventos desde archivo", subject = "AcademicEvent")
     public IngestResultDto ingestFile(MultipartFile file) {
         String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "(sin nombre)";
         AuditOperations.describe("Importación de eventos desde archivo " + originalFilename.replaceAll("\\p{Cntrl}", " "));

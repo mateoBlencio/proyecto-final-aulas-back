@@ -54,7 +54,7 @@ class HolidayAuditLabelProviderTest {
     void summaryLabels_dateAndDescription() {
         assertThat(provider.summaryLabels(List.of(record("2026-07-09", "Día de la Independencia"),
                 record("2026-05-25", null))))
-                .containsOnly(Map.entry("2026-07-09", "09/07/2026 (Día de la Independencia)"),
+                .containsOnly(Map.entry("2026-07-09", "Día de la Independencia (09/07/2026)"),
                         Map.entry("2026-05-25", "25/05/2026"));
     }
 

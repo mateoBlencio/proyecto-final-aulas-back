@@ -28,6 +28,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -44,6 +45,8 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 @RequiredArgsConstructor
 public class DashboardSnapshotServiceImpl implements DashboardSnapshotService {
+
+    private static final DateTimeFormatter MONTH_LABEL = DateTimeFormatter.ofPattern("MM/yyyy");
 
     static final String SYSTEM_ACTOR = "SISTEMA";
 
@@ -104,7 +107,8 @@ public class DashboardSnapshotServiceImpl implements DashboardSnapshotService {
         generate(month, actor, reason);
         regenerationRepository.save(new DashboardSnapshotRegeneration(
                 month.getYear(), month.getMonthValue(), reason, clock.instant()));
-        AuditOperations.describe("Regeneración del informe " + month + " del tablero: " + reason);
+        AuditOperations.describe("Regeneración del informe del tablero: " + MONTH_LABEL.format(month)
+                + " (motivo: " + reason + ")");
         return snapshotReader.report(month, BuildingScope.unrestricted());
     }
 

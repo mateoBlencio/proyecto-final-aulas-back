@@ -93,7 +93,7 @@ class ClassroomFeatureWriterTest {
         assertThatThrownBy(() -> writer.applyResources(classroom,
                 List.of(new ClassroomResourceRequestDto(1L, 5))))
                 .isInstanceOf(SpaceDomainException.class)
-                .hasMessageContaining("1");
+                .hasMessage("No existe el tipo de recurso 1.");
         verify(classroomResourceRepository, never()).save(any());
     }
 
@@ -155,7 +155,7 @@ class ClassroomFeatureWriterTest {
         assertThatThrownBy(() -> writer.applyResources(classroom,
                 List.of(new ClassroomResourceRequestDto(999L, 1))))
                 .isInstanceOf(SpaceDomainException.class)
-                .hasMessageContaining("999");
+                .hasMessage("No existe el tipo de recurso 999.");
     }
 
     @Test

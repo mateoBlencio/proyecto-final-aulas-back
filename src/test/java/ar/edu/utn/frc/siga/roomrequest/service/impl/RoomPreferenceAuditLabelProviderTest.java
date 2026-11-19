@@ -80,4 +80,13 @@ class RoomPreferenceAuditLabelProviderTest {
 
         verifyNoInteractions(classroomService);
     }
+
+    @Test
+    @DisplayName("summaryLabels: 'Aula {nro} ({edificio})' mientras labels conserva la coma")
+    void summaryLabels_buildingInParentheses() {
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 101, "Central")));
+
+        assertThat(provider.summaryLabels(List.of(record("1", 5L)))).containsOnly(Map.entry("1", "Aula 101 (Central)"));
+        assertThat(provider.labels(List.of(record("1", 5L)))).containsOnly(Map.entry("1", "Aula 101, Central"));
+    }
 }

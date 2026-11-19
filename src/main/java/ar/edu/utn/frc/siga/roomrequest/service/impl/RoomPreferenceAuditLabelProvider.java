@@ -16,7 +16,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Label of a classroom preference: "Aula 101, Central". Deactivated classrooms are included. */
+/** Label of a classroom preference: "Aula 101, Central" ("Aula 101 (Central)" in the summary). Deactivated classrooms are included. */
 @Component
 @RequiredArgsConstructor
 class RoomPreferenceAuditLabelProvider implements AuditLabelProvider {
@@ -30,6 +30,15 @@ class RoomPreferenceAuditLabelProvider implements AuditLabelProvider {
 
     @Override
     public Map<String, String> labels(List<AuditedRecord> records) {
+        return build(records, false);
+    }
+
+    @Override
+    public Map<String, String> summaryLabels(List<AuditedRecord> records) {
+        return build(records, true);
+    }
+
+    private Map<String, String> build(List<AuditedRecord> records, boolean summary) {
         Set<Long> classroomIds = records.stream().map(record -> record.longValue("classroomId"))
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         Map<Long, ClassroomResponseDto> classrooms = classroomIds.isEmpty() ? new HashMap<>()
@@ -39,7 +48,9 @@ class RoomPreferenceAuditLabelProvider implements AuditLabelProvider {
         for (AuditedRecord record : records) {
             ClassroomResponseDto classroom = classrooms.get(record.longValue("classroomId"));
             if (classroom != null) {
-                labels.put(record.recordId(), "Aula " + classroom.roomNumber() + ", " + classroom.buildingName());
+                String room = "Aula " + classroom.roomNumber();
+                labels.put(record.recordId(), summary ? room + " (" + classroom.buildingName() + ")"
+                        : room + ", " + classroom.buildingName());
             }
         }
         return labels;

@@ -240,7 +240,7 @@ class RoomRequestResolutionServiceImplTest {
     void findAllowedClassrooms_sinPermisoDeLectura() {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
-        doThrow(new RoomRequestForbiddenException("READ")).when(accessControl).authorizeRead(item, AUXILIAR);
+        doThrow(new RoomRequestForbiddenException("READ", "ver")).when(accessControl).authorizeRead(item, AUXILIAR);
 
         assertThatThrownBy(() -> service.findAllowedClassrooms(1L, AUXILIAR))
                 .isInstanceOf(RoomRequestForbiddenException.class);
@@ -277,7 +277,7 @@ class RoomRequestResolutionServiceImplTest {
     void findCandidateBuildings_sinPermisoDeLectura() {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
-        doThrow(new RoomRequestForbiddenException("READ")).when(accessControl).authorizeRead(item, AUXILIAR);
+        doThrow(new RoomRequestForbiddenException("READ", "ver")).when(accessControl).authorizeRead(item, AUXILIAR);
 
         assertThatThrownBy(() -> service.findCandidateBuildings(1L, AUXILIAR))
                 .isInstanceOf(RoomRequestForbiddenException.class);
@@ -475,7 +475,7 @@ class RoomRequestResolutionServiceImplTest {
     void takeOver_sinPermiso() {
         RoomRequestItem item = derivedItem(RoomRequestStatus.IN_EVALUATION, LocalDate.now().plusDays(5));
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
-        org.mockito.Mockito.doThrow(new RoomRequestForbiddenException("no"))
+        org.mockito.Mockito.doThrow(new RoomRequestForbiddenException("no", "no"))
                 .when(accessControl).authorize(item, "auxiliar@frc.utn.edu.ar", RoomRequestAccessControl.Action.TAKE_OVER);
 
         assertThatThrownBy(() -> service.takeOver(1L, "motivo", "auxiliar@frc.utn.edu.ar"))

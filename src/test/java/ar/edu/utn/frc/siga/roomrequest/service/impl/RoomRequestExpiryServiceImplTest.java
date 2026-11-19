@@ -20,7 +20,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -315,25 +315,26 @@ class RoomRequestExpiryServiceImplTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"0,0 ítems", "1,1 ítem", "2,2 ítems"})
-    @DisplayName("la descripción de la operación lleva la cantidad de ítems con la concordancia correcta")
-    void describesExpiredCount(int count, String expectedCount) {
+    @ValueSource(ints = {0, 1, 2})
+    @DisplayName("la descripción conserva el texto base sin conteo: los nombres los agrega el resumen de la operación")
+    void keepsBaseDescriptionWithoutCount(int count) {
         List<RoomRequestItem> expired = new java.util.ArrayList<>();
         for (int i = 0; i < count; i++) {
             expired.add(RoomRequestItem.builder().id(100L + i).status(RoomRequestStatus.NEW)
                     .date(LocalDate.now().minusDays(1)).build());
         }
+        AuditDescriptionProbe probe = new AuditDescriptionProbe();
         when(itemRepository.findExpiredByDate(any())).thenAnswer(inv -> {
+            probe.peek();
             AuditDescriptionProbe.stamp();
             return expired;
         });
         when(itemRepository.findActiveRegularRoomChangeItems()).thenReturn(List.of());
-        AuditDescriptionProbe probe = new AuditDescriptionProbe();
 
         probe.audited(newService()).expireOverdueItems();
 
-        assertThat(probe.rewrittenDescription())
-                .isEqualTo("Vencimiento automático de " + expectedCount + " de solicitudes de aula");
+        assertThat(probe.peeked()).isEqualTo("Vencimiento automático de solicitudes de aula");
+        probe.verifyNoRewrite();
     }
 
     private AcademicEventResponseDto recurringEvent(Long id, LocalDate endDate) {

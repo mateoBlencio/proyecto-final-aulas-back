@@ -131,4 +131,14 @@ class ClassroomResourceAuditLabelProviderTest {
 
         verifyNoInteractions(resourceTypeRepository, classroomService);
     }
+
+    @Test
+    @DisplayName("summaryLabels: '{tipo} en Aula {número} ({edificio})', sin coma que parta la lista del resumen")
+    void summaryLabels_buildingInParentheses() {
+        when(resourceTypeRepository.findAllById(any())).thenReturn(List.of(type(4L, "Proyector")));
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(9L, 101, "Central")));
+
+        assertThat(provider.summaryLabels(List.of(record("1", 4L, 9L), record("2", null, 9L))))
+                .containsOnly(Map.entry("1", "Proyector en Aula 101 (Central)"), Map.entry("2", "Aula 101 (Central)"));
+    }
 }

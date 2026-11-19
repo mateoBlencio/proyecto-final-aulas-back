@@ -65,11 +65,14 @@ class OperationSummary {
             Map<RecordRevision, RecordStates> states = stateRepository.load(rows.stream()
                     .map(row -> new RecordRevision(row.entity(), row.metadata().recordId(), row.metadata().revision()))
                     .toList());
-            names.addAll(labelResolver.resolveSummaries(states).values());
+            labelResolver.resolveSummaries(states).values().forEach(name -> names.add(withoutCommas(name)));
             if (rows.size() < PAGE_SIZE) {
                 return names;
             }
         }
+    }
+    private static String withoutCommas(String name) {
+        return name.replaceAll("\\s*,\\s*", " ").strip();
     }
 
     static String compose(String base, List<String> sortedNames) {

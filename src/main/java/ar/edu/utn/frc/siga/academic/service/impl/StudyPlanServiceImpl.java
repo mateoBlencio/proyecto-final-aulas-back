@@ -50,7 +50,7 @@ public class StudyPlanServiceImpl implements StudyPlanService {
 
     @Override
     @Transactional
-    @AuditOperation("Reactivación de plan de estudio")
+    @AuditOperation(value = "Reactivación de plan de estudio", subject = "StudyPlan")
     public void activate(Long id) {
         studyPlanRepository.restore(Finder.orThrow(studyPlanRepository::findById, id, "StudyPlan"));
         eventPublisher.publishEvent(new CatalogAvailabilityChanged());
@@ -58,7 +58,7 @@ public class StudyPlanServiceImpl implements StudyPlanService {
 
     @Override
     @Transactional
-    @AuditOperation("Baja de plan de estudio")
+    @AuditOperation(value = "Baja de plan de estudio", subject = "StudyPlan")
     public void deactivate(Long id) {
         studyPlanRepository.softDelete(Finder.orThrow(studyPlanRepository::findById, id, "StudyPlan"));
         eventPublisher.publishEvent(new CatalogAvailabilityChanged());

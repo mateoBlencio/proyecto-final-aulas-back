@@ -90,7 +90,7 @@ public class SpecialtyServiceImpl implements SpecialtyService {
 
     @Override
     @Transactional
-    @AuditOperation("Reactivación de especialidad")
+    @AuditOperation(value = "Reactivación de especialidad", subject = "Specialty")
     public void activate(Long id) {
         specialtyRepository.restore(Finder.orThrow(specialtyRepository::findById, id, "Specialty"));
         eventPublisher.publishEvent(new CatalogAvailabilityChanged());
@@ -98,7 +98,7 @@ public class SpecialtyServiceImpl implements SpecialtyService {
 
     @Override
     @Transactional
-    @AuditOperation("Baja de especialidad")
+    @AuditOperation(value = "Baja de especialidad", subject = "Specialty")
     public void deactivate(Long id) {
         specialtyRepository.softDelete(Finder.orThrow(specialtyRepository::findById, id, "Specialty"));
         eventPublisher.publishEvent(new CatalogAvailabilityChanged());
@@ -119,7 +119,7 @@ public class SpecialtyServiceImpl implements SpecialtyService {
     // El sync es un upsert simple por código y nunca reactiva: la baja manual es de la facultad.
     @Override
     @Transactional
-    @AuditOperation("Sincronización de especialidades desde SysAcad")
+    @AuditOperation(value = "Sincronización de especialidades desde SysAcad", subject = "Specialty")
     public int syncSpecialties(List<SpecialtySyncCommand> commands) {
         Instant syncedAt = Instant.now();
         Map<Integer, Specialty> existing = specialtyRepository.findAll().stream()

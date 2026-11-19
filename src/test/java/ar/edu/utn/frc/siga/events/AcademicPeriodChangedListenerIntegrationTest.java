@@ -92,7 +92,8 @@ class AcademicPeriodChangedListenerIntegrationTest extends AbstractIntegrationTe
 
         List<Map<String, Object>> deletions = namedJdbc.queryForList(sql, Map.of("ids", occurrenceIds));
         assertThat(deletions).extracting(row -> row.get("descripcion"))
-                .containsOnly("Recálculo de ocurrencias por cambio de período académico");
+                .containsOnly("Recálculo de ocurrencias por cambio de período académico: "
+                        + period.year() + "/" + period.semester());
         Set<Object> operations = deletions.stream().map(row -> row.get("operacion_id")).collect(Collectors.toSet());
         assertThat(operations).hasSize(1).doesNotContainNull();
     }

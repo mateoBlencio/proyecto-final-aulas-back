@@ -172,6 +172,51 @@ class OperationSummaryTest {
         assertThat(summary.describe("op-1", BASE, "Subject")).isEqualTo("Baja de materia: Álgebra, Biología y Zoología");
     }
 
+
+    @Test
+    @DisplayName("describe: la coma interna de un nombre ('Pérez, Juan') se reemplaza por un espacio para no confundirse con el separador")
+    void describe_commaInsideName_replacedBySpace() {
+        operationChanges(List.of(row(1)), List.of("Pérez, Juan"));
+
+        assertThat(summary.describe("op-1", "Alta de docente", "Subject")).isEqualTo("Alta de docente: Pérez Juan");
+    }
+
+    @Test
+    @DisplayName("describe: con dos docentes 'Apellido, Nombre' la lista queda 'A B y C D', sin comas dentro de los nombres")
+    void describe_twoNamesWithCommas_listIsUnambiguous() {
+        operationChanges(List.of(row(1), row(2)), List.of("Pérez, Juan", "Gómez ,Ana"));
+
+        assertThat(summary.describe("op-1", "Alta de docente", "Subject"))
+                .isEqualTo("Alta de docente: Gómez Ana y Pérez Juan");
+    }
+
+    @Test
+    @DisplayName("describe: cuatro docentes con coma dan 'A B, C D y 2 más' (la única coma de la frase es el separador)")
+    void describe_fourNamesWithCommas_oneSeparatorComma() {
+        operationChanges(List.of(row(1)), List.of("Pérez, Juan", "Gómez, Ana", "Ríos, Luis", "Soto, Eva"));
+
+        String result = summary.describe("op-1", "Alta de docente", "Subject");
+
+        assertThat(result).isEqualTo("Alta de docente: Gómez Ana, Pérez Juan y 2 más");
+        assertThat(result.chars().filter(c -> c == ',').count()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("describe: 'Pérez, Juan' y 'Pérez Juan' son el mismo nombre una vez sin coma y se listan una sola vez")
+    void describe_namesEqualWithoutComma_deduplicated() {
+        operationChanges(List.of(row(1)), List.of("Pérez, Juan", "Pérez Juan"));
+
+        assertThat(summary.describe("op-1", "Alta de docente", "Subject")).isEqualTo("Alta de docente: Pérez Juan");
+    }
+
+    @Test
+    @DisplayName("describe: los paréntesis del nombre ('Aula 101 (Central)') se conservan")
+    void describe_parenthesesInNameAreKept() {
+        operationChanges(List.of(row(1), row(2)), List.of("Aula 101 (Central)", "Día de la Independencia (09/07/2026)"));
+
+        assertThat(summary.describe("op-1", BASE, "Subject"))
+                .isEqualTo("Baja de materia: Aula 101 (Central) y Día de la Independencia (09/07/2026)");
+    }
     @Test
     @DisplayName("describe: consulta los cambios de la operación pedida sobre la entidad del subject")
     void describe_queriesOperationScopeOfSubjectEntity() {

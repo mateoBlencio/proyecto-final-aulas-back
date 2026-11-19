@@ -140,7 +140,7 @@ public class DirectEventServiceImpl implements DirectEventService {
 
     @Override
     @Transactional
-    @AuditOperation("Alta directa de evento con aula")
+    @AuditOperation(value = "Alta directa de evento con aula", subject = "AcademicEvent")
     public List<AllocationResponseDto> create(CreateDirectEventRequestDto request, String actor) {
         DirectEventDraftDto draft = request.draft();
         ResolvedSchedule schedule = draftValidator.validate(draft);

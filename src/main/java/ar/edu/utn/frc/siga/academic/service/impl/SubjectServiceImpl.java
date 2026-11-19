@@ -66,7 +66,7 @@ public class SubjectServiceImpl implements SubjectService {
 
     @Override
     @Transactional
-    @AuditOperation("Reactivación de materia")
+    @AuditOperation(value = "Reactivación de materia", subject = "Subject")
     public void activate(Long id) {
         subjectRepository.restore(Finder.orThrow(subjectRepository::findById, id, "Subject"));
         eventPublisher.publishEvent(new CatalogAvailabilityChanged());
@@ -74,7 +74,7 @@ public class SubjectServiceImpl implements SubjectService {
 
     @Override
     @Transactional
-    @AuditOperation("Baja de materia")
+    @AuditOperation(value = "Baja de materia", subject = "Subject")
     public void deactivate(Long id) {
         subjectRepository.softDelete(Finder.orThrow(subjectRepository::findById, id, "Subject"));
         eventPublisher.publishEvent(new CatalogAvailabilityChanged());
@@ -110,7 +110,7 @@ public class SubjectServiceImpl implements SubjectService {
 
     @Override
     @Transactional
-    @AuditOperation("Sincronización de materias desde SysAcad")
+    @AuditOperation(value = "Sincronización de materias desde SysAcad", subject = "Subject")
     public int syncSubjects(List<SubjectSyncCommand> commands) {
         Instant syncedAt = Instant.now();
         Map<SubjectKey, Subject> existing = Maps.byId(subjectRepository.findAll(), SubjectKey::of);

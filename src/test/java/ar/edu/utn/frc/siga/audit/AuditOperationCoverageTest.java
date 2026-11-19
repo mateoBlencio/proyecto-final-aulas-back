@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -125,6 +126,137 @@ class AuditOperationCoverageTest {
                         "Fixture#unannotatedScheduled");
     }
 
+
+    /** Operations that name no records, so they carry no {@code subject}. Key {@code Class#method}. */
+    private static final Map<String, String> WITHOUT_SUBJECT = Map.of(
+            "AuditArchiveServiceImpl#archive", "archives audit rows: it changes no record a summary could name",
+            "DashboardSnapshotServiceImpl#regenerate", "writes its own description with the month and the reason",
+            "AcademicPeriodChangedListener#on", "writes its own description with the period");
+
+    @Test
+    @DisplayName("toda @AuditOperation tiene subject, salvo las tres que no nombran registros")
+    void everyAuditOperationHasSubjectExceptTheExempt() {
+        Map<String, AuditOperation> operations = auditOperations();
+
+        Set<String> withoutSubject = new TreeSet<>();
+        operations.forEach((key, operation) -> {
+            if (operation.subject().isBlank()) {
+                withoutSubject.add(key);
+            }
+        });
+
+        assertThat(withoutSubject)
+                .as("@AuditOperation sin subject que no está en WITHOUT_SUBJECT")
+                .containsExactlyInAnyOrderElementsOf(WITHOUT_SUBJECT.keySet());
+    }
+
+    @Test
+    @DisplayName("el escaneo de operaciones encuentra las anotaciones de todos los módulos, también las exentas")
+    void auditOperationScanFindsOperationsOfEveryModule() {
+        Map<String, AuditOperation> operations = auditOperations();
+
+        assertThat(operations.size()).isGreaterThanOrEqualTo(85);
+        assertThat(operations).containsKeys(WITHOUT_SUBJECT.keySet().toArray(String[]::new));
+        assertThat(operations.get("SubjectServiceImpl#deactivate")).isNotNull();
+    }
+
+    @Test
+    @DisplayName("ningún texto base de @AuditOperation contiene el nombre de una constante de enum en mayúsculas")
+    void noBaseTextContainsAnEnumConstantName() {
+        Set<String> constants = enumConstantNames();
+        assertThat(constants).contains("VIRTUAL_CLASS", "SUBSECRETARIA", "NEW");
+
+        Map<String, String> offending = new TreeMap<>();
+        auditOperations().forEach((key, operation) -> {
+            for (String word : operation.value().split("[^\\p{L}\\p{N}_]+")) {
+                if (constants.contains(word)) {
+                    offending.put(key, operation.value());
+                }
+            }
+        });
+
+        assertThat(offending).as("textos base con códigos internos").isEmpty();
+    }
+
+    @Test
+    @DisplayName("el detector de constantes marca un texto con 'VIRTUAL_CLASS' y deja pasar 'Clase virtual'")
+    void enumConstantDetectorFlagsCodes() {
+        Set<String> constants = enumConstantNames();
+
+        assertThat(containsConstant("Liberación de aulas (VIRTUAL_CLASS)", constants)).isTrue();
+        assertThat(containsConstant("Liberación de aulas (Clase virtual)", constants)).isFalse();
+    }
+
+    private static boolean containsConstant(String text, Set<String> constants) {
+        return Arrays.stream(text.split("[^\\p{L}\\p{N}_]+")).anyMatch(constants::contains);
+    }
+
+    /** Every {@code @AuditOperation} method of the application, keyed {@code Class#method}. Test classes are left out. */
+    static Map<String, AuditOperation> auditOperations() {
+        Map<String, AuditOperation> operations = new TreeMap<>();
+        for (Resource resource : mainClasses()) {
+            AnnotationMetadata metadata = metadataOf(resource);
+            if (!metadata.hasAnnotatedMethods(AuditOperation.class.getName())) {
+                continue;
+            }
+            for (Method method : classOf(metadata).getDeclaredMethods()) {
+                AuditOperation operation = AnnotatedElementUtils.findMergedAnnotation(method, AuditOperation.class);
+                if (operation != null) {
+                    operations.put(method.getDeclaringClass().getSimpleName() + "#" + method.getName(), operation);
+                }
+            }
+        }
+        return operations;
+    }
+
+    private static Set<String> enumConstantNames() {
+        Set<String> names = new TreeSet<>();
+        for (Resource resource : mainClasses()) {
+            AnnotationMetadata metadata = metadataOf(resource);
+            if ("java.lang.Enum".equals(metadata.getSuperClassName())) {
+                Object[] constants = classOf(metadata).getEnumConstants();
+                if (constants != null) {
+                    Arrays.stream(constants).forEach(constant -> names.add(((Enum<?>) constant).name()));
+                }
+            }
+        }
+        return names;
+    }
+
+    private static List<Resource> mainClasses() {
+        try {
+            return Arrays.stream(new PathMatchingResourcePatternResolver()
+                            .getResources("classpath*:ar/edu/utn/frc/siga/**/*.class"))
+                    .filter(resource -> !resourcePath(resource).contains("test-classes"))
+                    .toList();
+        } catch (IOException e) {
+            throw new IllegalStateException("No se pudieron escanear las clases", e);
+        }
+    }
+
+    private static String resourcePath(Resource resource) {
+        try {
+            return resource.getURL().getPath();
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static AnnotationMetadata metadataOf(Resource resource) {
+        try {
+            return new SimpleMetadataReaderFactory().getMetadataReader(resource).getAnnotationMetadata();
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static Class<?> classOf(AnnotationMetadata metadata) {
+        try {
+            return Class.forName(metadata.getClassName());
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException(e);
+        }
+    }
     // Own scan instead of ClassPathScanningCandidateComponentProvider: that one discards beans with
     // @ConditionalOnProperty (Sysacad sync), which are audited all the same.
     private static List<Class<?>> scanComponents() {

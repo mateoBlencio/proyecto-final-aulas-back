@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.roomrequest.direct;
 
+import ar.edu.utn.frc.siga.audit.AuditLabels;
 import ar.edu.utn.frc.siga.roomrequest.direct.dto.DirectEventDraftDto;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
@@ -31,7 +32,7 @@ public class DirectEventDraftValidator {
         validateAcademicReferences(draft);
         if (draft.type() == RoomRequestType.OTHER
                 && (draft.description() == null || draft.description().isBlank())) {
-            throw new InvalidRoomRequestException("description es obligatorio para eventos de tipo OTHER.");
+            throw new InvalidRoomRequestException("La descripción es obligatoria para eventos de tipo Otro.");
         }
         ResolvedSchedule schedule = resolveSchedule(draft);
         ItemConsistency.requireNotPast(draft.date(), schedule.startTime());
@@ -41,7 +42,7 @@ public class DirectEventDraftValidator {
 
     private void requireSupportedType(RoomRequestType type) {
         if (type == RoomRequestType.ONE_TIME_ROOM_CHANGE || type == RoomRequestType.REGULAR_ROOM_CHANGE) {
-            throw new InvalidRoomRequestException("El tipo " + type + " no crea un evento con aula asignada.");
+            throw new InvalidRoomRequestException("El tipo " + AuditLabels.constant(type) + " no crea un evento con aula asignada.");
         }
     }
 

@@ -93,7 +93,7 @@ public class RoomRequestSuggestionServiceImpl implements RoomRequestSuggestionSe
 
     @Override
     @Transactional
-    @AuditOperation("Confirmación de aula sugerida para solicitud")
+    @AuditOperation(value = "Confirmación de aula sugerida para solicitud", subject = "RoomRequestItem")
     public RoomRequestItemResponseDto confirm(Long itemId, String suggestionId, String reason, String actor) {
         RoomRequestSuggestion suggestion = store.take(suggestionId)
                 .orElseThrow(() -> new ExpiredSuggestionException(suggestionId));

@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.auth.service.impl;
 
 import ar.edu.utn.frc.siga.audit.AuditOperation;
+import ar.edu.utn.frc.siga.audit.AuditOperations;
 import ar.edu.utn.frc.siga.auth.config.AuthDomainProperties;
 import ar.edu.utn.frc.siga.auth.dto.request.CreateUserRequestDto;
 import ar.edu.utn.frc.siga.auth.dto.response.UserResponseDto;
@@ -44,7 +45,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    @AuditOperation("Alta de usuario")
+    @AuditOperation(value = "Alta de usuario", subject = "User")
     public UserResponseDto create(CreateUserRequestDto dto, String currentUserEmail) {
         String email = AuthDomainProperties.normalizeEmail(dto.email());
         log.debug("Creando usuario: email={}", email);
@@ -78,9 +79,10 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    @AuditOperation("Cambio de habilitación de usuario")
+    @AuditOperation(value = "Cambio de habilitación de usuario", subject = "User")
     public UserResponseDto setEnabled(Long id, boolean enabled) {
         log.debug("{} usuario: id={}", enabled ? "Habilitando" : "Inhabilitando", id);
+        AuditOperations.describe(enabled ? "Habilitación de usuario" : "Inhabilitación de usuario");
         User user = findExisting(id);
         user.setEnabled(enabled);
         User saved = userRepository.save(user);

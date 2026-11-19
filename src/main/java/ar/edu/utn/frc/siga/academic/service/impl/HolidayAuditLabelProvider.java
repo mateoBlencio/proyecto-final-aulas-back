@@ -43,7 +43,7 @@ class HolidayAuditLabelProvider implements AuditLabelProvider {
             String description = record.text("description");
             boolean hasDescription = description != null && !description.isBlank();
             labels.put(record.recordId(), !hasDescription ? (summary ? date : "Feriado " + date)
-                    : summary ? date + " (" + description + ")" : "Feriado " + date + " · " + description);
+                    : summary ? description + " (" + date + ")" : "Feriado " + date + " · " + description);
         }
         return labels;
     }

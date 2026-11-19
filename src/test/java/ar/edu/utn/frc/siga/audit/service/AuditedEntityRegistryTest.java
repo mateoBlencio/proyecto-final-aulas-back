@@ -77,6 +77,27 @@ class AuditedEntityRegistryTest extends AbstractIntegrationTest {
                         .doesNotThrowAnyException());
     }
 
+
+    @Test
+    @DisplayName("bySimpleName resuelve el nombre simple de la clase Java de cada entidad auditada")
+    void bySimpleNameFindsEveryAuditedEntity() {
+        assertThat(registry.all()).allSatisfy(entity ->
+                assertThat(registry.bySimpleName(entity.javaType().getSimpleName()))
+                        .as("bySimpleName(%s)", entity.javaType().getSimpleName())
+                        .containsSame(entity));
+        assertThat(registry.bySimpleName("Subject")).get().extracting(AuditedEntity::jpaName).isEqualTo("Subject");
+        assertThat(registry.bySimpleName("RoomRequestItem")).get().extracting(AuditedEntity::auditTable)
+                .isEqualTo("solicitud_aula_item_aud");
+    }
+
+    @Test
+    @DisplayName("bySimpleName distingue mayúsculas y devuelve vacío para un nombre desconocido, vacío o un subtipo")
+    void bySimpleNameUnknownIsEmpty() {
+        assertThat(registry.bySimpleName("subject")).isEmpty();
+        assertThat(registry.bySimpleName("Inexistente")).isEmpty();
+        assertThat(registry.bySimpleName("")).isEmpty();
+        assertThat(registry.bySimpleName("RecurringEvent")).isEmpty();
+    }
     @Test
     @DisplayName("indexOf devuelve la posición en all()")
     void indexOfMatchesPosition() {

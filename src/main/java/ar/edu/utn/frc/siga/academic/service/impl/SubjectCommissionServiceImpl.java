@@ -52,7 +52,7 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
 
     @Override
     @Transactional
-    @AuditOperation("Reactivación de materia-comisión")
+    @AuditOperation(value = "Reactivación de materia-comisión", subject = "SubjectCommission")
     public void activate(SubjectCommissionId id) {
         subjectCommissionRepository.restore(requireLink(id));
         eventPublisher.publishEvent(new CatalogAvailabilityChanged());
@@ -60,7 +60,7 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
 
     @Override
     @Transactional
-    @AuditOperation("Baja de materia-comisión")
+    @AuditOperation(value = "Baja de materia-comisión", subject = "SubjectCommission")
     public void deactivate(SubjectCommissionId id) {
         subjectCommissionRepository.softDelete(requireLink(id));
         eventPublisher.publishEvent(new CatalogAvailabilityChanged());

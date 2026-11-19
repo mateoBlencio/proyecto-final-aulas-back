@@ -189,7 +189,8 @@ class SysacadViewReaderTest {
     void emptyViewPropagatesFailure() {
         when(fetcher.fetch()).thenReturn(List.of());
 
-        assertThatThrownBy(() -> reader.read()).isInstanceOf(SysacadEmptyViewException.class);
+        assertThatThrownBy(() -> reader.read()).isInstanceOf(SysacadEmptyViewException.class)
+                .hasMessage("Los datos de horarios de aulas de SysAcad vinieron vacíos: se aborta el sync para no marcar todo como ausente");
 
         verifyNoInteractions(scheduleRepository, reconciler, transactionManager);
     }

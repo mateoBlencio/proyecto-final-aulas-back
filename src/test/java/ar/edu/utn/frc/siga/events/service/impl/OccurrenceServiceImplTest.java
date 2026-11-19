@@ -159,7 +159,8 @@ class OccurrenceServiceImplTest {
     void releaseLoteOtherSinNota(String note) {
         assertThatThrownBy(() -> service.release(List.of(new OccurrenceRelease(10L, null)), ReleaseReason.OTHER, note))
                 .isInstanceOfSatisfying(InvalidSelectionException.class,
-                        e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+                        e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST))
+                .hasMessage("El motivo Otro requiere una nota.");
 
         verify(occurrenceRepository, never()).findAllById(any());
     }

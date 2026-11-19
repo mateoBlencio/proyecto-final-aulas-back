@@ -12,6 +12,7 @@ import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassSlot;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.NullSource;
@@ -195,5 +196,30 @@ class DirectEventDraftValidatorTest {
         assertThat(schedule.duration()).isEqualTo(Duration.ofHours(2));
         verify(classSchedule).requireClassDate(1L, 7L, FUTURE, null);
         verify(academicReferences).requireCommissionOfSubject(1L, 7L);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "ONE_TIME_ROOM_CHANGE,El tipo Cambio de aula único no crea un evento con aula asignada.",
+            "REGULAR_ROOM_CHANGE,El tipo Cambio de aula regular no crea un evento con aula asignada."})
+    @DisplayName("el mensaje del cambio de aula nombra el tipo en español y no su código")
+    void roomChangeMessageUsesTheLabel(RoomRequestType type, String expected) {
+        DirectEventDraftDto draft = new DirectEventDraftDto(type, 1L, 2L, LocalDate.now().plusDays(1),
+                LocalTime.of(9, 0), LocalTime.of(11, 0), 30, 1, null, true, 20, null, null, null);
+
+        assertThatThrownBy(() -> validator.validate(draft))
+                .isInstanceOf(InvalidRoomRequestException.class)
+                .hasMessage(expected)
+                .satisfies(ex -> assertThat(ex.getMessage()).doesNotContain("ROOM_CHANGE"));
+    }
+
+    @Test
+    @DisplayName("OTHER sin descripción: el mensaje está en español, sin el nombre del campo ni el código del tipo")
+    void otherWithoutDescriptionMessage() {
+        DirectEventDraftDto draft = draft(RoomRequestType.OTHER, null, LocalTime.of(9, 0), LocalTime.of(11, 0), true, " ");
+
+        assertThatThrownBy(() -> validator.validate(draft))
+                .isInstanceOf(InvalidRoomRequestException.class)
+                .hasMessage("La descripción es obligatoria para eventos de tipo Otro.");
     }
 }

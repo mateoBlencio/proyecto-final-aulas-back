@@ -1,6 +1,8 @@
 package ar.edu.utn.frc.siga.events.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditLabels;
 import ar.edu.utn.frc.siga.audit.AuditOperation;
+import ar.edu.utn.frc.siga.audit.AuditOperations;
 import ar.edu.utn.frc.siga.common.util.Chunks;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceAuditRefDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
@@ -78,7 +80,7 @@ public class OccurrenceServiceImpl implements OccurrenceService {
 
     @Override
     @Transactional
-    @AuditOperation("Alta de ocurrencias simultáneas")
+    @AuditOperation(value = "Alta de ocurrencias simultáneas", subject = "Occurrence")
     public List<Long> createSimultaneous(Long occurrenceId, int count) {
         Occurrence principal = Finder.orThrow(occurrenceRepository::findById, occurrenceId, "Occurrence");
         int nextSlot = occurrenceRepository.findByEvent_IdAndDate(principal.getEvent().getId(), principal.getDate())
@@ -183,13 +185,16 @@ public class OccurrenceServiceImpl implements OccurrenceService {
 
     @Override
     @Transactional
-    @AuditOperation("Liberación de ocurrencias")
+    @AuditOperation(value = "Liberación de ocurrencias", subject = "Occurrence")
     public void release(List<OccurrenceRelease> releases, ReleaseReason reason, String note) {
+        if (reason != null) {
+            AuditOperations.describe("Liberación de aulas (" + AuditLabels.constant(reason) + ")");
+        }
         if (reason == null) {
             throw new InvalidSelectionException("El motivo de liberación es obligatorio.");
         }
         if (reason == ReleaseReason.OTHER && (note == null || note.isBlank())) {
-            throw new InvalidSelectionException("El motivo OTHER requiere una nota.");
+            throw new InvalidSelectionException("El motivo Otro requiere una nota.");
         }
         Map<Long, Long> previousClassroomById = new HashMap<>();
         releases.forEach(r -> previousClassroomById.put(r.occurrenceId(), r.previousClassroomId()));
@@ -208,7 +213,7 @@ public class OccurrenceServiceImpl implements OccurrenceService {
 
     @Override
     @Transactional
-    @AuditOperation("Pedido de aula para ocurrencias")
+    @AuditOperation(value = "Pedido de aula para ocurrencias", subject = "Occurrence")
     public void requestRoom(Collection<Long> occurrenceIds) {
         List<Occurrence> occurrences = loadAll(new HashSet<>(occurrenceIds));
         occurrences.forEach(eventScheduleValidator::validateNotPast);
