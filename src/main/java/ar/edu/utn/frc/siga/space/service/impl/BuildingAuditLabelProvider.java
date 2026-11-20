@@ -20,11 +20,20 @@ class BuildingAuditLabelProvider implements AuditLabelProvider {
 
     @Override
     public Map<String, String> labels(List<AuditedRecord> records) {
+        return build(records, "Edificio ");
+    }
+
+    @Override
+    public Map<String, String> summaryLabels(List<AuditedRecord> records) {
+        return build(records, "");
+    }
+
+    private static Map<String, String> build(List<AuditedRecord> records, String prefix) {
         Map<String, String> labels = new HashMap<>();
         for (AuditedRecord record : records) {
             String name = record.text("name");
             if (name != null) {
-                labels.put(record.recordId(), "Edificio " + name);
+                labels.put(record.recordId(), prefix + name);
             }
         }
         return labels;

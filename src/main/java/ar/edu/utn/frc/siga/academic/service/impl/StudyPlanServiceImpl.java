@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.academic.dto.StudyPlanFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.StudyPlanResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.StudyPlanMapper;
+import ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
@@ -17,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class StudyPlanServiceImpl implements StudyPlanService {
 
+    private final ApplicationEventPublisher eventPublisher;
     private final StudyPlanRepository studyPlanRepository;
     private final SpecialtyRepository specialtyRepository;
     private final StudyPlanMapper studyPlanMapper;
@@ -47,16 +50,18 @@ public class StudyPlanServiceImpl implements StudyPlanService {
 
     @Override
     @Transactional
-    @AuditOperation("Reactivación de plan de estudio")
+    @AuditOperation(value = "Reactivación de plan de estudio", subject = "StudyPlan")
     public void activate(Long id) {
         studyPlanRepository.restore(Finder.orThrow(studyPlanRepository::findById, id, "StudyPlan"));
+        eventPublisher.publishEvent(new CatalogAvailabilityChanged());
     }
 
     @Override
     @Transactional
-    @AuditOperation("Baja de plan de estudio")
+    @AuditOperation(value = "Baja de plan de estudio", subject = "StudyPlan")
     public void deactivate(Long id) {
         studyPlanRepository.softDelete(Finder.orThrow(studyPlanRepository::findById, id, "StudyPlan"));
+        eventPublisher.publishEvent(new CatalogAvailabilityChanged());
     }
 
     @Override

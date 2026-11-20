@@ -44,7 +44,7 @@ public class ResourceTypeServiceImpl implements ResourceTypeService {
 
     @Override
     @Transactional
-    @AuditOperation("Alta de tipo de recurso")
+    @AuditOperation(value = "Alta de tipo de recurso", subject = "ResourceType")
     public ResourceTypeResponseDto create(ResourceTypeRequestDto dto) {
         log.debug("Creando tipo de recurso: name={}, valueKind={}", dto.name(), dto.valueKind());
         rejectDuplicateName(dto.name(), null);
@@ -58,7 +58,7 @@ public class ResourceTypeServiceImpl implements ResourceTypeService {
 
     @Override
     @Transactional
-    @AuditOperation("Modificación de tipo de recurso")
+    @AuditOperation(value = "Modificación de tipo de recurso", subject = "ResourceType")
     public ResourceTypeResponseDto update(Long id, ResourceTypeRequestDto dto) {
         log.debug("Actualizando tipo de recurso: id={}", id);
         ResourceType resourceType = findExistingById(id);
@@ -72,14 +72,14 @@ public class ResourceTypeServiceImpl implements ResourceTypeService {
 
     @Override
     @Transactional
-    @AuditOperation("Reactivación de tipo de recurso")
+    @AuditOperation(value = "Reactivación de tipo de recurso", subject = "ResourceType")
     public void activate(Long id) {
         resourceTypeRepository.restore(Finder.orThrow(resourceTypeRepository::findById, id, "ResourceType"));
     }
 
     @Override
     @Transactional
-    @AuditOperation("Baja de tipo de recurso")
+    @AuditOperation(value = "Baja de tipo de recurso", subject = "ResourceType")
     public void deactivate(Long id) {
         resourceTypeRepository.softDelete(Finder.orThrow(resourceTypeRepository::findById, id, "ResourceType"));
     }

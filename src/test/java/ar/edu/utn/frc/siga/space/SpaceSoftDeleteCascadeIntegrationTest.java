@@ -258,8 +258,8 @@ class SpaceSoftDeleteCascadeIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("un aula con habilitada = N en SysAcad no se ofrece ni valida como candidata y se lista con DISABLED_IN_SYSACAD")
-    void classroomDisabledInSysacad_isNotOffered() throws Exception {
+    @DisplayName("un aula con habilitada = N en SysAcad se ofrece, valida como candidata y se lista sin motivo y con enabledInSysacad false")
+    void classroomDisabledInSysacad_isStillOfferedWithWarning() throws Exception {
         Building building = testData.edificio();
         Classroom classroom = testData.aula(building);
         Long id = classroom.getId();
@@ -269,13 +269,14 @@ class SpaceSoftDeleteCascadeIntegrationTest extends AbstractIntegrationTest {
         notCurrentClassrooms.add(classroom);
         classroomRepository.save(classroom);
 
-        assertThat(availableIds()).doesNotContain(id);
-        assertThat(classroomService.findByIds(List.of(id))).isEmpty();
-        listClassrooms(building, true)
+        assertThat(availableIds()).contains(id);
+        assertThat(classroomService.findByIds(List.of(id))).hasSize(1);
+        listClassrooms(building, false)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[?(@.id==" + id + ")].unavailableReason",
-                        contains(UnavailableReason.DISABLED_IN_SYSACAD.name())))
-                .andExpect(jsonPath("$.content[?(@.id==" + id + ")].currentInSysacad", contains(true)));
+                .andExpect(jsonPath("$.content[?(@.id==" + id + ")].unavailableReason", contains((Object) null)))
+                .andExpect(jsonPath("$.content[?(@.id==" + id + ")].currentInSysacad", contains(true)))
+                .andExpect(jsonPath("$.content[?(@.id==" + id + ")].enabledInSysacad", contains(false)))
+                .andExpect(jsonPath("$.content[?(@.id==" + id + ")].canAllocate", contains(true)));
     }
 
     @Test
@@ -360,13 +361,17 @@ class SpaceSoftDeleteCascadeIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("la resolución por número y edificio (ingest, sync de asignaciones) devuelve el aula no vigente y no el aula de un edificio no vigente")
-    void roomNumberLookups_resolveNotCurrentClassroomButNotThoseOfNotCurrentBuilding() {
+    @DisplayName("la resolución por número y edificio (ingest, sync de asignaciones) devuelve el aula no vigente y también la de un edificio no vigente; la de un edificio dado de baja a mano no")
+    void roomNumberLookups_resolveNotCurrentAndAbsentBuildingClassroomsButNotThoseOfDeactivatedBuilding() {
         Building building = buildingWithCode();
         Classroom notCurrent = markNotCurrent(testData.aula(building));
         Building hiddenBuilding = buildingWithCode();
         Classroom inHiddenBuilding = testData.aula(hiddenBuilding);
         markNotCurrent(hiddenBuilding);
+        Building deactivatedBuilding = buildingWithCode();
+        Classroom inDeactivatedBuilding = testData.aula(deactivatedBuilding);
+        deactivatedBuilding.deactivate();
+        buildingRepository.save(deactivatedBuilding);
 
         assertThat(classroomService.findByRoomNumberAndBuilding(notCurrent.getRoomNumber(), building.getId()).id())
                 .isEqualTo(notCurrent.getId());
@@ -374,7 +379,10 @@ class SpaceSoftDeleteCascadeIntegrationTest extends AbstractIntegrationTest {
                 notCurrent.getRoomNumber(), building.getBuildingCode()))
                 .hasValueSatisfying(dto -> assertThat(dto.id()).isEqualTo(notCurrent.getId()));
         assertThat(classroomService.findByRoomNumberAndBuildingCode(
-                inHiddenBuilding.getRoomNumber(), hiddenBuilding.getBuildingCode())).isEmpty();
+                inHiddenBuilding.getRoomNumber(), hiddenBuilding.getBuildingCode()))
+                .hasValueSatisfying(dto -> assertThat(dto.id()).isEqualTo(inHiddenBuilding.getId()));
+        assertThat(classroomService.findByRoomNumberAndBuildingCode(
+                inDeactivatedBuilding.getRoomNumber(), deactivatedBuilding.getBuildingCode())).isEmpty();
     }
 
     @Test
@@ -394,21 +402,18 @@ class SpaceSoftDeleteCascadeIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("un edificio no vigente oculta a sus aulas (NOT_IN_SYSACAD) y reaparecen al volver a marcarlo vigente")
-    void buildingNotInSysacad_hidesItsClassroomsAndTheyComeBack() throws Exception {
+    @DisplayName("un edificio no vigente en SysAcad no oculta a sus aulas: se ofrecen sin motivo y con currentInSysacad false")
+    void buildingNotInSysacad_doesNotHideItsClassrooms() throws Exception {
         Building building = testData.edificio();
         Classroom classroom = testData.aula(building);
         Long id = classroom.getId();
 
         markNotCurrent(building);
 
-        assertThat(availableIds()).doesNotContain(id);
-        assertThat(classroomService.findByIds(List.of(id))).isEmpty();
+        assertThat(availableIds()).contains(id);
+        assertThat(classroomService.findByIds(List.of(id))).hasSize(1);
         listClassrooms(building, false)
-                .andExpect(jsonPath("$.content[*].id", not(hasItem(id.intValue()))));
-        listClassrooms(building, true)
-                .andExpect(jsonPath("$.content[?(@.id==" + id + ")].unavailableReason",
-                        contains(UnavailableReason.NOT_IN_SYSACAD.name())));
+                .andExpect(jsonPath("$.content[?(@.id==" + id + ")].unavailableReason", contains((Object) null)));
 
         markCurrent(building);
 
@@ -416,27 +421,29 @@ class SpaceSoftDeleteCascadeIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("un edificio no vigente sale del listado de edificios, aparece con includeDeactivated y reaparece al volver a marcarlo vigente")
-    void buildingNotInSysacad_isListedOnlyWithIncludeDeactivated() throws Exception {
+    @DisplayName("un edificio no vigente sigue en el listado sin includeDeactivated, con currentInSysacad false y sin motivo; la baja manual sí lo oculta")
+    void buildingNotInSysacad_isListedWithWarning() throws Exception {
         Building building = testData.edificio("Edificio-NoVigente", true);
         Long id = building.getId();
-        listBuilding(building, false).andExpect(jsonPath("$.content[*].id", hasItem(id.intValue())));
+        listBuilding(building, false).andExpect(jsonPath("$.content[*].id", hasItem(id.intValue())))
+                .andExpect(jsonPath("$.content[?(@.id==" + id + ")].currentInSysacad", contains(true)));
 
         markNotCurrent(building);
 
         listBuilding(building, false)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[*].id", not(hasItem(id.intValue()))));
+                .andExpect(jsonPath("$.content[?(@.id==" + id + ")].currentInSysacad", contains(false)))
+                .andExpect(jsonPath("$.content[?(@.id==" + id + ")].unavailableReason", contains((Object) null)));
+        assertThat(buildingService.findByName(building.getName()).id()).isEqualTo(id);
+
+        Building fresh = buildingRepository.findById(id).orElseThrow();
+        fresh.deactivate();
+        buildingRepository.save(fresh);
+
+        listBuilding(building, false).andExpect(jsonPath("$.content[*].id", not(hasItem(id.intValue()))));
         listBuilding(building, true)
                 .andExpect(jsonPath("$.content[?(@.id==" + id + ")].unavailableReason",
-                        contains(UnavailableReason.NOT_IN_SYSACAD.name())));
-        assertThatThrownBy(() -> buildingService.findByName(building.getName()))
-                .isInstanceOf(ResourceNotFoundException.class);
-
-        markCurrent(building);
-
-        listBuilding(building, false).andExpect(jsonPath("$.content[*].id", hasItem(id.intValue())));
-        assertThat(buildingService.findByName(building.getName()).id()).isEqualTo(id);
+                        contains(UnavailableReason.DEACTIVATED.name())));
     }
 
     @Test

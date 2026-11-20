@@ -133,14 +133,14 @@ public class DirectEventServiceImpl implements DirectEventService {
                 suggestionId, status, classroomIds);
         List<AllowedClassroomDto> allowed = suggested.stream()
                 .map(c -> new AllowedClassroomDto(c.id(), c.roomNumber(), c.buildingId(), c.buildingName(),
-                        c.capacity(), true, null, List.of(), false))
+                        c.capacity(), true, null, List.of(), false, c.enabledInSysacad()))
                 .toList();
         return new DirectEventSuggestionResponseDto(suggestionId, status, allowed, overcrowdedBy);
     }
 
     @Override
     @Transactional
-    @AuditOperation("Alta directa de evento con aula")
+    @AuditOperation(value = "Alta directa de evento con aula", subject = "AcademicEvent")
     public List<AllocationResponseDto> create(CreateDirectEventRequestDto request, String actor) {
         DirectEventDraftDto draft = request.draft();
         ResolvedSchedule schedule = draftValidator.validate(draft);

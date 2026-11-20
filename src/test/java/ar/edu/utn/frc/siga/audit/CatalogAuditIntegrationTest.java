@@ -107,7 +107,8 @@ class CatalogAuditIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("deactivate de un aula deja un MOD en aula_aud con eliminado_en y una revisión con la descripción de la operación")
     void deactivateClassroom_leavesModWithDeletionTimestampAndOperation() {
-        Classroom classroom = testData.aula(testData.edificio());
+        Building building = testData.edificio();
+        Classroom classroom = testData.aula(building);
         long addRows = countWhere("aula_aud", "id_aula", classroom.getId());
 
         asFixtureUser(() -> {
@@ -123,7 +124,8 @@ class CatalogAuditIntegrationTest extends AbstractIntegrationTest {
         assertThat(((Number) latest.get("revtype")).shortValue()).isEqualTo(MOD);
         assertThat(latest.get("eliminado_en")).isNotNull();
         assertThat(latest.get("operacion_id")).isNotNull();
-        assertThat(latest.get("descripcion")).isEqualTo("Baja de aula");
+        assertThat(latest.get("descripcion"))
+                .isEqualTo("Baja de aula: Aula " + classroom.getRoomNumber() + " (" + building.getName() + ")");
     }
 
     @Test

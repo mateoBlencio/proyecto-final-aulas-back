@@ -71,10 +71,7 @@ public class Building extends SoftDeletableEntity {
     }
 
     public UnavailableReason unavailableReason() {
-        if (!isActive()) {
-            return UnavailableReason.DEACTIVATED;
-        }
-        return isCurrentInSysacad() ? null : UnavailableReason.NOT_IN_SYSACAD;
+        return isActive() ? null : UnavailableReason.DEACTIVATED;
     }
 
     public boolean isAvailable() {

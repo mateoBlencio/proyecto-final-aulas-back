@@ -29,6 +29,15 @@ class CommissionAuditLabelProvider implements AuditLabelProvider {
 
     @Override
     public Map<String, String> labels(List<AuditedRecord> records) {
+        return build(records, false);
+    }
+
+    @Override
+    public Map<String, String> summaryLabels(List<AuditedRecord> records) {
+        return build(records, true);
+    }
+
+    private Map<String, String> build(List<AuditedRecord> records, boolean summary) {
         Set<Long> periodIds = records.stream().map(record -> record.longValue("academicPeriod"))
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         Map<Long, AcademicPeriod> periods = periodIds.isEmpty() ? new HashMap<>()
@@ -42,8 +51,10 @@ class CommissionAuditLabelProvider implements AuditLabelProvider {
                 continue;
             }
             AcademicPeriod period = periods.get(record.longValue("academicPeriod"));
-            labels.put(record.recordId(), period == null ? "Comisión " + code
-                    : "Comisión " + code + ", " + period.getYear() + "/" + period.getSemester());
+            String name = summary ? code : "Comisión " + code;
+            String periodText = period == null ? null : period.getYear() + "/" + period.getSemester();
+            labels.put(record.recordId(), periodText == null ? name
+                    : summary ? name + " (" + periodText + ")" : name + ", " + periodText);
         }
         return labels;
     }

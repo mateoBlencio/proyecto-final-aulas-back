@@ -21,7 +21,16 @@ public class RoomRequestAccessControl {
 
     private static final ZoneId ZONE = ZoneId.of("America/Argentina/Buenos_Aires");
 
-    public enum Action { ASSIGN, DERIVE, RETURN, TAKE_OVER, CANCEL, NOTIFY, CONFIRM, REOPEN }
+    public enum Action {
+        ASSIGN("asignar aula a"), DERIVE("derivar a un edificio"), RETURN("devolver"), TAKE_OVER("tomar a cargo"),
+        CANCEL("cancelar"), NOTIFY("notificar"), CONFIRM("confirmar"), REOPEN("reabrir");
+
+        private final String text;
+
+        Action(String text) {
+            this.text = text;
+        }
+    }
 
     private final UserService userService;
 
@@ -60,7 +69,7 @@ public class RoomRequestAccessControl {
 
     public void authorize(RoomRequestItem item, String actorEmail, Action action) {
         if (!allows(item, resolveActor(actorEmail), action)) {
-            throw new RoomRequestForbiddenException(action.name());
+            throw new RoomRequestForbiddenException(action.name(), action.text);
         }
     }
 
@@ -68,7 +77,7 @@ public class RoomRequestAccessControl {
         Optional<Set<Long>> scope = readScope(actorEmail);
         if (scope.isPresent()
                 && (item.getDerivedBuildingId() == null || !scope.get().contains(item.getDerivedBuildingId()))) {
-            throw new RoomRequestForbiddenException("READ");
+            throw new RoomRequestForbiddenException("READ", "ver");
         }
     }
 

@@ -1,8 +1,6 @@
 package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
 import ar.edu.utn.frc.siga.audit.AuditOperation;
-import ar.edu.utn.frc.siga.audit.AuditOperations;
-import ar.edu.utn.frc.siga.common.util.Plurals;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
@@ -44,7 +42,7 @@ public class RoomRequestExpiryServiceImpl implements RoomRequestExpiryService {
 
     @Override
     @Transactional
-    @AuditOperation("Vencimiento automático de solicitudes de aula")
+    @AuditOperation(value = "Vencimiento automático de solicitudes de aula", subject = "RoomRequestItem")
     public int expireOverdueItems() {
         LocalDate today = LocalDate.now();
 
@@ -62,8 +60,6 @@ public class RoomRequestExpiryServiceImpl implements RoomRequestExpiryService {
             }
         }
 
-        AuditOperations.describe("Vencimiento automático de " + Plurals.count(expired.size(), "ítem", "ítems")
-                + " de solicitudes de aula");
         log.info("Vencimiento automático de pedidos de aula: {} cancelado(s), {} aceptado(s)",
                 expired.size() - accepted, accepted);
         return expired.size();
@@ -71,14 +67,12 @@ public class RoomRequestExpiryServiceImpl implements RoomRequestExpiryService {
 
     @Override
     @Transactional
-    @AuditOperation("Aceptación automática de solicitudes de aula")
+    @AuditOperation(value = "Aceptación automática de solicitudes de aula", subject = "RoomRequestItem")
     public int acceptOverdueNotifiedItems() {
         Instant now = Instant.now();
         List<RoomRequestItem> overdue = itemRepository.findNotifiedWithDeadlineUntil(now);
         overdue.forEach(item -> accept(item, now));
 
-        AuditOperations.describe("Aceptación automática de " + Plurals.count(overdue.size(), "ítem", "ítems")
-                + " de solicitudes de aula");
         log.info("Aceptación automática de pedidos de aula: {} aceptado(s)", overdue.size());
         return overdue.size();
     }

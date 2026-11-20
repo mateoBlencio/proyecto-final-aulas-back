@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.common.security.BuildingScope;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.common.security.SystemScope;
+import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import ar.edu.utn.frc.siga.space.SpaceTestData;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
@@ -81,18 +82,18 @@ class SpaceActionFlagsTest {
     }
 
     @Test
-    @DisplayName("canUpdateClassroom: aula activa con unavailableReason sigue en true (editar solo exige aula activa)")
+    @DisplayName("canUpdateClassroom: aula activa con unavailableReason (edificio dado de baja) sigue en true (editar solo exige aula activa)")
     void canUpdateClassroomIgnoresUnavailableReasonOfActiveClassroom() {
-        Classroom disabled = disabledInSysacadClassroomIn(1L);
+        Classroom disabled = SpaceTestData.classroom().building(deactivatedBuilding(1L)).build();
         when(scopeResolver.scopeFor(Permission.CLASSROOM_UPDATE)).thenReturn(BuildingScope.of(Set.of(1L)));
         SpaceActionFlags flags = new SpaceActionFlags(scopeResolver);
 
-        assertThat(disabled.unavailableReason()).as("precondición").isNotNull();
+        assertThat(disabled.unavailableReason()).as("precondición").isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
         assertThat(flags.canUpdateClassroom(disabled)).isTrue();
     }
 
     @Test
-    @DisplayName("canAllocateClassroom: aula desactivada, con unavailableReason o en edificio desactivado da false aunque esté en alcance")
+    @DisplayName("canAllocateClassroom: aula desactivada o en edificio desactivado da false aunque esté en alcance; habilitada = N en SysAcad da true")
     void canAllocateClassroomIsFalseWhenClassroomIsNotAvailable() {
         when(scopeResolver.scopeFor(Permission.ALLOCATION_WRITE)).thenReturn(BuildingScope.of(Set.of(1L)));
         SpaceActionFlags flags = new SpaceActionFlags(scopeResolver);
@@ -101,7 +102,7 @@ class SpaceActionFlagsTest {
         assertThat(flags.canAllocateClassroom(classroomIn(1L))).as("disponible").isTrue();
         assertThat(flags.canAllocateClassroom(deactivatedClassroomIn(1L))).as("aula desactivada").isFalse();
         assertThat(flags.canAllocateClassroom(disabledInSysacadClassroomIn(1L)))
-                .as("habilitada = N en Sysacad").isFalse();
+                .as("habilitada = N en Sysacad").isTrue();
         assertThat(flags.canAllocateClassroom(inDeactivatedBuilding)).as("edificio desactivado").isFalse();
     }
 

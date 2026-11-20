@@ -169,14 +169,14 @@ class AuditLateDescriptionIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
         Map<String, Object> other = jdbcTemplate.queryForMap(
                 "SELECT operacion_id, descripcion FROM revinfo WHERE operacion_id IS NOT NULL ORDER BY rev DESC LIMIT 1");
-        assertThat(other.get("descripcion")).isEqualTo("Modificación de configuración");
+        assertThat(other.get("descripcion")).isEqualTo("Modificación de configuración: Horario de eventos: hora de fin");
 
         describer.writeTwiceThenDescribe(uniqueText());
 
         assertThat(jdbcTemplate.queryForList(
                 "SELECT descripcion FROM revinfo WHERE operacion_id = ?", String.class, other.get("operacion_id")))
                 .isNotEmpty()
-                .containsOnly("Modificación de configuración");
+                .containsOnly("Modificación de configuración: Horario de eventos: hora de fin");
     }
 
     @Test

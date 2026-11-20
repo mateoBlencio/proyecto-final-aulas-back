@@ -48,7 +48,7 @@ public class RoomRequestServiceImpl implements RoomRequestService {
 
     @Override
     @Transactional
-    @AuditOperation("Alta de solicitud de aula")
+    @AuditOperation(value = "Alta de solicitud de aula", subject = "RoomRequest")
     public RoomRequestResponseDto create(CreateRoomRequestDto dto) {
         log.debug("Creando solicitud de aula: teacherName={}, type={}, scope={}, subjectId={}, items={}",
                 dto.requester().teacherName(), dto.type(), dto.requester().scope(),

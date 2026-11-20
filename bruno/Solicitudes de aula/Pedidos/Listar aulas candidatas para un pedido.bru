@@ -17,7 +17,7 @@ docs {
   todo sale de los datos del ítem.
 
   Respuesta: array de { id, roomNumber, buildingId, buildingName, capacity,
-  available, computerCount, missingRequirements, current }. `current: true` marca el aula donde la
+  available, computerCount, missingRequirements, current, enabledInSysacad }. enabledInSysacad=false avisa que SysAcad inhabilito el aula; el aula se ofrece igual. `current: true` marca el aula donde la
   comisión cursa hoy la clase que el pedido quiere cambiar (cambio regular: aulas de las clases futuras del día;
   cambio puntual y parcial en clase: aula de esa fecha; en los dos casos también las aulas adicionales si la
   clase usa varias a la vez); siempre `false` en los demás tipos. Esas aulas salen `available: true` porque la

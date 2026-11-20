@@ -65,7 +65,7 @@ public class Commission extends SoftDeletableEntity {
         if (!academicPeriod.isActive()) {
             return UnavailableReason.PARENT_DEACTIVATED;
         }
-        return isCurrentInSysacad() ? null : UnavailableReason.NOT_IN_SYSACAD;
+        return null;
     }
 
     public boolean isAvailable() {

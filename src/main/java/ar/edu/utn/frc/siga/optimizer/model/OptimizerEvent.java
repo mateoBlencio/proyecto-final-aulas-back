@@ -11,7 +11,15 @@ import java.util.Set;
 public record OptimizerEvent(String planningId, String commissionKey, int enrolled,
                           LocalTime startTime, LocalTime endTime,
                           Set<LocalDate> occurrenceDates, Set<Long> subjectIds, String groupKey,
-                          boolean needsProjector, int computersNeeded) implements TimeSpan {
+                          boolean needsProjector, int computersNeeded, Long priorRoomId) implements TimeSpan {
+
+    public OptimizerEvent(String planningId, String commissionKey, int enrolled,
+                          LocalTime startTime, LocalTime endTime,
+                          Set<LocalDate> occurrenceDates, Set<Long> subjectIds, String groupKey,
+                          boolean needsProjector, int computersNeeded) {
+        this(planningId, commissionKey, enrolled, startTime, endTime, occurrenceDates, subjectIds, groupKey,
+                needsProjector, computersNeeded, null);
+    }
 
     public OptimizerEvent(String planningId, String commissionKey, int enrolled,
                           LocalTime startTime, LocalTime endTime,

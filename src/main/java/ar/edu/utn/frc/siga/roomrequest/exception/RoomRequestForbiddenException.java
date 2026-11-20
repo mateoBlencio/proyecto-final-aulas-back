@@ -10,9 +10,9 @@ public class RoomRequestForbiddenException extends SigaAppException {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    public RoomRequestForbiddenException(String action) {
+    public RoomRequestForbiddenException(String action, String actionText) {
         super(HttpStatus.FORBIDDEN, "Room request action forbidden",
-                "Tu rol no puede hacer '" + action + "' sobre este pedido en su estado o edificio actual.");
+                "Tu rol no puede " + actionText + " este pedido en su estado o edificio actual.");
         withProperty("action", action);
     }
 }

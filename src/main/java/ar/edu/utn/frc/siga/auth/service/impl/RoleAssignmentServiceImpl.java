@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.auth.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditLabels;
 import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.auth.dto.request.AssignRoleRequestDto;
 import ar.edu.utn.frc.siga.auth.dto.response.RoleAssignmentDto;
@@ -35,7 +36,7 @@ public class RoleAssignmentServiceImpl implements RoleAssignmentService {
 
     @Override
     @Transactional
-    @AuditOperation("Asignación de rol")
+    @AuditOperation(value = "Asignación de rol", subject = "RoleAssignment")
     public RoleAssignmentDto assign(Long userId, AssignRoleRequestDto dto, String currentUserEmail) {
         log.debug("Asignando rol: userId={}, role={}, scopeType={}, scopeId={}",
                 userId, dto.role(), dto.scopeType(), dto.scopeId());
@@ -59,7 +60,7 @@ public class RoleAssignmentServiceImpl implements RoleAssignmentService {
 
     @Override
     @Transactional
-    @AuditOperation("Revocación de rol")
+    @AuditOperation(value = "Revocación de rol", subject = "RoleAssignment")
     public void revoke(Long userId, Long assignmentId, String currentUserEmail) {
         log.debug("Revocando asignación: userId={}, assignmentId={}", userId, assignmentId);
 
@@ -76,7 +77,7 @@ public class RoleAssignmentServiceImpl implements RoleAssignmentService {
 
         if (assignment.getUser().getEmail().equalsIgnoreCase(currentUserEmail)) {
             log.warn("Auto-revocación rechazada: userId={}, assignmentId={}", userId, assignmentId);
-            throw new RoleDomainException("A user cannot revoke their own role assignment");
+            throw new RoleDomainException("Un usuario no puede revocar su propia asignación de rol");
         }
 
         roleAssignmentRepository.delete(assignment);
@@ -85,17 +86,17 @@ public class RoleAssignmentServiceImpl implements RoleAssignmentService {
 
     private void validateRoleScope(SystemRole role, ScopeType scopeType) {
         if (!role.allowsScope(scopeType)) {
-            throw new RoleDomainException("Role " + role + " does not allow " + scopeType + " scope");
+            throw new RoleDomainException("El rol " + AuditLabels.constant(role) + " no admite el alcance " + AuditLabels.constant(scopeType));
         }
     }
 
     private void validateScope(ScopeType scopeType, Long scopeId) {
         if (scopeType == ScopeType.GLOBAL && scopeId != null) {
-            throw new RoleDomainException("scopeId must be null for GLOBAL scope");
+            throw new RoleDomainException("El alcance Global no admite scopeId");
         }
         if (scopeType == ScopeType.BUILDING) {
             if (scopeId == null) {
-                throw new RoleDomainException("scopeId is required for BUILDING scope");
+                throw new RoleDomainException("El alcance Edificio requiere un edificio");
             }
             buildingService.findById(scopeId);
         }
@@ -108,7 +109,7 @@ public class RoleAssignmentServiceImpl implements RoleAssignmentService {
                         && assignment.getScopeType() == dto.scopeType()
                         && Objects.equals(assignment.getScopeId(), dto.scopeId()));
         if (duplicate) {
-            throw new RoleDomainException("The user already has that role assignment");
+            throw new RoleDomainException("El usuario ya tiene esa asignación de rol");
         }
     }
 

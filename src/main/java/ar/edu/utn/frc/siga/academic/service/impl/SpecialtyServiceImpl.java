@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.academic.dto.SpecialtyFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SpecialtyMapper;
+import ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.repository.CommissionCountSearch;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
@@ -28,6 +29,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class SpecialtyServiceImpl implements SpecialtyService {
 
+    private final ApplicationEventPublisher eventPublisher;
     private final SpecialtyRepository specialtyRepository;
     private final SubjectCommissionRepository subjectCommissionRepository;
     private final SubjectRepository subjectRepository;
@@ -87,16 +90,18 @@ public class SpecialtyServiceImpl implements SpecialtyService {
 
     @Override
     @Transactional
-    @AuditOperation("Reactivación de especialidad")
+    @AuditOperation(value = "Reactivación de especialidad", subject = "Specialty")
     public void activate(Long id) {
         specialtyRepository.restore(Finder.orThrow(specialtyRepository::findById, id, "Specialty"));
+        eventPublisher.publishEvent(new CatalogAvailabilityChanged());
     }
 
     @Override
     @Transactional
-    @AuditOperation("Baja de especialidad")
+    @AuditOperation(value = "Baja de especialidad", subject = "Specialty")
     public void deactivate(Long id) {
         specialtyRepository.softDelete(Finder.orThrow(specialtyRepository::findById, id, "Specialty"));
+        eventPublisher.publishEvent(new CatalogAvailabilityChanged());
     }
 
     @Override
@@ -114,7 +119,7 @@ public class SpecialtyServiceImpl implements SpecialtyService {
     // El sync es un upsert simple por código y nunca reactiva: la baja manual es de la facultad.
     @Override
     @Transactional
-    @AuditOperation("Sincronización de especialidades desde SysAcad")
+    @AuditOperation(value = "Sincronización de especialidades desde SysAcad", subject = "Specialty")
     public int syncSpecialties(List<SpecialtySyncCommand> commands) {
         Instant syncedAt = Instant.now();
         Map<Integer, Specialty> existing = specialtyRepository.findAll().stream()

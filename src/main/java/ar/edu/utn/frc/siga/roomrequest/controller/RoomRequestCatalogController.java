@@ -57,7 +57,7 @@ public class RoomRequestCatalogController {
 
     @GetMapping("/classrooms")
     @Operation(summary = "Listar aulas disponibles",
-               description = "Para elegir las aulas de preferencia. Devuelve solo identificación y edificio.")
+               description = "Para elegir las aulas de preferencia. Devuelve solo identificación y edificio, sin datos de SysAcad.")
     public ResponseEntity<List<ClassroomOptionDto>> findClassrooms() {
         log.debug("GET /v1/room-requests/catalog/classrooms");
         return ResponseEntity.ok(catalogService.findClassrooms());

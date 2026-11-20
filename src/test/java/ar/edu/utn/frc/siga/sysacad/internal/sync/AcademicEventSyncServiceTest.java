@@ -391,7 +391,7 @@ class AcademicEventSyncServiceTest {
     void syncDescribesCreatedUpdatedAndAbsent() {
         String description = syncAndReadDescription(List.of(created(100L)), 2);
 
-        assertThat(description).isEqualTo("Sincronización de eventos desde SysAcad: 1 alta, 0 cambios, 2 bajas");
+        assertThat(description).isEqualTo("Sincronización de eventos desde SysAcad (1 alta, 0 cambios, 2 bajas)");
     }
 
     @Test
@@ -399,7 +399,7 @@ class AcademicEventSyncServiceTest {
     void syncDescribesSingularUpdateAndAbsent() {
         String description = syncAndReadDescription(List.of(updated(100L)), 1);
 
-        assertThat(description).isEqualTo("Sincronización de eventos desde SysAcad: 0 altas, 1 cambio, 1 baja");
+        assertThat(description).isEqualTo("Sincronización de eventos desde SysAcad (0 altas, 1 cambio, 1 baja)");
     }
 
     @Test
@@ -408,7 +408,7 @@ class AcademicEventSyncServiceTest {
         String description = syncAndReadDescription(
                 List.of(created(1L), created(2L), updated(3L), updated(4L), updated(5L), unchanged(6L), unchanged(7L)), 0);
 
-        assertThat(description).isEqualTo("Sincronización de eventos desde SysAcad: 2 altas, 3 cambios, 0 bajas");
+        assertThat(description).isEqualTo("Sincronización de eventos desde SysAcad (2 altas, 3 cambios, 0 bajas)");
     }
 
     @Test

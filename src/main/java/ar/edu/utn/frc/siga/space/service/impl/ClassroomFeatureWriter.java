@@ -100,7 +100,7 @@ public class ClassroomFeatureWriter {
 
     private ResourceType resolveResourceType(Long resourceTypeId) {
         return resourceTypeRepository.findActiveById(resourceTypeId)
-                .orElseThrow(() -> new SpaceDomainException("Unknown resource type id: " + resourceTypeId));
+                .orElseThrow(() -> new SpaceDomainException("No existe el tipo de recurso " + resourceTypeId + "."));
     }
 
     private static void validateQuantity(ResourceType resourceType, Integer quantity) {

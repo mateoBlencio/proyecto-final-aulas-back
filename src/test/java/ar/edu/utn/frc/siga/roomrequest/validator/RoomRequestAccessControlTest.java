@@ -8,6 +8,8 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl.Action;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -463,5 +465,35 @@ class RoomRequestAccessControlTest {
                     .as("%s en %s", action, item.getStatus())
                     .isInstanceOf(RoomRequestForbiddenException.class);
         }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "ASSIGN,asignar aula a", "DERIVE,derivar a un edificio", "RETURN,devolver", "TAKE_OVER,tomar a cargo",
+            "CANCEL,cancelar", "NOTIFY,notificar", "CONFIRM,confirmar", "REOPEN,reabrir"})
+    @DisplayName("authorize: el 403 de cada acción dice qué no puede hacer el rol en español y conserva el código en action")
+    void authorizeForbiddenMessageIsReadable(Action action, String actionText) {
+        asOtroRol("consulta@frc.utn.edu.ar");
+
+        assertThatThrownBy(() -> accessControl.authorize(item(RoomRequestStatus.NEW, null), "consulta@frc.utn.edu.ar", action))
+                .isInstanceOfSatisfying(RoomRequestForbiddenException.class, e -> {
+                    assertThat(e.getMessage())
+                            .isEqualTo("Tu rol no puede " + actionText + " este pedido en su estado o edificio actual.");
+                    assertThat(e.getMessage()).doesNotContain(action.name());
+                    assertThat(e.getProperties()).containsEntry("action", action.name());
+                });
+    }
+
+    @Test
+    @DisplayName("authorizeRead: el 403 dice 'ver' y la propiedad action es READ")
+    void authorizeReadForbiddenMessageIsReadable() {
+        asAuxiliar(OTRO_BUILDING);
+
+        assertThatThrownBy(() -> accessControl.authorizeRead(item(RoomRequestStatus.NEW, SU_BUILDING), AUXILIAR_EMAIL))
+                .isInstanceOfSatisfying(RoomRequestForbiddenException.class, e -> {
+                    assertThat(e.getMessage())
+                            .isEqualTo("Tu rol no puede ver este pedido en su estado o edificio actual.");
+                    assertThat(e.getProperties()).containsEntry("action", "READ");
+                });
     }
 }

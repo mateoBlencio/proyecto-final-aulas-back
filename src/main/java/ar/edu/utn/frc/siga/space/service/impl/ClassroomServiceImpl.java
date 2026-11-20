@@ -78,7 +78,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
     @Override
     @Transactional
-    @AuditOperation("Alta de aula")
+    @AuditOperation(value = "Alta de aula", subject = "Classroom")
     public ClassroomResponseDto create(ClassroomRequestDto dto) {
         log.debug("Creando aula: roomNumber={}, buildingId={}, classroomTypeId={}",
                 dto.roomNumber(), dto.buildingId(), dto.classroomTypeId());
@@ -196,7 +196,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
     @Override
     @Transactional
-    @AuditOperation("Modificación de aula")
+    @AuditOperation(value = "Modificación de aula", subject = "Classroom")
     public ClassroomResponseDto update(Long id, ClassroomRequestDto dto) {
         log.debug("Actualizando aula: id={}, roomNumber={}", id, dto.roomNumber());
 
@@ -221,7 +221,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
     @Override
     @Transactional
-    @AuditOperation("Modificación de detalles de aula")
+    @AuditOperation(value = "Modificación de detalles de aula", subject = "Classroom")
     public ClassroomListItemDto updateDetails(Long id, ClassroomDetailsUpdateDto dto) {
         log.debug("Actualizando campos locales del aula: id={}, permissionMode={}", id, dto.permissionMode());
 
@@ -242,7 +242,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
     @Override
     @Transactional
-    @AuditOperation("Baja de aula")
+    @AuditOperation(value = "Baja de aula", subject = "Classroom")
     public void delete(Long id) {
         log.debug("Eliminando (soft-delete) aula: id={}", id);
         Classroom classroom = scopedClassroom.requireActiveInScope(id, Permission.CLASSROOM_DELETE);
@@ -253,7 +253,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
     @Override
     @Transactional
-    @AuditOperation("Reactivación de aula")
+    @AuditOperation(value = "Reactivación de aula", subject = "Classroom")
     public void activate(Long id) {
         Classroom classroom = scopedClassroom.requireAnyInScope(id, Permission.CLASSROOM_ACTIVATE);
         requireRoomNumberFree(classroom.getRoomNumber(), classroom.getBuilding(), classroom.getId());
@@ -273,7 +273,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
     @Override
     @Transactional
-    @AuditOperation("Baja de aula")
+    @AuditOperation(value = "Baja de aula", subject = "Classroom")
     public DeactivationImpactDto deactivate(Long id) {
         Classroom classroom = scopedClassroom.requireAnyInScope(id, Permission.CLASSROOM_ACTIVATE);
         classroomRepository.softDelete(classroom);
@@ -347,7 +347,7 @@ public class ClassroomServiceImpl implements ClassroomService {
 
     @Override
     @Transactional
-    @AuditOperation("Sincronización de aulas desde SysAcad")
+    @AuditOperation(value = "Sincronización de aulas desde SysAcad", subject = "Classroom")
     public int syncClassrooms(List<ClassroomSyncCommand> commands, int minValidPercent) {
         Instant syncedAt = Instant.now();
         ClassroomType defaultType = null;

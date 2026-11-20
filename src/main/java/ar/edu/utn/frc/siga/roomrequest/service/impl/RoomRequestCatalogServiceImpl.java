@@ -74,7 +74,9 @@ public class RoomRequestCatalogServiceImpl implements RoomRequestCatalogService 
     @Override
     @Transactional(readOnly = true)
     public List<ClassroomOptionDto> findClassrooms() {
-        return mapper.toClassroomOptions(SystemScope.call(classroomService::findAllAvailable));
+        return mapper.toClassroomOptions(SystemScope.call(classroomService::findAllAvailable)).stream()
+                .map(ClassroomOptionDto::withoutSysacad)
+                .toList();
     }
 
     @Override

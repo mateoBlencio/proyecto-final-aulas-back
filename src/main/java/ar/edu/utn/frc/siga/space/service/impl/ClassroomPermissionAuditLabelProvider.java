@@ -37,6 +37,15 @@ class ClassroomPermissionAuditLabelProvider implements AuditLabelProvider {
 
     @Override
     public Map<String, String> labels(List<AuditedRecord> records) {
+        return build(records, false);
+    }
+
+    @Override
+    public Map<String, String> summaryLabels(List<AuditedRecord> records) {
+        return build(records, true);
+    }
+
+    private Map<String, String> build(List<AuditedRecord> records, boolean summary) {
         Set<Long> subjectIds = records.stream().filter(ClassroomPermissionAuditLabelProvider::targetsSubject)
                 .map(record -> record.longValue("targetId")).filter(Objects::nonNull).collect(Collectors.toSet());
         Set<Long> classroomIds = records.stream().map(record -> record.longValue("classroom"))
@@ -51,7 +60,8 @@ class ClassroomPermissionAuditLabelProvider implements AuditLabelProvider {
             SubjectResponseDto subject = targetsSubject(record) ? subjects.get(record.longValue("targetId")) : null;
             ClassroomResponseDto classroom = classrooms.get(record.longValue("classroom"));
             String target = subject == null ? null : "Materia " + subject.name();
-            String room = classroom == null ? null : "Aula " + classroom.roomNumber() + ", " + classroom.buildingName();
+            String room = classroom == null ? null : "Aula " + classroom.roomNumber()
+                    + (summary ? " (" + classroom.buildingName() + ")" : ", " + classroom.buildingName());
             String label = target == null ? room : room == null ? target : target + " en " + room;
             if (label != null) {
                 labels.put(record.recordId(), label);

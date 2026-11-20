@@ -106,4 +106,13 @@ class StudyPlanAuditLabelProviderTest {
 
         assertThat(provider.labels(List.of(record("1", null, 3L)))).isEmpty();
     }
+
+    @Test
+    @DisplayName("summaryLabels: Plan y código con la especialidad entre paréntesis; sin especialidad, solo el plan")
+    void summaryLabels_planAndSpecialtyInParentheses() {
+        when(specialtyRepository.findAllById(any())).thenReturn(List.of(specialty(3L, "Sistemas")));
+
+        assertThat(provider.summaryLabels(List.of(record("1", 2023, 3L), record("2", 2008, null))))
+                .containsOnly(Map.entry("1", "Plan 2023 (Sistemas)"), Map.entry("2", "Plan 2008"));
+    }
 }

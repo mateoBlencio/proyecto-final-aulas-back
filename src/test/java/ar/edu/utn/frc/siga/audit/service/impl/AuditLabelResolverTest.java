@@ -286,4 +286,65 @@ class AuditLabelResolverTest {
         verify(transactionManager).rollback(status);
         verify(transactionManager, never()).commit(any());
     }
+
+    @Test
+    @DisplayName("resolveSummaries usa summaryLabels del proveedor y no llama a labels")
+    void resolveSummaries_usesSummaryLabelsNotLabels() {
+        AuditLabelProvider provider = providerOf(String.class);
+        when(provider.summaryLabels(any())).thenReturn(Map.of("1", "Álgebra (1K1)"));
+        RecordRevision key = new RecordRevision(ALLOCATION, "1", 10);
+
+        Map<RecordRevision, String> result = resolverOf(provider)
+                .resolveSummaries(Map.of(key, currentOnly(Map.of("name", "a"))));
+
+        assertThat(result).containsExactly(Map.entry(key, "Álgebra (1K1)"));
+        verify(provider, never()).labels(any());
+    }
+
+    @Test
+    @DisplayName("resolveSummaries cae en labels cuando el proveedor no redefine summaryLabels")
+    void resolveSummaries_providerWithoutOverride_fallsBackToLabels() {
+        AuditLabelProvider provider = new AuditLabelProvider() {
+            @Override
+            public Class<?> entityType() {
+                return String.class;
+            }
+
+            @Override
+            public Map<String, String> labels(List<AuditedRecord> records) {
+                return Map.of("1", "Etiqueta completa");
+            }
+        };
+        RecordRevision key = new RecordRevision(ALLOCATION, "1", 10);
+
+        Map<RecordRevision, String> result = resolverOf(provider)
+                .resolveSummaries(Map.of(key, currentOnly(Map.of("name", "a"))));
+
+        assertThat(result).containsExactly(Map.entry(key, "Etiqueta completa"));
+    }
+
+    @Test
+    @DisplayName("resolve sigue usando labels aunque el proveedor redefina summaryLabels")
+    void resolve_ignoresSummaryLabels() {
+        AuditLabelProvider provider = providerOf(String.class);
+        when(provider.labels(any())).thenReturn(Map.of("1", "Etiqueta completa"));
+        RecordRevision key = new RecordRevision(ALLOCATION, "1", 10);
+
+        Map<RecordRevision, String> result = resolverOf(provider).resolve(Map.of(key, currentOnly(Map.of("name", "a"))));
+
+        assertThat(result).containsExactly(Map.entry(key, "Etiqueta completa"));
+        verify(provider, never()).summaryLabels(any());
+    }
+
+    @Test
+    @DisplayName("resolveSummaries con un proveedor que lanza deja ese registro sin resumen y no propaga")
+    void resolveSummaries_failingProvider_leavesRecordWithoutSummary() {
+        AuditLabelProvider failing = providerOf(String.class);
+        when(failing.summaryLabels(any())).thenThrow(new IllegalStateException("boom"));
+
+        Map<RecordRevision, String> result = resolverOf(failing).resolveSummaries(Map.of(
+                new RecordRevision(ALLOCATION, "1", 10), currentOnly(Map.of("name", "a"))));
+
+        assertThat(result).isEmpty();
+    }
 }

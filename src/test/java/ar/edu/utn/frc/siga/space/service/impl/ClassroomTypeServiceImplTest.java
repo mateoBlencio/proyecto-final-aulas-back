@@ -60,7 +60,7 @@ class ClassroomTypeServiceImplTest {
 
         assertThatThrownBy(() -> service.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("ClassroomType not found with id: 99");
+                .hasMessage("No existe el tipo de aula 99.");
     }
 
     @Test

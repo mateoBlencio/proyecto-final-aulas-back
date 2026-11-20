@@ -23,6 +23,14 @@ class FieldValueFormatterTest {
     }
 
     @Test
+    @DisplayName("un instante de una columna timestamptz se muestra en hora de Argentina una sola vez")
+    void zonedInstantIsShiftedOnce() {
+        AuditedColumn column = new AuditedColumn("t_aud", "fecha_decision", "decidedAt", Instant.class, null);
+
+        assertThat(formatter.format(column, Instant.parse("2026-11-17T04:36:00Z"))).isEqualTo("17/11/2026 01:36");
+    }
+
+    @Test
     @DisplayName("una columna LocalDateTime se muestra tal cual")
     void localDateTimeColumnIsNotShifted() {
         AuditedColumn column = new AuditedColumn("t_aud", "fecha", "date", LocalDateTime.class, null);

@@ -10,7 +10,6 @@ import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
-import ar.edu.utn.frc.siga.academic.model.SubjectCommissionDeactivationReason;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
@@ -30,7 +29,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -47,6 +45,8 @@ import static org.mockito.Mockito.when;
 @DisplayName("CommissionServiceImpl")
 class CommissionServiceImplTest {
 
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
     @Mock
     private CommissionRepository commissionRepository;
     @Mock
@@ -66,7 +66,7 @@ class CommissionServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new CommissionServiceImpl(commissionRepository, academicPeriodRepository, subjectRepository,
+        service = new CommissionServiceImpl(eventPublisher, commissionRepository, academicPeriodRepository, subjectRepository,
                 subjectCommissionRepository, studyPlanResolver, commissionMapper);
     }
 
@@ -74,7 +74,7 @@ class CommissionServiceImplTest {
     @DisplayName("findById: devuelve el DTO mapeado cuando la comisión existe")
     void findByIdReturnsMappedDto() {
         Commission commission = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build();
-        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null, null, List.of());
+        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null, null, List.of(), true);
         when(commissionRepository.findById(3L)).thenReturn(Optional.of(commission));
         when(commissionMapper.toDto(commission)).thenReturn(dto);
 
@@ -90,7 +90,7 @@ class CommissionServiceImplTest {
 
         assertThatThrownBy(() -> service.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Commission not found with id: 99");
+                .hasMessage("No existe la comisión 99.");
     }
 
     @Test
@@ -140,7 +140,7 @@ class CommissionServiceImplTest {
 
         assertThatThrownBy(() -> service.findByCourseAndPeriod("K1001", 2030, 2))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("AcademicPeriod not found with id: 2030-2");
+                .hasMessage("No existe el período académico 2030-2.");
         verify(commissionRepository, never()).findByCourseCodeAndAcademicPeriod(any(), any());
     }
 
@@ -148,7 +148,7 @@ class CommissionServiceImplTest {
     @DisplayName("findAll: devuelve la página de comisiones mapeadas según el Specification")
     void findAllMapsAllCommissions() {
         Commission commission = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build();
-        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null, null, List.of());
+        CommissionResponseDto dto = new CommissionResponseDto(3L, "K1001", null, null, List.of(), true);
         when(commissionRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(commission)));
         when(commissionMapper.toDto(commission)).thenReturn(dto);
@@ -163,8 +163,8 @@ class CommissionServiceImplTest {
         Commission active = Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build();
         Commission inactive = Commission.builder().id(4L).courseCode("K1002").academicPeriod(period).build();
         inactive.deactivate();
-        CommissionResponseDto activeDto = new CommissionResponseDto(3L, "K1001", null, null, List.of());
-        CommissionResponseDto inactiveDto = new CommissionResponseDto(4L, "K1002", null, null, List.of());
+        CommissionResponseDto activeDto = new CommissionResponseDto(3L, "K1001", null, null, List.of(), true);
+        CommissionResponseDto inactiveDto = new CommissionResponseDto(4L, "K1002", null, null, List.of(), true);
         when(commissionRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(active, inactive)));
         when(commissionMapper.toDto(active)).thenReturn(activeDto);
@@ -553,27 +553,26 @@ class CommissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("syncCommissions: con cero inscriptos da de baja el link existente con motivo NO_ENROLLED y sigue actualizándolo")
-    void syncCommissionsDeactivatesLinkWithZeroEnrolled() {
+    @DisplayName("syncCommissions: con cero inscriptos el link existente sigue activo y guarda enrolledCount 0")
+    void syncCommissionsKeepsLinkActiveWithZeroEnrolled() {
         SubjectCommission link = existingLink(20);
 
         syncLink(link, 0);
 
         assertThat(link.getEnrolledCount()).isZero();
-        assertThat(link.isDeactivatedFor(SubjectCommissionDeactivationReason.NO_ENROLLED)).isTrue();
+        assertThat(link.isActive()).isTrue();
         verify(subjectCommissionRepository).save(link);
     }
 
     @Test
-    @DisplayName("syncCommissions: con inscriptos positivos reactiva el link dado de baja por cero inscriptos")
-    void syncCommissionsReactivatesLinkDeactivatedForNoEnrolled() {
+    @DisplayName("syncCommissions: pasar de 0 a 12 inscriptos actualiza la cantidad y el link sigue activo")
+    void syncCommissionsFromZeroToPositiveKeepsLinkActive() {
         SubjectCommission link = existingLink(0);
-        link.deactivateFor(SubjectCommissionDeactivationReason.NO_ENROLLED, Instant.now());
 
         syncLink(link, 12);
 
         assertThat(link.isActive()).isTrue();
-        assertThat(link.getDeactivationReason()).isNull();
+        assertThat(link.getDeletedAt()).isNull();
         assertThat(link.getEnrolledCount()).isEqualTo(12);
         verify(subjectCommissionRepository).save(link);
     }
@@ -587,13 +586,24 @@ class CommissionServiceImplTest {
         syncLink(link, 25);
 
         assertThat(link.isDeleted()).isTrue();
-        assertThat(link.getDeactivationReason()).isNull();
         assertThat(link.getEnrolledCount()).isEqualTo(25);
     }
 
     @Test
-    @DisplayName("syncCommissions: un link nuevo con cero inscriptos informados se crea dado de baja con motivo NO_ENROLLED")
-    void syncCommissionsCreatesDeactivatedLinkWithZeroEnrolled() {
+    @DisplayName("syncCommissions: con cero inscriptos no reactiva un link dado de baja a mano")
+    void syncCommissionsZeroEnrolledKeepsManualDeactivation() {
+        SubjectCommission link = existingLink(20);
+        link.deactivate();
+
+        syncLink(link, 0);
+
+        assertThat(link.isDeleted()).isTrue();
+        assertThat(link.getEnrolledCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("syncCommissions: un link nuevo con cero inscriptos informados se crea activo")
+    void syncCommissionsCreatesActiveLinkWithZeroEnrolled() {
         CommissionSyncCommand command = new CommissionSyncCommand("101", 1, 2024, 55, 2026, 0);
         AcademicPeriod annualPeriod = annualPeriod();
         StudyPlan studyPlan = studyPlan();
@@ -611,7 +621,8 @@ class CommissionServiceImplTest {
 
         ArgumentCaptor<SubjectCommission> saved = ArgumentCaptor.forClass(SubjectCommission.class);
         verify(subjectCommissionRepository).save(saved.capture());
-        assertThat(saved.getValue().isDeactivatedFor(SubjectCommissionDeactivationReason.NO_ENROLLED)).isTrue();
+        assertThat(saved.getValue().isActive()).isTrue();
+        assertThat(saved.getValue().getEnrolledCount()).isZero();
     }
 
     @Test
@@ -655,5 +666,17 @@ class CommissionServiceImplTest {
                 .thenReturn(Optional.of(link.getCommission().getAcademicPeriod()));
 
         service.syncCommissions(List.of(new CommissionSyncCommand("101", 1, 2024, 55, 2026, enrolledCount)), 0);
+    }
+
+    @Test
+    @DisplayName("deactivate y activate publican CatalogAvailabilityChanged, una vez cada uno")
+    void deactivateAndActivatePublishCatalogAvailabilityChanged() {
+        when(commissionRepository.findById(3L)).thenReturn(java.util.Optional.of(Commission.builder().id(3L).courseCode("K1001").academicPeriod(period).build()));
+        service.deactivate(3L);
+        verify(eventPublisher, org.mockito.Mockito.times(1))
+                .publishEvent(new ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged());
+        service.activate(3L);
+        verify(eventPublisher, org.mockito.Mockito.times(2))
+                .publishEvent(new ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged());
     }
 }

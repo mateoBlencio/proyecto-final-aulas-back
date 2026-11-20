@@ -85,8 +85,6 @@ public final class CatalogSearch {
         where.add(visibleLink(cb, link, includeDeactivated));
         if (!includeDeactivated) {
             where.add(cb.isNull(link.get("commission").get("deletedAt")));
-            where.add(cb.or(cb.isTrue(link.get("commission").get("sysacadEnabled")),
-                    cb.isNull(link.get("commission").get("sysacadHash"))));
             where.add(cb.isNull(link.get("commission").get("academicPeriod").get("deletedAt")));
         }
         links.where(where.toArray(new Predicate[0]));

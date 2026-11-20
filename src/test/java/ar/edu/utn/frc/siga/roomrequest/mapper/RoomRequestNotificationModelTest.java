@@ -320,10 +320,10 @@ class RoomRequestNotificationModelTest {
     @DisplayName("ningún texto del modelo usa tuteo, voseo ni la palabra 'mail', en singular ni en plural")
     void ningunTextoUsaRegistroInformal(RoomRequestType type) {
         List<ClassroomOptionDto> unaNoDisponible = List.of(
-                new ClassroomOptionDto(31L, 204, "Central", UnavailableReason.DEACTIVATED));
+                new ClassroomOptionDto(31L, 204, "Central", UnavailableReason.DEACTIVATED, true));
         List<ClassroomOptionDto> dosNoDisponibles = List.of(
-                new ClassroomOptionDto(31L, 204, "Central", UnavailableReason.DEACTIVATED),
-                new ClassroomOptionDto(32L, 305, "Norte", UnavailableReason.PARENT_DEACTIVATED));
+                new ClassroomOptionDto(31L, 204, "Central", UnavailableReason.DEACTIVATED, true),
+                new ClassroomOptionDto(32L, 305, "Norte", UnavailableReason.PARENT_DEACTIVATED, true));
 
         for (List<AssignedClassroomDto> aulas : List.of(List.of(AULA_A), List.of(AULA_A, AULA_B))) {
             List<ClassroomOptionDto> preferidas = aulas.size() == 1 ? unaNoDisponible : dosNoDisponibles;

@@ -11,12 +11,13 @@ public record CommissionResponseDto(
         String courseCode,
         AcademicPeriodResponseDto academicPeriod,
         UnavailableReason unavailableReason,
-        List<SpecialtySummaryDto> specialties
+        List<SpecialtySummaryDto> specialties,
+        boolean currentInSysacad
 ) {
 
     public CommissionResponseDto(Long id, String courseCode, AcademicPeriodResponseDto academicPeriod,
             UnavailableReason unavailableReason) {
-        this(id, courseCode, academicPeriod, unavailableReason, null);
+        this(id, courseCode, academicPeriod, unavailableReason, null, true);
     }
 
     /** Year of study derived from the first digit of courseCode (1-9); null otherwise (e.g. TEST, EXAMEN, 0D0). */

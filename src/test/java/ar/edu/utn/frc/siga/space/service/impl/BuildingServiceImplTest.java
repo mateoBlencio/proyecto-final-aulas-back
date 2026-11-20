@@ -122,7 +122,7 @@ class BuildingServiceImplTest {
 
         assertThatThrownBy(() -> service.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Building not found with id: 99");
+                .hasMessage("No existe el edificio 99.");
     }
 
     @Test
@@ -143,7 +143,7 @@ class BuildingServiceImplTest {
 
         assertThatThrownBy(() -> service.findByName("Edificio Nuevo"))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Building not found with id: Edificio Nuevo");
+                .hasMessage("No existe el edificio Edificio Nuevo.");
     }
 
     @Test
@@ -168,7 +168,7 @@ class BuildingServiceImplTest {
 
         assertThatThrownBy(() -> service.setActive(99L, true))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Building not found with id: 99");
+                .hasMessage("No existe el edificio 99.");
     }
 
     @Test
@@ -201,7 +201,7 @@ class BuildingServiceImplTest {
 
         assertThatThrownBy(() -> service.setActiveBatch(List.of(new BuildingActiveBatchItemDto(99L, true))))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Building not found with id: 99");
+                .hasMessage("No existe el edificio 99.");
     }
 
     @Test

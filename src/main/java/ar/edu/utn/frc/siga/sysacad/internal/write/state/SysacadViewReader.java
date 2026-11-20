@@ -64,7 +64,7 @@ public class SysacadViewReader {
     public ViewReadResult read() {
         List<RawSchedule> raw = fetcher.fetch();
         if (raw.isEmpty()) {
-            throw new SysacadEmptyViewException(SysacadView.ASIGNACIONES.name());
+            throw new SysacadEmptyViewException(SysacadView.ASIGNACIONES.label());
         }
         Map<RowKey, List<SysacadAllocationDto>> rowsByKey = raw.stream()
                 .map(mapper::toAllocation)

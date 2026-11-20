@@ -68,10 +68,10 @@ class DashboardRegenerationApiIntegrationTest extends DashboardIntegrationSuppor
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM tablero_snapshot WHERE anio = 2020 AND vigente", Integer.class))
                 .isEqualTo(rowsPerGeneration);
-        mockMvc.perform(get("/v1/audit").param("q", "Regeneración del informe 2020-03"))
+        mockMvc.perform(get("/v1/audit").param("q", "Regeneración del informe del tablero: 03/2020"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].description").value(
-                        "Regeneración del informe 2020-03 del tablero: Se corrigió una capacidad"));
+                        "Regeneración del informe del tablero: 03/2020 (motivo: Se corrigió una capacidad)"));
     }
 
     @Test
@@ -116,7 +116,7 @@ class DashboardRegenerationApiIntegrationTest extends DashboardIntegrationSuppor
         assertThat(content).hasSize(1);
         JsonNode entry = content.get(0);
         assertThat(entry.get("description").asText())
-                .isEqualTo("Regeneración del informe 2020-03 del tablero: Motivo único de auditoría");
+                .isEqualTo("Regeneración del informe del tablero: 03/2020 (motivo: Motivo único de auditoría)");
         assertThat(entry.get("user").asText()).isEqualTo("integration-test@frc.utn.edu.ar");
         assertThat(entry.get("actorType").asText()).isEqualTo("HUMAN");
     }

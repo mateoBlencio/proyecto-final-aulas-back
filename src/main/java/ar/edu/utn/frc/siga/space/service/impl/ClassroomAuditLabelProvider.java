@@ -32,6 +32,15 @@ class ClassroomAuditLabelProvider implements AuditLabelProvider {
 
     @Override
     public Map<String, String> labels(List<AuditedRecord> records) {
+        return build(records, false);
+    }
+
+    @Override
+    public Map<String, String> summaryLabels(List<AuditedRecord> records) {
+        return build(records, true);
+    }
+
+    private Map<String, String> build(List<AuditedRecord> records, boolean summary) {
         Set<Long> buildingIds = records.stream().map(record -> record.longValue("building"))
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         Map<Long, String> buildingNames = buildingIds.isEmpty() ? new HashMap<>()
@@ -45,7 +54,9 @@ class ClassroomAuditLabelProvider implements AuditLabelProvider {
                 continue;
             }
             String buildingName = buildingNames.get(record.longValue("building"));
-            labels.put(record.recordId(), buildingName == null ? "Aula " + number : "Aula " + number + ", " + buildingName);
+            String room = "Aula " + number;
+            labels.put(record.recordId(), buildingName == null ? room
+                    : summary ? room + " (" + buildingName + ")" : room + ", " + buildingName);
         }
         return labels;
     }

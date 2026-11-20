@@ -43,7 +43,7 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
 
     @Override
     @Transactional
-    @AuditOperation("Alta de período académico")
+    @AuditOperation(value = "Alta de período académico", subject = "AcademicPeriod")
     public FindOrCreateResult<AcademicPeriodResponseDto> findOrCreate(Integer year, TermType termType) {
         return FindOrCreateResult.resolve(
                 academicPeriodRepository.findByYearAndSemester(year, termType.getSemester()),
@@ -101,7 +101,7 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
      */
     @Override
     @Transactional
-    @AuditOperation("Alta de períodos académicos del año en curso")
+    @AuditOperation(value = "Alta de períodos académicos del año en curso", subject = "AcademicPeriod")
     public void materializeCurrentYear() {
         int year = LocalDate.now().getYear();
         if (!academicPeriodRepository.findByYearAndDeletedAtIsNull(year).isEmpty()) {
@@ -116,7 +116,7 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
 
     @Override
     @Transactional
-    @AuditOperation("Modificación de período académico")
+    @AuditOperation(value = "Modificación de período académico", subject = "AcademicPeriod")
     public AcademicPeriodResponseDto update(Long id, UpdateAcademicPeriodRequestDto dto) {
         AcademicPeriod period = academicPeriodRepository.findActiveById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("AcademicPeriod", id));
@@ -209,14 +209,14 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
 
     @Override
     @Transactional
-    @AuditOperation("Reactivación de período académico")
+    @AuditOperation(value = "Reactivación de período académico", subject = "AcademicPeriod")
     public void activate(Long id) {
         academicPeriodRepository.restore(Finder.orThrow(academicPeriodRepository::findById, id, "AcademicPeriod"));
     }
 
     @Override
     @Transactional
-    @AuditOperation("Baja de período académico")
+    @AuditOperation(value = "Baja de período académico", subject = "AcademicPeriod")
     public void deactivate(Long id) {
         academicPeriodRepository.softDelete(Finder.orThrow(academicPeriodRepository::findById, id, "AcademicPeriod"));
     }

@@ -97,7 +97,8 @@ class PreviewEngine {
                         .filter(entry -> entry.getKey().eventId().equals(e.id()))
                         .sorted(Map.Entry.comparingByKey())
                         .map(entry -> toSolverEvent(e, entry.getKey(), entry.getValue(),
-                                divisors.get(entry.getKey()), mirrored.contains(e.id()))))
+                                divisors.get(entry.getKey()), mirrored.contains(e.id()),
+                                inputs.priorRoomByKey().get(entry.getKey()))))
                 .toList();
         if (optimizerEvents.isEmpty()) {
             throw new AllocationConflictException(
@@ -191,7 +192,7 @@ class PreviewEngine {
     }
 
     private OptimizerEvent toSolverEvent(AcademicEventResponseDto e, PlanningKey key, List<LocalDate> dates,
-            int divisor, boolean mirrored) {
+            int divisor, boolean mirrored, Long priorRoomId) {
         var commission = switch (e) {
             case RecurringEventResponseDto recurring -> recurring.commission();
             case UniqueEventResponseDto unique -> unique.commission();
@@ -205,7 +206,7 @@ class PreviewEngine {
                 ? RoomRequirements.computersNeeded(unique, divisor) : 0;
         return new OptimizerEvent(key.toPlanningId(), commissionKey, enrolledPerRoom, e.startTime(),
                 e.startTime().plusMinutes(e.durationMinutes()), Set.copyOf(dates), subjectIds, groupKey,
-                needsProjector, computersNeeded);
+                needsProjector, computersNeeded, priorRoomId);
     }
 
     private List<AcademicEventResponseDto> loadEvents(Set<Long> eventIds) {

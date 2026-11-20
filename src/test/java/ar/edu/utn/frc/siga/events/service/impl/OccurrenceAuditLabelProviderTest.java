@@ -47,7 +47,7 @@ class OccurrenceAuditLabelProviderTest {
 
     @BeforeEach
     void setUp() {
-        provider = new OccurrenceAuditLabelProvider(eventRepository, new EventLabels(subjectService, commissionService));
+        provider = new OccurrenceAuditLabelProvider(new EventLabels(subjectService, commissionService, eventRepository));
     }
 
     private static AuditedRecord record(String id, Long eventId, LocalDate date) {
@@ -78,14 +78,14 @@ class OccurrenceAuditLabelProviderTest {
     }
 
     @Test
-    @DisplayName("formato '{materia} {comisión} · fecha'")
+    @DisplayName("formato '{materia} ({comisión}) · fecha'")
     void labels_eventAndDate() {
         catalogs();
         when(eventRepository.findAllById(any())).thenReturn(List.of(recurring(10L, 1L, 2L)));
 
         Map<String, String> labels = provider.labels(List.of(record("100", 10L, DATE)));
 
-        assertThat(labels).containsExactly(Map.entry("100", "Álgebra 1K1 · 04/03/2026"));
+        assertThat(labels).containsExactly(Map.entry("100", "Álgebra (1K1) · 04/03/2026"));
     }
 
     @Test
@@ -104,7 +104,7 @@ class OccurrenceAuditLabelProviderTest {
         verify(commissionService, times(1)).findByIdsIncludingDeactivated(any());
         assertThat(eventIds.getValue()).containsExactly(10L);
         assertThat(labels).containsOnly(
-                Map.entry("100", "Álgebra 1K1 · 04/03/2026"), Map.entry("101", "Álgebra 1K1 · 11/03/2026"));
+                Map.entry("100", "Álgebra (1K1) · 04/03/2026"), Map.entry("101", "Álgebra (1K1) · 11/03/2026"));
     }
 
     @Test
@@ -123,7 +123,7 @@ class OccurrenceAuditLabelProviderTest {
         when(eventRepository.findAllById(any())).thenReturn(List.of(recurring(10L, 1L, 2L)));
 
         assertThat(provider.labels(List.of(record("100", 10L, null))))
-                .containsExactly(Map.entry("100", "Álgebra 1K1"));
+                .containsExactly(Map.entry("100", "Álgebra (1K1)"));
     }
 
     @Test
@@ -139,8 +139,25 @@ class OccurrenceAuditLabelProviderTest {
     @Test
     @DisplayName("sin evento ni fecha en el estado no hay etiqueta")
     void labels_noEventNoDate_hasNoLabel() {
+        assertThat(provider.labels(List.of(record("100", null, null)))).isEmpty();
+        verifyNoInteractions(eventRepository);
+    }
+
+    @Test
+    @DisplayName("summaryLabels es solo la etiqueta del evento, sin fecha")
+    void summaryLabels_isEventLabelWithoutDate() {
+        catalogs();
+        when(eventRepository.findAllById(any())).thenReturn(List.of(recurring(10L, 1L, 2L)));
+
+        assertThat(provider.summaryLabels(List.of(record("100", 10L, DATE), record("101", 10L, DATE.plusDays(7)))))
+                .containsOnly(Map.entry("100", "Álgebra (1K1)"), Map.entry("101", "Álgebra (1K1)"));
+    }
+
+    @Test
+    @DisplayName("summaryLabels sin evento encontrado no devuelve resumen aunque haya fecha")
+    void summaryLabels_eventGone_hasNoSummary() {
         when(eventRepository.findAllById(any())).thenReturn(List.of());
 
-        assertThat(provider.labels(List.of(record("100", null, null)))).isEmpty();
+        assertThat(provider.summaryLabels(List.of(record("100", 10L, DATE)))).isEmpty();
     }
 }

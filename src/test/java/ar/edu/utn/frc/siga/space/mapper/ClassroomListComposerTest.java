@@ -238,7 +238,7 @@ class ClassroomListComposerTest {
     }
 
     @Test
-    @DisplayName("aula desactivada, aula no disponible y aula activa en la misma página: canUpdate/canAllocate siguen el estado, canActivate solo el alcance")
+    @DisplayName("aula desactivada, aula inhabilitada en SysAcad y aula activa en la misma página: canUpdate/canAllocate siguen la baja manual, no SysAcad; canActivate solo el alcance")
     void flagsDependOnClassroomStatePerItem() {
         Classroom active = classroom(1L, 1L, PermissionMode.ALL);
         Classroom deactivated = classroom(2L, 1L, PermissionMode.ALL);
@@ -251,7 +251,8 @@ class ClassroomListComposerTest {
         List<ClassroomListItemDto> items = composeAll(active, deactivated, disabledInSysacad);
 
         assertThat(items).extracting(ClassroomListItemDto::canUpdate).containsExactly(true, false, true);
-        assertThat(items).extracting(ClassroomListItemDto::canAllocate).containsExactly(true, false, false);
+        assertThat(items).extracting(ClassroomListItemDto::canAllocate).containsExactly(true, false, true);
+        assertThat(items).extracting(ClassroomListItemDto::enabledInSysacad).containsExactly(true, true, false);
         assertThat(items).extracting(ClassroomListItemDto::canActivate).containsExactly(true, true, true);
     }
 
