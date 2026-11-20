@@ -111,12 +111,27 @@ class AllocationTargetResolverTest {
     }
 
     @Test
-    @DisplayName("'from' en el pasado → 400 y no se consulta nada (D4)")
-    void fromPasadoEsBadRequest() {
+    @DisplayName("'from' en el pasado → se recorta a hoy sin error y solo se aplican las ocurrencias futuras")
+    void fromPasadoSeRecortaAHoy() {
+        LocalDate today = LocalDate.now();
+        realValidateRange();
+        when(occurrenceService.findSlotsByEvent(EVENT_ID, today)).thenReturn(List.of(slot(1L, today.plusDays(7))));
+
+        Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
+                List.of(rangeItem(today.minusDays(7), null)), today, false).classroomByOccurrence();
+
+        assertThat(resolved.keySet()).extracting(OccurrenceSlotDto::occurrenceId).containsExactly(1L);
+        verify(occurrenceService, never()).findSlotsByEvent(EVENT_ID, today.minusDays(7));
+    }
+
+    @Test
+    @DisplayName("'to' en el pasado → 400 y no se consulta nada")
+    void toPasadoEsBadRequest() {
+        LocalDate today = LocalDate.now();
         realValidateRange();
 
         assertThatThrownBy(() -> resolver.resolveClassroomByOccurrence(
-                List.of(rangeItem(LocalDate.now().minusDays(1), null)), LocalDate.now(), false))
+                List.of(rangeItem(today.minusDays(14), today.minusDays(1))), today, false))
                 .isInstanceOf(InvalidDateRangeException.class);
 
         verifyNoInteractions(occurrenceService);

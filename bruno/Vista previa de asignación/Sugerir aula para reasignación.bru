@@ -55,7 +55,7 @@ docs {
   (preview.ttlMinutes). Confirmarla: POST /v1/previews/reallocation-suggestion/{suggestionId}/confirm.
 
   Errores:
-  - 400: target inválido, from anterior a hoy, o to < from.
+  - 400: target inválido, to anterior a hoy o to < from (un from anterior a hoy se recorta a hoy).
   - 403: falta PERM_PREVIEW_RUN o PERM_ALLOCATION_WRITE.
   - 404: el evento no existe.
   - 409: ocurrencia inexistente o ya pasada, o el target no tiene ocurrencias futuras.

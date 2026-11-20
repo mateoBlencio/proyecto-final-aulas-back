@@ -278,14 +278,15 @@ class AllocationImpactApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("Un rango que arranca en el pasado sigue siendo 400, no un impacto vacío")
-    void impactDesdeElPasadoEs400() throws Exception {
+    @DisplayName("Un rango que arranca en el pasado se recorta a hoy y calcula el impacto de las clases futuras")
+    void impactDesdeElPasadoSeRecortaAHoy() throws Exception {
         var sc = testData.materiaYComision();
         Classroom destino = testData.aula(testData.edificio());
         LocalDate start = LocalDate.now().plusDays(7);
         Long eventId = seedWeeklyEvent(sc, start, 2);
 
         impact(byRange(eventId, LocalDate.now().minusDays(1), start.plusWeeks(1), destino.getId()))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.movableClasses").value(2));
     }
 }
