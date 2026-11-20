@@ -37,8 +37,8 @@ docs {
      aula y las aulas libres en esa fecha y franja para poder destrabarlo.
 
   Siempre 200, incluso con conflictos. Sigue devolviendo 400 si el pedido está
-  mal formado (from en el pasado, to antes que from, from/to con occurrenceIds)
-  y 409 si pide un aula inexistente o una ocurrencia ya pasada: eso no es un
+  mal formado (to en el pasado, to antes que from, from/to con occurrenceIds).
+  Un from anterior a hoy se recorta a hoy sin error. Responde 409 si pide un aula inexistente o una ocurrencia ya pasada: eso no es un
   resultado para mostrar, es un pedido que no se puede ni evaluar.
 
   Respuesta:
