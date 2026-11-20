@@ -114,6 +114,8 @@ class AllocationServiceImplTest {
     private RevisionReader revisionReader;
     @Mock
     private OccurrenceBoardCache boardCache;
+    @Mock
+    private MirrorConsolidator mirrorConsolidator;
 
     private AllocationServiceImpl service;
 
@@ -121,7 +123,7 @@ class AllocationServiceImplTest {
     void setUp() {
         service = new AllocationServiceImpl(allocationRepository, occurrenceService, academicEventService, composer, validator, targetResolver,
                 writer, classroomService, buildingScopeResolver, classroomLock, revisionReader,
-                boardCache);
+                boardCache, mirrorConsolidator);
         lenient().when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of());
         lenient().when(buildingScopeResolver.scopeFor(any())).thenReturn(BuildingScope.unrestricted());
     }
@@ -592,7 +594,7 @@ class AllocationServiceImplTest {
 
     private ReleaseCommand releaseCommand(Long... occurrenceIds) {
         return new ReleaseCommand(List.of(new AllocationTarget.Occurrences(List.of(occurrenceIds))),
-                ReleaseReason.VIRTUAL_CLASS, "cursado virtual");
+                ReleaseReason.VIRTUAL_CLASS, "cursado virtual", null);
     }
 
     @Test

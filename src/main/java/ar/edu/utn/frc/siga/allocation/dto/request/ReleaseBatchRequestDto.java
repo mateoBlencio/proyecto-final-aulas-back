@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.allocation.dto.request;
 
 import java.util.List;
 
+import ar.edu.utn.frc.siga.allocation.service.command.MirrorScope;
 import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
@@ -12,7 +13,8 @@ import jakarta.validation.constraints.Size;
 public record ReleaseBatchRequestDto(
         @NotEmpty @Valid List<DeallocationTargetRequestDto> items,
         @NotNull ReleaseReason reason,
-        @Size(max = 255) String note
+        @Size(max = 255) String note,
+        MirrorScope mirrorScope
 ) {
     @AssertTrue(message = "Los motivos Espejo retirado y Aula o edificio deshabilitado son internos y no se pueden elegir")
     private boolean isReasonSelectable() {

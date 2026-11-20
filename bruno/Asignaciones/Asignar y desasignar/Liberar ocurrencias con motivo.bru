@@ -18,7 +18,8 @@ body:json {
       { "eventId": 56, "from": "2026-04-07", "to": "2026-06-30" }
     ],
     "reason": "VIRTUAL_CLASS",
-    "note": "Cursado virtual hasta fin de cuatrimestre"
+    "note": "Cursado virtual hasta fin de cuatrimestre",
+    "mirrorScope": "ALL"
   }
 }
 
@@ -27,6 +28,11 @@ docs {
   sus asignaciones. OTHER exige nota. Arrastra los espejos, salvo los retirados por un pedido de
   aula (MIRROR_RETIRED), que no se tocan. Atómico.
 
-  Respuesta 200: [ { occurrenceId, eventId, date, freedClassroomId, reason } ].
+  mirrorScope (opcional, default ALL). Con ONLY_SELECTED no se arrastran los espejos no seleccionados:
+  una principal seleccionada pasa al aula de uno de ellos (el de mayor capacidad), que queda
+  MIRROR_RETIRED, y vuelve con movedToClassroomId. Un espejo seleccionado solo se libera él.
+  409 si el espejo no tiene aula disponible (propiedad dates): reenviar con ALL.
+
+  Respuesta 200: [ { occurrenceId, eventId, date, freedClassroomId, reason, movedToClassroomId } ].
   400 motivo faltante, MIRROR_RETIRED o CLASSROOM_DEACTIVATED (motivos internos, errors.reasonSelectable) u OTHER sin nota; 403 sin alcance sobre el edificio; 409 ocurrencia pasada.
 }

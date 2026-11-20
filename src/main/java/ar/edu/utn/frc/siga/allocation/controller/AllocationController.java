@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.allocation.controller;
 
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocationBatchRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.ClassroomWithdrawalRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.DeallocationBatchRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.ReleaseBatchRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationConflictDto;
@@ -8,6 +9,7 @@ import ar.edu.utn.frc.siga.allocation.dto.response.AllocationHistorySnapshotDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationImpactResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationSearchResultDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.ClassroomWithdrawalResultDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ReleasedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.UniqueEventAllocationResponseDto;
@@ -25,6 +27,7 @@ import ar.edu.utn.frc.siga.allocation.model.ConflictType;
 import ar.edu.utn.frc.siga.allocation.model.OccurrenceIssueType;
 import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceBoardEventDto;
 import ar.edu.utn.frc.siga.allocation.service.OccurrenceBoardService;
+import ar.edu.utn.frc.siga.allocation.service.command.ClassroomWithdrawalCommand;
 import ar.edu.utn.frc.siga.common.security.BuildingScope;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
 import ar.edu.utn.frc.siga.common.security.Permission;
@@ -294,11 +297,32 @@ public class AllocationController {
                        + "'from' [+ 'to']. Arrastra las ocurrencias espejo con el mismo motivo, salvo las ya retiradas "
                        + "(MIRROR_RETIRED, por un pedido de aula o una baja de aula). 400 si falta el motivo, es "
                        + "MIRROR_RETIRED o CLASSROOM_DEACTIVATED u OTHER sin nota; 403 sin alcance sobre el edificio del aula; "
-                       + "409 si alguna ocurrencia ya pasó. Atómico.")
+                       + "409 si alguna ocurrencia ya pasó. Atómico. 'mirrorScope' (opcional, default ALL): con "
+                       + "ONLY_SELECTED no se arrastran los espejos no seleccionados; una principal seleccionada pasa "
+                       + "al aula de uno de ellos (el de mayor capacidad), que queda MIRROR_RETIRED, y vuelve con "
+                       + "'movedToClassroomId'. 409 si ese espejo no tiene aula disponible: la respuesta lleva "
+                       + "'dates' y se puede reenviar con ALL.")
     public ResponseEntity<List<ReleasedOccurrenceDto>> release(@Valid @RequestBody ReleaseBatchRequestDto dto) {
         log.debug("POST /v1/allocations/releases: items={}, reason={}", dto.items().size(), dto.reason());
         List<ReleasedOccurrenceDto> response = allocationService.release(commandMapper.toReleaseCommand(dto));
         log.info("Liberación con motivo completa: released={}", response.size());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/classroom-withdrawals")
+    @PreAuthorize("hasAuthority('PERM_OCCURRENCE_RELEASE')")
+    @Operation(summary = "Retirar un aula de las clases futuras",
+               description = "Desde 'from' (default hoy) en adelante: la principal que está en el aula pasa al aula "
+                       + "de uno de sus espejos ('consolidated'), el espejo que está en el aula se retira "
+                       + "('mirrorsRetired') y la principal sin espejo con aula disponible no se toca "
+                       + "('withoutAlternative'). Las clases que ya empezaron no se tocan. 400 si 'from' es anterior "
+                       + "a hoy; 403 sin alcance sobre el aula o sobre las aulas destino; 404 si el aula no existe. "
+                       + "Atómico; repetirlo es seguro.")
+    public ResponseEntity<ClassroomWithdrawalResultDto> withdrawClassroom(
+            @Valid @RequestBody ClassroomWithdrawalRequestDto dto) {
+        log.debug("POST /v1/allocations/classroom-withdrawals: classroomId={}, from={}", dto.classroomId(), dto.from());
+        ClassroomWithdrawalResultDto response = allocationService.withdrawClassroom(
+                new ClassroomWithdrawalCommand(dto.classroomId(), dto.from(), dto.note()));
         return ResponseEntity.ok(response);
     }
 
