@@ -239,7 +239,7 @@ public class AllocationController {
                        + "mover un evento por rango de fechas: 'eventId' + 'from' + 'to' es un cambio TEMPORAL "
                        + "(las ocurrencias de afuera del rango conservan su aula, así que la clase 'vuelve' sola), "
                        + "y 'eventId' + 'from' sin 'to' es un cambio PERMANENTE desde esa fecha hasta que termine "
-                       + "el dictado. Ambos bordes son inclusive y 'from' no puede ser anterior a hoy (400). "
+                       + "el dictado. Ambos bordes son inclusive; si 'from' es anterior a hoy el cambio rige desde hoy, y si 'to' ya pasó es 400. "
                        + "403 si el aula actual o la de destino es de un edificio fuera de su alcance. "
                        + "409 si alguna ocurrencia del lote no tiene aula asignada (para asignar se usa POST), "
                        + "si algún aula no existe/no está disponible, si hay solapamiento de horario con otra "

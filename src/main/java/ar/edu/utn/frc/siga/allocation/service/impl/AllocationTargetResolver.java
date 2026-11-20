@@ -101,10 +101,12 @@ class AllocationTargetResolver {
                     .toList();
             case AllocationTarget.EventRange(Long eventId, LocalDate from, LocalDate to) -> {
                 validator.validateRange(from, to);
-                // Se ignora el clamp del comando: el rango trae su propio 'desde', ya validado.
+                // Se ignora el clamp del comando: el rango trae su propio 'desde'.
+                // Un 'desde' anterior a hoy se recorta a hoy sin error: el pasado no se toca.
                 // El 'hasta' se filtra acá (no en la base) porque es un solo evento acotado.
                 // Un cambio "desde hoy" omite la clase de hoy si ya empezó, igual que el target Event.
-                yield occurrenceService.findSlotsByEvent(eventId, from).stream()
+                LocalDate effectiveFrom = from.isBefore(LocalDate.now()) ? LocalDate.now() : from;
+                yield occurrenceService.findSlotsByEvent(eventId, effectiveFrom).stream()
                         .filter(o -> to == null || !o.date().isAfter(to))
                         .filter(o -> !o.isPast())
                         .toList();

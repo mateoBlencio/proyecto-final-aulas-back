@@ -128,9 +128,8 @@ public class AllocationValidator {
         if (from == null) {
             throw new InvalidDateRangeException("La reasignación por rango necesita una fecha de inicio.");
         }
-        if (from.isBefore(LocalDate.now())) {
-            throw new InvalidDateRangeException(
-                    "No se puede reasignar desde el " + from + ": esa fecha ya pasó.");
+        if (to != null && to.isBefore(LocalDate.now())) {
+            throw new InvalidDateRangeException("El rango termina el " + to + ", que ya pasó.");
         }
         DateRanges.requireNotBefore(to, from);
     }

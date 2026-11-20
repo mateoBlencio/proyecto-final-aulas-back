@@ -535,8 +535,26 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("PUT por rango con 'from' anterior a hoy responde 400 (D4: el pedido está mal formado)")
-    void reallocateByRange_fromEnElPasado_responde400() throws Exception {
+    @DisplayName("PUT por rango con 'from' anterior a hoy se recorta a hoy y reasigna las ocurrencias futuras")
+    void reallocateByRange_fromEnElPasado_serecortaAHoy() throws Exception {
+        var sc = testData.materiaYComision();
+        Classroom aulaOriginal = testData.aula(testData.edificio());
+        Classroom aulaNueva = testData.aula(testData.edificio());
+        LocalDate start = LocalDate.now().plusDays(7);
+        Long eventId = seedWeeklyEvent(sc, start, 2);
+        allocateEventOk(eventId, aulaOriginal.getId());
+
+        mockMvc.perform(put("/v1/allocations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                byRange(eventId, LocalDate.now().minusDays(1), null, aulaNueva.getId()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    @DisplayName("PUT por rango con 'to' anterior a hoy responde 400")
+    void reallocateByRange_toEnElPasado_responde400() throws Exception {
         var sc = testData.materiaYComision();
         Classroom aula = testData.aula(testData.edificio());
         LocalDate start = LocalDate.now().plusDays(7);
@@ -545,7 +563,7 @@ class AllocationApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(put("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                byRange(eventId, LocalDate.now().minusDays(1), null, aula.getId()))))
+                                byRange(eventId, LocalDate.now().minusDays(7), LocalDate.now().minusDays(1), aula.getId()))))
                 .andExpect(status().isBadRequest());
     }
 

@@ -33,7 +33,8 @@ docs {
   Reglas de "from"/"to" (formato yyyy-MM-dd):
   - Solo aplican junto a "eventId". Mandarlos con "occurrenceIds" → 400.
   - "to" sin "from" → 400.
-  - "from" anterior a hoy → 400 (no se modifica el pasado).
+  - "from" anterior a hoy → se recorta a hoy, sin error (no se modifica el pasado).
+  - "to" anterior a hoy → 400 (no queda nada por cambiar).
   - "to" anterior a "from" → 400.
   - Sin "to" el movimiento es PERMANENTE: ver 09-reasignar-por-rango-permanente.bru.
 
