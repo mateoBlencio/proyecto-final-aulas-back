@@ -45,7 +45,7 @@ class SysacadDirtyCourseCodeSyncIntegrationTest extends AbstractIntegrationTest 
     private static final int SPECIALTY = 9901;
     private static final int STUDY_PLAN = 9902;
     private static final int SUBJECT = 987654;
-    private static final int YEAR = 2031;
+    private static final int YEAR = 2095;
 
     @MockitoBean
     private BuildingViewFetcher buildingFetcher;

@@ -39,7 +39,7 @@ class SysacadEventDurationSyncIntegrationTest extends AbstractIntegrationTest {
     private static final int SPECIALTY = 9911;
     private static final int STUDY_PLAN = 9912;
     private static final int SUBJECT = 987655;
-    private static final int YEAR = 2032;
+    private static final int YEAR = 2096;
     private static final String COURSE = "7Z1";
 
     @MockitoBean

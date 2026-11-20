@@ -119,7 +119,7 @@ class PriorRoomPreviewIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("dueños del aula previa no la pierden ante competidores: sin choques internos y confirm sin 409")
     void contestedPriorRoom_proposalHasNoInternalClashes_andConfirmSucceeds() throws Exception {
-        LocalDate wednesday = LocalDate.now().plusDays(400).with(TemporalAdjusters.nextOrSame(DayOfWeek.WEDNESDAY));
+        LocalDate wednesday = LocalDate.now().plusDays(900).with(TemporalAdjusters.nextOrSame(DayOfWeek.WEDNESDAY));
         LocalDate thursday = wednesday.plusDays(1);
         Classroom roomX = testData.aula(testData.edificio());
         blockAllDayExcept(roomX.getId(), wednesday);
