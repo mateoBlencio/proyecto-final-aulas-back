@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -256,6 +257,28 @@ class RoomRequestItemTakeOverApiIntegrationTest extends AbstractIntegrationTest 
         assertThat((String) rows.getFirst().get("cuerpo")).contains("lo resuelve subsecretaría")
                 .contains("Estimado/a:").contains("Ya no aparece en su bandeja.")
                 .contains("Ante cualquier consulta, responda este correo.");
+    }
+
+    @Test
+    @DisplayName("el retomado deja una entrada en Movimientos del edificio que perdió el pedido, visible para su auxiliar")
+    void takeOver_apareceEnMovimientos() throws Exception {
+        Building building = testData.edificio();
+        MockMvc auxiliar = auxiliarOf(building);
+        RoomRequestItem item = seed(RoomRequestStatus.IN_EVALUATION, building, LocalDate.now().plusDays(30), null);
+
+        mockMvc.perform(post("/v1/room-requests/items/" + item.getId() + "/take-over")
+                        .contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isOk());
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> auxiliar.perform(get("/v1/building-activity"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].type").value("ROOM_REQUEST_TAKEN_OVER"))
+                .andExpect(jsonPath("$.content[0].building.id").value(building.getId()))
+                .andExpect(jsonPath("$.content[0].reason").value("lo resuelve subsecretaría"))
+                .andExpect(jsonPath("$.content[0].roomRequestItem.id").value(item.getId()))
+                .andExpect(jsonPath("$.content[0].roomRequestItem.status").value("IN_EVALUATION"))
+                .andExpect(jsonPath("$.content[0].roomRequestItem.teacherName").value("Ada Lovelace")));
     }
 
     @Test

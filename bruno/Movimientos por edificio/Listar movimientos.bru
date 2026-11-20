@@ -18,6 +18,7 @@ params:query {
   ~to: 2026-10-31
   ~sort: occurredAt,desc
   ~source: MANUAL
+  ~type: ROOM_REQUEST_TAKEN_OVER
   ~seen: false
   ~actor: lopez
 }
@@ -28,6 +29,8 @@ docs {
   sort=<campo>,<asc|desc>: occurredAt, buildingName, actor, lineCount. Sin sort: occurredAt,desc.
   Desempate por id desc. Otro campo responde 400. source=MANUAL|AUTOMATIC, seen=true|false
   (relativo al usuario) y actor (parcial, sin mayúsculas, sobre el email) se combinan con AND.
+  type=ALLOCATION_CHANGE|ROOM_REQUEST_TAKEN_OVER. El retomado de un pedido trae roomRequestItem
+  {id, status, teacherName}, source MANUAL y lines vacío; las de asignación traen roomRequestItem null.
   from/to (yyyy-MM-dd) filtran por el momento del movimiento. buildingId fuera de
   alcance responde 403. "seen" es true si id <= última marca del usuario o si lo hizo él.
   Las líneas son una foto: el nombre del aula no cambia si se renombra después.
