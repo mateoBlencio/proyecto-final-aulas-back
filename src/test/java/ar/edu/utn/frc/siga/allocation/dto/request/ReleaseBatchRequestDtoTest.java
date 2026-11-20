@@ -37,7 +37,7 @@ class ReleaseBatchRequestDtoTest {
 
     private static List<String> messages(ReleaseReason reason, String note) {
         var items = List.of(new DeallocationTargetRequestDto(List.of(1L), null, null, null));
-        return validator.validate(new ReleaseBatchRequestDto(items, reason, note)).stream()
+        return validator.validate(new ReleaseBatchRequestDto(items, reason, note, null)).stream()
                 .map(ConstraintViolation::getMessage).toList();
     }
 

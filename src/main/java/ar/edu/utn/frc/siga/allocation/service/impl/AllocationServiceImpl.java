@@ -1,6 +1,8 @@
 package ar.edu.utn.frc.siga.allocation.service.impl;
 
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationGroupDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.ClassroomWithdrawalResultDto;
+import ar.edu.utn.frc.siga.allocation.exception.MirrorConsolidationNotPossibleException;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationSiblingDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationLastRevisionDto;
@@ -17,6 +19,8 @@ import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
+import ar.edu.utn.frc.siga.allocation.service.command.ClassroomWithdrawalCommand;
+import ar.edu.utn.frc.siga.allocation.service.command.MirrorScope;
 import ar.edu.utn.frc.siga.allocation.service.command.ReleaseCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.RestoreCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.RestoreResult;
@@ -80,6 +84,7 @@ public class AllocationServiceImpl implements AllocationService {
     private final ClassroomAllocationLock classroomLock;
     private final RevisionReader revisionReader;
     private final OccurrenceBoardCache boardCache;
+    private final MirrorConsolidator mirrorConsolidator;
 
     @Override
     @Transactional(readOnly = true)
@@ -221,14 +226,21 @@ public class AllocationServiceImpl implements AllocationService {
     @Transactional
     @AuditOperation(value = "Liberación de aulas", subject = "Occurrence")
     public List<ReleasedOccurrenceDto> release(ReleaseCommand command) {
-        List<OccurrenceSlotDto> occurrences =
-                withActiveMirrors(targetResolver.resolveAll(command.targets(), LocalDate.now()));
+        List<OccurrenceSlotDto> resolved = targetResolver.resolveAll(command.targets(), LocalDate.now());
         AuditOperations.describe("Liberación de aulas (" + AuditLabels.constant(command.reason()) + ")");
+        if (command.mirrorScope() == MirrorScope.ONLY_SELECTED) {
+            return releaseOnlySelected(command, resolved);
+        }
+        List<OccurrenceSlotDto> occurrences = withActiveMirrors(resolved);
         occurrences.forEach(validator::validateNotPast);
 
         Map<Long, Long> classroomByOccurrence = currentClassroomByOccurrence(occurrences);
         requireAccessToOwningBuildings(occurrences, classroomByOccurrence);
+        return releaseAll(occurrences, classroomByOccurrence, command);
+    }
 
+    private List<ReleasedOccurrenceDto> releaseAll(List<OccurrenceSlotDto> occurrences,
+            Map<Long, Long> classroomByOccurrence, ReleaseCommand command) {
         writer.delete(occurrences, command.note());
         boardCache.invalidate();
         occurrenceService.release(
@@ -242,6 +254,117 @@ public class AllocationServiceImpl implements AllocationService {
                 .map(o -> new ReleasedOccurrenceDto(o.occurrenceId(), o.eventId(), o.date(),
                         classroomByOccurrence.get(o.occurrenceId()), command.reason()))
                 .toList();
+    }
+
+    /**
+     * Libera solo lo seleccionado. Una principal seleccionada que tiene un espejo asignado sin seleccionar no
+     * se libera: pasa al aula de ese espejo y el espejo queda retirado.
+     */
+    private List<ReleasedOccurrenceDto> releaseOnlySelected(ReleaseCommand command, List<OccurrenceSlotDto> resolved) {
+        Map<Long, OccurrenceSlotDto> selectedById = new LinkedHashMap<>();
+        resolved.stream()
+                .filter(o -> o.releaseReason() != ReleaseReason.MIRROR_RETIRED)
+                .forEach(o -> selectedById.putIfAbsent(o.occurrenceId(), o));
+        List<OccurrenceSlotDto> selected = List.copyOf(selectedById.values());
+        selected.forEach(validator::validateNotPast);
+
+        List<OccurrenceSlotDto> principals = selected.stream()
+                .filter(o -> o.mirrorOfOccurrenceId() == null)
+                .filter(o -> o.status() != OccurrenceStatus.ROOM_RELEASED)
+                .toList();
+        MirrorConsolidator.Plan plan = mirrorConsolidator.plan(principals, selectedById.keySet());
+        Set<Long> consolidatedIds = plan.consolidations().stream()
+                .map(c -> c.principal().occurrenceId())
+                .collect(Collectors.toSet());
+
+        List<OccurrenceSlotDto> toRelease = withActiveMirrors(selected.stream()
+                .filter(o -> !consolidatedIds.contains(o.occurrenceId()))
+                .toList());
+        Map<Long, Long> classroomByOccurrence = currentClassroomByOccurrence(toRelease);
+        requireAccessToOwningBuildings(toRelease, classroomByOccurrence);
+        requireAccessToClassrooms(plan.consolidations().stream()
+                .flatMap(c -> java.util.stream.Stream.of(c.fromClassroomId(), c.toClassroomId()))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet()));
+        if (!plan.blocked().isEmpty()) {
+            throw new MirrorConsolidationNotPossibleException(plan.blocked().stream()
+                    .map(OccurrenceSlotDto::date).distinct().sorted().toList());
+        }
+
+        List<ReleasedOccurrenceDto> released = new ArrayList<>(
+                toRelease.isEmpty() ? List.of() : releaseAll(toRelease, classroomByOccurrence, command));
+        mirrorConsolidator.apply(plan.consolidations(), partialReleaseNote(command));
+        plan.consolidations().forEach(c -> released.add(new ReleasedOccurrenceDto(c.principal().occurrenceId(),
+                c.principal().eventId(), c.principal().date(), c.fromClassroomId(), command.reason(),
+                c.toClassroomId())));
+        log.info("Liberación parcial: liberadas={}, consolidadas={}", toRelease.size(), plan.consolidations().size());
+        return released;
+    }
+
+    private static String partialReleaseNote(ReleaseCommand command) {
+        String note = "Liberación parcial (" + AuditLabels.constant(command.reason()) + ")"
+                + (command.note() == null || command.note().isBlank() ? "" : ": " + command.note());
+        return MirrorConsolidator.truncate(note);
+    }
+
+    @Override
+    @Transactional
+    @AuditOperation(value = "Retiro de aula", subject = "Allocation")
+    public ClassroomWithdrawalResultDto withdrawClassroom(ClassroomWithdrawalCommand command) {
+        Long classroomId = command.classroomId();
+        LocalDate from = command.from() == null ? LocalDate.now() : command.from();
+        ClassroomResponseDto classroom = requireAccessToClassrooms(Set.of(classroomId)).stream()
+                .findFirst()
+                .orElseThrow(() -> ResourceNotFoundException.of("Classroom", classroomId));
+
+        List<Long> occurrenceIds = allocationRepository.findByClassroomIdInFromDate(Set.of(classroomId), from).stream()
+                .map(Allocation::getOccurrenceId)
+                .toList();
+        List<OccurrenceSlotDto> inClassroom = occurrenceIds.isEmpty() ? List.of()
+                : occurrenceService.findSlots(occurrenceIds).stream()
+                        .filter(o -> !o.isPast())
+                        .filter(o -> o.status() != OccurrenceStatus.ROOM_RELEASED)
+                        .toList();
+        List<OccurrenceSlotDto> principals = inClassroom.stream().filter(o -> o.mirrorOfOccurrenceId() == null).toList();
+        List<OccurrenceSlotDto> mirrors = inClassroom.stream().filter(o -> o.mirrorOfOccurrenceId() != null).toList();
+
+        MirrorConsolidator.Plan plan = mirrorConsolidator.plan(principals, Set.of());
+        requireAccessToClassrooms(plan.consolidations().stream()
+                .map(MirrorConsolidator.Consolidation::toClassroomId)
+                .collect(Collectors.toSet()));
+
+        String note = MirrorConsolidator.truncate("Retiro del aula " + classroom.roomNumber() + " ("
+                + classroom.buildingName() + ")"
+                + (command.note() == null || command.note().isBlank() ? "" : ": " + command.note()));
+        classroomLock.lock(Set.of(classroomId));
+        mirrorConsolidator.apply(plan.consolidations(), note);
+        if (!mirrors.isEmpty()) {
+            writer.delete(mirrors, note);
+            occurrenceService.release(
+                    mirrors.stream().map(m -> new OccurrenceRelease(m.occurrenceId(), classroomId)).toList(),
+                    ReleaseReason.MIRROR_RETIRED, note);
+        }
+
+        ClassroomWithdrawalResultDto result = new ClassroomWithdrawalResultDto(
+                plan.consolidations().stream()
+                        .map(c -> new ClassroomWithdrawalResultDto.Consolidated(c.principal().occurrenceId(),
+                                c.principal().eventId(), c.principal().date(), c.fromClassroomId(), c.toClassroomId()))
+                        .toList(),
+                mirrors.stream()
+                        .map(m -> new ClassroomWithdrawalResultDto.MirrorRetired(m.occurrenceId(), m.eventId(),
+                                m.date(), m.mirrorOfOccurrenceId()))
+                        .toList(),
+                plan.withoutAlternative().stream()
+                        .map(o -> new ClassroomWithdrawalResultDto.WithoutAlternative(o.occurrenceId(), o.eventId(),
+                                o.date()))
+                        .toList());
+        AuditOperations.describe("Retiro de aula ("
+                + Plurals.count(result.consolidated().size(), "clase consolidada", "clases consolidadas") + ", "
+                + Plurals.count(result.mirrorsRetired().size(), "espejo retirado", "espejos retirados") + ", "
+                + result.withoutAlternative().size() + " sin alternativa)");
+        log.info("Retiro de aula: aula={}, consolidadas={}, espejosRetirados={}, sinAlternativa={}", classroomId,
+                result.consolidated().size(), result.mirrorsRetired().size(), result.withoutAlternative().size());
+        return result;
     }
 
     @Override

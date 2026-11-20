@@ -475,4 +475,75 @@ class AllocationWriterTest {
 
         verify(boardCache).invalidate();
     }
+
+    private OccurrenceSlotDto mirrorSlot(long id, long principalId) {
+        return new OccurrenceSlotDto(id, 1L, LocalDate.now().plusDays(1), LocalTime.of(8, 0),
+                LocalTime.of(9, 30), OccurrenceStatus.NEEDS_ROOM, 30, 2, null, null, null, principalId);
+    }
+
+    @Test
+    @DisplayName("consolidate: borra la asignacion del espejo y mueve la principal de A a B con origen MANUAL")
+    void consolidateMovesPrincipalAndDeletesMirror() {
+        OccurrenceSlotDto principal = occurrenceSlot(10L, 1L);
+        OccurrenceSlotDto mirror = mirrorSlot(11L, 10L);
+        Allocation principalAllocation = allocation(100L, 10L, 5L, AllocationSource.SYSACAD);
+        Allocation mirrorAllocation = allocation(101L, 11L, 6L, AllocationSource.IMPORTED);
+        when(allocationRepository.findByOccurrenceId(11L)).thenReturn(java.util.Optional.of(mirrorAllocation));
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of(principalAllocation));
+
+        writer.consolidate(principal, mirror, 6L, "obs");
+
+        verify(allocationRepository).delete(mirrorAllocation);
+        assertThat(principalAllocation.getClassroomId()).isEqualTo(6L);
+        assertThat(principalAllocation.getSource()).isEqualTo(AllocationSource.MANUAL);
+        assertThat(principalAllocation.getObservation()).isEqualTo("obs");
+        verify(boardCache, org.mockito.Mockito.atLeastOnce()).invalidate();
+    }
+
+    @Test
+    @DisplayName("consolidate: publica un solo Change, el de la principal de A a B, con origen MANUAL")
+    void consolidatePublishesSingleChangeOfPrincipal() {
+        OccurrenceSlotDto principal = occurrenceSlot(10L, 1L);
+        OccurrenceSlotDto mirror = mirrorSlot(11L, 10L);
+        Allocation mirrorAllocation = allocation(101L, 11L, 6L, AllocationSource.MANUAL);
+        when(allocationRepository.findByOccurrenceId(11L)).thenReturn(java.util.Optional.of(mirrorAllocation));
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L)))
+                .thenReturn(List.of(allocation(100L, 10L, 5L, AllocationSource.MANUAL)));
+
+        writer.consolidate(principal, mirror, 6L, "obs");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Change>> changes = ArgumentCaptor.forClass(List.class);
+        verify(movementPublisher).publish(eq(AllocationSource.MANUAL), eq("obs"), changes.capture());
+        assertThat(changes.getValue()).singleElement().satisfies(change -> {
+            assertThat(change.occurrenceId()).isEqualTo(10L);
+            assertThat(change.fromClassroomId()).isEqualTo(5L);
+            assertThat(change.toClassroomId()).isEqualTo(6L);
+        });
+    }
+
+    @Test
+    @DisplayName("consolidate: si la principal no tenia asignacion la crea en el aula del espejo, sin aula de origen")
+    void consolidateCreatesPrincipalAllocationWhenMissing() {
+        OccurrenceSlotDto principal = occurrenceSlot(10L, 1L);
+        OccurrenceSlotDto mirror = mirrorSlot(11L, 10L);
+        Allocation mirrorAllocation = allocation(101L, 11L, 6L, AllocationSource.MANUAL);
+        when(allocationRepository.findByOccurrenceId(11L)).thenReturn(java.util.Optional.of(mirrorAllocation));
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L))).thenReturn(List.of());
+
+        writer.consolidate(principal, mirror, 6L, "obs");
+
+        ArgumentCaptor<Allocation> saved = ArgumentCaptor.forClass(Allocation.class);
+        verify(allocationRepository).save(saved.capture());
+        assertThat(saved.getValue().getOccurrenceId()).isEqualTo(10L);
+        assertThat(saved.getValue().getClassroomId()).isEqualTo(6L);
+        assertThat(saved.getValue().getSource()).isEqualTo(AllocationSource.MANUAL);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Change>> changes = ArgumentCaptor.forClass(List.class);
+        verify(movementPublisher).publish(eq(AllocationSource.MANUAL), eq("obs"), changes.capture());
+        assertThat(changes.getValue()).singleElement().satisfies(change -> {
+            assertThat(change.fromClassroomId()).isNull();
+            assertThat(change.toClassroomId()).isEqualTo(6L);
+        });
+    }
 }

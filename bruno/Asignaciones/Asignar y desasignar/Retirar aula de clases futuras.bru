@@ -1,0 +1,31 @@
+meta {
+  name: Retirar aula de clases futuras
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/v1/allocations/classroom-withdrawals
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "classroomId": 202,
+    "from": "2026-11-20",
+    "note": "inundación"
+  }
+}
+
+docs {
+  Saca el aula de las clases futuras que la usan (PERM_OCCURRENCE_RELEASE, con alcance por edificio).
+  from es opcional (default hoy). Las clases que ya empezaron no se tocan.
+
+  - La principal en el aula pasa al aula de uno de sus espejos (consolidated); el espejo queda MIRROR_RETIRED.
+  - El espejo en el aula se retira (mirrorsRetired); la principal sigue en su aula.
+  - La principal sin espejo con aula disponible no se toca (withoutAlternative): reasignar a mano.
+
+  Respuesta 200: { consolidated: [...], mirrorsRetired: [...], withoutAlternative: [...] }.
+  400 from anterior a hoy; 403 sin alcance sobre el aula o los destinos; 404 aula inexistente. Atómico; repetirlo es seguro.
+}

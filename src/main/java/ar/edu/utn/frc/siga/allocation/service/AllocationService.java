@@ -1,12 +1,14 @@
 package ar.edu.utn.frc.siga.allocation.service;
 
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.ClassroomWithdrawalResultDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.ReleasedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationLastRevisionDto;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
+import ar.edu.utn.frc.siga.allocation.service.command.ClassroomWithdrawalCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.ReleaseCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.RestoreCommand;
@@ -53,9 +55,17 @@ public interface AllocationService {
     /**
      * Libera las ocurrencias del lote con motivo: borra sus asignaciones y las pasa a
      * {@code ROOM_RELEASED} en la misma transacción. Arrastra los espejos de cada ocurrencia con el
-     * mismo motivo. Conserva el aula que tenían como {@code previousClassroomId}.
+     * mismo motivo. Conserva el aula que tenían como {@code previousClassroomId}. Con
+     * {@code MirrorScope.ONLY_SELECTED} no arrastra los espejos no seleccionados: una principal seleccionada
+     * pasa al aula de uno de ellos y ese espejo queda retirado.
      */
     List<ReleasedOccurrenceDto> release(ReleaseCommand command);
+
+    /**
+     * Saca un aula de las clases futuras que la usan: la principal pasa al aula de un espejo, el espejo en esa
+     * aula se retira y la principal sin espejo disponible no se toca.
+     */
+    ClassroomWithdrawalResultDto withdrawClassroom(ClassroomWithdrawalCommand command);
 
     /**
      * Revierte la liberación: las ocurrencias liberadas vuelven a {@code NEEDS_ROOM}. No asigna aula

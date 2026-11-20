@@ -31,7 +31,7 @@ public class AllocationCommandMapper {
 
     public ReleaseCommand toReleaseCommand(ReleaseBatchRequestDto dto) {
         List<AllocationTarget> targets = dto.items().stream().map(this::toTarget).toList();
-        return new ReleaseCommand(targets, dto.reason(), dto.note());
+        return new ReleaseCommand(targets, dto.reason(), dto.note(), dto.mirrorScope());
     }
 
     private AllocationItem toItem(AllocationItemRequestDto dto) {

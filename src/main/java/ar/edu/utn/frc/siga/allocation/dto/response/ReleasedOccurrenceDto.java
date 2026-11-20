@@ -9,5 +9,12 @@ public record ReleasedOccurrenceDto(
         Long eventId,
         LocalDate date,
         Long freedClassroomId,
-        ReleaseReason reason
-) {}
+        ReleaseReason reason,
+        Long movedToClassroomId
+) {
+
+    public ReleasedOccurrenceDto(Long occurrenceId, Long eventId, LocalDate date, Long freedClassroomId,
+                                 ReleaseReason reason) {
+        this(occurrenceId, eventId, date, freedClassroomId, reason, null);
+    }
+}

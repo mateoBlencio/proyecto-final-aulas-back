@@ -49,6 +49,13 @@ class AllocationWriter {
         return write(classroomByOccurrence, observation, source, AllocationSource.MANUAL);
     }
 
+    /** Borra la asignación del espejo sin publicarla y mueve la principal a su aula: un solo movimiento, el de la principal. */
+    void consolidate(OccurrenceSlotDto principal, OccurrenceSlotDto mirror, Long toClassroomId, String observation) {
+        boardCache.invalidate();
+        allocationRepository.findByOccurrenceId(mirror.occurrenceId()).ifPresent(allocationRepository::delete);
+        write(Map.of(principal, toClassroomId), observation, AllocationSource.MANUAL);
+    }
+
     private List<Allocation> write(Map<OccurrenceSlotDto, Long> classroomByOccurrence, String observation, AllocationSource source) {
         return write(classroomByOccurrence, observation, source, source);
     }
