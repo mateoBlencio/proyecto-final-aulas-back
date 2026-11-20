@@ -333,8 +333,8 @@ class ReallocationSuggestionIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("suggest: from anterior a hoy responde 400")
-    void suggest_pastFrom_returns400() throws Exception {
+    @DisplayName("suggest: from anterior a hoy se recorta a hoy y responde 200")
+    void suggest_pastFrom_isClampedToToday() throws Exception {
         var sc = testData.materiaYComision();
         LocalDate date = LocalDate.now().plusDays(570);
         Long eventId = createEvent(sc, date);
@@ -343,7 +343,7 @@ class ReallocationSuggestionIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new ReallocationSuggestionRequestDto(
                                 null, eventId, LocalDate.now().minusDays(1), null, null))))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isOk());
     }
 
     @Test
