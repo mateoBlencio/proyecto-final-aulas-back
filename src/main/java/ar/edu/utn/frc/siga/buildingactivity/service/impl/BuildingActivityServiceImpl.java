@@ -4,7 +4,9 @@ import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.buildingactivity.dto.response.BuildingActivityDto;
 import ar.edu.utn.frc.siga.buildingactivity.model.ActivityLine;
 import ar.edu.utn.frc.siga.buildingactivity.model.BuildingActivity;
+import ar.edu.utn.frc.siga.buildingactivity.model.BuildingActivityType;
 import ar.edu.utn.frc.siga.buildingactivity.model.BuildingActivitySeen;
+import ar.edu.utn.frc.siga.buildingactivity.model.RoomRequestItemRef;
 import ar.edu.utn.frc.siga.buildingactivity.repository.BuildingActivityRepository;
 import ar.edu.utn.frc.siga.buildingactivity.repository.BuildingActivitySeenRepository;
 import ar.edu.utn.frc.siga.buildingactivity.service.BuildingActivityService;
@@ -52,7 +54,8 @@ class BuildingActivityServiceImpl implements BuildingActivityService {
     @Override
     @Transactional(readOnly = true)
     public Page<BuildingActivityDto> find(String user, Long buildingId, LocalDate from, LocalDate to,
-                                          AllocationSource source, Boolean seen, String actor, Pageable pageable) {
+                                          AllocationSource source, BuildingActivityType type, Boolean seen,
+                                          String actor, Pageable pageable) {
         Specification<BuildingActivity> ordering = orderedBy(pageable.getSort());
         if (buildingId != null) {
             buildingScopeResolver.requireAccess(Permission.BUILDING_ACTIVITY_READ, buildingId);
@@ -72,6 +75,9 @@ class BuildingActivityServiceImpl implements BuildingActivityService {
         long watermark = watermark(user);
         if (source != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("source"), source));
+        }
+        if (type != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("type"), type));
         }
         if (seen != null) {
             spec = spec.and((root, query, cb) -> {
@@ -139,12 +145,15 @@ class BuildingActivityServiceImpl implements BuildingActivityService {
     private BuildingActivityDto toDto(BuildingActivity activity, String user, long watermark) {
         return new BuildingActivityDto(
                 activity.getId(),
+                activity.getType(),
                 new BuildingActivityDto.BuildingRef(activity.getBuildingId(), activity.getBuildingName()),
                 activity.getActor(),
                 activity.getSource(),
                 activity.getReason(),
                 activity.getOccurredAt(),
                 activity.getId() <= watermark || activity.getActor().equals(user),
+                activity.getRoomRequestItem() == null ? null
+                        : objectMapper.readValue(activity.getRoomRequestItem(), RoomRequestItemRef.class),
                 objectMapper.readValue(activity.getLines(), LINES_TYPE));
     }
 }

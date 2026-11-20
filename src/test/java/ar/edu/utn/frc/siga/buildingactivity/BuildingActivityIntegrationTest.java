@@ -19,6 +19,7 @@ import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.roomrequest.event.RoomRequestItemTakenOver;
 import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
@@ -257,6 +258,85 @@ class BuildingActivityIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("retomado de solicitud: lo ve el auxiliar del edificio y no el de otro, suma al unseen-count y POST /seen lo baja")
+    void takeOverEntryVisibleOnlyToBuildingAuxiliary() throws Exception {
+        Building building = testData.edificio();
+        MockMvc auxiliary = auxiliaryOf(building);
+        MockMvc otherAuxiliary = auxiliaryOf(testData.edificio());
+
+        publishInTransaction(takenOver(building));
+        awaitActivities(building.getId(), 1);
+
+        JsonNode entry = firstActivity(auxiliary);
+        assertThat(entry.at("/type").asText()).isEqualTo("ROOM_REQUEST_TAKEN_OVER");
+        assertThat(entry.at("/building/id").asLong()).isEqualTo(building.getId());
+        assertThat(entry.at("/source").asText()).isEqualTo("MANUAL");
+        assertThat(entry.at("/reason").asText()).isEqualTo("lo resuelve subsecretaría");
+        assertThat(entry.at("/lines")).isEmpty();
+        assertThat(entry.at("/roomRequestItem/id").asLong()).isEqualTo(77L);
+        assertThat(entry.at("/roomRequestItem/status").asText()).isEqualTo("IN_EVALUATION");
+        assertThat(entry.at("/roomRequestItem/teacherName").asText()).isEqualTo("Ada Lovelace");
+        assertThat(unseenCount(auxiliary)).isEqualTo(1);
+        assertThat(unseenCount(otherAuxiliary)).isZero();
+        otherAuxiliary.perform(get("/v1/building-activity"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isEmpty());
+
+        auxiliary.perform(post("/v1/building-activity/seen")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lastSeenId\":" + entry.at("/id").asLong() + "}"))
+                .andExpect(status().isNoContent());
+
+        assertThat(unseenCount(auxiliary)).isZero();
+    }
+
+    @Test
+    @DisplayName("type filtra entre retomados y cambios de aula, y los cambios de aula vienen como ALLOCATION_CHANGE")
+    void typeFilterSplitsTakeOverFromAllocationChange() throws Exception {
+        Scenario s = scenario();
+        reallocate(s);
+        awaitActivities(s.building().getId(), 1);
+        publishInTransaction(takenOver(s.building()));
+        awaitActivities(s.building().getId(), 2);
+
+        assertThat(listTypes(s.auxiliary(), null)).containsExactlyInAnyOrder("ALLOCATION_CHANGE", "ROOM_REQUEST_TAKEN_OVER");
+        assertThat(listTypes(s.auxiliary(), "ALLOCATION_CHANGE")).containsExactly("ALLOCATION_CHANGE");
+        assertThat(listTypes(s.auxiliary(), "ROOM_REQUEST_TAKEN_OVER")).containsExactly("ROOM_REQUEST_TAKEN_OVER");
+        s.auxiliary().perform(get("/v1/building-activity").param("type", "OTRO"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("el mismo retomado reentregado no duplica la entrada")
+    void redeliveredTakeOverDoesNotDuplicate() throws Exception {
+        Building building = testData.edificio();
+        RoomRequestItemTakenOver event = takenOver(building);
+
+        publishInTransaction(event);
+        awaitActivities(building.getId(), 1);
+        publishInTransaction(event);
+
+        await().during(Duration.ofSeconds(3)).atMost(TIMEOUT)
+                .untilAsserted(() -> assertThat(activitiesIn(building.getId())).isEqualTo(1));
+    }
+
+    private RoomRequestItemTakenOver takenOver(Building building) {
+        return new RoomRequestItemTakenOver(UUID.randomUUID().toString(), 77L, building.getId(), building.getName(),
+                "IN_EVALUATION", "Ada Lovelace", "lo resuelve subsecretaría", "sub@frc.utn.edu.ar", Instant.now());
+    }
+
+    private List<String> listTypes(MockMvc client, String type) throws Exception {
+        var request = get("/v1/building-activity");
+        if (type != null) {
+            request.param("type", type);
+        }
+        String body = client.perform(request).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        List<String> types = new java.util.ArrayList<>();
+        objectMapper.readTree(body).get("content").forEach(n -> types.add(n.at("/type").asText()));
+        return types;
+    }
+
+    @Test
     @DisplayName("sort ordena por cada campo permitido, sin sort es occurredAt desc y un campo invalido da 400")
     void sortsByAllowedFields() throws Exception {
         Building building = testData.edificio();
@@ -393,7 +473,7 @@ class BuildingActivityIntegrationTest extends AbstractIntegrationTest {
         assertThat(activitiesIn(s.building().getId())).isZero();
     }
 
-    private void publishInTransaction(ClassroomMovements event) {
+    private void publishInTransaction(Object event) {
         transactionTemplate.executeWithoutResult(status -> eventPublisher.publishEvent(event));
     }
 

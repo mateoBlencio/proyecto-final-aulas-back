@@ -4,6 +4,8 @@ import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.buildingactivity.dto.response.BuildingActivityDto;
 import ar.edu.utn.frc.siga.buildingactivity.model.BuildingActivity;
 import ar.edu.utn.frc.siga.buildingactivity.model.BuildingActivitySeen;
+import ar.edu.utn.frc.siga.buildingactivity.model.BuildingActivityType;
+import ar.edu.utn.frc.siga.buildingactivity.model.RoomRequestItemRef;
 import ar.edu.utn.frc.siga.buildingactivity.repository.BuildingActivityRepository;
 import ar.edu.utn.frc.siga.buildingactivity.repository.BuildingActivitySeenRepository;
 import ar.edu.utn.frc.siga.common.exception.InvalidSortPropertyException;
@@ -44,6 +46,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -99,7 +102,7 @@ class BuildingActivityServiceImplTest {
                         activity(5L, "otro@utn.edu.ar"),
                         activity(8L, ME))));
 
-        Page<BuildingActivityDto> page = service.find(ME, null, null, null, null, null, null, PageRequest.of(0, 20));
+        Page<BuildingActivityDto> page = service.find(ME, null, null, null, null, null, null, null, PageRequest.of(0, 20));
 
         assertThat(page.getContent()).extracting(BuildingActivityDto::id, BuildingActivityDto::seen)
                 .containsExactly(
@@ -117,7 +120,7 @@ class BuildingActivityServiceImplTest {
         when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(activity(1L, "otro@utn.edu.ar"))));
 
-        BuildingActivityDto dto = service.find(ME, null, null, null, null, null, null, PageRequest.of(0, 20)).getContent().getFirst();
+        BuildingActivityDto dto = service.find(ME, null, null, null, null, null, null, null, PageRequest.of(0, 20)).getContent().getFirst();
 
         assertThat(dto.seen()).isFalse();
         assertThat(dto.building()).isEqualTo(new BuildingActivityDto.BuildingRef(1L, "Central"));
@@ -137,7 +140,7 @@ class BuildingActivityServiceImplTest {
         when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
                 .thenReturn(Page.empty());
 
-        service.find(ME, null, null, null, null, null, null, PageRequest.of(2, 500, Sort.by("buildingName")));
+        service.find(ME, null, null, null, null, null, null, null, PageRequest.of(2, 500, Sort.by("buildingName")));
 
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
         verify(repository).findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), captor.capture());
@@ -183,7 +186,7 @@ class BuildingActivityServiceImplTest {
         stubWatermark(0L);
         when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
                 .thenReturn(Page.empty());
-        service.find(ME, null, null, null, null, null, null, PageRequest.of(0, 20));
+        service.find(ME, null, null, null, null, null, null, null, PageRequest.of(0, 20));
         CriteriaQuery countQuery = mock(CriteriaQuery.class);
         when(countQuery.getResultType()).thenReturn(Long.class);
 
@@ -195,7 +198,7 @@ class BuildingActivityServiceImplTest {
     @Test
     @DisplayName("find: un campo de sort no permitido da InvalidSortPropertyException y no consulta el repositorio")
     void findWithInvalidSortThrows() {
-        assertThatThrownBy(() -> service.find(ME, null, null, null, null, null, null,
+        assertThatThrownBy(() -> service.find(ME, null, null, null, null, null, null, null,
                 PageRequest.of(0, 20, Sort.by("lines"))))
                 .isInstanceOf(InvalidSortPropertyException.class)
                 .hasMessageContaining("lines")
@@ -210,6 +213,47 @@ class BuildingActivityServiceImplTest {
         Fixture fixture = evaluateFind(PageRequest.of(0, 20), AllocationSource.AUTOMATIC, null, null);
 
         verify(fixture.cb()).equal(fixture.path("source"), AllocationSource.AUTOMATIC);
+    }
+
+    @Test
+    @DisplayName("find: type filtra por tipo de actividad y sin type no agrega el predicado")
+    void findFiltersByType() {
+        Fixture withType = evaluateFind(PageRequest.of(0, 20), null, BuildingActivityType.ROOM_REQUEST_TAKEN_OVER, null, null);
+
+        verify(withType.cb()).equal(withType.path("type"), BuildingActivityType.ROOM_REQUEST_TAKEN_OVER);
+    }
+
+    @Test
+    @DisplayName("find: sin type no filtra por tipo")
+    void findWithoutTypeDoesNotFilter() {
+        Fixture fixture = evaluateFind(PageRequest.of(0, 20), null, null, null);
+
+        Path typePath = fixture.path("type");
+        verify(fixture.cb(), never()).equal(eq(typePath), ArgumentMatchers.<Object>any());
+    }
+
+    @Test
+    @DisplayName("find: una entrada de retomado expone type y roomRequestItem deserializado del jsonb")
+    void findMapsRoomRequestItem() {
+        stubScope(BuildingScope.unrestricted());
+        when(seenRepository.findById(ME)).thenReturn(Optional.empty());
+        BuildingActivity takeOver = BuildingActivity.builder().id(2L).type(BuildingActivityType.ROOM_REQUEST_TAKEN_OVER)
+                .buildingId(1L).buildingName("Central").operationId("op-2").actor("sub@utn.edu.ar")
+                .source(AllocationSource.MANUAL).reason("motivo").occurredAt(Instant.parse("2026-10-17T12:00:00Z"))
+                .lines("[]").roomRequestItem("{\"id\":42,\"status\":\"NOTIFIED\",\"teacherName\":\"Ada Lovelace\"}")
+                .build();
+        BuildingActivity allocation = activity(1L, "otro@utn.edu.ar");
+        when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(takeOver, allocation)));
+
+        List<BuildingActivityDto> content = service.find(ME, null, null, null, null, null, null, null,
+                PageRequest.of(0, 20)).getContent();
+
+        assertThat(content.get(0).type()).isEqualTo(BuildingActivityType.ROOM_REQUEST_TAKEN_OVER);
+        assertThat(content.get(0).lines()).isEmpty();
+        assertThat(content.get(0).roomRequestItem()).isEqualTo(new RoomRequestItemRef(42L, "NOTIFIED", "Ada Lovelace"));
+        assertThat(content.get(1).type()).isEqualTo(BuildingActivityType.ALLOCATION_CHANGE);
+        assertThat(content.get(1).roomRequestItem()).isNull();
     }
 
     @Test
@@ -254,7 +298,7 @@ class BuildingActivityServiceImplTest {
         org.mockito.Mockito.doThrow(new AccessDeniedException("sin acceso"))
                 .when(buildingScopeResolver).requireAccess(Permission.BUILDING_ACTIVITY_READ, 9L);
 
-        assertThatThrownBy(() -> service.find(ME, 9L, null, null, null, null, null, PageRequest.of(0, 20)))
+        assertThatThrownBy(() -> service.find(ME, 9L, null, null, null, null, null, null, PageRequest.of(0, 20)))
                 .isInstanceOf(AccessDeniedException.class);
 
         verifyNoInteractions(repository, seenRepository);
@@ -268,7 +312,7 @@ class BuildingActivityServiceImplTest {
         when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
                 .thenReturn(Page.empty());
 
-        service.find(ME, 3L, null, null, null, null, null, PageRequest.of(0, 20));
+        service.find(ME, 3L, null, null, null, null, null, null, PageRequest.of(0, 20));
 
         verify(buildingScopeResolver).requireAccess(Permission.BUILDING_ACTIVITY_READ, 3L);
         Fixture fixture = evaluate(capturedFindSpec());
@@ -283,7 +327,7 @@ class BuildingActivityServiceImplTest {
         when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
                 .thenReturn(Page.empty());
 
-        service.find(ME, null, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), null, null, null, PageRequest.of(0, 20));
+        service.find(ME, null, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), null, null, null, null, PageRequest.of(0, 20));
 
         Fixture fixture = evaluate(capturedFindSpec());
         verify(fixture.cb()).greaterThanOrEqualTo(fixture.path("occurredAt"), Instant.parse("2026-10-01T00:00:00Z"));
@@ -363,11 +407,16 @@ class BuildingActivityServiceImplTest {
     }
 
     private Fixture evaluateFind(Pageable pageable, AllocationSource source, Boolean seen, String actor) {
+        return evaluateFind(pageable, source, null, seen, actor);
+    }
+
+    private Fixture evaluateFind(Pageable pageable, AllocationSource source, BuildingActivityType type, Boolean seen,
+                                 String actor) {
         stubScope(BuildingScope.unrestricted());
         lenient().when(seenRepository.findById(ME)).thenReturn(Optional.ofNullable(watermarkStub));
         when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
                 .thenReturn(Page.empty());
-        service.find(ME, null, null, null, source, seen, actor, pageable);
+        service.find(ME, null, null, null, source, type, seen, actor, pageable);
         return evaluate(capturedFindSpec());
     }
 
@@ -386,6 +435,7 @@ class BuildingActivityServiceImplTest {
     private BuildingActivity activity(Long id, String actor) {
         return BuildingActivity.builder()
                 .id(id)
+                .type(BuildingActivityType.ALLOCATION_CHANGE)
                 .buildingId(1L)
                 .buildingName("Central")
                 .operationId("op-" + id)

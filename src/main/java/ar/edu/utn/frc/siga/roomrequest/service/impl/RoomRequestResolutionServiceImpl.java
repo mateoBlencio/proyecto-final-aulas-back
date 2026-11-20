@@ -22,6 +22,7 @@ import ar.edu.utn.frc.siga.roomrequest.dto.response.ReversionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.event.RoomRequestItemAccepted;
 import ar.edu.utn.frc.siga.roomrequest.event.RoomRequestItemReopened;
+import ar.edu.utn.frc.siga.roomrequest.event.RoomRequestItemTakenOver;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestTransitionException;
 import ar.edu.utn.frc.siga.roomrequest.exception.PartialAssignmentReasonRequiredException;
@@ -56,6 +57,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 
 @Slf4j
@@ -318,6 +320,9 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
         item.takeOverFromBuilding(reason);
 
+        eventPublisher.publishEvent(new RoomRequestItemTakenOver(UUID.randomUUID().toString(), itemId, buildingId,
+                buildingName, item.getStatus().name(), item.getRequest().getTeacherName(), reason, actor,
+                Instant.now()));
         if (before != null) {
             sendTakenOverMail(itemId, buildingName, before, item.getStatus(), reason, recipients, derivedAtMillis);
         }

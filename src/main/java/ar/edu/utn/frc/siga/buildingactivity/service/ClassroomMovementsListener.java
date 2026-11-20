@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.service.UserService;
 import ar.edu.utn.frc.siga.buildingactivity.model.ActivityLine;
 import ar.edu.utn.frc.siga.buildingactivity.model.BuildingActivity;
+import ar.edu.utn.frc.siga.buildingactivity.model.BuildingActivityType;
 import ar.edu.utn.frc.siga.buildingactivity.model.ClassroomRef;
 import ar.edu.utn.frc.siga.buildingactivity.repository.BuildingActivityRepository;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
@@ -89,6 +90,7 @@ class ClassroomMovementsListener {
 
     private void register(ClassroomMovements event, Long buildingId, String buildingName, List<ActivityLine> lines) {
         repository.save(BuildingActivity.builder()
+                .type(BuildingActivityType.ALLOCATION_CHANGE)
                 .buildingId(buildingId)
                 .buildingName(buildingName)
                 .operationId(event.operationId())

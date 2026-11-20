@@ -42,6 +42,10 @@ public class BuildingActivity {
     @Column(name = "operacion_id", nullable = false, length = 36)
     private String operationId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo", nullable = false, length = 40)
+    private BuildingActivityType type;
+
     @Column(name = "usuario", nullable = false)
     private String actor;
 
@@ -58,4 +62,8 @@ public class BuildingActivity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "lineas", nullable = false, columnDefinition = "jsonb")
     private String lines;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "solicitud", columnDefinition = "jsonb")
+    private String roomRequestItem;
 }

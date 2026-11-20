@@ -22,6 +22,7 @@ import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailHeaderD
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.event.RoomRequestItemAccepted;
 import ar.edu.utn.frc.siga.roomrequest.event.RoomRequestItemReopened;
+import ar.edu.utn.frc.siga.roomrequest.event.RoomRequestItemTakenOver;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestTransitionException;
 import ar.edu.utn.frc.siga.roomrequest.exception.PartialAssignmentReasonRequiredException;
@@ -543,6 +544,31 @@ class RoomRequestResolutionServiceImplTest {
         assertThat(request.model().get("motivo")).isEqualTo("se resuelve desde subsecretaría");
         assertThat((String) request.model().get("resumen")).contains("#1").contains("notificado al docente")
                 .endsWith("Ya no aparece en su bandeja.");
+    }
+
+    @Test
+    @DisplayName("takeOver: publica RoomRequestItemTakenOver con el edificio que perdió el pedido, el estado sin cambio, el docente, el motivo y el actor")
+    void takeOver_publicaEvento() {
+        RoomRequestItem item = derivedItem(RoomRequestStatus.NOTIFIED, LocalDate.now().plusDays(5));
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(buildingService.findById(1L)).thenReturn(new BuildingResponseDto(1L, "Edificio Central", true, null));
+        when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 1L)).thenReturn(List.of());
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.takeOver(1L, "se resuelve desde subsecretaría", "subsecretaria@frc.utn.edu.ar");
+
+        ArgumentCaptor<RoomRequestItemTakenOver> captor = ArgumentCaptor.forClass(RoomRequestItemTakenOver.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        RoomRequestItemTakenOver event = captor.getValue();
+        assertThat(event.operationId()).isNotBlank();
+        assertThat(event.itemId()).isEqualTo(1L);
+        assertThat(event.buildingId()).isEqualTo(1L);
+        assertThat(event.buildingName()).isEqualTo("Edificio Central");
+        assertThat(event.status()).isEqualTo("NOTIFIED");
+        assertThat(event.teacherName()).isEqualTo("Ada Lovelace");
+        assertThat(event.reason()).isEqualTo("se resuelve desde subsecretaría");
+        assertThat(event.actor()).isEqualTo("subsecretaria@frc.utn.edu.ar");
+        assertThat(event.occurredAt()).isNotNull();
     }
 
     @Test
