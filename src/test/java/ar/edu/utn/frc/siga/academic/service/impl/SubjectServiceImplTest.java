@@ -41,6 +41,8 @@ import static org.mockito.Mockito.when;
 class SubjectServiceImplTest {
 
     @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+    @Mock
     private SubjectRepository subjectRepository;
     @Mock
     private StudyPlanRepository studyPlanRepository;
@@ -59,7 +61,7 @@ class SubjectServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new SubjectServiceImpl(
-                subjectRepository, studyPlanRepository, specialtyRepository, subjectMapper, studyPlanResolver);
+                eventPublisher, subjectRepository, studyPlanRepository, specialtyRepository, subjectMapper, studyPlanResolver);
     }
 
     @Test
@@ -82,7 +84,7 @@ class SubjectServiceImplTest {
 
         assertThatThrownBy(() -> service.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Subject not found with id: 99");
+                .hasMessage("No existe la materia 99.");
     }
 
     @Test
@@ -166,7 +168,7 @@ class SubjectServiceImplTest {
 
         assertThatThrownBy(() -> service.findByCodeAndStudyPlan(101, 2020, 999))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Specialty not found with id: 999");
+                .hasMessage("No existe la especialidad 999.");
     }
 
     @Test
@@ -177,7 +179,7 @@ class SubjectServiceImplTest {
 
         assertThatThrownBy(() -> service.findByCodeAndStudyPlan(101, 2020, 10))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("StudyPlan not found with id: 2020");
+                .hasMessage("No existe el plan de estudio 2020.");
     }
 
     @Test
@@ -189,7 +191,7 @@ class SubjectServiceImplTest {
 
         assertThatThrownBy(() -> service.findByCodeAndStudyPlan(101, 2020, 10))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Subject not found with id: 101");
+                .hasMessage("No existe la materia 101.");
     }
 
     @Test
@@ -386,5 +388,17 @@ class SubjectServiceImplTest {
     private static StudyPlan syncStudyPlan() {
         return StudyPlan.builder().id(1L).planCode(94)
                 .specialty(Specialty.builder().id(1L).specialtyCode(17).build()).build();
+    }
+
+    @Test
+    @DisplayName("deactivate y activate publican CatalogAvailabilityChanged, una vez cada uno")
+    void deactivateAndActivatePublishCatalogAvailabilityChanged() {
+        when(subjectRepository.findById(5L)).thenReturn(Optional.of(Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build()));
+        service.deactivate(5L);
+        verify(eventPublisher, org.mockito.Mockito.times(1))
+                .publishEvent(new ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged());
+        service.activate(5L);
+        verify(eventPublisher, org.mockito.Mockito.times(2))
+                .publishEvent(new ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged());
     }
 }

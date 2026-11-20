@@ -18,7 +18,7 @@ docs {
   cabecera completa (incluido teacherEmail/teacherPhone, para poder contactar
   al docente) e "item" trae todos los campos del pedido: decidedBy,
   decisionReason, requiresProjector, requiresComputers, computerCount,
-  requiresExamUsers, requiredSoftware, observations, preferredClassrooms.
+  requiresExamUsers, requiredSoftware, observations, preferredClassrooms (ClassroomOptionDto con enabledInSysacad: false avisa que SysAcad inhabilitó el aula; es solo informativo).
 
   También suma el resultado de la resolución, cuando aplica:
   - assignedClassrooms: AssignedClassroomDto[] (id, roomNumber, buildingName,
@@ -50,7 +50,7 @@ docs {
   REGULAR_ROOM_CHANGE, PARTIAL_EXAM_IN_CLASS), suma además:
   - enrolled: Integer, inscriptos de la comisión en ese evento. null si el pedido
     no tiene evento de cursado asociado.
-  - currentClassrooms: ClassroomOptionDto[] (id, number, buildingName), el/las
+  - currentClassrooms: ClassroomOptionDto[] (id, number, buildingName, enabledInSysacad), el/las
     aula(s) que tiene hoy esa comisión según el cursado (no depende de que este
     pedido se haya resuelto). null en el mismo caso que enrolled.
 

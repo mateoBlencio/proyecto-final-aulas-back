@@ -22,14 +22,13 @@ params:query {
 docs {
   GET /v1/classrooms. Permiso: PERM_CLASSROOM_READ.
   Sin includeDeactivated solo devuelve aulas que se ofrecen: aula y edificio
-  activos y edificio vigente en SysAcad. Un aula que SysAcad dejo de traer se sigue
+  activos. Un aula que SysAcad dejo de traer o inhabilito, o cuyo edificio dejo de traer, se sigue
   ofreciendo. Con includeDeactivated=true devuelve todas.
   notInSysacad=true devuelve solo las aulas que SysAcad dejo de traer (lo cargado a
   mano nunca entra); se combina con el resto de los filtros y respeta el alcance por edificio.
   Cada elemento trae unavailableReason: null si se puede ofrecer; DEACTIVATED si
   tiene baja propia; PARENT_DEACTIVATED si lo oculta la baja de su edificio;
-  NOT_IN_SYSACAD si SysAcad dejo de traer su edificio.
-  currentInSysacad=false es el aviso de que SysAcad dejo de traer el aula.
+  currentInSysacad=false avisa que SysAcad dejo de traer el aula y enabledInSysacad=false que la inhabilito; ninguno bloquea la oferta del aula.
   Cada elemento trae pistas de UI calculadas con el alcance del usuario (el back
   valida igual en cada endpoint):
   - canUpdate: puede editar el aula; false si esta desactivada.

@@ -38,7 +38,7 @@ class DeactivatedClassroomReconciler implements ApplicationRunner {
      * para que el catch quede afuera de ella: con la anotación, el commit rollback-only escaparía del catch.
      */
     @Override
-    @AuditOperation("Baja de aula: reconciliación de aulas dadas de baja")
+    @AuditOperation(value = "Reconciliación de aulas dadas de baja", subject = "Allocation")
     public void run(@NonNull ApplicationArguments args) {
         try {
             transactionTemplate.executeWithoutResult(status -> SystemScope.run(this::reconcile));

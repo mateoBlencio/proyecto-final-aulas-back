@@ -141,15 +141,15 @@ class DeactivatedClassroomReleaser {
         return new Plan(released, retired, moved, allocationByOccurrence, noteByOccurrence, merged);
     }
 
-    @AuditOperation("Baja de aula: liberación y fusión de clases")
+    @AuditOperation(value = "Liberación y fusión de clases por baja de aula", subject = "Allocation")
     public DeactivationResult apply(Map<Long, String> noteByClassroom) {
         Plan plan = plan(noteByClassroom);
         if (plan.isEmpty()) {
             return new DeactivationResult(0, 0);
         }
-        AuditOperations.describe("Baja de aula: "
-                + Plurals.count(plan.releasedClasses(), "clase liberada", "clases liberadas") + ", "
-                + Plurals.count(plan.mergedClasses(), "clase fusionada", "clases fusionadas"));
+        AuditOperations.describe("Liberación y fusión de clases por baja de aula ("
+                + Plurals.count(plan.releasedClasses(), "liberada", "liberadas") + ", "
+                + Plurals.count(plan.mergedClasses(), "fusionada", "fusionadas") + ")");
 
         classroomLock.lock(plan.movedPrincipals().values());
 

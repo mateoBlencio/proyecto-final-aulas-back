@@ -184,6 +184,7 @@ class RoomRequestOriginalRestorer {
         }
         return classroomService.findByIdsIncludingDeactivated(new HashSet<>(classroomIds)).stream()
                 .collect(Collectors.toMap(ClassroomResponseDto::id,
-                        c -> new ClassroomOptionDto(c.id(), c.roomNumber(), c.buildingName())));
+                        c -> new ClassroomOptionDto(c.id(), c.roomNumber(), c.buildingName(), null,
+                                c.enabledInSysacad())));
     }
 }

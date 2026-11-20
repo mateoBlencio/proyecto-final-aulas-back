@@ -5,6 +5,7 @@ import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
+import ar.edu.utn.frc.siga.academic.service.AcademicLabels;
 import ar.edu.utn.frc.siga.audit.AuditedRecord;
 import ar.edu.utn.frc.siga.audit.AuditLabelProvider;
 import java.util.HashMap;
@@ -16,7 +17,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** Label of a subject-commission link: "Análisis Matemático I, comisión 1K1". */
+/** Label of a subject-commission link: "Análisis Matemático I (1K1)". */
 @Component
 @RequiredArgsConstructor
 class SubjectCommissionAuditLabelProvider implements AuditLabelProvider {
@@ -44,8 +45,9 @@ class SubjectCommissionAuditLabelProvider implements AuditLabelProvider {
         for (AuditedRecord record : records) {
             String subject = subjectNames.get(record.longValue("subject"));
             String commission = courseCodes.get(record.longValue("commission"));
-            if (subject != null && commission != null) {
-                labels.put(record.recordId(), subject + ", comisión " + commission);
+            String label = AcademicLabels.subjectCommission(subject, commission);
+            if (label != null) {
+                labels.put(record.recordId(), label);
             }
         }
         return labels;

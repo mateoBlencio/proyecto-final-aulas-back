@@ -219,7 +219,7 @@ class IngestServiceImplTest {
 
         assertThat(result.processedRows()).isZero();
         assertThat(result.skippedRows()).hasSize(1);
-        assertThat(result.skippedRows().getFirst().message()).contains("Subject not found with id: 100");
+        assertThat(result.skippedRows().getFirst().message()).contains("No existe la materia 100.");
         verify(allocationService, never()).reallocate(any());
     }
 

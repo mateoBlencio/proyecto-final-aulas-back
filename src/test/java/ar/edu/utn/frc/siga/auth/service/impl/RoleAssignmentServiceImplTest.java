@@ -67,7 +67,8 @@ class RoleAssignmentServiceImplTest {
 
         AssignRoleRequestDto dto = new AssignRoleRequestDto(ROLE, ScopeType.BUILDING, null);
 
-        assertThatThrownBy(() -> service.assign(1L, dto, OTHER_EMAIL)).isInstanceOf(RoleDomainException.class);
+        assertThatThrownBy(() -> service.assign(1L, dto, OTHER_EMAIL)).isInstanceOf(RoleDomainException.class)
+                .hasMessage("El alcance Edificio requiere un edificio");
 
         verify(roleAssignmentRepository, never()).save(any());
     }
@@ -81,7 +82,7 @@ class RoleAssignmentServiceImplTest {
 
         assertThatThrownBy(() -> service.assign(1L, dto, OTHER_EMAIL))
                 .isInstanceOf(RoleDomainException.class)
-                .hasMessage("scopeId must be null for GLOBAL scope");
+                .hasMessage("El alcance Global no admite scopeId");
 
         verify(roleAssignmentRepository, never()).save(any());
     }
@@ -111,7 +112,8 @@ class RoleAssignmentServiceImplTest {
 
         AssignRoleRequestDto dto = new AssignRoleRequestDto(ROLE, ScopeType.BUILDING, 5L);
 
-        assertThatThrownBy(() -> service.assign(1L, dto, OTHER_EMAIL)).isInstanceOf(RoleDomainException.class);
+        assertThatThrownBy(() -> service.assign(1L, dto, OTHER_EMAIL)).isInstanceOf(RoleDomainException.class)
+                .hasMessage("El usuario ya tiene esa asignación de rol");
 
         verify(roleAssignmentRepository, never()).save(any());
     }
@@ -146,7 +148,7 @@ class RoleAssignmentServiceImplTest {
 
         assertThatThrownBy(() -> service.assign(1L, dto, OTHER_EMAIL))
                 .isInstanceOf(RoleDomainException.class)
-                .hasMessageContaining("SUBSECRETARIA");
+                .hasMessage("El rol Subsecretaría no admite el alcance Edificio");
 
         verify(roleAssignmentRepository, never()).save(any());
         verifyNoInteractions(buildingService);
@@ -161,7 +163,7 @@ class RoleAssignmentServiceImplTest {
 
         assertThatThrownBy(() -> service.assign(1L, dto, OTHER_EMAIL))
                 .isInstanceOf(RoleDomainException.class)
-                .hasMessageContaining("AUXILIAR_AULICO");
+                .hasMessage("El rol Auxiliar áulico no admite el alcance Global");
 
         verify(roleAssignmentRepository, never()).save(any());
     }
@@ -229,7 +231,8 @@ class RoleAssignmentServiceImplTest {
                 .scopeType(ScopeType.GLOBAL).build();
         when(roleAssignmentRepository.findById(10L)).thenReturn(Optional.of(assignment));
 
-        assertThatThrownBy(() -> service.revoke(1L, 10L, OTHER_EMAIL)).isInstanceOf(RoleDomainException.class);
+        assertThatThrownBy(() -> service.revoke(1L, 10L, OTHER_EMAIL)).isInstanceOf(RoleDomainException.class)
+                .hasMessage("Un usuario no puede revocar su propia asignación de rol");
 
         verify(roleAssignmentRepository, never()).delete(any());
     }

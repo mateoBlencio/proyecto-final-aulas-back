@@ -22,7 +22,7 @@ public class SettingsSeeder implements ApplicationRunner {
 
     @Override
     @Transactional
-    @AuditOperation("Alta de configuraciones por defecto")
+    @AuditOperation(value = "Alta de configuraciones por defecto", subject = "Setting")
     public void run(@NonNull ApplicationArguments args) {
         int seeded = 0;
         for (SettingKey key : SettingKey.values()) {

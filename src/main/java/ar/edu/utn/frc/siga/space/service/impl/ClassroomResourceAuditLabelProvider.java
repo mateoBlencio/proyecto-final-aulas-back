@@ -36,6 +36,15 @@ class ClassroomResourceAuditLabelProvider implements AuditLabelProvider {
 
     @Override
     public Map<String, String> labels(List<AuditedRecord> records) {
+        return build(records, false);
+    }
+
+    @Override
+    public Map<String, String> summaryLabels(List<AuditedRecord> records) {
+        return build(records, true);
+    }
+
+    private Map<String, String> build(List<AuditedRecord> records, boolean summary) {
         Set<Long> typeIds = records.stream().map(record -> record.longValue("resourceType"))
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         Set<Long> classroomIds = records.stream().map(record -> record.longValue("classroom"))
@@ -50,7 +59,8 @@ class ClassroomResourceAuditLabelProvider implements AuditLabelProvider {
         for (AuditedRecord record : records) {
             String type = typeNames.get(record.longValue("resourceType"));
             ClassroomResponseDto classroom = classrooms.get(record.longValue("classroom"));
-            String room = classroom == null ? null : "Aula " + classroom.roomNumber() + ", " + classroom.buildingName();
+            String room = classroom == null ? null : "Aula " + classroom.roomNumber()
+                    + (summary ? " (" + classroom.buildingName() + ")" : ", " + classroom.buildingName());
             String label = type == null ? room : room == null ? type : type + " en " + room;
             if (label != null) {
                 labels.put(record.recordId(), label);

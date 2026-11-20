@@ -94,7 +94,7 @@ class AcademicEventApiIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(dto)))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.title").value("Resource not found"));
+                .andExpect(jsonPath("$.title").value("Recurso no encontrado"));
     }
 
     @Test

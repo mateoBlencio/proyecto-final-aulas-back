@@ -118,6 +118,7 @@ public class ClassroomListComposer {
                 targetDtos,
                 classroom.unavailableReason(),
                 classroom.isCurrentInSysacad(),
+                classroom.isEnabledInSysacad(),
                 classroom.isActive() && updateScope.allows(classroom.getBuilding().getId()),
                 activateScope.allows(classroom.getBuilding().getId()),
                 classroom.isAvailable() && allocateScope.allows(classroom.getBuilding().getId()));

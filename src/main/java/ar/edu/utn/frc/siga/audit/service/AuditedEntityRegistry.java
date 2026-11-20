@@ -119,6 +119,10 @@ public class AuditedEntityRegistry {
         return entities.stream().filter(entity -> entity.label().equals(label)).findFirst();
     }
 
+    public Optional<AuditedEntity> bySimpleName(String simpleName) {
+        return entities.stream().filter(entity -> entity.javaType().getSimpleName().equals(simpleName)).findFirst();
+    }
+
     private static AuditedEntity toAuditedEntity(SessionFactoryImplementor sessionFactory, EntityType<?> type,
                                                  Set<Class<?>> auditedTypes, Map<String, Class<?>> entityClasses) {
         Class<?> javaType = type.getJavaType();

@@ -34,6 +34,8 @@ import static org.mockito.Mockito.when;
 class SpecialtyServiceImplTest {
 
     @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+    @Mock
     private SpecialtyRepository specialtyRepository;
     @Mock
     private SubjectCommissionRepository subjectCommissionRepository;
@@ -48,7 +50,7 @@ class SpecialtyServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new SpecialtyServiceImpl(specialtyRepository, subjectCommissionRepository, subjectRepository,
+        service = new SpecialtyServiceImpl(eventPublisher, specialtyRepository, subjectCommissionRepository, subjectRepository,
                 commissionCountSearch, specialtyMapper);
     }
 
@@ -241,5 +243,17 @@ class SpecialtyServiceImplTest {
                 .name(name)
                 .sysacadHash(hash)
                 .build();
+    }
+
+    @Test
+    @DisplayName("deactivate y activate publican CatalogAvailabilityChanged, una vez cada uno")
+    void deactivateAndActivatePublishCatalogAvailabilityChanged() {
+        when(specialtyRepository.findById(1L)).thenReturn(java.util.Optional.of(Specialty.builder().id(1L).specialtyCode(17).build()));
+        service.deactivate(1L);
+        verify(eventPublisher, org.mockito.Mockito.times(1))
+                .publishEvent(new ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged());
+        service.activate(1L);
+        verify(eventPublisher, org.mockito.Mockito.times(2))
+                .publishEvent(new ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged());
     }
 }

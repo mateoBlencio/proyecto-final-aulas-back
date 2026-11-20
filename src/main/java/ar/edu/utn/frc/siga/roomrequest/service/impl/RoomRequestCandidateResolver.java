@@ -159,7 +159,7 @@ class RoomRequestCandidateResolver {
                     }
                     return new AllowedClassroomDto(classroom.id(), classroom.roomNumber(), classroom.buildingId(),
                             classroom.buildingName(), classroom.capacity(), !occupied.contains(classroom.id()),
-                            computersByClassroom.get(classroom.id()), missing, false);
+                            computersByClassroom.get(classroom.id()), missing, false, classroom.enabledInSysacad());
                 })
                 .sorted(Comparator.comparing((AllowedClassroomDto c) -> !c.missingRequirements().isEmpty()))
                 .toList();
@@ -246,7 +246,7 @@ class RoomRequestCandidateResolver {
                         classroom.buildingId(), classroom.buildingName(), classroom.capacity(),
                         !occupiedClassroomIds.contains(classroom.id()),
                         computersByClassroom.get(classroom.id()), List.of(),
-                        currentClassroomIds.contains(classroom.id())))
+                        currentClassroomIds.contains(classroom.id()), classroom.enabledInSysacad()))
                 .toList();
     }
 }

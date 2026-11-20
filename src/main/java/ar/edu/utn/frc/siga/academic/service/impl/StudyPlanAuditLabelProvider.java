@@ -29,6 +29,15 @@ class StudyPlanAuditLabelProvider implements AuditLabelProvider {
 
     @Override
     public Map<String, String> labels(List<AuditedRecord> records) {
+        return build(records, false);
+    }
+
+    @Override
+    public Map<String, String> summaryLabels(List<AuditedRecord> records) {
+        return build(records, true);
+    }
+
+    private Map<String, String> build(List<AuditedRecord> records, boolean summary) {
         Set<Long> specialtyIds = records.stream().map(record -> record.longValue("specialty"))
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         Map<Long, String> names = specialtyIds.isEmpty() ? new HashMap<>()
@@ -43,7 +52,9 @@ class StudyPlanAuditLabelProvider implements AuditLabelProvider {
                 continue;
             }
             String specialty = names.get(record.longValue("specialty"));
-            labels.put(record.recordId(), specialty == null ? "Plan " + code : "Plan " + code + ", " + specialty);
+            String plan = "Plan " + code;
+            labels.put(record.recordId(), specialty == null ? plan
+                    : summary ? plan + " (" + specialty + ")" : plan + ", " + specialty);
         }
         return labels;
     }

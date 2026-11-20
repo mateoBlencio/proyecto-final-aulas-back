@@ -28,7 +28,7 @@ class RoomRequestNotificationModelUnavailableTest {
     @DisplayName("una preferida dada de baja y una asignada distinta: texto singular exacto")
     void preferidaDadaDeBajaSingular() {
         Map<String, Object> result = model.build(detail(
-                List.of(new ClassroomOptionDto(1L, 204, "Central", UnavailableReason.DEACTIVATED)),
+                List.of(new ClassroomOptionDto(1L, 204, "Central", UnavailableReason.DEACTIVATED, true)),
                 List.of(new AssignedClassroomDto(2L, 301, "Norte", 40))));
 
         assertThat(result).containsEntry(KEY, "El aula 204 (Central) que solicitó no está disponible por el momento.");
@@ -38,8 +38,8 @@ class RoomRequestNotificationModelUnavailableTest {
     @DisplayName("dos preferidas dadas de baja (una por el edificio) y una asignada distinta: texto plural exacto")
     void preferidasDadasDeBajaPlural() {
         Map<String, Object> result = model.build(detail(
-                List.of(new ClassroomOptionDto(1L, 204, "Central", UnavailableReason.DEACTIVATED),
-                        new ClassroomOptionDto(3L, 305, "Norte", UnavailableReason.PARENT_DEACTIVATED)),
+                List.of(new ClassroomOptionDto(1L, 204, "Central", UnavailableReason.DEACTIVATED, true),
+                        new ClassroomOptionDto(3L, 305, "Norte", UnavailableReason.PARENT_DEACTIVATED, true)),
                 List.of(new AssignedClassroomDto(2L, 301, "Sur", 40))));
 
         assertThat(result).containsEntry(KEY,
@@ -50,28 +50,18 @@ class RoomRequestNotificationModelUnavailableTest {
     @DisplayName("si una asignada es preferida, la clave no aparece aunque otra preferida este dada de baja")
     void asignadaPreferidaApagaLaLinea() {
         Map<String, Object> result = model.build(detail(
-                List.of(new ClassroomOptionDto(1L, 204, "Central", UnavailableReason.DEACTIVATED),
-                        new ClassroomOptionDto(4L, 210, "Central", null)),
+                List.of(new ClassroomOptionDto(1L, 204, "Central", UnavailableReason.DEACTIVATED, true),
+                        new ClassroomOptionDto(4L, 210, "Central", null, true)),
                 List.of(new AssignedClassroomDto(4L, 210, "Central", 40))));
 
         assertThat(result).doesNotContainKey(KEY);
     }
 
     @Test
-    @DisplayName("una preferida deshabilitada en SysAcad no genera la linea")
-    void deshabilitadaEnSysacadNoGeneraLinea() {
+    @DisplayName("una preferida inhabilitada en SysAcad, sin baja en SIGA, no genera la linea")
+    void inhabilitadaEnSysacadNoGeneraLinea() {
         Map<String, Object> result = model.build(detail(
-                List.of(new ClassroomOptionDto(1L, 204, "Central", UnavailableReason.DISABLED_IN_SYSACAD)),
-                List.of(new AssignedClassroomDto(2L, 301, "Norte", 40))));
-
-        assertThat(result).doesNotContainKey(KEY);
-    }
-
-    @Test
-    @DisplayName("una preferida fuera de SysAcad no genera la linea")
-    void fueraDeSysacadNoGeneraLinea() {
-        Map<String, Object> result = model.build(detail(
-                List.of(new ClassroomOptionDto(1L, 204, "Central", UnavailableReason.NOT_IN_SYSACAD)),
+                List.of(new ClassroomOptionDto(1L, 204, "Central", null, false)),
                 List.of(new AssignedClassroomDto(2L, 301, "Norte", 40))));
 
         assertThat(result).doesNotContainKey(KEY);

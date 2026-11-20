@@ -4,7 +4,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /** Spanish names of the audited properties and of the enum constants shown in the field diff. */
-final class FieldLabels {
+public final class FieldLabels {
 
     private static final Map<String, String> PROPERTIES = Map.ofEntries(
             Map.entry("year", "Año"), Map.entry("semester", "Cuatrimestre"),
@@ -18,7 +18,7 @@ final class FieldLabels {
             Map.entry("abbreviation", "Abreviatura"), Map.entry("planCode", "Código de plan"),
             Map.entry("specialty", "Especialidad"), Map.entry("subject", "Materia"),
             Map.entry("commission", "Comisión"), Map.entry("enrolledCount", "Inscriptos"),
-            Map.entry("inPerson", "Presencial"), Map.entry("deactivationReason", "Motivo de baja"), Map.entry("deletedAt", "Fecha de baja"),
+            Map.entry("inPerson", "Presencial"), Map.entry("deletedAt", "Fecha de baja"),
             Map.entry("code", "Código"), Map.entry("studyPlan", "Plan de estudio"), Map.entry("term", "Cursada"),
             Map.entry("occurrenceId", "Ocurrencia"), Map.entry("classroomId", "Aula"),
             Map.entry("source", "Origen"), Map.entry("observation", "Observación"),
@@ -45,7 +45,7 @@ final class FieldLabels {
             Map.entry("classroomCount", "Cantidad de aulas"), Map.entry("observations", "Observaciones"),
             Map.entry("derivedBuildingId", "Edificio derivado"), Map.entry("derivedAt", "Fecha de derivación"),
             Map.entry("returnedFromBuildingId", "Edificio que lo devolvió"),
-            Map.entry("returnedReason", "Motivo de devolución"), Map.entry("notifiedAt", "Fecha de notificación"),
+            Map.entry("returnedReason", "Motivo de devolución o retomado"), Map.entry("notifiedAt", "Fecha de notificación"),
             Map.entry("acceptanceDeadline", "Plazo de aceptación"), Map.entry("acceptedAt", "Fecha de aceptación"),
             Map.entry("acceptedBy", "Aceptado por"), Map.entry("notificationRound", "Ronda de notificación"),
             Map.entry("type", "Tipo"), Map.entry("scope", "Ámbito"), Map.entry("teacherName", "Docente"),
@@ -76,6 +76,8 @@ final class FieldLabels {
             Map.entry("PARTIAL_EXAM_IN_CLASS", "Parcial en horario de clase"),
             Map.entry("PARTIAL_EXAM_OFF_SCHEDULE", "Parcial fuera de horario"),
             Map.entry("FINAL_EXAM", "Examen final"), Map.entry("CONFERENCE", "Conferencia"),
+            Map.entry("TRABAJO_PRACTICO", "Trabajo práctico"), Map.entry("EXAMEN_FINAL", "Examen final"),
+            Map.entry("CONFERENCIA", "Conferencia"), Map.entry("OTRO", "Otro"),
             Map.entry("GRADO", "Grado"), Map.entry("TECNICATURA", "Tecnicatura"),
             Map.entry("LICENCIATURA", "Licenciatura"), Map.entry("EXTENSION", "Extensión"),
             Map.entry("POSTGRADO", "Posgrado"), Map.entry("PARCIAL", "Parcial"),
@@ -95,7 +97,7 @@ final class FieldLabels {
         return label != null ? label : humanize(property.replaceAll("([a-z0-9])([A-Z])", "$1 $2"));
     }
 
-    static String constant(String constant) {
+    public static String constant(String constant) {
         String label = CONSTANTS.get(constant);
         return label != null ? label : humanize(constant.replace('_', ' '));
     }

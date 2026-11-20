@@ -201,7 +201,10 @@ class RoomRequestItemTakeOverApiIntegrationTest extends AbstractIntegrationTest 
 
         auxiliarOf(building).perform(post("/v1/room-requests/items/" + item.getId() + "/take-over")
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value(
+                        "Tu rol no puede tomar a cargo este pedido en su estado o edificio actual."))
+                .andExpect(jsonPath("$.action").value("TAKE_OVER"));
 
         assertThat(itemRepository.findById(item.getId()).orElseThrow().getDerivedBuildingId())
                 .isEqualTo(building.getId());
@@ -287,8 +290,8 @@ class RoomRequestItemTakeOverApiIntegrationTest extends AbstractIntegrationTest 
 
     private int auditedOperations() {
         return jdbcTemplate.queryForObject(
-                "SELECT COUNT(DISTINCT operacion_id) FROM revinfo WHERE descripcion = ?", Integer.class,
-                "Retomado de solicitud de aula derivada");
+                "SELECT COUNT(DISTINCT operacion_id) FROM revinfo WHERE descripcion = ? OR descripcion LIKE ?", Integer.class,
+                "Retomado de solicitud de aula derivada", "Retomado de solicitud de aula derivada: %");
     }
 
     private List<Map<String, Object>> takenOverMails(Long itemId) {

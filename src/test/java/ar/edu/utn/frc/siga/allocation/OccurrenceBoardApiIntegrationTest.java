@@ -63,6 +63,8 @@ class OccurrenceBoardApiIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
     @Autowired
+    private ar.edu.utn.frc.siga.academic.service.SubjectService subjectService;
+    @Autowired
     private WebApplicationContext webApplicationContext;
     @Autowired
     private JwtService jwtService;
@@ -491,5 +493,56 @@ class OccurrenceBoardApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(overlap.get("withEvent").get("subject").get("id").isNull()).isFalse();
         assertThat(event.get("summary").get("overlap").asInt()).isEqualTo(1);
         assertThat(event).isEqualTo(eventNode(unfiltered, candidate.eventId()));
+    }
+
+    private void suspendSubject(Long subjectId) {
+        subjectService.deactivate(subjectId);
+    }
+
+    @Test
+    @DisplayName("un evento suspendido sin aula no aparece como candidato del tablero")
+    void suspendedEventWithoutRoomIsNotACandidate() throws Exception {
+        Window w = freshWindow();
+        var sc = testData.materiaYComision();
+        Seeded seeded = seed(sc, w.day(1), 20);
+        assertThat(eventNode(board(w, "issues", "UNALLOCATED"), seeded.eventId())).isNotNull();
+
+        suspendSubject(sc.subjectId());
+
+        assertThat(eventNode(board(w), seeded.eventId())).isNull();
+    }
+
+    @Test
+    @DisplayName("una asignación suspendida deja de marcar OVERLAP sobre un evento visible que comparte aula y horario")
+    void suspendedAllocationDoesNotMarkOverlapOnVisibleEvent() throws Exception {
+        Window w = freshWindow();
+        Classroom room = testData.aula(testData.edificio(), testData.tipoAulaPorDefecto(), 100);
+        var scSuspended = testData.materiaYComision();
+        Seeded suspended = seed(scSuspended, w.day(1), LocalTime.of(9, 0), 20);
+        Seeded visible = seed(testData.materiaYComision(), w.day(1), LocalTime.of(9, 30), 20);
+        allocate(suspended.occurrenceId(), room);
+        allocate(mockMvc, visible.occurrenceId(), room, "solape tolerado, autorizado para este caso");
+        JsonNode before = eventNode(board(w, "issues", "OVERLAP"), visible.eventId()).get("occurrences").get(0);
+        assertThat(issueTypes(before)).containsExactly("OVERLAP");
+
+        suspendSubject(scSuspended.subjectId());
+
+        JsonNode page = board(w);
+        assertThat(eventNode(page, suspended.eventId())).isNull();
+        JsonNode after = eventNode(page, visible.eventId()).get("occurrences").get(0);
+        assertThat(issueTypes(after)).doesNotContain("OVERLAP");
+    }
+
+    @Test
+    @DisplayName("el tablero deja de mostrar el evento suspendido en la consulta siguiente a la baja, con la misma ventana ya cacheada")
+    void suspendedEventDisappearsFromAlreadyCachedBoard() throws Exception {
+        Window w = freshWindow();
+        var sc = testData.materiaYComision();
+        Seeded seeded = seed(sc, w.day(1), 20);
+        assertThat(eventNode(board(w), seeded.eventId())).isNotNull();
+
+        suspendSubject(sc.subjectId());
+
+        assertThat(eventNode(board(w), seeded.eventId())).isNull();
     }
 }

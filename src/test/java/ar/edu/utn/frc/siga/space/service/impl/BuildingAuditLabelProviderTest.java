@@ -46,4 +46,11 @@ class BuildingAuditLabelProviderTest {
     void labels_noValue_hasNoLabel() {
         assertThat(provider.labels(List.of(record("1", null)))).isEmpty();
     }
+
+    @Test
+    @DisplayName("summaryLabels: solo el nombre, sin el prefijo Edificio")
+    void summaryLabels_nameWithoutPrefix() {
+        assertThat(provider.summaryLabels(List.of(record("1", "Central"), record("2", null))))
+                .containsExactly(Map.entry("1", "Central"));
+    }
 }

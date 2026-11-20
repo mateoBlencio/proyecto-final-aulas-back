@@ -83,6 +83,14 @@ public class ClassAllocation {
         return event.groupKey();
     }
 
+    public Long getPriorRoomId() {
+        return event.priorRoomId();
+    }
+
+    public Long getClassroomId() {
+        return classroom != null ? classroom.id() : null;
+    }
+
     public Long getBuildingId() {
         return classroom != null ? classroom.buildingId() : null;
     }

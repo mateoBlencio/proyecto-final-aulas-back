@@ -23,7 +23,8 @@ class OptimizerConstraintsTest {
             "Preferir mismo edificio por evento",
             "Permiso no satisfecho",
             "Preferir aula con proyector",
-            "Preferir aula con computadoras");
+            "Preferir aula con computadoras",
+            "Aula previa respetada");
 
     private static final Set<SettingKey> EXPECTED_WEIGHT_KEYS = Set.of(
             SettingKey.OPTIMIZER_WEIGHT_OVERCROWDING,
@@ -35,11 +36,11 @@ class OptimizerConstraintsTest {
             SettingKey.OPTIMIZER_WEIGHT_MISSING_COMPUTER);
 
     @Test
-    @DisplayName("discovers exactly the ten constraints via ServiceLoader")
+    @DisplayName("discovers exactly the eleven constraints via ServiceLoader")
     void discoversAllConstraints() {
         List<OptimizerConstraint> constraints = OptimizerConstraints.all();
 
-        assertThat(constraints).hasSize(10);
+        assertThat(constraints).hasSize(11);
     }
 
     @Test
@@ -73,6 +74,6 @@ class OptimizerConstraintsTest {
                 .map(OptimizerConstraint::name)
                 .collect(Collectors.toSet());
         assertThat(namesWithoutWeight).isEqualTo(
-                Set.of("Sin solapamiento", "Asignar todo lo posible", "Permiso no satisfecho"));
+                Set.of("Sin solapamiento", "Asignar todo lo posible", "Permiso no satisfecho", "Aula previa respetada"));
     }
 }

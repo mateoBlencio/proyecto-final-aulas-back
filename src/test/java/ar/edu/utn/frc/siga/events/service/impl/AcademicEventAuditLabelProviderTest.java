@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.audit.AuditedRecord;
 import ar.edu.utn.frc.siga.events.model.AcademicEvent;
+import ar.edu.utn.frc.siga.events.repository.AcademicEventRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,12 +32,14 @@ class AcademicEventAuditLabelProviderTest {
     private SubjectService subjectService;
     @Mock
     private CommissionService commissionService;
+    @Mock
+    private AcademicEventRepository eventRepository;
 
     private AcademicEventAuditLabelProvider provider;
 
     @BeforeEach
     void setUp() {
-        provider = new AcademicEventAuditLabelProvider(new EventLabels(subjectService, commissionService));
+        provider = new AcademicEventAuditLabelProvider(new EventLabels(subjectService, commissionService, eventRepository));
     }
 
     private static AuditedRecord record(String id, Long subjectId, Long commissionId, String description) {
@@ -54,7 +57,7 @@ class AcademicEventAuditLabelProviderTest {
     }
 
     @Test
-    @DisplayName("formato '{materia} {comisión}' y una sola llamada en lote a cada servicio")
+    @DisplayName("formato '{materia} ({comisión})' y una sola llamada en lote a cada servicio")
     void labels_subjectAndCommission_oneBatchCallPerService() {
         when(subjectService.findByIdsIncludingDeactivated(any()))
                 .thenReturn(List.of(new SubjectResponseDto(1L, 100, "Álgebra", null, null, false, null)));
@@ -63,7 +66,7 @@ class AcademicEventAuditLabelProviderTest {
         Map<String, String> labels = provider.labels(List.of(
                 record("10", 1L, 2L, null), record("11", 1L, 2L, null)));
 
-        assertThat(labels).containsOnly(Map.entry("10", "Álgebra 1K1"), Map.entry("11", "Álgebra 1K1"));
+        assertThat(labels).containsOnly(Map.entry("10", "Álgebra (1K1)"), Map.entry("11", "Álgebra (1K1)"));
         verify(subjectService, times(1)).findByIdsIncludingDeactivated(any());
         verify(commissionService, times(1)).findByIdsIncludingDeactivated(any());
     }

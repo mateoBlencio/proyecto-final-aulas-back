@@ -22,8 +22,6 @@ public class BuildingSpecification {
     }
 
     public static Specification<Building> available() {
-        return (root, query, cb) -> cb.and(
-                cb.isNull(root.get("deletedAt")),
-                cb.or(cb.isTrue(root.get("sysacadEnabled")), cb.isNull(root.get("sysacadHash"))));
+        return (root, query, cb) -> cb.isNull(root.get("deletedAt"));
     }
 }

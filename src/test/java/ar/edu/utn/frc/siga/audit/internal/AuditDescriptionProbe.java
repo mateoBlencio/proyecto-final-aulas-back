@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.audit.internal;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.aop.aspectj.annotation.AspectJProxyFactory;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -33,8 +34,19 @@ public final class AuditDescriptionProbe {
     public <T> T audited(T target) {
         AspectJProxyFactory factory = new AspectJProxyFactory(target);
         factory.setProxyTargetClass(true);
-        factory.addAspect(new AuditOperationAspect(updater));
+        factory.addAspect(new AuditOperationAspect(updater, summaryProvider()));
         return factory.getProxy();
+    }
+
+    /** Summary stub that keeps the base description: the probe does not read the audit tables. */
+    @SuppressWarnings("unchecked")
+    private static ObjectProvider<OperationSummary> summaryProvider() {
+        OperationSummary summary = Mockito.mock(OperationSummary.class);
+        Mockito.lenient().when(summary.describe(Mockito.any(), Mockito.any(), Mockito.any()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
+        ObjectProvider<OperationSummary> provider = Mockito.mock(ObjectProvider.class);
+        Mockito.lenient().when(provider.getObject()).thenReturn(summary);
+        return provider;
     }
 
     /** Simulates the first revision of the operation being stamped. */

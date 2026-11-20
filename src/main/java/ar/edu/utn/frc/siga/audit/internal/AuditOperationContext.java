@@ -14,17 +14,17 @@ import java.util.UUID;
  */
 public final class AuditOperationContext {
 
-    private static final int MAX_DESCRIPTION_LENGTH = 255;
+    static final int MAX_DESCRIPTION_LENGTH = 255;
 
     private static final ThreadLocal<Holder> CURRENT = new ThreadLocal<>();
 
     private AuditOperationContext() {
     }
 
-    static void begin(String description, String parentId) {
+    static void begin(String description, String parentId, String subject) {
         Holder holder = CURRENT.get();
         if (holder == null) {
-            CURRENT.set(new Holder(UUID.randomUUID().toString(), description, parentId));
+            CURRENT.set(new Holder(UUID.randomUUID().toString(), description, parentId, subject));
         } else {
             holder.depth++;
         }
@@ -32,7 +32,8 @@ public final class AuditOperationContext {
 
     /**
      * Closes one level. When it closes the outermost one and the description changed after the
-     * first revision was stamped, returns the pending {@code revinfo} rewrite; otherwise null.
+     * first revision was stamped, or the operation names records of a subject, returns the pending
+     * {@code revinfo} rewrite; otherwise null.
      */
     static PendingDescription end() {
         Holder holder = CURRENT.get();
@@ -43,7 +44,9 @@ public final class AuditOperationContext {
             return null;
         }
         CURRENT.remove();
-        return holder.dirty ? new PendingDescription(holder.id, holder.description) : null;
+        boolean namesRecords = !holder.subject.isEmpty();
+        return holder.dirty || namesRecords
+                ? new PendingDescription(holder.id, holder.description, holder.subject, holder.dirty) : null;
     }
 
     static Operation current() {
@@ -95,22 +98,24 @@ public final class AuditOperationContext {
     record Operation(String id, String description, String parentId) {
     }
 
-    record PendingDescription(String operationId, String description) {
+    record PendingDescription(String operationId, String description, String subject, boolean dirty) {
     }
 
     private static final class Holder {
 
         private final String id;
         private final String parentId;
+        private final String subject;
         private String description;
         private int depth = 1;
         private boolean stamped;
         private boolean dirty;
 
-        private Holder(String id, String description, String parentId) {
+        private Holder(String id, String description, String parentId, String subject) {
             this.id = id;
             this.description = description;
             this.parentId = parentId;
+            this.subject = subject;
         }
     }
 }

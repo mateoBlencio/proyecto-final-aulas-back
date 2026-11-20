@@ -16,8 +16,9 @@ params:path {
 
 docs {
   GET /v1/commissions/{id}. Responde 404 si la comision esta dada de baja, su
-  periodo esta dado de baja o SysAcad dejo de traerla. Para ver esas comisiones y
+  periodo esta dado de baja. Para ver esas comisiones y
   su unavailableReason, usar el listado con includeDeactivated=true.
+  currentInSysacad=false avisa que SysAcad dejo de traer la comision (se resuelve igual).
   "yearLevel" es el año de cursada: primer dígito de courseCode (1-9), o null si
   el código no empieza con 1-9 (ej. TEST, EXAMEN, 0D0).
 }

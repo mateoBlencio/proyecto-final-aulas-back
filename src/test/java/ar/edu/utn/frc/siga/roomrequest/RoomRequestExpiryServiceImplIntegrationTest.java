@@ -187,8 +187,8 @@ class RoomRequestExpiryServiceImplIntegrationTest extends AbstractIntegrationTes
                 "SELECT r.descripcion AS descripcion, r.operacion_id AS operacion_id FROM revinfo r "
                         + "JOIN solicitud_aula_item_aud a ON a.rev = r.rev WHERE a.id_item = ? "
                         + "ORDER BY r.rev DESC LIMIT 1", overdueId).getFirst();
-        // Shared DB: other tests may leave overdue items, so the count is not fixed here (unit tests pin the wording).
-        assertThat((String) latest.get("descripcion")).matches("Vencimiento automático de \\d+ ítems? de solicitudes de aula");
+        // Shared DB: other tests may leave overdue items, so the names listed after the base text are not fixed here.
+        assertThat((String) latest.get("descripcion")).startsWith("Vencimiento automático de solicitudes de aula");
         assertThat(latest.get("operacion_id")).isNotNull();
     }
 

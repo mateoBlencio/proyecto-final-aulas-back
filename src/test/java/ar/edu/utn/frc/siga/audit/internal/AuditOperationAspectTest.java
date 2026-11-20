@@ -4,20 +4,33 @@ import ar.edu.utn.frc.siga.audit.AuditCause;
 import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.audit.AuditOperations;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.aspectj.annotation.AspectJProxyFactory;
+import org.springframework.beans.factory.ObjectProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @DisplayName("AuditOperationAspect")
 class AuditOperationAspectTest {
 
     private final RevisionDescriptionUpdater updater = mock(RevisionDescriptionUpdater.class);
+    private final OperationSummary summary = mock(OperationSummary.class);
+    @SuppressWarnings("unchecked")
+    private final ObjectProvider<OperationSummary> summaryProvider = mock(ObjectProvider.class);
+
+    @BeforeEach
+    void stubSummaryProvider() {
+        when(summaryProvider.getObject()).thenReturn(summary);
+    }
 
     @AfterEach
     void clear() {
@@ -81,6 +94,25 @@ class AuditOperationAspectTest {
             seen = AuditOperationContext.current();
         }
 
+        @AuditOperation(value = "Baja de materia", subject = "Subject")
+        public void withSubject() {
+            seen = AuditOperationContext.current();
+            AuditOperationContext.markStamped();
+        }
+
+        @AuditOperation(value = "Baja de materia", subject = "Subject")
+        public void withSubjectAndLateDescribe() {
+            seen = AuditOperationContext.current();
+            AuditOperationContext.markStamped();
+            AuditOperations.describe("Final");
+        }
+
+        @AuditOperation(value = "Baja de materia", subject = "Subject")
+        public void withSubjectThenFail() {
+            seen = AuditOperationContext.current();
+            throw new IllegalStateException("boom");
+        }
+
         @AuditOperation("Operación que falla")
         public void fail(AuditCause cause) {
             seen = AuditOperationContext.current();
@@ -90,7 +122,7 @@ class AuditOperationAspectTest {
 
     private Target proxied(Target target) {
         AspectJProxyFactory factory = new AspectJProxyFactory(target);
-        factory.addAspect(new AuditOperationAspect(updater));
+        factory.addAspect(new AuditOperationAspect(updater, summaryProvider));
         return factory.getProxy();
     }
 
@@ -209,5 +241,73 @@ class AuditOperationAspectTest {
                 .isInstanceOf(IllegalStateException.class);
 
         verifyNoInteractions(updater);
+    }
+
+    @Test
+    @DisplayName("con subject arma el resumen con el id de la operación, la base y el subject, y reescribe con su resultado")
+    void subjectDescribesAndUpdatesWithSummary() {
+        Target target = new Target();
+        when(summary.describe(any(), any(), any())).thenReturn("Baja de materia: Física I (1)");
+
+        proxied(target).withSubject();
+
+        verify(summary).describe(target.seen.id(), "Baja de materia", "Subject");
+        verify(updater).update(target.seen.id(), "Baja de materia: Física I (1)");
+    }
+
+    @Test
+    @DisplayName("con subject y un describe tardío el resumen parte de la descripción nueva, no de la del annotation")
+    void subjectWithLateDescribeSummarizesFromNewBase() {
+        Target target = new Target();
+        when(summary.describe(any(), any(), any())).thenReturn("Final: A y B");
+
+        proxied(target).withSubjectAndLateDescribe();
+
+        verify(summary).describe(target.seen.id(), "Final", "Subject");
+        verify(updater).update(target.seen.id(), "Final: A y B");
+    }
+
+    @Test
+    @DisplayName("con subject, si el resumen devuelve la base y nada cambió, el updater no se llama")
+    void subjectWithUnchangedSummaryDoesNotCallUpdater() {
+        Target target = new Target();
+        when(summary.describe(any(), any(), any())).thenReturn("Baja de materia");
+
+        proxied(target).withSubject();
+
+        verify(summary).describe(target.seen.id(), "Baja de materia", "Subject");
+        verifyNoInteractions(updater);
+    }
+
+    @Test
+    @DisplayName("con subject y el método falla igual resume lo ya commiteado y propaga la excepción")
+    void subjectWithFailingMethodStillSummarizes() {
+        Target target = new Target();
+        when(summary.describe(any(), any(), any())).thenReturn("Baja de materia: Física I (1)");
+
+        assertThatThrownBy(() -> proxied(target).withSubjectThenFail()).isInstanceOf(IllegalStateException.class);
+
+        verify(updater).update(target.seen.id(), "Baja de materia: Física I (1)");
+        assertThat(AuditOperationContext.current()).isNull();
+    }
+
+    @Test
+    @DisplayName("sin subject y sin describe no resuelve el resumen ni llama al updater")
+    void noSubjectNoDescribeCallsNothing() {
+        proxied(new Target()).stampWithoutDescribe();
+
+        verify(summary, never()).describe(any(), any(), any());
+        verifyNoInteractions(updater);
+    }
+
+    @Test
+    @DisplayName("sin subject y con describe tardío reescribe con ese texto sin pasar por el resumen")
+    void noSubjectLateDescribeSkipsSummary() {
+        Target target = new Target();
+
+        proxied(target).describeAfterStamp();
+
+        verify(updater).update(target.seen.id(), "Final");
+        verify(summary, never()).describe(any(), any(), any());
     }
 }

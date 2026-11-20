@@ -20,8 +20,9 @@ params:query {
 docs {
   Listado paginado. Filtro opcional: name (contiene, case-insensitive). La
   respuesta es { content: [...], page: { size, number, totalElements, totalPages } }.
-  Sin includeDeactivated solo devuelve edificios activos y vigentes en SysAcad.
-  unavailableReason: null, DEACTIVATED o NOT_IN_SYSACAD.
+  Sin includeDeactivated solo devuelve edificios activos (no depende de SysAcad).
+  unavailableReason: null o DEACTIVATED.
+  currentInSysacad=false avisa que SysAcad dejo de traer el edificio; es solo informativo.
   Pistas de UI por edificio (el back valida igual en cada endpoint):
   - canActivate: puede activar/desactivar edificios (permiso global).
   - canCreateClassroom: puede crear aulas en el edificio segun su alcance; false

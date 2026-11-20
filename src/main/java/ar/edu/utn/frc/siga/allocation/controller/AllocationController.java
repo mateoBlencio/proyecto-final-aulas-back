@@ -84,7 +84,7 @@ public class AllocationController {
 
     @GetMapping
     @Operation(summary = "Listar asignaciones por fecha",
-               description = "Devuelve todas las asignaciones del día indicado.")
+               description = "Devuelve todas las asignaciones del día indicado. Excluye las ocurrencias desde el día en que la materia, comisión, materia-comisión, plan o especialidad del evento se dio de baja.")
     public ResponseEntity<List<AllocationResponseDto>> findByDate(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         log.debug("GET /v1/allocations: date={}", date);
@@ -101,7 +101,8 @@ public class AllocationController {
                        + "especialidad. Solo ocurrencias asignadas y no liberadas. 'limit' (1 a 50, default 20) "
                        + "corta eventos, no ocurrencias. Orden: eventos con fecha desde 'date' primero, por la más "
                        + "cercana; después los ya terminados, por la última fecha descendente. Cada evento trae "
-                       + "sus ocurrencias coincidentes por fecha ascendente. Sin período que contenga 'date': lista vacía.")
+                       + "sus ocurrencias coincidentes por fecha ascendente. Sin período que contenga 'date': lista vacía. "
+                       + "Excluye las ocurrencias desde el día en que la materia, comisión, materia-comisión, plan o especialidad del evento se dio de baja.")
     public ResponseEntity<List<AllocationSearchResultDto>> search(
             @RequestParam @Size(max = 100) String q,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
@@ -158,7 +159,8 @@ public class AllocationController {
                        + "comisión y especialidad), 'dayOfWeek' (día que dicta el evento; en únicos, el día de su "
                        + "fecha) y 'specialty' (nombre exacto de la especialidad) filtran antes de paginar. "
                        + "'sort=campo,asc|desc' acepta subject, dayOfWeek, startTime, enrolled y commissionCode "
-                       + "(otra propiedad da 400); sin sort, orden por id del evento.")
+                       + "(otra propiedad da 400); sin sort, orden por id del evento. "
+                       + "Excluye las ocurrencias desde el día en que la materia, comisión, materia-comisión, plan o especialidad del evento se dio de baja.")
     public ResponseEntity<Page<AllocationConflictDto>> findConflicts(
             @RequestParam(required = false) Set<ConflictType> types,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -196,7 +198,7 @@ public class AllocationController {
                        + "de /releases; una fecha sin slots visibles no aparece. Los espejos retirados por un pedido "
                        + "de aula (MIRROR_RETIRED) no aparecen. 'sort=campo,asc|desc' acepta subject, dayOfWeek, "
                        + "startTime, enrolled y commissionCode (otra propiedad da 400); sin sort, orden por id del "
-                       + "evento.")
+                       + "evento. Excluye las ocurrencias desde el día en que la materia, comisión, materia-comisión, plan o especialidad del evento se dio de baja.")
     public ResponseEntity<Page<OccurrenceBoardEventDto>> findOccurrencesBoard(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
@@ -220,7 +222,8 @@ public class AllocationController {
                        + "del evento) o 'eventId' + 'from' [+ 'to'] (rango de fechas, ambos bordes inclusive). "
                        + "409 si alguna occurrence del lote ya tiene asignación, si algún aula no existe/no está "
                        + "disponible, o si hay solapamiento de horario con otra asignación. Asigna también las clases "
-                       + "liberadas por baja de aula (CLASSROOM_DEACTIVATED) y las saca de liberadas. Atómico.")
+                       + "liberadas por baja de aula (CLASSROOM_DEACTIVATED) y las saca de liberadas. 422 si algún evento "
+                       + "del lote está suspendido por la baja de su materia, comisión, materia-comisión, plan o especialidad. Atómico.")
     public ResponseEntity<List<AllocationResponseDto>> allocate(@Valid @RequestBody AllocationBatchRequestDto dto) {
         log.debug("POST /v1/allocations: items={}", dto.items().size());
         List<AllocationResponseDto> response = allocationService.allocate(commandMapper.toManualCommand(dto));
@@ -243,7 +246,8 @@ public class AllocationController {
                        + "asignación, o si una ocurrencia del rango ya ocurrió. En el 409 y en el 400 por "
                        + "superposición dentro del margen, 'classroomIds' lista todas las aulas en conflicto y "
                        + "'detail' explica el motivo. Atómico: si una sola fecha del "
-                       + "rango falla, no se aplica ningún cambio.")
+                       + "rango falla, no se aplica ningún cambio. 422 si algún evento del lote está suspendido por la baja de "
+                       + "su materia, comisión, materia-comisión, plan o especialidad.")
     public ResponseEntity<List<AllocationResponseDto>> reallocate(@Valid @RequestBody AllocationBatchRequestDto dto) {
         log.debug("PUT /v1/allocations: items={}", dto.items().size());
         List<AllocationResponseDto> response = allocationService.reallocateExisting(commandMapper.toManualCommand(dto));
@@ -311,7 +315,8 @@ public class AllocationController {
                        + "subject, dayOfWeek, startTime, enrolled y commissionCode (otra propiedad da 400); sin "
                        + "sort, orden por id del evento. Si el usuario tiene alcance "
                        + "por edificio, solo ve las liberadas cuya aula anterior está en su alcance (las "
-                       + "que nunca tuvieron aula se ven siempre).")
+                       + "que nunca tuvieron aula se ven siempre). "
+                       + "Excluye las ocurrencias desde el día en que la materia, comisión, materia-comisión, plan o especialidad del evento se dio de baja.")
     public ResponseEntity<Page<ReleasedOccurrenceItemDto>> findReleased(
             @RequestParam(required = false) ReleaseReason reason,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

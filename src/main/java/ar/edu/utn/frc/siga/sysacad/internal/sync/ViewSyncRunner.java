@@ -15,7 +15,7 @@ final class ViewSyncRunner {
 
     static <T> List<T> requireRows(List<T> rows, SysacadView view) {
         if (rows.isEmpty()) {
-            throw new SysacadEmptyViewException(view.name());
+            throw new SysacadEmptyViewException(view.label());
         }
         return rows;
     }

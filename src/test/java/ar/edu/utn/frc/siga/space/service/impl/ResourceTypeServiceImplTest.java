@@ -53,7 +53,7 @@ class ResourceTypeServiceImplTest {
 
         assertThatThrownBy(() -> service.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("ResourceType");
+                .hasMessage("No existe el tipo de recurso 99.");
     }
 
     @Test

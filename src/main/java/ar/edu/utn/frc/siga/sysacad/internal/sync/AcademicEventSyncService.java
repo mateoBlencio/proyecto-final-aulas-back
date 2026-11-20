@@ -50,7 +50,7 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
     }
 
     @Override
-    @AuditOperation("Sincronización de eventos desde SysAcad")
+    @AuditOperation(value = "Sincronización de eventos desde SysAcad", subject = "AcademicEvent")
     public void sync(SysacadCatalogReader catalog) {
         ViewSyncRunner.run(syncStateService, SysacadView.EVENTOS, "Eventos", log, () -> doSync(catalog));
     }
@@ -112,8 +112,8 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
                 properties.getSync().minValidRowsPercent());
         occurrenceBoardService.invalidateCache();
 
-        AuditOperations.describe("Sincronización de eventos desde SysAcad: " + Plurals.count(created, "alta", "altas")
-                + ", " + Plurals.count(updated, "cambio", "cambios") + ", " + Plurals.count(absent, "baja", "bajas"));
+        AuditOperations.describe("Sincronización de eventos desde SysAcad (" + Plurals.count(created, "alta", "altas")
+                + ", " + Plurals.count(updated, "cambio", "cambios") + ", " + Plurals.count(absent, "baja", "bajas") + ")");
         return (int) (created + updated) + absent;
     }
 }

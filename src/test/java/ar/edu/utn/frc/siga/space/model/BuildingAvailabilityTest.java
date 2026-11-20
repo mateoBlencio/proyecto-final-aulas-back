@@ -47,11 +47,21 @@ class BuildingAvailabilityTest {
     }
 
     @Test
-    @DisplayName("un edificio con hash y flag apagado es NOT_IN_SYSACAD")
-    void absentBuildingIsNotInSysacad() {
+    @DisplayName("un edificio con hash y flag apagado (ausente de SysAcad) sigue disponible y figura no vigente")
+    void absentBuildingStaysAvailable() {
         Building building = building(true, false, HASH);
 
-        assertThat(building.unavailableReason()).isEqualTo(UnavailableReason.NOT_IN_SYSACAD);
+        assertThat(building.unavailableReason()).isNull();
+        assertThat(building.isAvailable()).isTrue();
+        assertThat(building.isCurrentInSysacad()).isFalse();
+    }
+
+    @Test
+    @DisplayName("un edificio ausente de SysAcad y dado de baja en SIGA es DEACTIVATED")
+    void absentAndDeactivatedBuildingIsDeactivated() {
+        Building building = building(false, false, HASH);
+
+        assertThat(building.unavailableReason()).isEqualTo(UnavailableReason.DEACTIVATED);
         assertThat(building.isAvailable()).isFalse();
     }
 

@@ -10,7 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Label of an event: "Álgebra 1K1"; a unique event without subject shows its description. */
+/** Label of an event: "Álgebra (1K1)"; a unique event without subject shows its description. */
 @Component
 @RequiredArgsConstructor
 class AcademicEventAuditLabelProvider implements AuditLabelProvider {

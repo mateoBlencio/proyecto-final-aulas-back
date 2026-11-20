@@ -18,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -52,6 +53,16 @@ public class AuditLabelResolver {
      * latest revision in {@code states}.
      */
     public Map<RecordRevision, String> resolve(Map<RecordRevision, RecordStates> states) {
+        return resolveWith(states, AuditLabelProvider::labels);
+    }
+
+    /** Like {@link #resolve} with the short names the operation summary lists. */
+    public Map<RecordRevision, String> resolveSummaries(Map<RecordRevision, RecordStates> states) {
+        return resolveWith(states, AuditLabelProvider::summaryLabels);
+    }
+
+    private Map<RecordRevision, String> resolveWith(Map<RecordRevision, RecordStates> states,
+            BiFunction<AuditLabelProvider, List<AuditedRecord>, Map<String, String>> labeller) {
         Map<AuditedEntity, List<RecordRevision>> byEntity = states.keySet().stream()
                 .collect(Collectors.groupingBy(RecordRevision::entity, LinkedHashMap::new, Collectors.toList()));
         Map<RecordRevision, String> result = new HashMap<>();
@@ -67,7 +78,7 @@ public class AuditLabelResolver {
             latestByRecord.forEach((recordId, key) -> records.add(new AuditedRecord(recordId, valuesOf(states.get(key)))));
             records.sort(Comparator.comparing(AuditedRecord::recordId));
             try {
-                Map<String, String> labels = isolated.execute(status -> provider.labels(records));
+                Map<String, String> labels = isolated.execute(status -> labeller.apply(provider, records));
                 for (RecordRevision key : keys) {
                     String label = labels.get(key.recordId());
                     if (label != null) {

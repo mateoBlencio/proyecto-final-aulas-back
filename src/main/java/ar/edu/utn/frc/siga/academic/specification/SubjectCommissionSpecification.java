@@ -39,8 +39,6 @@ public class SubjectCommissionSpecification {
                 cb.isNull(root.get("subject").get("studyPlan").get("deletedAt")),
                 cb.isNull(root.get("subject").get("studyPlan").get("specialty").get("deletedAt")),
                 cb.isNull(root.get("commission").get("deletedAt")),
-                cb.or(cb.isTrue(root.get("commission").get("sysacadEnabled")),
-                        cb.isNull(root.get("commission").get("sysacadHash"))),
                 cb.isNull(root.get("commission").get("academicPeriod").get("deletedAt")));
     }
 }

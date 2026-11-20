@@ -85,9 +85,10 @@ public class OptimizerServiceImpl implements OptimizerService {
         for (OptimizerOccupancy occ : occupancy) {
             OptimizerRoom room = roomsById.get(occ.classroomId());
             if (room == null) continue;
-            String planningId = "occupied:" + occ.classroomId() + ":" + occ.date() + ":" + occ.startTime();
+            String planningId = "occupied:" + occ.classroomId() + ":" + occ.date() + ":" + occ.startTime()
+                    + ":" + occ.endTime();
             if (byPlanningId.containsKey(planningId)) {
-                log.warn("Ocupación existente duplicada descartada, planningId={}", planningId);
+                log.warn("Ocupación existente duplicada exacta descartada, planningId={}", planningId);
                 continue;
             }
             OptimizerEvent event = new OptimizerEvent(planningId, null, 0,

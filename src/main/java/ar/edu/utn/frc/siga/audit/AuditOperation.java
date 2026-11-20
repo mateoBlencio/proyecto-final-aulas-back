@@ -21,4 +21,10 @@ import org.springframework.modulith.NamedInterface;
 public @interface AuditOperation {
 
     String value();
+
+    /**
+     * Simple name of the audited root entity whose changed records the summary names ("Subject", "Allocation").
+     * Empty when the operation names no records (archiving, board regeneration, recalculation by period).
+     */
+    String subject() default "";
 }

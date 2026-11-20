@@ -40,7 +40,7 @@ public class HolidayServiceImpl implements HolidayService {
 
     @Override
     @Transactional
-    @AuditOperation("Sincronización de feriados desde SysAcad")
+    @AuditOperation(value = "Sincronización de feriados desde SysAcad", subject = "Holiday")
     public int syncHolidays(List<HolidaySyncCommand> commands) {
         LocalDate today = LocalDate.now(clock);
         Instant syncedAt = Instant.now(clock);

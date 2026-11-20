@@ -4,6 +4,9 @@ import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
+import ar.edu.utn.frc.siga.events.model.RecurringEvent;
+import ar.edu.utn.frc.siga.events.model.UniqueEvent;
+import ar.edu.utn.frc.siga.events.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.events.service.impl.EventLabels.EventRef;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,12 +37,14 @@ class EventLabelsTest {
     private SubjectService subjectService;
     @Mock
     private CommissionService commissionService;
+    @Mock
+    private AcademicEventRepository eventRepository;
 
     private EventLabels labels;
 
     @BeforeEach
     void setUp() {
-        labels = new EventLabels(subjectService, commissionService);
+        labels = new EventLabels(subjectService, commissionService, eventRepository);
     }
 
     private static SubjectResponseDto subject(Long id, String name) {
@@ -51,14 +56,14 @@ class EventLabelsTest {
     }
 
     @Test
-    @DisplayName("evento con materia y comisión: '{materia} {comisión}'")
+    @DisplayName("evento con materia y comisión: '{materia} ({comisión})'")
     void labelsOf_subjectAndCommission() {
         when(subjectService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(subject(1L, "Álgebra")));
         when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(commission(2L, "1K1")));
 
         Map<Long, String> result = labels.labelsOf(Map.of(10L, new EventRef(1L, 2L, null)));
 
-        assertThat(result).containsExactly(Map.entry(10L, "Álgebra 1K1"));
+        assertThat(result).containsExactly(Map.entry(10L, "Álgebra (1K1)"));
     }
 
     @Test
@@ -82,7 +87,7 @@ class EventLabelsTest {
         assertThat(subjectIds.getValue()).containsExactlyInAnyOrder(1L, 3L);
         assertThat(commissionIds.getValue()).containsExactlyInAnyOrder(2L, 4L);
         assertThat(result).containsOnly(
-                Map.entry(10L, "Álgebra 1K1"), Map.entry(11L, "Álgebra 2K2"), Map.entry(12L, "Física 1K1"));
+                Map.entry(10L, "Álgebra (1K1)"), Map.entry(11L, "Álgebra (2K2)"), Map.entry(12L, "Física (1K1)"));
     }
 
     @Test
@@ -127,5 +132,36 @@ class EventLabelsTest {
     void labelsOf_nothing_hasNoLabel() {
         assertThat(labels.labelsOf(Map.of(10L, new EventRef(null, null, null)))).isEmpty();
         verifyNoInteractions(subjectService, commissionService);
+    }
+
+    @Test
+    @DisplayName("labelsOfEventIds carga los eventos en una consulta y arma '{materia} ({comisión})'; el único sin materia usa su descripción")
+    void labelsOfEventIds_loadsEventsAndLabelsThem() {
+        when(eventRepository.findAllById(any())).thenReturn(List.of(
+                RecurringEvent.builder().id(10L).subjectId(1L).commissionId(2L).build(),
+                UniqueEvent.builder().id(11L).description("Charla de ingreso").build()));
+        when(subjectService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(subject(1L, "Análisis Matemático I")));
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(commission(2L, "1K1")));
+
+        assertThat(labels.labelsOfEventIds(List.of(10L, 11L))).containsOnly(
+                Map.entry(10L, "Análisis Matemático I (1K1)"), Map.entry(11L, "Charla de ingreso"));
+        verify(eventRepository, times(1)).findAllById(any());
+    }
+
+    @Test
+    @DisplayName("labelsOfEventIds sin ids no consulta nada")
+    void labelsOfEventIds_empty_queriesNothing() {
+        assertThat(labels.labelsOfEventIds(List.of())).isEmpty();
+        verifyNoInteractions(eventRepository, subjectService, commissionService);
+    }
+
+    @Test
+    @DisplayName("con materia y comisión que ya no se encuentra muestra solo la materia")
+    void labelsOf_commissionNotFound_showsSubject() {
+        when(subjectService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(subject(1L, "Álgebra")));
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of());
+
+        assertThat(labels.labelsOf(Map.of(10L, new EventRef(1L, 2L, null))))
+                .containsExactly(Map.entry(10L, "Álgebra"));
     }
 }

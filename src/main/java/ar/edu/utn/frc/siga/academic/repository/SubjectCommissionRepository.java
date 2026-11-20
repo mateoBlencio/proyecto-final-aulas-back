@@ -50,7 +50,6 @@ public interface SubjectCommissionRepository
               and (:academicPeriodId is null or ap.id = :academicPeriodId)
               and (:includeDeactivated = true
                    or (c.deletedAt is null
-                       and (c.sysacadEnabled = true or c.sysacadHash is null)
                        and ap.deletedAt is null
                        and p.deletedAt is null
                        and sp.deletedAt is null))

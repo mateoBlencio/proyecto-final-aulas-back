@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.preview.mapper;
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import ar.edu.utn.frc.siga.common.util.Overcrowding;
+import ar.edu.utn.frc.siga.common.util.TimeRanges;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.UniqueEventResponseDto;
 import ar.edu.utn.frc.siga.preview.dto.response.MoveConflictDto;
@@ -29,6 +30,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -56,17 +58,25 @@ public class PreviewComposer {
         List<PlanningKey> resolved = new ArrayList<>();
         List<PlanningKey> unresolved = new ArrayList<>();
         Map<PlanningKey, Long> effectiveRoomByKey = new LinkedHashMap<>();
+        List<PlanningKey> fallbackCandidates = new ArrayList<>();
         for (OptimizerAllocation allocation : preview.allocations()) {
             PlanningKey key = PlanningKey.parse(allocation.eventId());
-            Long classroomId = allocation.classroomId();
-            if (classroomId == null) {
-                classroomId = priorRoomByKey.get(key);
-            }
-            if (classroomId != null) {
+            if (allocation.classroomId() != null) {
                 resolved.add(key);
-                effectiveRoomByKey.put(key, classroomId);
+                effectiveRoomByKey.put(key, allocation.classroomId());
+            } else if (priorRoomByKey.get(key) != null) {
+                fallbackCandidates.add(key);
             } else {
                 unresolved.add(key);
+            }
+        }
+        for (PlanningKey key : fallbackCandidates) {
+            Long priorRoom = priorRoomByKey.get(key);
+            if (clashesWithEffective(key, priorRoom, effectiveRoomByKey, eventsById, datesByKey)) {
+                unresolved.add(key);
+            } else {
+                resolved.add(key);
+                effectiveRoomByKey.put(key, priorRoom);
             }
         }
 
@@ -91,6 +101,28 @@ public class PreviewComposer {
                 .toList();
 
         return new PreviewResponseDto(preview.previewId(), allocations, unresolvedDtos);
+    }
+
+    private static boolean clashesWithEffective(PlanningKey key, Long roomId,
+            Map<PlanningKey, Long> effectiveRoomByKey, Map<Long, AcademicEventResponseDto> eventsById,
+            Map<PlanningKey, List<LocalDate>> datesByKey) {
+        AcademicEventResponseDto event = eventsById.get(key.eventId());
+        if (event == null) {
+            return true;
+        }
+        List<LocalDate> dates = datesByKey.getOrDefault(key, List.of());
+        for (Map.Entry<PlanningKey, Long> other : effectiveRoomByKey.entrySet()) {
+            AcademicEventResponseDto otherEvent = eventsById.get(other.getKey().eventId());
+            if (otherEvent == null || !roomId.equals(other.getValue()) || other.getKey().equals(key)) {
+                continue;
+            }
+            boolean sharesDate = !Collections.disjoint(dates, datesByKey.getOrDefault(other.getKey(), List.of()));
+            if (sharesDate && TimeRanges.overlaps(event.startTime(), endTime(event),
+                    otherEvent.startTime(), endTime(otherEvent))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private record Requirements(Map<Long, Integer> computersByRoom, Map<Long, Integer> projectorsByRoom) {

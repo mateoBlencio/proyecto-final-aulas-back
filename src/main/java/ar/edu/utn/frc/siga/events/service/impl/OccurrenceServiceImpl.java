@@ -1,11 +1,16 @@
 package ar.edu.utn.frc.siga.events.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditLabels;
 import ar.edu.utn.frc.siga.audit.AuditOperation;
+import ar.edu.utn.frc.siga.audit.AuditOperations;
+import ar.edu.utn.frc.siga.common.util.Chunks;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceAuditRefDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.events.repository.SuspendedEventRepository;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.events.service.command.OccurrenceRelease;
 import ar.edu.utn.frc.siga.common.exception.InvalidSelectionException;
@@ -30,8 +35,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OccurrenceServiceImpl implements OccurrenceService {
 
+    private static final int AUDIT_REFS_CHUNK_SIZE = 10_000;
+
     private final OccurrenceRepository occurrenceRepository;
     private final EventScheduleValidator eventScheduleValidator;
+    private final SuspendedEventRepository suspendedEventRepository;
+    private final EventLabels eventLabels;
 
     @Override
     @Transactional(readOnly = true)
@@ -47,10 +56,17 @@ public class OccurrenceServiceImpl implements OccurrenceService {
 
     @Override
     @Transactional(readOnly = true)
-    public Map<Long, LocalDate> findDatesByIds(Collection<Long> occurrenceIds) {
-        return occurrenceRepository.findDatesByIdIn(occurrenceIds).stream()
-                .collect(Collectors.toMap(OccurrenceRepository.OccurrenceDate::getId,
-                        OccurrenceRepository.OccurrenceDate::getDate));
+    public Map<Long, OccurrenceAuditRefDto> findAuditRefs(Collection<Long> occurrenceIds) {
+        List<OccurrenceRepository.OccurrenceDate> rows = Chunks.query(occurrenceIds, AUDIT_REFS_CHUNK_SIZE,
+                occurrenceRepository::findDatesByIdIn);
+        Map<Long, String> eventLabelsById = eventLabels.labelsOfEventIds(
+                rows.stream().map(OccurrenceRepository.OccurrenceDate::getEventId).collect(Collectors.toSet()));
+        Map<Long, OccurrenceAuditRefDto> refs = new HashMap<>();
+        for (OccurrenceRepository.OccurrenceDate row : rows) {
+            refs.put(row.getId(), new OccurrenceAuditRefDto(row.getId(), row.getEventId(),
+                    eventLabelsById.get(row.getEventId()), row.getDate()));
+        }
+        return refs;
     }
 
     @Override
@@ -64,7 +80,7 @@ public class OccurrenceServiceImpl implements OccurrenceService {
 
     @Override
     @Transactional
-    @AuditOperation("Alta de ocurrencias simultáneas")
+    @AuditOperation(value = "Alta de ocurrencias simultáneas", subject = "Occurrence")
     public List<Long> createSimultaneous(Long occurrenceId, int count) {
         Occurrence principal = Finder.orThrow(occurrenceRepository::findById, occurrenceId, "Occurrence");
         int nextSlot = occurrenceRepository.findByEvent_IdAndDate(principal.getEvent().getId(), principal.getDate())
@@ -118,21 +134,37 @@ public class OccurrenceServiceImpl implements OccurrenceService {
     @Override
     @Transactional(readOnly = true)
     public List<OccurrenceSlotDto> findSlotsByStatusBetween(OccurrenceStatus status, LocalDate from, LocalDate to) {
-        return occurrenceRepository.findByStatusAndDateBetweenOrderByEvent_IdAscDateAsc(status, from, to).stream()
-                .map(OccurrenceServiceImpl::toSlot).toList();
+        return visible(occurrenceRepository.findByStatusAndDateBetweenOrderByEvent_IdAscDateAsc(status, from, to)
+                .stream().map(OccurrenceServiceImpl::toSlot).toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<OccurrenceSlotDto> findSlotsBetween(LocalDate from, LocalDate to) {
-        return occurrenceRepository.findByDateBetween(from, to).stream()
-                .map(OccurrenceServiceImpl::toSlot).toList();
+        return visible(occurrenceRepository.findByDateBetween(from, to).stream()
+                .map(OccurrenceServiceImpl::toSlot).toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<OccurrenceSlotDto> findSlotsByDate(LocalDate date) {
-        return occurrenceRepository.findByDate(date).stream().map(OccurrenceServiceImpl::toSlot).toList();
+        return visible(occurrenceRepository.findByDate(date).stream().map(OccurrenceServiceImpl::toSlot).toList());
+    }
+
+    private List<OccurrenceSlotDto> visible(List<OccurrenceSlotDto> slots) {
+        if (slots.isEmpty()) {
+            return slots;
+        }
+        Map<Long, LocalDate> suspendedFrom = suspendedEventRepository.findAllSuspendedFrom();
+        if (suspendedFrom.isEmpty()) {
+            return slots;
+        }
+        return slots.stream().filter(slot -> !isSuspended(slot, suspendedFrom)).toList();
+    }
+
+    private static boolean isSuspended(OccurrenceSlotDto slot, Map<Long, LocalDate> suspendedFrom) {
+        LocalDate from = suspendedFrom.get(slot.eventId());
+        return from != null && !slot.date().isBefore(from);
     }
 
     @Override
@@ -153,13 +185,16 @@ public class OccurrenceServiceImpl implements OccurrenceService {
 
     @Override
     @Transactional
-    @AuditOperation("Liberación de ocurrencias")
+    @AuditOperation(value = "Liberación de ocurrencias", subject = "Occurrence")
     public void release(List<OccurrenceRelease> releases, ReleaseReason reason, String note) {
+        if (reason != null) {
+            AuditOperations.describe("Liberación de aulas (" + AuditLabels.constant(reason) + ")");
+        }
         if (reason == null) {
             throw new InvalidSelectionException("El motivo de liberación es obligatorio.");
         }
         if (reason == ReleaseReason.OTHER && (note == null || note.isBlank())) {
-            throw new InvalidSelectionException("El motivo OTHER requiere una nota.");
+            throw new InvalidSelectionException("El motivo Otro requiere una nota.");
         }
         Map<Long, Long> previousClassroomById = new HashMap<>();
         releases.forEach(r -> previousClassroomById.put(r.occurrenceId(), r.previousClassroomId()));
@@ -178,7 +213,7 @@ public class OccurrenceServiceImpl implements OccurrenceService {
 
     @Override
     @Transactional
-    @AuditOperation("Pedido de aula para ocurrencias")
+    @AuditOperation(value = "Pedido de aula para ocurrencias", subject = "Occurrence")
     public void requestRoom(Collection<Long> occurrenceIds) {
         List<Occurrence> occurrences = loadAll(new HashSet<>(occurrenceIds));
         occurrences.forEach(eventScheduleValidator::validateNotPast);

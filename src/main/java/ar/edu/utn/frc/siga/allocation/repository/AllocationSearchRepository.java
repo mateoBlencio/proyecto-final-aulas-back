@@ -43,6 +43,8 @@ public class AllocationSearchRepository {
                     LEFT JOIN especialidad es ON es.id_especialidad = p.id_especialidad
                     LEFT JOIN comision co ON co.id_comision = e.id_comision
                     WHERE o.fecha BETWEEN :from AND :to
+                      AND NOT EXISTS (SELECT 1 FROM evento_academico_suspendido s
+                                      WHERE s.id_evento_academico = o.id_evento_academico AND o.fecha >= s.fecha_baja)
                       AND (:unrestricted OR c.id_edificio IN (:buildingIds))
                       AND (public.unaccent(lower(coalesce(m.nombre, ''))) LIKE public.unaccent(lower(:pattern)) ESCAPE '\\'
                         OR public.unaccent(lower(coalesce(co.codigo_curso, ''))) LIKE public.unaccent(lower(:pattern)) ESCAPE '\\'

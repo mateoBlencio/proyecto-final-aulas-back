@@ -14,12 +14,12 @@ public record ReleaseBatchRequestDto(
         @NotNull ReleaseReason reason,
         @Size(max = 255) String note
 ) {
-    @AssertTrue(message = "MIRROR_RETIRED y CLASSROOM_DEACTIVATED son motivos internos y no se pueden elegir")
+    @AssertTrue(message = "Los motivos Espejo retirado y Aula o edificio deshabilitado son internos y no se pueden elegir")
     private boolean isReasonSelectable() {
         return reason != ReleaseReason.MIRROR_RETIRED && reason != ReleaseReason.CLASSROOM_DEACTIVATED;
     }
 
-    @AssertTrue(message = "El motivo OTHER requiere una nota")
+    @AssertTrue(message = "El motivo Otro requiere una nota")
     private boolean isNoteProvidedForOther() {
         return reason != ReleaseReason.OTHER || (note != null && !note.isBlank());
     }

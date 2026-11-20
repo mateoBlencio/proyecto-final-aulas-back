@@ -137,4 +137,15 @@ class ClassroomPermissionAuditLabelProviderTest {
 
         assertThat(provider.labels(List.of(record("1", "SUBJECT", 7L, 9L)))).isEmpty();
     }
+
+    @Test
+    @DisplayName("summaryLabels: 'Materia {nombre} en Aula {número} ({edificio})', sin coma que parta la lista del resumen")
+    void summaryLabels_buildingInParentheses() {
+        when(subjectService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(subject(7L, "Física I")));
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(9L, 101, "Central")));
+
+        assertThat(provider.summaryLabels(List.of(record("1", "SUBJECT", 7L, 9L), record("2", "OTHER", 7L, 9L))))
+                .containsOnly(Map.entry("1", "Materia Física I en Aula 101 (Central)"),
+                        Map.entry("2", "Aula 101 (Central)"));
+    }
 }

@@ -8,3 +8,4 @@ ar.edu.utn.frc.siga.optimizer.constraint.PreferSameBuildingSameEvent
 ar.edu.utn.frc.siga.optimizer.constraint.PermissionNotSatisfied
 ar.edu.utn.frc.siga.optimizer.constraint.PreferRoomWithProjector
 ar.edu.utn.frc.siga.optimizer.constraint.PreferRoomWithComputers
+ar.edu.utn.frc.siga.optimizer.constraint.PriorRoomRespected

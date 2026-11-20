@@ -1,8 +1,10 @@
 package ar.edu.utn.frc.siga.auth.service.impl;
 
 import ar.edu.utn.frc.siga.audit.AuditLabelProvider;
+import ar.edu.utn.frc.siga.audit.AuditLabels;
 import ar.edu.utn.frc.siga.audit.AuditedRecord;
 import ar.edu.utn.frc.siga.auth.model.RoleAssignment;
+import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository.UserEmail;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +17,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Label of a role assignment: "SUBSECRETARIA de ana@frc.utn.edu.ar". Without the user, only the role. */
+/** Label of a role assignment: "Subsecretaría de ana@frc.utn.edu.ar". Without the user, only the role. */
 @Component
 @RequiredArgsConstructor
 class RoleAssignmentAuditLabelProvider implements AuditLabelProvider {
@@ -37,7 +39,7 @@ class RoleAssignmentAuditLabelProvider implements AuditLabelProvider {
 
         Map<String, String> labels = new HashMap<>();
         for (AuditedRecord record : records) {
-            String role = record.text("role");
+            String role = roleName(record.text("role"));
             if (role == null) {
                 continue;
             }
@@ -45,5 +47,16 @@ class RoleAssignmentAuditLabelProvider implements AuditLabelProvider {
             labels.put(record.recordId(), email == null ? role : role + " de " + email);
         }
         return labels;
+    }
+
+    private static String roleName(String role) {
+        if (role == null) {
+            return null;
+        }
+        try {
+            return AuditLabels.constant(SystemRole.valueOf(role));
+        } catch (IllegalArgumentException e) {
+            return role;
+        }
     }
 }

@@ -19,6 +19,7 @@ import java.time.LocalTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -30,6 +31,9 @@ public interface AcademicEventService {
     AcademicEventResponseDto findById(Long eventId);
 
     List<AcademicEventResponseDto> findByIds(Collection<Long> eventIds);
+
+    /** Eventos con una baja manual vigente en su materia, comisión, materia-comisión, plan o especialidad. */
+    Set<Long> findSuspendedIds(Collection<Long> eventIds);
     List<OccurrenceResponseDto> findOccurrencesByEventId(Long eventId);
     List<OccurrenceResponseDto> findOccurrencesByEventIds(Collection<Long> eventIds);
 

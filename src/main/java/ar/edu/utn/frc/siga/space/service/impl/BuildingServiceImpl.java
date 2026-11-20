@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.audit.AuditOperation;
+import ar.edu.utn.frc.siga.audit.AuditOperations;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.security.BuildingScope;
 import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
@@ -84,9 +85,10 @@ public class BuildingServiceImpl implements BuildingService {
 
     @Override
     @Transactional
-    @AuditOperation("Cambio de estado de edificio")
+    @AuditOperation(value = "Cambio de estado de edificio", subject = "Building")
     public BuildingResponseDto setActive(Long id, Boolean active) {
         log.debug("Cambiando estado activo del edificio: id={}, active={}", id, active);
+        AuditOperations.describe(Boolean.TRUE.equals(active) ? "Reactivación de edificio" : "Baja de edificio");
         Building building = buildingRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("Building", id));
         if (Boolean.TRUE.equals(active)) {
@@ -105,14 +107,14 @@ public class BuildingServiceImpl implements BuildingService {
 
     @Override
     @Transactional
-    @AuditOperation("Reactivación de edificio")
+    @AuditOperation(value = "Reactivación de edificio", subject = "Building")
     public void activate(Long id) {
         buildingRepository.restore(Finder.orThrow(buildingRepository::findById, id, "Building"));
     }
 
     @Override
     @Transactional
-    @AuditOperation("Baja de edificio")
+    @AuditOperation(value = "Baja de edificio", subject = "Building")
     public DeactivationImpactDto deactivate(Long id) {
         buildingRepository.softDelete(Finder.orThrow(buildingRepository::findById, id, "Building"));
         return deactivationCoordinator.apply(DeactivationTarget.BUILDING, classroomRepository.findIdsByBuildingId(id));
@@ -126,7 +128,7 @@ public class BuildingServiceImpl implements BuildingService {
 
     @Override
     @Transactional
-    @AuditOperation("Cambio de estado de edificios en lote")
+    @AuditOperation(value = "Cambio de estado de edificios", subject = "Building")
     public List<BuildingResponseDto> setActiveBatch(List<BuildingActiveBatchItemDto> items) {
         log.debug("Actualizando estado activo en lote: count={}", items.size());
         return items.stream()
@@ -136,7 +138,7 @@ public class BuildingServiceImpl implements BuildingService {
 
     @Override
     @Transactional
-    @AuditOperation("Sincronización de edificios desde SysAcad")
+    @AuditOperation(value = "Sincronización de edificios desde SysAcad", subject = "Building")
     public int syncBuildings(List<BuildingSyncCommand> commands, int minValidPercent) {
         Instant syncedAt = Instant.now();
         Map<Integer, Building> existing = buildingRepository.findAll().stream()
