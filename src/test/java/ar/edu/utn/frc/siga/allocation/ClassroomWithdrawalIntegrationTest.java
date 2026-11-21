@@ -22,9 +22,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
+import java.sql.Time;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -52,6 +54,8 @@ class ClassroomWithdrawalIntegrationTest extends AbstractIntegrationTest {
     private AllocationRepository allocationRepository;
     @Autowired
     private ClassroomRepository classroomRepository;
+    @Autowired
+    private JdbcTemplate jdbc;
 
     private MirrorScenarioBuilder scenarios;
 
@@ -187,7 +191,8 @@ class ClassroomWithdrawalIntegrationTest extends AbstractIntegrationTest {
         Classroom other = testData.aula(building);
         LocalDate today = LocalDate.now();
         Long eventId = testData.eventoRecurrente(sc.subjectId(), sc.commissionId(), today.getDayOfWeek(),
-                LocalTime.of(0, 0), 30, today, today, 30);
+                LocalTime.of(8, 0), 30, today, today, 30);
+        startedAtMidnight(eventId);
         Long principalId = occurrenceRepository.findByEvent_Id(eventId).getFirst().getId();
         Long mirrorId = occurrenceService.createSimultaneous(principalId, 1).getFirst();
         allocationRepository.save(Allocation.builder().occurrenceId(principalId).classroomId(withdrawn.getId())
@@ -264,5 +269,11 @@ class ClassroomWithdrawalIntegrationTest extends AbstractIntegrationTest {
         withdraw(auxiliar, s.principalRoom().getId(), null).andExpect(status().isForbidden());
 
         assertUntouched(s);
+    }
+
+    /** El alta valida la ventana horaria, así que el evento se crea dentro de ella y se retrasa su inicio a 00:00 para que "ya empezó" valga a cualquier hora. */
+    private void startedAtMidnight(Long eventId) {
+        jdbc.update("update evento_academico set hora_inicio = ? where id_evento_academico = ?",
+                Time.valueOf(LocalTime.MIN), eventId);
     }
 }

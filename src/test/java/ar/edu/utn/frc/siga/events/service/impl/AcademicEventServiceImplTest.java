@@ -14,7 +14,10 @@ import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.ScheduleStatus;
 import ar.edu.utn.frc.siga.events.dto.response.SysacadRecurringEventRefDto;
 import ar.edu.utn.frc.siga.events.dto.response.UniqueEventResponseDto;
+import ar.edu.utn.frc.siga.common.exception.InvalidDateRangeException;
+import ar.edu.utn.frc.siga.events.event.UniqueEventRescheduled;
 import ar.edu.utn.frc.siga.events.exception.InvalidCommissionForSubjectException;
+import ar.edu.utn.frc.siga.events.exception.InvalidEventScheduleException;
 import ar.edu.utn.frc.siga.events.exception.MissingAcademicReferenceException;
 import ar.edu.utn.frc.siga.events.exception.OccurrenceAlreadyPastException;
 import ar.edu.utn.frc.siga.events.mapper.AcademicEventComposer;
@@ -46,6 +49,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.stubbing.Answer;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -66,10 +70,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -98,6 +104,8 @@ class AcademicEventServiceImplTest {
     private EventScheduleValidator eventScheduleValidator;
     @Mock
     private RecurringEventReconciler recurringEventReconciler;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     private AcademicEventServiceImpl service;
 
@@ -105,7 +113,7 @@ class AcademicEventServiceImplTest {
     void setUp() {
         service = new AcademicEventServiceImpl(eventRepository, recurringEventRepository, uniqueEventRepository,
                 occurrenceRepository, suspendedEventRepository, composer, occurrenceMapper, subjectService, commissionService, eventScheduleValidator,
-                recurringEventReconciler);
+                recurringEventReconciler, eventPublisher);
     }
 
 
@@ -125,7 +133,8 @@ class AcademicEventServiceImplTest {
         assertThat(result).isNotNull();
         verify(subjectService).findById(1L);
         verify(commissionService).findById(1L);
-        verifyNoInteractions(eventScheduleValidator);
+        verify(eventScheduleValidator).validateBusinessHours(dto.startTime(), LocalTime.of(9, 30));
+        verifyNoMoreInteractions(eventScheduleValidator);
 
         ArgumentCaptor<RecurringEvent> eventCaptor = ArgumentCaptor.forClass(RecurringEvent.class);
         verify(eventRepository).save(eventCaptor.capture());
@@ -142,6 +151,50 @@ class AcademicEventServiceImplTest {
         List<Occurrence> occurrences = occurrencesCaptor.getValue();
         assertThat(occurrences).hasSize(3);
         assertThat(occurrences).allSatisfy(o -> assertThat(o.getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM));
+    }
+
+    @Test
+    @DisplayName("createRecurringEvent: fecha de fin anterior a la de inicio → InvalidDateRangeException, sin consultar ni guardar nada")
+    void createRecurringEventFinAnteriorAInicioRechaza() {
+        CreateRecurringEventRequestDto dto = recurringDto(DayOfWeek.MONDAY,
+                LocalDate.of(2026, 1, 19), LocalDate.of(2026, 1, 18));
+
+        assertThatThrownBy(() -> service.createRecurringEvent(dto))
+                .isInstanceOf(InvalidDateRangeException.class);
+
+        verifyNoInteractions(subjectService, commissionService, eventRepository, occurrenceRepository);
+    }
+
+    @Test
+    @DisplayName("createRecurringEvent: fecha de fin igual a la de inicio (borde) → se crea con una sola ocurrencia")
+    void createRecurringEventFinIgualAInicioCrea() {
+        CreateRecurringEventRequestDto dto = recurringDto(DayOfWeek.MONDAY,
+                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 5));
+        RecurringEvent saved = EventTestData.recurringEvent(1L, dto.dayOfWeek(), dto.startDate(), dto.endDate());
+        when(subjectService.findById(1L)).thenReturn(EventTestData.subjectResponseDto(1L));
+        when(commissionService.findById(1L)).thenReturn(EventTestData.commissionResponseDto(1L));
+        when(eventRepository.save(any())).thenReturn(saved);
+        when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyRecurringResponseDto(1L));
+
+        service.createRecurringEvent(dto);
+
+        verify(eventRepository).save(any(RecurringEvent.class));
+        verify(occurrenceRepository).saveAll(anyCollection());
+    }
+
+    @Test
+    @DisplayName("createRecurringEvent: horario fuera de la ventana permitida → propaga InvalidEventScheduleException, sin guardar")
+    void createRecurringEventHorarioFueraDeVentanaRechaza() {
+        CreateRecurringEventRequestDto dto = new CreateRecurringEventRequestDto(30, LocalTime.of(22, 0), 90,
+                DayOfWeek.MONDAY, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19), 1L, 1L);
+        doThrow(new InvalidEventScheduleException("fuera de ventana"))
+                .when(eventScheduleValidator).validateBusinessHours(LocalTime.of(22, 0), LocalTime.of(23, 30));
+
+        assertThatThrownBy(() -> service.createRecurringEvent(dto))
+                .isInstanceOf(InvalidEventScheduleException.class);
+
+        verify(eventScheduleValidator).validateBusinessHours(LocalTime.of(22, 0), LocalTime.of(23, 30));
+        verifyNoInteractions(eventRepository, occurrenceRepository);
     }
 
 
@@ -935,7 +988,7 @@ class AcademicEventServiceImplTest {
         stubUpdate(event);
         UpdateUniqueEventRequestDto dto = new UpdateUniqueEventRequestDto(
                 UniqueEventKind.PARCIAL, 1L, 1L, LocalDate.of(2026, 3, 15),
-                LocalTime.of(11, 0), 90, 25, "descripcion actualizada", null, false, null, null, null);
+                LocalTime.of(11, 0), 90, 25, "descripcion actualizada", null, false, null, null, null, null);
 
         service.updateUniqueEvent(3L, dto);
 
@@ -992,7 +1045,7 @@ class AcademicEventServiceImplTest {
         when(commissionService.findById(2L)).thenThrow(ResourceNotFoundException.of("Commission", 2L));
         UpdateUniqueEventRequestDto dto = new UpdateUniqueEventRequestDto(
                 UniqueEventKind.PARCIAL, 1L, 2L, LocalDate.of(2026, 3, 15),
-                LocalTime.of(11, 0), 90, 25, "descripcion actualizada", null, null, null, null, null);
+                LocalTime.of(11, 0), 90, 25, "descripcion actualizada", null, null, null, null, null, null);
 
         assertThatThrownBy(() -> service.updateUniqueEvent(3L, dto))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -1011,6 +1064,98 @@ class AcademicEventServiceImplTest {
 
         assertThatThrownBy(() -> service.updateUniqueEvent(3L, updateDto()))
                 .isInstanceOf(OccurrenceAlreadyPastException.class);
+    }
+
+    @Test
+    @DisplayName("updateUniqueEvent: fecha y hora nuevas en el pasado → OccurrenceAlreadyPastException, no modifica el evento ni publica")
+    void updateUniqueEventFechaNuevaPasadaRechaza() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence occurrence = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.NEEDS_ROOM);
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
+        UpdateUniqueEventRequestDto dto = updateDtoAt(LocalDate.of(2020, 1, 1), LocalTime.of(9, 0), 60);
+        lenient().doThrow(new OccurrenceAlreadyPastException("ya ocurrió"))
+                .when(eventScheduleValidator).validateNotPast(LocalDate.of(2020, 1, 1), LocalTime.of(9, 0));
+
+        assertThatThrownBy(() -> service.updateUniqueEvent(3L, dto))
+                .isInstanceOf(OccurrenceAlreadyPastException.class);
+
+        verify(eventScheduleValidator).validateNotPast(LocalDate.of(2020, 1, 1), LocalTime.of(9, 0));
+        assertThat(event.getDate()).isEqualTo(LocalDate.of(2026, 3, 10));
+        assertThat(occurrence.getDate()).isEqualTo(LocalDate.of(2026, 3, 10));
+        verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    @DisplayName("updateUniqueEvent: cambio de fecha → publica UniqueEventRescheduled con el id del evento, los ids de principal y espejos, la fecha nueva y la observación")
+    void updateUniqueEventCambioDeFechaPublicaEvento() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence principal = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.NEEDS_ROOM);
+        Occurrence mirror = Occurrence.builder()
+                .id(11L).event(event).date(event.getDate()).status(OccurrenceStatus.NEEDS_ROOM)
+                .roomSlot(2).mirrorOfOccurrenceId(10L).build();
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(mirror, principal));
+        when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyUniqueResponseDto(3L));
+        UpdateUniqueEventRequestDto dto = updateDtoAt(LocalDate.of(2026, 3, 11), LocalTime.of(10, 0), 60, "mudanza por obra");
+
+        service.updateUniqueEvent(3L, dto);
+
+        ArgumentCaptor<UniqueEventRescheduled> captor = ArgumentCaptor.forClass(UniqueEventRescheduled.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        UniqueEventRescheduled published = captor.getValue();
+        assertThat(published.eventId()).isEqualTo(3L);
+        assertThat(published.occurrenceIds()).containsExactlyInAnyOrder(10L, 11L);
+        assertThat(published.date()).isEqualTo(LocalDate.of(2026, 3, 11));
+        assertThat(published.observation()).isEqualTo("mudanza por obra");
+    }
+
+    @Test
+    @DisplayName("updateUniqueEvent: cambio de fecha sin observación → publica con observation null")
+    void updateUniqueEventCambioDeFechaSinObservacion() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        stubUpdate(event);
+
+        service.updateUniqueEvent(3L, updateDtoAt(LocalDate.of(2026, 3, 11), LocalTime.of(10, 0), 60));
+
+        ArgumentCaptor<UniqueEventRescheduled> captor = ArgumentCaptor.forClass(UniqueEventRescheduled.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().observation()).isNull();
+    }
+
+    @Test
+    @DisplayName("updateUniqueEvent: cambia solo la hora de inicio → publica UniqueEventRescheduled")
+    void updateUniqueEventSoloHoraPublica() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        stubUpdate(event);
+
+        service.updateUniqueEvent(3L, updateDtoAt(LocalDate.of(2026, 3, 10), LocalTime.of(10, 30), 60));
+
+        verify(eventPublisher).publishEvent(any(UniqueEventRescheduled.class));
+    }
+
+    @Test
+    @DisplayName("updateUniqueEvent: cambia solo la duración → publica UniqueEventRescheduled")
+    void updateUniqueEventSoloDuracionPublica() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        stubUpdate(event);
+
+        service.updateUniqueEvent(3L, updateDtoAt(LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), 90));
+
+        verify(eventPublisher).publishEvent(any(UniqueEventRescheduled.class));
+    }
+
+    @Test
+    @DisplayName("updateUniqueEvent: cambia solo description y enrolled (fecha, hora y duración iguales) → no publica")
+    void updateUniqueEventSinCambioDeHorarioNoPublica() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        stubUpdate(event);
+
+        service.updateUniqueEvent(3L, updateDtoAt(LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), 60));
+
+        assertThat(event.getDescription()).isEqualTo("descripcion actualizada");
+        assertThat(event.getEnrolled()).isEqualTo(25);
+        verifyNoInteractions(eventPublisher);
     }
 
 
@@ -1227,9 +1372,20 @@ class AcademicEventServiceImplTest {
         when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyUniqueResponseDto(3L));
     }
 
+    private UpdateUniqueEventRequestDto updateDtoAt(LocalDate date, LocalTime startTime, int durationMinutes) {
+        return updateDtoAt(date, startTime, durationMinutes, null);
+    }
+
+    private UpdateUniqueEventRequestDto updateDtoAt(LocalDate date, LocalTime startTime, int durationMinutes,
+                                                    String observation) {
+        return new UpdateUniqueEventRequestDto(
+                UniqueEventKind.PARCIAL, 1L, 1L, date, startTime, durationMinutes, 25, "descripcion actualizada",
+                null, null, null, null, null, observation);
+    }
+
     private UpdateUniqueEventRequestDto updateDto() {
         return new UpdateUniqueEventRequestDto(
                 UniqueEventKind.PARCIAL, 1L, 1L, LocalDate.of(2026, 3, 15),
-                LocalTime.of(11, 0), 90, 25, "descripcion actualizada", null, null, null, null, null);
+                LocalTime.of(11, 0), 90, 25, "descripcion actualizada", null, null, null, null, null, null);
     }
 }

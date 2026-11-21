@@ -2,6 +2,7 @@ package ar.edu.utn.frc.siga.events.service.impl;
 
 import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.events.dto.AcademicEventFilter;
+import ar.edu.utn.frc.siga.events.event.UniqueEventRescheduled;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.UpdateUniqueEventRequestDto;
@@ -33,6 +34,7 @@ import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.util.DateRanges;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.common.util.SyncGuard;
@@ -41,6 +43,7 @@ import ar.edu.utn.frc.siga.common.util.RecurringEventKey;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -81,6 +84,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     private final CommissionService commissionService;
     private final EventScheduleValidator eventScheduleValidator;
     private final RecurringEventReconciler recurringEventReconciler;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional(readOnly = true)
@@ -192,13 +196,16 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         log.debug("Creando evento recurrente: subjectId={}, commissionId={}, dayOfWeek={}, startDate={}",
                 dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startDate());
 
+        DateRanges.requireNotBefore(dto.endDate(), dto.startDate());
+        Duration duration = Duration.ofMinutes(dto.durationMinutes());
+        eventScheduleValidator.validateBusinessHours(dto.startTime(), dto.startTime().plus(duration));
         subjectService.findById(dto.subjectId());
         CommissionResponseDto commission = commissionService.findById(dto.commissionId());
 
         RecurringEvent event = RecurringEvent.builder()
                 .enrolled(dto.enrolled())
                 .startTime(dto.startTime())
-                .duration(Duration.ofMinutes(dto.durationMinutes()))
+                .duration(duration)
                 .dayOfWeek(dto.dayOfWeek())
                 .startDate(dto.startDate())
                 .endDate(dto.endDate())
@@ -574,6 +581,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 .orElseThrow(() -> ResourceNotFoundException.of("Occurrence", id));
 
         eventScheduleValidator.validateNotPast(principal);
+        eventScheduleValidator.validateNotPast(dto.date(), dto.startTime());
 
         Duration duration = Duration.ofMinutes(dto.durationMinutes());
         eventScheduleValidator.validateBusinessHours(dto.startTime(), dto.startTime().plus(duration));
@@ -590,6 +598,10 @@ public class AcademicEventServiceImpl implements AcademicEventService {
             }
             eventScheduleValidator.validateCommissionBelongsToSubject(dto.subjectId(), dto.commissionId());
         }
+
+        boolean rescheduled = !event.getDate().equals(dto.date())
+                || !event.getStartTime().equals(dto.startTime())
+                || !event.getDuration().equals(duration);
 
         event.setEnrolled(dto.enrolled());
         event.setStartTime(dto.startTime());
@@ -612,6 +624,11 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         event.setSubjectId(dto.subjectId());
         event.setCommissionId(dto.commissionId());
         occurrences.forEach(o -> o.setDate(dto.date()));
+        if (rescheduled) {
+            // Sincrónico y en esta transacción: si allocation rechaza el solape, la edición hace rollback.
+            eventPublisher.publishEvent(new UniqueEventRescheduled(id,
+                    occurrences.stream().map(Occurrence::getId).toList(), dto.date(), dto.observation()));
+        }
 
         log.info("Evento único actualizado: id={}", id);
         return composer.compose(event);

@@ -49,10 +49,16 @@ public abstract class AbstractDeactivationIntegrationTest extends AbstractIntegr
         return LocalDate.now().plusYears(2).with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY));
     }
 
+    /** El alta valida la ventana horaria: un inicio anterior a las 08:00 se crea a las 08:00 y se retrasa en base. */
     protected Long createOccurrence(LocalDate date, LocalTime start) {
         var sc = testData.materiaYComision();
-        Long eventId = testData.eventoRecurrente(sc.subjectId(), sc.commissionId(), date.getDayOfWeek(), start, 90,
-                date, date, 30);
+        LocalTime creationStart = start.isBefore(LocalTime.of(8, 0)) ? LocalTime.of(8, 0) : start;
+        Long eventId = testData.eventoRecurrente(sc.subjectId(), sc.commissionId(), date.getDayOfWeek(),
+                creationStart, 90, date, date, 30);
+        if (!creationStart.equals(start)) {
+            jdbc.update("update evento_academico set hora_inicio = ? where id_evento_academico = ?",
+                    java.sql.Time.valueOf(start), eventId);
+        }
         return occurrenceRepository.findByEvent_Id(eventId).getFirst().getId();
     }
 

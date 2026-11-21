@@ -295,7 +295,9 @@ class RoomRequestOriginalClassroomIntegrationTest extends AbstractIntegrationTes
         LocalDate today = LocalDate.now();
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision(OWN_PERIOD_YEAR);
         Long eventId = testData.eventoRecurrente(academic.subjectId(), academic.commissionId(), today.getDayOfWeek(),
-                LocalTime.MIN, 90, today, today.plusWeeks(2), 30);
+                LocalTime.of(8, 0), 90, today, today.plusWeeks(2), 30);
+        jdbc.update("update evento_academico set hora_inicio = ? where id_evento_academico = ?",
+                java.sql.Time.valueOf(LocalTime.MIN), eventId);
         List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId).stream()
                 .sorted(Comparator.comparing(Occurrence::getDate)).toList();
         Series series = new Series(eventId, academic, occurrences);

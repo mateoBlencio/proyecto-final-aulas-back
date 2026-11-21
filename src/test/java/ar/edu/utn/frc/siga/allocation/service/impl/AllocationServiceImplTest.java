@@ -12,6 +12,7 @@ import ar.edu.utn.frc.siga.allocation.service.command.ReleaseCommand;
 import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.service.command.OccurrenceRelease;
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
+import ar.edu.utn.frc.siga.allocation.exception.OverlapObservationRequiredException;
 import ar.edu.utn.frc.siga.allocation.exception.ReallocationConflictException;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationComposer;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
@@ -1673,6 +1674,132 @@ class AllocationServiceImplTest {
 
         assertThat(probe.peeked()).isEqualTo("Sincronización de asignaciones desde SysAcad");
         probe.verifyNoRewrite();
+    }
+
+    // ---------- revalidateRescheduled ----------
+
+    @Test
+    @DisplayName("revalidateRescheduled: ninguna ocurrencia tiene asignación → no hace nada (sin lock, alcance, validación ni cache)")
+    void revalidateRescheduledSinAsignacionesNoHaceNada() {
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L, 11L))).thenReturn(List.of());
+
+        service.revalidateRescheduled(List.of(10L, 11L), "obs");
+
+        verifyNoInteractions(occurrenceService, validator, classroomLock, buildingScopeResolver, boardCache);
+    }
+
+    @Test
+    @DisplayName("revalidateRescheduled: sin solapes → bloquea las aulas, valida alcance, hermanas y solape con los candidatos, e invalida el board; no toca observation")
+    void revalidateRescheduledSinSolapes() {
+        Allocation principal = allocation(100L, 10L, 5, AllocationSource.SYSACAD);
+        Allocation mirror = allocation(101L, 11L, 6, AllocationSource.MANUAL);
+        OccurrenceSlotDto slotPrincipal = occurrenceSlot(10L, 1L, futureDate(2));
+        OccurrenceSlotDto slotMirror = occurrenceSlot(11L, 1L, futureDate(2));
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L, 11L))).thenReturn(List.of(principal, mirror));
+        when(occurrenceService.findSlots(any())).thenReturn(List.of(slotPrincipal, slotMirror));
+        when(classroomService.findByIdsIncludingDeactivated(Set.of(5L, 6L)))
+                .thenReturn(List.of(classroomIn(5L, 1L, CENTRAL), classroomIn(6L, 2L, CENTRAL)));
+        when(validator.reviewManualOverlaps(anyList())).thenReturn(new OverlapReview(List.of(), List.of()));
+
+        service.revalidateRescheduled(List.of(10L, 11L), "obs");
+
+        ArgumentCaptor<List<AllocationCandidate>> candidates = ArgumentCaptor.forClass(List.class);
+        InOrder order = inOrder(classroomLock, buildingScopeResolver, validator, boardCache);
+        order.verify(classroomLock).lock(Set.of(5L, 6L));
+        order.verify(buildingScopeResolver).requireAccess(Permission.ALLOCATION_WRITE, Set.of(1L, 2L));
+        order.verify(validator).validateNoSiblingRoomClash(candidates.capture());
+        order.verify(validator).validateManualOverlap(anyList(), eq("obs"));
+        order.verify(boardCache).invalidate();
+        assertThat(candidates.getValue()).containsExactlyInAnyOrder(
+                new AllocationCandidate(slotPrincipal, 5L), new AllocationCandidate(slotMirror, 6L));
+        assertThat(principal.getObservation()).isNull();
+        assertThat(mirror.getObservation()).isNull();
+    }
+
+    @Test
+    @DisplayName("revalidateRescheduled: solape mayor al margen → ReallocationConflictException, no toca observation ni invalida el board")
+    void revalidateRescheduledSolapeMayorAlMargenLanza() {
+        Allocation allocation = allocation(100L, 10L, 5, AllocationSource.SYSACAD);
+        stubRevalidation(allocation, 10L);
+        doThrow(new ReallocationConflictException(List.of(), Map.of()))
+                .when(validator).validateManualOverlap(anyList(), eq("obs"));
+
+        assertThatThrownBy(() -> service.revalidateRescheduled(List.of(10L), "obs"))
+                .isInstanceOf(ReallocationConflictException.class);
+
+        assertThat(allocation.getObservation()).isNull();
+        verify(boardCache, never()).invalidate();
+    }
+
+    @Test
+    @DisplayName("revalidateRescheduled: solape tolerado sin observación → OverlapObservationRequiredException y la asignación queda igual")
+    void revalidateRescheduledToleradoSinObservacionLanza() {
+        Allocation allocation = allocation(100L, 10L, 5, AllocationSource.SYSACAD);
+        stubRevalidation(allocation, 10L);
+        doThrow(new OverlapObservationRequiredException(List.of(sysacadConflictOf(10L, 5L)), Map.of(5L, 105)))
+                .when(validator).validateManualOverlap(anyList(), isNull());
+
+        assertThatThrownBy(() -> service.revalidateRescheduled(List.of(10L), null))
+                .isInstanceOf(OverlapObservationRequiredException.class);
+
+        assertThat(allocation.getObservation()).isNull();
+        verify(boardCache, never()).invalidate();
+    }
+
+    @Test
+    @DisplayName("revalidateRescheduled: solape tolerado con observación → la guarda solo en la asignación tolerada y no cambia source")
+    void revalidateRescheduledToleradoConObservacionLaGuarda() {
+        Allocation tolerated = allocation(100L, 10L, 5, AllocationSource.SYSACAD);
+        Allocation clean = allocation(101L, 11L, 6, AllocationSource.SYSACAD);
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L, 11L))).thenReturn(List.of(tolerated, clean));
+        when(occurrenceService.findSlots(any()))
+                .thenReturn(List.of(occurrenceSlot(10L, 1L, futureDate(2)), occurrenceSlot(11L, 1L, futureDate(2))));
+        when(validator.reviewManualOverlaps(anyList()))
+                .thenReturn(new OverlapReview(List.of(), List.of(sysacadConflictOf(10L, 5L))));
+
+        service.revalidateRescheduled(List.of(10L, 11L), "corrimiento por obra");
+
+        assertThat(tolerated.getObservation()).isEqualTo("corrimiento por obra");
+        assertThat(tolerated.getSource()).isEqualTo(AllocationSource.SYSACAD);
+        assertThat(clean.getObservation()).isNull();
+        verify(boardCache).invalidate();
+    }
+
+    @Test
+    @DisplayName("revalidateRescheduled: aulas simultáneas del mismo evento en la misma aula y fecha → AllocationConflictException, no valida solape")
+    void revalidateRescheduledHermanasEnLaMismaAulaLanza() {
+        Allocation allocation = allocation(100L, 10L, 5, AllocationSource.SYSACAD);
+        stubRevalidation(allocation, 10L);
+        doThrow(new AllocationConflictException("misma aula")).when(validator).validateNoSiblingRoomClash(anyList());
+
+        assertThatThrownBy(() -> service.revalidateRescheduled(List.of(10L), "obs"))
+                .isInstanceOf(AllocationConflictException.class);
+
+        verify(validator, never()).validateManualOverlap(anyList(), any());
+        verify(boardCache, never()).invalidate();
+    }
+
+    @Test
+    @DisplayName("revalidateRescheduled: aula asignada fuera del alcance del usuario → AccessDeniedException, no valida ni escribe")
+    void revalidateRescheduledFueraDeAlcanceLanza() {
+        Allocation allocation = allocation(100L, 10L, 5, AllocationSource.SYSACAD);
+        stubRevalidation(allocation, 10L);
+        when(classroomService.findByIdsIncludingDeactivated(Set.of(5L)))
+                .thenReturn(List.of(classroomIn(5L, 9L, "Edificio Ajeno")));
+        doThrow(new AccessDeniedException("sin acceso"))
+                .when(buildingScopeResolver).requireAccess(Permission.ALLOCATION_WRITE, Set.of(9L));
+
+        assertThatThrownBy(() -> service.revalidateRescheduled(List.of(10L), "obs"))
+                .isInstanceOf(AccessDeniedException.class);
+
+        verifyNoInteractions(validator);
+        assertThat(allocation.getObservation()).isNull();
+        verify(boardCache, never()).invalidate();
+    }
+
+    private void stubRevalidation(Allocation allocation, long occurrenceId) {
+        when(allocationRepository.findByOccurrenceIdIn(List.of(occurrenceId))).thenReturn(List.of(allocation));
+        when(occurrenceService.findSlots(any())).thenReturn(List.of(occurrenceSlot(occurrenceId, 1L, futureDate(2))));
     }
 
     // ---------- helpers ----------

@@ -250,6 +250,11 @@ public class RoomRequestItem extends TimestampedEntity {
         this.reopenedFromNotifiedOn = null;
     }
 
+    /** El evento único al que apunta el pedido cambió de fecha. */
+    public void reschedule(LocalDate date) {
+        this.date = date;
+    }
+
     public void markReopenedFromNotified(LocalDate today) {
         this.reopenedFromNotifiedOn = today;
     }

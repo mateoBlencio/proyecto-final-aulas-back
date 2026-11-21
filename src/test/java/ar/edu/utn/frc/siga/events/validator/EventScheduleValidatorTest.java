@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.events.config.EventScheduleSettings;
 import ar.edu.utn.frc.siga.events.exception.InvalidCommissionForSubjectException;
 import ar.edu.utn.frc.siga.events.exception.InvalidEventScheduleException;
 import ar.edu.utn.frc.siga.events.exception.MissingAcademicReferenceException;
+import ar.edu.utn.frc.siga.events.exception.OccurrenceAlreadyPastException;
 import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 
@@ -16,6 +17,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -125,6 +128,38 @@ class EventScheduleValidatorTest {
                 .thenReturn(new SubjectCommissionResponseDto(1L, null, 1L, null, 30, true, true));
 
         assertThatCode(() -> validator.validateCommissionBelongsToSubject(1L, 1L))
+                .doesNotThrowAnyException();
+    }
+
+
+    @Test
+    @DisplayName("validateNotPast(fecha, hora): fecha de ayer → OccurrenceAlreadyPastException")
+    void validateNotPastFechaDeAyer() {
+        assertThatThrownBy(() -> validator.validateNotPast(LocalDate.now().minusDays(1), LocalTime.of(23, 0)))
+                .isInstanceOf(OccurrenceAlreadyPastException.class);
+    }
+
+    @Test
+    @DisplayName("validateNotPast(fecha, hora): fecha de mañana a cualquier hora → no lanza")
+    void validateNotPastFechaDeManana() {
+        assertThatCode(() -> validator.validateNotPast(LocalDate.now().plusDays(1), LocalTime.MIN))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateNotPast(fecha, hora): hoy con una hora que ya pasó → OccurrenceAlreadyPastException")
+    void validateNotPastHoyConHoraPasada() {
+        LocalDateTime past = LocalDateTime.now().minusMinutes(1);
+        // Si el test corre justo después de medianoche, "hace un minuto" cae en ayer y el caso sigue siendo pasado.
+        assertThatThrownBy(() -> validator.validateNotPast(past.toLocalDate(), past.toLocalTime()))
+                .isInstanceOf(OccurrenceAlreadyPastException.class);
+    }
+
+    @Test
+    @DisplayName("validateNotPast(fecha, hora): hoy con una hora futura → no lanza")
+    void validateNotPastHoyConHoraFutura() {
+        LocalDateTime future = LocalDateTime.now().plusMinutes(5);
+        assertThatCode(() -> validator.validateNotPast(future.toLocalDate(), future.toLocalTime()))
                 .doesNotThrowAnyException();
     }
 }

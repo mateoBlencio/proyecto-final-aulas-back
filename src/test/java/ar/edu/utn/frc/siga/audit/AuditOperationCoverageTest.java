@@ -81,7 +81,10 @@ class AuditOperationCoverageTest {
             Map.entry("RecurringEventReconciler#reconcileFuture",
                     "its only caller is AcademicPeriodChangedListener.on, which carries the annotation"),
             Map.entry("RecurringEventReconciler#retireFuture",
-                    "its only caller is AcademicEventServiceImpl.syncRecurringEvents, which carries the annotation"));
+                    "its only caller is AcademicEventServiceImpl.syncRecurringEvents, which carries the annotation"),
+            Map.entry("AllocationServiceImpl#revalidateRescheduled",
+                    "its only caller is UniqueEventRescheduledListener.on, which runs inside"
+                            + " AcademicEventServiceImpl.updateUniqueEvent, which carries the annotation"));
 
     @Test
     @DisplayName("todo punto de escritura tiene @AuditOperation o una excepción justificada")

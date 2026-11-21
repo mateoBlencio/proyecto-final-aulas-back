@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -244,5 +245,15 @@ class RoomRequestItemTest {
         assertThat(item.keepsNotifiedClassroom(List.of(1L))).isTrue();
         assertThat(item.keepsNotifiedClassroom(List.of(2L))).isFalse();
         assertThat(item.keepsNotifiedClassroom(List.of())).isFalse();
+    }
+
+    @Test
+    @DisplayName("reschedule: reemplaza la fecha del pedido por la nueva")
+    void rescheduleActualizaLaFecha() {
+        RoomRequestItem item = RoomRequestItem.builder().date(LocalDate.of(2026, 12, 1)).build();
+
+        item.reschedule(LocalDate.of(2026, 12, 3));
+
+        assertThat(item.getDate()).isEqualTo(LocalDate.of(2026, 12, 3));
     }
 }

@@ -481,6 +481,36 @@ public class AllocationServiceImpl implements AllocationService {
 
     @Override
     @Transactional
+    public void revalidateRescheduled(Collection<Long> occurrenceIds, String observation) {
+        List<Allocation> allocations = allocationRepository.findByOccurrenceIdIn(occurrenceIds);
+        if (allocations.isEmpty()) {
+            return;
+        }
+        // El auto-flush de JPA ya refleja la fecha y el horario nuevos en los slots.
+        Map<Long, Long> classroomByOccurrence = allocations.stream()
+                .collect(Collectors.toMap(Allocation::getOccurrenceId, Allocation::getClassroomId));
+        List<AllocationCandidate> candidates = occurrenceService.findSlots(classroomByOccurrence.keySet()).stream()
+                .map(slot -> new AllocationCandidate(slot, classroomByOccurrence.get(slot.occurrenceId())))
+                .toList();
+
+        classroomLock.lock(Set.copyOf(classroomByOccurrence.values()));
+        requireAccessToClassrooms(Set.copyOf(classroomByOccurrence.values()));
+        validator.validateNoSiblingRoomClash(candidates);
+        validator.validateManualOverlap(candidates, observation);
+
+        Set<Long> toleratedOccurrenceIds = validator.reviewManualOverlaps(candidates).tolerated().stream()
+                .map(OccurrenceConflictDto::occurrenceId)
+                .collect(Collectors.toSet());
+        allocations.stream()
+                .filter(a -> toleratedOccurrenceIds.contains(a.getOccurrenceId()))
+                .forEach(a -> a.setObservation(observation));
+        boardCache.invalidate();
+        log.info("Asignaciones revalidadas tras reprogramar: ocurrencias={}, toleradas={}",
+                classroomByOccurrence.size(), toleratedOccurrenceIds.size());
+    }
+
+    @Override
+    @Transactional
     @AuditOperation(value = "Restauración de aulas originales", subject = "Allocation")
     public RestoreResult restoreClassrooms(RestoreCommand command) {
         Map<Long, RestoreCommand.RestoreItem> itemByOccurrence = new LinkedHashMap<>();
