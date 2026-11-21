@@ -75,10 +75,11 @@ public class DashboardController {
     @PreAuthorize("hasAuthority('PERM_DASHBOARD_READ')")
     @Operation(summary = "Contadores del menú",
                description = "Solicitudes que esperan acción del usuario, solicitudes por vencer en 48 horas, "
-                       + "clases sin aula y conflictos en los próximos 7 días. Liviano: se puede consultar cada minuto.")
+                       + "clases sin aula y conflictos en los próximos 7 días. Deshabilitado temporalmente: "
+                       + "responde 204 sin cuerpo y no consulta nada.")
     public ResponseEntity<DashboardBadgesResponseDto> badges() {
-        log.debug("GET /v1/dashboard/badges");
-        return ResponseEntity.ok(queryService.badges());
+        log.debug("GET /v1/dashboard/badges (deshabilitado temporalmente)");
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/room-requests")

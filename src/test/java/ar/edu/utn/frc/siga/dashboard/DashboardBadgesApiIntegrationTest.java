@@ -1,7 +1,9 @@
 package ar.edu.utn.frc.siga.dashboard;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -13,10 +15,14 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -26,6 +32,12 @@ import tools.jackson.databind.JsonNode;
 @Import(IntegrationTestData.class)
 @DisplayName("Dashboard - GET /v1/dashboard/badges (integración)")
 class DashboardBadgesApiIntegrationTest extends DashboardIntegrationSupport {
+
+    private static final String BADGES = "/v1/dashboard/badges";
+    private static final String DISABLED_REASON = "endpoint /badges deshabilitado temporalmente";
+
+    @Autowired
+    private WebApplicationContext webApplicationContext;
 
     private JsonNode badges(MockMvc mvc) throws Exception {
         return getJson(mvc, "/v1/dashboard/badges");
@@ -37,6 +49,7 @@ class DashboardBadgesApiIntegrationTest extends DashboardIntegrationSupport {
     }
 
     @Test
+    @Disabled(DISABLED_REASON)
     @DisplayName("responds the four counters for an unrestricted user")
     void unrestrictedUserGetsAllCounters() throws Exception {
         mockMvc.perform(get("/v1/dashboard/badges"))
@@ -48,6 +61,7 @@ class DashboardBadgesApiIntegrationTest extends DashboardIntegrationSupport {
     }
 
     @Test
+    @Disabled(DISABLED_REASON)
     @DisplayName("awaiting action: Subsecretaria sees new and non-derived in-evaluation or notified items, each auxiliar the ones derived to its building")
     void awaitingActionDependsOnTheRole() throws Exception {
         Building a = building();
@@ -72,6 +86,7 @@ class DashboardBadgesApiIntegrationTest extends DashboardIntegrationSupport {
     }
 
     @Test
+    @Disabled(DISABLED_REASON)
     @DisplayName("expiring soon: an item starting in 47 hours counts, one in 49 hours, one without date and a past one do not")
     void expiringSoonWindowIsFortyEightHours() throws Exception {
         Building a = building();
@@ -92,6 +107,7 @@ class DashboardBadgesApiIntegrationTest extends DashboardIntegrationSupport {
     }
 
     @Test
+    @Disabled(DISABLED_REASON)
     @DisplayName("expiring soon: a dated item without start time counts until the end of its day")
     void itemWithoutStartTimeCountsUntilEndOfDay() throws Exception {
         Building a = building();
@@ -105,6 +121,7 @@ class DashboardBadgesApiIntegrationTest extends DashboardIntegrationSupport {
     }
 
     @Test
+    @Disabled(DISABLED_REASON)
     @DisplayName("unallocatedClassesNext7Days counts a class released by a classroom deactivation, not one released for another reason")
     void unallocatedBadgeCountsDeactivationReleases() throws Exception {
         LocalDate inside = workday(LocalDate.now().plusDays(5));
@@ -120,6 +137,7 @@ class DashboardBadgesApiIntegrationTest extends DashboardIntegrationSupport {
     }
 
     @Test
+    @Disabled(DISABLED_REASON)
     @DisplayName("a restricted user gets unallocatedClassesNext7Days null, an unrestricted one counts only the next 7 days")
     void unallocatedBadgeIsNullWhenRestricted() throws Exception {
         LocalDate today = LocalDate.now();
@@ -135,6 +153,7 @@ class DashboardBadgesApiIntegrationTest extends DashboardIntegrationSupport {
     }
 
     @Test
+    @Disabled(DISABLED_REASON)
     @DisplayName("conflicts: an overcrowded class in 3 days counts, one in 8 days does not; an overlapping pair counts twice")
     void conflictsWindowIsSevenDays() throws Exception {
         LocalDate today = LocalDate.now();
@@ -157,10 +176,33 @@ class DashboardBadgesApiIntegrationTest extends DashboardIntegrationSupport {
     }
 
     @Test
-    @DisplayName("CONSULTA gets the counters, a user without roles gets 403")
-    void permissions() throws Exception {
-        consulta().perform(get("/v1/dashboard/badges")).andExpect(status().isOk());
+    @DisplayName("Subsecretaria gets 204 with an empty body")
+    void subsecretariaGetsNoContent() throws Exception {
+        mockMvc.perform(get(BADGES))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+    }
 
-        userWithoutRoles().perform(get("/v1/dashboard/badges")).andExpect(status().isForbidden());
+    @Test
+    @DisplayName("CONSULTA gets 204 with an empty body")
+    void consultaGetsNoContent() throws Exception {
+        consulta().perform(get(BADGES))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+    }
+
+    @Test
+    @DisplayName("a user without roles gets 403")
+    void userWithoutRolesGetsForbidden() throws Exception {
+        userWithoutRoles().perform(get(BADGES)).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("an unauthenticated request gets 401")
+    void anonymousGetsUnauthorized() throws Exception {
+        MockMvcBuilders.webAppContextSetup(webApplicationContext)
+                .apply(springSecurity()).build()
+                .perform(get(BADGES))
+                .andExpect(status().isUnauthorized());
     }
 }
