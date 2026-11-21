@@ -169,7 +169,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
             allocationItems.add(new AllocationItem(
                     new AllocationTarget.Occurrences(occurrencesBySlot.get(i)), ids.get(i)));
         }
-        allocationService.reallocate(commandFactory.apply(allocationItems));
+        allocationService.reallocate(commandFactory.apply(allocationItems).withCurrentScopeAuthorized());
 
         item.assignClassrooms(ids, occurrencesBySlot, retiredOccurrenceIds, originalByOccurrence);
         item.decide(RoomRequestStatus.IN_EVALUATION, actor, reason, Instant.now());

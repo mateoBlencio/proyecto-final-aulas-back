@@ -23,6 +23,8 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -57,9 +59,32 @@ public class AllocationValidator {
     }
 
     public void validateStrictOverlap(List<AllocationCandidate> candidates) {
+        throwIfAny(strictConflicts(candidates));
+    }
+
+    /** Solapes de las ocurrencias futuras sin margen de tolerancia; no lanza. */
+    public List<OccurrenceConflictDto> strictConflicts(List<AllocationCandidate> candidates) {
         List<AllocationCandidate> future = candidates.stream().filter(c -> !c.occurrence().isPast()).toList();
-        if (future.isEmpty()) return;
-        throwIfAny(review(future, loadOccupancy(future), 0).blocking());
+        if (future.isEmpty()) return List.of();
+        return review(future, loadOccupancy(future), 0).blocking();
+    }
+
+    // internalConflicts ignora los pares del mismo evento, así que dos espejos en la misma aula y fecha
+    // pasarían como válidos.
+    public void validateNoSiblingRoomClash(List<AllocationCandidate> candidates) {
+        Map<List<Object>, Set<Integer>> roomSlotsByRoomDate = new HashMap<>();
+        for (AllocationCandidate candidate : candidates) {
+            OccurrenceSlotDto occurrence = candidate.occurrence();
+            roomSlotsByRoomDate.computeIfAbsent(
+                            List.of(occurrence.eventId(), candidate.classroomId(), occurrence.date()),
+                            k -> new HashSet<>())
+                    .add(occurrence.roomSlot());
+        }
+        boolean clash = roomSlotsByRoomDate.values().stream().anyMatch(slots -> slots.size() > 1);
+        if (clash) {
+            throw new AllocationConflictException(
+                    "dos aulas simultáneas del mismo evento no pueden asignarse a la misma aula en la misma fecha");
+        }
     }
 
     private OverlapReview review(List<AllocationCandidate> candidates, List<OccupiedSlot> occupancy,
@@ -135,10 +160,10 @@ public class AllocationValidator {
     }
 
     public void validateOccurrencesExist(List<Long> requestedIds, List<OccurrenceSlotDto> resolved) {
-        if (requestedIds.size() == resolved.size()) return;
+        if (Set.copyOf(requestedIds).size() == resolved.size()) return;
 
         Set<Long> resolvedIds = resolved.stream().map(OccurrenceSlotDto::occurrenceId).collect(Collectors.toSet());
-        List<Long> missing = requestedIds.stream().filter(id -> !resolvedIds.contains(id)).toList();
+        List<Long> missing = requestedIds.stream().filter(id -> !resolvedIds.contains(id)).distinct().toList();
         throw new AllocationConflictException("La(s) ocurrencia(s) " + missing + " no existe(n).");
     }
 

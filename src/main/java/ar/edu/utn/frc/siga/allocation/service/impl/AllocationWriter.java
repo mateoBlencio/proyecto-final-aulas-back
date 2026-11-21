@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -82,9 +83,12 @@ class AllocationWriter {
             }
             Allocation allocation;
             if (existing != null) {
-                existing.setClassroomId(classroomId);
-                existing.setSource(source);
-                existing.setObservation(observation);
+                // Mismo aula: no se pisa el origen ni la observación de la asignación vigente.
+                if (!Objects.equals(fromClassroomId, classroomId)) {
+                    existing.setClassroomId(classroomId);
+                    existing.setSource(source);
+                    existing.setObservation(observation);
+                }
                 allocation = existing;
             } else {
                 allocation = allocationRepository.save(Allocation.builder()
@@ -131,8 +135,7 @@ class AllocationWriter {
                         .build());
                 affected++;
             } else if (existing.getSource() == AllocationSource.SYSACAD) {
-                if (!eventIdsToUpdate.contains(occurrence.eventId()) || occurrence.isPast()
-                        || classroomId.equals(existing.getClassroomId())) {
+                if (!isSysacadUpdate(existing, occurrence, classroomId, eventIdsToUpdate)) {
                     continue;
                 }
                 existing.setClassroomId(classroomId);
@@ -144,6 +147,35 @@ class AllocationWriter {
             }
         }
         return affected;
+    }
+
+    /**
+     * Subconjunto de {@code classroomByOccurrence} que {@link #syncFromSysacad} escribiría: ocurrencias sin
+     * asignación, o con asignación SYSACAD de un evento a actualizar, futura y con aula distinta.
+     */
+    Map<OccurrenceSlotDto, Long> writableFromSysacad(Map<OccurrenceSlotDto, Long> classroomByOccurrence,
+            Set<Long> eventIdsToUpdate) {
+        if (classroomByOccurrence.isEmpty()) return Map.of();
+
+        List<Long> occurrenceIds = classroomByOccurrence.keySet().stream().map(OccurrenceSlotDto::occurrenceId).toList();
+        Map<Long, Allocation> existingByOccurrence = Maps.byId(
+                allocationRepository.findByOccurrenceIdIn(occurrenceIds), Allocation::getOccurrenceId);
+
+        Map<OccurrenceSlotDto, Long> writable = new LinkedHashMap<>();
+        for (Entry<OccurrenceSlotDto, Long> entry : classroomByOccurrence.entrySet()) {
+            Allocation existing = existingByOccurrence.get(entry.getKey().occurrenceId());
+            if (existing == null || (existing.getSource() == AllocationSource.SYSACAD
+                    && isSysacadUpdate(existing, entry.getKey(), entry.getValue(), eventIdsToUpdate))) {
+                writable.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return writable;
+    }
+
+    private static boolean isSysacadUpdate(Allocation existing, OccurrenceSlotDto occurrence, Long classroomId,
+            Set<Long> eventIdsToUpdate) {
+        return eventIdsToUpdate.contains(occurrence.eventId()) && !occurrence.isPast()
+                && !classroomId.equals(existing.getClassroomId());
     }
 
     /** Cambio directo en SysAcad: pisa cualquier origen, crea si falta y publica con el actor indicado. */

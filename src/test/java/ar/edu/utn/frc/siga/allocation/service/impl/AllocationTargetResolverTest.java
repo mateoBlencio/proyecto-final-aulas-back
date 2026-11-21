@@ -369,7 +369,102 @@ class AllocationTargetResolverTest {
         assertThat(resolved).containsExactly(liberada);
     }
 
+    // ---------- espejos (AL-03: Event y EventRange resuelven solo la principal) ----------
+
+    @Test
+    @DisplayName("target Event: con principal y espejo el mismo día, resolveClassroomByOccurrence deja solo la principal")
+    void eventDescartaEspejos() {
+        LocalDate d = LocalDate.now().plusDays(10);
+        OccurrenceSlotDto principal = slotForEvent(1L, EVENT_ID, d);
+        OccurrenceSlotDto espejo = mirrorSlotForEvent(2L, EVENT_ID, d, 1L);
+        when(occurrenceService.findSlotsByEvents(anyCollection(), any())).thenReturn(List.of(principal, espejo));
+
+        Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
+                List.of(eventItem(EVENT_ID, CLASSROOM_ID)), LocalDate.now(), false).classroomByOccurrence();
+
+        assertThat(resolved.keySet()).containsExactly(principal);
+    }
+
+    @Test
+    @DisplayName("target Event sin clamp (IMPORTED/SYSACAD): también descarta el espejo")
+    void eventSinClampDescartaEspejos() {
+        LocalDate d = LocalDate.now().plusDays(10);
+        OccurrenceSlotDto principal = slotForEvent(1L, EVENT_ID, d);
+        OccurrenceSlotDto espejo = mirrorSlotForEvent(2L, EVENT_ID, d, 1L);
+        when(occurrenceService.findSlotsByEvents(anyCollection())).thenReturn(List.of(principal, espejo));
+
+        Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
+                List.of(eventItem(EVENT_ID, CLASSROOM_ID)), null, false).classroomByOccurrence();
+
+        assertThat(resolved.keySet()).containsExactly(principal);
+    }
+
+    @Test
+    @DisplayName("target EventRange: con principal y espejo el mismo día, resolveClassroomByOccurrence deja solo la principal")
+    void eventRangeDescartaEspejos() {
+        LocalDate from = LocalDate.now().plusDays(7);
+        realValidateRange();
+        OccurrenceSlotDto principal = slot(1L, from);
+        OccurrenceSlotDto espejo = mirrorSlotForEvent(2L, EVENT_ID, from, 1L);
+        when(occurrenceService.findSlotsByEvent(EVENT_ID, from)).thenReturn(List.of(principal, espejo));
+
+        Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
+                List.of(rangeItem(from, from.plusDays(14))), LocalDate.now(), false).classroomByOccurrence();
+
+        assertThat(resolved.keySet()).containsExactly(principal);
+    }
+
+    @Test
+    @DisplayName("resolveAll: Event con principal y espejo devuelve ambas (release y deallocate actúan sobre los dos)")
+    void resolveAllEventIncluyeEspejos() {
+        LocalDate d = LocalDate.now().plusDays(10);
+        OccurrenceSlotDto principal = slotForEvent(1L, EVENT_ID, d);
+        OccurrenceSlotDto espejo = mirrorSlotForEvent(2L, EVENT_ID, d, 1L);
+        when(occurrenceService.findSlotsByEvents(anyCollection(), any())).thenReturn(List.of(principal, espejo));
+
+        List<OccurrenceSlotDto> resolved = resolver.resolveAll(
+                List.of(new AllocationTarget.Event(EVENT_ID)), LocalDate.now());
+
+        assertThat(resolved).containsExactly(principal, espejo);
+    }
+
+    @Test
+    @DisplayName("resolveAll: EventRange con principal y espejo devuelve ambas")
+    void resolveAllEventRangeIncluyeEspejos() {
+        LocalDate from = LocalDate.now().plusDays(7);
+        realValidateRange();
+        OccurrenceSlotDto principal = slot(1L, from);
+        OccurrenceSlotDto espejo = mirrorSlotForEvent(2L, EVENT_ID, from, 1L);
+        when(occurrenceService.findSlotsByEvent(EVENT_ID, from)).thenReturn(List.of(principal, espejo));
+
+        List<OccurrenceSlotDto> resolved = resolver.resolveAll(
+                List.of(new AllocationTarget.EventRange(EVENT_ID, from, from.plusDays(14))), LocalDate.now());
+
+        assertThat(resolved).containsExactly(principal, espejo);
+    }
+
+    @Test
+    @DisplayName("target Occurrences: un espejo pedido por id sí se resuelve")
+    void occurrencesIncluyeEspejoPedidoPorId() {
+        LocalDate d = LocalDate.now().plusDays(10);
+        OccurrenceSlotDto principal = slotForEvent(1L, EVENT_ID, d);
+        OccurrenceSlotDto espejo = mirrorSlotForEvent(2L, EVENT_ID, d, 1L);
+        when(occurrenceService.findSlots(List.of(1L, 2L))).thenReturn(List.of(principal, espejo));
+
+        Map<OccurrenceSlotDto, Long> resolved = resolver.resolveClassroomByOccurrence(
+                List.of(new AllocationItem(new AllocationTarget.Occurrences(List.of(1L, 2L)), CLASSROOM_ID)),
+                LocalDate.now(), false).classroomByOccurrence();
+
+        assertThat(resolved.keySet()).containsExactly(principal, espejo);
+    }
+
     // ---------- helpers ----------
+
+    private static OccurrenceSlotDto mirrorSlotForEvent(long occurrenceId, long eventId, LocalDate date,
+            long principalOccurrenceId) {
+        return new OccurrenceSlotDto(occurrenceId, eventId, date, LocalTime.of(8, 0), LocalTime.of(10, 0),
+                OccurrenceStatus.NEEDS_ROOM, 30, 2, null, null, null, principalOccurrenceId);
+    }
 
     private static AllocationItem eventItem(long eventId, long classroomId) {
         return new AllocationItem(new AllocationTarget.Event(eventId), classroomId);

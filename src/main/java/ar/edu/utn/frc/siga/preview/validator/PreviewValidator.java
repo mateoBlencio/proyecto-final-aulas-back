@@ -1,12 +1,10 @@
 package ar.edu.utn.frc.siga.preview.validator;
 
 import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
-import ar.edu.utn.frc.siga.allocation.validator.AllocationCandidate;
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
 import ar.edu.utn.frc.siga.common.util.Clashes;
 import ar.edu.utn.frc.siga.common.util.RoomDate;
 import ar.edu.utn.frc.siga.common.util.TimeSpan;
-import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.preview.dto.request.PreviewAllocationDto;
 import ar.edu.utn.frc.siga.preview.dto.response.MoveConflictDto;
 import ar.edu.utn.frc.siga.preview.dto.response.MoveConflictDto.ConflictOrigin;
@@ -18,10 +16,8 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -55,24 +51,6 @@ public class PreviewValidator {
             throw new AllocationConflictException(
                     "los eventos " + foreign.stream().map(PlanningKey::toPlanningId).sorted().toList()
                             + " no pertenecen al preview indicado");
-        }
-    }
-
-    // internalConflicts ignora los pares del mismo evento, así que dos espejos en la misma aula y fecha
-    // pasarían como válidos.
-    public void validateNoSiblingRoomClash(List<AllocationCandidate> candidates) {
-        Map<List<Object>, Set<Integer>> roomSlotsByRoomDate = new HashMap<>();
-        for (AllocationCandidate candidate : candidates) {
-            OccurrenceSlotDto occurrence = candidate.occurrence();
-            roomSlotsByRoomDate.computeIfAbsent(
-                            List.of(occurrence.eventId(), candidate.classroomId(), occurrence.date()),
-                            k -> new HashSet<>())
-                    .add(occurrence.roomSlot());
-        }
-        boolean clash = roomSlotsByRoomDate.values().stream().anyMatch(slots -> slots.size() > 1);
-        if (clash) {
-            throw new AllocationConflictException(
-                    "dos aulas simultáneas del mismo evento no pueden asignarse a la misma aula en la misma fecha");
         }
     }
 

@@ -438,6 +438,135 @@ class AllocationValidatorTest {
                 });
     }
 
+    // ---------- strictConflicts: misma regla que validateStrictOverlap, sin lanzar ----------
+
+    @Test
+    @DisplayName("strictConflicts: devuelve los conflictos sin lanzar, y validateStrictOverlap lanza con los mismos")
+    void strictConflictsDevuelveLosMismosQueLanzaValidateStrictOverlap() {
+        List<AllocationCandidate> candidates = roomOverlapping(5L, futureDate(1), 60);
+
+        List<OccurrenceConflictDto> conflicts = validator.strictConflicts(candidates);
+
+        assertThat(conflicts).hasSize(1);
+        assertThat(conflicts.getFirst().classroomId()).isEqualTo(5L);
+        assertThat(conflicts.getFirst().overlapMinutes()).isEqualTo(60);
+        assertThatThrownBy(() -> validator.validateStrictOverlap(candidates))
+                .isInstanceOf(ReallocationConflictException.class)
+                .satisfies(ex -> assertThat(((ReallocationConflictException) ex).getConflicts())
+                        .isEqualTo(conflicts));
+    }
+
+    @Test
+    @DisplayName("strictConflicts: sin tolerancia, un solape de 5 minutos ya es conflicto")
+    void strictConflictsNoTieneMargen() {
+        List<AllocationCandidate> candidates = roomOverlapping(5L, futureDate(1), 5);
+
+        assertThat(validator.strictConflicts(candidates)).singleElement()
+                .satisfies(c -> assertThat(c.overlapMinutes()).isEqualTo(5));
+    }
+
+    @Test
+    @DisplayName("strictConflicts: las ocurrencias pasadas se ignoran aunque se pisen entre sí, y no consulta la base")
+    void strictConflictsIgnoraPasadas() {
+        List<AllocationCandidate> candidates = roomOverlapping(5L, LocalDate.now().minusDays(2), 60);
+
+        assertThat(validator.strictConflicts(candidates)).isEmpty();
+        assertThatCode(() -> validator.validateStrictOverlap(candidates)).doesNotThrowAnyException();
+        org.mockito.Mockito.verifyNoInteractions(allocationRepository, occurrenceService);
+    }
+
+    @Test
+    @DisplayName("strictConflicts: sin solapes devuelve lista vacía")
+    void strictConflictsSinSolapesDevuelveVacio() {
+        List<AllocationCandidate> candidates = roomOverlapping(5L, futureDate(1), 0);
+
+        assertThat(validator.strictConflicts(candidates)).isEmpty();
+    }
+
+    // ---------- validateNoSiblingRoomClash ----------
+
+    @Test
+    @DisplayName("validateNoSiblingRoomClash: dos roomSlot del mismo evento en la misma aula y fecha lanza AllocationConflictException")
+    void validateNoSiblingRoomClashMismaAulaYFechaLanza() {
+        LocalDate date = futureDate(3);
+        List<AllocationCandidate> candidates = List.of(
+                siblingCandidate(10L, 1L, date, 1, 5L), siblingCandidate(11L, 1L, date, 2, 5L));
+
+        assertThatThrownBy(() -> validator.validateNoSiblingRoomClash(candidates))
+                .isInstanceOf(AllocationConflictException.class)
+                .hasMessageContaining("misma aula");
+    }
+
+    @Test
+    @DisplayName("validateNoSiblingRoomClash: dos roomSlot del mismo evento en aulas distintas no lanza")
+    void validateNoSiblingRoomClashAulasDistintasNoLanza() {
+        LocalDate date = futureDate(3);
+        List<AllocationCandidate> candidates = List.of(
+                siblingCandidate(10L, 1L, date, 1, 5L), siblingCandidate(11L, 1L, date, 2, 6L));
+
+        assertThatCode(() -> validator.validateNoSiblingRoomClash(candidates)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateNoSiblingRoomClash: misma aula en fechas distintas no lanza")
+    void validateNoSiblingRoomClashFechasDistintasNoLanza() {
+        List<AllocationCandidate> candidates = List.of(
+                siblingCandidate(10L, 1L, futureDate(3), 1, 5L), siblingCandidate(11L, 1L, futureDate(10), 2, 5L));
+
+        assertThatCode(() -> validator.validateNoSiblingRoomClash(candidates)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateNoSiblingRoomClash: eventos distintos en la misma aula y fecha no son de este chequeo")
+    void validateNoSiblingRoomClashEventosDistintosNoLanza() {
+        LocalDate date = futureDate(3);
+        List<AllocationCandidate> candidates = List.of(
+                siblingCandidate(10L, 1L, date, 1, 5L), siblingCandidate(20L, 2L, date, 1, 5L));
+
+        assertThatCode(() -> validator.validateNoSiblingRoomClash(candidates)).doesNotThrowAnyException();
+    }
+
+    // ---------- validateOccurrencesExist ----------
+
+    @Test
+    @DisplayName("validateOccurrencesExist: ids repetidos que resuelven a una sola ocurrencia no lanzan")
+    void validateOccurrencesExistConIdsRepetidosNoLanza() {
+        OccurrenceSlotDto slot1 = slotOf(1L);
+
+        assertThatCode(() -> validator.validateOccurrencesExist(List.of(1L, 1L), List.of(slot1)))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateOccurrencesExist: un id inexistente lanza y lo nombra")
+    void validateOccurrencesExistConIdInexistenteLanza() {
+        OccurrenceSlotDto slot1 = slotOf(1L);
+
+        assertThatThrownBy(() -> validator.validateOccurrencesExist(List.of(1L, 2L), List.of(slot1)))
+                .isInstanceOf(AllocationConflictException.class)
+                .hasMessage("La(s) ocurrencia(s) [2] no existe(n).");
+    }
+
+    @Test
+    @DisplayName("validateOccurrencesExist: un id inexistente repetido se informa una sola vez")
+    void validateOccurrencesExistInformaElInexistenteUnaVez() {
+        OccurrenceSlotDto slot1 = slotOf(1L);
+
+        assertThatThrownBy(() -> validator.validateOccurrencesExist(List.of(1L, 2L, 2L), List.of(slot1)))
+                .isInstanceOf(AllocationConflictException.class)
+                .hasMessage("La(s) ocurrencia(s) [2] no existe(n).");
+    }
+
+    @Test
+    @DisplayName("validateOccurrencesExist: con repetidos y un faltante a la vez, la cuenta cruda no lo tapa")
+    void validateOccurrencesExistRepetidosNoTapanUnFaltante() {
+        OccurrenceSlotDto slot1 = slotOf(1L);
+
+        assertThatThrownBy(() -> validator.validateOccurrencesExist(List.of(1L, 1L, 2L), List.of(slot1)))
+                .isInstanceOf(AllocationConflictException.class)
+                .hasMessage("La(s) ocurrencia(s) [2] no existe(n).");
+    }
+
     // ---------- estado de la ocurrencia ----------
 
     @Test
@@ -497,6 +626,17 @@ class AllocationValidatorTest {
         return List.of(
                 new AllocationCandidate(EventTestData.occurrenceSlot(room * 100, first, date, OccurrenceStatus.NEEDS_ROOM), room),
                 new AllocationCandidate(EventTestData.occurrenceSlot(room * 100 + 1, second, date, OccurrenceStatus.NEEDS_ROOM), room));
+    }
+
+    private AllocationCandidate siblingCandidate(Long occurrenceId, Long eventId, LocalDate date, int roomSlot,
+            Long classroomId) {
+        return new AllocationCandidate(new OccurrenceSlotDto(occurrenceId, eventId, date, LocalTime.of(8, 0),
+                LocalTime.of(9, 30), OccurrenceStatus.NEEDS_ROOM, 30, roomSlot, null, null, null, null), classroomId);
+    }
+
+    private OccurrenceSlotDto slotOf(Long occurrenceId) {
+        RecurringEvent event = EventTestData.recurringEvent(1L, LocalTime.of(8, 0), Duration.ofMinutes(90));
+        return EventTestData.occurrenceSlot(occurrenceId, event, futureDate(1), OccurrenceStatus.NEEDS_ROOM);
     }
 
     private ClassroomResponseDto classroomWithNumber(Long id, int roomNumber) {

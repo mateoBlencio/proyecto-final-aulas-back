@@ -319,7 +319,7 @@ class PreviewServiceImplTest {
                 new PreviewAllocationDto(5L, 1, 10L), new PreviewAllocationDto(5L, 2, 10L))));
 
         ArgumentCaptor<List<AllocationCandidate>> candidatesCaptor = ArgumentCaptor.forClass(List.class);
-        verify(previewValidator).validateNoSiblingRoomClash(candidatesCaptor.capture());
+        verify(validator).validateNoSiblingRoomClash(candidatesCaptor.capture());
         assertThat(candidatesCaptor.getValue()).extracting(c -> c.occurrence().occurrenceId())
                 .containsExactlyInAnyOrder(100L, 200L);
         assertThat(candidatesCaptor.getValue()).extracting(AllocationCandidate::classroomId).containsOnly(10L);

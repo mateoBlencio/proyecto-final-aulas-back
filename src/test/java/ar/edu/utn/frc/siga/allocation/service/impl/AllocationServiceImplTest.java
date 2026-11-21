@@ -45,6 +45,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpStatus;
@@ -278,8 +279,8 @@ class AllocationServiceImplTest {
     }
 
     @Test
-    @DisplayName("allocate: source AUTOMATIC no valida solapamiento (ya lo validó el preview contra su propio snapshot)")
-    void allocateAutomaticNoValidaSolapamiento() {
+    @DisplayName("allocate: source AUTOMATIC valida solapamiento estricto con los candidatos del lote")
+    void allocateAutomaticValidaSolapamientoEstricto() {
         AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
         AllocationCommand command = AllocationCommand.automatic(List.of(item));
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, futureDate(1));
@@ -290,13 +291,16 @@ class AllocationServiceImplTest {
         service.allocate(command);
 
         verify(validator).validateClassroomsAvailable(Set.of(5L));
+        ArgumentCaptor<List<AllocationCandidate>> captor = ArgumentCaptor.forClass(List.class);
+        verify(validator).validateStrictOverlap(captor.capture());
+        assertThat(captor.getValue()).containsExactly(new AllocationCandidate(occ, 5L));
         // Requisito A: AUTOMATIC nunca ve el margen tolerado, ni siquiera indirectamente.
         verify(validator, never()).validateManualOverlap(anyList(), any());
     }
 
     @Test
-    @DisplayName("allocate: source IMPORTED clampea a null (incluye pasadas) y no valida solapamiento")
-    void allocateImportedClampeaNullYNoValidaSolapamiento() {
+    @DisplayName("allocate: source IMPORTED clampea a null (incluye pasadas) y valida solapamiento estricto")
+    void allocateImportedClampeaNullYValidaSolapamientoEstricto() {
         AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5L);
         AllocationCommand command = AllocationCommand.imported(List.of(item), "Importado de Excel");
         OccurrenceSlotDto occ = occurrenceSlot(10L, 1L, LocalDate.now().minusDays(3));
@@ -308,8 +312,95 @@ class AllocationServiceImplTest {
         service.allocate(command);
 
         verify(targetResolver).resolveClassroomByOccurrence(command.items(), null, false);
+        ArgumentCaptor<List<AllocationCandidate>> captor = ArgumentCaptor.forClass(List.class);
+        verify(validator).validateStrictOverlap(captor.capture());
+        assertThat(captor.getValue()).containsExactly(new AllocationCandidate(occ, 5L));
         // Requisito A: IMPORTED nunca ve el margen tolerado, ni siquiera indirectamente.
         verify(validator, never()).validateManualOverlap(anyList(), any());
+    }
+
+    @Test
+    @DisplayName("allocate: source IMPORTED con solapamiento → el validator corta y writer.create nunca se llama")
+    void allocateImportedConSolapeNoEscribe() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5L);
+        AllocationCommand command = AllocationCommand.imported(List.of(item), "Importado de Excel");
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occurrenceSlot(10L, 1L, futureDate(1)), 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), isNull(), anyBoolean())).thenReturn(assignments(resolved));
+        doThrow(new ReallocationConflictException(List.of(), java.util.Map.of())).when(validator).validateStrictOverlap(anyList());
+
+        assertThatThrownBy(() -> service.allocate(command)).isInstanceOf(ReallocationConflictException.class);
+
+        verify(writer, never()).create(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("allocate: source MANUAL llama validateManualOverlap y nunca validateStrictOverlap")
+    void allocateManualNuncaLlamaValidateStrictOverlap() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occurrenceSlot(10L, 1L, futureDate(1)), 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()), anyBoolean())).thenReturn(assignments(resolved));
+        when(writer.create(resolved, "obs", AllocationSource.MANUAL)).thenReturn(List.of());
+
+        service.allocate(command);
+
+        verify(validator).validateManualOverlap(anyList(), eq("obs"));
+        verify(validator, never()).validateStrictOverlap(anyList());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = AllocationSource.class, names = {"MANUAL", "AUTOMATIC", "IMPORTED"})
+    @DisplayName("allocate: dos hermanas del mismo evento en la misma aula y fecha → el validator corta y no se escribe, sea cual sea el origen")
+    void allocateHermanasEnLaMismaAulaNoEscribe(AllocationSource source) {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L, 11L)), 5L);
+        AllocationCommand command = new AllocationCommand(List.of(item), "obs", source);
+        OccurrenceSlotDto principal = occurrenceSlot(10L, 1L, futureDate(1));
+        OccurrenceSlotDto espejo = new OccurrenceSlotDto(11L, 1L, futureDate(1), LocalTime.of(8, 0), LocalTime.of(9, 30),
+                OccurrenceStatus.NEEDS_ROOM, 30, 2, null, null, null, 10L);
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(principal, 5, espejo, 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), any(), anyBoolean())).thenReturn(assignments(resolved));
+        doThrow(new AllocationConflictException("dos aulas simultáneas")).when(validator).validateNoSiblingRoomClash(anyList());
+
+        assertThatThrownBy(() -> service.allocate(command)).isInstanceOf(AllocationConflictException.class);
+
+        ArgumentCaptor<List<AllocationCandidate>> captor = ArgumentCaptor.forClass(List.class);
+        verify(validator).validateNoSiblingRoomClash(captor.capture());
+        assertThat(captor.getValue()).containsExactly(
+                new AllocationCandidate(principal, 5L), new AllocationCandidate(espejo, 5L));
+        verify(writer, never()).create(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("reallocate: dos hermanas del mismo evento en la misma aula y fecha → el validator corta y writer.upsert nunca se llama")
+    void reallocateHermanasEnLaMismaAulaNoEscribe() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L, 11L)), 5L);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        OccurrenceSlotDto principal = occurrenceSlot(10L, 1L, futureDate(1));
+        OccurrenceSlotDto espejo = new OccurrenceSlotDto(11L, 1L, futureDate(1), LocalTime.of(8, 0), LocalTime.of(9, 30),
+                OccurrenceStatus.NEEDS_ROOM, 30, 2, null, null, null, 10L);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), any(), anyBoolean()))
+                .thenReturn(assignments(mapOf(principal, 5, espejo, 5)));
+        doThrow(new AllocationConflictException("dos aulas simultáneas")).when(validator).validateNoSiblingRoomClash(anyList());
+
+        assertThatThrownBy(() -> service.reallocate(command)).isInstanceOf(AllocationConflictException.class);
+
+        verify(writer, never()).upsert(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("allocate: el chequeo de hermanas corre antes que el de solapamiento")
+    void allocateChequeaHermanasAntesQueSolapamiento() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occurrenceSlot(10L, 1L, futureDate(1)), 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()), anyBoolean())).thenReturn(assignments(resolved));
+        when(writer.create(resolved, "obs", AllocationSource.MANUAL)).thenReturn(List.of());
+
+        service.allocate(command);
+
+        InOrder order = inOrder(validator);
+        order.verify(validator).validateNoSiblingRoomClash(anyList());
+        order.verify(validator).validateManualOverlap(anyList(), any());
     }
 
     @Test
@@ -462,6 +553,84 @@ class AllocationServiceImplTest {
         InOrder order = inOrder(classroomLock, validator);
         order.verify(classroomLock).lock(Set.of(5L, 6L));
         order.verify(validator).validateManualOverlap(anyList(), any());
+    }
+
+    @Test
+    @DisplayName("reallocate: sin el flag, una ocurrencia hoy en un aula fuera del alcance → AccessDenied, sin lock ni upsert")
+    void reallocateSinFlagConAulaActualFueraDeAlcanceNoEscribe() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occurrenceSlot(10L, 1L, futureDate(1)), 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()), anyBoolean())).thenReturn(assignments(resolved));
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L)))
+                .thenReturn(List.of(allocation(900L, 10L, 9, AllocationSource.MANUAL)));
+        when(classroomService.findByIdsIncludingDeactivated(Set.of(9L)))
+                .thenReturn(List.of(classroomIn(9L, 2L, "Edificio B")));
+        doThrow(new AccessDeniedException("sin acceso")).when(buildingScopeResolver)
+                .requireAccess(Permission.ALLOCATION_WRITE, Set.of(2L));
+
+        assertThatThrownBy(() -> service.reallocate(command)).isInstanceOf(AccessDeniedException.class);
+
+        verify(classroomLock, never()).lock(any());
+        verify(writer, never()).upsert(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("reallocate: sin el flag, con alcance sobre el aula actual y la destino → chequea ambas y hace upsert")
+    void reallocateSinFlagChequeaAulaActualYDestino() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs");
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occurrenceSlot(10L, 1L, futureDate(1)), 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()), anyBoolean())).thenReturn(assignments(resolved));
+        when(allocationRepository.findByOccurrenceIdIn(List.of(10L)))
+                .thenReturn(List.of(allocation(900L, 10L, 9, AllocationSource.MANUAL)));
+        when(classroomService.findByIdsIncludingDeactivated(Set.of(9L)))
+                .thenReturn(List.of(classroomIn(9L, 2L, "Edificio B")));
+        when(classroomService.findByIdsIncludingDeactivated(Set.of(5L)))
+                .thenReturn(List.of(classroomIn(5L, 1L, "Edificio A")));
+        when(writer.upsert(resolved, "obs", AllocationSource.MANUAL)).thenReturn(List.of());
+
+        service.reallocate(command);
+
+        verify(buildingScopeResolver).requireAccess(Permission.ALLOCATION_WRITE, Set.of(2L));
+        verify(buildingScopeResolver).requireAccess(Permission.ALLOCATION_WRITE, Set.of(1L));
+        verify(writer).upsert(resolved, "obs", AllocationSource.MANUAL);
+    }
+
+    @Test
+    @DisplayName("reallocate: con el flag no consulta el aula actual, pero igual chequea el alcance sobre el aula destino")
+    void reallocateConFlagSoloChequeaElAulaDestino() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs").withCurrentScopeAuthorized();
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occurrenceSlot(10L, 1L, futureDate(1)), 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()), anyBoolean())).thenReturn(assignments(resolved));
+        when(classroomService.findByIdsIncludingDeactivated(Set.of(5L)))
+                .thenReturn(List.of(classroomIn(5L, 1L, "Edificio A")));
+        when(writer.upsert(resolved, "obs", AllocationSource.MANUAL)).thenReturn(List.of());
+
+        service.reallocate(command);
+
+        verify(allocationRepository, never()).findByOccurrenceIdIn(anyCollection());
+        verify(buildingScopeResolver).requireAccess(Permission.ALLOCATION_WRITE, Set.of(1L));
+        verify(buildingScopeResolver, org.mockito.Mockito.times(1)).requireAccess(any(Permission.class), anyCollection());
+        verify(writer).upsert(resolved, "obs", AllocationSource.MANUAL);
+    }
+
+    @Test
+    @DisplayName("reallocate: con el flag, un aula destino fuera del alcance sigue lanzando AccessDenied y no escribe")
+    void reallocateConFlagConAulaDestinoFueraDeAlcanceNoEscribe() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Occurrences(List.of(10L)), 5L);
+        AllocationCommand command = AllocationCommand.manual(List.of(item), "obs").withCurrentScopeAuthorized();
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(occurrenceSlot(10L, 1L, futureDate(1)), 5);
+        when(targetResolver.resolveClassroomByOccurrence(eq(command.items()), eq(LocalDate.now()), anyBoolean())).thenReturn(assignments(resolved));
+        when(classroomService.findByIdsIncludingDeactivated(Set.of(5L)))
+                .thenReturn(List.of(classroomIn(5L, 9L, "Edificio Ajeno")));
+        doThrow(new AccessDeniedException("sin acceso")).when(buildingScopeResolver)
+                .requireAccess(Permission.ALLOCATION_WRITE, Set.of(9L));
+
+        assertThatThrownBy(() -> service.reallocate(command)).isInstanceOf(AccessDeniedException.class);
+
+        verify(writer, never()).upsert(any(), any(), any());
     }
 
     // ---------- reallocateExisting ----------
@@ -1081,6 +1250,93 @@ class AllocationServiceImplTest {
 
         assertThat(affected).isEqualTo(0);
         verify(validator, never()).validateClassroomsAvailable(any());
+    }
+
+    @Test
+    @DisplayName("syncFromSysacad: una ocurrencia escribible que choca se saca del mapa sin lanzar; las demás pasan al writer")
+    void syncFromSysacadSacaLasQueChocanYEscribeElResto() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5L);
+        OccurrenceSlotDto choca = occurrenceSlot(10L, 1L, futureDate(1));
+        OccurrenceSlotDto libre = occurrenceSlot(11L, 1L, futureDate(8));
+        OccurrenceSlotDto noEscribible = occurrenceSlot(12L, 1L, futureDate(15));
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(choca, 5, libre, 6, noEscribible, 7);
+        Map<OccurrenceSlotDto, Long> writable = mapOf(choca, 5, libre, 6);
+        when(targetResolver.resolveClassroomByOccurrence(List.of(item), null, false)).thenReturn(assignments(resolved));
+        when(writer.writableFromSysacad(resolved, Set.of(1L))).thenReturn(writable);
+        when(validator.strictConflicts(anyList())).thenReturn(List.of(sysacadConflictOf(10L, 5L)));
+        when(writer.syncFromSysacad(mapOf(libre, 6, noEscribible, 7), Set.of(1L))).thenReturn(2);
+
+        int affected = service.syncFromSysacad(List.of(item), Set.of(1L));
+
+        assertThat(affected).isEqualTo(2);
+        ArgumentCaptor<List<AllocationCandidate>> candidates = ArgumentCaptor.forClass(List.class);
+        verify(validator).strictConflicts(candidates.capture());
+        assertThat(candidates.getValue()).containsExactly(
+                new AllocationCandidate(choca, 5L), new AllocationCandidate(libre, 6L));
+        verify(writer).syncFromSysacad(mapOf(libre, 6, noEscribible, 7), Set.of(1L));
+        verify(validator, never()).validateStrictOverlap(anyList());
+    }
+
+    @Test
+    @DisplayName("syncFromSysacad: un solo WARN por occurrenceId aunque choque con varias asignaciones")
+    void syncFromSysacadLogueaUnWarnPorOccurrenceId() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5L);
+        OccurrenceSlotDto a = occurrenceSlot(10L, 1L, futureDate(1));
+        OccurrenceSlotDto b = occurrenceSlot(11L, 1L, futureDate(8));
+        OccurrenceSlotDto c = occurrenceSlot(12L, 1L, futureDate(15));
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(a, 5, b, 5, c, 5);
+        when(targetResolver.resolveClassroomByOccurrence(List.of(item), null, false)).thenReturn(assignments(resolved));
+        when(writer.writableFromSysacad(resolved, Set.of())).thenReturn(resolved);
+        when(validator.strictConflicts(anyList())).thenReturn(List.of(
+                sysacadConflictOf(10L, 5L), sysacadConflictOf(10L, 5L), sysacadConflictOf(11L, 5L)));
+        when(writer.syncFromSysacad(mapOf(c, 5), Set.of())).thenReturn(1);
+        ch.qos.logback.classic.Logger logger =
+                (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(AllocationServiceImpl.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> appender =
+                new ch.qos.logback.core.read.ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+
+        try {
+            service.syncFromSysacad(List.of(item), Set.of());
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        List<String> warns = appender.list.stream()
+                .filter(e -> e.getLevel() == ch.qos.logback.classic.Level.WARN)
+                .map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+                .filter(m -> m.contains("no se asigna"))
+                .toList();
+        assertThat(warns).hasSize(2);
+        assertThat(warns).filteredOn(m -> m.contains("ocurrencia 10 ")).hasSize(1);
+        assertThat(warns).filteredOn(m -> m.contains("ocurrencia 11 ")).hasSize(1);
+        verify(writer).syncFromSysacad(mapOf(c, 5), Set.of());
+    }
+
+    @Test
+    @DisplayName("syncFromSysacad: sin conflictos pasa al writer el mapa resuelto sin tocarlo")
+    void syncFromSysacadSinConflictosPasaElMapaIntacto() {
+        AllocationItem item = new AllocationItem(new AllocationTarget.Event(1L), 5L);
+        OccurrenceSlotDto a = occurrenceSlot(10L, 1L, futureDate(1));
+        OccurrenceSlotDto b = occurrenceSlot(11L, 1L, futureDate(8));
+        Map<OccurrenceSlotDto, Long> resolved = mapOf(a, 5, b, 6);
+        when(targetResolver.resolveClassroomByOccurrence(List.of(item), null, false)).thenReturn(assignments(resolved));
+        when(writer.writableFromSysacad(resolved, Set.of(1L))).thenReturn(resolved);
+        when(validator.strictConflicts(anyList())).thenReturn(List.of());
+        when(writer.syncFromSysacad(resolved, Set.of(1L))).thenReturn(2);
+
+        int affected = service.syncFromSysacad(List.of(item), Set.of(1L));
+
+        assertThat(affected).isEqualTo(2);
+        ArgumentCaptor<Map<OccurrenceSlotDto, Long>> sent = ArgumentCaptor.forClass(Map.class);
+        verify(writer).syncFromSysacad(sent.capture(), eq(Set.of(1L)));
+        assertThat(sent.getValue()).containsExactlyEntriesOf(resolved);
+    }
+
+    private OccurrenceConflictDto sysacadConflictOf(long occurrenceId, long classroomId) {
+        return new OccurrenceConflictDto(occurrenceId, futureDate(1), LocalTime.of(8, 0), LocalTime.of(9, 30),
+                classroomId, 99L, 500L, 20L, 60);
     }
 
     // ---------- resolveOccurrences ----------

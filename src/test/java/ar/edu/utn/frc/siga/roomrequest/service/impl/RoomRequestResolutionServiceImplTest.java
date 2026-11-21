@@ -1465,6 +1465,71 @@ class RoomRequestResolutionServiceImplTest {
         assertThat(captor.getValue().observation()).isEqualTo("solo hay una disponible");
     }
 
+    @Test
+    @DisplayName("assign: el comando que llega a reallocate marca el alcance sobre las aulas actuales como ya autorizado")
+    void assign_marcaAlcanceActualAutorizado() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 1, false)).thenReturn(List.of(List.of(9000L)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(104L), null, "subsecretaria@frc.utn.edu.ar");
+
+        ArgumentCaptor<AllocationCommand> captor = ArgumentCaptor.forClass(AllocationCommand.class);
+        verify(allocationService).reallocate(captor.capture());
+        assertThat(captor.getValue().currentScopeAuthorized()).isTrue();
+        assertThat(captor.getValue().source()).isEqualTo(AllocationSource.MANUAL);
+    }
+
+    @Test
+    @DisplayName("assignAutomatic: el comando que llega a reallocate marca el alcance sobre las aulas actuales como ya autorizado")
+    void assignAutomatic_marcaAlcanceActualAutorizado() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 1, false)).thenReturn(List.of(List.of(9000L)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assignAutomatic(1L, List.of(104L), "solo hay un aula libre", "subsecretaria@frc.utn.edu.ar");
+
+        ArgumentCaptor<AllocationCommand> captor = ArgumentCaptor.forClass(AllocationCommand.class);
+        verify(allocationService).reallocate(captor.capture());
+        assertThat(captor.getValue().currentScopeAuthorized()).isTrue();
+        assertThat(captor.getValue().source()).isEqualTo(AllocationSource.AUTOMATIC);
+    }
+
+    @Test
+    @DisplayName("assign: un auxiliar sin permiso sobre el pedido es rechazado antes de reallocate")
+    void assign_auxiliarAjenoNoLlegaAReallocate() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        doThrow(new RoomRequestForbiddenException("ASSIGN", "asignar"))
+                .when(accessControl).authorize(item, "auxiliar@frc.utn.edu.ar", RoomRequestAccessControl.Action.ASSIGN);
+
+        assertThatThrownBy(() -> service.assign(1L, List.of(104L), null, "auxiliar@frc.utn.edu.ar"))
+                .isInstanceOf(RoomRequestForbiddenException.class);
+
+        verifyNoInteractions(allocationService);
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.NEW);
+    }
+
+    @Test
+    @DisplayName("assignAutomatic: un auxiliar sin permiso sobre el pedido es rechazado antes de reallocate")
+    void assignAutomatic_auxiliarAjenoNoLlegaAReallocate() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        doThrow(new RoomRequestForbiddenException("ASSIGN", "asignar"))
+                .when(accessControl).authorize(item, "auxiliar@frc.utn.edu.ar", RoomRequestAccessControl.Action.ASSIGN);
+
+        assertThatThrownBy(() -> service.assignAutomatic(1L, List.of(104L), "motivo", "auxiliar@frc.utn.edu.ar"))
+                .isInstanceOf(RoomRequestForbiddenException.class);
+
+        verifyNoInteractions(allocationService);
+    }
+
     private static RoomRequestItem labItem(int classroomCount, int computerCount) {
         return RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
                 .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(classroomCount)
