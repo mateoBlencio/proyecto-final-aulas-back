@@ -49,7 +49,7 @@ public class SysacadWritePlanner {
     @Transactional(readOnly = true)
     public List<PlannedSchedule> plan(LocalDateTime now) {
         Set<Long> currentEventIds = academicEventService.findSysacadRecurringEvents().stream()
-                .filter(SysacadRecurringEventRefDto::sysacadEnabled)
+                .filter(SysacadRecurringEventRefDto::sigaEnabled)
                 .map(SysacadRecurringEventRefDto::eventId)
                 .collect(Collectors.toSet());
         List<SysacadSchedule> schedules = scheduleRepository.findPlannable(SysacadScheduleStatus.REVIEW).stream()

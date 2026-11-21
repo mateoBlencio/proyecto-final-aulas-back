@@ -186,6 +186,48 @@ class AcademicEventServiceImplTest {
     }
 
     @Test
+    @DisplayName("findOrCreateRecurringEvents: el evento que crea nace con sysacadEnabled=false, sigaEnabled=true y genera ocurrencias")
+    void findOrCreateCreaConFlagsPorDefectoYOcurrencias() {
+        CreateRecurringEventRequestDto dto = recurringDto(DayOfWeek.MONDAY,
+                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19));
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of());
+        when(subjectService.findByIds(any())).thenReturn(List.of(EventTestData.subjectResponseDto(1L)));
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(EventTestData.commissionResponseDto(1L)));
+        when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(9L));
+
+        service.findOrCreateRecurringEvents(List.of(dto));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<RecurringEvent>> eventsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(eventRepository).saveAll(eventsCaptor.capture());
+        RecurringEvent created = eventsCaptor.getValue().getFirst();
+        assertThat(created.getSysacadEnabled()).isFalse();
+        assertThat(created.getSigaEnabled()).isTrue();
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Occurrence>> occurrencesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(occurrenceRepository).saveAll(occurrencesCaptor.capture());
+        assertThat(occurrencesCaptor.getValue()).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("findOrCreateRecurringEvents: evento existente por clave natural no se escribe ni cambia sus flags")
+    void findOrCreateExistenteNoTocaFlags() {
+        CreateRecurringEventRequestDto dto = recurringDto(DayOfWeek.MONDAY,
+                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19));
+        RecurringEvent existing = EventTestData.recurringEvent(7L, dto.dayOfWeek(), dto.startDate(), dto.endDate());
+        existing.setSysacadEnabled(true);
+        existing.setSigaEnabled(false);
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of(existing));
+
+        service.findOrCreateRecurringEvents(List.of(dto));
+
+        assertThat(existing.getSysacadEnabled()).isTrue();
+        assertThat(existing.getSigaEnabled()).isFalse();
+        verify(eventRepository, never()).saveAll(any());
+        verify(occurrenceRepository, never()).saveAll(any());
+    }
+
+    @Test
     @DisplayName("findOrCreateRecurringEvents: prefetch único, dos requests con la misma clave → un solo insert, resultados en orden")
     void findOrCreateRecurringEventsBulk() {
         CreateRecurringEventRequestDto monday = recurringDto(DayOfWeek.MONDAY,
@@ -328,7 +370,8 @@ class AcademicEventServiceImplTest {
         RecurringEvent persisted = captor.getValue().getFirst();
         assertThat(persisted.getEnrolled()).isEqualTo(30);
         assertThat(persisted.getDuration()).isEqualTo(Duration.ofMinutes(90));
-        assertThat(persisted.getSysacadEnabled()).isTrue();
+        assertThat(persisted.getSigaEnabled()).isTrue();
+        assertThat(persisted.getSysacadEnabled()).isFalse();
         assertThat(persisted.getSyncedAt()).isNotNull();
         assertThat(persisted.getSysacadHash()).isEqualTo(Hashes.sha256Hex(90));
 
@@ -348,7 +391,7 @@ class AcademicEventServiceImplTest {
         assertThat(result.updated()).isTrue();
         assertThat(existing.getEnrolled()).isEqualTo(45);
         assertThat(existing.getSyncedAt()).isNotNull();
-        assertThat(existing.getSysacadEnabled()).isTrue();
+        assertThat(existing.getSigaEnabled()).isTrue();
         assertThat(savedRecurringEvents()).containsExactly(existing);
 
         // sin eventos nuevos no se toca occurrenceRepository (guarda !created.isEmpty())
@@ -364,13 +407,13 @@ class AcademicEventServiceImplTest {
         UpsertRecurringEventResult result = service.syncRecurringEvent(syncCommand(90, 30));
 
         assertThat(result.updated()).isTrue();
-        assertThat(notCurrent.getSysacadEnabled()).isTrue();
+        assertThat(notCurrent.getSigaEnabled()).isTrue();
         assertThat(notCurrent.getSyncedAt()).isNotNull();
         assertThat(savedRecurringEvents()).containsExactly(notCurrent);
     }
 
     @Test
-    @DisplayName("syncRecurringEvent: evento vigente que pasa a 0 inscriptos se deshabilita y se retiran sus ocurrencias futuras")
+    @DisplayName("syncRecurringEvent: evento vigente que pasa a 0 inscriptos queda con sigaEnabled=false, sin tocar sysacadEnabled, y se retiran sus ocurrencias futuras")
     void syncRecurringEventRetiraEventoSinInscriptos() {
         RecurringEvent existing = existingSyncedEvent(7L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
         when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of(existing));
@@ -378,20 +421,24 @@ class AcademicEventServiceImplTest {
         service.syncRecurringEvent(syncCommand(90, 0));
 
         assertThat(existing.getEnrolled()).isZero();
-        assertThat(existing.getSysacadEnabled()).isFalse();
+        assertThat(existing.getSigaEnabled()).isFalse();
+        assertThat(existing.getSysacadEnabled()).as("el sync ya no escribe sysacadEnabled").isTrue();
+        assertThat(existing.getSyncedAt()).isNotNull();
+        assertThat(savedRecurringEvents()).containsExactly(existing);
         verify(recurringEventReconciler).retireFuture(existing);
         verify(recurringEventReconciler, never()).reconcileFuture(any(), any());
     }
 
     @Test
-    @DisplayName("syncRecurringEvent: evento deshabilitado que vuelve a tener inscriptos se rehabilita y se recrean sus ocurrencias")
+    @DisplayName("syncRecurringEvent: evento con sigaEnabled=false que vuelve a tener inscriptos se rehabilita y se recrean sus ocurrencias")
     void syncRecurringEventRestauraEventoConInscriptos() {
         RecurringEvent existing = existingSyncedEvent(7L, Duration.ofMinutes(90), Hashes.sha256Hex(90), false);
         when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of(existing));
 
         service.syncRecurringEvent(syncCommand(90, 12));
 
-        assertThat(existing.getSysacadEnabled()).isTrue();
+        assertThat(existing.getSigaEnabled()).isTrue();
+        assertThat(existing.getSysacadEnabled()).as("el sync ya no escribe sysacadEnabled").isTrue();
         verify(recurringEventReconciler).reconcileFuture(eq(existing), any());
         verify(recurringEventReconciler, never()).retireFuture(any());
     }
@@ -407,7 +454,10 @@ class AcademicEventServiceImplTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<RecurringEvent>> captor = ArgumentCaptor.forClass(List.class);
         verify(eventRepository).saveAll(captor.capture());
-        assertThat(captor.getValue().getFirst().getSysacadEnabled()).isFalse();
+        RecurringEvent created = captor.getValue().getFirst();
+        assertThat(created.getSigaEnabled()).isFalse();
+        assertThat(created.getSysacadEnabled()).isFalse();
+        assertThat(created.getEnrolled()).isZero();
         verify(occurrenceRepository).saveAll(List.of());
     }
 
@@ -535,7 +585,7 @@ class AcademicEventServiceImplTest {
 
 
     @Test
-    @DisplayName("markRecurringEventsAbsent: marca sysacadEnabled=false sólo en los sync-owned ausentes de la corrida, sin tocar los presentes, los ya deshabilitados, ni ocurrencias/eventos")
+    @DisplayName("markRecurringEventsAbsent: da de baja (sigaEnabled=false) sólo a los sync-owned ausentes, retira sus ocurrencias futuras y no toca sysacadEnabled, los presentes ni los ya dados de baja")
     void markRecurringEventsAbsentMarcaSoloAusentesSyncOwned() {
         RecurringEvent present = existingSyncedEvent(1L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
         RecurringEvent absent = existingSyncedEvent(2L, Duration.ofMinutes(60), Hashes.sha256Hex(60), true);
@@ -546,12 +596,18 @@ class AcademicEventServiceImplTest {
         int affected = service.markRecurringEventsAbsent(Set.of(1L), Set.of(), 0);
 
         assertThat(affected).isEqualTo(1);
-        assertThat(absent.getSysacadEnabled()).isFalse();
+        assertThat(absent.getSigaEnabled()).isFalse();
+        assertThat(absent.getSysacadEnabled()).as("el sync ya no escribe sysacadEnabled").isTrue();
         assertThat(absent.getSyncedAt()).isNotNull();
-        assertThat(present.getSysacadEnabled()).isTrue();
+        assertThat(present.getSigaEnabled()).isTrue();
+        assertThat(present.getSyncedAt()).isNull();
+        assertThat(alreadyDisabled.getSyncedAt()).isNull();
         verify(recurringEventRepository).save(absent);
+        verify(recurringEventReconciler).retireFuture(absent);
         verify(recurringEventRepository, never()).save(present);
         verify(recurringEventRepository, never()).save(alreadyDisabled);
+        verify(recurringEventReconciler, never()).retireFuture(present);
+        verify(recurringEventReconciler, never()).retireFuture(alreadyDisabled);
         verifyNoInteractions(eventRepository);
         verifyNoInteractions(occurrenceRepository);
     }
@@ -569,8 +625,40 @@ class AcademicEventServiceImplTest {
         int affected = service.markRecurringEventsAbsent(Set.of(1L), Set.of(7L), 0);
 
         assertThat(affected).isEqualTo(1);
-        assertThat(ofUnresolved.getSysacadEnabled()).isTrue();
-        assertThat(absent.getSysacadEnabled()).isFalse();
+        assertThat(ofUnresolved.getSigaEnabled()).isTrue();
+        assertThat(absent.getSigaEnabled()).isFalse();
+        verify(recurringEventReconciler, never()).retireFuture(ofUnresolved);
+    }
+
+    @Test
+    @DisplayName("markRecurringEventsAbsent: los vigentes del umbral se cuentan por sigaEnabled, no por sysacadEnabled")
+    void markRecurringEventsAbsentCuentaVigentesPorSigaEnabled() {
+        RecurringEvent present = existingSyncedEvent(1L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
+        RecurringEvent absent = existingSyncedEvent(2L, Duration.ofMinutes(60), Hashes.sha256Hex(60), true);
+        RecurringEvent disabledA = existingSyncedEvent(3L, Duration.ofMinutes(45), Hashes.sha256Hex(45), false);
+        RecurringEvent disabledB = existingSyncedEvent(4L, Duration.ofMinutes(30), Hashes.sha256Hex(30), false);
+        when(recurringEventRepository.findBySysacadHashIsNotNull())
+                .thenReturn(List.of(present, absent, disabledA, disabledB));
+
+        // 2 vigentes por sigaEnabled: 1 presente = 50%, alcanza. Contando sysacadEnabled serían 4 y 1 = 25% abortaría.
+        int affected = service.markRecurringEventsAbsent(Set.of(1L), Set.of(), 50);
+
+        assertThat(affected).isEqualTo(1);
+        assertThat(absent.getSigaEnabled()).isFalse();
+    }
+
+    @Test
+    @DisplayName("markRecurringEventsAbsent: un ausente que ya tenía sigaEnabled=false no se guarda, aunque siga con sysacadEnabled=true")
+    void markRecurringEventsAbsentIgnoraAusenteYaDadoDeBaja() {
+        RecurringEvent present = existingSyncedEvent(1L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
+        RecurringEvent alreadyDown = existingSyncedEvent(2L, Duration.ofMinutes(60), Hashes.sha256Hex(60), false);
+        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(present, alreadyDown));
+
+        int affected = service.markRecurringEventsAbsent(Set.of(1L), Set.of(), 0);
+
+        assertThat(affected).isZero();
+        verify(recurringEventRepository, never()).save(any());
+        verifyNoInteractions(recurringEventReconciler);
     }
 
     @Test
@@ -584,9 +672,10 @@ class AcademicEventServiceImplTest {
         assertThatThrownBy(() -> service.markRecurringEventsAbsent(Set.of(1L), Set.of(), 50))
                 .isInstanceOf(SyncAbortedException.class);
 
-        assertThat(second.getSysacadEnabled()).isTrue();
-        assertThat(third.getSysacadEnabled()).isTrue();
+        assertThat(second.getSigaEnabled()).isTrue();
+        assertThat(third.getSigaEnabled()).isTrue();
         verify(recurringEventRepository, never()).save(any());
+        verifyNoInteractions(recurringEventReconciler);
     }
 
     @Test
@@ -598,7 +687,8 @@ class AcademicEventServiceImplTest {
         assertThatThrownBy(() -> service.markRecurringEventsAbsent(Set.of(), Set.of(), 0))
                 .isInstanceOf(SyncAbortedException.class);
 
-        assertThat(current.getSysacadEnabled()).isTrue();
+        assertThat(current.getSigaEnabled()).isTrue();
+        verifyNoInteractions(recurringEventReconciler);
     }
 
     @Test
@@ -613,7 +703,7 @@ class AcademicEventServiceImplTest {
     }
 
     @Test
-    @DisplayName("findSysacadRecurringEvents: mapea cada evento sync-owned a una ref liviana, campo por campo, con su vigencia en SysAcad")
+    @DisplayName("findSysacadRecurringEvents: mapea cada evento sync-owned a una ref liviana, campo por campo, con ambos flags (sysacadEnabled y sigaEnabled) sin mezclarlos")
     void findSysacadRecurringEventsMapeaCampoPorCampo() {
         RecurringEvent first = RecurringEvent.builder()
                 .id(10L)
@@ -627,6 +717,7 @@ class AcademicEventServiceImplTest {
                 .commissionId(2L)
                 .sysacadHash(Hashes.sha256Hex(90))
                 .sysacadEnabled(true)
+                .sigaEnabled(false)
                 .build();
         RecurringEvent second = RecurringEvent.builder()
                 .id(11L)
@@ -639,6 +730,8 @@ class AcademicEventServiceImplTest {
                 .subjectId(3L)
                 .commissionId(4L)
                 .sysacadHash(Hashes.sha256Hex(120))
+                .sysacadEnabled(false)
+                .sigaEnabled(true)
                 .build();
         when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(first, second));
 
@@ -646,9 +739,9 @@ class AcademicEventServiceImplTest {
 
         assertThat(result).containsExactly(
                 new SysacadRecurringEventRefDto(10L, 1L, 2L, DayOfWeek.MONDAY, LocalTime.of(8, 0),
-                        LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31), true),
+                        LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31), true, false),
                 new SysacadRecurringEventRefDto(11L, 3L, 4L, DayOfWeek.WEDNESDAY, LocalTime.of(14, 30),
-                        LocalDate.of(2026, 8, 1), LocalDate.of(2026, 12, 15), false));
+                        LocalDate.of(2026, 8, 1), LocalDate.of(2026, 12, 15), false, true));
     }
 
     @Test
@@ -983,11 +1076,11 @@ class AcademicEventServiceImplTest {
     }
 
 
-    private static RecurringEvent scheduleEvent(LocalDate endDate, String hash, boolean enabled) {
+    private static RecurringEvent scheduleEvent(LocalDate endDate, String hash, boolean sigaEnabled) {
         return RecurringEvent.builder().subjectId(1L).commissionId(2L).dayOfWeek(DayOfWeek.MONDAY)
                 .startTime(LocalTime.of(8, 0)).duration(Duration.ofMinutes(90))
                 .startDate(LocalDate.of(2026, 3, 1)).endDate(endDate)
-                .sysacadHash(hash).sysacadEnabled(enabled).build();
+                .sysacadHash(hash).sysacadEnabled(true).sigaEnabled(sigaEnabled).build();
     }
 
     @Test
@@ -1008,7 +1101,7 @@ class AcademicEventServiceImplTest {
     }
 
     @Test
-    @DisplayName("recurringScheduleStatus: todos deshabilitados por SysAcad es DISABLED_IN_SYSACAD aunque sigan vigentes")
+    @DisplayName("recurringScheduleStatus: todos con sigaEnabled=false es DISABLED_IN_SYSACAD aunque sigan vigentes y con sysacadEnabled=true")
     void scheduleStatusDeshabilitado() {
         when(recurringEventRepository.findBySubjectIdAndCommissionId(1L, 2L))
                 .thenReturn(List.of(scheduleEvent(LocalDate.of(2999, 7, 31), "h", false)));
@@ -1020,9 +1113,27 @@ class AcademicEventServiceImplTest {
     @DisplayName("recurringScheduleStatus: uno vigente (o cargado a mano sin fecha de fin) es ACTIVE")
     void scheduleStatusVigente() {
         when(recurringEventRepository.findBySubjectIdAndCommissionId(1L, 2L)).thenReturn(List.of(
-                scheduleEvent(LocalDate.of(2020, 7, 31), "h", true), scheduleEvent(null, null, false)));
+                scheduleEvent(LocalDate.of(2020, 7, 31), "h", true), scheduleEvent(null, null, true)));
 
         assertThat(service.recurringScheduleStatus(1L, 2L)).isEqualTo(ScheduleStatus.ACTIVE);
+    }
+
+    @Test
+    @DisplayName("recurringScheduleStatus: evento sin hash (cargado a mano) con sigaEnabled=false es DISABLED_IN_SYSACAD")
+    void scheduleStatusSinHashDeshabilitado() {
+        when(recurringEventRepository.findBySubjectIdAndCommissionId(1L, 2L))
+                .thenReturn(List.of(scheduleEvent(null, null, false)));
+
+        assertThat(service.recurringScheduleStatus(1L, 2L)).isEqualTo(ScheduleStatus.DISABLED_IN_SYSACAD);
+    }
+
+    @Test
+    @DisplayName("recurringScheduleStatus: ignora los eventos con sigaEnabled=false al decidir ENDED/ACTIVE")
+    void scheduleStatusIgnoraDadosDeBajaAlEvaluarVigencia() {
+        when(recurringEventRepository.findBySubjectIdAndCommissionId(1L, 2L)).thenReturn(List.of(
+                scheduleEvent(LocalDate.of(2020, 7, 31), "h", true), scheduleEvent(LocalDate.of(2999, 7, 31), "h", false)));
+
+        assertThat(service.recurringScheduleStatus(1L, 2L)).isEqualTo(ScheduleStatus.ENDED);
     }
 
     private CreateRecurringEventRequestDto recurringDto(DayOfWeek dayOfWeek, LocalDate startDate, LocalDate endDate) {
@@ -1038,7 +1149,8 @@ class AcademicEventServiceImplTest {
                 enrolled, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31));
     }
 
-    private RecurringEvent existingSyncedEvent(Long id, Duration duration, String sysacadHash, boolean sysacadEnabled) {
+    /** sysacadEnabled queda siempre en true: el sync ya no lo escribe y los tests verifican que no cambie. */
+    private RecurringEvent existingSyncedEvent(Long id, Duration duration, String sysacadHash, boolean sigaEnabled) {
         return RecurringEvent.builder()
                 .id(id)
                 .enrolled(30)
@@ -1050,7 +1162,8 @@ class AcademicEventServiceImplTest {
                 .subjectId(1L)
                 .commissionId(1L)
                 .sysacadHash(sysacadHash)
-                .sysacadEnabled(sysacadEnabled)
+                .sysacadEnabled(true)
+                .sigaEnabled(sigaEnabled)
                 .build();
     }
 
@@ -1067,6 +1180,7 @@ class AcademicEventServiceImplTest {
                 .commissionId(1L)
                 .sysacadHash(Hashes.sha256Hex(90))
                 .sysacadEnabled(true)
+                .sigaEnabled(true)
                 .build();
     }
 

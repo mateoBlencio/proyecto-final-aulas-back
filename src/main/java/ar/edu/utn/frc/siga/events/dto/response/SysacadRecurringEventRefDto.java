@@ -14,5 +14,6 @@ public record SysacadRecurringEventRefDto(
         LocalTime startTime,
         LocalDate startDate,
         LocalDate endDate,
-        boolean sysacadEnabled) {
+        boolean sysacadEnabled,
+        boolean sigaEnabled) {
 }

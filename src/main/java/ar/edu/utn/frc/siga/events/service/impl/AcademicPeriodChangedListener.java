@@ -37,7 +37,7 @@ class AcademicPeriodChangedListener {
     @AuditOperation("Recálculo de ocurrencias por cambio de período académico")
     void on(AcademicPeriodChanged event) {
         AuditOperations.describe("Recálculo de ocurrencias por cambio de período académico: " + event.year() + "/" + event.semester());
-        List<RecurringEvent> allEvents = recurringEventRepository.findAll();
+        List<RecurringEvent> allEvents = recurringEventRepository.findBySigaEnabledTrue();
         Set<Long> commissionIds = allEvents.stream()
                 .map(RecurringEvent::getCommissionId)
                 .filter(Objects::nonNull)

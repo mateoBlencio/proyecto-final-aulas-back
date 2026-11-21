@@ -72,9 +72,10 @@ class SysacadWritePlannerTest {
                 allocationService, classroomService, occurrenceRequestQuery, holidayService);
     }
 
-    private static SysacadRecurringEventRefDto eventRef(long id, boolean enabled) {
+    /** sysacadEnabled queda en true: el planner decide sólo por sigaEnabled. */
+    private static SysacadRecurringEventRefDto eventRef(long id, boolean sigaEnabled) {
         return new SysacadRecurringEventRefDto(id, 1L, 1L, DayOfWeek.MONDAY, LocalTime.of(8, 0),
-                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31), enabled);
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31), true, sigaEnabled);
     }
 
     private static SysacadSchedule schedule(long id, Long event1, Long event2) {

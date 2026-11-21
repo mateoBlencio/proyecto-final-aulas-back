@@ -77,13 +77,14 @@ public interface AcademicEventService {
     UpsertRecurringEventResult syncRecurringEvent(SyncRecurringEventCommand cmd);
 
     /**
-     * Marca {@code sysacadEnabled=false} en los eventos recurrentes "sync-owned" (con
-     * {@code sysacadHash} no nulo) que no aparecieron en la corrida actual del sync. Los eventos de las
+     * Da de baja ({@code sigaEnabled=false}) los eventos recurrentes "sync-owned" (con
+     * {@code sysacadHash} no nulo) que no aparecieron en la corrida actual del sync, y retira sus
+     * ocurrencias futuras sin aula ni pedido (las que tienen alguno se conservan). Los eventos de las
      * comisiones en {@code unresolvedCommissionIds} (filas que Sysacad listó pero el sync no pudo resolver
-     * por causas locales) no se marcan: no se sabe si Sysacad los dejó de listar. No destructivo:
-     * nunca borra el evento, sus ocurrencias ni sus asignaciones. Devuelve la cantidad marcada. Aborta sin
-     * marcar nada si los eventos presentes no alcanzan {@code minValidPercent}% de los vigentes (0 desactiva
-     * el umbral; cero presentes aborta siempre).
+     * por causas locales) no se marcan: no se sabe si Sysacad los dejó de listar. Nunca borra el evento
+     * ni sus asignaciones. Devuelve la cantidad marcada. Aborta sin marcar nada si los eventos presentes
+     * no alcanzan {@code minValidPercent}% de los vigentes (0 desactiva el umbral; cero presentes aborta
+     * siempre).
      */
     int markRecurringEventsAbsent(Collection<Long> presentEventIds, Collection<Long> unresolvedCommissionIds,
             int minValidPercent);

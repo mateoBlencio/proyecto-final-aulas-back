@@ -150,7 +150,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         }
         LocalDate today = LocalDate.now();
         List<RecurringEvent> owned = events.stream()
-                .filter(e -> Boolean.TRUE.equals(e.getSysacadEnabled()) || e.getSysacadHash() == null)
+                .filter(e -> Boolean.TRUE.equals(e.getSigaEnabled()))
                 .toList();
         if (owned.isEmpty()) {
             return ScheduleStatus.DISABLED_IN_SYSACAD;
@@ -281,7 +281,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         }
         eventRepository.saveAll(created);
         occurrenceRepository.saveAll(created.stream()
-                .filter(event -> event.getSysacadHash() == null || Boolean.TRUE.equals(event.getSysacadEnabled()))
+                .filter(event -> Boolean.TRUE.equals(event.getSigaEnabled()))
                 .flatMap(event -> event.toOccurrences(windowByCommission.getOrDefault(
                         event.getCommissionId(), windowFor(null))).stream())
                 .toList());
@@ -302,13 +302,13 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                     boolean noEnrolled = cmd.enrolled() == 0;
                     boolean enrolledChanged = !Objects.equals(existing.getEnrolled(), cmd.enrolled());
                     boolean durationChanged = reconcileDuration(existing, cmd.durationMinutes());
-                    boolean stateChanged = Boolean.TRUE.equals(existing.getSysacadEnabled()) == noEnrolled;
+                    boolean stateChanged = Boolean.TRUE.equals(existing.getSigaEnabled()) == noEnrolled;
                     if (!enrolledChanged && !durationChanged && !stateChanged) {
                         return;
                     }
                     existing.setEnrolled(cmd.enrolled());
                     existing.setSyncedAt(now);
-                    existing.setSysacadEnabled(!noEnrolled);
+                    existing.setSigaEnabled(!noEnrolled);
                     if (existing.getId() != null) {
                         updated.add(existing);
                         if (stateChanged) {
@@ -350,7 +350,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
                 .commissionId(cmd.commissionId())
                 .syncedAt(now)
                 .sysacadHash(Hashes.sha256Hex(cmd.durationMinutes()))
-                .sysacadEnabled(cmd.enrolled() > 0)
+                .sigaEnabled(cmd.enrolled() > 0)
                 .build();
     }
 
@@ -474,18 +474,19 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         // Events of unresolvedCommissionIds still count in currentRows. What syncRecurringEvents already wrote
         // before an abort here stays written (the guard only prevents deactivations).
         long currentRows = syncOwned.stream()
-                .filter(event -> !Boolean.FALSE.equals(event.getSysacadEnabled())).count();
+                .filter(event -> Boolean.TRUE.equals(event.getSigaEnabled())).count();
         SyncGuard.requireEnoughValidRows("eventos", presentEventIds.size(), currentRows, minValidPercent);
         for (RecurringEvent event : syncOwned) {
-            if (presentEventIds.contains(event.getId()) || Boolean.FALSE.equals(event.getSysacadEnabled())
+            if (presentEventIds.contains(event.getId()) || !Boolean.TRUE.equals(event.getSigaEnabled())
                     || unresolvedCommissionIds.contains(event.getCommissionId())) {
                 continue;
             }
-            event.setSysacadEnabled(false);
+            event.setSigaEnabled(false);
             event.setSyncedAt(now);
             recurringEventRepository.save(event);
+            recurringEventReconciler.retireFuture(event);
             affected++;
-            log.info("Evento recurrente marcado como no vigente en SysAcad: id={}", event.getId());
+            log.info("Evento recurrente dado de baja por ausencia en SysAcad: id={}", event.getId());
         }
         return affected;
     }
@@ -506,7 +507,7 @@ public class AcademicEventServiceImpl implements AcademicEventService {
         return recurringEventRepository.findBySysacadHashIsNotNull().stream()
                 .map(r -> new SysacadRecurringEventRefDto(r.getId(), r.getSubjectId(), r.getCommissionId(),
                         r.getDayOfWeek(), r.getStartTime(), r.getStartDate(), r.getEndDate(),
-                        !Boolean.FALSE.equals(r.getSysacadEnabled())))
+                        Boolean.TRUE.equals(r.getSysacadEnabled()), Boolean.TRUE.equals(r.getSigaEnabled())))
                 .toList();
     }
 

@@ -32,6 +32,8 @@ public interface AllocationRepository extends JpaRepository<Allocation, Long>, A
               and not exists (select 1 from asignacion_aula a where a.id_ocurrencia = o.id_ocurrencia)
               and not exists (select 1 from evento_academico_suspendido s
                               where s.id_evento_academico = o.id_evento_academico and o.fecha >= s.fecha_baja)
+              and exists (select 1 from evento_academico e
+                          where e.id_evento_academico = o.id_evento_academico and e.habilitado_siga)
             """, nativeQuery = true)
     List<Long> findEventIdsWithUnallocatedOccurrencesBetween(LocalDate from, LocalDate to);
 

@@ -44,7 +44,7 @@ class AcademicPeriodChangedListenerTest {
     void reconcilesOnlyMatchingPeriod() {
         RecurringEvent matching = event(1L, 10L);
         RecurringEvent otherPeriod = event(2L, 20L);
-        when(recurringEventRepository.findAll()).thenReturn(List.of(matching, otherPeriod));
+        when(recurringEventRepository.findBySigaEnabledTrue()).thenReturn(List.of(matching, otherPeriod));
         when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(
                 commission(10L, 2026, 0),
                 commission(20L, 2026, 1)));
@@ -55,6 +55,22 @@ class AcademicPeriodChangedListenerTest {
 
         verify(reconciler).reconcileFuture(eq(matching), any(OccurrenceWindow.class));
         verify(reconciler, never()).reconcileFuture(eq(otherPeriod), any());
+    }
+
+    @Test
+    @DisplayName("lee los eventos con findBySigaEnabledTrue (los dados de baja no llegan al reconciler) y no con findAll")
+    void readsOnlySigaEnabledEvents() {
+        RecurringEvent enabled = event(1L, 10L);
+        // El filtro por habilitado_siga vive en el repositorio; acá se verifica que el listener use esa consulta.
+        when(recurringEventRepository.findBySigaEnabledTrue()).thenReturn(List.of(enabled));
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(commission(10L, 2026, 0)));
+
+        listener.on(new AcademicPeriodChanged(1L, 2026, 0,
+                LocalDate.of(2026, 3, 16), LocalDate.of(2026, 11, 30),
+                LocalDate.of(2026, 7, 6), LocalDate.of(2026, 7, 27)));
+
+        verify(reconciler).reconcileFuture(eq(enabled), any(OccurrenceWindow.class));
+        verify(recurringEventRepository, never()).findAll();
     }
 
     private RecurringEvent event(Long id, Long commissionId) {
