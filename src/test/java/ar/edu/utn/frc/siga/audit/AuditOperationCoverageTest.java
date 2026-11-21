@@ -74,8 +74,6 @@ class AuditOperationCoverageTest {
             Map.entry("AuditArchiveRepository#tryLock",
                     "propagation MANDATORY, only takes an advisory lock and writes nothing"),
             Map.entry("ClassroomAllocationLock#lock", "propagation MANDATORY, only takes an advisory lock and writes nothing"),
-            Map.entry("IngestRowResolver#resolveRefs",
-                    "runs inside IngestServiceImpl.ingestFile, which opens the operation"),
             Map.entry("SysacadScheduleLoader#load",
                     "only writes sysacad_horario, which is not @Audited; its own log table keeps the history"),
             Map.entry("RecurringEventReconciler#reconcileFuture",
