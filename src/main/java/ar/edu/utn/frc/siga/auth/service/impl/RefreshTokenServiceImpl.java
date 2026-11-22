@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.auth.service.impl;
 
 import ar.edu.utn.frc.siga.auth.config.JwtProperties;
+import ar.edu.utn.frc.siga.auth.exception.InvalidCredentialsException;
 import ar.edu.utn.frc.siga.auth.exception.InvalidRefreshTokenException;
 import ar.edu.utn.frc.siga.auth.model.RefreshToken;
 import ar.edu.utn.frc.siga.auth.model.RevocationReason;
@@ -31,6 +32,16 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Transactional
     public IssuedRefreshToken issue(User user) {
         return doIssue(user);
+    }
+
+    @Override
+    @Transactional
+    public IssuedRefreshToken issueForLogin(User user, String authenticatedPasswordHash) {
+        User locked = userRepository.findByIdForUpdate(user.getId()).orElseThrow(InvalidCredentialsException::new);
+        if (!locked.getPasswordHash().equals(authenticatedPasswordHash) || !Boolean.TRUE.equals(locked.getEnabled())) {
+            throw new InvalidCredentialsException();
+        }
+        return doIssue(locked);
     }
 
     private IssuedRefreshToken doIssue(User user) {

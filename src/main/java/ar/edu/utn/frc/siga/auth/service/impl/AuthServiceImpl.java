@@ -74,7 +74,7 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmailAndEnabledTrue(email)
                 .orElseThrow(InvalidCredentialsException::new);
 
-        return startSession(user);
+        return buildTokenResponse(user, refreshTokenService.issueForLogin(user, securityUser.getPassword()));
     }
 
     // noRollbackFor: this transaction wraps RefreshTokenService.refresh, so it must not roll back either

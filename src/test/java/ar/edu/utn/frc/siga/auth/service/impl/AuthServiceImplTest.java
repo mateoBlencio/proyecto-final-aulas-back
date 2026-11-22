@@ -73,7 +73,7 @@ class AuthServiceImplTest {
     }
 
     private User user(String email) {
-        return User.builder().id(1L).email(email).roleAssignments(List.of()).build();
+        return User.builder().id(1L).email(email).passwordHash("hash-autenticado").roleAssignments(List.of()).build();
     }
 
     @Test
@@ -87,7 +87,7 @@ class AuthServiceImplTest {
         when(authenticationManager.authenticate(any())).thenReturn(authentication);
         User user = user("user@frc.utn.edu.ar");
         when(userRepository.findByEmailAndEnabledTrue("user@frc.utn.edu.ar")).thenReturn(Optional.of(user));
-        when(refreshTokenService.issue(user)).thenReturn(new IssuedRefreshToken("raw-token", 3600));
+        when(refreshTokenService.issueForLogin(user, "hash-autenticado")).thenReturn(new IssuedRefreshToken("raw-token", 3600));
         when(jwtService.generateAccessToken(any())).thenReturn("access-token");
         when(jwtService.getAccessExpirationSeconds()).thenReturn(1200L);
 
@@ -124,7 +124,7 @@ class AuthServiceImplTest {
                 .thenReturn(new UsernamePasswordAuthenticationToken(securityUser, null));
         User user = user(email);
         when(userRepository.findByEmailAndEnabledTrue(email)).thenReturn(Optional.of(user));
-        when(refreshTokenService.issue(user)).thenReturn(new IssuedRefreshToken("raw-token", 3600));
+        when(refreshTokenService.issueForLogin(user, "hash-autenticado")).thenReturn(new IssuedRefreshToken("raw-token", 3600));
         when(jwtService.generateAccessToken(email)).thenReturn("access-token");
 
         TokenResponse result = serviceConDominioReal.login(loginRequest(email), httpRequest);
@@ -145,7 +145,7 @@ class AuthServiceImplTest {
                 .thenReturn(new UsernamePasswordAuthenticationToken(securityUser, null));
         User user = user(normalized);
         when(userRepository.findByEmailAndEnabledTrue(normalized)).thenReturn(Optional.of(user));
-        when(refreshTokenService.issue(user)).thenReturn(new IssuedRefreshToken("raw-token", 3600));
+        when(refreshTokenService.issueForLogin(user, "hash-autenticado")).thenReturn(new IssuedRefreshToken("raw-token", 3600));
 
         TokenResponse result = service.login(loginRequest("  JPerez@Sistemas.FRC.utn.edu.ar  "), httpRequest);
 
@@ -210,6 +210,38 @@ class AuthServiceImplTest {
 
         assertThatThrownBy(() -> service.login(loginRequest("user@frc.utn.edu.ar"), httpRequest))
                 .isInstanceOf(InvalidCredentialsException.class);
+    }
+
+    @Test
+    @DisplayName("login: el hash cambió tras autenticar → InvalidCredentialsException, sin access token ni issue()")
+    void loginHashCambiadoTrasAutenticar() {
+        when(authDomainProperties.isAllowedEmail(any())).thenReturn(true);
+        when(loginRateLimiter.isRateLimited(any(), any(), any())).thenReturn(false);
+        SecurityUser securityUser = SecurityUser.fromUser(user("user@frc.utn.edu.ar"));
+        when(authenticationManager.authenticate(any()))
+                .thenReturn(new UsernamePasswordAuthenticationToken(securityUser, null));
+        User user = user("user@frc.utn.edu.ar");
+        when(userRepository.findByEmailAndEnabledTrue("user@frc.utn.edu.ar")).thenReturn(Optional.of(user));
+        when(refreshTokenService.issueForLogin(user, "hash-autenticado")).thenThrow(new InvalidCredentialsException());
+
+        assertThatThrownBy(() -> service.login(loginRequest("user@frc.utn.edu.ar"), httpRequest))
+                .isInstanceOf(InvalidCredentialsException.class);
+
+        verify(refreshTokenService, never()).issue(any());
+        verify(jwtService, never()).generateAccessToken(any());
+    }
+
+    @Test
+    @DisplayName("startSession: emite con issue(), sin la comprobación de hash del login")
+    void startSessionUsaIssue() {
+        User user = user("user@frc.utn.edu.ar");
+        when(refreshTokenService.issue(user)).thenReturn(new IssuedRefreshToken("raw-token", 3600));
+        when(jwtService.generateAccessToken(any())).thenReturn("access-token");
+
+        TokenResponse result = service.startSession(user);
+
+        assertThat(result.getRefreshToken()).isEqualTo("raw-token");
+        verify(refreshTokenService, never()).issueForLogin(any(), any());
     }
 
     @Test

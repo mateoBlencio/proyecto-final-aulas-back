@@ -59,6 +59,7 @@ class AuditOperationCoverageTest {
             Map.entry("RoomRequestSuggestionStore#onSettingChanged", "only updates the in-memory suggestion cache TTL"),
             Map.entry("DirectEventSuggestionStore#onSettingChanged", "only updates the in-memory suggestion cache TTL"),
             Map.entry("RefreshTokenServiceImpl#issue", "refresh tokens are not @Audited"),
+            Map.entry("RefreshTokenServiceImpl#issueForLogin", "refresh tokens are not @Audited"),
             Map.entry("RefreshTokenServiceImpl#refresh", "refresh tokens are not @Audited"),
             Map.entry("RefreshTokenServiceImpl#revoke", "refresh tokens are not @Audited"),
             Map.entry("RefreshTokenServiceImpl#revokeAllByUserId", "refresh tokens are not @Audited"),
