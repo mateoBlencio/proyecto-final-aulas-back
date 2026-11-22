@@ -12,7 +12,6 @@ import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
 import ar.edu.utn.frc.siga.academic.specification.AcademicPeriodSpecification;
-import ar.edu.utn.frc.siga.academic.util.WeekAlignedDates;
 import ar.edu.utn.frc.siga.academic.validator.AcademicPeriodUpdateValidator;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
@@ -20,7 +19,6 @@ import ar.edu.utn.frc.siga.common.util.Finder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -85,36 +83,6 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
     }
 
     @Override
-    public List<AcademicPeriodResponseDto> findCurrent() {
-        LocalDate today = LocalDate.now();
-        return academicPeriodRepository.findAllActive().stream()
-                .filter(period -> isCurrent(period, today))
-                .map(academicPeriodMapper::toDto)
-                .toList();
-    }
-
-    /**
-     * Comando explícito de materialización: si el año en curso no tiene filas, las genera desde el
-     * año previo (rollover perezoso). Separado de {@link #findCurrent()} para que una lectura no
-     * escriba. Tolera la carrera contra {@code @UniqueConstraint(anio, cuatrimestre)}: si otra
-     * transacción concurrente ya insertó, la violación de integridad se ignora.
-     */
-    @Override
-    @Transactional
-    @AuditOperation(value = "Alta de períodos académicos del año en curso", subject = "AcademicPeriod")
-    public void materializeCurrentYear() {
-        int year = LocalDate.now().getYear();
-        if (!academicPeriodRepository.findByYearAndDeletedAtIsNull(year).isEmpty()) {
-            return;
-        }
-        try {
-            rolloverFrom(year - 1, year);
-        } catch (DataIntegrityViolationException e) {
-            log.info("Rollover de {} ya materializado por otra transacción concurrente", year);
-        }
-    }
-
-    @Override
     @Transactional
     @AuditOperation(value = "Modificación de período académico", subject = "AcademicPeriod")
     public AcademicPeriodResponseDto update(Long id, UpdateAcademicPeriodRequestDto dto) {
@@ -161,34 +129,6 @@ public class AcademicPeriodServiceImpl implements AcademicPeriodService {
                 period.getId(), period.getYear(), period.getSemester(),
                 period.getStartDate(), period.getEndDate(),
                 period.getRecessStart(), period.getRecessEnd()));
-    }
-
-    private void rolloverFrom(int sourceYear, int targetYear) {
-        for (AcademicPeriod source : academicPeriodRepository.findByYearAndDeletedAtIsNull(sourceYear)) {
-            FindOrCreateResult.resolve(
-                    academicPeriodRepository.findByYearAndSemester(targetYear, source.getSemester()),
-                    () -> {
-                        log.info("Rollover perezoso de AcademicPeriod: year={}, semester={}",
-                                targetYear, source.getSemester());
-                        return academicPeriodRepository.save(AcademicPeriod.builder()
-                                .year(targetYear)
-                                .semester(source.getSemester())
-                                .startDate(alignedOrNull(source.getStartDate(), targetYear))
-                                .endDate(alignedOrNull(source.getEndDate(), targetYear))
-                                .recessStart(alignedOrNull(source.getRecessStart(), targetYear))
-                                .recessEnd(alignedOrNull(source.getRecessEnd(), targetYear))
-                                .build());
-                    });
-        }
-    }
-
-    private static LocalDate alignedOrNull(LocalDate date, int targetYear) {
-        return date != null ? WeekAlignedDates.sameWeekOfMonth(date, targetYear) : null;
-    }
-
-    private static boolean isCurrent(AcademicPeriod period, LocalDate today) {
-        return period.getStartDate() != null && period.getEndDate() != null
-                && !today.isBefore(period.getStartDate()) && !today.isAfter(period.getEndDate());
     }
 
     @Override

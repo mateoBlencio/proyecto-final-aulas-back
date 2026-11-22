@@ -28,20 +28,6 @@ public interface AcademicPeriodService extends ActivationService<Long> {
     /** Período ANUAL activo (no eliminado) del año, si existe. */
     Optional<AcademicPeriodResponseDto> findAnnual(int year);
 
-    /**
-     * Período(s) en vigencia hoy (año + cuatrimestre en curso). Lectura pura: no re-significa
-     * {@link #findActive()} ni materializa nada. Si el año en curso todavía no tiene filas, ver
-     * {@link #materializeCurrentYear()}.
-     */
-    List<AcademicPeriodResponseDto> findCurrent();
-
-    /**
-     * Comando explícito de materialización: si el año en curso no tiene filas, las genera desde el
-     * año previo (rollover perezoso, fechas ajustadas a la semana). Idempotente y tolerante a la
-     * carrera contra el índice único (anio, cuatrimestre).
-     */
-    void materializeCurrentYear();
-
     Page<AcademicPeriodResponseDto> findAll(AcademicPeriodFilter filter, Pageable pageable, boolean includeDeactivated);
 
     AcademicPeriodResponseDto findById(Long id);
