@@ -163,7 +163,7 @@ class RbacApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("DELETE role-assignments propia: 400, no se puede auto-revocar")
     void revoke_ownAssignment_returns400() throws Exception {
         String email = uniqueEmail("self");
-        MockMvc selfMockMvc = mockMvcAsScoped(email, SystemRole.SUBSECRETARIA, ScopeType.GLOBAL, null);
+        MockMvc selfMockMvc = mockMvcAsScoped(email, SystemRole.ADMINISTRADOR, ScopeType.GLOBAL, null);
         Long userId = userRepository.findByEmailAndEnabledTrue(email).orElseThrow().getId();
         Long assignmentId = roleAssignmentRepository.findAllByUserId(userId).getFirst().getId();
 
@@ -228,7 +228,7 @@ class RbacApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST role-assignments: SUBSECRETARIA con BUILDING o AUXILIAR_AULICO con GLOBAL: 400 y no se guarda nada")
+    @DisplayName("POST role-assignments: ADMINISTRADOR con BUILDING o AUXILIAR_AULICO con GLOBAL: 400 y no se guarda nada")
     void assign_roleWithDisallowedScope_returnsBadRequestAndPersistsNothing() throws Exception {
         Building building = testData.edificio();
         Long subsecretariaUserId = createPlainUser(uniqueEmail("subsec-building"));
@@ -236,7 +236,7 @@ class RbacApiIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(post("/v1/users/{id}/role-assignments", subsecretariaUserId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(assignRoleBody("SUBSECRETARIA", ScopeType.BUILDING, building.getId())))
+                        .content(assignRoleBody("ADMINISTRADOR", ScopeType.BUILDING, building.getId())))
                 .andExpect(status().isBadRequest());
         mockMvc.perform(post("/v1/users/{id}/role-assignments", auxiliarUserId)
                         .contentType(MediaType.APPLICATION_JSON)

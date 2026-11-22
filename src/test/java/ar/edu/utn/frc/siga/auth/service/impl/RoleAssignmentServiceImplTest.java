@@ -140,15 +140,15 @@ class RoleAssignmentServiceImplTest {
     }
 
     @Test
-    @DisplayName("assign: SUBSECRETARIA con alcance BUILDING → RoleDomainException, sin consultar edificio ni guardar")
+    @DisplayName("assign: ADMINISTRADOR con alcance BUILDING → RoleDomainException, sin consultar edificio ni guardar")
     void assignSubsecretariaWithBuildingScopeThrows() {
         when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "u@frc.utn.edu.ar")));
 
-        AssignRoleRequestDto dto = new AssignRoleRequestDto(SystemRole.SUBSECRETARIA, ScopeType.BUILDING, 5L);
+        AssignRoleRequestDto dto = new AssignRoleRequestDto(SystemRole.ADMINISTRADOR, ScopeType.BUILDING, 5L);
 
         assertThatThrownBy(() -> service.assign(1L, dto, OTHER_EMAIL))
                 .isInstanceOf(RoleDomainException.class)
-                .hasMessage("El rol Subsecretaría no admite el alcance Edificio");
+                .hasMessage("El rol Administrador no admite el alcance Edificio");
 
         verify(roleAssignmentRepository, never()).save(any());
         verifyNoInteractions(buildingService);

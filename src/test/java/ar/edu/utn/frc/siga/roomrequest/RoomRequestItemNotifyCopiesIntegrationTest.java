@@ -121,7 +121,7 @@ class RoomRequestItemNotifyCopiesIntegrationTest extends AbstractIntegrationTest
     /** Crea una subsecretaria habilitada vía el helper de MockMvc y devuelve su email. */
     private String enabledSubsecretaria() {
         String email = "subsecretaria-extra-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar";
-        mockMvcAs(email, SystemRole.SUBSECRETARIA);
+        mockMvcAs(email, SystemRole.ADMINISTRADOR);
         return email;
     }
 
@@ -135,7 +135,7 @@ class RoomRequestItemNotifyCopiesIntegrationTest extends AbstractIntegrationTest
                 .lastName("Subsecretaria")
                 .build());
         roleAssignmentRepository.save(RoleAssignment.builder()
-                .user(user).role(SystemRole.SUBSECRETARIA).scopeType(ScopeType.GLOBAL).scopeId(null).build());
+                .user(user).role(SystemRole.ADMINISTRADOR).scopeType(ScopeType.GLOBAL).scopeId(null).build());
         return email;
     }
 

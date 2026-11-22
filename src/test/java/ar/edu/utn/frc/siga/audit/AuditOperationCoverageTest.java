@@ -164,7 +164,7 @@ class AuditOperationCoverageTest {
     @DisplayName("ningún texto base de @AuditOperation contiene el nombre de una constante de enum en mayúsculas")
     void noBaseTextContainsAnEnumConstantName() {
         Set<String> constants = enumConstantNames();
-        assertThat(constants).contains("VIRTUAL_CLASS", "SUBSECRETARIA", "NEW");
+        assertThat(constants).contains("VIRTUAL_CLASS", "ADMINISTRADOR", "NEW");
 
         Map<String, String> offending = new TreeMap<>();
         auditOperations().forEach((key, operation) -> {

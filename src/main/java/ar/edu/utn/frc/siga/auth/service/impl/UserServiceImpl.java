@@ -156,16 +156,16 @@ public class UserServiceImpl implements UserService {
         return userRepository.findBuildingIdsForUserAndRole(AuthDomainProperties.normalizeEmail(email), role);
     }
 
-    // AUTH-RN-06: nadie se inhabilita a sí mismo ni deja al sistema sin subsecretaria habilitada
+    // AUTH-RN-06: nadie se inhabilita a sí mismo ni deja al sistema sin administrador habilitado
     private void requireDisableAllowed(User target, String currentUserEmail) {
         if (target.getEmail().equals(AuthDomainProperties.normalizeEmail(currentUserEmail))) {
             log.warn("Inhabilitación rechazada: el usuario no puede inhabilitarse a sí mismo, id={}", target.getId());
             throw new UserDomainException("Users cannot disable themselves");
         }
-        List<User> subsecretarias = userRepository.findEnabledByRole(SystemRole.SUBSECRETARIA);
-        if (subsecretarias.size() == 1 && subsecretarias.getFirst().getId().equals(target.getId())) {
-            log.warn("Inhabilitación rechazada: última subsecretaria habilitada, id={}", target.getId());
-            throw new UserDomainException("The last enabled SUBSECRETARIA cannot be disabled");
+        List<User> administrators = userRepository.findEnabledByRole(SystemRole.ADMINISTRADOR);
+        if (administrators.size() == 1 && administrators.getFirst().getId().equals(target.getId())) {
+            log.warn("Inhabilitación rechazada: último administrador habilitado, id={}", target.getId());
+            throw new UserDomainException("The last enabled ADMINISTRADOR cannot be disabled");
         }
     }
 

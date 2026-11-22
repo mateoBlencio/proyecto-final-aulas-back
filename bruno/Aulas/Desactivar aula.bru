@@ -23,7 +23,7 @@ assert {
 }
 
 docs {
-  DELETE /v1/classrooms/{id}/activation. Roles: SUBSECRETARIA, AUXILIAR_AULICO
+  DELETE /v1/classrooms/{id}/activation. Roles: ADMINISTRADOR, AUXILIAR_AULICO
   (acotado a sus edificios). Soft-delete idempotente. Libera las clases futuras asignadas
   al aula (releaseReason CLASSROOM_DEACTIVATED, nota "Aula deshabilitada") y fusiona las que
   tienen espejo en otra aula. 404 si el aula no existe.

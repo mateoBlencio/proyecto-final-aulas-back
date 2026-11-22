@@ -205,7 +205,7 @@ class ActionFlagsApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /v1/buildings como SUBSECRETARIA: canActivate y canCreateClassroom true")
+    @DisplayName("GET /v1/buildings como ADMINISTRADOR: canActivate y canCreateClassroom true")
     void buildingFlagsForSubsecretaria() throws Exception {
         Building a = testData.edificio();
 

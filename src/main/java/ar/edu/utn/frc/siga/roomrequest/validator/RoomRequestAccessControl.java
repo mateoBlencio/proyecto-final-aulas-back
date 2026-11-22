@@ -42,7 +42,7 @@ public class RoomRequestAccessControl {
     }
 
     public Actor resolveActor(String actorEmail) {
-        if (userService.hasRole(actorEmail, SystemRole.SUBSECRETARIA)) {
+        if (userService.hasRole(actorEmail, SystemRole.ADMINISTRADOR)) {
             return new Actor(true, Set.of());
         }
         return new Actor(false, userService.findBuildingIdsForRole(actorEmail, SystemRole.AUXILIAR_AULICO));
@@ -79,7 +79,7 @@ public class RoomRequestAccessControl {
     }
 
     public Optional<Set<Long>> readScope(String actorEmail) {
-        if (userService.hasRole(actorEmail, SystemRole.SUBSECRETARIA)
+        if (userService.hasRole(actorEmail, SystemRole.ADMINISTRADOR)
                 || !userService.hasRole(actorEmail, SystemRole.AUXILIAR_AULICO)) {
             return Optional.empty();
         }

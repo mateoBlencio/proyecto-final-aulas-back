@@ -214,7 +214,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("PATCH /v1/users/{id}/enabled con el propio usuario autenticado responde 400 y no lo inhabilita")
     void setEnabled_disablingSelf_returns400() throws Exception {
         String email = "self.disable." + System.nanoTime() + "@frc.utn.edu.ar";
-        MockMvc self = mockMvcAs(email, SystemRole.SUBSECRETARIA);
+        MockMvc self = mockMvcAs(email, SystemRole.ADMINISTRADOR);
         long id = userRepository.findByEmailAndEnabledTrue(email).orElseThrow().getId();
 
         self.perform(patch("/v1/users/{id}/enabled", id)
@@ -262,7 +262,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /v1/users/with-role es accesible para SUBSECRETARIA (200)")
+    @DisplayName("GET /v1/users/with-role es accesible para ADMINISTRADOR (200)")
     void findByRole_asSubsecretaria_returns200() throws Exception {
         mockMvc.perform(get("/v1/users/with-role")
                         .param("role", "AUXILIAR_AULICO")
@@ -272,7 +272,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /v1/users es accesible para SUBSECRETARIA (200)")
+    @DisplayName("GET /v1/users es accesible para ADMINISTRADOR (200)")
     void findEnabled_asSubsecretaria_returns200() throws Exception {
         mockMvc.perform(get("/v1/users")).andExpect(status().isOk());
     }

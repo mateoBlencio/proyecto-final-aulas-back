@@ -132,13 +132,13 @@ class RoomRequestItemForeignAuxiliarApiIntegrationTest extends AbstractIntegrati
     }
 
     @Test
-    @DisplayName("un usuario con SUBSECRETARIA y además auxiliar de otro edificio lee un ítem derivado a un tercero y ve su acción de subsecretaría")
+    @DisplayName("un usuario con ADMINISTRADOR y además auxiliar de otro edificio lee un ítem derivado a un tercero y ve su acción de subsecretaría")
     void subsecretariaYAuxiliarDeOtroEdificio_noSeRecorta() throws Exception {
         Building own = testData.edificio();
         Building auxiliarBuilding = testData.edificio();
         RoomRequestItem item = derivedItem(RoomRequestStatus.NOTIFIED, own);
         String email = "sub-aux-" + IntegrationTestData.nextSeq() + "@frc.utn.edu.ar";
-        MockMvc both = mockMvcAsScoped(email, SystemRole.SUBSECRETARIA, ScopeType.GLOBAL, null);
+        MockMvc both = mockMvcAsScoped(email, SystemRole.ADMINISTRADOR, ScopeType.GLOBAL, null);
         roleAssignmentRepository.save(RoleAssignment.builder()
                 .user(userRepository.findByEmailAndEnabledTrue(email).orElseThrow())
                 .role(SystemRole.AUXILIAR_AULICO)

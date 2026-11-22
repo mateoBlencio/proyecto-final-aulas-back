@@ -312,15 +312,15 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("setEnabled(false): la única SUBSECRETARIA habilitada no se puede inhabilitar")
-    void disableLastSubsecretariaThrows() {
+    @DisplayName("setEnabled(false): la única ADMINISTRADOR habilitada no se puede inhabilitar")
+    void disableLastAdministratorThrows() {
         User user = existing(7L, "sub@frc.utn.edu.ar");
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(userRepository.findEnabledByRole(SystemRole.SUBSECRETARIA)).thenReturn(List.of(user));
+        when(userRepository.findEnabledByRole(SystemRole.ADMINISTRADOR)).thenReturn(List.of(user));
 
         assertThatThrownBy(() -> service.setEnabled(7L, false, CREATOR_EMAIL))
                 .isInstanceOf(UserDomainException.class)
-                .hasMessage("The last enabled SUBSECRETARIA cannot be disabled");
+                .hasMessage("The last enabled ADMINISTRADOR cannot be disabled");
 
         assertThat(user.getEnabled()).isTrue();
         verify(userRepository, never()).save(any());
@@ -328,12 +328,12 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("setEnabled(false): con dos SUBSECRETARIA habilitadas se puede inhabilitar a una y se revocan sus tokens")
-    void disableOneOfTwoSubsecretariasPasses() {
+    @DisplayName("setEnabled(false): con dos ADMINISTRADOR habilitadas se puede inhabilitar a una y se revocan sus tokens")
+    void disableOneOfTwoAdministratorsPasses() {
         User user = existing(7L, "sub@frc.utn.edu.ar");
         User other = existing(8L, "otra.sub@frc.utn.edu.ar");
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(userRepository.findEnabledByRole(SystemRole.SUBSECRETARIA)).thenReturn(List.of(user, other));
+        when(userRepository.findEnabledByRole(SystemRole.ADMINISTRADOR)).thenReturn(List.of(user, other));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(userMapper.toDto(any(User.class)))
                 .thenReturn(new UserResponseDto(7L, "sub@frc.utn.edu.ar", "Nombre", "Apellido", null));
@@ -345,12 +345,12 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("setEnabled(false): un usuario que no es la SUBSECRETARIA se inhabilita aunque quede una sola habilitada")
-    void disableAuxiliarWithSingleEnabledSubsecretariaPasses() {
+    @DisplayName("setEnabled(false): un usuario que no es la ADMINISTRADOR se inhabilita aunque quede una sola habilitada")
+    void disableAuxiliarWithSingleEnabledAdministratorPasses() {
         User auxiliar = existing(7L, "aux@frc.utn.edu.ar");
-        User onlySubsecretaria = existing(8L, "sub@frc.utn.edu.ar");
+        User onlyAdministrator = existing(8L, "sub@frc.utn.edu.ar");
         when(userRepository.findById(7L)).thenReturn(Optional.of(auxiliar));
-        when(userRepository.findEnabledByRole(SystemRole.SUBSECRETARIA)).thenReturn(List.of(onlySubsecretaria));
+        when(userRepository.findEnabledByRole(SystemRole.ADMINISTRADOR)).thenReturn(List.of(onlyAdministrator));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(userMapper.toDto(any(User.class)))
                 .thenReturn(new UserResponseDto(7L, "aux@frc.utn.edu.ar", "Nombre", "Apellido", null));
@@ -362,7 +362,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("setEnabled(true): habilitar no valida autoinhabilitación ni consulta las SUBSECRETARIA")
+    @DisplayName("setEnabled(true): habilitar no valida autoinhabilitación ni consulta las ADMINISTRADOR")
     void enableSkipsDisableValidations() {
         User user = existing(7L, "u@frc.utn.edu.ar");
         user.setEnabled(false);
