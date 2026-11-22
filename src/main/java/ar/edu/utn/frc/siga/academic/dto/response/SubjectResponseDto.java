@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.dto.response;
 
+import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import org.springframework.modulith.NamedInterface;
 
 @NamedInterface("api")
@@ -8,6 +9,8 @@ public record SubjectResponseDto(
         Integer code,
         String name,
         String term,
-        StudyPlanResponseDto studyPlan
+        StudyPlanResponseDto studyPlan,
+        boolean enabled,
+        UnavailableReason unavailableReason
 ) {
 }

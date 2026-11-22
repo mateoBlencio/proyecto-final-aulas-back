@@ -15,7 +15,7 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response, AccessDeniedException accessDeniedException)
             throws IOException {
-        ProblemDetailResponseWriter.write(response, HttpStatus.FORBIDDEN,
-                "Forbidden", "You do not have permission to access this resource");
+        ProblemDetailResponseWriter.write(request, response,HttpStatus.FORBIDDEN,
+                "Forbidden", "No tenés permiso para acceder a este recurso.");
     }
 }

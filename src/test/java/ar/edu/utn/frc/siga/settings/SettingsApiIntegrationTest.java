@@ -1,46 +1,49 @@
 package ar.edu.utn.frc.siga.settings;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
-import ar.edu.utn.frc.siga.auth.model.Role;
-import ar.edu.utn.frc.siga.auth.security.JwtService;
-import ar.edu.utn.frc.siga.common.audit.RevisionReader;
-import ar.edu.utn.frc.siga.common.dto.response.RevisionDto;
+import ar.edu.utn.frc.siga.auth.model.SystemRole;
+import ar.edu.utn.frc.siga.audit.service.RevisionReader;
+import ar.edu.utn.frc.siga.audit.dto.response.RevisionDto;
 import ar.edu.utn.frc.siga.settings.config.SettingsCatalogProperties;
 import ar.edu.utn.frc.siga.settings.model.Setting;
 import ar.edu.utn.frc.siga.settings.model.SettingKey;
 import ar.edu.utn.frc.siga.settings.repository.SettingRepository;
+import ar.edu.utn.frc.siga.space.model.Building;
+import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.context.WebApplicationContext;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.temporal.TemporalAdjusters;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
+@Import(IntegrationTestData.class)
 @DisplayName("Settings API (integración)")
 class SettingsApiIntegrationTest extends AbstractIntegrationTest {
 
     private static final String USER = "integration-test@frc.utn.edu.ar";
 
-    @Autowired
-    private WebApplicationContext webApplicationContext;
-    @Autowired
-    private JwtService jwtService;
     @Autowired
     private SettingRepository settingRepository;
     @Autowired
@@ -51,6 +54,12 @@ class SettingsApiIntegrationTest extends AbstractIntegrationTest {
     private ObjectMapper objectMapper;
     @Autowired
     private SettingsCatalogProperties catalog;
+    @Autowired
+    private ar.edu.utn.frc.siga.settings.service.SettingsStore settingsStore;
+    @Autowired
+    private IntegrationTestData testData;
+
+    private final Map<SettingKey, String> initialValues = new LinkedHashMap<>();
 
     @BeforeEach
     void ensureSeeded() {
@@ -58,6 +67,25 @@ class SettingsApiIntegrationTest extends AbstractIntegrationTest {
             for (SettingKey key : SettingKey.values()) {
                 if (!settingRepository.existsById(key.getKey())) {
                     settingRepository.save(new Setting(key.getKey(), catalog.defaultValue(key)));
+                }
+            }
+        });
+        initialValues.clear();
+        for (SettingKey key : SettingKey.values()) {
+            initialValues.put(key, settingsStore.getRaw(key));
+        }
+    }
+
+    /**
+     * La base y el caché de settings se comparten con el resto de las clases de integración: sin esta
+     * restauración, un PUT de acá (por ejemplo events.hours.end=22:30) rompe a los tests que corren después.
+     */
+    @AfterEach
+    void restoreChangedSettings() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
+            for (Map.Entry<SettingKey, String> initial : initialValues.entrySet()) {
+                if (!initial.getValue().equals(settingsStore.getRaw(initial.getKey()))) {
+                    settingsStore.write(initial.getKey(), initial.getValue());
                 }
             }
         });
@@ -74,7 +102,15 @@ class SettingsApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.events[?(@.key=='events.hours.start')].value").value("08:00"))
                 .andExpect(jsonPath("$.events[?(@.key=='events.hours.start')].type").value("TIME"))
                 .andExpect(jsonPath("$.optimizer[?(@.key=='optimizer.weights.overcrowding')].min").value("0"))
-                .andExpect(jsonPath("$.optimizer[?(@.key=='optimizer.weights.overcrowding')].max").value("1000000"));
+                .andExpect(jsonPath("$.optimizer[?(@.key=='optimizer.weights.overcrowding')].max").value("1000000"))
+                .andExpect(jsonPath("$.allocation").isArray())
+                .andExpect(jsonPath("$.allocation[?(@.key=='allocation.maxOverlapMinutes')].value").value("40"))
+                .andExpect(jsonPath("$.allocation[?(@.key=='allocation.maxOverlapMinutes')].defaultValue").value("40"))
+                .andExpect(jsonPath("$.allocation[?(@.key=='allocation.maxOverlapMinutes')].type").value("INT"))
+                .andExpect(jsonPath("$.allocation[?(@.key=='allocation.maxOverlapMinutes')].riskLevel").value("ADVANCED"))
+                .andExpect(jsonPath("$.allocation[?(@.key=='allocation.maxOverlapMinutes')].warning").exists())
+                .andExpect(jsonPath("$.allocation[?(@.key=='allocation.maxOverlapMinutes')].max")
+                        .value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.nullValue())));
     }
 
     @Test
@@ -148,16 +184,179 @@ class SettingsApiIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("Un AUXILIAR_AULICO no puede modificar configuración (403)")
     void put_asAuxiliar_isForbidden() throws Exception {
-        String auxToken = jwtService.generateAccessToken("auxiliar@frc.utn.edu.ar", Set.of(Role.AUXILIAR_AULICO));
-        MockMvc auxiliarMockMvc = webAppContextSetup(webApplicationContext)
-                .apply(springSecurity())
-                .defaultRequest(get("/").header("Authorization", "Bearer " + auxToken))
-                .build();
+        MockMvc auxiliarMockMvc = mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar");
 
         auxiliarMockMvc.perform(put("/v1/settings/{key}", "optimizer.weights.overcrowding")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"value\":\"123\"}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("PUT allocation.maxOverlapMinutes sin cota superior: acepta 5000 y lo persiste")
+    void put_allocationMaxOverlapMinutes_sinTecho_persiste5000() throws Exception {
+        putValue("allocation.maxOverlapMinutes", "5000")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.value").value("5000"));
+
+        assertThat(settingRepository.findById("allocation.maxOverlapMinutes"))
+                .get()
+                .extracting(Setting::getValue)
+                .isEqualTo("5000");
+
+        putValue("allocation.maxOverlapMinutes", "40").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("PUT allocation.maxOverlapMinutes con -1 responde 400 por el min: 0")
+    void put_allocationMaxOverlapMinutes_negativo_returns400() throws Exception {
+        putValue("allocation.maxOverlapMinutes", "-1")
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PUT allocation.maxOverlapMinutes con un valor que desborda Integer responde 400")
+    void put_allocationMaxOverlapMinutes_desbordeDeInteger_returns400() throws Exception {
+        putValue("allocation.maxOverlapMinutes", "99999999999")
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Un AUXILIAR_AULICO no puede mover el margen de solape (403): solo Subsecretaría")
+    void put_allocationMaxOverlapMinutes_asAuxiliar_isForbidden() throws Exception {
+        MockMvc auxiliarMockMvc = mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar");
+
+        auxiliarMockMvc.perform(put("/v1/settings/{key}", "allocation.maxOverlapMinutes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"value\":\"50\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("GET /v1/settings expone las opciones de un setting ENUM y deja options vacío para los demás")
+    void findAll_exposesEnumOptions() throws Exception {
+        mockMvc.perform(get("/v1/settings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sysacad[?(@.key=='sysacad.write.mode')].type").value("ENUM"))
+                .andExpect(jsonPath("$.sysacad[?(@.key=='sysacad.write.mode')].options")
+                        .value(org.hamcrest.Matchers.contains(
+                                org.hamcrest.Matchers.contains("OFF", "SANDBOX", "ON"))))
+                .andExpect(jsonPath("$.allocation[?(@.key=='allocation.maxOverlapMinutes')].options")
+                        .value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.empty())));
+    }
+
+    @Test
+    @DisplayName("PUT de un ENUM con un valor fuera de las opciones responde 400 y no persiste")
+    void put_enumOutsideOptions_returns400() throws Exception {
+        putValue("sysacad.write.mode", "MAYBE").andExpect(status().isBadRequest());
+        putValue("sysacad.write.mode", "on").andExpect(status().isBadRequest());
+
+        assertThat(settingRepository.findById("sysacad.write.mode"))
+                .get().extracting(Setting::getValue).isEqualTo("OFF");
+    }
+
+    @Test
+    @DisplayName("PUT de sysacad.write.mode=SANDBOX persiste y se vuelve a OFF al final")
+    void put_sandboxMode_persists() throws Exception {
+        try {
+            putValue("sysacad.write.mode", "SANDBOX")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.value").value("SANDBOX"));
+
+            assertThat(settingRepository.findById("sysacad.write.mode"))
+                    .get().extracting(Setting::getValue).isEqualTo("SANDBOX");
+        } finally {
+            new TransactionTemplate(transactionManager).executeWithoutResult(tx ->
+                    settingsStore.write(SettingKey.SYSACAD_WRITE_MODE, "OFF"));
+        }
+    }
+
+    @Test
+    @DisplayName("PUT events.hours.end anterior al inicio vigente responde 400 y el valor en base no cambia")
+    void put_endBeforeCurrentStart_returns400AndKeepsValue() throws Exception {
+        assertThat(storedValue("events.hours.start")).isEqualTo("08:00");
+        String endBefore = storedValue("events.hours.end");
+
+        putValue("events.hours.end", "07:00")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("debe ser anterior")));
+
+        assertThat(storedValue("events.hours.end")).isEqualTo(endBefore);
+        assertThat(settingsStore.getTime(SettingKey.EVENTS_HOURS_END)).isEqualTo(LocalTime.parse(endBefore));
+    }
+
+    @Test
+    @DisplayName("PUT events.hours.end igual al inicio vigente (08:00) responde 400")
+    void put_endEqualToCurrentStart_returns400() throws Exception {
+        assertThat(storedValue("events.hours.start")).isEqualTo("08:00");
+        String endBefore = storedValue("events.hours.end");
+
+        putValue("events.hours.end", "08:00").andExpect(status().isBadRequest());
+
+        assertThat(storedValue("events.hours.end")).isEqualTo(endBefore);
+    }
+
+    @Test
+    @DisplayName("PUT en lote con un par de ventana inválido no persiste ninguna clave")
+    void putBatch_invalidWindowPair_writesNothing() throws Exception {
+        String ttlBefore = storedValue("preview.ttlMinutes");
+        String startBefore = storedValue("events.hours.start");
+        String endBefore = storedValue("events.hours.end");
+        String body = """
+                {"settings":[
+                  {"key":"preview.ttlMinutes","value":"120"},
+                  {"key":"events.hours.start","value":"22:00"},
+                  {"key":"events.hours.end","value":"21:00"}
+                ]}
+                """;
+
+        mockMvc.perform(put("/v1/settings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+
+        assertThat(storedValue("preview.ttlMinutes")).isEqualTo(ttlBefore);
+        assertThat(storedValue("events.hours.start")).isEqualTo(startBefore);
+        assertThat(storedValue("events.hours.end")).isEqualTo(endBefore);
+    }
+
+    @Test
+    @DisplayName("Con events.hours.end en 00:00 el tablero semanal responde 200 y mide la banda 08:00-24:00")
+    void put_endMidnight_dashboardWeekStillWorks() throws Exception {
+        assertThat(storedValue("events.hours.start")).isEqualTo("08:00");
+        String endBefore = storedValue("events.hours.end");
+        Building building = testData.edificio();
+        testData.aula(building, testData.tipoAulaPorDefecto(), 30);
+        LocalDate monday = LocalDate.now().plusYears(5).with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY))
+                .plusWeeks(95);
+        try {
+            putValue("events.hours.end", "00:00")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.value").value("00:00"));
+
+            String content = mockMvc.perform(get("/v1/dashboard/week").param("weekOf", monday.toString()))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+
+            JsonNode root = objectMapper.readTree(content);
+            assertThat(LocalTime.parse(root.get("parameters").get("hoursEnd").asText())).isEqualTo(LocalTime.MIDNIGHT);
+            JsonNode mine = null;
+            for (JsonNode node : root.get("buildings")) {
+                if (node.get("buildingId").asLong() == building.getId()) {
+                    mine = node;
+                }
+            }
+            assertThat(mine).isNotNull();
+            int availableDays = 6 - root.get("excludedDays").size();
+            assertThat(mine.get("hourlyProfile")).hasSize(16);
+            assertThat(mine.get("occupancy").get("availableHours").asDouble()).isEqualTo(16.0 * availableDays);
+        } finally {
+            putValue("events.hours.end", endBefore).andExpect(status().isOk());
+        }
+    }
+
+    private String storedValue(String key) {
+        return settingRepository.findById(key).orElseThrow().getValue();
     }
 
     private org.springframework.test.web.servlet.ResultActions putValue(String key, String value) throws Exception {

@@ -1,0 +1,35 @@
+meta {
+  name: Contar personas
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/v1/camera-counts
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "rtspUrl": "{{cameraRtspUrl}}",
+    "samples": 5
+  }
+}
+
+docs {
+  Cuenta las personas que ve la cámara: el servicio toma samples fotogramas
+  (1 a 10; sin samples usa 5) y devuelve la mediana redondeada en people.
+  Tarda unos 25 s y hasta 90 s en el peor caso. status NO_SIGNAL (people null)
+  significa que la cámara no dio fotogramas suficientes.
+
+  cameraRtspUrl es una variable secreta del entorno (lleva usuario y clave de
+  la cámara): cargarla en Bruno, en el entorno, y no escribirla en este
+  archivo. Formato: rtsp://usuario:clave@IP:554/Streaming/Channels/101
+
+  Errores: 400 si rtspUrl falta o no es rtsp:// o rtsps://, o samples está
+  fuera de 1 a 10; 422 si el servicio rechaza la URL; 503 si el servicio está
+  caído, saturado (con Retry-After) o deshabilitado en el backend; 502 ante
+  otro error del servicio. Requiere PERM_CAMERA_COUNT_RUN (SUBSECRETARIA o
+  AUXILIAR_AULICO, sin importar el edificio).
+}

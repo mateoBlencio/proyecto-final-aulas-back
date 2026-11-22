@@ -1,9 +1,14 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
+import ar.edu.utn.frc.siga.academic.dto.CommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
+import ar.edu.utn.frc.siga.academic.dto.response.SpecialtySummaryDto;
 import ar.edu.utn.frc.siga.academic.mapper.CommissionMapper;
+import ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged;
 import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
 import ar.edu.utn.frc.siga.academic.model.Commission;
+import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
@@ -15,15 +20,18 @@ import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.command.CommissionSyncCommand;
+import ar.edu.utn.frc.siga.academic.specification.CommissionSpecification;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
+import ar.edu.utn.frc.siga.common.util.SyncGuard;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,6 +40,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +53,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class CommissionServiceImpl implements CommissionService {
 
+    private final ApplicationEventPublisher eventPublisher;
     private final CommissionRepository commissionRepository;
     private final AcademicPeriodRepository academicPeriodRepository;
     private final SubjectRepository subjectRepository;
@@ -50,36 +63,69 @@ public class CommissionServiceImpl implements CommissionService {
 
     @Override
     public CommissionResponseDto findById(Long id) {
-        return commissionMapper.toDto(commissionRepository.findActiveById(id)
-                .orElseThrow(() -> ResourceNotFoundException.of("Commission", id)));
+        Commission commission = commissionRepository.findById(id)
+                .filter(Commission::isAvailable)
+                .orElseThrow(() -> ResourceNotFoundException.of("Commission", id));
+        return withSpecialties(List.of(commission)).get(0);
     }
 
     @Override
     @Transactional
+    @AuditOperation(value = "Reactivación de comisión", subject = "Commission")
     public void activate(Long id) {
         commissionRepository.restore(Finder.orThrow(commissionRepository::findById, id, "Commission"));
+        eventPublisher.publishEvent(new CatalogAvailabilityChanged());
     }
 
     @Override
     @Transactional
+    @AuditOperation(value = "Baja de comisión", subject = "Commission")
     public void deactivate(Long id) {
         commissionRepository.softDelete(Finder.orThrow(commissionRepository::findById, id, "Commission"));
+        eventPublisher.publishEvent(new CatalogAvailabilityChanged());
     }
 
     @Override
     public List<CommissionResponseDto> findByIds(Collection<Long> ids) {
+        return commissionRepository.findAllById(ids).stream()
+                .filter(Commission::isAvailable)
+                .map(commissionMapper::toDto)
+                .toList();
+    }
+
+    @Override
+    public List<CommissionResponseDto> findByIdsIncludingDeactivated(Collection<Long> ids) {
         return commissionRepository.findAllById(ids).stream()
                 .map(commissionMapper::toDto)
                 .toList();
     }
 
     @Override
-    public List<CommissionResponseDto> findAll(boolean includeDeactivated) {
-        List<Commission> commissions = includeDeactivated
-                ? commissionRepository.findAll()
-                : commissionRepository.findAllActive();
+    public Page<CommissionResponseDto> findAll(CommissionFilter filter, Pageable pageable, boolean includeDeactivated) {
+        Page<Commission> page = commissionRepository.findAll(
+                CommissionSpecification.withFilter(filter, includeDeactivated)
+                        .and(includeDeactivated ? Specification.<Commission>unrestricted() : CommissionSpecification.available()),
+                pageable);
+        Iterator<CommissionResponseDto> enriched = withSpecialties(page.getContent()).iterator();
+        return page.map(commission -> enriched.next());
+    }
+
+    // One query for the whole page. A commission can offer subjects of several specialties, so the
+    // response carries the distinct list instead of repeating the commission once per specialty.
+    private List<CommissionResponseDto> withSpecialties(List<Commission> commissions) {
+        List<Long> ids = commissions.stream().map(Commission::getId).toList();
+        Map<Long, List<SpecialtySummaryDto>> byCommission = ids.isEmpty() ? Map.of()
+                : subjectCommissionRepository.findSpecialtiesByCommissionIds(ids).stream()
+                        .collect(Collectors.groupingBy(row -> (Long) row[0],
+                                Collectors.mapping(row -> new SpecialtySummaryDto((Integer) row[1], (String) row[2]),
+                                        Collectors.toList())));
         return commissions.stream()
-                .map(commissionMapper::toDto)
+                .map(commission -> {
+                    CommissionResponseDto dto = commissionMapper.toDto(commission);
+                    return new CommissionResponseDto(dto.id(), dto.courseCode(), dto.academicPeriod(),
+                            dto.unavailableReason(), byCommission.getOrDefault(commission.getId(), List.of()),
+                            dto.currentInSysacad());
+                })
                 .toList();
     }
 
@@ -88,6 +134,7 @@ public class CommissionServiceImpl implements CommissionService {
             Integer periodSemester) {
         AcademicPeriod period = requirePeriod(periodYear, periodSemester);
         return commissionRepository.findByCourseCodeAndAcademicPeriod(courseCode, period)
+                .filter(Commission::isAvailable)
                 .map(commissionMapper::toDto)
                 .orElseThrow(() -> ResourceNotFoundException.of("Commission",
                         courseCode + "-" + periodYear + "-" + periodSemester));
@@ -100,7 +147,10 @@ public class CommissionServiceImpl implements CommissionService {
 
     @Override
     public CommissionResponseDto findActiveByCourseCode(String courseCode) {
-        List<Commission> active = commissionRepository.findByCourseCodeAndSysacadEnabledTrueAndDeletedAtIsNull(courseCode);
+        List<Commission> active = commissionRepository.findByCourseCodeAndSysacadEnabledTrueAndDeletedAtIsNull(courseCode)
+                .stream()
+                .filter(Commission::isAvailable)
+                .toList();
         if (active.size() > 1) {
             log.warn("Más de una comisión vigente en SysAcad para el curso {}: {} candidatas, no se puede "
                     + "resolver sin ambigüedad", courseCode, active.size());
@@ -112,16 +162,29 @@ public class CommissionServiceImpl implements CommissionService {
     }
 
     @Override
+    public List<Long> findActiveIdsByCourseCode(String courseCode) {
+        return commissionRepository.findByCourseCodeAndSysacadEnabledTrueAndDeletedAtIsNull(courseCode).stream()
+                .filter(Commission::isAvailable)
+                .map(Commission::getId)
+                .toList();
+    }
+
+    @Override
     @Transactional
-    public int syncCommissions(List<CommissionSyncCommand> commands) {
+    @AuditOperation(value = "Sincronización de comisiones desde SysAcad", subject = "Commission")
+    public int syncCommissions(List<CommissionSyncCommand> commands, int minValidPercent) {
         Instant syncedAt = Instant.now();
         Map<CommissionKey, Commission> existingCommissions = commissionRepository.findAll().stream()
                 .collect(Collectors.toMap(CommissionKey::of, Function.identity()));
         Map<Integer, AcademicPeriod> periodsByYear = new HashMap<>();
         Map<StudyPlanKey, Optional<StudyPlan>> studyPlansByKey = new HashMap<>();
+        Map<Integer, Specialty> specialtyCache = new HashMap<>();
         Map<SubjectKey, Subject> existingSubjects = Maps.byId(subjectRepository.findAll(), SubjectKey::of);
         Map<SubjectCommissionId, SubjectCommission> existingLinks =
-                Maps.byId(subjectCommissionRepository.findAll(), SubjectCommission::getId);
+                Maps.byId(subjectCommissionRepository.findAll(), SubjectCommission::key);
+        long currentRows = existingCommissions.values().stream()
+                .filter(commission -> commission.getSysacadHash() != null
+                        && Boolean.TRUE.equals(commission.getSysacadEnabled())).count();
         Set<CommissionKey> incoming = new HashSet<>();
         int affected = 0;
 
@@ -131,14 +194,13 @@ public class CommissionServiceImpl implements CommissionService {
                         command.courseCode(), command.academicYear());
                 continue;
             }
-            Optional<StudyPlan> studyPlan =
-                    findOrCreateStudyPlan(studyPlansByKey, command.specialtyCode(), command.studyPlanCode(), syncedAt);
+            Optional<StudyPlan> studyPlan = findOrCreateStudyPlan(studyPlansByKey, specialtyCache,
+                    command.specialtyCode(), command.studyPlanCode(), command.courseCode(), syncedAt);
             AcademicPeriod period = findOrCreatePeriod(periodsByYear, command.academicYear());
             CommissionKey rowKey = new CommissionKey(command.courseCode(), period.getId());
             incoming.add(rowKey);
-            String hash = Hashes.sha256Hex(
-                    command.courseCode(), period.getId(),
-                    command.specialtyCode(), command.studyPlanCode(), command.subjectCode());
+            // The key is (course, period) and Horarios has one row per subject: the hash cannot include the subject.
+            String hash = Hashes.sha256Hex(command.courseCode(), period.getId());
             Commission commission = existingCommissions.get(rowKey);
 
             if (commission == null) {
@@ -159,24 +221,24 @@ public class CommissionServiceImpl implements CommissionService {
                 affected++;
             }
 
-            affected += linkSubjectCommission(existingSubjects, existingLinks, studyPlan, commission, command);
+            affected += linkSubjectCommission(existingSubjects, existingLinks, studyPlan, commission, command, syncedAt);
         }
 
+        SyncGuard.requireEnoughValidRows("comisiones", incoming.size(), currentRows, minValidPercent);
         return affected + markAbsent(existingCommissions.values(), incoming, syncedAt);
     }
 
     private Optional<StudyPlan> findOrCreateStudyPlan(Map<StudyPlanKey, Optional<StudyPlan>> cache,
-            Integer specialtyCode, Integer planCode, Instant syncedAt) {
+            Map<Integer, Specialty> specialtyCache, Integer specialtyCode, Integer planCode, String courseCode,
+            Instant syncedAt) {
         if (specialtyCode == null || planCode == null) {
+            log.warn("Comisión {} sin especialidad o plan de estudio en el comando: no se resuelve el plan y no se "
+                    + "vincula la materia", courseCode);
             return Optional.empty();
         }
         StudyPlanKey key = new StudyPlanKey(specialtyCode, planCode);
-        Optional<StudyPlan> studyPlan = cache.computeIfAbsent(key,
-                k -> studyPlanResolver.findOrCreate(specialtyCode, planCode, syncedAt));
-        if (studyPlan.isEmpty()) {
-            log.warn("No se pudo resolver el plan de estudio: especialidad {} no sincronizada todavía", specialtyCode);
-        }
-        return studyPlan;
+        return cache.computeIfAbsent(key,
+                k -> studyPlanResolver.findOrCreate(specialtyCode, planCode, syncedAt, specialtyCache));
     }
 
     private AcademicPeriod findOrCreatePeriod(Map<Integer, AcademicPeriod> cache, Integer year) {
@@ -195,7 +257,7 @@ public class CommissionServiceImpl implements CommissionService {
 
     private int linkSubjectCommission(Map<SubjectKey, Subject> existingSubjects,
             Map<SubjectCommissionId, SubjectCommission> existingLinks,
-            Optional<StudyPlan> studyPlan, Commission commission, CommissionSyncCommand command) {
+            Optional<StudyPlan> studyPlan, Commission commission, CommissionSyncCommand command, Instant syncedAt) {
         if (studyPlan.isEmpty() || command.subjectCode() == null) {
             return 0;
         }
@@ -205,20 +267,19 @@ public class CommissionServiceImpl implements CommissionService {
                     command.subjectCode(), command.courseCode());
             return 0;
         }
-        if (command.enrolledCount() == null) {
-            log.warn("No se pudo resolver la cantidad de inscriptos: curso={}, materia={}",
-                    command.courseCode(), command.subjectCode());
-            return 0;
-        }
         SubjectCommissionId id = new SubjectCommissionId(subject.getId(), commission.getId());
         SubjectCommission link = existingLinks.get(id);
 
         if (link == null) {
+            Integer enrolledCount = command.enrolledCount() != null ? command.enrolledCount() : 0;
+            if (command.enrolledCount() == null) {
+                log.info("Inscriptos no informados para curso={}, materia={}: se crea el link con 0 provisional",
+                        command.courseCode(), command.subjectCode());
+            }
             SubjectCommission created = SubjectCommission.builder()
-                    .id(new SubjectCommissionId())
                     .subject(subject)
                     .commission(commission)
-                    .enrolledCount(command.enrolledCount())
+                    .enrolledCount(enrolledCount)
                     .build();
             subjectCommissionRepository.save(created);
             // Registrar el link recién creado para que un duplicado (mismo subject+commission) en el
@@ -226,10 +287,16 @@ public class CommissionServiceImpl implements CommissionService {
             existingLinks.put(id, created);
             return 1;
         }
-        if (command.enrolledCount().equals(link.getEnrolledCount())) {
+        if (command.enrolledCount() == null) {
+            log.info("Inscriptos no informados para curso={}, materia={}: se conserva el valor existente ({})",
+                    command.courseCode(), command.subjectCode(), link.getEnrolledCount());
             return 0;
         }
+        boolean countChanged = !command.enrolledCount().equals(link.getEnrolledCount());
         link.setEnrolledCount(command.enrolledCount());
+        if (!countChanged) {
+            return 0;
+        }
         subjectCommissionRepository.save(link);
         return 1;
     }
@@ -237,7 +304,7 @@ public class CommissionServiceImpl implements CommissionService {
     private int markAbsent(Iterable<Commission> existing, Set<CommissionKey> incoming, Instant syncedAt) {
         int affected = 0;
         for (Commission commission : existing) {
-            if (incoming.contains(CommissionKey.of(commission))
+            if (commission.getSysacadHash() == null || incoming.contains(CommissionKey.of(commission))
                     || Boolean.FALSE.equals(commission.getSysacadEnabled())) {
                 continue;
             }

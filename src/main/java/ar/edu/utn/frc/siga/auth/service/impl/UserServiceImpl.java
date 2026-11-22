@@ -1,17 +1,24 @@
 package ar.edu.utn.frc.siga.auth.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
+import ar.edu.utn.frc.siga.audit.AuditOperations;
 import ar.edu.utn.frc.siga.auth.config.AuthDomainProperties;
 import ar.edu.utn.frc.siga.auth.dto.request.CreateUserRequestDto;
 import ar.edu.utn.frc.siga.auth.dto.response.UserResponseDto;
 import ar.edu.utn.frc.siga.auth.exception.UserDomainException;
+import ar.edu.utn.frc.siga.auth.mapper.RoleAssignmentComposer;
 import ar.edu.utn.frc.siga.auth.mapper.UserMapper;
-import ar.edu.utn.frc.siga.auth.model.Role;
+import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import ar.edu.utn.frc.siga.auth.service.RefreshTokenService;
+import ar.edu.utn.frc.siga.auth.service.RoleAssignmentService;
 import ar.edu.utn.frc.siga.auth.service.UserService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
-import java.util.HashSet;
+import ar.edu.utn.frc.siga.common.util.Paging;
+import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,19 +36,23 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserServiceImpl implements UserService {
 
     private static final int PAGE_SIZE = 15;
+    private static final int MAX_PASSWORD_BYTES = 72;
+    private static final Set<String> SORTABLE = Set.of("id", "email", "firstName", "lastName");
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
     private final UserMapper userMapper;
+    private final RoleAssignmentComposer roleAssignmentComposer;
+    private final RoleAssignmentService roleAssignmentService;
     private final AuthDomainProperties authDomainProperties;
 
     @Override
     @Transactional
-    public UserResponseDto create(CreateUserRequestDto dto) {
-        String email = dto.email();
-        log.debug("Creando usuario: email={}, rol={}", email, dto.rol());
-        Role parsedRole = parseRole(dto.rol());
+    @AuditOperation(value = "Alta de usuario", subject = "User")
+    public UserResponseDto create(CreateUserRequestDto dto, String currentUserEmail) {
+        String email = AuthDomainProperties.normalizeEmail(dto.email());
+        log.debug("Creando usuario: email={}", email);
 
         if (!authDomainProperties.isAllowedEmail(email)) {
             log.warn("Alta de usuario rechazada: dominio no institucional, email={}", email);
@@ -51,24 +62,40 @@ public class UserServiceImpl implements UserService {
             log.warn("Alta de usuario rechazada: email '{}' ya existe", email);
             throw new UserDomainException("User email already exists: " + email);
         }
+        // BCrypt trunca en 72 bytes; @Size cuenta caracteres, y un caracter UTF-8 puede ocupar hasta 4 bytes
+        if (dto.password().getBytes(StandardCharsets.UTF_8).length > MAX_PASSWORD_BYTES) {
+            log.warn("Alta de usuario rechazada: password supera {} bytes, email={}", MAX_PASSWORD_BYTES, email);
+            throw new UserDomainException("Password must not exceed " + MAX_PASSWORD_BYTES + " bytes in UTF-8");
+        }
 
         User user = User.builder()
                 .email(email)
                 .passwordHash(passwordEncoder.encode(dto.password()))
                 .enabled(true)
-                .roles(mutableRoleSet(parsedRole))
+                .firstName(dto.firstName())
+                .lastName(dto.lastName())
                 .build();
 
         User saved = userRepository.save(user);
         log.info("Usuario creado: id={}, email={}", saved.getId(), saved.getEmail());
-        return userMapper.toDto(saved);
+
+        if (dto.initialRole() != null) {
+            roleAssignmentService.assign(saved.getId(), dto.initialRole(), currentUserEmail);
+        }
+
+        return toDto(saved);
     }
 
     @Override
     @Transactional
-    public UserResponseDto setEnabled(Long id, boolean enabled) {
+    @AuditOperation(value = "Cambio de habilitación de usuario", subject = "User")
+    public UserResponseDto setEnabled(Long id, boolean enabled, String currentUserEmail) {
         log.debug("{} usuario: id={}", enabled ? "Habilitando" : "Inhabilitando", id);
+        AuditOperations.describe(enabled ? "Habilitación de usuario" : "Inhabilitación de usuario");
         User user = findExisting(id);
+        if (!enabled) {
+            requireDisableAllowed(user, currentUserEmail);
+        }
         user.setEnabled(enabled);
         User saved = userRepository.save(user);
 
@@ -76,47 +103,70 @@ public class UserServiceImpl implements UserService {
             refreshTokenService.revokeAllByUserId(id);
         }
         log.info("Usuario {}: id={}", enabled ? "habilitado" : "inhabilitado", id);
-        return userMapper.toDto(saved);
-    }
-
-    @Override
-    @Transactional
-    public UserResponseDto changeRole(Long id, String rol, String currentUserEmail) {
-        log.debug("Cambiando rol: id={}, rol={}", id, rol);
-        Role parsedRole = parseRole(rol);
-        User user = findExisting(id);
-
-        if (user.getEmail().equalsIgnoreCase(currentUserEmail)) {
-            log.warn("Cambio de rol rechazado: el usuario id={} intentó editar su propio rol", id);
-            throw new UserDomainException("A user cannot change their own role");
-        }
-
-        user.setRoles(mutableRoleSet(parsedRole));
-        User saved = userRepository.save(user);
-        refreshTokenService.revokeAllByUserId(id);
-        log.info("Rol de usuario actualizado: id={}, rol={}", id, parsedRole);
-        return userMapper.toDto(saved);
-    }
-
-    private Role parseRole(String rol) {
-        try {
-            return Role.valueOf(rol);
-        } catch (IllegalArgumentException e) {
-            log.warn("Rol inválido: '{}'", rol);
-            throw new UserDomainException("Invalid role: " + rol);
-        }
+        return toDto(saved);
     }
 
     @Override
     public Page<UserResponseDto> findEnabled(Pageable pageable) {
         log.debug("Listando usuarios habilitados: page={}", pageable.getPageNumber());
-        return userRepository.findAllByEnabled(true, fixedSize(pageable)).map(userMapper::toDto);
+        return userRepository.findAllByEnabled(true, fixedSize(pageable)).map(this::toDto);
     }
 
     @Override
     public Page<UserResponseDto> findDisabled(Pageable pageable) {
         log.debug("Listando usuarios inhabilitados: page={}", pageable.getPageNumber());
-        return userRepository.findAllByEnabled(false, fixedSize(pageable)).map(userMapper::toDto);
+        return userRepository.findAllByEnabled(false, fixedSize(pageable)).map(this::toDto);
+    }
+
+    @Override
+    public List<UserResponseDto> findByRoleForBuilding(SystemRole role, Long buildingId) {
+        log.debug("Listando usuarios habilitados con rol {} sobre el edificio {}", role, buildingId);
+        List<UserResponseDto> users = userRepository.findEnabledByRoleCoveringBuilding(role, buildingId).stream()
+                .map(this::toDto)
+                .toList();
+        log.info("Usuarios con rol {} sobre el edificio {}: count={}", role, buildingId, users.size());
+        return users;
+    }
+
+    @Override
+    public List<UserResponseDto> findByRole(SystemRole role) {
+        List<UserResponseDto> users = userRepository.findEnabledByRole(role).stream().map(this::toDto).toList();
+        log.info("Usuarios habilitados con rol {}: count={}", role, users.size());
+        return users;
+    }
+
+    @Override
+    public Set<Long> findBuildingIdsCoveredByRole(SystemRole role, Collection<Long> buildingIds) {
+        if (buildingIds.isEmpty()) {
+            return Set.of();
+        }
+        if (userRepository.existsEnabledGlobalRole(role)) {
+            return Set.copyOf(buildingIds);
+        }
+        return userRepository.findBuildingIdsWithScopedRole(role, buildingIds);
+    }
+
+    @Override
+    public boolean hasRole(String email, SystemRole role) {
+        return userRepository.existsEnabledRoleForUser(AuthDomainProperties.normalizeEmail(email), role);
+    }
+
+    @Override
+    public Set<Long> findBuildingIdsForRole(String email, SystemRole role) {
+        return userRepository.findBuildingIdsForUserAndRole(AuthDomainProperties.normalizeEmail(email), role);
+    }
+
+    // AUTH-RN-06: nadie se inhabilita a sí mismo ni deja al sistema sin subsecretaria habilitada
+    private void requireDisableAllowed(User target, String currentUserEmail) {
+        if (target.getEmail().equals(AuthDomainProperties.normalizeEmail(currentUserEmail))) {
+            log.warn("Inhabilitación rechazada: el usuario no puede inhabilitarse a sí mismo, id={}", target.getId());
+            throw new UserDomainException("Users cannot disable themselves");
+        }
+        List<User> subsecretarias = userRepository.findEnabledByRole(SystemRole.SUBSECRETARIA);
+        if (subsecretarias.size() == 1 && subsecretarias.getFirst().getId().equals(target.getId())) {
+            log.warn("Inhabilitación rechazada: última subsecretaria habilitada, id={}", target.getId());
+            throw new UserDomainException("The last enabled SUBSECRETARIA cannot be disabled");
+        }
     }
 
     private User findExisting(Long id) {
@@ -128,12 +178,13 @@ public class UserServiceImpl implements UserService {
     }
 
     private Pageable fixedSize(Pageable pageable) {
+        Paging.requireSortable(pageable.getSort(), SORTABLE);
         return PageRequest.of(pageable.getPageNumber(), PAGE_SIZE, pageable.getSort());
     }
 
-    private Set<Role> mutableRoleSet(Role rol) {
-        Set<Role> roles = new HashSet<>();
-        roles.add(rol);
-        return roles;
+    private UserResponseDto toDto(User user) {
+        UserResponseDto base = userMapper.toDto(user);
+        return new UserResponseDto(base.id(), base.email(), base.firstName(), base.lastName(),
+                roleAssignmentComposer.composeAll(user.getRoleAssignments()));
     }
 }

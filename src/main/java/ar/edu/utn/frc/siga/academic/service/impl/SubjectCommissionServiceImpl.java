@@ -1,19 +1,30 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
+import ar.edu.utn.frc.siga.academic.dto.SubjectCommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SubjectCommissionMapper;
+import ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged;
 import ar.edu.utn.frc.siga.academic.model.Commission;
+import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
+import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
+import ar.edu.utn.frc.siga.academic.specification.SubjectCommissionSpecification;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class SubjectCommissionServiceImpl implements SubjectCommissionService {
 
+    private final ApplicationEventPublisher eventPublisher;
     private final SubjectCommissionRepository subjectCommissionRepository;
     private final SubjectRepository subjectRepository;
     private final CommissionRepository commissionRepository;
@@ -40,50 +52,75 @@ public class SubjectCommissionServiceImpl implements SubjectCommissionService {
 
     @Override
     @Transactional
+    @AuditOperation(value = "Reactivación de materia-comisión", subject = "SubjectCommission")
     public void activate(SubjectCommissionId id) {
-        subjectCommissionRepository.restore(
-                Finder.orThrow(subjectCommissionRepository::findById, id, "SubjectCommission"));
+        subjectCommissionRepository.restore(requireLink(id));
+        eventPublisher.publishEvent(new CatalogAvailabilityChanged());
     }
 
     @Override
     @Transactional
+    @AuditOperation(value = "Baja de materia-comisión", subject = "SubjectCommission")
     public void deactivate(SubjectCommissionId id) {
-        subjectCommissionRepository.softDelete(
-                Finder.orThrow(subjectCommissionRepository::findById, id, "SubjectCommission"));
+        subjectCommissionRepository.softDelete(requireLink(id));
+        eventPublisher.publishEvent(new CatalogAvailabilityChanged());
+    }
+
+    private SubjectCommission requireLink(SubjectCommissionId id) {
+        return subjectCommissionRepository.findBySubject_IdAndCommission_Id(id.subjectId(), id.commissionId())
+                .orElseThrow(() -> ResourceNotFoundException.of("SubjectCommission",
+                        id.subjectId() + "-" + id.commissionId()));
     }
 
     private Subject requireSubject(Long id) {
         return subjectRepository.findById(id)
+                .filter(Subject::isAvailable)
                 .orElseThrow(() -> ResourceNotFoundException.of("Subject", id));
     }
 
     private Commission requireCommission(Long id) {
         return commissionRepository.findById(id)
+                .filter(Commission::isAvailable)
                 .orElseThrow(() -> ResourceNotFoundException.of("Commission", id));
     }
 
     @Override
-    public SubjectCommissionResponseDto findByCommissionAndSubjectCode(Long commissionId, Integer subjectCode) {
-        return subjectCommissionRepository
-                .findFirstByCommission_IdAndSubject_CodeAndDeletedAtIsNullOrderBySubject_IdAsc(commissionId, subjectCode)
-                .map(subjectCommissionMapper::toDto)
-                .orElseThrow(() -> ResourceNotFoundException.of("SubjectCommission",
-                        commissionId + "-" + subjectCode));
+    public SubjectCommissionResponseDto findByCommissionAndSubjectCode(Long commissionId, Integer subjectCode,
+            Integer specialtyCode, Integer studyPlanCode) {
+        List<SubjectCommission> candidates = subjectCommissionRepository
+                .findByCommission_IdAndSubject_Code(commissionId, subjectCode);
+        List<SubjectCommission> exact = candidates.stream()
+                .filter(link -> isOfStudyPlan(link.getSubject().getStudyPlan(), specialtyCode, studyPlanCode))
+                .toList();
+        List<SubjectCommission> chosen = exact.isEmpty() ? candidates : exact;
+        if (exact.isEmpty() && candidates.size() == 1) {
+            log.warn("La materia {} de la comisión {} no coincide con especialidad={}, plan={}: se usa el único "
+                    + "candidato", subjectCode, commissionId, specialtyCode, studyPlanCode);
+        }
+        if (chosen.size() == 1) {
+            return subjectCommissionMapper.toDto(chosen.getFirst());
+        }
+        if (chosen.size() > 1) {
+            log.warn("Más de una materia con código {} en la comisión {} y ninguna coincide con especialidad={}, "
+                    + "plan={}: no se resuelve el link", subjectCode, commissionId, specialtyCode, studyPlanCode);
+        }
+        throw ResourceNotFoundException.of("SubjectCommission", commissionId + "-" + subjectCode);
+    }
+
+    private static boolean isOfStudyPlan(StudyPlan studyPlan, Integer specialtyCode, Integer studyPlanCode) {
+        return Objects.equals(studyPlan.getPlanCode(), studyPlanCode)
+                && Objects.equals(studyPlan.getSpecialty().getSpecialtyCode(), specialtyCode);
     }
 
     @Override
-    public List<SubjectCommissionResponseDto> findAll(boolean includeDeactivated) {
-        return subjectCommissionRepository.findAll().stream()
-                .filter(link -> includeDeactivated || link.isActive())
-                .map(subjectCommissionMapper::toDto)
-                .toList();
-    }
-
-    @Override
-    public List<SubjectCommissionResponseDto> findBySubjectId(Long subjectId, boolean includeDeactivated) {
-        return subjectCommissionRepository.findBySubject_Id(subjectId).stream()
-                .filter(link -> includeDeactivated || link.isActive())
-                .map(subjectCommissionMapper::toDto)
-                .toList();
+    public Page<SubjectCommissionResponseDto> findAll(SubjectCommissionFilter filter, Pageable pageable,
+            boolean includeDeactivated) {
+        return subjectCommissionRepository.findAll(
+                        SubjectCommissionSpecification.withFilter(filter)
+                                .and(includeDeactivated
+                                        ? Specification.<SubjectCommission>unrestricted()
+                                        : SubjectCommissionSpecification.available()),
+                        pageable)
+                .map(subjectCommissionMapper::toDto);
     }
 }

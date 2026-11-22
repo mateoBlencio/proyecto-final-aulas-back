@@ -6,7 +6,6 @@ import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
-import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
@@ -17,6 +16,11 @@ import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
+import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import static ar.edu.utn.frc.siga.space.service.ClassroomService.DEFAULT_CLASSROOM_TYPE;
 
 import ar.edu.utn.frc.siga.space.model.Building;
@@ -34,8 +38,11 @@ import ar.edu.utn.frc.siga.space.repository.ClassroomResourceRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
 import ar.edu.utn.frc.siga.space.repository.ResourceTypeRepository;
 
+import java.time.Instant;
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -165,6 +172,11 @@ public class IntegrationTestData {
     public record SubjectAndCommission(Long subjectId, Long commissionId) {}
 
     public SubjectAndCommission materiaYComision() {
+        return materiaYComision(2100 + (int) (nextSeq() % 500));
+    }
+
+    /** En un año propio, fuera del rango aleatorio de {@link #materiaYComision()}: los listeners que recalculan por período no ven estos eventos. */
+    public SubjectAndCommission materiaYComision(int year) {
         int specialtyCode = (int) nextSeq();
         int planCode = (int) nextSeq();
         int subjectCode = (int) nextSeq();
@@ -172,8 +184,11 @@ public class IntegrationTestData {
         StudyPlan plan = planDeEstudio(planCode, specialty);
         Subject subject = materia(subjectCode, "Materia-IT", plan, TermType.ANUAL.getLabel());
 
-        int year = 2100 + (int) (nextSeq() % 500);
         AcademicPeriod period = periodoAcademico(year, TermType.ANUAL);
+        LocalDate today = LocalDate.now();
+        period.setStartDate(today.minusYears(5));
+        period.setEndDate(today.plusYears(15));
+        period = academicPeriodRepository.save(period);
         Commission commission = comision("CUR-" + nextSeq(), period);
         materiaComision(subject, commission, 30);
 
@@ -194,11 +209,38 @@ public class IntegrationTestData {
 
     public SubjectCommission materiaComision(Subject subject, Commission commission, int enrolledCount) {
         return subjectCommissionRepository.save(SubjectCommission.builder()
-                .id(new SubjectCommissionId())
                 .subject(subject)
                 .commission(commission)
                 .enrolledCount(enrolledCount)
                 .build());
+    }
+
+    public RoomRequest solicitudDeAula(RoomRequestType type, Long subjectId) {
+        return RoomRequest.builder()
+                .type(type)
+                .scope(AcademicScope.GRADO)
+                .teacherName("Ada Lovelace")
+                .teacherEmail("ada@frc.utn.edu.ar")
+                .teacherPhone("351-1234567")
+                .subjectId(subjectId)
+                .build();
+    }
+
+    /** Statuses distintos de NEW pasan por {@code decide(...)}: el check constraint de la tabla exige decidedBy/decidedAt. */
+    public RoomRequestItem itemDePedido(RoomRequest request, Long commissionId, LocalDate date, RoomRequestStatus status) {
+        RoomRequestItem item = RoomRequestItem.builder()
+                .commissionId(commissionId)
+                .date(date)
+                .startTime(LocalTime.of(10, 0))
+                .duration(Duration.ofMinutes(120))
+                .estimated(35)
+                .classroomCount(1)
+                .build();
+        request.addItem(item);
+        if (status != RoomRequestStatus.NEW) {
+            item.decide(status, "subsecretaria@frc.utn.edu.ar", "motivo de prueba", Instant.now());
+        }
+        return item;
     }
 
     public Long eventoRecurrente(Long subjectId, Long commissionId, DayOfWeek dayOfWeek, LocalTime startTime,

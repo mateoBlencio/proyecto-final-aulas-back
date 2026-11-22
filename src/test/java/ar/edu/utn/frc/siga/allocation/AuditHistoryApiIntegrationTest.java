@@ -93,7 +93,7 @@ class AuditHistoryApiIntegrationTest extends AbstractIntegrationTest {
 
     private void reallocateOk(Long occurrenceId, Long classroomId) throws Exception {
         var dto = new AllocationBatchRequestDto(
-                List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, null, null, classroomId)), null);
+                List.of(new AllocationItemRequestDto(List.of(occurrenceId), null, null, null, classroomId)), "cambio de aula");
         mockMvc.perform(put("/v1/allocations")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(dto)))
@@ -124,7 +124,8 @@ class AuditHistoryApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$[1].kind").value("MODIFIED"))
                 .andExpect(jsonPath("$[1].snapshot.classroomId").value(aulaB.getId()))
                 .andExpect(jsonPath("$[2].kind").value("DELETED"))
-                .andExpect(jsonPath("$[2].snapshot").doesNotExist());
+                .andExpect(jsonPath("$[2].snapshot").doesNotExist())
+                .andExpect(jsonPath("$[2].entityId").doesNotExist());
     }
 
     @Test
@@ -153,8 +154,8 @@ class AuditHistoryApiIntegrationTest extends AbstractIntegrationTest {
     void occurrenceHistory_showsStatusTransition() throws Exception {
         Occurrence occurrence = seedOccurrence(LocalDate.now().plusDays(23));
 
-        mockMvc.perform(post("/v1/events/occurrences/{occurrenceId}/release", occurrence.getId()))
-                .andExpect(status().isNoContent());
+        mockMvc.perform(post("/v1/allocations/releases").contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"items\":[{\"occurrenceIds\":[" + occurrence.getId() + "]}],\"reason\":\"OTHER\",\"note\":\"test\"}"))
+                .andExpect(status().isOk());
 
         mockMvc.perform(get("/v1/events/occurrences/{occurrenceId}/history", occurrence.getId()))
                 .andExpect(status().isOk())

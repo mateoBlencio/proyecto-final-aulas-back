@@ -1,0 +1,67 @@
+meta {
+  name: Obtener detalle de un pedido
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/v1/room-requests/items/1
+  body: none
+  auth: inherit
+}
+
+docs {
+  Detalle completo de un pedido (item), no de la solicitud. Requiere autenticación
+  (hasAnyRole SUBSECRETARIA, AUXILIAR_AULICO).
+  
+  A diferencia de la bandeja (08-listar-pedidos), acá "request" trae la
+  cabecera completa (incluido teacherEmail/teacherPhone, para poder contactar
+  al docente) e "item" trae todos los campos del pedido: decidedBy,
+  decisionReason, reopenReason, requiresProjector, requiresComputers, computerCount,
+  requiresExamUsers, requiredSoftware, observations, preferredClassrooms (ClassroomOptionDto con enabledInSysacad: false avisa que SysAcad inhabilitó el aula; es solo informativo).
+
+  También suma el resultado de la resolución, cuando aplica:
+  - assignedClassrooms: AssignedClassroomDto[] (id, roomNumber, buildingName,
+    capacity). [] si todavía no se asignó ninguna aula. Una entrada por aula
+    del pedido (posición 1..classroomCount), no una por ocurrencia real: un
+    REGULAR_ROOM_CHANGE que cubre N clases futuras con la misma aula aparece
+    una sola vez acá.
+  - releasedTargetDates: lista de { date, reason } con las fechas objetivo del
+    pedido (ONE_TIME_ROOM_CHANGE, PARTIAL_EXAM_IN_CLASS, REGULAR_ROOM_CHANGE) que
+    alguien marcó como liberadas. Asignar el pedido las reactiva (vuelven a
+    NEEDS_ROOM con aula). Lista vacía si no hay.
+  - previousClassroom: AssignedClassroomDto, el aula que tenía la clase antes
+    del primer cambio de aula (solo ONE_TIME_ROOM_CHANGE / REGULAR_ROOM_CHANGE).
+    Se completa una sola vez: si se reasigna varias veces (A→B→C), sigue
+    mostrando A, porque el docente nunca vio B. null si no aplica o todavía
+    no se asignó nada.
+  - request.itemCount: cantidad de pedidos de la solicitud (incluye cancelados).
+  - Fechas de evento (request.createdAt, decidedAt, notifiedAt, derivedAt): instante
+    ISO-8601 con Z (UTC). El front las muestra en America/Argentina/Buenos_Aires.
+    date y startTime siguen sin zona: son hora de pared de la facultad.
+  - notifiedAt: fecha en que se avisó al docente (notify), null si no se avisó.
+  - derivedBuilding / derivedAt: edificio y fecha de la derivación vigente
+    (DERIVED_TO_BUILDING), null si nunca se derivó o ya se devolvió.
+  - returnedFromBuilding / returnedReason: edificio y motivo de la última
+    devolución (return), null si nunca se devolvió. Un return posterior pisa
+    estos dos con los datos nuevos.
+
+  Cuando el pedido viene de un evento recurrente de cursado (ONE_TIME_ROOM_CHANGE,
+  REGULAR_ROOM_CHANGE, PARTIAL_EXAM_IN_CLASS), suma además:
+  - enrolled: Integer, inscriptos de la comisión en ese evento. null si el pedido
+    no tiene evento de cursado asociado.
+  - currentClassrooms: ClassroomOptionDto[] (id, number, buildingName, enabledInSysacad), el/las
+    aula(s) que tiene hoy esa comisión según el cursado (no depende de que este
+    pedido se haya resuelto). null en el mismo caso que enrolled.
+
+  overlappingItems: pedidos activos de otra materia que se pisan con este parcial
+  fuera de horario ([] si no hay). Cada uno trae itemId, subjectName,
+  commissionCode (null si el otro pedido es para todas las comisiones), date,
+  startTime y endTime. Se calcula al leer.
+
+  allowedActions: subconjunto de ASSIGN | DERIVE | RETURN | CANCEL | NOTIFY que el
+  usuario autenticado puede ejecutar sobre el pedido (rol, estado y edificio
+  derivado). Pista de UI: el back valida igual en cada endpoint.
+
+  404 si el id no existe.
+}

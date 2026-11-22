@@ -1,0 +1,30 @@
+meta {
+  name: Desactivar edificio
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/v1/buildings/1/activation
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+  res.body.releasedClasses: isNumber
+  res.body.mergedClasses: isNumber
+  res.body.affectedRoomRequests: isNumber
+  res.body.visibleRoomRequests: isArray
+}
+
+docs {
+  DELETE /v1/buildings/{id}/activation. Permiso: PERM_BUILDING_ACTIVATE. Soft-delete idempotente.
+  Libera las clases futuras asignadas a las aulas del edificio (releaseReason CLASSROOM_DEACTIVATED,
+  nota "Edificio deshabilitado") y fusiona las que tienen espejo en un aula de otro edificio.
+  404 si el edificio no existe.
+
+  Respuesta 200 (antes 204), siempre con cuerpo:
+  { releasedClasses, mergedClasses, affectedRoomRequests,
+    visibleRoomRequests: [ { itemId, requestId, status, teacherName, subjectName, classroomIds } ] }
+}

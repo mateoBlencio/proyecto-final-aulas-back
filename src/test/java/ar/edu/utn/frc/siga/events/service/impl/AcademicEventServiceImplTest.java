@@ -1,17 +1,26 @@
 package ar.edu.utn.frc.siga.events.service.impl;
 
+import ar.edu.utn.frc.siga.common.exception.SyncAbortedException;
+import ar.edu.utn.frc.siga.common.service.OccurrenceAllocationQuery;
+import ar.edu.utn.frc.siga.common.service.OccurrenceRequestReferenceQuery;
+import ar.edu.utn.frc.siga.events.exception.UniqueEventInUseException;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.events.EventTestData;
+import ar.edu.utn.frc.siga.events.dto.AcademicEventFilter;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.UpdateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.ScheduleStatus;
 import ar.edu.utn.frc.siga.events.dto.response.SysacadRecurringEventRefDto;
 import ar.edu.utn.frc.siga.events.dto.response.UniqueEventResponseDto;
+import ar.edu.utn.frc.siga.common.exception.InvalidDateRangeException;
+import ar.edu.utn.frc.siga.events.event.UniqueEventRescheduled;
 import ar.edu.utn.frc.siga.events.exception.InvalidCommissionForSubjectException;
+import ar.edu.utn.frc.siga.events.exception.InvalidEventScheduleException;
 import ar.edu.utn.frc.siga.events.exception.MissingAcademicReferenceException;
 import ar.edu.utn.frc.siga.events.exception.OccurrenceAlreadyPastException;
 import ar.edu.utn.frc.siga.events.mapper.AcademicEventComposer;
@@ -26,6 +35,7 @@ import ar.edu.utn.frc.siga.events.model.UniqueEvent;
 import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
 import ar.edu.utn.frc.siga.events.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.events.repository.SuspendedEventRepository;
 import ar.edu.utn.frc.siga.events.repository.RecurringEventRepository;
 import ar.edu.utn.frc.siga.events.repository.UniqueEventRepository;
 import ar.edu.utn.frc.siga.events.service.command.SyncRecurringEventCommand;
@@ -42,6 +52,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.stubbing.Answer;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.DayOfWeek;
@@ -59,10 +73,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -78,6 +94,8 @@ class AcademicEventServiceImplTest {
     @Mock
     private OccurrenceRepository occurrenceRepository;
     @Mock
+    private SuspendedEventRepository suspendedEventRepository;
+    @Mock
     private AcademicEventComposer composer;
     @Mock
     private OccurrenceMapper occurrenceMapper;
@@ -87,13 +105,22 @@ class AcademicEventServiceImplTest {
     private CommissionService commissionService;
     @Mock
     private EventScheduleValidator eventScheduleValidator;
+    @Mock
+    private RecurringEventReconciler recurringEventReconciler;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+    @Mock
+    private OccurrenceAllocationQuery occurrenceAllocationQuery;
+    @Mock
+    private OccurrenceRequestReferenceQuery occurrenceRequestReferenceQuery;
 
     private AcademicEventServiceImpl service;
 
     @BeforeEach
     void setUp() {
         service = new AcademicEventServiceImpl(eventRepository, recurringEventRepository, uniqueEventRepository,
-                occurrenceRepository, composer, occurrenceMapper, subjectService, commissionService, eventScheduleValidator);
+                occurrenceRepository, suspendedEventRepository, composer, occurrenceMapper, subjectService, commissionService, eventScheduleValidator,
+                recurringEventReconciler, eventPublisher, occurrenceAllocationQuery, occurrenceRequestReferenceQuery);
     }
 
 
@@ -113,7 +140,8 @@ class AcademicEventServiceImplTest {
         assertThat(result).isNotNull();
         verify(subjectService).findById(1L);
         verify(commissionService).findById(1L);
-        verifyNoInteractions(eventScheduleValidator);
+        verify(eventScheduleValidator).validateBusinessHours(dto.startTime(), LocalTime.of(9, 30));
+        verifyNoMoreInteractions(eventScheduleValidator);
 
         ArgumentCaptor<RecurringEvent> eventCaptor = ArgumentCaptor.forClass(RecurringEvent.class);
         verify(eventRepository).save(eventCaptor.capture());
@@ -132,6 +160,50 @@ class AcademicEventServiceImplTest {
         assertThat(occurrences).allSatisfy(o -> assertThat(o.getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM));
     }
 
+    @Test
+    @DisplayName("createRecurringEvent: fecha de fin anterior a la de inicio → InvalidDateRangeException, sin consultar ni guardar nada")
+    void createRecurringEventFinAnteriorAInicioRechaza() {
+        CreateRecurringEventRequestDto dto = recurringDto(DayOfWeek.MONDAY,
+                LocalDate.of(2026, 1, 19), LocalDate.of(2026, 1, 18));
+
+        assertThatThrownBy(() -> service.createRecurringEvent(dto))
+                .isInstanceOf(InvalidDateRangeException.class);
+
+        verifyNoInteractions(subjectService, commissionService, eventRepository, occurrenceRepository);
+    }
+
+    @Test
+    @DisplayName("createRecurringEvent: fecha de fin igual a la de inicio (borde) → se crea con una sola ocurrencia")
+    void createRecurringEventFinIgualAInicioCrea() {
+        CreateRecurringEventRequestDto dto = recurringDto(DayOfWeek.MONDAY,
+                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 5));
+        RecurringEvent saved = EventTestData.recurringEvent(1L, dto.dayOfWeek(), dto.startDate(), dto.endDate());
+        when(subjectService.findById(1L)).thenReturn(EventTestData.subjectResponseDto(1L));
+        when(commissionService.findById(1L)).thenReturn(EventTestData.commissionResponseDto(1L));
+        when(eventRepository.save(any())).thenReturn(saved);
+        when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyRecurringResponseDto(1L));
+
+        service.createRecurringEvent(dto);
+
+        verify(eventRepository).save(any(RecurringEvent.class));
+        verify(occurrenceRepository).saveAll(anyCollection());
+    }
+
+    @Test
+    @DisplayName("createRecurringEvent: horario fuera de la ventana permitida → propaga InvalidEventScheduleException, sin guardar")
+    void createRecurringEventHorarioFueraDeVentanaRechaza() {
+        CreateRecurringEventRequestDto dto = new CreateRecurringEventRequestDto(30, LocalTime.of(22, 0), 90,
+                DayOfWeek.MONDAY, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19), 1L, 1L);
+        doThrow(new InvalidEventScheduleException("fuera de ventana"))
+                .when(eventScheduleValidator).validateBusinessHours(LocalTime.of(22, 0), LocalTime.of(23, 30));
+
+        assertThatThrownBy(() -> service.createRecurringEvent(dto))
+                .isInstanceOf(InvalidEventScheduleException.class);
+
+        verify(eventScheduleValidator).validateBusinessHours(LocalTime.of(22, 0), LocalTime.of(23, 30));
+        verifyNoInteractions(eventRepository, occurrenceRepository);
+    }
+
 
     @Test
     @DisplayName("findOrCreateRecurringEvent: existe uno con la misma sextupla → lo reusa, no crea")
@@ -139,39 +211,107 @@ class AcademicEventServiceImplTest {
         CreateRecurringEventRequestDto dto = recurringDto(DayOfWeek.MONDAY,
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19));
         RecurringEvent existing = EventTestData.recurringEvent(7L, dto.dayOfWeek(), dto.startDate(), dto.endDate());
-        when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
-                dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startTime(), dto.startDate(), dto.endDate()))
-                .thenReturn(Optional.of(existing));
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any()))
+                .thenReturn(List.of(existing));
 
         FindOrCreateResult<Long> result = service.findOrCreateRecurringEvent(dto);
 
         assertThat(result.created()).isFalse();
         assertThat(result.value()).isEqualTo(7L);
-        verify(eventRepository, never()).save(any());
+        verify(eventRepository, never()).saveAll(any());
         verify(subjectService, never()).findById(any());
         verify(commissionService, never()).findById(any());
         verify(composer, never()).compose(any(AcademicEvent.class));
     }
 
     @Test
-    @DisplayName("findOrCreateRecurringEvent: no existe ninguno con esa sextupla → lo crea")
+    @DisplayName("findOrCreateRecurringEvent: no existe ninguno con esa sextupla → lo crea vía el bulk, validando el set de refs con findByIds")
     void findOrCreateCreaNuevo() {
         CreateRecurringEventRequestDto dto = recurringDto(DayOfWeek.MONDAY,
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19));
-        when(recurringEventRepository.findBySubjectIdAndCommissionIdAndDayOfWeekAndStartTimeAndStartDateAndEndDate(
-                dto.subjectId(), dto.commissionId(), dto.dayOfWeek(), dto.startTime(), dto.startDate(), dto.endDate()))
-                .thenReturn(Optional.empty());
-        when(subjectService.findById(1L)).thenReturn(EventTestData.subjectResponseDto(1L));
-        when(commissionService.findById(1L)).thenReturn(EventTestData.commissionResponseDto(1L));
-        RecurringEvent saved = EventTestData.recurringEvent(9L, dto.dayOfWeek(), dto.startDate(), dto.endDate());
-        when(eventRepository.save(any())).thenReturn(saved);
-        when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyRecurringResponseDto(9L));
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of());
+        when(subjectService.findByIds(any())).thenReturn(List.of(EventTestData.subjectResponseDto(1L)));
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(EventTestData.commissionResponseDto(1L)));
+        when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(9L));
 
         FindOrCreateResult<Long> result = service.findOrCreateRecurringEvent(dto);
 
         assertThat(result.created()).isTrue();
         assertThat(result.value()).isEqualTo(9L);
-        verify(eventRepository).save(any());
+        verify(subjectService, never()).findById(any());
+        verify(commissionService, never()).findById(any());
+        verify(subjectService).findByIds(any());
+        verify(commissionService).findByIdsIncludingDeactivated(any());
+        verify(occurrenceRepository).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("findOrCreateRecurringEvents: el evento que crea nace con sysacadEnabled=false, sigaEnabled=true y genera ocurrencias")
+    void findOrCreateCreaConFlagsPorDefectoYOcurrencias() {
+        CreateRecurringEventRequestDto dto = recurringDto(DayOfWeek.MONDAY,
+                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19));
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of());
+        when(subjectService.findByIds(any())).thenReturn(List.of(EventTestData.subjectResponseDto(1L)));
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(EventTestData.commissionResponseDto(1L)));
+        when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(9L));
+
+        service.findOrCreateRecurringEvents(List.of(dto));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<RecurringEvent>> eventsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(eventRepository).saveAll(eventsCaptor.capture());
+        RecurringEvent created = eventsCaptor.getValue().getFirst();
+        assertThat(created.getSysacadEnabled()).isFalse();
+        assertThat(created.getSigaEnabled()).isTrue();
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Occurrence>> occurrencesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(occurrenceRepository).saveAll(occurrencesCaptor.capture());
+        assertThat(occurrencesCaptor.getValue()).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("findOrCreateRecurringEvents: evento existente por clave natural no se escribe ni cambia sus flags")
+    void findOrCreateExistenteNoTocaFlags() {
+        CreateRecurringEventRequestDto dto = recurringDto(DayOfWeek.MONDAY,
+                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19));
+        RecurringEvent existing = EventTestData.recurringEvent(7L, dto.dayOfWeek(), dto.startDate(), dto.endDate());
+        existing.setSysacadEnabled(true);
+        existing.setSigaEnabled(false);
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of(existing));
+
+        service.findOrCreateRecurringEvents(List.of(dto));
+
+        assertThat(existing.getSysacadEnabled()).isTrue();
+        assertThat(existing.getSigaEnabled()).isFalse();
+        verify(eventRepository, never()).saveAll(any());
+        verify(occurrenceRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("findOrCreateRecurringEvents: prefetch único, dos requests con la misma clave → un solo insert, resultados en orden")
+    void findOrCreateRecurringEventsBulk() {
+        CreateRecurringEventRequestDto monday = recurringDto(DayOfWeek.MONDAY,
+                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 19));
+        CreateRecurringEventRequestDto tuesday = recurringDto(DayOfWeek.TUESDAY,
+                LocalDate.of(2026, 1, 6), LocalDate.of(2026, 1, 20));
+        RecurringEvent existingTuesday = EventTestData.recurringEvent(4L, DayOfWeek.TUESDAY,
+                tuesday.startDate(), tuesday.endDate());
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any()))
+                .thenReturn(List.of(existingTuesday));
+        when(subjectService.findByIds(any())).thenReturn(List.of(EventTestData.subjectResponseDto(1L)));
+        when(commissionService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(EventTestData.commissionResponseDto(1L)));
+        when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(10L));
+
+        List<FindOrCreateResult<Long>> results = service.findOrCreateRecurringEvents(
+                List.of(monday, tuesday, monday));
+
+        verify(recurringEventRepository, times(1)).findBySubjectIdInAndCommissionIdIn(any(), any());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<RecurringEvent>> captor = ArgumentCaptor.forClass(List.class);
+        verify(eventRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).hasSize(1);
+        assertThat(results).extracting(FindOrCreateResult::value).containsExactly(10L, 4L, 10L);
+        assertThat(results).extracting(FindOrCreateResult::created).containsExactly(true, false, false);
     }
 
 
@@ -250,9 +390,9 @@ class AcademicEventServiceImplTest {
         when(occurrenceRepository.findByEvent_IdInAndDateGreaterThanEqual(List.of(1L), from))
                 .thenReturn(List.of(o1, o2));
         when(occurrenceMapper.toDto(o1)).thenReturn(new OccurrenceResponseDto(11L, 1L, o1.getDate(),
-                OccurrenceStatus.NEEDS_ROOM, LocalTime.of(8, 0), LocalTime.of(9, 30)));
+                OccurrenceStatus.NEEDS_ROOM, LocalTime.of(8, 0), LocalTime.of(9, 30), null, null, null));
         when(occurrenceMapper.toDto(o2)).thenReturn(new OccurrenceResponseDto(12L, 1L, o2.getDate(),
-                OccurrenceStatus.NEEDS_ROOM, LocalTime.of(8, 0), LocalTime.of(9, 30)));
+                OccurrenceStatus.NEEDS_ROOM, LocalTime.of(8, 0), LocalTime.of(9, 30), null, null, null));
 
         List<OccurrenceResponseDto> result = service.findClassOccurrences(1L, 9L, from);
 
@@ -290,7 +430,8 @@ class AcademicEventServiceImplTest {
         RecurringEvent persisted = captor.getValue().getFirst();
         assertThat(persisted.getEnrolled()).isEqualTo(30);
         assertThat(persisted.getDuration()).isEqualTo(Duration.ofMinutes(90));
-        assertThat(persisted.getSysacadEnabled()).isTrue();
+        assertThat(persisted.getSigaEnabled()).isTrue();
+        assertThat(persisted.getSysacadEnabled()).isFalse();
         assertThat(persisted.getSyncedAt()).isNotNull();
         assertThat(persisted.getSysacadHash()).isEqualTo(Hashes.sha256Hex(90));
 
@@ -310,13 +451,74 @@ class AcademicEventServiceImplTest {
         assertThat(result.updated()).isTrue();
         assertThat(existing.getEnrolled()).isEqualTo(45);
         assertThat(existing.getSyncedAt()).isNotNull();
-        assertThat(existing.getSysacadEnabled()).isTrue();
+        assertThat(existing.getSigaEnabled()).isTrue();
         assertThat(savedRecurringEvents()).containsExactly(existing);
 
+        // sin eventos nuevos no se toca occurrenceRepository (guarda !created.isEmpty())
+        verify(occurrenceRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("syncRecurringEvent: un evento no vigente que reaparece vuelve a vigente y se escribe aunque no cambien los datos")
+    void syncRecurringEventReactivaEventoNoVigente() {
+        RecurringEvent notCurrent = existingSyncedEvent(7L, Duration.ofMinutes(90), Hashes.sha256Hex(90), false);
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of(notCurrent));
+
+        UpsertRecurringEventResult result = service.syncRecurringEvent(syncCommand(90, 30));
+
+        assertThat(result.updated()).isTrue();
+        assertThat(notCurrent.getSigaEnabled()).isTrue();
+        assertThat(notCurrent.getSyncedAt()).isNotNull();
+        assertThat(savedRecurringEvents()).containsExactly(notCurrent);
+    }
+
+    @Test
+    @DisplayName("syncRecurringEvent: evento vigente que pasa a 0 inscriptos queda con sigaEnabled=false, sin tocar sysacadEnabled, y se retiran sus ocurrencias futuras")
+    void syncRecurringEventRetiraEventoSinInscriptos() {
+        RecurringEvent existing = existingSyncedEvent(7L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of(existing));
+
+        service.syncRecurringEvent(syncCommand(90, 0));
+
+        assertThat(existing.getEnrolled()).isZero();
+        assertThat(existing.getSigaEnabled()).isFalse();
+        assertThat(existing.getSysacadEnabled()).as("el sync ya no escribe sysacadEnabled").isTrue();
+        assertThat(existing.getSyncedAt()).isNotNull();
+        assertThat(savedRecurringEvents()).containsExactly(existing);
+        verify(recurringEventReconciler).retireFuture(existing);
+        verify(recurringEventReconciler, never()).reconcileFuture(any(), any());
+    }
+
+    @Test
+    @DisplayName("syncRecurringEvent: evento con sigaEnabled=false que vuelve a tener inscriptos se rehabilita y se recrean sus ocurrencias")
+    void syncRecurringEventRestauraEventoConInscriptos() {
+        RecurringEvent existing = existingSyncedEvent(7L, Duration.ofMinutes(90), Hashes.sha256Hex(90), false);
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of(existing));
+
+        service.syncRecurringEvent(syncCommand(90, 12));
+
+        assertThat(existing.getSigaEnabled()).isTrue();
+        assertThat(existing.getSysacadEnabled()).as("el sync ya no escribe sysacadEnabled").isTrue();
+        verify(recurringEventReconciler).reconcileFuture(eq(existing), any());
+        verify(recurringEventReconciler, never()).retireFuture(any());
+    }
+
+    @Test
+    @DisplayName("syncRecurringEvent: evento nuevo con 0 inscriptos se crea deshabilitado y sin ocurrencias")
+    void syncRecurringEventCreaSinOcurrenciasSiNoHayInscriptos() {
+        when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of());
+        when(eventRepository.saveAll(any())).thenAnswer(assignSequentialIds(5L));
+
+        service.syncRecurringEvent(syncCommand(90, 0));
+
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<Occurrence>> occCaptor = ArgumentCaptor.forClass(List.class);
-        verify(occurrenceRepository).saveAll(occCaptor.capture());
-        assertThat(occCaptor.getValue()).isEmpty();
+        ArgumentCaptor<List<RecurringEvent>> captor = ArgumentCaptor.forClass(List.class);
+        verify(eventRepository).saveAll(captor.capture());
+        RecurringEvent created = captor.getValue().getFirst();
+        assertThat(created.getSigaEnabled()).isFalse();
+        assertThat(created.getSysacadEnabled()).isFalse();
+        assertThat(created.getEnrolled()).isZero();
+        verify(occurrenceRepository).saveAll(List.of());
     }
 
     @Test
@@ -336,7 +538,7 @@ class AcademicEventServiceImplTest {
     @Test
     @DisplayName("syncRecurringEvent: duration editada a mano fuera del sync (drift) y el valor entrante difiere → NO se pisa, la edición manual se preserva")
     void syncRecurringEventNoPisaDurationConDrift() {
-        SyncRecurringEventCommand cmd = syncCommand(120, 30);
+        SyncRecurringEventCommand cmd = syncCommand(120, 45);
         RecurringEvent existing = existingSyncedEvent(7L, Duration.ofMinutes(100), Hashes.sha256Hex(90), true);
         when(recurringEventRepository.findBySubjectIdInAndCommissionIdIn(any(), any())).thenReturn(List.of(existing));
 
@@ -345,12 +547,12 @@ class AcademicEventServiceImplTest {
         assertThat(result.updated()).isTrue();
         assertThat(existing.getDuration()).isEqualTo(Duration.ofMinutes(100));
         assertThat(existing.getSysacadHash()).isEqualTo(Hashes.sha256Hex(90));
-        assertThat(existing.getEnrolled()).isEqualTo(30);
+        assertThat(existing.getEnrolled()).isEqualTo(45);
         assertThat(savedRecurringEvents()).containsExactly(existing);
     }
 
     @Test
-    @DisplayName("syncRecurringEvent: primer resync inmediato tras la creación por sync no lee drift falso (sysacadHash ya quedó seteado al crear)")
+    @DisplayName("syncRecurringEvent: resync idéntico (mismos inscriptos y duración) no escribe, no toca syncedAt y devuelve updated=false")
     void syncRecurringEventPrimerResyncNoFalsoDrift() {
         SyncRecurringEventCommand cmd = syncCommand(90, 30);
         RecurringEvent justCreated = existingSyncedEvent(9L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
@@ -358,10 +560,11 @@ class AcademicEventServiceImplTest {
 
         UpsertRecurringEventResult result = service.syncRecurringEvent(cmd);
 
-        assertThat(result.updated()).isTrue();
+        assertThat(result).isEqualTo(new UpsertRecurringEventResult(9L, false, false));
         assertThat(justCreated.getDuration()).isEqualTo(Duration.ofMinutes(90));
         assertThat(justCreated.getSysacadHash()).isEqualTo(Hashes.sha256Hex(90));
-        assertThat(savedRecurringEvents()).containsExactly(justCreated);
+        assertThat(justCreated.getSyncedAt()).isNull();
+        assertThat(savedRecurringEvents()).isEmpty();
     }
 
     @Test
@@ -397,7 +600,7 @@ class AcademicEventServiceImplTest {
 
         assertThat(results).hasSize(2);
         assertThat(results.get(0)).isEqualTo(new UpsertRecurringEventResult(3L, true, false));
-        assertThat(results.get(1)).isEqualTo(new UpsertRecurringEventResult(3L, false, true));
+        assertThat(results.get(1)).isEqualTo(new UpsertRecurringEventResult(3L, false, false));
     }
 
     @Test
@@ -442,7 +645,7 @@ class AcademicEventServiceImplTest {
 
 
     @Test
-    @DisplayName("markRecurringEventsAbsent: marca sysacadEnabled=false sólo en los sync-owned ausentes de la corrida, sin tocar los presentes, los ya deshabilitados, ni ocurrencias/eventos")
+    @DisplayName("markRecurringEventsAbsent: da de baja (sigaEnabled=false) sólo a los sync-owned ausentes, retira sus ocurrencias futuras y no toca sysacadEnabled, los presentes ni los ya dados de baja")
     void markRecurringEventsAbsentMarcaSoloAusentesSyncOwned() {
         RecurringEvent present = existingSyncedEvent(1L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
         RecurringEvent absent = existingSyncedEvent(2L, Duration.ofMinutes(60), Hashes.sha256Hex(60), true);
@@ -450,17 +653,102 @@ class AcademicEventServiceImplTest {
         when(recurringEventRepository.findBySysacadHashIsNotNull())
                 .thenReturn(List.of(present, absent, alreadyDisabled));
 
-        int affected = service.markRecurringEventsAbsent(Set.of(1L));
+        int affected = service.markRecurringEventsAbsent(Set.of(1L), Set.of(), 0);
 
         assertThat(affected).isEqualTo(1);
-        assertThat(absent.getSysacadEnabled()).isFalse();
+        assertThat(absent.getSigaEnabled()).isFalse();
+        assertThat(absent.getSysacadEnabled()).as("el sync ya no escribe sysacadEnabled").isTrue();
         assertThat(absent.getSyncedAt()).isNotNull();
-        assertThat(present.getSysacadEnabled()).isTrue();
+        assertThat(present.getSigaEnabled()).isTrue();
+        assertThat(present.getSyncedAt()).isNull();
+        assertThat(alreadyDisabled.getSyncedAt()).isNull();
         verify(recurringEventRepository).save(absent);
+        verify(recurringEventReconciler).retireFuture(absent);
         verify(recurringEventRepository, never()).save(present);
         verify(recurringEventRepository, never()).save(alreadyDisabled);
+        verify(recurringEventReconciler, never()).retireFuture(present);
+        verify(recurringEventReconciler, never()).retireFuture(alreadyDisabled);
         verifyNoInteractions(eventRepository);
         verifyNoInteractions(occurrenceRepository);
+    }
+
+    @Test
+    @DisplayName("markRecurringEventsAbsent: no marca ausentes los eventos de una comisión que el sync no pudo resolver")
+    void markRecurringEventsAbsentRespetaComisionesNoResueltas() {
+        RecurringEvent present = existingSyncedEvent(1L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
+        RecurringEvent ofUnresolved = existingSyncedEvent(2L, Duration.ofMinutes(60), Hashes.sha256Hex(60), true);
+        ReflectionTestUtils.setField(ofUnresolved, "commissionId", 7L);
+        RecurringEvent absent = existingSyncedEvent(3L, Duration.ofMinutes(45), Hashes.sha256Hex(45), true);
+        when(recurringEventRepository.findBySysacadHashIsNotNull())
+                .thenReturn(List.of(present, ofUnresolved, absent));
+
+        int affected = service.markRecurringEventsAbsent(Set.of(1L), Set.of(7L), 0);
+
+        assertThat(affected).isEqualTo(1);
+        assertThat(ofUnresolved.getSigaEnabled()).isTrue();
+        assertThat(absent.getSigaEnabled()).isFalse();
+        verify(recurringEventReconciler, never()).retireFuture(ofUnresolved);
+    }
+
+    @Test
+    @DisplayName("markRecurringEventsAbsent: los vigentes del umbral se cuentan por sigaEnabled, no por sysacadEnabled")
+    void markRecurringEventsAbsentCuentaVigentesPorSigaEnabled() {
+        RecurringEvent present = existingSyncedEvent(1L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
+        RecurringEvent absent = existingSyncedEvent(2L, Duration.ofMinutes(60), Hashes.sha256Hex(60), true);
+        RecurringEvent disabledA = existingSyncedEvent(3L, Duration.ofMinutes(45), Hashes.sha256Hex(45), false);
+        RecurringEvent disabledB = existingSyncedEvent(4L, Duration.ofMinutes(30), Hashes.sha256Hex(30), false);
+        when(recurringEventRepository.findBySysacadHashIsNotNull())
+                .thenReturn(List.of(present, absent, disabledA, disabledB));
+
+        // 2 vigentes por sigaEnabled: 1 presente = 50%, alcanza. Contando sysacadEnabled serían 4 y 1 = 25% abortaría.
+        int affected = service.markRecurringEventsAbsent(Set.of(1L), Set.of(), 50);
+
+        assertThat(affected).isEqualTo(1);
+        assertThat(absent.getSigaEnabled()).isFalse();
+    }
+
+    @Test
+    @DisplayName("markRecurringEventsAbsent: un ausente que ya tenía sigaEnabled=false no se guarda, aunque siga con sysacadEnabled=true")
+    void markRecurringEventsAbsentIgnoraAusenteYaDadoDeBaja() {
+        RecurringEvent present = existingSyncedEvent(1L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
+        RecurringEvent alreadyDown = existingSyncedEvent(2L, Duration.ofMinutes(60), Hashes.sha256Hex(60), false);
+        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(present, alreadyDown));
+
+        int affected = service.markRecurringEventsAbsent(Set.of(1L), Set.of(), 0);
+
+        assertThat(affected).isZero();
+        verify(recurringEventRepository, never()).save(any());
+        verifyNoInteractions(recurringEventReconciler);
+    }
+
+    @Test
+    @DisplayName("markRecurringEventsAbsent: por debajo del umbral de presentes aborta y no marca nada")
+    void markRecurringEventsAbsentAbortaBajoUmbral() {
+        RecurringEvent present = existingSyncedEvent(1L, Duration.ofMinutes(90), Hashes.sha256Hex(90), true);
+        RecurringEvent second = existingSyncedEvent(2L, Duration.ofMinutes(60), Hashes.sha256Hex(60), true);
+        RecurringEvent third = existingSyncedEvent(3L, Duration.ofMinutes(45), Hashes.sha256Hex(45), true);
+        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(present, second, third));
+
+        assertThatThrownBy(() -> service.markRecurringEventsAbsent(Set.of(1L), Set.of(), 50))
+                .isInstanceOf(SyncAbortedException.class);
+
+        assertThat(second.getSigaEnabled()).isTrue();
+        assertThat(third.getSigaEnabled()).isTrue();
+        verify(recurringEventRepository, never()).save(any());
+        verifyNoInteractions(recurringEventReconciler);
+    }
+
+    @Test
+    @DisplayName("markRecurringEventsAbsent: sin presentes aborta aunque el umbral esté desactivado")
+    void markRecurringEventsAbsentAbortaSinPresentes() {
+        RecurringEvent current = existingSyncedEvent(2L, Duration.ofMinutes(60), Hashes.sha256Hex(60), true);
+        when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(current));
+
+        assertThatThrownBy(() -> service.markRecurringEventsAbsent(Set.of(), Set.of(), 0))
+                .isInstanceOf(SyncAbortedException.class);
+
+        assertThat(current.getSigaEnabled()).isTrue();
+        verifyNoInteractions(recurringEventReconciler);
     }
 
     @Test
@@ -468,14 +756,14 @@ class AcademicEventServiceImplTest {
     void markRecurringEventsAbsentSinSyncOwnedNoHaceNada() {
         when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of());
 
-        int affected = service.markRecurringEventsAbsent(Set.of(1L));
+        int affected = service.markRecurringEventsAbsent(Set.of(1L), Set.of(), 0);
 
         assertThat(affected).isZero();
         verify(recurringEventRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("findSysacadRecurringEvents: mapea cada evento sync-owned a una ref liviana, campo por campo")
+    @DisplayName("findSysacadRecurringEvents: mapea cada evento sync-owned a una ref liviana, campo por campo, con ambos flags (sysacadEnabled y sigaEnabled) sin mezclarlos")
     void findSysacadRecurringEventsMapeaCampoPorCampo() {
         RecurringEvent first = RecurringEvent.builder()
                 .id(10L)
@@ -488,6 +776,8 @@ class AcademicEventServiceImplTest {
                 .subjectId(1L)
                 .commissionId(2L)
                 .sysacadHash(Hashes.sha256Hex(90))
+                .sysacadEnabled(true)
+                .sigaEnabled(false)
                 .build();
         RecurringEvent second = RecurringEvent.builder()
                 .id(11L)
@@ -500,6 +790,8 @@ class AcademicEventServiceImplTest {
                 .subjectId(3L)
                 .commissionId(4L)
                 .sysacadHash(Hashes.sha256Hex(120))
+                .sysacadEnabled(false)
+                .sigaEnabled(true)
                 .build();
         when(recurringEventRepository.findBySysacadHashIsNotNull()).thenReturn(List.of(first, second));
 
@@ -507,9 +799,9 @@ class AcademicEventServiceImplTest {
 
         assertThat(result).containsExactly(
                 new SysacadRecurringEventRefDto(10L, 1L, 2L, DayOfWeek.MONDAY, LocalTime.of(8, 0),
-                        LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31)),
+                        LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31), true, false),
                 new SysacadRecurringEventRefDto(11L, 3L, 4L, DayOfWeek.WEDNESDAY, LocalTime.of(14, 30),
-                        LocalDate.of(2026, 8, 1), LocalDate.of(2026, 12, 15)));
+                        LocalDate.of(2026, 8, 1), LocalDate.of(2026, 12, 15), false, true));
     }
 
     @Test
@@ -526,7 +818,7 @@ class AcademicEventServiceImplTest {
     void createUniqueEventFeliz() {
         CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
                 UniqueEventKind.EXAMEN_FINAL, 1L, 1L, LocalDate.of(2026, 3, 10),
-                LocalTime.of(10, 0), 60, 20, "Examen final de la materia");
+                LocalTime.of(10, 0), 60, 20, "Examen final de la materia", null, null, null, null, null);
         UniqueEvent saved = EventTestData.uniqueEvent(3L, dto.date(), dto.startTime(),
                 Duration.ofMinutes(dto.durationMinutes()));
         when(subjectService.findById(1L)).thenReturn(EventTestData.subjectResponseDto(1L));
@@ -558,7 +850,7 @@ class AcademicEventServiceImplTest {
     void createUniqueEventReferenciaAcademicaInvalidaPropagaExcepcion() {
         CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
                 UniqueEventKind.PARCIAL, null, 1L, LocalDate.of(2026, 3, 10),
-                LocalTime.of(10, 0), 60, 20, null);
+                LocalTime.of(10, 0), 60, 20, null, null, null, null, null, null);
         doThrow(new MissingAcademicReferenceException("subjectId es obligatorio"))
                 .when(eventScheduleValidator).validateAcademicReference(dto.eventType(), dto.subjectId(), dto.commissionId());
 
@@ -572,7 +864,7 @@ class AcademicEventServiceImplTest {
     void createUniqueEventOtroSinMateriaNiComision() {
         CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
                 UniqueEventKind.OTRO, null, null, LocalDate.of(2026, 3, 10),
-                LocalTime.of(10, 0), 60, 20, null);
+                LocalTime.of(10, 0), 60, 20, null, null, null, null, null, null);
         UniqueEvent saved = EventTestData.uniqueEvent(3L, dto.date(), dto.startTime(),
                 Duration.ofMinutes(dto.durationMinutes()));
         when(eventRepository.save(any())).thenReturn(saved);
@@ -580,7 +872,7 @@ class AcademicEventServiceImplTest {
 
         AcademicEventResponseDto result = service.createUniqueEvent(dto);
 
-        assertThat(result).isNotNull();
+        assertThat(result.id()).isEqualTo(3L);
         verify(subjectService, never()).findById(any());
         verify(commissionService, never()).findById(any());
     }
@@ -590,7 +882,7 @@ class AcademicEventServiceImplTest {
     void createUniqueEventExamenFinalSinCommissionIdPersisteIgual() {
         CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
                 UniqueEventKind.EXAMEN_FINAL, 1L, null, LocalDate.of(2026, 3, 10),
-                LocalTime.of(10, 0), 60, 20, null);
+                LocalTime.of(10, 0), 60, 20, null, null, null, null, null, null);
         UniqueEvent saved = EventTestData.uniqueEvent(3L, dto.date(), dto.startTime(),
                 Duration.ofMinutes(dto.durationMinutes()));
         when(subjectService.findById(1L)).thenReturn(EventTestData.subjectResponseDto(1L));
@@ -609,7 +901,7 @@ class AcademicEventServiceImplTest {
     void createUniqueEventCommissionNoPerteneceASubjectLanzaExcepcion() {
         CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
                 UniqueEventKind.EXAMEN_FINAL, 1L, 2L, LocalDate.of(2026, 3, 10),
-                LocalTime.of(10, 0), 60, 20, null);
+                LocalTime.of(10, 0), 60, 20, null, null, null, null, null, null);
         when(subjectService.findById(1L)).thenReturn(EventTestData.subjectResponseDto(1L));
         when(commissionService.findById(2L)).thenReturn(EventTestData.commissionResponseDto(2L));
         doThrow(new InvalidCommissionForSubjectException("la comisión 2 no pertenece a la materia 1"))
@@ -625,7 +917,7 @@ class AcademicEventServiceImplTest {
     void createUniqueEventCommissionPerteneceASubjectPersiste() {
         CreateUniqueEventRequestDto dto = new CreateUniqueEventRequestDto(
                 UniqueEventKind.EXAMEN_FINAL, 1L, 1L, LocalDate.of(2026, 3, 10),
-                LocalTime.of(10, 0), 60, 20, null);
+                LocalTime.of(10, 0), 60, 20, null, null, null, null, null, null);
         UniqueEvent saved = EventTestData.uniqueEvent(3L, dto.date(), dto.startTime(),
                 Duration.ofMinutes(dto.durationMinutes()));
         when(subjectService.findById(1L)).thenReturn(EventTestData.subjectResponseDto(1L));
@@ -684,6 +976,91 @@ class AcademicEventServiceImplTest {
     }
 
     @Test
+    @DisplayName("updateUniqueEvent: si el dto omite los cinco requisitos, conserva los que el evento ya tenía")
+    void updateUniqueEventSinRequisitosLosPreserva() {
+        UniqueEvent event = eventWithComputers();
+        stubUpdate(event);
+
+        service.updateUniqueEvent(3L, updateDto());
+
+        assertThat(event.isRequiresComputers()).isTrue();
+        assertThat(event.getComputerCount()).isEqualTo(40);
+        assertThat(event.getRequiredSoftware()).isEqualTo("MATLAB");
+    }
+
+    @Test
+    @DisplayName("updateUniqueEvent: requiresComputers=false limpia cantidad y software (CHECK chk_evento_unico_computadoras)")
+    void updateUniqueEventRequiresComputersFalseLosLimpia() {
+        UniqueEvent event = eventWithComputers();
+        stubUpdate(event);
+        UpdateUniqueEventRequestDto dto = new UpdateUniqueEventRequestDto(
+                UniqueEventKind.PARCIAL, 1L, 1L, LocalDate.of(2026, 3, 15),
+                LocalTime.of(11, 0), 90, 25, "descripcion actualizada", null, false, null, null, null, null);
+
+        service.updateUniqueEvent(3L, dto);
+
+        assertThat(event.isRequiresComputers()).isFalse();
+        assertThat(event.getComputerCount()).isNull();
+        assertThat(event.getRequiredSoftware()).isNull();
+    }
+
+    @Test
+    @DisplayName("updateUniqueEvent: evento con ocurrencias simultáneas mueve la fecha de todas, valida contra la principal")
+    void updateUniqueEventConOcurrenciasSimultaneas() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence principal = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.NEEDS_ROOM);
+        Occurrence mirror = Occurrence.builder()
+                .id(11L).event(event).date(event.getDate()).status(OccurrenceStatus.NEEDS_ROOM)
+                .roomSlot(2).mirrorOfOccurrenceId(10L).build();
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(mirror, principal));
+        when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyUniqueResponseDto(3L));
+
+        UpdateUniqueEventRequestDto dto = updateDto();
+        service.updateUniqueEvent(3L, dto);
+
+        verify(eventScheduleValidator).validateNotPast(principal);
+        verify(eventScheduleValidator, never()).validateNotPast(mirror);
+        assertThat(principal.getDate()).isEqualTo(dto.date());
+        assertThat(mirror.getDate()).isEqualTo(dto.date());
+    }
+
+    @Test
+    @DisplayName("updateUniqueEvent: si la materia y la comisión no cambian, no se revalidan (un período inhabilitado no bloquea editar el horario)")
+    void updateUniqueEventSinCambiarReferenciasNoRevalida() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence occurrence = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.NEEDS_ROOM);
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
+        when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyUniqueResponseDto(3L));
+
+        service.updateUniqueEvent(3L, updateDto());
+
+        verify(subjectService, never()).findById(any());
+        verify(commissionService, never()).findById(any());
+        verify(eventScheduleValidator, never()).validateCommissionBelongsToSubject(any(), any());
+        assertThat(event.getStartTime()).isEqualTo(LocalTime.of(11, 0));
+    }
+
+    @Test
+    @DisplayName("updateUniqueEvent: si cambia la comisión, se valida y una comisión no disponible rechaza la edición sin escribir")
+    void updateUniqueEventCambiandoAComisionNoDisponibleRechaza() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence occurrence = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.NEEDS_ROOM);
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
+        when(commissionService.findById(2L)).thenThrow(ResourceNotFoundException.of("Commission", 2L));
+        UpdateUniqueEventRequestDto dto = new UpdateUniqueEventRequestDto(
+                UniqueEventKind.PARCIAL, 1L, 2L, LocalDate.of(2026, 3, 15),
+                LocalTime.of(11, 0), 90, 25, "descripcion actualizada", null, null, null, null, null, null);
+
+        assertThatThrownBy(() -> service.updateUniqueEvent(3L, dto))
+                .isInstanceOf(ResourceNotFoundException.class);
+        assertThat(event.getCommissionId()).isEqualTo(1L);
+        assertThat(event.getStartTime()).isEqualTo(LocalTime.of(10, 0));
+    }
+
+    @Test
     @DisplayName("updateUniqueEvent: occurrence ya pasada → propaga la excepción del validator, sin escribir")
     void updateUniqueEventOccurrencePasada() {
         UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2020, 1, 1), LocalTime.of(10, 0), Duration.ofMinutes(60));
@@ -696,16 +1073,110 @@ class AcademicEventServiceImplTest {
                 .isInstanceOf(OccurrenceAlreadyPastException.class);
     }
 
+    @Test
+    @DisplayName("updateUniqueEvent: fecha y hora nuevas en el pasado → OccurrenceAlreadyPastException, no modifica el evento ni publica")
+    void updateUniqueEventFechaNuevaPasadaRechaza() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence occurrence = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.NEEDS_ROOM);
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
+        UpdateUniqueEventRequestDto dto = updateDtoAt(LocalDate.of(2020, 1, 1), LocalTime.of(9, 0), 60);
+        lenient().doThrow(new OccurrenceAlreadyPastException("ya ocurrió"))
+                .when(eventScheduleValidator).validateNotPast(LocalDate.of(2020, 1, 1), LocalTime.of(9, 0));
+
+        assertThatThrownBy(() -> service.updateUniqueEvent(3L, dto))
+                .isInstanceOf(OccurrenceAlreadyPastException.class);
+
+        verify(eventScheduleValidator).validateNotPast(LocalDate.of(2020, 1, 1), LocalTime.of(9, 0));
+        assertThat(event.getDate()).isEqualTo(LocalDate.of(2026, 3, 10));
+        assertThat(occurrence.getDate()).isEqualTo(LocalDate.of(2026, 3, 10));
+        verifyNoInteractions(eventPublisher);
+    }
 
     @Test
-    @DisplayName("findAll: delega en el composer sobre todos los eventos")
+    @DisplayName("updateUniqueEvent: cambio de fecha → publica UniqueEventRescheduled con el id del evento, los ids de principal y espejos, la fecha nueva y la observación")
+    void updateUniqueEventCambioDeFechaPublicaEvento() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence principal = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.NEEDS_ROOM);
+        Occurrence mirror = Occurrence.builder()
+                .id(11L).event(event).date(event.getDate()).status(OccurrenceStatus.NEEDS_ROOM)
+                .roomSlot(2).mirrorOfOccurrenceId(10L).build();
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(mirror, principal));
+        when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyUniqueResponseDto(3L));
+        UpdateUniqueEventRequestDto dto = updateDtoAt(LocalDate.of(2026, 3, 11), LocalTime.of(10, 0), 60, "mudanza por obra");
+
+        service.updateUniqueEvent(3L, dto);
+
+        ArgumentCaptor<UniqueEventRescheduled> captor = ArgumentCaptor.forClass(UniqueEventRescheduled.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        UniqueEventRescheduled published = captor.getValue();
+        assertThat(published.eventId()).isEqualTo(3L);
+        assertThat(published.occurrenceIds()).containsExactlyInAnyOrder(10L, 11L);
+        assertThat(published.date()).isEqualTo(LocalDate.of(2026, 3, 11));
+        assertThat(published.observation()).isEqualTo("mudanza por obra");
+    }
+
+    @Test
+    @DisplayName("updateUniqueEvent: cambio de fecha sin observación → publica con observation null")
+    void updateUniqueEventCambioDeFechaSinObservacion() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        stubUpdate(event);
+
+        service.updateUniqueEvent(3L, updateDtoAt(LocalDate.of(2026, 3, 11), LocalTime.of(10, 0), 60));
+
+        ArgumentCaptor<UniqueEventRescheduled> captor = ArgumentCaptor.forClass(UniqueEventRescheduled.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().observation()).isNull();
+    }
+
+    @Test
+    @DisplayName("updateUniqueEvent: cambia solo la hora de inicio → publica UniqueEventRescheduled")
+    void updateUniqueEventSoloHoraPublica() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        stubUpdate(event);
+
+        service.updateUniqueEvent(3L, updateDtoAt(LocalDate.of(2026, 3, 10), LocalTime.of(10, 30), 60));
+
+        verify(eventPublisher).publishEvent(any(UniqueEventRescheduled.class));
+    }
+
+    @Test
+    @DisplayName("updateUniqueEvent: cambia solo la duración → publica UniqueEventRescheduled")
+    void updateUniqueEventSoloDuracionPublica() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        stubUpdate(event);
+
+        service.updateUniqueEvent(3L, updateDtoAt(LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), 90));
+
+        verify(eventPublisher).publishEvent(any(UniqueEventRescheduled.class));
+    }
+
+    @Test
+    @DisplayName("updateUniqueEvent: cambia solo description y enrolled (fecha, hora y duración iguales) → no publica")
+    void updateUniqueEventSinCambioDeHorarioNoPublica() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        stubUpdate(event);
+
+        service.updateUniqueEvent(3L, updateDtoAt(LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), 60));
+
+        assertThat(event.getDescription()).isEqualTo("descripcion actualizada");
+        assertThat(event.getEnrolled()).isEqualTo(25);
+        verifyNoInteractions(eventPublisher);
+    }
+
+
+    @Test
+    @DisplayName("findAll: delega en el composer sobre la página del repositorio")
     void findAllDelegaEnComposer() {
-        when(eventRepository.findAll()).thenReturn(List.of());
+        when(eventRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
         when(composer.compose(anyCollection())).thenReturn(List.of());
 
-        List<AcademicEventResponseDto> result = service.findAll();
+        var result = service.findAll(new AcademicEventFilter(null, null, null),
+                Pageable.unpaged());
 
-        assertThat(result).isEmpty();
+        assertThat(result.getContent()).isEmpty();
         verify(composer).compose(anyCollection());
     }
 
@@ -748,7 +1219,7 @@ class AcademicEventServiceImplTest {
         when(occurrenceRepository.findByEvent_Id(1L)).thenReturn(List.of(occurrence));
         when(occurrenceMapper.toDto(occurrence)).thenReturn(
                 new OccurrenceResponseDto(10L, 1L, occurrence.getDate(), OccurrenceStatus.NEEDS_ROOM,
-                        LocalTime.of(8, 0), LocalTime.of(9, 30)));
+                        LocalTime.of(8, 0), LocalTime.of(9, 30), null, null, null));
 
         List<OccurrenceResponseDto> result = service.findOccurrencesByEventId(1L);
 
@@ -756,6 +1227,66 @@ class AcademicEventServiceImplTest {
         assertThat(result.getFirst().id()).isEqualTo(10L);
     }
 
+
+    private static RecurringEvent scheduleEvent(LocalDate endDate, String hash, boolean sigaEnabled) {
+        return RecurringEvent.builder().subjectId(1L).commissionId(2L).dayOfWeek(DayOfWeek.MONDAY)
+                .startTime(LocalTime.of(8, 0)).duration(Duration.ofMinutes(90))
+                .startDate(LocalDate.of(2026, 3, 1)).endDate(endDate)
+                .sysacadHash(hash).sysacadEnabled(true).sigaEnabled(sigaEnabled).build();
+    }
+
+    @Test
+    @DisplayName("recurringScheduleStatus: sin eventos es NO_SCHEDULE")
+    void scheduleStatusSinEventos() {
+        when(recurringEventRepository.findBySubjectIdAndCommissionId(1L, 2L)).thenReturn(List.of());
+
+        assertThat(service.recurringScheduleStatus(1L, 2L)).isEqualTo(ScheduleStatus.NO_SCHEDULE);
+    }
+
+    @Test
+    @DisplayName("recurringScheduleStatus: habilitado con fecha de fin pasada es ENDED")
+    void scheduleStatusTerminado() {
+        when(recurringEventRepository.findBySubjectIdAndCommissionId(1L, 2L))
+                .thenReturn(List.of(scheduleEvent(LocalDate.of(2020, 7, 31), "h", true)));
+
+        assertThat(service.recurringScheduleStatus(1L, 2L)).isEqualTo(ScheduleStatus.ENDED);
+    }
+
+    @Test
+    @DisplayName("recurringScheduleStatus: todos con sigaEnabled=false es DISABLED_IN_SYSACAD aunque sigan vigentes y con sysacadEnabled=true")
+    void scheduleStatusDeshabilitado() {
+        when(recurringEventRepository.findBySubjectIdAndCommissionId(1L, 2L))
+                .thenReturn(List.of(scheduleEvent(LocalDate.of(2999, 7, 31), "h", false)));
+
+        assertThat(service.recurringScheduleStatus(1L, 2L)).isEqualTo(ScheduleStatus.DISABLED_IN_SYSACAD);
+    }
+
+    @Test
+    @DisplayName("recurringScheduleStatus: uno vigente (o cargado a mano sin fecha de fin) es ACTIVE")
+    void scheduleStatusVigente() {
+        when(recurringEventRepository.findBySubjectIdAndCommissionId(1L, 2L)).thenReturn(List.of(
+                scheduleEvent(LocalDate.of(2020, 7, 31), "h", true), scheduleEvent(null, null, true)));
+
+        assertThat(service.recurringScheduleStatus(1L, 2L)).isEqualTo(ScheduleStatus.ACTIVE);
+    }
+
+    @Test
+    @DisplayName("recurringScheduleStatus: evento sin hash (cargado a mano) con sigaEnabled=false es DISABLED_IN_SYSACAD")
+    void scheduleStatusSinHashDeshabilitado() {
+        when(recurringEventRepository.findBySubjectIdAndCommissionId(1L, 2L))
+                .thenReturn(List.of(scheduleEvent(null, null, false)));
+
+        assertThat(service.recurringScheduleStatus(1L, 2L)).isEqualTo(ScheduleStatus.DISABLED_IN_SYSACAD);
+    }
+
+    @Test
+    @DisplayName("recurringScheduleStatus: ignora los eventos con sigaEnabled=false al decidir ENDED/ACTIVE")
+    void scheduleStatusIgnoraDadosDeBajaAlEvaluarVigencia() {
+        when(recurringEventRepository.findBySubjectIdAndCommissionId(1L, 2L)).thenReturn(List.of(
+                scheduleEvent(LocalDate.of(2020, 7, 31), "h", true), scheduleEvent(LocalDate.of(2999, 7, 31), "h", false)));
+
+        assertThat(service.recurringScheduleStatus(1L, 2L)).isEqualTo(ScheduleStatus.ENDED);
+    }
 
     private CreateRecurringEventRequestDto recurringDto(DayOfWeek dayOfWeek, LocalDate startDate, LocalDate endDate) {
         return new CreateRecurringEventRequestDto(30, LocalTime.of(8, 0), 90, dayOfWeek, startDate, endDate, 1L, 1L);
@@ -770,7 +1301,8 @@ class AcademicEventServiceImplTest {
                 enrolled, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 7, 31));
     }
 
-    private RecurringEvent existingSyncedEvent(Long id, Duration duration, String sysacadHash, boolean sysacadEnabled) {
+    /** sysacadEnabled queda siempre en true: el sync ya no lo escribe y los tests verifican que no cambie. */
+    private RecurringEvent existingSyncedEvent(Long id, Duration duration, String sysacadHash, boolean sigaEnabled) {
         return RecurringEvent.builder()
                 .id(id)
                 .enrolled(30)
@@ -782,7 +1314,8 @@ class AcademicEventServiceImplTest {
                 .subjectId(1L)
                 .commissionId(1L)
                 .sysacadHash(sysacadHash)
-                .sysacadEnabled(sysacadEnabled)
+                .sysacadEnabled(true)
+                .sigaEnabled(sigaEnabled)
                 .build();
     }
 
@@ -799,6 +1332,7 @@ class AcademicEventServiceImplTest {
                 .commissionId(1L)
                 .sysacadHash(Hashes.sha256Hex(90))
                 .sysacadEnabled(true)
+                .sigaEnabled(true)
                 .build();
     }
 
@@ -827,12 +1361,112 @@ class AcademicEventServiceImplTest {
 
     private UniqueEventResponseDto dummyUniqueResponseDto(Long id) {
         return new UniqueEventResponseDto(id, EventType.UNIQUE_EVENT, UniqueEventKind.EXAMEN_FINAL, 20,
-                LocalTime.of(10, 0), 60, LocalDate.of(2026, 3, 10), "evento especial", null, null);
+                LocalTime.of(10, 0), 60, LocalDate.of(2026, 3, 10), "evento especial", null, null, false, false, null, null, null);
+    }
+
+    private UniqueEvent eventWithComputers() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        event.setRequiresComputers(true);
+        event.setComputerCount(40);
+        event.setRequiredSoftware("MATLAB");
+        return event;
+    }
+
+    private void stubUpdate(UniqueEvent event) {
+        Occurrence occurrence = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.NEEDS_ROOM);
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(occurrence));
+        when(composer.compose(any(AcademicEvent.class))).thenReturn(dummyUniqueResponseDto(3L));
+    }
+
+    private UpdateUniqueEventRequestDto updateDtoAt(LocalDate date, LocalTime startTime, int durationMinutes) {
+        return updateDtoAt(date, startTime, durationMinutes, null);
+    }
+
+    private UpdateUniqueEventRequestDto updateDtoAt(LocalDate date, LocalTime startTime, int durationMinutes,
+                                                    String observation) {
+        return new UpdateUniqueEventRequestDto(
+                UniqueEventKind.PARCIAL, 1L, 1L, date, startTime, durationMinutes, 25, "descripcion actualizada",
+                null, null, null, null, null, observation);
     }
 
     private UpdateUniqueEventRequestDto updateDto() {
         return new UpdateUniqueEventRequestDto(
                 UniqueEventKind.PARCIAL, 1L, 1L, LocalDate.of(2026, 3, 15),
-                LocalTime.of(11, 0), 90, 25, "descripcion actualizada");
+                LocalTime.of(11, 0), 90, 25, "descripcion actualizada", null, null, null, null, null, null);
+    }
+
+    // ---------- deleteUniqueEvent ----------
+
+    @Test
+    @DisplayName("deleteUniqueEvent: evento inexistente → 404, sin consultar asignaciones ni borrar")
+    void deleteUniqueEventInexistente() {
+        when(uniqueEventRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.deleteUniqueEvent(99L))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(occurrenceAllocationQuery, occurrenceRequestReferenceQuery);
+        verify(occurrenceRepository, never()).deleteAll(any());
+        verify(uniqueEventRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("deleteUniqueEvent: una ocurrencia espejo con aula asignada → 409 UniqueEventInUseException, no borra nada")
+    void deleteUniqueEventConOcurrenciaAsignada() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence principal = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.NEEDS_ROOM);
+        Occurrence mirror = Occurrence.builder()
+                .id(11L).event(event).date(event.getDate()).status(OccurrenceStatus.NEEDS_ROOM)
+                .roomSlot(2).mirrorOfOccurrenceId(10L).build();
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(principal, mirror));
+        when(occurrenceAllocationQuery.allocatedAmong(List.of(10L, 11L))).thenReturn(Set.of(11L));
+        lenient().when(occurrenceRequestReferenceQuery.referencedAmong(any())).thenReturn(Set.of());
+
+        assertThatThrownBy(() -> service.deleteUniqueEvent(3L))
+                .isInstanceOfSatisfying(UniqueEventInUseException.class,
+                        e -> assertThat(e.getStatus()).isEqualTo(org.springframework.http.HttpStatus.CONFLICT));
+
+        verify(occurrenceRepository, never()).deleteAll(any());
+        verify(uniqueEventRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("deleteUniqueEvent: una ocurrencia sin aula pero referenciada por un pedido → 409, no borra nada")
+    void deleteUniqueEventConOcurrenciaReferenciadaPorPedido() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence principal = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.NEEDS_ROOM);
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(principal));
+        when(occurrenceAllocationQuery.allocatedAmong(List.of(10L))).thenReturn(Set.of());
+        when(occurrenceRequestReferenceQuery.referencedAmong(List.of(10L))).thenReturn(Set.of(10L));
+
+        assertThatThrownBy(() -> service.deleteUniqueEvent(3L))
+                .isInstanceOf(UniqueEventInUseException.class);
+
+        verify(occurrenceRepository, never()).deleteAll(any());
+        verify(uniqueEventRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("deleteUniqueEvent: sin asignaciones ni pedidos borra todas las ocurrencias (principal y espejo) y el evento")
+    void deleteUniqueEventFeliz() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence principal = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.NEEDS_ROOM);
+        Occurrence mirror = Occurrence.builder()
+                .id(11L).event(event).date(event.getDate()).status(OccurrenceStatus.ROOM_RELEASED)
+                .roomSlot(2).mirrorOfOccurrenceId(10L).build();
+        List<Occurrence> occurrences = List.of(principal, mirror);
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(occurrences);
+        when(occurrenceAllocationQuery.allocatedAmong(List.of(10L, 11L))).thenReturn(Set.of());
+        when(occurrenceRequestReferenceQuery.referencedAmong(List.of(10L, 11L))).thenReturn(Set.of());
+
+        service.deleteUniqueEvent(3L);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(occurrenceRepository, uniqueEventRepository);
+        order.verify(occurrenceRepository).deleteAll(occurrences);
+        order.verify(uniqueEventRepository).delete(event);
     }
 }

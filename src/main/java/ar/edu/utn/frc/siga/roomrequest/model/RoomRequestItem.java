@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.roomrequest.model;
 
+import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
 import ar.edu.utn.frc.siga.common.converter.DurationMinutesConverter;
 import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
 import jakarta.persistence.CascadeType;
@@ -18,6 +19,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -29,11 +31,16 @@ import org.hibernate.envers.Audited;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Entity
 @Audited
@@ -63,16 +70,20 @@ public class RoomRequestItem extends TimestampedEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "estado", nullable = false, length = 30)
     @Builder.Default
-    private RoomRequestStatus status = RoomRequestStatus.PENDING;
+    private RoomRequestStatus status = RoomRequestStatus.NEW;
 
     @Column(name = "decidido_por", length = 150)
     private String decidedBy;
 
     @Column(name = "fecha_decision")
-    private LocalDateTime decidedAt;
+    private Instant decidedAt;
 
     @Column(name = "motivo_decision")
     private String decisionReason;
+
+    /** Motivo de la última reapertura. Va aparte de {@link #decisionReason}, que guarda el motivo de resolución parcial del assign. */
+    @Column(name = "motivo_reapertura")
+    private String reopenReason;
 
     @Column(name = "id_comision")
     private Long commissionId;
@@ -86,7 +97,6 @@ public class RoomRequestItem extends TimestampedEntity {
     @Column(name = "dia_semana", length = 20)
     private DayOfWeek dayOfWeek;
 
-    /** Evento recurrente del que se derivó día y horario, cuando el tipo usa el cursado. Trazabilidad. */
     @Column(name = "id_evento_recurrente")
     private Long sourceRecurringEventId;
 
@@ -131,8 +141,64 @@ public class RoomRequestItem extends TimestampedEntity {
     @Builder.Default
     private List<RoomPreference> preferences = new ArrayList<>();
 
+    @Column(name = "id_edificio_derivado")
+    private Long derivedBuildingId;
+
+    @Column(name = "fecha_derivacion")
+    private Instant derivedAt;
+
+    @Column(name = "id_edificio_devuelto")
+    private Long returnedFromBuildingId;
+
+    @Column(name = "motivo_devolucion")
+    private String returnedReason;
+
+    @Column(name = "fecha_notificacion")
+    private Instant notifiedAt;
+
+    @Column(name = "plazo_aceptacion")
+    private Instant acceptanceDeadline;
+
+    @Column(name = "fecha_aceptacion")
+    private Instant acceptedAt;
+
+    @Column(name = "aceptado_por", length = 150)
+    private String acceptedBy;
+
+    /** Cantidad de veces que se notificó al docente; 0 mientras no se notificó nunca. */
+    @Column(name = "ronda_notificacion", nullable = false)
+    @Builder.Default
+    private Integer notificationRound = 0;
+
+    /** Aula que ocupaba la clase antes del primer assign. Solo se completa una vez: si Subsecretaría
+     *  reasigna A -> B -> C, el docente sigue viendo A como aula anterior, porque nunca vio B. */
+    @Column(name = "id_aula_anterior")
+    private Long previousClassroomId;
+
+    /** Día en que se reabrió desde NOTIFIED. Nulo si no se reabrió así o si después se reasignó: reasignar anula el aula que el docente ya vio. */
+    @Column(name = "reabierto_desde")
+    private LocalDate reopenedFromNotifiedOn;
+
+    /** Lock optimista: dos resoluciones concurrentes sobre el mismo ítem (assign/notify/cancel a la vez) chocan en el commit en vez de pisarse. */
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
+    @OneToMany(mappedBy = "item", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("position ASC")
+    @BatchSize(size = 50)
+    @Builder.Default
+    private List<RoomRequestItemAllocation> allocations = new ArrayList<>();
+
     public LocalTime endTime() {
         return (startTime == null || duration == null) ? null : startTime.plus(duration);
+    }
+
+    /** Fuente de verdad de la regla; {@link ar.edu.utn.frc.siga.roomrequest.specification.RoomRequestItemSpecification}
+     *  la repite en SQL para poder filtrar sin traer las filas, así que un cambio acá hay que replicarlo ahí. */
+    public boolean requiresSpecialAssignment() {
+        return Boolean.TRUE.equals(requiresComputers) || requiredSoftware != null
+                || Boolean.TRUE.equals(requiresExamUsers);
     }
 
     void attachTo(RoomRequest request, int position) {
@@ -140,15 +206,156 @@ public class RoomRequestItem extends TimestampedEntity {
         this.position = position;
     }
 
-    public void decide(RoomRequestStatus target, String decidedBy, String reason, LocalDateTime decidedAt) {
+    /** Trunca a microsegundos: Postgres guarda timestamp con esa precisión, y sin truncar acá la respuesta de la misma llamada (en memoria, con nanosegundos) no coincide byte a byte con una relectura posterior desde la base. */
+    public void decide(RoomRequestStatus target, String decidedBy, String reason, Instant decidedAt) {
         this.status = target;
         this.decidedBy = decidedBy;
         this.decisionReason = reason;
-        this.decidedAt = decidedAt;
+        this.decidedAt = truncateToMicros(decidedAt);
+    }
+
+    /** decidedBy/decidedAt trackean la última decisión sea cual sea; el CHECK chk_solicitud_item_decision exige ambos no nulos fuera de NEW. */
+    public void deriveTo(Long buildingId, String decidedBy, Instant derivedAt) {
+        Instant truncated = truncateToMicros(derivedAt);
+        this.status = RoomRequestStatus.DERIVED_TO_BUILDING;
+        this.derivedBuildingId = buildingId;
+        this.derivedAt = truncated;
+        this.decidedBy = decidedBy;
+        this.decidedAt = truncated;
+    }
+
+    /** No toca decisionReason: preserva el motivo de resolución parcial que haya dejado el último assign. */
+    public void notifyTeacher(String decidedBy, Instant notifiedAt, Instant acceptanceDeadline) {
+        Instant truncated = truncateToMicros(notifiedAt);
+        this.status = RoomRequestStatus.NOTIFIED;
+        this.decidedBy = decidedBy;
+        this.decidedAt = truncated;
+        this.notifiedAt = truncated;
+        this.acceptanceDeadline = acceptanceDeadline == null ? null : truncateToMicros(acceptanceDeadline);
+        this.notificationRound = notificationRound + 1;
+    }
+
+    public void accept(String acceptedBy, Instant acceptedAt) {
+        Instant truncated = truncateToMicros(acceptedAt);
+        this.status = RoomRequestStatus.RESOLVED;
+        this.decidedBy = acceptedBy;
+        this.decidedAt = truncated;
+        this.acceptedBy = acceptedBy;
+        this.acceptedAt = truncated;
+        this.acceptanceDeadline = null;
+    }
+
+    /** Conserva notifiedAt, la ronda y decisionReason: el front reconoce un pedido reabierto por IN_EVALUATION con notifiedAt, y el mail del próximo notify sigue mostrando el motivo de la asignación parcial. */
+    public void reopen(String reason, String decidedBy, Instant reopenedAt) {
+        this.status = RoomRequestStatus.IN_EVALUATION;
+        this.decidedBy = decidedBy;
+        this.decidedAt = truncateToMicros(reopenedAt);
+        this.reopenReason = reason;
+        this.acceptanceDeadline = null;
+        this.acceptedAt = null;
+        this.acceptedBy = null;
+        this.reopenedFromNotifiedOn = null;
+    }
+
+    /** El evento único al que apunta el pedido cambió de fecha. */
+    public void reschedule(LocalDate date) {
+        this.date = date;
+    }
+
+    public void markReopenedFromNotified(LocalDate today) {
+        this.reopenedFromNotifiedOn = today;
+    }
+
+    private static Instant truncateToMicros(Instant value) {
+        return value.truncatedTo(ChronoUnit.MICROS);
+    }
+
+    public void returnFromBuilding(String reason) {
+        takeOverFromBuilding(reason);
+        this.status = RoomRequestStatus.NEW;
+    }
+
+    /** Saca el pedido de la cola del edificio sin tocar estado, aulas ni plazo: no libera lo que el docente ya recibió. */
+    public void takeOverFromBuilding(String reason) {
+        this.returnedFromBuildingId = this.derivedBuildingId;
+        this.returnedReason = reason;
+        this.derivedBuildingId = null;
+        this.derivedAt = null;
+    }
+
+    /** Actualiza en el lugar la fila cuya ocurrencia se reutiliza (p. ej. la principal en una reasignación): borrar y recrear con la misma id_ocurrencia viola el UNIQUE(id_item, id_ocurrencia) por el orden de flush de Hibernate.
+     *  classroomIds[i] cubre occurrencesBySlot.get(i): una fila por ocurrencia real, orden = i+1. Solo se borran las filas
+     *  de los espejos que se retiraron; las demás (clases pasadas de un cambio regular) quedan con su aula. */
+    public void assignClassrooms(List<Long> classroomIds, List<List<Long>> occurrencesBySlot,
+                                 Collection<Long> retiredOccurrenceIds,
+                                 Map<Long, RoomRequestItemAllocation.Original> originalByOccurrence) {
+        Map<Long, RoomRequestItemAllocation> existingByOccurrence = allocations.stream()
+                .collect(java.util.stream.Collectors.toMap(RoomRequestItemAllocation::getOccurrenceId, a -> a));
+        Set<Long> keptOccurrenceIds = new HashSet<>();
+
+        for (int i = 0; i < classroomIds.size(); i++) {
+            Long classroomId = classroomIds.get(i);
+            int position = i + 1;
+            for (Long occurrenceId : occurrencesBySlot.get(i)) {
+                keptOccurrenceIds.add(occurrenceId);
+                RoomRequestItemAllocation.Original original = position == 1 ? originalByOccurrence.get(occurrenceId) : null;
+                RoomRequestItemAllocation existing = existingByOccurrence.get(occurrenceId);
+                if (existing != null) {
+                    existing.update(classroomId, position);
+                } else {
+                    allocations.add(RoomRequestItemAllocation.builder()
+                            .item(this)
+                            .occurrenceId(occurrenceId)
+                            .classroomId(classroomId)
+                            .position(position)
+                            .originalCaptured(position == 1)
+                            .originalClassroomId(original == null ? null : original.classroomId())
+                            .originalSource(original == null ? null : original.source())
+                            .build());
+                }
+            }
+        }
+        this.reopenedFromNotifiedOn = null;
+        allocations.removeIf(a -> !keptOccurrenceIds.contains(a.getOccurrenceId())
+                && retiredOccurrenceIds.contains(a.getOccurrenceId()));
+    }
+
+    /** Solo las filas anteriores a V60 no guardaron el original: sirve el aula anterior del ítem, con origen MANUAL. */
+    public Long originalClassroomOf(RoomRequestItemAllocation allocation) {
+        return allocation.isOriginalCaptured() ? allocation.getOriginalClassroomId() : previousClassroomId;
+    }
+
+    public AllocationSource originalSourceOf(RoomRequestItemAllocation allocation) {
+        return allocation.isOriginalCaptured() ? allocation.getOriginalSource() : AllocationSource.MANUAL;
+    }
+
+    public void moveToOriginal(Collection<Long> occurrenceIds) {
+        allocations.stream()
+                .filter(a -> a.getPosition() == 1 && occurrenceIds.contains(a.getOccurrenceId()))
+                .forEach(a -> a.moveTo(originalClassroomOf(a)));
+    }
+
+    /** Espejos que tomaron el aula que dejó su principal al volver a la original. */
+    public void moveMirrors(Map<Long, Long> classroomByOccurrence) {
+        allocations.stream()
+                .filter(a -> classroomByOccurrence.containsKey(a.getOccurrenceId()))
+                .forEach(a -> a.moveTo(classroomByOccurrence.get(a.getOccurrenceId())));
+    }
+
+    public boolean keepsNotifiedClassroom(Collection<Long> relevantOccurrenceIds) {
+        return allocations.stream()
+                .filter(a -> a.getPosition() == 1 && relevantOccurrenceIds.contains(a.getOccurrenceId()))
+                .anyMatch(a -> !a.getClassroomId().equals(originalClassroomOf(a)));
     }
 
     public void addPreferences(List<Long> classroomIds) {
         classroomIds.forEach(this::addPreference);
+    }
+
+    public void rememberPreviousClassroom(Long classroomId) {
+        if (this.previousClassroomId == null) {
+            this.previousClassroomId = classroomId;
+        }
     }
 
     public void addPreference(Long classroomId) {

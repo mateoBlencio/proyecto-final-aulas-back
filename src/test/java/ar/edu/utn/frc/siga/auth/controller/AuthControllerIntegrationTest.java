@@ -21,11 +21,13 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.DefaultResponseErrorHandler;
 import org.springframework.web.client.RestTemplate;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("integration")
+@Testcontainers(disabledWithoutDocker = true)
 @Sql(scripts = "/auth/integration/seed-admin.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(scripts = "/auth/integration/cleanup-auth.sql", executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 class AuthControllerIntegrationTest {
@@ -86,6 +88,31 @@ class AuthControllerIntegrationTest {
         assertThat(body.get("accessToken")).isNotNull();
         assertThat(body.get("refreshToken")).isNotNull();
         assertThat(body.get("email")).isEqualTo(ADMIN_EMAIL);
+    }
+
+    @Test
+    void login_shouldReturn200WithTokens_whenEmailUsesInstitutionalSubdomain() throws Exception {
+        String email = "subdominio.test@sistemas.frc.utn.edu.ar";
+        ResponseEntity<String> response = login(email, PASSWORD);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        Map<String, Object> body = parseMap(response);
+        assertThat(body.get("accessToken")).isNotNull();
+        assertThat(body.get("email")).isEqualTo(email);
+    }
+
+    @Test
+    void login_shouldReturn200ForLowercaseUser_whenEmailHasUppercase() throws Exception {
+        ResponseEntity<String> response = login("Subdominio.Test@SISTEMAS.frc.utn.edu.ar", PASSWORD);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(parseMap(response).get("email")).isEqualTo("subdominio.test@sistemas.frc.utn.edu.ar");
+    }
+
+    @Test
+    void login_shouldReturn400_whenEmailHasSurroundingSpaces() throws Exception {
+        ResponseEntity<String> response = login("  subdominio.test@sistemas.frc.utn.edu.ar  ", PASSWORD);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(parseMap(response).get("errors")).asString().contains("email");
     }
 
     @Test

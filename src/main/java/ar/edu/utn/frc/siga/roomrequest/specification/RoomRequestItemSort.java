@@ -16,7 +16,9 @@ public final class RoomRequestItemSort {
             "id", "id",
             "date", "date",
             "startTime", "startTime",
-            "createdAt", "request.createdAt");
+            "createdAt", "request.createdAt",
+            "derivedAt", "derivedAt",
+            "decidedAt", "decidedAt");
 
     private static final String TIEBREAKER_PROPERTY = "id";
 

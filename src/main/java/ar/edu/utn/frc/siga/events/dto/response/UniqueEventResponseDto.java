@@ -20,6 +20,11 @@ public record UniqueEventResponseDto(
         LocalDate date,
         String description,
         SubjectResponseDto subject,
-        CommissionResponseDto commission
+        CommissionResponseDto commission,
+        boolean requiresProjector,
+        boolean requiresComputers,
+        Integer computerCount,
+        String requiredSoftware,
+        Boolean requiresExamUsers
 ) implements AcademicEventResponseDto {
 }

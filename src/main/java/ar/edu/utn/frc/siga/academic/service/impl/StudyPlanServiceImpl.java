@@ -1,17 +1,24 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
+import ar.edu.utn.frc.siga.academic.dto.StudyPlanFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.StudyPlanResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.StudyPlanMapper;
+import ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
 import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
 import ar.edu.utn.frc.siga.academic.service.StudyPlanService;
+import ar.edu.utn.frc.siga.academic.specification.StudyPlanSpecification;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.common.util.Finder;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,18 +28,18 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class StudyPlanServiceImpl implements StudyPlanService {
 
+    private final ApplicationEventPublisher eventPublisher;
     private final StudyPlanRepository studyPlanRepository;
     private final SpecialtyRepository specialtyRepository;
     private final StudyPlanMapper studyPlanMapper;
 
     @Override
-    public List<StudyPlanResponseDto> findAll(boolean includeDeactivated) {
-        List<StudyPlan> studyPlans = includeDeactivated
-                ? studyPlanRepository.findAll()
-                : studyPlanRepository.findAllActive();
-        return studyPlans.stream()
-                .map(studyPlanMapper::toDto)
-                .toList();
+    public Page<StudyPlanResponseDto> findAll(StudyPlanFilter filter, Pageable pageable, boolean includeDeactivated) {
+        return studyPlanRepository.findAll(
+                        StudyPlanSpecification.withFilter(filter)
+                                .and(includeDeactivated ? Specification.<StudyPlan>unrestricted() : StudyPlanSpecification.available()),
+                        pageable)
+                .map(studyPlanMapper::toDto);
     }
 
     @Override
@@ -43,14 +50,18 @@ public class StudyPlanServiceImpl implements StudyPlanService {
 
     @Override
     @Transactional
+    @AuditOperation(value = "Reactivación de plan de estudio", subject = "StudyPlan")
     public void activate(Long id) {
         studyPlanRepository.restore(Finder.orThrow(studyPlanRepository::findById, id, "StudyPlan"));
+        eventPublisher.publishEvent(new CatalogAvailabilityChanged());
     }
 
     @Override
     @Transactional
+    @AuditOperation(value = "Baja de plan de estudio", subject = "StudyPlan")
     public void deactivate(Long id) {
         studyPlanRepository.softDelete(Finder.orThrow(studyPlanRepository::findById, id, "StudyPlan"));
+        eventPublisher.publishEvent(new CatalogAvailabilityChanged());
     }
 
     @Override

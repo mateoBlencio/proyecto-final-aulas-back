@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSpecialtyDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
+import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadEmptyViewException;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,7 +18,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -63,12 +70,24 @@ class SpecialtySyncServiceTest {
     }
 
     @Test
+    @DisplayName("sync: con la vista vacía no llama al servicio de dominio y registra el fallo")
+    void syncWithEmptyViewSkipsDomainServiceAndRecordsFailure() {
+        when(catalogReader.findSpecialties()).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(SysacadEmptyViewException.class);
+
+        verify(specialtyService, never()).syncSpecialties(anyList());
+        verify(syncStateService).recordFailure(eq(SysacadView.ESPECIALIDADES), anyString());
+        verify(syncStateService, never()).recordSuccess(any(), anyInt());
+    }
+
+    @Test
     @DisplayName("sync: si falla, registra el error y propaga la excepción")
     void syncRecordsFailureAndRethrows() {
         when(catalogReader.findSpecialties()).thenThrow(new IllegalStateException("SysAcad caído"));
 
         assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(IllegalStateException.class);
 
-        verify(syncStateService).recordFailure(SysacadView.ESPECIALIDADES, "SysAcad caído");
+        verify(syncStateService).recordFailure(eq(SysacadView.ESPECIALIDADES), startsWith("INTERNAL_ERROR"));
     }
 }

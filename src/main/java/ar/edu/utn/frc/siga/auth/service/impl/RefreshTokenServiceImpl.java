@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RefreshTokenServiceImpl implements RefreshTokenService {
 
     private static final int RAW_TOKEN_BYTES = 32;
+    private static final Duration PURGE_RETENTION = Duration.ofDays(30);
 
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtProperties jwtProperties;
@@ -54,8 +55,9 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         return new IssuedRefreshToken(rawToken, expirationSeconds);
     }
 
+    // noRollbackFor: the cascade revocation must persist even though the exception follows it
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = InvalidRefreshTokenException.class)
     public RefreshResult refresh(String rawToken) {
         String tokenHash = hash(rawToken);
         RefreshToken token = refreshTokenRepository.findByTokenHash(tokenHash)
@@ -100,6 +102,8 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
                 && Duration.between(token.getRevokedAt(), Instant.now())
                         .compareTo(Duration.ofSeconds(jwtProperties.getRefreshGraceSeconds())) <= 0;
 
+        // Trade-off: within refresh-grace-seconds a reused rotated token still yields a new token, so a thief
+        // replaying a stolen token in that window is not detected; accepted to tolerate network retries.
         if (token.getRevocationReason() == RevocationReason.ROTATION && withinGrace) {
             log.info("Refresh token reutilizado dentro de la ventana de gracia, tratado como reintento de red");
             return new RefreshResult(token.getUser(), doIssue(token.getUser()));
@@ -127,6 +131,12 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Transactional
     public void revokeAllByUserId(Long userId) {
         refreshTokenRepository.revokeAllByUserId(userId, Instant.now());
+    }
+
+    @Override
+    @Transactional
+    public int purgeExpired() {
+        return refreshTokenRepository.deleteExpiredBefore(Instant.now().minus(PURGE_RETENTION));
     }
 
     private String generateRawToken() {

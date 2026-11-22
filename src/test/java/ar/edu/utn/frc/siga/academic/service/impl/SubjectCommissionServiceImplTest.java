@@ -1,27 +1,39 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.academic.dto.SubjectCommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SubjectCommissionMapper;
+import ar.edu.utn.frc.siga.academic.model.AcademicPeriod;
 import ar.edu.utn.frc.siga.academic.model.Commission;
+import ar.edu.utn.frc.siga.academic.model.Specialty;
+import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
 import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
-import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -30,6 +42,8 @@ import static org.mockito.Mockito.when;
 @DisplayName("SubjectCommissionServiceImpl")
 class SubjectCommissionServiceImplTest {
 
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
     @Mock
     private SubjectCommissionRepository subjectCommissionRepository;
     @Mock
@@ -41,13 +55,15 @@ class SubjectCommissionServiceImplTest {
 
     private SubjectCommissionServiceImpl service;
 
-    private final Subject subject = Subject.builder().id(1L).code(101).name("Algoritmos").build();
-    private final Commission commission = Commission.builder().id(2L).courseCode("K1001").build();
+    private final Subject subject = Subject.builder().id(1L).code(101).name("Algoritmos")
+            .studyPlan(StudyPlan.builder().id(1L).specialty(Specialty.builder().id(1L).build()).build()).build();
+    private final Commission commission = Commission.builder().id(2L).courseCode("K1001")
+            .academicPeriod(AcademicPeriod.builder().id(1L).build()).build();
 
     @BeforeEach
     void setUp() {
         service = new SubjectCommissionServiceImpl(
-                subjectCommissionRepository, subjectRepository, commissionRepository, subjectCommissionMapper);
+                eventPublisher, subjectCommissionRepository, subjectRepository, commissionRepository, subjectCommissionMapper);
     }
 
     @Test
@@ -55,7 +71,7 @@ class SubjectCommissionServiceImplTest {
     void findWithExistingRelationReturnsMappedDto() {
         SubjectCommission existing = SubjectCommission.builder().subject(subject).commission(commission)
                 .enrolledCount(30).build();
-        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, 2L, null, 30);
+        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, null, 2L, null, 30, true, true);
         when(subjectRepository.findById(1L)).thenReturn(Optional.of(subject));
         when(commissionRepository.findById(2L)).thenReturn(Optional.of(commission));
         when(subjectCommissionRepository.findBySubjectAndCommissionAndDeletedAtIsNull(subject, commission)).thenReturn(Optional.of(existing));
@@ -85,83 +101,162 @@ class SubjectCommissionServiceImplTest {
 
         assertThatThrownBy(() -> service.findBySubjectAndCommission(99L, 2L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Subject not found with id: 99");
+                .hasMessage("No existe la materia 99.");
+    }
+
+    private SubjectCommission linkOf(long subjectId, int specialtyCode, int planCode) {
+        Subject other = Subject.builder().id(subjectId).code(101).name("Algoritmos")
+                .studyPlan(StudyPlan.builder().id(subjectId).planCode(planCode).specialty(Specialty.builder().id(1L).build())
+                        .specialty(Specialty.builder().id(subjectId).specialtyCode(specialtyCode).build())
+                        .build())
+                .build();
+        return SubjectCommission.builder().subject(other).commission(commission).enrolledCount(30).build();
     }
 
     @Test
-    @DisplayName("findByCommissionAndSubjectCode: si existe la relación, devuelve el DTO mapeado")
-    void findByCommissionAndSubjectCodeWithExistingRelationReturnsMappedDto() {
-        SubjectCommission existing = SubjectCommission.builder().subject(subject).commission(commission)
-                .enrolledCount(30).build();
-        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, 2L, null, 30);
-        when(subjectCommissionRepository.findFirstByCommission_IdAndSubject_CodeAndDeletedAtIsNullOrderBySubject_IdAsc(2L, 101))
-                .thenReturn(Optional.of(existing));
+    @DisplayName("findByCommissionAndSubjectCode: con una sola candidata que coincide en especialidad y plan, devuelve su DTO")
+    void findByCommissionAndSubjectCodeWithExactMatchReturnsMappedDto() {
+        SubjectCommission existing = linkOf(1L, 5, 2008);
+        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, null, 2L, null, 30, true, true);
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
+                .thenReturn(List.of(existing));
         when(subjectCommissionMapper.toDto(existing)).thenReturn(dto);
 
-        SubjectCommissionResponseDto result = service.findByCommissionAndSubjectCode(2L, 101);
+        assertThat(service.findByCommissionAndSubjectCode(2L, 101, 5, 2008)).isEqualTo(dto);
+    }
 
-        assertThat(result).isEqualTo(dto);
+    @Test
+    @DisplayName("findByCommissionAndSubjectCode: con dos materias de igual código elige la de la especialidad y plan pedidos, no la de menor id")
+    void findByCommissionAndSubjectCodeDisambiguatesByStudyPlan() {
+        SubjectCommission lowerId = linkOf(1L, 5, 2008);
+        SubjectCommission wanted = linkOf(2L, 7, 2023);
+        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(2L, null, 2L, null, 30, true, true);
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
+                .thenReturn(List.of(lowerId, wanted));
+        when(subjectCommissionMapper.toDto(wanted)).thenReturn(dto);
+
+        assertThat(service.findByCommissionAndSubjectCode(2L, 101, 7, 2023)).isEqualTo(dto);
+    }
+
+    @Test
+    @DisplayName("findByCommissionAndSubjectCode: una sola candidata sin coincidencia exacta se usa igual")
+    void findByCommissionAndSubjectCodeFallsBackToSingleCandidate() {
+        SubjectCommission only = linkOf(1L, 5, 2008);
+        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, null, 2L, null, 30, true, true);
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
+                .thenReturn(List.of(only));
+        when(subjectCommissionMapper.toDto(only)).thenReturn(dto);
+
+        assertThat(service.findByCommissionAndSubjectCode(2L, 101, 9, 1999)).isEqualTo(dto);
+    }
+
+    @Test
+    @DisplayName("findByCommissionAndSubjectCode: una sola candidata sin coincidencia exacta loguea WARN con materia, comisión, especialidad y plan")
+    void findByCommissionAndSubjectCodeWarnsWhenFallingBackToSingleCandidate() {
+        SubjectCommission only = linkOf(1L, 5, 2008);
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
+                .thenReturn(List.of(only));
+        when(subjectCommissionMapper.toDto(only))
+                .thenReturn(new SubjectCommissionResponseDto(1L, null, 2L, null, 30, true, true));
+
+        List<ILoggingEvent> events = capturingLogs(() -> service.findByCommissionAndSubjectCode(2L, 101, 9, 1999));
+
+        assertThat(events).filteredOn(event -> event.getLevel() == Level.WARN)
+                .singleElement()
+                .satisfies(event -> assertThat(event.getFormattedMessage())
+                        .contains("materia 101 de la comisión 2", "especialidad=9", "plan=1999", "único candidato"));
+    }
+
+    @Test
+    @DisplayName("findByCommissionAndSubjectCode: con coincidencia exacta no loguea el WARN del candidato único")
+    void findByCommissionAndSubjectCodeDoesNotWarnOnExactMatch() {
+        SubjectCommission only = linkOf(1L, 5, 2008);
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
+                .thenReturn(List.of(only));
+        when(subjectCommissionMapper.toDto(only))
+                .thenReturn(new SubjectCommissionResponseDto(1L, null, 2L, null, 30, true, true));
+
+        List<ILoggingEvent> events = capturingLogs(() -> service.findByCommissionAndSubjectCode(2L, 101, 5, 2008));
+
+        assertThat(events).filteredOn(event -> event.getLevel() == Level.WARN).isEmpty();
+    }
+
+    private static List<ILoggingEvent> capturingLogs(Runnable action) {
+        Logger logger = (Logger) LoggerFactory.getLogger(SubjectCommissionServiceImpl.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            action.run();
+        } finally {
+            logger.detachAppender(appender);
+        }
+        return appender.list;
+    }
+
+    @Test
+    @DisplayName("findByCommissionAndSubjectCode: dos candidatas y ninguna coincide con especialidad y plan → ResourceNotFoundException")
+    void findByCommissionAndSubjectCodeAmbiguousThrows() {
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
+                .thenReturn(List.of(linkOf(1L, 5, 2008), linkOf(2L, 7, 2023)));
+
+        assertThatThrownBy(() -> service.findByCommissionAndSubjectCode(2L, 101, 9, 1999))
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
     @DisplayName("findByCommissionAndSubjectCode: si no existe la relación, lanza ResourceNotFoundException")
     void findByCommissionAndSubjectCodeWithoutExistingRelationThrowsResourceNotFound() {
-        when(subjectCommissionRepository.findFirstByCommission_IdAndSubject_CodeAndDeletedAtIsNullOrderBySubject_IdAsc(2L, 101))
-                .thenReturn(Optional.empty());
+        when(subjectCommissionRepository.findByCommission_IdAndSubject_Code(2L, 101))
+                .thenReturn(List.of());
 
-        assertThatThrownBy(() -> service.findByCommissionAndSubjectCode(2L, 101))
+        assertThatThrownBy(() -> service.findByCommissionAndSubjectCode(2L, 101, 5, 2008))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
-    @DisplayName("findAll: mapea todas las relaciones del repositorio")
+    @DisplayName("findAll: devuelve la página de relaciones mapeadas según el Specification")
     void findAllMapsAllRelations() {
         SubjectCommission relation = SubjectCommission.builder().subject(subject).commission(commission)
                 .enrolledCount(30).build();
-        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, 2L, null, 30);
-        when(subjectCommissionRepository.findAll()).thenReturn(List.of(relation));
+        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, null, 2L, null, 30, true, true);
+        when(subjectCommissionRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(relation)));
         when(subjectCommissionMapper.toDto(relation)).thenReturn(dto);
 
-        List<SubjectCommissionResponseDto> result = service.findAll(false);
-
-        assertThat(result).containsExactly(dto);
+        assertThat(service.findAll(new SubjectCommissionFilter(null, null), Pageable.unpaged(), false).getContent())
+                .containsExactly(dto);
     }
 
     @Test
-    @DisplayName("findAll: sin includeDeactivated, descarta los vínculos desactivados")
-    void findAllFiltersOutDeactivated() {
-        SubjectCommission active = SubjectCommission.builder().id(new SubjectCommissionId(1L, 2L))
+    @DisplayName("findAll: con includeDeactivated=true, no restringe por deletedAt")
+    void findAllWithIncludeDeactivatedMapsEveryStatus() {
+        SubjectCommission active = SubjectCommission.builder().id(1L)
                 .subject(subject).commission(commission).enrolledCount(30).build();
-        SubjectCommission inactive = SubjectCommission.builder().id(new SubjectCommissionId(1L, 3L))
+        SubjectCommission inactive = SubjectCommission.builder().id(2L)
                 .subject(subject).commission(commission).enrolledCount(10).build();
         inactive.deactivate();
-        SubjectCommissionResponseDto activeDto = new SubjectCommissionResponseDto(1L, 2L, null, 30);
-        SubjectCommissionResponseDto inactiveDto = new SubjectCommissionResponseDto(1L, 2L, null, 10);
-        when(subjectCommissionRepository.findAll()).thenReturn(List.of(active, inactive));
+        SubjectCommissionResponseDto activeDto = new SubjectCommissionResponseDto(1L, null, 2L, null, 30, true, true);
+        SubjectCommissionResponseDto inactiveDto = new SubjectCommissionResponseDto(1L, null, 2L, null, 10, true, false);
+        when(subjectCommissionRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(active, inactive)));
         when(subjectCommissionMapper.toDto(active)).thenReturn(activeDto);
         when(subjectCommissionMapper.toDto(inactive)).thenReturn(inactiveDto);
 
-        assertThat(service.findAll(true)).containsExactly(activeDto, inactiveDto);
-        assertThat(service.findAll(false)).containsExactly(activeDto);
+        assertThat(service.findAll(new SubjectCommissionFilter(null, null), Pageable.unpaged(), true).getContent())
+                .containsExactly(activeDto, inactiveDto);
     }
 
     @Test
-    @DisplayName("findBySubjectId: mapea las comisiones vinculadas a esa materia")
-    void findBySubjectIdMapsRelations() {
-        SubjectCommission relation = SubjectCommission.builder().subject(subject).commission(commission)
-                .enrolledCount(30).build();
-        SubjectCommissionResponseDto dto = new SubjectCommissionResponseDto(1L, 2L, null, 30);
-        when(subjectCommissionRepository.findBySubject_Id(1L)).thenReturn(List.of(relation));
-        when(subjectCommissionMapper.toDto(relation)).thenReturn(dto);
-
-        assertThat(service.findBySubjectId(1L, false)).containsExactly(dto);
-    }
-
-    @Test
-    @DisplayName("findBySubjectId: sin comisiones vinculadas, devuelve lista vacía (no lanza)")
-    void findBySubjectIdWithoutMatchesReturnsEmptyList() {
-        when(subjectCommissionRepository.findBySubject_Id(99L)).thenReturn(List.of());
-
-        assertThat(service.findBySubjectId(99L, false)).isEmpty();
+    @DisplayName("deactivate y activate publican CatalogAvailabilityChanged, una vez cada uno")
+    void deactivateAndActivatePublishCatalogAvailabilityChanged() {
+        when(subjectCommissionRepository.findBySubject_IdAndCommission_Id(1L, 2L)).thenReturn(Optional.of(SubjectCommission.builder().subject(subject).commission(commission).enrolledCount(30).build()));
+        var id = new ar.edu.utn.frc.siga.academic.model.SubjectCommissionId(1L, 2L);
+        service.deactivate(id);
+        verify(eventPublisher, org.mockito.Mockito.times(1))
+                .publishEvent(new ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged());
+        service.activate(id);
+        verify(eventPublisher, org.mockito.Mockito.times(2))
+                .publishEvent(new ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged());
     }
 }

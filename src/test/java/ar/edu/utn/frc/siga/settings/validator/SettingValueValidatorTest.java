@@ -6,6 +6,8 @@ import ar.edu.utn.frc.siga.settings.model.SettingKey;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -81,5 +83,111 @@ class SettingValueValidatorTest {
         assertThatCode(() -> validator.validate(SettingKey.OPTIMIZER_WEIGHT_UNUSED_CAPACITY, "  42  "))
                 .doesNotThrowAnyException();
         assertThat(validator.validate(SettingKey.OPTIMIZER_WEIGHT_UNUSED_CAPACITY, "  42  ")).isEqualTo("42");
+    }
+
+    @Test
+    @DisplayName("ENUM con una opción del catálogo se acepta")
+    void enumValidOptionIsAccepted() {
+        assertThat(validator.validate(SettingKey.SYSACAD_WRITE_MODE, "SANDBOX")).isEqualTo("SANDBOX");
+        assertThat(validator.validate(SettingKey.SYSACAD_AUTOGESTION_MODE, "ON")).isEqualTo("ON");
+    }
+
+    @Test
+    @DisplayName("ENUM fuera del catálogo lanza 400 y el mensaje lista las opciones")
+    void enumUnknownOptionIsRejected() {
+        assertThatThrownBy(() -> validator.validate(SettingKey.SYSACAD_WRITE_MODE, "MAYBE"))
+                .isInstanceOf(InvalidSettingValueException.class)
+                .hasMessageContaining("MAYBE")
+                .hasMessageContaining("SANDBOX");
+    }
+
+    @Test
+    @DisplayName("ENUM vacío o en blanco lanza 400")
+    void enumBlankIsRejected() {
+        assertThatThrownBy(() -> validator.validate(SettingKey.SYSACAD_WRITE_MODE, ""))
+                .isInstanceOf(InvalidSettingValueException.class);
+        assertThatThrownBy(() -> validator.validate(SettingKey.SYSACAD_WRITE_MODE, "   "))
+                .isInstanceOf(InvalidSettingValueException.class);
+    }
+
+    @Test
+    @DisplayName("ENUM distingue mayúsculas y minúsculas")
+    void enumIsCaseSensitive() {
+        assertThatThrownBy(() -> validator.validate(SettingKey.SYSACAD_WRITE_MODE, "on"))
+                .isInstanceOf(InvalidSettingValueException.class);
+        assertThatThrownBy(() -> validator.validate(SettingKey.SYSACAD_AUTOGESTION_MODE, "on"))
+                .isInstanceOf(InvalidSettingValueException.class);
+    }
+
+    @Test
+    @DisplayName("ENUM con espacios alrededor se recorta antes de comparar")
+    void enumIsTrimmed() {
+        assertThat(validator.validate(SettingKey.SYSACAD_WRITE_MODE, " ON ")).isEqualTo("ON");
+    }
+
+    @Test
+    @DisplayName("BOOLEAN true y false se aceptan")
+    void booleanValidValuesAreAccepted() {
+        assertThat(validator.validate(SettingKey.NOTIFICATIONS_ENABLED, "true")).isEqualTo("true");
+        assertThat(validator.validate(SettingKey.NOTIFICATIONS_ENABLED, "false")).isEqualTo("false");
+    }
+
+    @Test
+    @DisplayName("BOOLEAN en mayúsculas se normaliza a minúsculas")
+    void booleanIsNormalizedToLowerCase() {
+        assertThat(validator.validate(SettingKey.NOTIFICATIONS_ENABLED, "TRUE")).isEqualTo("true");
+        assertThat(validator.validate(SettingKey.NOTIFICATIONS_ENABLED, "False")).isEqualTo("false");
+    }
+
+    @Test
+    @DisplayName("BOOLEAN con un valor que no es true ni false lanza 400")
+    void booleanInvalidIsRejected() {
+        assertThatThrownBy(() -> validator.validate(SettingKey.NOTIFICATIONS_ENABLED, "yes"))
+                .isInstanceOf(InvalidSettingValueException.class);
+        assertThatThrownBy(() -> validator.validate(SettingKey.NOTIFICATIONS_ENABLED, "1"))
+                .isInstanceOf(InvalidSettingValueException.class);
+    }
+
+    @Test
+    @DisplayName("validateEventHours: fin 00:00 es fin de día y pasa con cualquier inicio")
+    void eventHoursMidnightEndIsAccepted() {
+        assertThatCode(() -> validator.validateEventHours(LocalTime.of(8, 0), LocalTime.MIDNIGHT))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateEventHours: inicio 00:00 con fin 00:00 pasa")
+    void eventHoursMidnightStartAndEndIsAccepted() {
+        assertThatCode(() -> validator.validateEventHours(LocalTime.MIDNIGHT, LocalTime.MIDNIGHT))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateEventHours: inicio igual al fin (08:00/08:00) lanza 400")
+    void eventHoursStartEqualToEndIsRejected() {
+        assertThatThrownBy(() -> validator.validateEventHours(LocalTime.of(8, 0), LocalTime.of(8, 0)))
+                .isInstanceOf(InvalidSettingValueException.class)
+                .hasMessage("La hora de inicio de la ventana horaria (08:00) debe ser anterior a la hora de fin (08:00)");
+    }
+
+    @Test
+    @DisplayName("validateEventHours: inicio un minuto antes del fin (08:00/08:01) pasa")
+    void eventHoursStartOneMinuteBeforeEndIsAccepted() {
+        assertThatCode(() -> validator.validateEventHours(LocalTime.of(8, 0), LocalTime.of(8, 1)))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateEventHours: inicio posterior al fin (09:00/08:00) lanza 400")
+    void eventHoursStartAfterEndIsRejected() {
+        assertThatThrownBy(() -> validator.validateEventHours(LocalTime.of(9, 0), LocalTime.of(8, 0)))
+                .isInstanceOf(InvalidSettingValueException.class);
+    }
+
+    @Test
+    @DisplayName("validateEventHours: inicio un minuto después del fin (08:01/08:00) lanza 400")
+    void eventHoursStartOneMinuteAfterEndIsRejected() {
+        assertThatThrownBy(() -> validator.validateEventHours(LocalTime.of(8, 1), LocalTime.of(8, 0)))
+                .isInstanceOf(InvalidSettingValueException.class);
     }
 }

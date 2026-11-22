@@ -1,0 +1,72 @@
+meta {
+  name: Listar tablero de ocurrencias
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/v1/allocations/occurrences-board?from=2026-01-01&to=2026-12-31&onlyFuture=true&issues=UNALLOCATED,OVERCROWDED&q=algebra&dayOfWeek=MONDAY&specialty=Ingeniería en Sistemas de Información&sort=subject,asc&page=0&size=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~from: 2026-01-01
+  ~to: 2026-12-31
+  onlyFuture: true
+  ~issues: UNALLOCATED,OVERCROWDED
+  ~q: algebra
+  ~dayOfWeek: MONDAY
+  ~specialty: Ingeniería en Sistemas de Información
+  ~sort: subject,asc
+  page: 0
+  size: 20
+}
+
+docs {
+  Tablero de la pantalla de conflictos. Una fila por evento (paginado por evento) con:
+  - event: el evento académico.
+  - summary: total, unallocated, released, overlap, overcrowded, notPermitted. Cuenta
+    fechas visibles del evento (rango, q, día, especialidad y alcance) sin aplicar
+    "issues". La unidad es la fecha: una fecha con 2 aulas faltantes suma 1.
+  - occurrences: las fechas que pasan el filtro, ordenadas por fecha. Cada una trae
+    date, startTime, endTime, past, requiredRooms (slots NEEDS_ROOM), slots e issues.
+
+  slots: una por aula de la fecha (principal roomSlot 1 y espejos), ordenadas por
+  roomSlot. Cada slot trae occurrenceId, status, releaseReason, releaseNote,
+  allocation (null si no tiene aula) y previousClassroom (aula anterior con
+  unavailableReason; solo en slots liberados o NEEDS_ROOM sin aula).
+
+  issues: discriminador "type".
+  - UNALLOCATED { missingRooms }: slots NEEDS_ROOM sin aula.
+  - OVERCROWDED { enrolled, capacity, overcrowdedBy }: capacity suma todas las aulas
+    asignadas de la fecha.
+  - OVERLAP { occurrenceId, classroomId, withEvent }: misma aula y fecha que otro
+    evento; incluye la superposición tolerada dentro del margen.
+  - NOT_PERMITTED { occurrenceId, classroomId }: el aula no habilita la materia.
+
+  Rango: to por defecto = fin del período académico activo (o from + 6 meses).
+  onlyFuture=true (default): from por defecto = hoy y excluye fechas ya empezadas.
+  onlyFuture=false: from por defecto = inicio del período activo más antiguo (o hoy),
+  y "past" indica si la clase ya empezó. 'to' anterior a 'from' -> 400.
+
+  issues: lista separada por comas en un solo parámetro (issues=UNALLOCATED,OVERCROWDED).
+  "issues[]=" no se lee: Spring lo trata como otro parámetro y el filtro queda vacío.
+  Valores: UNALLOCATED, OVERLAP, OVERCROWDED, NOT_PERMITTED, RELEASED. Se combinan con
+  OR: pasa la fecha con algún problema pedido, o con un slot liberado si se pidió
+  RELEASED. Omitido o vacío: no filtra (incluye fechas OK y liberadas). Valor
+  inválido -> 400.
+
+  Alcance por edificio: un slot con aula se ve si el edificio está en el alcance; un
+  slot sin aula se ve siempre; un liberado se ve si no tenía aula, si el aula es
+  desconocida o si está en el alcance. Los slots ocultos y sus problemas no salen;
+  una fecha sin slots visibles no aparece. El sobrecupo se calcula con todas las aulas.
+  Los espejos retirados por un pedido de aula (MIRROR_RETIRED) no aparecen nunca.
+
+  q, dayOfWeek y specialty filtran eventos igual que en /conflicts.
+  sort=campo,asc|desc: subject, dayOfWeek, startTime, enrolled, commissionCode. Otra
+  propiedad -> 400. Sin sort, orden por id del evento.
+  Paginado estándar (page/size, default size=20).
+
+  Excluye las ocurrencias desde el día en que la materia, comisión, materia-comisión, plan o especialidad del evento se dio de baja.
+}

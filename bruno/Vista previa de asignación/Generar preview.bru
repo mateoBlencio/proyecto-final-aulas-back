@@ -26,7 +26,7 @@ body:json {
 docs {
   Corre el solver con TODAS las aulas disponibles de la BD y la ocupación existente
   (asignaciones ya hechas) como restricción dura. Devuelve una preview con previewId,
-  sin persistir asignaciones. El confirm es un paso aparte (pendiente).
+  sin persistir asignaciones. El confirm es un paso aparte (POST /v1/previews/{previewId}/confirm).
   
   Dos modos EXCLUYENTES para elegir los eventos a (RE)RESOLVER (ninguno o ambos a la
   vez → 400 Invalid selection):
@@ -49,15 +49,34 @@ docs {
   Todo lo NO seleccionado sigue siendo intocable (ocupación pinned): la propuesta
   jamás pisa asignaciones firmes. Solo se consideran occurrences futuras (>= hoy).
   
+  Acepta eventos recurrentes y únicos.
+
   Respuesta (datos para dibujar la propuesta en el calendario):
   {
     "previewId": "prev_xxxxxxxx",
-    "allocations": [ { "event": {...}, "occurrenceDates": ["2026-08-03", ...], "classroom": {...}, "overcrowdedBy": 0, "unchanged": false } ],
-    "unresolved": [ { "event": {...}, "dates": ["2026-08-03", ...], "conflicts": [
+    "allocations": [ { "event": {...}, "roomSlot": 1, "occurrenceDates": ["2026-08-03", ...], "classroom": {...}, "overcrowdedBy": 0, "unchanged": false, "currentRoomStretches": [], "unmetRequirements": [ { "type": "PROJECTOR", "severity": "MINOR" } ] } ],
+    "unresolved": [ { "event": {...}, "roomSlot": 1, "dates": ["2026-08-03", ...], "conflicts": [
       { "date": "2026-08-03", "startTime": "08:00", "endTime": "09:30", "classroomId": 9,
         "conflictingEventId": 42, "origin": "DATABASE" }
     ] } ]
   }
+
+  roomSlot identifica la clave (evento, aula de espejo). Un evento sin espejos
+  aparece una vez con roomSlot 1; un evento repartido en 3 aulas aparece 3 veces
+  (roomSlot 1, 2 y 3), cada una con su aula. Para enviar la propuesta al confirm,
+  usar el mismo roomSlot.
+
+  overcrowdedBy usa los inscriptos repartidos entre los espejos: ceil(inscriptos / n),
+  con n la cantidad de roomSlot que el evento tiene en cada fecha (mínimo sobre las
+  fechas de la clave). El roomSlot 1 de un recurrente con un espejo parcial conserva
+  los inscriptos completos.
+
+  unmetRequirements (solo eventos únicos; vacío en recurrentes y en únicos sin
+  requisitos): advertencias, nunca bloquean la asignación ni dejan el evento sin aula.
+  - PROJECTOR / MINOR: el evento pide proyector y el aula no tiene.
+  - COMPUTERS / SEVERE: el evento pide PCs y el aula tiene menos de ceil(pedidas / n).
+  - SOFTWARE y EXAM_USERS / UNVERIFIABLE: el evento lo pide y no hay dato del aula
+    para comparar.
   allocations = filas con aula propuesta; unresolved = el solver no encontró aula sin
   conflicto para ese evento → queda para revisión manual.
   overcrowdedBy = alumnos que exceden la capacidad del aula propuesta (0 si entran, o si

@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.academic.dto.SubjectFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SubjectMapper;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
@@ -18,6 +19,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
 import java.util.Optional;
@@ -27,13 +31,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("SubjectServiceImpl")
 class SubjectServiceImplTest {
 
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
     @Mock
     private SubjectRepository subjectRepository;
     @Mock
@@ -53,15 +61,15 @@ class SubjectServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new SubjectServiceImpl(
-                subjectRepository, studyPlanRepository, specialtyRepository, subjectMapper, studyPlanResolver);
+                eventPublisher, subjectRepository, studyPlanRepository, specialtyRepository, subjectMapper, studyPlanResolver);
     }
 
     @Test
     @DisplayName("findById: devuelve el DTO mapeado cuando la materia existe")
     void findByIdReturnsMappedDto() {
         Subject subject = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
-        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null);
-        when(subjectRepository.findActiveById(5L)).thenReturn(Optional.of(subject));
+        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true, null);
+        when(subjectRepository.findById(5L)).thenReturn(Optional.of(subject));
         when(subjectMapper.toDto(subject)).thenReturn(dto);
 
         SubjectResponseDto result = service.findById(5L);
@@ -72,18 +80,18 @@ class SubjectServiceImplTest {
     @Test
     @DisplayName("findById: si la materia no existe, lanza ResourceNotFoundException")
     void findByIdWithMissingSubjectThrowsResourceNotFound() {
-        when(subjectRepository.findActiveById(99L)).thenReturn(Optional.empty());
+        when(subjectRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Subject not found with id: 99");
+                .hasMessage("No existe la materia 99.");
     }
 
     @Test
     @DisplayName("findByIds: mapea cada materia encontrada, sin fallar por ids inexistentes")
     void findByIdsMapsAllFound() {
         Subject subject = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
-        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null);
+        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true, null);
         when(subjectRepository.findAllById(List.of(5L, 99L))).thenReturn(List.of(subject));
         when(subjectMapper.toDto(subject)).thenReturn(dto);
 
@@ -93,71 +101,56 @@ class SubjectServiceImplTest {
     }
 
     @Test
-    @DisplayName("findAll: mapea todas las materias del repositorio")
-    void findAllMapsAllSubjects() {
-        Subject subject = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
-        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null);
-        when(subjectRepository.findAllActive()).thenReturn(List.of(subject));
-        when(subjectMapper.toDto(subject)).thenReturn(dto);
+    @DisplayName("findByIds excluye las materias desactivadas y findByIdsIncludingDeactivated las incluye")
+    void findByIds_excludesDeactivated_butIncludingDeactivatedKeepsThem() {
+        Subject active = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
+        Subject deactivated = Subject.builder().id(6L).code(102).name("Química").studyPlan(studyPlan).build();
+        deactivated.deactivate();
+        SubjectResponseDto activeDto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true, null);
+        SubjectResponseDto deactivatedDto = new SubjectResponseDto(6L, 102, "Química", null, null, false, null);
+        when(subjectRepository.findAllById(List.of(5L, 6L))).thenReturn(List.of(active, deactivated));
+        when(subjectMapper.toDto(active)).thenReturn(activeDto);
+        lenient().when(subjectMapper.toDto(deactivated)).thenReturn(deactivatedDto);
 
-        assertThat(service.findAll(false)).containsExactly(dto);
+        assertThat(service.findByIds(List.of(5L, 6L))).containsExactly(activeDto);
+        assertThat(service.findByIdsIncludingDeactivated(List.of(5L, 6L))).containsExactly(activeDto, deactivatedDto);
     }
 
     @Test
-    @DisplayName("findAll: con includeDeactivated=true, mapea todas las materias (activas e inactivas)")
+    @DisplayName("findAll: devuelve la página de materias mapeadas según el Specification")
+    void findAllMapsAllSubjects() {
+        Subject subject = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
+        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true, null);
+        when(subjectRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(subject)));
+        when(subjectMapper.toDto(subject)).thenReturn(dto);
+
+        assertThat(service.findAll(new SubjectFilter(null, null, null, null), Pageable.unpaged(), false).getContent())
+                .containsExactly(dto);
+    }
+
+    @Test
+    @DisplayName("findAll: con includeDeactivated=true, no restringe por deletedAt")
     void findAllWithIncludeDeactivatedMapsEveryStatus() {
         Subject active = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
         Subject inactive = Subject.builder().id(6L).code(102).name("Química").studyPlan(studyPlan).build();
         inactive.deactivate();
-        SubjectResponseDto activeDto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null);
-        SubjectResponseDto inactiveDto = new SubjectResponseDto(6L, 102, "Química", null, null);
-        when(subjectRepository.findAll()).thenReturn(List.of(active, inactive));
+        SubjectResponseDto activeDto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null, true, null);
+        SubjectResponseDto inactiveDto = new SubjectResponseDto(6L, 102, "Química", null, null, false, null);
+        when(subjectRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(active, inactive)));
         when(subjectMapper.toDto(active)).thenReturn(activeDto);
         when(subjectMapper.toDto(inactive)).thenReturn(inactiveDto);
 
-        assertThat(service.findAll(true)).containsExactly(activeDto, inactiveDto);
-    }
-
-    @Test
-    @DisplayName("findBySpecialtyCode: mapea las materias de todos los planes de esa especialidad")
-    void findBySpecialtyCodeMapsAllSubjects() {
-        Subject subject = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
-        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null);
-        when(subjectRepository.findByStudyPlan_Specialty_SpecialtyCode(10)).thenReturn(List.of(subject));
-        when(subjectMapper.toDto(subject)).thenReturn(dto);
-
-        assertThat(service.findBySpecialtyCode(10, false)).containsExactly(dto);
-    }
-
-    @Test
-    @DisplayName("findBySpecialtyCode: sin includeDeactivated, descarta las materias desactivadas")
-    void findBySpecialtyCodeFiltersOutDeactivated() {
-        Subject active = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
-        Subject inactive = Subject.builder().id(6L).code(102).name("Química").studyPlan(studyPlan).build();
-        inactive.deactivate();
-        SubjectResponseDto activeDto = new SubjectResponseDto(5L, 101, "Algoritmos", null, null);
-        SubjectResponseDto inactiveDto = new SubjectResponseDto(6L, 102, "Química", null, null);
-        when(subjectRepository.findByStudyPlan_Specialty_SpecialtyCode(10)).thenReturn(List.of(active, inactive));
-        when(subjectMapper.toDto(active)).thenReturn(activeDto);
-        when(subjectMapper.toDto(inactive)).thenReturn(inactiveDto);
-
-        assertThat(service.findBySpecialtyCode(10, true)).containsExactly(activeDto, inactiveDto);
-        assertThat(service.findBySpecialtyCode(10, false)).containsExactly(activeDto);
-    }
-
-    @Test
-    @DisplayName("findBySpecialtyCode: sin materias vinculadas, devuelve lista vacía (no lanza)")
-    void findBySpecialtyCodeWithoutMatchesReturnsEmptyList() {
-        when(subjectRepository.findByStudyPlan_Specialty_SpecialtyCode(999)).thenReturn(List.of());
-
-        assertThat(service.findBySpecialtyCode(999, false)).isEmpty();
+        assertThat(service.findAll(new SubjectFilter(null, null, null, null), Pageable.unpaged(), true).getContent())
+                .containsExactly(activeDto, inactiveDto);
     }
 
     @Test
     @DisplayName("findByCodeAndStudyPlan: devuelve el DTO mapeado cuando la materia existe para ese plan")
     void findByCodeAndStudyPlanReturnsMappedDto() {
         Subject existing = Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build();
-        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", "Anual", null);
+        SubjectResponseDto dto = new SubjectResponseDto(5L, 101, "Algoritmos", "Anual", null, true, null);
         when(specialtyRepository.findBySpecialtyCode(10)).thenReturn(Optional.of(specialty));
         when(studyPlanRepository.findByPlanCodeAndSpecialtyAndDeletedAtIsNull(2020, specialty)).thenReturn(Optional.of(studyPlan));
         when(subjectRepository.findByCodeAndStudyPlanAndDeletedAtIsNull(101, studyPlan)).thenReturn(Optional.of(existing));
@@ -175,7 +168,7 @@ class SubjectServiceImplTest {
 
         assertThatThrownBy(() -> service.findByCodeAndStudyPlan(101, 2020, 999))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Specialty not found with id: 999");
+                .hasMessage("No existe la especialidad 999.");
     }
 
     @Test
@@ -186,7 +179,7 @@ class SubjectServiceImplTest {
 
         assertThatThrownBy(() -> service.findByCodeAndStudyPlan(101, 2020, 10))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("StudyPlan not found with id: 2020");
+                .hasMessage("No existe el plan de estudio 2020.");
     }
 
     @Test
@@ -198,14 +191,14 @@ class SubjectServiceImplTest {
 
         assertThatThrownBy(() -> service.findByCodeAndStudyPlan(101, 2020, 10))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Subject not found with id: 101");
+                .hasMessage("No existe la materia 101.");
     }
 
     @Test
     @DisplayName("syncSubjects: inserta la materia que no existe con columnas de control")
     void syncSubjectsInsertsUnknownSubject() {
         StudyPlan syncStudyPlan = syncStudyPlan();
-        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any())).thenReturn(Optional.of(syncStudyPlan));
+        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any(), any())).thenReturn(Optional.of(syncStudyPlan));
         when(subjectRepository.findAll()).thenReturn(List.of());
         when(subjectRepository.save(any(Subject.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -230,7 +223,7 @@ class SubjectServiceImplTest {
         StudyPlan syncStudyPlan = syncStudyPlan();
         Subject existing = Subject.builder().id(1L).code(519).name("Analisis I").term("A").studyPlan(syncStudyPlan)
                 .sysacadHash(Hashes.sha256Hex("Analisis I", "A")).build();
-        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any())).thenReturn(Optional.of(syncStudyPlan));
+        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any(), any())).thenReturn(Optional.of(syncStudyPlan));
         when(subjectRepository.findAll()).thenReturn(List.of(existing));
 
         service.syncSubjects(List.of(new SubjectSyncCommand(17, 94, 519, "Análisis Matemático I", "C")));
@@ -246,13 +239,119 @@ class SubjectServiceImplTest {
         StudyPlan syncStudyPlan = syncStudyPlan();
         Subject existing = Subject.builder().id(1L).code(519).name("Análisis Matemático I").term("C")
                 .studyPlan(syncStudyPlan).sysacadHash(Hashes.sha256Hex("Análisis Matemático I", "C")).build();
-        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any())).thenReturn(Optional.of(syncStudyPlan));
+        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any(), any())).thenReturn(Optional.of(syncStudyPlan));
         when(subjectRepository.findAll()).thenReturn(List.of(existing));
 
         int affected = service.syncSubjects(
                 List.of(new SubjectSyncCommand(17, 94, 519, "Análisis Matemático I", "C")));
 
         verify(subjectRepository, never()).save(any());
+        assertThat(existing.getDeletedAt()).isNull();
+        assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("syncSubjects: dos comandos idénticos en la misma corrida insertan una sola vez")
+    void syncSubjectsInsertsDuplicatedCommandOnce() {
+        StudyPlan syncStudyPlan = syncStudyPlan();
+        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any(), any())).thenReturn(Optional.of(syncStudyPlan));
+        when(subjectRepository.findAll()).thenReturn(List.of());
+        when(subjectRepository.save(any(Subject.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        SubjectSyncCommand command = new SubjectSyncCommand(17, 94, 519, "Análisis Matemático I", "C");
+
+        int affected = service.syncSubjects(List.of(command, command));
+
+        verify(subjectRepository, times(1)).save(any(Subject.class));
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("syncSubjects: clave repetida con datos distintos se ignora completa, sin resolver el plan ni escribir")
+    void syncSubjectsIgnoresKeyWithConflictingVariants() {
+        when(subjectRepository.findAll()).thenReturn(List.of());
+
+        int affected = service.syncSubjects(List.of(
+                new SubjectSyncCommand(17, 94, 519, "Analisis I", "A"),
+                new SubjectSyncCommand(17, 94, 519, "Análisis Matemático I", "C")));
+
+        verify(subjectRepository, never()).save(any());
+        verify(studyPlanResolver, never()).findOrCreate(any(), any(), any(), any());
+        assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("syncSubjects: variantes distintas sobre una materia existente la dejan sin cambios")
+    void syncSubjectsLeavesExistingSubjectUntouchedOnConflictingVariants() {
+        StudyPlan syncStudyPlan = syncStudyPlan();
+        Subject existing = Subject.builder().id(1L).code(519).name("Original").term("A").studyPlan(syncStudyPlan)
+                .sysacadHash(Hashes.sha256Hex("Original", "A")).build();
+        when(subjectRepository.findAll()).thenReturn(List.of(existing));
+
+        int affected = service.syncSubjects(List.of(
+                new SubjectSyncCommand(17, 94, 519, "Variante 1", "A"),
+                new SubjectSyncCommand(17, 94, 519, "Variante 2", "A")));
+
+        verify(subjectRepository, never()).save(any());
+        assertThat(existing.getName()).isEqualTo("Original");
+        assertThat(existing.getSysacadHash()).isEqualTo(Hashes.sha256Hex("Original", "A"));
+        assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("syncSubjects: variantes distintas sobre una materia dada de baja no la reactivan")
+    void syncSubjectsDoesNotReactivateSoftDeletedSubjectOnConflictingVariants() {
+        StudyPlan syncStudyPlan = syncStudyPlan();
+        Subject existing = Subject.builder().id(1L).code(519).name("Original").term("A").studyPlan(syncStudyPlan)
+                .sysacadHash(Hashes.sha256Hex("Original", "A")).build();
+        existing.deactivate();
+        when(subjectRepository.findAll()).thenReturn(List.of(existing));
+
+        int affected = service.syncSubjects(List.of(
+                new SubjectSyncCommand(17, 94, 519, "Original", "A"),
+                new SubjectSyncCommand(17, 94, 519, "Otro", "A")));
+
+        verify(subjectRepository, never()).save(any());
+        assertThat(existing.getDeletedAt()).isNotNull();
+        assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("syncSubjects: en una corrida mixta procesa la clave con copias idénticas y la normal, e ignora la conflictiva")
+    void syncSubjectsProcessesOnlyNonConflictingKeysInMixedRun() {
+        StudyPlan syncStudyPlan = syncStudyPlan();
+        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any(), any())).thenReturn(Optional.of(syncStudyPlan));
+        when(subjectRepository.findAll()).thenReturn(List.of());
+        when(subjectRepository.save(any(Subject.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        SubjectSyncCommand identical = new SubjectSyncCommand(17, 94, 520, "Física I", "A");
+
+        int affected = service.syncSubjects(List.of(
+                new SubjectSyncCommand(17, 94, 519, "Conflicto 1", "A"),
+                identical,
+                new SubjectSyncCommand(17, 94, 521, "Química", "C"),
+                new SubjectSyncCommand(17, 94, 519, "Conflicto 2", "A"),
+                identical));
+
+        ArgumentCaptor<Subject> saved = ArgumentCaptor.forClass(Subject.class);
+        verify(subjectRepository, times(2)).save(saved.capture());
+        assertThat(saved.getAllValues()).extracting(Subject::getCode).containsExactlyInAnyOrder(520, 521);
+        assertThat(affected).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("syncSubjects: no reactiva la materia dada de baja que sigue en SysAcad con el mismo hash")
+    void syncSubjectsKeepsSoftDeletedSubjectWithSameHash() {
+        StudyPlan syncStudyPlan = syncStudyPlan();
+        Subject existing = Subject.builder().id(1L).code(519).name("Análisis Matemático I").term("C")
+                .studyPlan(syncStudyPlan).sysacadHash(Hashes.sha256Hex("Análisis Matemático I", "C")).build();
+        existing.deactivate();
+        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any(), any())).thenReturn(Optional.of(syncStudyPlan));
+        when(subjectRepository.findAll()).thenReturn(List.of(existing));
+
+        int affected = service.syncSubjects(
+                List.of(new SubjectSyncCommand(17, 94, 519, "Análisis Matemático I", "C")));
+
+        assertThat(existing.getDeletedAt()).isNotNull();
+        verify(subjectRepository, never()).save(existing);
         assertThat(affected).isZero();
     }
 
@@ -265,25 +364,41 @@ class SubjectServiceImplTest {
                 List.of(new SubjectSyncCommand(17, null, 519, "Análisis Matemático I", "C")));
 
         verify(subjectRepository, never()).save(any());
-        verify(studyPlanResolver, never()).findOrCreate(any(), any(), any());
+        verify(studyPlanResolver, never()).findOrCreate(any(), any(), any(), any());
         assertThat(affected).isZero();
     }
 
     @Test
-    @DisplayName("syncSubjects: si no se resuelve el plan de estudio, la materia se ignora")
-    void syncSubjectsSkipsWhenStudyPlanUnresolved() {
-        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any())).thenReturn(Optional.empty());
+    @DisplayName("syncSubjects: con la especialidad ausente, el resolver crea el stub y la materia se da de alta igual")
+    void syncSubjectsCreatesSubjectWhenSpecialtyWasAbsent() {
+        StudyPlan stubBackedPlan = syncStudyPlan();
+        when(studyPlanResolver.findOrCreate(eq(17), eq(94), any(), any())).thenReturn(Optional.of(stubBackedPlan));
         when(subjectRepository.findAll()).thenReturn(List.of());
+        when(subjectRepository.save(any(Subject.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         int affected = service.syncSubjects(
                 List.of(new SubjectSyncCommand(17, 94, 519, "Análisis Matemático I", "C")));
 
-        verify(subjectRepository, never()).save(any());
-        assertThat(affected).isZero();
+        ArgumentCaptor<Subject> saved = ArgumentCaptor.forClass(Subject.class);
+        verify(subjectRepository).save(saved.capture());
+        assertThat(saved.getValue().getStudyPlan()).isEqualTo(stubBackedPlan);
+        assertThat(affected).isEqualTo(1);
     }
 
     private static StudyPlan syncStudyPlan() {
         return StudyPlan.builder().id(1L).planCode(94)
                 .specialty(Specialty.builder().id(1L).specialtyCode(17).build()).build();
+    }
+
+    @Test
+    @DisplayName("deactivate y activate publican CatalogAvailabilityChanged, una vez cada uno")
+    void deactivateAndActivatePublishCatalogAvailabilityChanged() {
+        when(subjectRepository.findById(5L)).thenReturn(Optional.of(Subject.builder().id(5L).code(101).name("Algoritmos").studyPlan(studyPlan).build()));
+        service.deactivate(5L);
+        verify(eventPublisher, org.mockito.Mockito.times(1))
+                .publishEvent(new ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged());
+        service.activate(5L);
+        verify(eventPublisher, org.mockito.Mockito.times(2))
+                .publishEvent(new ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged());
     }
 }

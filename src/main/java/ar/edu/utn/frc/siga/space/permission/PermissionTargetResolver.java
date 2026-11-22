@@ -8,5 +8,5 @@ public interface PermissionTargetResolver {
 
     PermissionTargetKind kind();
 
-    Map<Long, String> resolveNames(Collection<Long> targetIds);
+    Map<Long, TargetInfo> resolve(Collection<Long> targetIds);
 }

@@ -1,11 +1,13 @@
 package ar.edu.utn.frc.siga.events.service;
 
+import ar.edu.utn.frc.siga.events.dto.AcademicEventFilter;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.UpdateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
+import ar.edu.utn.frc.siga.events.dto.response.ScheduleStatus;
 import ar.edu.utn.frc.siga.events.dto.response.SysacadRecurringEventRefDto;
 import ar.edu.utn.frc.siga.events.service.command.SyncRecurringEventCommand;
 import ar.edu.utn.frc.siga.events.service.command.UpsertRecurringEventResult;
@@ -17,24 +19,45 @@ import java.time.LocalTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.modulith.NamedInterface;
 
 @NamedInterface("api")
 public interface AcademicEventService {
-    List<AcademicEventResponseDto> findAll();
+    Page<AcademicEventResponseDto> findAll(AcademicEventFilter filter, Pageable pageable);
     AcademicEventResponseDto findById(Long eventId);
 
     List<AcademicEventResponseDto> findByIds(Collection<Long> eventIds);
+
+    /** Eventos con una baja manual vigente en su materia, comisión, materia-comisión, plan o especialidad. */
+    Set<Long> findSuspendedIds(Collection<Long> eventIds);
     List<OccurrenceResponseDto> findOccurrencesByEventId(Long eventId);
+    List<OccurrenceResponseDto> findOccurrencesByEventIds(Collection<Long> eventIds);
 
     List<RecurringEventResponseDto> findRecurringEventsBySubjectAndCommission(Long subjectId, Long commissionId);
+
+    ScheduleStatus recurringScheduleStatus(Long subjectId, Long commissionId);
+
+    List<RecurringEventResponseDto> findRecurringEventsBySubject(Long subjectId, LocalDate onDate);
 
     List<OccurrenceResponseDto> findClassOccurrences(Long subjectId, Long commissionId, LocalDate from);
 
     AcademicEventResponseDto createRecurringEvent(CreateRecurringEventRequestDto dto);
 
     FindOrCreateResult<Long> findOrCreateRecurringEvent(CreateRecurringEventRequestDto dto);
+
+    /**
+     * Find-or-create bulk por clave natural (subjectId, commissionId, dayOfWeek, startTime, startDate,
+     * endDate) para una corrida entera de importación de Excel: un único prefetch del superset por
+     * (materia, comisión) del lote, un único insert de los nuevos y una única expansión de ocurrencias.
+     * A diferencia de {@link #syncRecurringEvents}, nunca toca el evento existente ni escribe campos de
+     * sync. El resultado respeta el orden de {@code requests}. El singular
+     * {@link #findOrCreateRecurringEvent} delega acá con una lista de un elemento.
+     */
+    List<FindOrCreateResult<Long>> findOrCreateRecurringEvents(List<CreateRecurringEventRequestDto> requests);
 
     /**
      * Upsert bulk por clave natural (subjectId, commissionId, dayOfWeek, startTime, startDate, endDate)
@@ -54,11 +77,17 @@ public interface AcademicEventService {
     UpsertRecurringEventResult syncRecurringEvent(SyncRecurringEventCommand cmd);
 
     /**
-     * Marca {@code sysacadEnabled=false} en los eventos recurrentes "sync-owned" (con
-     * {@code sysacadHash} no nulo) que no aparecieron en la corrida actual del sync. No destructivo:
-     * nunca borra el evento, sus ocurrencias ni sus asignaciones. Devuelve la cantidad marcada.
+     * Da de baja ({@code sigaEnabled=false}) los eventos recurrentes "sync-owned" (con
+     * {@code sysacadHash} no nulo) que no aparecieron en la corrida actual del sync, y retira sus
+     * ocurrencias futuras sin aula ni pedido (las que tienen alguno se conservan). Los eventos de las
+     * comisiones en {@code unresolvedCommissionIds} (filas que Sysacad listó pero el sync no pudo resolver
+     * por causas locales) no se marcan: no se sabe si Sysacad los dejó de listar. Nunca borra el evento
+     * ni sus asignaciones. Devuelve la cantidad marcada. Aborta sin marcar nada si los eventos presentes
+     * no alcanzan {@code minValidPercent}% de los vigentes (0 desactiva el umbral; cero presentes aborta
+     * siempre).
      */
-    int markRecurringEventsAbsent(Collection<Long> presentEventIds);
+    int markRecurringEventsAbsent(Collection<Long> presentEventIds, Collection<Long> unresolvedCommissionIds,
+            int minValidPercent);
 
     /**
      * Ubica (sin crear) el {@code RecurringEvent} ya creado por el sync EVENTOS, por su clave natural
@@ -78,4 +107,11 @@ public interface AcademicEventService {
     List<AcademicEventResponseDto> findUniqueEvents();
 
     AcademicEventResponseDto updateUniqueEvent(Long id, UpdateUniqueEventRequestDto dto);
+
+    /**
+     * Borra un evento único con todas sus ocurrencias (la principal y los espejos, vigentes o retirados).
+     * Falla con 404 si no existe y con 409 si alguna ocurrencia todavía tiene asignación de aula o un pedido
+     * de aula que la referencie: el llamador tiene que liberarlas antes.
+     */
+    void deleteUniqueEvent(Long eventId);
 }

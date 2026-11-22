@@ -4,5 +4,5 @@ import org.springframework.modulith.NamedInterface;
 
 @NamedInterface("api")
 public enum UniqueEventKind {
-    PARCIAL, TRABAJO_PRACTICO, EXAMEN_FINAL, OTRO
+    PARCIAL, TRABAJO_PRACTICO, EXAMEN_FINAL, CONFERENCIA, OTRO
 }

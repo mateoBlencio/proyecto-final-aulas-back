@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
 import ar.edu.utn.frc.siga.preview.dto.request.PreviewAllocationDto;
 import ar.edu.utn.frc.siga.preview.dto.response.MoveConflictDto;
+import ar.edu.utn.frc.siga.preview.service.impl.PlanningKey;
 import ar.edu.utn.frc.siga.preview.dto.response.MoveConflictDto.ConflictOrigin;
 import ar.edu.utn.frc.siga.preview.validator.PreviewValidator.ResolvedProposal;
 
@@ -32,39 +33,39 @@ class PreviewValidatorTest {
 
 
     @Test
-    @DisplayName("validateNoDuplicateEventIds: eventId repetido lanza AllocationConflictException")
-    void validateNoDuplicateEventIdsRepetidoLanza() {
+    @DisplayName("validateNoDuplicateAllocations: eventId repetido lanza AllocationConflictException")
+    void validateNoDuplicateAllocationsRepetidoLanza() {
         List<PreviewAllocationDto> allocations = List.of(
-                new PreviewAllocationDto(1L, 5L), new PreviewAllocationDto(1L, 6L));
+                new PreviewAllocationDto(1L, null, 5L), new PreviewAllocationDto(1L, null, 6L));
 
-        assertThatThrownBy(() -> validator.validateNoDuplicateEventIds(allocations))
+        assertThatThrownBy(() -> validator.validateNoDuplicateAllocations(allocations))
                 .isInstanceOf(AllocationConflictException.class);
     }
 
     @Test
-    @DisplayName("validateNoDuplicateEventIds: sin repetidos no lanza")
-    void validateNoDuplicateEventIdsSinRepetidosNoLanza() {
+    @DisplayName("validateNoDuplicateAllocations: sin repetidos no lanza")
+    void validateNoDuplicateAllocationsSinRepetidosNoLanza() {
         List<PreviewAllocationDto> allocations = List.of(
-                new PreviewAllocationDto(1L, 5L), new PreviewAllocationDto(2L, 6L));
+                new PreviewAllocationDto(1L, null, 5L), new PreviewAllocationDto(2L, null, 6L));
 
-        assertThatCode(() -> validator.validateNoDuplicateEventIds(allocations)).doesNotThrowAnyException();
+        assertThatCode(() -> validator.validateNoDuplicateAllocations(allocations)).doesNotThrowAnyException();
     }
 
     @Test
     @DisplayName("validateAllocationsBelongToPreview: evento ajeno al preview lanza AllocationConflictException")
     void validateAllocationsBelongToPreviewAjenoLanza() {
-        List<PreviewAllocationDto> allocations = List.of(new PreviewAllocationDto(99L, 5L));
+        List<PreviewAllocationDto> allocations = List.of(new PreviewAllocationDto(99L, null, 5L));
 
-        assertThatThrownBy(() -> validator.validateAllocationsBelongToPreview(allocations, Set.of(1L, 2L)))
+        assertThatThrownBy(() -> validator.validateAllocationsBelongToPreview(allocations, Set.of(new PlanningKey(1L, 1), new PlanningKey(2L, 1))))
                 .isInstanceOf(AllocationConflictException.class);
     }
 
     @Test
     @DisplayName("validateAllocationsBelongToPreview: todos pertenecen al preview no lanza")
     void validateAllocationsBelongToPreviewTodosPertenecenNoLanza() {
-        List<PreviewAllocationDto> allocations = List.of(new PreviewAllocationDto(1L, 5L));
+        List<PreviewAllocationDto> allocations = List.of(new PreviewAllocationDto(1L, null, 5L));
 
-        assertThatCode(() -> validator.validateAllocationsBelongToPreview(allocations, Set.of(1L, 2L)))
+        assertThatCode(() -> validator.validateAllocationsBelongToPreview(allocations, Set.of(new PlanningKey(1L, 1), new PlanningKey(2L, 1))))
                 .doesNotThrowAnyException();
     }
 
@@ -140,6 +141,54 @@ class PreviewValidatorTest {
         assertThat(conflicts).isEmpty();
     }
 
+
+    @Test
+    @DisplayName("validateNoDuplicateAllocations: mismo evento y mismo roomSlot repetidos lanza AllocationConflictException")
+    void validateNoDuplicateAllocationsMismoEventoYRoomSlotLanza() {
+        List<PreviewAllocationDto> allocations = List.of(
+                new PreviewAllocationDto(1L, 2, 5L), new PreviewAllocationDto(1L, 2, 6L));
+
+        assertThatThrownBy(() -> validator.validateNoDuplicateAllocations(allocations))
+                .isInstanceOf(AllocationConflictException.class);
+    }
+
+    @Test
+    @DisplayName("validateNoDuplicateAllocations: mismo evento con roomSlot distinto no es duplicado")
+    void validateNoDuplicateAllocationsRoomSlotDistintoNoLanza() {
+        List<PreviewAllocationDto> allocations = List.of(
+                new PreviewAllocationDto(1L, 1, 5L), new PreviewAllocationDto(1L, 2, 6L));
+
+        assertThatCode(() -> validator.validateNoDuplicateAllocations(allocations)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateNoDuplicateAllocations: roomSlot null equivale a 1")
+    void validateNoDuplicateAllocationsRoomSlotNullEquivaleAUno() {
+        List<PreviewAllocationDto> allocations = List.of(
+                new PreviewAllocationDto(1L, null, 5L), new PreviewAllocationDto(1L, 1, 6L));
+
+        assertThatThrownBy(() -> validator.validateNoDuplicateAllocations(allocations))
+                .isInstanceOf(AllocationConflictException.class);
+    }
+
+    @Test
+    @DisplayName("validateAllocationsBelongToPreview: roomSlot que el preview no planificó lanza aunque el evento sí esté")
+    void validateAllocationsBelongToPreviewRoomSlotAjenoLanza() {
+        List<PreviewAllocationDto> allocations = List.of(new PreviewAllocationDto(1L, 2, 5L));
+
+        assertThatThrownBy(() -> validator.validateAllocationsBelongToPreview(allocations, Set.of(new PlanningKey(1L, 1))))
+                .isInstanceOf(AllocationConflictException.class)
+                .hasMessageContaining("1:2");
+    }
+
+    @Test
+    @DisplayName("validateAllocationsBelongToPreview: roomSlot null se resuelve contra la clave con roomSlot 1")
+    void validateAllocationsBelongToPreviewRoomSlotNullEsUno() {
+        List<PreviewAllocationDto> allocations = List.of(new PreviewAllocationDto(1L, null, 5L));
+
+        assertThatCode(() -> validator.validateAllocationsBelongToPreview(allocations, Set.of(new PlanningKey(1L, 1))))
+                .doesNotThrowAnyException();
+    }
 
     private LocalDate futureDate(int daysFromNow) {
         return LocalDate.now().plusDays(daysFromNow);

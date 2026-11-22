@@ -34,6 +34,8 @@ public class EventAllocationComposer {
         return new UniqueEventAllocationResponseDto(
                 event,
                 allocation.occurrence() != null ? allocation.occurrence().status() : null,
+                allocation.occurrence() != null ? allocation.occurrence().releaseReason() : null,
+                allocation.occurrence() != null ? allocation.occurrence().releaseNote() : null,
                 allocation.classroom(),
                 Overcrowding.by(event.enrolled(), allocation.classroom() != null ? allocation.classroom().capacity() : null),
                 allocation.observation());
@@ -47,8 +49,12 @@ public class EventAllocationComposer {
 
         Set<Long> eventIds = uniqueEvents.stream().map(UniqueEventResponseDto::id)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
+        // Los espejos comparten eventId con la principal: se descartan para no duplicar la clave.
         Map<Long, OccurrenceSlotDto> slotByEventId = Maps.byId(
-                occurrenceService.findSlotsByEvents(eventIds), OccurrenceSlotDto::eventId);
+                occurrenceService.findSlotsByEvents(eventIds).stream()
+                        .filter(slot -> slot.mirrorOfOccurrenceId() == null)
+                        .toList(),
+                OccurrenceSlotDto::eventId);
 
         Set<Long> occurrenceIds = slotByEventId.values().stream().map(OccurrenceSlotDto::occurrenceId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
@@ -58,7 +64,7 @@ public class EventAllocationComposer {
         Set<Long> classroomIds = allocationByOccurrenceId.values().stream().map(Allocation::getClassroomId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         Map<Long, ClassroomResponseDto> classroomById = Maps.byId(
-                classroomService.findByIds(classroomIds), ClassroomResponseDto::id);
+                classroomService.findByIdsIncludingDeactivated(classroomIds), ClassroomResponseDto::id);
 
         List<UniqueEventAllocationResponseDto> result = new ArrayList<>(uniqueEvents.size());
         for (UniqueEventResponseDto event : uniqueEvents) {
@@ -68,6 +74,8 @@ public class EventAllocationComposer {
             result.add(new UniqueEventAllocationResponseDto(
                     event,
                     slot != null ? slot.status() : null,
+                    slot != null ? slot.releaseReason() : null,
+                    slot != null ? slot.releaseNote() : null,
                     classroom,
                     Overcrowding.by(event.enrolled(), classroom != null ? classroom.capacity() : null),
                     allocation != null ? allocation.getObservation() : null));

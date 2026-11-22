@@ -1,6 +1,10 @@
 package ar.edu.utn.frc.siga.academic.model;
 
-import ar.edu.utn.frc.siga.common.model.TimestampedEntity;
+import org.hibernate.envers.Audited;
+import org.hibernate.envers.AuditOverride;
+import org.hibernate.envers.NotAudited;
+import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
+import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -16,13 +20,15 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
+@Audited
+@AuditOverride(forClass = SoftDeletableEntity.class)
 @Table(name = "especialidad")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Specialty extends TimestampedEntity {
+public class Specialty extends SoftDeletableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -38,13 +44,27 @@ public class Specialty extends TimestampedEntity {
     @Column(name = "abreviatura")
     private String abbreviation;
 
+    @NotAudited
     @Column(name = "sincronizado_en")
     private Instant syncedAt;
 
-    @Column(name = "hash_sysacad", length = 64)
+    @NotAudited
+    @Column(name = "hash_raw", length = 64)
     private String sysacadHash;
 
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
+
+    public UnavailableReason unavailableReason() {
+        return isActive() ? null : UnavailableReason.DEACTIVATED;
+    }
+
+    public boolean isCurrentInSysacad() {
+        return sysacadHash != null;
+    }
+
+    public boolean isAvailable() {
+        return unavailableReason() == null;
+    }
 }

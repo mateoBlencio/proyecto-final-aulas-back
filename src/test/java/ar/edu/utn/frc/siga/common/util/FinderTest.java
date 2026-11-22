@@ -25,7 +25,6 @@ class FinderTest {
     void noEncontradoLanzaConMensaje() {
         assertThatThrownBy(() -> Finder.orThrow(id -> Optional.empty(), 42L, "Classroom"))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("Classroom")
-                .hasMessageContaining("42");
+                .hasMessage("No existe el aula 42.");
     }
 }

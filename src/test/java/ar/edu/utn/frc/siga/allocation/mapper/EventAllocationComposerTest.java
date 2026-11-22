@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.dto.response.UniqueEventResponseDto;
 import ar.edu.utn.frc.siga.events.model.EventType;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
@@ -48,7 +49,7 @@ class EventAllocationComposerTest {
         composer = new EventAllocationComposer(occurrenceService, allocationRepository, classroomService);
         lenient().when(occurrenceService.findSlotsByEvents(any())).thenReturn(List.of());
         lenient().when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of());
-        lenient().when(classroomService.findByIds(any())).thenReturn(List.of());
+        lenient().when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of());
     }
 
     @Test
@@ -57,7 +58,7 @@ class EventAllocationComposerTest {
         UniqueEventResponseDto event = uniqueEvent(3L, 40);
         ClassroomResponseDto classroom = classroom(5L, 30);
         AllocationResponseDto allocation = new AllocationResponseDto(
-                1L, AllocationSource.MANUAL, null, "obs", null, null, classroom);
+                1L, AllocationSource.MANUAL, null, "obs", null, null, classroom, null);
 
         UniqueEventAllocationResponseDto result = composer.compose(event, allocation);
 
@@ -71,7 +72,7 @@ class EventAllocationComposerTest {
     void composeSinAula() {
         UniqueEventResponseDto event = uniqueEvent(3L, 40);
         AllocationResponseDto allocation = new AllocationResponseDto(
-                1L, AllocationSource.MANUAL, null, null, null, null, null);
+                1L, AllocationSource.MANUAL, null, null, null, null, null, null);
 
         UniqueEventAllocationResponseDto result = composer.compose(event, allocation);
 
@@ -97,12 +98,12 @@ class EventAllocationComposerTest {
     void composeAllJuntaTodo() {
         UniqueEventResponseDto event = uniqueEvent(3L, 40);
         OccurrenceSlotDto slot = new OccurrenceSlotDto(10L, 3L, LocalDate.of(2026, 3, 10),
-                LocalTime.of(10, 0), LocalTime.of(11, 0), OccurrenceStatus.NEEDS_ROOM, 40);
+                LocalTime.of(10, 0), LocalTime.of(11, 0), OccurrenceStatus.NEEDS_ROOM, 40, 1, null, null, null, null);
         Allocation allocation = Allocation.builder()
                 .id(1L).occurrenceId(10L).classroomId(5L).observation("obs").build();
         when(occurrenceService.findSlotsByEvents(any())).thenReturn(List.of(slot));
         when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(allocation));
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, 30)));
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 30)));
 
         List<UniqueEventAllocationResponseDto> result = composer.composeAll(List.of(event));
 
@@ -115,6 +116,79 @@ class EventAllocationComposerTest {
     }
 
     @Test
+    @DisplayName("composeAll: evento con slot principal y espejo no lanza y devuelve un solo elemento")
+    void composeAllConEspejoNoLanza() {
+        UniqueEventResponseDto event = uniqueEvent(3L, 40);
+        when(occurrenceService.findSlotsByEvents(any())).thenReturn(List.of(
+                slot(10L, 3L, 1, null), slot(11L, 3L, 2, 10L)));
+
+        List<UniqueEventAllocationResponseDto> result = composer.composeAll(List.of(event));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().status()).isEqualTo(OccurrenceStatus.NEEDS_ROOM);
+    }
+
+    @Test
+    @DisplayName("composeAll: con espejo en otra aula, aula y observación son las de la principal")
+    void composeAllConEspejoUsaAulaDeLaPrincipal() {
+        UniqueEventResponseDto event = uniqueEvent(3L, 40);
+        // El espejo va primero para detectar un filtro que se quede con el último o el primero.
+        when(occurrenceService.findSlotsByEvents(any())).thenReturn(List.of(
+                slot(11L, 3L, 2, 10L), slot(10L, 3L, 1, null)));
+        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(
+                Allocation.builder().id(1L).occurrenceId(10L).classroomId(5L).observation("principal").build(),
+                Allocation.builder().id(2L).occurrenceId(11L).classroomId(6L).observation("espejo").build()));
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(
+                classroom(5L, 30), classroom(6L, 50)));
+
+        UniqueEventAllocationResponseDto dto = composer.composeAll(List.of(event)).getFirst();
+
+        assertThat(dto.classroom().id()).isEqualTo(5);
+        assertThat(dto.observation()).isEqualTo("principal");
+        assertThat(dto.overcrowdedBy()).isEqualTo(10);
+    }
+
+    @Test
+    @DisplayName("composeAll: dos eventos, uno con espejo y otro sin, se resuelven cada uno con su slot")
+    void composeAllEventosConYSinEspejo() {
+        UniqueEventResponseDto conEspejo = uniqueEvent(3L, 40);
+        UniqueEventResponseDto sinEspejo = uniqueEvent(4L, 20);
+        when(occurrenceService.findSlotsByEvents(any())).thenReturn(List.of(
+                slot(10L, 3L, 1, null), slot(11L, 3L, 2, 10L), slot(20L, 4L, 1, null)));
+        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(
+                Allocation.builder().id(1L).occurrenceId(10L).classroomId(5L).observation("A").build(),
+                Allocation.builder().id(3L).occurrenceId(20L).classroomId(7L).observation("B").build()));
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(
+                classroom(5L, 30), classroom(7L, 25)));
+
+        List<UniqueEventAllocationResponseDto> result = composer.composeAll(List.of(conEspejo, sinEspejo));
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).classroom().id()).isEqualTo(5);
+        assertThat(result.get(0).observation()).isEqualTo("A");
+        assertThat(result.get(1).classroom().id()).isEqualTo(7);
+        assertThat(result.get(1).observation()).isEqualTo("B");
+        assertThat(result.get(1).overcrowdedBy()).isZero();
+    }
+
+    @Test
+    @DisplayName("composeAll: ocurrencia liberada devuelve motivo y nota")
+    void composeAllOcurrenciaLiberada() {
+        UniqueEventResponseDto event = uniqueEvent(3L, 40);
+        OccurrenceSlotDto slot = new OccurrenceSlotDto(10L, 3L, LocalDate.of(2026, 3, 10),
+                LocalTime.of(10, 0), LocalTime.of(11, 0), OccurrenceStatus.ROOM_RELEASED, 40, 1,
+                ReleaseReason.OTHER, "Paro docente", 5L, null);
+        when(occurrenceService.findSlotsByEvents(any())).thenReturn(List.of(slot));
+
+        UniqueEventAllocationResponseDto dto = composer.composeAll(List.of(event)).getFirst();
+
+        assertThat(dto.status()).isEqualTo(OccurrenceStatus.ROOM_RELEASED);
+        assertThat(dto.releaseReason()).isEqualTo(ReleaseReason.OTHER);
+        assertThat(dto.releaseNote()).isEqualTo("Paro docente");
+        assertThat(dto.classroom()).isNull();
+    }
+
+    @Test
     @DisplayName("composeAll: lista vacía no consulta ocurrencias")
     void composeAllListaVacia() {
         List<UniqueEventAllocationResponseDto> result = composer.composeAll(List.of());
@@ -124,10 +198,16 @@ class EventAllocationComposerTest {
 
     private UniqueEventResponseDto uniqueEvent(Long id, Integer enrolled) {
         return new UniqueEventResponseDto(id, EventType.UNIQUE_EVENT, UniqueEventKind.EXAMEN_FINAL, enrolled,
-                LocalTime.of(10, 0), 60, LocalDate.of(2026, 3, 10), "evento especial", null, null);
+                LocalTime.of(10, 0), 60, LocalDate.of(2026, 3, 10), "evento especial", null, null, false, false, null, null, null);
+    }
+
+    private OccurrenceSlotDto slot(Long occurrenceId, Long eventId, Integer roomSlot, Long mirrorOfOccurrenceId) {
+        return new OccurrenceSlotDto(occurrenceId, eventId, LocalDate.of(2026, 3, 10),
+                LocalTime.of(10, 0), LocalTime.of(11, 0), OccurrenceStatus.NEEDS_ROOM, 40, roomSlot,
+                null, null, null, mirrorOfOccurrenceId);
     }
 
     private ClassroomResponseDto classroom(Long id, Integer capacity) {
-        return new ClassroomResponseDto(id, id.intValue(), capacity, 1L, "Edificio 1", 1L, "Tipo");
+        return new ClassroomResponseDto(id, id.intValue(), capacity, 1L, "Edificio 1", 1L, "Tipo", null, true);
     }
 }

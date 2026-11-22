@@ -1,0 +1,39 @@
+meta {
+  name: Exportar registro de auditoría
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/v1/audit/export
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~from: 2026-01-01
+  ~to: 2026-12-31
+  ~user: admin@frc.utn.edu.ar
+  ~entityType: Configuración
+  ~kind: MODIFIED
+  ~actor: HUMAN
+  ~q: asignación
+}
+
+docs {
+  Descarga el listado de GET /v1/audit como CSV (UTF-8 con BOM, separador ';').
+  Mismos filtros, sin paginación. Requiere PERM_AUDIT_READ.
+  La columna fecha y el nombre del archivo están en hora de Buenos Aires.
+
+  Columnas: fecha, tipo, actor, usuario, descripcion, entidades, cantidad,
+  tipo_cambio, registro (recordLabel o recordId), operacion, operacion_padre,
+  revision.
+
+  Las celdas de texto que empiezan con =, +, -, @, tab o CR llevan un prefijo '.
+
+  400 si el filtro devuelve más entradas que siga.audit.export.max-rows
+  (10000 por defecto): acotar el rango de fechas o agregar filtros.
+
+  Si entran revisiones mientras se exporta, puede haber filas repetidas en el borde
+  entre páginas. Un error tras el primer byte deja el archivo truncado.
+}

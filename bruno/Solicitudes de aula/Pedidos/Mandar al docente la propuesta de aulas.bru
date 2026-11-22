@@ -1,0 +1,32 @@
+meta {
+  name: Mandar al docente la propuesta de aulas
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/v1/room-requests/items/1/notify
+  body: none
+  auth: inherit
+}
+
+docs {
+  POST /v1/room-requests/items/{id}/notify. Rol: SUBSECRETARIA, AUXILIAR_AULICO.
+
+  Manda al docente la propuesta de aulas y deja el pedido en `NOTIFIED`. Calcula
+  `acceptanceDeadline`: el menor entre `roomRequests.acceptance.businessHours` horas
+  hábiles desde ahora (cada día hábil suma 24 h, sin fines de semana ni feriados, en hora
+  argentina) y el inicio del evento menos `roomRequests.acceptance.hoursBeforeEvent` horas.
+  Sube `notificationRound` en uno. El aula sigue reservada; el pedido pasa a `RESOLVED`
+  con `confirm`, por plazo vencido o por el vencimiento diario.
+
+  **Idempotente** en `NOTIFIED` y `RESOLVED`: devuelve 200 con el estado actual sin
+  volver a avisar. Un pedido reabierto (`IN_EVALUATION` con `notifiedAt`) se puede
+  notificar de nuevo: sale otro mail (clave de idempotencia por ronda).
+
+  Si todavía no se notificó:
+  - 409 si el estado no es `IN_EVALUATION`;
+  - 400 si el pedido no tiene ninguna aula asignada.
+
+  Respuesta: 200 con el pedido actualizado (`status: "NOTIFIED"`, `acceptanceDeadline`).
+}

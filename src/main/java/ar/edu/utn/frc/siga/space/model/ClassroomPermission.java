@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.space.model;
 
+import org.hibernate.envers.Audited;
+import org.hibernate.envers.AuditOverride;
 import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -20,6 +22,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
+@Audited
+@AuditOverride(forClass = SoftDeletableEntity.class)
 @Table(name = "aula_permiso",
        uniqueConstraints = @UniqueConstraint(name = "uq_aula_permiso",
                columnNames = {"id_aula", "tipo_objetivo", "id_objetivo"}))

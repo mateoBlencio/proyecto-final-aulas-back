@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.ingest.service.impl;
 
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
+import ar.edu.utn.frc.siga.allocation.service.OccurrenceBoardService;
 import ar.edu.utn.frc.siga.ingest.dto.IngestResultDto;
 import ar.edu.utn.frc.siga.ingest.exception.InvalidFileFormatException;
 import ar.edu.utn.frc.siga.ingest.source.IngestSource;
@@ -8,9 +9,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.util.List;
 
@@ -18,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -39,13 +44,20 @@ class IngestSourceSelectionTest {
     @Mock
     private AllocationService allocationService;
 
+    @Mock
+    private OccurrenceBoardService occurrenceBoardService;
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
     private IngestServiceImpl service;
 
     @BeforeEach
     void setUp() {
         lenient().when(excelSource.supports(any())).thenReturn(false);
         lenient().when(csvSource.supports(any())).thenReturn(false);
-        service = new IngestServiceImpl(List.of(excelSource, csvSource), batchProcessor, allocationService);
+        lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        service = new IngestServiceImpl(List.of(excelSource, csvSource), batchProcessor, allocationService,
+                occurrenceBoardService, transactionManager);
     }
 
     @Test
@@ -54,8 +66,7 @@ class IngestSourceSelectionTest {
         MockMultipartFile file = new MockMultipartFile("file", "planilla.csv", "text/csv", new byte[0]);
         when(csvSource.supports("planilla.csv")).thenReturn(true);
         when(csvSource.parse(file)).thenReturn(new IngestSource.ParsedContent(List.of(), 2026));
-        when(batchProcessor.process(any(), eq(2026))).thenReturn(
-                new IngestRowBatchProcessor.BatchResult(0, 0, 0, List.of(), List.of(), List.of()));
+        stubBatch();
 
         IngestResultDto result = service.ingestFile(file);
 
@@ -78,11 +89,33 @@ class IngestSourceSelectionTest {
         MockMultipartFile file = new MockMultipartFile("file", "vacia.xlsx", "application/vnd.ms-excel", new byte[0]);
         when(excelSource.supports("vacia.xlsx")).thenReturn(true);
         when(excelSource.parse(file)).thenReturn(new IngestSource.ParsedContent(List.of(), 2026));
-        when(batchProcessor.process(any(), eq(2026))).thenReturn(
-                new IngestRowBatchProcessor.BatchResult(0, 0, 0, List.of(), List.of(), List.of()));
+        stubBatch();
 
         service.ingestFile(file);
 
         verifyNoInteractions(allocationService);
+    }
+
+    @Test
+    @DisplayName("después de procesar el lote invalida la caché del tablero de ocurrencias")
+    void invalidaElTableroDespuesDelLote() {
+        MockMultipartFile file = new MockMultipartFile("file", "planilla.xlsx", "application/vnd.ms-excel", new byte[0]);
+        when(excelSource.supports("planilla.xlsx")).thenReturn(true);
+        when(excelSource.parse(file)).thenReturn(new IngestSource.ParsedContent(List.of(), 2026));
+        stubBatch();
+
+        service.ingestFile(file);
+
+        InOrder inOrder = inOrder(batchProcessor, occurrenceBoardService);
+        inOrder.verify(batchProcessor).resolve(any(), eq(2026));
+        inOrder.verify(batchProcessor).write(any());
+        inOrder.verify(occurrenceBoardService).invalidateCache();
+    }
+
+    private void stubBatch() {
+        IngestRowBatchProcessor.ResolvedBatch resolved = new IngestRowBatchProcessor.ResolvedBatch(List.of(), 0, List.of());
+        when(batchProcessor.resolve(any(), eq(2026))).thenReturn(resolved);
+        when(batchProcessor.write(resolved)).thenReturn(
+                new IngestRowBatchProcessor.BatchResult(0, 0, 0, List.of(), List.of(), List.of()));
     }
 }

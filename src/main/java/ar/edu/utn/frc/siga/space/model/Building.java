@@ -1,6 +1,10 @@
 package ar.edu.utn.frc.siga.space.model;
 
+import org.hibernate.envers.Audited;
+import org.hibernate.envers.AuditOverride;
+import org.hibernate.envers.NotAudited;
 import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
+import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -20,6 +24,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
+@Audited
+@AuditOverride(forClass = SoftDeletableEntity.class)
 @Table(name = "edificio")
 @Getter
 @Setter
@@ -39,18 +45,36 @@ public class Building extends SoftDeletableEntity {
     @Column(name = "nombre", nullable = false, length = 100)
     private String name;
 
+    @NotAudited
     @Column(name = "sincronizado_en")
     private Instant syncedAt;
 
-    @Column(name = "hash_sysacad", length = 64)
+    @NotAudited
+    @Column(name = "hash_raw", length = 64)
     private String sysacadHash;
+
+    @Builder.Default
+    @Column(name = "habilitado_sysacad", nullable = false)
+    private Boolean sysacadEnabled = true;
 
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
 
+    @NotAudited
     @JsonIgnore
     @OneToMany(mappedBy = "building", fetch = FetchType.LAZY)
     private List<Classroom> classrooms;
 
+    public boolean isCurrentInSysacad() {
+        return Boolean.TRUE.equals(sysacadEnabled) || sysacadHash == null;
+    }
+
+    public UnavailableReason unavailableReason() {
+        return isActive() ? null : UnavailableReason.DEACTIVATED;
+    }
+
+    public boolean isAvailable() {
+        return unavailableReason() == null;
+    }
 }

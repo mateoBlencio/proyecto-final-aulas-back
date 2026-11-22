@@ -3,6 +3,8 @@ package ar.edu.utn.frc.siga.ingest.service.impl;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -29,7 +31,11 @@ import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.model.EventType;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
+import ar.edu.utn.frc.siga.allocation.service.OccurrenceBoardService;
+import ar.edu.utn.frc.siga.allocation.exception.AllocationConflictException;
+import ar.edu.utn.frc.siga.audit.internal.AuditDescriptionProbe;
 import ar.edu.utn.frc.siga.common.dto.FindOrCreateResult;
+import ar.edu.utn.frc.siga.common.security.SystemScope;
 import ar.edu.utn.frc.siga.ingest.ExcelTestWorkbooks;
 import ar.edu.utn.frc.siga.ingest.ExcelTestWorkbooks.DataRow;
 import ar.edu.utn.frc.siga.ingest.dto.IngestResultDto;
@@ -48,15 +54,19 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("IngestServiceImpl")
@@ -78,21 +88,28 @@ class IngestServiceImplTest {
     private AcademicEventService academicEventService;
     @Mock
     private AllocationService allocationService;
+
+    @Mock
+    private OccurrenceBoardService occurrenceBoardService;
     @Mock
     private BuildingService buildingService;
     @Mock
     private ClassroomService classroomService;
+    @Mock
+    private PlatformTransactionManager transactionManager;
 
     private IngestServiceImpl service;
 
     @BeforeEach
     void setUp() {
         IngestRowResolver rowResolver = new IngestRowResolver(specialtyService, studyPlanService, subjectService,
-            academicPeriodService, commissionService, subjectCommissionService, academicEventService,
+            academicPeriodService, commissionService, subjectCommissionService,
             buildingService, classroomService);
-        IngestRowBatchProcessor batchProcessor = new IngestRowBatchProcessor(rowResolver);
+        IngestRowBatchProcessor batchProcessor = new IngestRowBatchProcessor(rowResolver, academicEventService);
         ExcelIngestSource excelSource = new ExcelIngestSource(new ExcelTemplateValidator(), new ExcelRowMapper());
-        service = new IngestServiceImpl(List.of(excelSource), batchProcessor, allocationService);
+        lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        service = new IngestServiceImpl(List.of(excelSource), batchProcessor, allocationService,
+            occurrenceBoardService, transactionManager);
     }
 
     @Test
@@ -115,10 +132,10 @@ class IngestServiceImplTest {
         verify(buildingService).findByName("Edificio Central");
         verify(classroomService).findByRoomNumberAndBuilding(105, 5L);
 
-        ArgumentCaptor<CreateRecurringEventRequestDto> eventCaptor =
-            ArgumentCaptor.forClass(CreateRecurringEventRequestDto.class);
-        verify(academicEventService).findOrCreateRecurringEvent(eventCaptor.capture());
-        CreateRecurringEventRequestDto eventDto = eventCaptor.getValue();
+        ArgumentCaptor<List<CreateRecurringEventRequestDto>> eventCaptor =
+            ArgumentCaptor.forClass(List.class);
+        verify(academicEventService).findOrCreateRecurringEvents(eventCaptor.capture());
+        CreateRecurringEventRequestDto eventDto = eventCaptor.getValue().getFirst();
         assertThat(eventDto.subjectId()).isEqualTo(10L);
         assertThat(eventDto.commissionId()).isEqualTo(20L);
         assertThat(eventDto.dayOfWeek()).isEqualTo(DayOfWeek.MONDAY);
@@ -176,10 +193,10 @@ class IngestServiceImplTest {
 
         service.ingestFile(file);
 
-        ArgumentCaptor<CreateRecurringEventRequestDto> eventCaptor =
-            ArgumentCaptor.forClass(CreateRecurringEventRequestDto.class);
-        verify(academicEventService).findOrCreateRecurringEvent(eventCaptor.capture());
-        assertThat(eventCaptor.getValue().durationMinutes()).isEqualTo(90);
+        ArgumentCaptor<List<CreateRecurringEventRequestDto>> eventCaptor =
+            ArgumentCaptor.forClass(List.class);
+        verify(academicEventService).findOrCreateRecurringEvents(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getFirst().durationMinutes()).isEqualTo(90);
     }
 
     @Test
@@ -203,7 +220,7 @@ class IngestServiceImplTest {
     void materiaInexistenteSalteaFilaYLaReporta() {
         SpecialtyResponseDto specialty = new SpecialtyResponseDto(1, "Ingeniería en Sistemas", "Ing. Sist.");
         when(specialtyService.findBySpecialtyCode(1)).thenReturn(specialty);
-        StudyPlanResponseDto plan = new StudyPlanResponseDto(1, specialty);
+        StudyPlanResponseDto plan = new StudyPlanResponseDto(1L, 1, specialty, true);
         when(studyPlanService.findByPlanCodeAndSpecialtyCode(1, 1)).thenReturn(plan);
         when(subjectService.findByCodeAndStudyPlan(100, 1, 1))
             .thenThrow(ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException.of("Subject", 100));
@@ -214,7 +231,7 @@ class IngestServiceImplTest {
 
         assertThat(result.processedRows()).isZero();
         assertThat(result.skippedRows()).hasSize(1);
-        assertThat(result.skippedRows().getFirst().message()).contains("Subject not found with id: 100");
+        assertThat(result.skippedRows().getFirst().message()).contains("No existe la materia 100.");
         verify(allocationService, never()).reallocate(any());
     }
 
@@ -223,7 +240,7 @@ class IngestServiceImplTest {
     void aulaEnEdificioDistintoReportaWarning() {
         stubHappyPath(DataRow.defaultRow());
         ClassroomResponseDto classroomEnOtroEdificio = new ClassroomResponseDto(5L, 105, 40,
-            7L, "Otro Edificio", 1L, "Aula");
+            7L, "Otro Edificio", 1L, "Aula", null, true);
         when(classroomService.findByRoomNumberAndBuilding(105, 5L)).thenReturn(classroomEnOtroEdificio);
         MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow().toMultipartFile();
 
@@ -268,6 +285,125 @@ class IngestServiceImplTest {
     }
 
 
+    @Test
+    @DisplayName("la escritura y la asignación van en una transacción que se confirma, y la caché se invalida después del commit")
+    void commitSeguidoDeInvalidacionDeCache() {
+        stubHappyPath(DataRow.defaultRow());
+        MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow().toMultipartFile();
+
+        service.ingestFile(file);
+
+        InOrder order = inOrder(transactionManager, occurrenceBoardService);
+        order.verify(transactionManager).commit(any());
+        order.verify(occurrenceBoardService).invalidateCache();
+        verify(transactionManager, never()).rollback(any());
+    }
+
+    @Test
+    @DisplayName("el catálogo se resuelve antes de abrir la transacción; eventos y asignación van dentro, antes del commit")
+    void resolucionFueraDeLaTransaccionYEscrituraDentro() {
+        stubHappyPath(DataRow.defaultRow());
+        MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow().toMultipartFile();
+
+        service.ingestFile(file);
+
+        InOrder order = inOrder(classroomService, transactionManager, academicEventService, allocationService);
+        order.verify(classroomService).findByRoomNumberAndBuilding(105, 5L);
+        order.verify(transactionManager).getTransaction(any());
+        order.verify(academicEventService).findOrCreateRecurringEvents(any());
+        order.verify(allocationService).reallocate(any());
+        order.verify(transactionManager).commit(any());
+    }
+
+    @Test
+    @DisplayName("si reallocate lanza, la excepción se propaga, la transacción hace rollback y no se invalida la caché")
+    void reallocateQueFallaPropagaYNoInvalidaCache() {
+        stubHappyPath(DataRow.defaultRow());
+        when(allocationService.reallocate(any())).thenThrow(new AllocationConflictException("solape"));
+        MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow().toMultipartFile();
+
+        assertThatThrownBy(() -> service.ingestFile(file))
+            .isInstanceOf(AllocationConflictException.class)
+            .hasMessageContaining("solape");
+
+        verify(transactionManager).rollback(any());
+        verify(transactionManager, never()).commit(any());
+        verify(occurrenceBoardService, never()).invalidateCache();
+    }
+
+    @Test
+    @DisplayName("reallocate corre con SystemScope activo y lo deja desactivado al terminar")
+    void reallocateCorreConSystemScopeActivo() {
+        stubHappyPath(DataRow.defaultRow());
+        AtomicBoolean scopeActiveDuringReallocate = new AtomicBoolean(false);
+        when(allocationService.reallocate(any())).thenAnswer(inv -> {
+            scopeActiveDuringReallocate.set(SystemScope.isActive());
+            return List.of();
+        });
+        MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow().toMultipartFile();
+
+        service.ingestFile(file);
+
+        assertThat(scopeActiveDuringReallocate).isTrue();
+        assertThat(SystemScope.isActive()).isFalse();
+    }
+
+    @Test
+    @DisplayName("sin asignaciones pendientes (mismo evento con dos aulas) no se llama reallocate y se advierte cada fila")
+    void sinAsignacionesPendientesNoLlamaReallocate() {
+        stubHappyPath(DataRow.defaultRow());
+        ClassroomResponseDto otraAula = new ClassroomResponseDto(6L, 106, 40, 5L, "Edificio Central", 1L, "Aula", null, true);
+        when(classroomService.findByRoomNumberAndBuilding(106, 5L)).thenReturn(otraAula);
+        MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026)
+            .withValidDataRow()
+            .withDataRow(DataRow.defaultRow().toBuilder().roomNumber(106).build())
+            .toMultipartFile();
+
+        IngestResultDto result = service.ingestFile(file);
+
+        assertThat(result.processedRows()).isEqualTo(2);
+        assertThat(result.rowWarnings()).hasSize(2);
+        assertThat(result.rowWarnings()).allSatisfy(w -> assertThat(w.message()).contains("mismo evento"));
+        verify(allocationService, never()).reallocate(any());
+        verify(transactionManager).commit(any());
+        verify(occurrenceBoardService).invalidateCache();
+    }
+
+    /** Runs the import through the real audit aspect and returns the description seen when the allocation runs. */
+    private String descriptionDuringImport(String filename) {
+        stubHappyPath(DataRow.defaultRow());
+        AuditDescriptionProbe probe = new AuditDescriptionProbe();
+        when(allocationService.reallocate(any())).thenAnswer(inv -> {
+            probe.peek();
+            return List.of();
+        });
+        MockMultipartFile file = ExcelTestWorkbooks.validTemplate(2026).withValidDataRow().toMultipartFile(filename);
+
+        probe.audited(service).ingestFile(file);
+
+        return probe.peeked();
+    }
+
+    @Test
+    @DisplayName("la descripción de la operación lleva el nombre del archivo importado")
+    void descriptionCarriesFilename() {
+        assertThat(descriptionDuringImport("planilla-2026.xlsx"))
+            .isEqualTo("Importación de eventos desde archivo planilla-2026.xlsx");
+    }
+
+    @Test
+    @DisplayName("los caracteres de control del nombre de archivo se reemplazan por espacio en la descripción")
+    void descriptionReplacesControlCharactersInFilename() {
+        assertThat(descriptionDuringImport("a\nb.xlsx"))
+            .isEqualTo("Importación de eventos desde archivo a b.xlsx");
+    }
+
+    @Test
+    @DisplayName("un nombre de archivo larguísimo deja la descripción en 255 caracteres como máximo")
+    void descriptionIsTruncatedForLongFilename() {
+        assertThat(descriptionDuringImport("x".repeat(300) + ".xlsx")).hasSize(255).endsWith("…");
+    }
+
     private void stubHappyPath(DataRow row) {
         stubHappyPath(row, true);
     }
@@ -276,12 +412,12 @@ class IngestServiceImplTest {
         SpecialtyResponseDto specialty = new SpecialtyResponseDto(row.specialtyCode(), "Ingeniería en Sistemas", "Ing. Sist.");
         when(specialtyService.findBySpecialtyCode(row.specialtyCode())).thenReturn(specialty);
 
-        StudyPlanResponseDto plan = new StudyPlanResponseDto(row.studyPlanCode(), specialty);
+        StudyPlanResponseDto plan = new StudyPlanResponseDto(1L, row.studyPlanCode(), specialty, true);
         when(studyPlanService.findByPlanCodeAndSpecialtyCode(row.studyPlanCode(), row.specialtyCode()))
             .thenReturn(plan);
 
         SubjectResponseDto subject = new SubjectResponseDto(10L, row.subjectCode(), row.subjectName(),
-            row.termType(), plan);
+            row.termType(), plan, true, null);
         when(subjectService.findByCodeAndStudyPlan(row.subjectCode(), row.studyPlanCode(), row.specialtyCode()))
             .thenReturn(subject);
 
@@ -290,72 +426,76 @@ class IngestServiceImplTest {
         when(academicPeriodService.findOrCreate(2026, TermType.ANUAL))
             .thenReturn(new FindOrCreateResult<>(period, created));
 
-        CommissionResponseDto commission = new CommissionResponseDto(20L, row.courseCode(), period);
+        CommissionResponseDto commission = new CommissionResponseDto(20L, row.courseCode(), period, null);
         when(commissionService.findByCourseAndPeriod(row.courseCode(), 2026, 0))
             .thenReturn(commission);
 
-        SubjectCommissionResponseDto subjectCommission = new SubjectCommissionResponseDto(10L, 20L,
-            commission, row.enrolledCount());
+        SubjectCommissionResponseDto subjectCommission = new SubjectCommissionResponseDto(10L, null, 20L,
+            commission, row.enrolledCount(), true, true);
         when(subjectCommissionService.findBySubjectAndCommission(10L, 20L))
             .thenReturn(subjectCommission);
 
-        BuildingResponseDto building = new BuildingResponseDto(5L, row.buildingName(), true);
+        BuildingResponseDto building = new BuildingResponseDto(5L, row.buildingName(), true, null);
         when(buildingService.findByName(row.buildingName())).thenReturn(building);
 
         ClassroomResponseDto classroom = new ClassroomResponseDto(5L, (Integer) row.roomNumber(), 40,
-            5L, row.buildingName(), 1L, "Aula");
+            5L, row.buildingName(), 1L, "Aula", null, true);
         when(classroomService.findByRoomNumberAndBuilding((Integer) row.roomNumber(), 5L))
             .thenReturn(classroom);
 
         RecurringEventResponseDto event = new RecurringEventResponseDto(1L, EventType.RECURRING,
             row.enrolledCount(), LocalTime.of(18, 30), 90L, DayOfWeek.MONDAY,
             LocalDate.of(2026, 3, 1), LocalDate.of(2026, 11, 30), subject, commission);
-        when(academicEventService.findOrCreateRecurringEvent(any()))
-            .thenReturn(new FindOrCreateResult<>(event.id(), true));
+        when(academicEventService.findOrCreateRecurringEvents(any())).thenAnswer(inv -> {
+                java.util.List<CreateRecurringEventRequestDto> reqs = inv.getArgument(0);
+                return reqs.stream().map(r -> new FindOrCreateResult<>(event.id(), true)).toList();
+            });
     }
 
     private void stubRestOfChain(SpecialtyResponseDto specialty, int subjectCode, String subjectName,
             long subjectId, String courseCode, long commissionId, int roomNumber,
             long buildingId, long eventId) {
-        StudyPlanResponseDto plan = new StudyPlanResponseDto(1, specialty);
+        StudyPlanResponseDto plan = new StudyPlanResponseDto(1L, 1, specialty, true);
         when(studyPlanService.findByPlanCodeAndSpecialtyCode(1, 1)).thenReturn(plan);
 
-        SubjectResponseDto subject = new SubjectResponseDto(subjectId, subjectCode, subjectName, "Anual", plan);
+        SubjectResponseDto subject = new SubjectResponseDto(subjectId, subjectCode, subjectName, "Anual", plan, true, null);
         when(subjectService.findByCodeAndStudyPlan(subjectCode, 1, 1)).thenReturn(subject);
 
         AcademicPeriodResponseDto period = new AcademicPeriodResponseDto(2026, 0,
             LocalDate.of(2026, 3, 1), LocalDate.of(2026, 11, 30));
         when(academicPeriodService.findOrCreate(2026, TermType.ANUAL)).thenReturn(new FindOrCreateResult<>(period, true));
 
-        CommissionResponseDto commission = new CommissionResponseDto(commissionId, courseCode, period);
+        CommissionResponseDto commission = new CommissionResponseDto(commissionId, courseCode, period, null);
         when(commissionService.findByCourseAndPeriod(courseCode, 2026, 0))
             .thenReturn(commission);
 
         SubjectCommissionResponseDto subjectCommission =
-            new SubjectCommissionResponseDto(subjectId, commissionId, commission, 30);
+            new SubjectCommissionResponseDto(subjectId, null, commissionId, commission, 30, true, true);
         when(subjectCommissionService.findBySubjectAndCommission(subjectId, commissionId))
             .thenReturn(subjectCommission);
 
-        BuildingResponseDto building = new BuildingResponseDto(buildingId, "Edificio Central", true);
+        BuildingResponseDto building = new BuildingResponseDto(buildingId, "Edificio Central", true, null);
         when(buildingService.findByName("Edificio Central")).thenReturn(building);
 
         ClassroomResponseDto classroom = new ClassroomResponseDto(buildingId, roomNumber, 40,
-            buildingId, "Edificio Central", 1L, "Aula");
+            buildingId, "Edificio Central", 1L, "Aula", null, true);
         when(classroomService.findByRoomNumberAndBuilding(roomNumber, buildingId)).thenReturn(classroom);
 
         RecurringEventResponseDto event = new RecurringEventResponseDto(eventId, EventType.RECURRING, 30,
             LocalTime.of(18, 30), 90L, DayOfWeek.MONDAY, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 11, 30),
             subject, commission);
-        when(academicEventService.findOrCreateRecurringEvent(any()))
-            .thenReturn(new FindOrCreateResult<>(event.id(), true));
+        when(academicEventService.findOrCreateRecurringEvents(any())).thenAnswer(inv -> {
+                java.util.List<CreateRecurringEventRequestDto> reqs = inv.getArgument(0);
+                return reqs.stream().map(r -> new FindOrCreateResult<>(event.id(), true)).toList();
+            });
     }
 
     private void stubForSecondSubject(SpecialtyResponseDto specialty) {
-        StudyPlanResponseDto plan = new StudyPlanResponseDto(1, specialty);
-        SubjectResponseDto subject = new SubjectResponseDto(21L, 101, "Álgebra", "Anual", plan);
+        StudyPlanResponseDto plan = new StudyPlanResponseDto(1L, 1, specialty, true);
+        SubjectResponseDto subject = new SubjectResponseDto(21L, 101, "Álgebra", "Anual", plan, true, null);
         when(subjectService.findByCodeAndStudyPlan(101, 1, 1)).thenReturn(subject);
 
-        SubjectCommissionResponseDto subjectCommission = new SubjectCommissionResponseDto(21L, 30L, null, 30);
+        SubjectCommissionResponseDto subjectCommission = new SubjectCommissionResponseDto(21L, null, 30L, null, 30, true, true);
         when(subjectCommissionService.findBySubjectAndCommission(21L, 30L))
             .thenReturn(subjectCommission);
     }

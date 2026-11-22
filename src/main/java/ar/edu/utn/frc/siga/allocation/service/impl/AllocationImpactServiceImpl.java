@@ -14,12 +14,16 @@ import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationCandidate;
 import ar.edu.utn.frc.siga.allocation.validator.AllocationValidator;
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
+import ar.edu.utn.frc.siga.allocation.validator.OverlapReview;
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
+import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.common.util.TimeRanges;
 import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.model.EventType;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomSubjectPermissionDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 
 import lombok.RequiredArgsConstructor;
@@ -42,7 +46,7 @@ import java.util.stream.Collectors;
 class AllocationImpactServiceImpl implements AllocationImpactService {
 
     private static final AllocationImpactResponseDto EMPTY =
-            new AllocationImpactResponseDto(0, 0, 0, List.of(), List.of());
+            new AllocationImpactResponseDto(0, 0, 0, List.of(), List.of(), List.of());
 
     private final AllocationTargetResolver targetResolver;
     private final AllocationValidator validator;
@@ -50,31 +54,40 @@ class AllocationImpactServiceImpl implements AllocationImpactService {
     private final AllocationRepository allocationRepository;
     private final ClassroomService classroomService;
     private final AcademicEventService academicEventService;
+    private final BuildingScopeResolver buildingScopeResolver;
 
     @Override
     @Transactional(readOnly = true)
     public AllocationImpactResponseDto analyze(AllocationCommand command) {
         LocalDate clampFrom = command.source() == AllocationSource.IMPORTED ? null : LocalDate.now();
-        Map<OccurrenceSlotDto, Long> classroomByOccurrence =
-                targetResolver.resolveClassroomByOccurrence(command.items(), clampFrom);
+        boolean reassignDeactivationReleases = command.source() == AllocationSource.MANUAL
+                || command.source() == AllocationSource.AUTOMATIC;
+        Map<OccurrenceSlotDto, Long> classroomByOccurrence = targetResolver
+                .resolveClassroomByOccurrence(command.items(), clampFrom, reassignDeactivationReleases)
+                .classroomByOccurrence();
 
         if (classroomByOccurrence.isEmpty()) {
             return EMPTY;
         }
 
-        validator.validateClassroomsAvailable(Set.copyOf(classroomByOccurrence.values()));
+        Set<Long> classroomIds = Set.copyOf(classroomByOccurrence.values());
+        Set<Long> buildingIds = classroomService.findByIdsIncludingDeactivated(classroomIds).stream()
+                .map(ClassroomResponseDto::buildingId)
+                .collect(Collectors.toSet());
+        buildingScopeResolver.requireAccess(Permission.ALLOCATION_WRITE, buildingIds);
+        validator.validateClassroomsAvailable(classroomIds);
 
         List<AllocationCandidate> candidates = classroomByOccurrence.entrySet().stream()
                 .map(e -> new AllocationCandidate(e.getKey(), e.getValue()))
                 .toList();
 
-        List<OccurrenceConflictDto> conflicts = validator.findConflicts(candidates);
-        Set<Long> blockedOccurrenceIds = conflicts.stream()
+        OverlapReview overlaps = validator.reviewManualOverlaps(candidates);
+        Set<Long> blockedOccurrenceIds = overlaps.blocking().stream()
                 .map(OccurrenceConflictDto::occurrenceId)
                 .collect(Collectors.toSet());
 
         List<ImpactOccurrenceDto> occurrences = describeOccurrences(candidates, blockedOccurrenceIds);
-        List<ImpactConflictDto> detailed = describeConflicts(conflicts, candidates);
+        List<ImpactConflictDto> detailed = describeConflicts(overlaps.blocking(), candidates);
 
         log.debug("Impacto analizado: total={}, bloqueadas={}", occurrences.size(), blockedOccurrenceIds.size());
         return new AllocationImpactResponseDto(
@@ -82,7 +95,8 @@ class AllocationImpactServiceImpl implements AllocationImpactService {
                 occurrences.size() - blockedOccurrenceIds.size(),
                 blockedOccurrenceIds.size(),
                 occurrences,
-                detailed);
+                detailed,
+                overlaps.tolerated());
     }
 
     private List<ImpactOccurrenceDto> describeOccurrences(List<AllocationCandidate> candidates,
@@ -117,6 +131,9 @@ class AllocationImpactServiceImpl implements AllocationImpactService {
 
         Map<Long, EventType> typeByEventId = blockerTypes(conflicts);
         List<ClassroomResponseDto> availableRooms = classroomService.findAllAvailable();
+        Map<Long, ClassroomSubjectPermissionDto> permissionByRoom = classroomService.findSubjectPermissions(
+                availableRooms.stream().map(ClassroomResponseDto::id).toList());
+        Map<Long, Long> subjectByOccurrenceId = subjectByOccurrenceId(candidates);
 
         LocalDate min = conflicts.stream().map(OccurrenceConflictDto::date).min(Comparator.naturalOrder()).orElseThrow();
         LocalDate max = conflicts.stream().map(OccurrenceConflictDto::date).max(Comparator.naturalOrder()).orElseThrow();
@@ -136,7 +153,36 @@ class AllocationImpactServiceImpl implements AllocationImpactService {
                                 typeByEventId.get(c.conflictingEventId()),
                                 c.conflictingOccurrenceId(),
                                 c.conflictingAllocationId()),
-                        freeRoomsAt(c, occupancy, movingOccurrenceIds, candidates, availableRooms)))
+                        freeRoomsAfterApplying(c, occupancy, movingOccurrenceIds, candidates,
+                                permittedRooms(availableRooms, permissionByRoom,
+                                        subjectByOccurrenceId.get(c.occurrenceId())))))
+                .toList();
+    }
+
+    private Map<Long, Long> subjectByOccurrenceId(List<AllocationCandidate> candidates) {
+        Set<Long> eventIds = candidates.stream()
+                .map(c -> c.occurrence().eventId())
+                .collect(Collectors.toSet());
+        Map<Long, Long> subjectByEventId = academicEventService.findByIds(eventIds).stream()
+                .filter(e -> e.subject() != null)
+                .collect(Collectors.toMap(AcademicEventResponseDto::id, e -> e.subject().id(), (x, y) -> x));
+        return candidates.stream()
+                .filter(c -> subjectByEventId.containsKey(c.occurrence().eventId()))
+                .collect(Collectors.toMap(c -> c.occurrence().occurrenceId(),
+                        c -> subjectByEventId.get(c.occurrence().eventId()), (x, y) -> x));
+    }
+
+    List<ClassroomResponseDto> permittedRooms(List<ClassroomResponseDto> rooms,
+                                              Map<Long, ClassroomSubjectPermissionDto> permissionByRoom,
+                                              Long subjectId) {
+        if (subjectId == null) {
+            return rooms;
+        }
+        return rooms.stream()
+                .filter(room -> {
+                    ClassroomSubjectPermissionDto permission = permissionByRoom.get(room.id());
+                    return permission == null || permission.permits(subjectId);
+                })
                 .toList();
     }
 
@@ -153,13 +199,12 @@ class AllocationImpactServiceImpl implements AllocationImpactService {
                         (x, y) -> x));
     }
 
-    // Libres DESPUÉS de aplicar el pedido: las ocurrencias que se mueven liberan su aula vieja,
-    // y las aulas que el propio pedido ocupa cuentan como tomadas.
-    private List<ClassroomResponseDto> freeRoomsAt(OccurrenceConflictDto conflict,
-                                                   List<OccupiedSlot> occupancy,
-                                                   Set<Long> movingOccurrenceIds,
-                                                   List<AllocationCandidate> candidates,
-                                                   List<ClassroomResponseDto> availableRooms) {
+    // Rooms the moving occurrences leave count as free; rooms the batch itself takes count as taken.
+    private List<ClassroomResponseDto> freeRoomsAfterApplying(OccurrenceConflictDto conflict,
+                                                             List<OccupiedSlot> occupancy,
+                                                             Set<Long> movingOccurrenceIds,
+                                                             List<AllocationCandidate> candidates,
+                                                             List<ClassroomResponseDto> availableRooms) {
         Set<Long> taken = new HashSet<>();
 
         for (OccupiedSlot slot : occupancy) {

@@ -15,6 +15,11 @@ public class JwtProperties {
 
     private String secret;
 
+    // RFC 8725: tokens are bound to this issuer and audience and rejected otherwise
+    private String issuer = "siga";
+
+    private String audience = "siga-api";
+
     private int accessExpirationMinutes = 20;
 
     private int refreshExpirationDays = 30;

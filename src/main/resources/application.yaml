@@ -7,6 +7,18 @@ spring:
       max-file-size: 10MB
       max-request-size: 10MB
 
+  data:
+    web:
+      pageable:
+        max-page-size: 200
+        default-page-size: 20
+
+  # Hay 8 @Scheduled: con el pool por defecto (1 hilo) una tarea lenta atrasa a las demás.
+  task:
+    scheduling:
+      pool:
+        size: 4
+
   datasource:
     url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
     username: ${DB_USERNAME}
@@ -30,6 +42,7 @@ spring:
       hibernate:
         jdbc:
           batch_size: 50
+        default_batch_fetch_size: 50
         order_inserts: true
         order_updates: true
       org:
@@ -39,8 +52,6 @@ spring:
 
   flyway:
     enabled: true
-    # dev y test ya tienen el schema: Flyway las marca en la baseline y salta la V1.
-    # Sobre una base vacia (tests, ambiente nuevo) aplica todo desde cero.
     baseline-on-migrate: true
     baseline-version: 1
     baseline-description: schema de dev al 04/09/2026
@@ -49,10 +60,30 @@ spring:
     compose:
       enabled: false
 
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${MAIL_SMTP_AUTH:true}
+      mail.smtp.starttls.enable: ${MAIL_SMTP_STARTTLS_ENABLE:true}
+      mail.smtp.starttls.required: ${MAIL_SMTP_STARTTLS_REQUIRED:true}
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
+
 server:
   servlet:
     context-path: /api
-  forward-headers-strategy: framework
+  # native: Tomcat's RemoteIpValve, which only honors X-Forwarded-For when the direct peer matches
+  # internal-proxies. "framework" trusted the header from anyone (leftmost entry, client-controlled).
+  forward-headers-strategy: native
+  tomcat:
+    remoteip:
+      # Regex of the reverse proxy IP(s). Empty by default: no proxy is trusted and the header is ignored.
+      # Setting it in dev, test and prod is a mandatory deploy step (see TrustedProxiesStartupCheck).
+      internal-proxies: ${TRUSTED_PROXIES:}
 
 springdoc:
   swagger-ui:
@@ -64,6 +95,10 @@ springdoc:
     path: /v3/api-docs
 
 management:
+  health:
+    # An external SMTP outage must not turn the aggregate health (HEALTHCHECK, deploy) DOWN
+    mail:
+      enabled: false
   endpoints:
     web:
       exposure:
@@ -79,6 +114,23 @@ cors:
 siga:
   api:
     base-path: /v1
+  audit:
+    export:
+      max-rows: 10000
+    archive:
+      enabled: ${AUDIT_ARCHIVE_ENABLED:false}
+      cron: "0 0 4 * * SAT"
+      batch-size: 5000
+  dashboard:
+    underused-threshold-percent: 50
+    snapshot:
+      enabled: ${DASHBOARD_SNAPSHOT_ENABLED:true}
+      cron: "0 0 3 1 * *"
+  room-requests:
+    acceptance:
+      cron: "0 0 * * * *"
+    expiry:
+      cron: "0 0 7 * * *"
   settings:
     definitions:
       - key: optimizer.unimprovedSecondsLimit
@@ -97,6 +149,18 @@ siga:
         default-value: "4000"
         min: "0"
         max: "1000000"
+      - key: optimizer.weights.sameEventDiffBuilding
+        default-value: "8000"
+        min: "0"
+        max: "1000000"
+      - key: optimizer.weights.missingProjector
+        default-value: "10000"
+        min: "0"
+        max: "1000000"
+      - key: optimizer.weights.missingComputer
+        default-value: "20000"
+        min: "0"
+        max: "1000000"
       - key: optimizer.weights.unusedCapacity
         default-value: "1"
         min: "0"
@@ -113,26 +177,78 @@ siga:
         default-value: "30"
         min: "1"
         max: "1440"
+      - key: preview.suggestionTimeLimitSeconds
+        default-value: "2"
+        min: "1"
+        max: "60"
       - key: events.hours.start
         default-value: "08:00"
       - key: events.hours.end
         default-value: "23:00"
+      - key: allocation.maxOverlapMinutes
+        default-value: "40"
+        min: "0"
+      - key: notifications.enabled
+        default-value: "true"
+      - key: notifications.channel.email.enabled
+        default-value: "true"
+      - key: roomRequests.maxClassroomCount
+        default-value: "20"
+        min: "1"
+        max: "100"
+      - key: roomRequests.maxEstimated
+        default-value: "500"
+        min: "1"
+        max: "10000"
+      - key: roomRequests.maxComputerCount
+        default-value: "500"
+        min: "1"
+        max: "1000"
+      - key: roomRequests.alertDaysBeforeDate
+        default-value: "3"
+        min: "0"
+        max: "60"
+      - key: roomRequests.acceptance.businessHours
+        default-value: "48"
+        min: "1"
+        max: "720"
+      - key: roomRequests.acceptance.hoursBeforeEvent
+        default-value: "24"
+        min: "0"
+        max: "720"
+      - key: sysacad.write.mode
+        default-value: ${SYSACAD_WRITE_MODE:OFF}
+        options: ["OFF", SANDBOX, "ON"]
+      - key: sysacad.autogestion.mode
+        default-value: ${AUTOGESTION_MESSAGE_MODE:OFF}
+        options: ["OFF", "ON"]
+      - key: sysacad.write.jobDelayMinutes
+        default-value: "5"
+        min: "1"
+        max: "1440"
+      - key: sysacad.write.viewReadIntervalMinutes
+        default-value: "60"
+        min: "5"
+        max: "1440"
   optimizer:
     parallel-solver-count: AUTO
-    environment-mode: PHASE_ASSERT
+    environment-mode: NO_ASSERT
   jwt:
     secret: ${JWT_SECRET}
+    issuer: ${JWT_ISSUER:siga}
+    audience: ${JWT_AUDIENCE:siga-api}
     access-expiration-minutes: ${JWT_ACCESS_EXPIRATION_MINUTES:20}
     refresh-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS:30}
     refresh-grace-seconds: ${JWT_REFRESH_GRACE_SECONDS:10}
-  auth:
-    allowed-email-domain: ${AUTH_ALLOWED_EMAIL_DOMAIN:frc.utn.edu.ar}
+    refresh-purge-cron: "0 30 3 * * SUN"
   login-ratelimit:
     max-attempts: 5
+    max-attempts-per-ip: 200
+    alert-threshold-per-email: 50
     window-minutes: 15
   ratelimit:
     general:
-      capacity: 100
+      capacity: 600
       refill-period-seconds: 60
   sysacad:
     enabled: ${SYSACAD_ENABLED}
@@ -142,15 +258,47 @@ siga:
     connect-timeout: 5s
     read-timeout: 120s
     max-retries: 3
+    max-response-size: 32MB
+    # Curso TEST de Ing. en Sistemas, Gestión de la Calidad (Elec.).
+    commission-message-test-commissions:
+      - specialty: 5
+        plan: 2023
+        subject: 581
+        commission: 5
+    commission-message-publisher-legajo: 0
+    commission-message-publisher-user-type: "S"
     sync:
-
-      buildings: "0 0 3 * * SUN"
-      classrooms: "0 0 3 * * SUN"
-      specialties: "0 0 3 * * SUN"
-      events: "0 0 3 * * SUN"
-      allocations: "0 0 3 * * SUN"
-      subjects: "0 0 3 * * SUN"
-      commissions: "0 0 3 * * SUN"
+      cron: "0 0 3 * * SUN"
+      min-valid-rows-percent: 50
+      zone: America/Argentina/Buenos_Aires
+    write:
+      max-attempts: 5
+      max-consecutive-failures: 3
+      retry-backoff: PT5M,PT15M,PT30M,PT1H
+      read-timeout: PT15S
+      in-call-retry-delay: PT2S
+      outage-alert-after: PT1H
+      outage-alert-repeat: P1D
+      max-sends-per-run: 30
+      max-requests-per-minute: 30
+      recent-send-window: P7D
+      waiting-visible-before: PT24H
+      after-sync-margin: PT1H
+      no-cron-retry-delay: P1D
+      alert-mail-max-lines: 30
+  camera-count:
+    enabled: ${CONTEO_ENABLED}
+    url: ${CONTEO_URL:}
+    api-key: ${CONTEO_API_KEY:}
+    connect-timeout: 5s
+    read-timeout: ${CONTEO_TIMEOUT_SEG:90}s
+  notifications:
+    max-attempts: 5
+    retry-interval: PT1M
+    email:
+      enabled: ${MAIL_ENABLED:false}
+      from: ${MAIL_FROM:no-reply@frc.utn.edu.ar}
+      reply-to: ${MAIL_REPLY_TO:}
 
 logging:
   level:

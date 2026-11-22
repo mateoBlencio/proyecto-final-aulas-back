@@ -1,6 +1,10 @@
 package ar.edu.utn.frc.siga.space.model;
 
+import org.hibernate.envers.Audited;
+import org.hibernate.envers.AuditOverride;
+import org.hibernate.envers.NotAudited;
 import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
+import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -22,6 +26,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
+@Audited
+@AuditOverride(forClass = SoftDeletableEntity.class)
 @Table(name = "aula")
 @Getter
 @Setter
@@ -43,14 +49,22 @@ public class Classroom extends SoftDeletableEntity {
     @Column(name = "capacidad", nullable = false)
     private Integer capacity;
 
+    /** Sysacad's "habilitada" (S/N) flag. Written only from a view row, never because of absence. */
     @Builder.Default
-    @Column(name = "habilitada_sysacad", nullable = false)
+    @Column(name = "raw_habilitada", nullable = false)
     private Boolean sysacadEnabled = false;
 
+    /** {@code false} when the classroom stopped appearing in the Sysacad view. Does not remove it from the candidates. */
+    @Builder.Default
+    @Column(name = "vigente_sysacad", nullable = false)
+    private Boolean sysacadCurrent = true;
+
+    @NotAudited
     @Column(name = "sincronizado_en")
     private Instant syncedAt;
 
-    @Column(name = "hash_sysacad", length = 64)
+    @NotAudited
+    @Column(name = "hash_raw", length = 64)
     private String sysacadHash;
 
     @Version
@@ -73,4 +87,23 @@ public class Classroom extends SoftDeletableEntity {
     @Column(name = "observaciones", length = 500)
     private String observations;
 
+    public boolean isCurrentInSysacad() {
+        return Boolean.TRUE.equals(sysacadCurrent) || sysacadHash == null;
+    }
+
+    /** Only "habilitada = N" excludes the classroom; manually created ones (null hash) do not depend on the flag. */
+    public boolean isEnabledInSysacad() {
+        return Boolean.TRUE.equals(sysacadEnabled) || sysacadHash == null;
+    }
+
+    public UnavailableReason unavailableReason() {
+        if (!isActive()) {
+            return UnavailableReason.DEACTIVATED;
+        }
+        return building.isActive() ? null : UnavailableReason.PARENT_DEACTIVATED;
+    }
+
+    public boolean isAvailable() {
+        return unavailableReason() == null;
+    }
 }

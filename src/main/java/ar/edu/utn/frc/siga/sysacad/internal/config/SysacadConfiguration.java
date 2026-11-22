@@ -1,18 +1,18 @@
 package ar.edu.utn.frc.siga.sysacad.internal.config;
 
+import ar.edu.utn.frc.siga.sysacad.internal.client.ResponseSizeLimitInterceptor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.EnableAsync;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.client.RestClient;
 
 import java.net.http.HttpClient;
+import java.time.Duration;
 
 @Configuration
-@EnableScheduling
 @EnableAsync
 @EnableConfigurationProperties(SysacadProperties.class)
 @ConditionalOnProperty(prefix = "siga.sysacad", name = "enabled", havingValue = "true")
@@ -22,16 +22,26 @@ public class SysacadConfiguration {
 
     @Bean
     public RestClient sysacadRestClient(SysacadProperties properties) {
+        return buildClient(properties, properties.getReadTimeout());
+    }
+
+    @Bean
+    public RestClient sysacadWriteRestClient(SysacadProperties properties) {
+        return buildClient(properties, properties.getWrite().readTimeout());
+    }
+
+    private static RestClient buildClient(SysacadProperties properties, Duration readTimeout) {
         HttpClient httpClient = HttpClient.newBuilder()
                 .connectTimeout(properties.getConnectTimeout())
                 .build();
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
-        requestFactory.setReadTimeout(properties.getReadTimeout());
+        requestFactory.setReadTimeout(readTimeout);
 
         return RestClient.builder()
                 .baseUrl(properties.getBaseUrl())
                 .defaultHeader(API_KEY_HEADER, properties.getApiKey())
                 .requestFactory(requestFactory)
+                .requestInterceptor(new ResponseSizeLimitInterceptor(properties.getMaxResponseSize().toBytes()))
                 .build();
     }
 }

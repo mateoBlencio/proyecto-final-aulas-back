@@ -1,0 +1,21 @@
+meta {
+  name: Activar aula
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{baseUrl}}/v1/classrooms/:id/activation
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: 34
+}
+
+docs {
+  PUT /v1/classrooms/{id}/activation. Roles: SUBSECRETARIA, AUXILIAR_AULICO
+  (acotado a sus edificios). Reactiva un aula desactivada (idempotente). 204
+  si queda activa; 404 si el aula no existe.
+}

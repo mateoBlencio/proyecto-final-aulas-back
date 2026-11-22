@@ -9,6 +9,7 @@ import java.util.List;
 public record OvercrowdedConflictDto(
         AcademicEventResponseDto event,
         ClassroomResponseDto classroom,
+        List<ClassroomResponseDto> classrooms,
         int enrolled,
         int capacity,
         int overcrowdedBy,

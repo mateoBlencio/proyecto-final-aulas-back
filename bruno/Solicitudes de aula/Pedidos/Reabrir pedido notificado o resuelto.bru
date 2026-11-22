@@ -1,0 +1,52 @@
+meta {
+  name: Reabrir pedido notificado o resuelto
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/v1/room-requests/items/1/reopen
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "reason": "El docente pide la 101: la 204 queda lejos"
+  }
+}
+
+docs {
+  POST /v1/room-requests/items/{id}/reopen. Rol: SUBSECRETARIA (pedidos no derivados),
+  AUXILIAR_AULICO (pedidos derivados a su edificio).
+
+  Vuelve el pedido de `NOTIFIED` o `RESOLVED` a `IN_EVALUATION`. `reason` es obligatorio y
+  queda en `reopenReason`; `decisionReason` conserva el motivo de la última asignación parcial.
+
+  Desde `NOTIFIED` en un cambio de aula (ONE_TIME_ROOM_CHANGE, REGULAR_ROOM_CHANGE,
+  PARTIAL_EXAM_IN_CLASS): cada clase futura vuelve al aula original si está libre; si no, queda en la
+  notificada. Las aulas extra (espejos) siguen asignadas hasta que se reasigne con `assign`. La respuesta
+  trae `reversion`:
+  "reversion": {
+    "reverted": [{ "date": "2026-11-10", "classroom": { "id": 101, "roomNumber": 101, "buildingName": "Central" } }],
+    "kept": [{
+      "date": "2026-11-24",
+      "originalClassroom": { "id": 101, "roomNumber": 101, "buildingName": "Central" },
+      "occupiedBy": { "subjectName": "Análisis Matemático", "commissionCode": "2K3" }
+    }]
+  }
+  En un `kept` sin aula original guardada, `originalClassroom` y `occupiedBy` son null.
+  `reversion` es null desde `RESOLVED` y en los tipos que crea SIGA: ahí las aulas siguen reservadas
+  hasta que se reasigne con `assign`.
+  Conserva `notifiedAt`: el front reconoce un pedido reabierto por `IN_EVALUATION` con
+  `notifiedAt` no nulo. Limpia `acceptanceDeadline`, `acceptedAt` y `acceptedBy`.
+
+  Desde `RESOLVED` exige fechas futuras: la fecha propia no pasada en los tipos por
+  fecha, o clases futuras en el cambio regular. En un cambio regular, la reasignación
+  posterior solo toca las clases futuras.
+
+  Errores: 400 si falta `reason` o no quedan fechas futuras; 409 si el pedido no está
+  `NOTIFIED` ni `RESOLVED`; 403 si el rol no corresponde.
+
+  Publica `RoomRequestItemReopened` (hoy sin listener).
+}

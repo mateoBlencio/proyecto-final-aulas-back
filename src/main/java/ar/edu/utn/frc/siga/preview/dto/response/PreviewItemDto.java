@@ -8,10 +8,12 @@ import java.util.List;
 
 public record PreviewItemDto(
         AcademicEventResponseDto event,
+        int roomSlot,
         List<LocalDate> occurrenceDates,
         ClassroomResponseDto classroom,
         int overcrowdedBy,
         boolean unchanged,
-        List<RoomStretchDto> currentRoomStretches
+        List<RoomStretchDto> currentRoomStretches,
+        List<UnmetRequirementDto> unmetRequirements
 ) {
 }

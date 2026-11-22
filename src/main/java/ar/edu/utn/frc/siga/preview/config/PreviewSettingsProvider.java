@@ -20,4 +20,9 @@ class PreviewSettingsProvider implements PreviewSettings {
     public long getTtlMinutes() {
         return settingsReader.getLong(SettingKey.PREVIEW_TTL_MINUTES);
     }
+
+    @Override
+    public int getSuggestionTimeLimitSeconds() {
+        return settingsReader.getInt(SettingKey.PREVIEW_SUGGESTION_TIME_LIMIT_SECONDS);
+    }
 }

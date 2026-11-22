@@ -1,0 +1,75 @@
+package ar.edu.utn.frc.siga.auth.model;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import ar.edu.utn.frc.siga.common.security.Permission;
+import ar.edu.utn.frc.siga.common.security.ScopeType;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+
+@DisplayName("SystemRole - dashboard permissions")
+class SystemRoleTest {
+
+    @Test
+    @DisplayName("DASHBOARD_READ is granted to SUBSECRETARIA, AUXILIAR_AULICO and CONSULTA")
+    void dashboardReadIsGrantedToEveryRole() {
+        for (SystemRole role : SystemRole.values()) {
+            assertThat(role.permissions()).as(role.name()).contains(Permission.DASHBOARD_READ);
+        }
+    }
+
+    @Test
+    @DisplayName("DASHBOARD_SNAPSHOT_REGENERATE is granted to SUBSECRETARIA only")
+    void snapshotRegenerationIsSubsecretariaOnly() {
+        assertThat(SystemRole.SUBSECRETARIA.permissions()).contains(Permission.DASHBOARD_SNAPSHOT_REGENERATE);
+        assertThat(SystemRole.AUXILIAR_AULICO.permissions()).doesNotContain(Permission.DASHBOARD_SNAPSHOT_REGENERATE);
+        assertThat(SystemRole.CONSULTA.permissions()).doesNotContain(Permission.DASHBOARD_SNAPSHOT_REGENERATE);
+    }
+
+    @Test
+    @DisplayName("DASHBOARD_READ is building-scoped and DASHBOARD_SNAPSHOT_REGENERATE is global")
+    void dashboardPermissionScopes() {
+        assertThat(Permission.DASHBOARD_READ.scopeType()).isEqualTo(ScopeType.BUILDING);
+        assertThat(Permission.DASHBOARD_SNAPSHOT_REGENERATE.scopeType()).isEqualTo(ScopeType.GLOBAL);
+    }
+
+    @Test
+    @DisplayName("ALLOCATION_HISTORY_READ is granted to SUBSECRETARIA and AUXILIAR_AULICO but not to CONSULTA")
+    void allocationHistoryReadIsGrantedToStaffThatOperatesAllocations() {
+        assertThat(SystemRole.SUBSECRETARIA.permissions()).contains(Permission.ALLOCATION_HISTORY_READ);
+        assertThat(SystemRole.AUXILIAR_AULICO.permissions()).contains(Permission.ALLOCATION_HISTORY_READ);
+        assertThat(SystemRole.CONSULTA.permissions()).doesNotContain(Permission.ALLOCATION_HISTORY_READ);
+    }
+
+    @Test
+    @DisplayName("BUILDING_ACTIVITY_READ is building-scoped and granted to SUBSECRETARIA and AUXILIAR_AULICO but not to CONSULTA")
+    void buildingActivityReadIsGrantedToStaffThatOperatesBuildings() {
+        assertThat(Permission.BUILDING_ACTIVITY_READ.scopeType()).isEqualTo(ScopeType.BUILDING);
+        assertThat(SystemRole.SUBSECRETARIA.permissions()).contains(Permission.BUILDING_ACTIVITY_READ);
+        assertThat(SystemRole.AUXILIAR_AULICO.permissions()).contains(Permission.BUILDING_ACTIVITY_READ);
+        assertThat(SystemRole.CONSULTA.permissions()).doesNotContain(Permission.BUILDING_ACTIVITY_READ);
+    }
+
+    @Test
+    @DisplayName("USER_READ es de SUBSECRETARIA y no de AUXILIAR_AULICO")
+    void userReadIsSubsecretariaOnly() {
+        assertThat(SystemRole.SUBSECRETARIA.permissions()).contains(Permission.USER_READ);
+        assertThat(SystemRole.AUXILIAR_AULICO.permissions()).doesNotContain(Permission.USER_READ);
+    }
+
+    @ParameterizedTest(name = "{0} + {1} -> {2}")
+    @CsvSource({
+            "SUBSECRETARIA, GLOBAL, true",
+            "SUBSECRETARIA, BUILDING, false",
+            "AUXILIAR_AULICO, GLOBAL, false",
+            "AUXILIAR_AULICO, BUILDING, true",
+            "CONSULTA, GLOBAL, true",
+            "CONSULTA, BUILDING, true"
+    })
+    @DisplayName("allowsScope: SUBSECRETARIA solo GLOBAL, AUXILIAR_AULICO solo BUILDING, CONSULTA ambos")
+    void allowsScope(SystemRole role, ScopeType scopeType, boolean expected) {
+        assertThat(role.allowsScope(scopeType)).isEqualTo(expected);
+    }
+}

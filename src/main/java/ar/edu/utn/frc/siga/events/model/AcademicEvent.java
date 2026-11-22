@@ -74,7 +74,7 @@ public abstract class AcademicEvent extends TimestampedEntity {
 
     @Setter
     @NotAudited
-    @Column(name = "hash_sysacad", length = 64)
+    @Column(name = "hash_raw", length = 64)
     protected String sysacadHash;
 
     @Setter
@@ -82,6 +82,13 @@ public abstract class AcademicEvent extends TimestampedEntity {
     @NotAudited
     @Column(name = "habilitado_sysacad", nullable = false)
     protected Boolean sysacadEnabled = false;
+
+    /** Baja decidida por SIGA (0 inscriptos o ausente en Horarios); el sync ya no escribe {@code sysacadEnabled}. */
+    @Setter
+    @Builder.Default
+    @NotAudited
+    @Column(name = "habilitado_siga", nullable = false)
+    protected Boolean sigaEnabled = true;
 
     public LocalTime endTime() {
         return startTime.plus(duration);

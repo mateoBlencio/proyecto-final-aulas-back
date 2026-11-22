@@ -1,25 +1,32 @@
 package ar.edu.utn.frc.siga.academic.service;
 
+import ar.edu.utn.frc.siga.academic.dto.SubjectFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.academic.service.command.SubjectSyncCommand;
 import ar.edu.utn.frc.siga.common.service.ActivationService;
 import java.util.Collection;
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.modulith.NamedInterface;
 
 @NamedInterface("api")
 public interface SubjectService extends ActivationService<Long> {
 
-    List<SubjectResponseDto> findAll(boolean includeDeactivated);
+    Page<SubjectResponseDto> findAll(SubjectFilter filter, Pageable pageable, boolean includeDeactivated);
 
     SubjectResponseDto findById(Long id);
 
     List<SubjectResponseDto> findByIds(Collection<Long> ids);
 
-    SubjectResponseDto findByCodeAndStudyPlan(Integer code, Integer studyPlanCode, Integer specialtyCode);
+    /**
+     * Como {@link #findByIds}, pero incluye las materias desactivadas (para referencias históricas). No aplica
+     * alcance por edificio; pensado para etiquetas de auditoría.
+     */
+    List<SubjectResponseDto> findByIdsIncludingDeactivated(Collection<Long> ids);
 
-    List<SubjectResponseDto> findBySpecialtyCode(Integer specialtyCode, boolean includeDeactivated);
+    SubjectResponseDto findByCodeAndStudyPlan(Integer code, Integer studyPlanCode, Integer specialtyCode);
 
     /**
      * Sincroniza el lote de materias provenientes de SysAcad: crea/actualiza por clave natural

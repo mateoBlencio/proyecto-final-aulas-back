@@ -22,9 +22,17 @@ public class ExcelRowMapper {
         String buildingName = getStringCellValue(row, 3, "Nombre Edificio", rowNum);
         DayOfWeek dayOfWeek = parseDayOfWeek(getStringCellValue(row, 4, "Día", rowNum), rowNum);
         String termType = getStringCellValue(row, 5, "Dictado", rowNum);
-        LocalTime startTime = parseHHMM(getNumericIntValue(row, 6, "Hora Comienzo", rowNum));
-        LocalTime endTime = parseHHMM(getNumericIntValue(row, 7, "Hora Fin", rowNum));
-        Integer durationMinutes = getOptionalNumericIntValue(row, 9);
+        LocalTime startTime = parseHHMM(getNumericIntValue(row, 6, "Hora Comienzo", rowNum), "Hora Comienzo", rowNum);
+        LocalTime endTime = parseHHMM(getNumericIntValue(row, 7, "Hora Fin", rowNum), "Hora Fin", rowNum);
+        if (!endTime.isAfter(startTime)) {
+            throw new InvalidRowException(
+                "Column 'Hora Fin' must be after 'Hora Comienzo', row " + rowNum);
+        }
+        Integer durationMinutes = getOptionalNumericIntValue(row, 9, "Durac[min]", rowNum);
+        if (durationMinutes != null && durationMinutes <= 0) {
+            throw new InvalidRowException(
+                "Column 'Durac[min]' must be greater than zero, row " + rowNum);
+        }
         Integer specialtyCode = getNumericIntValue(row, 11, "Especialidad", rowNum);
         Integer studyPlanCode = getNumericIntValue(row, 12, "Plan", rowNum);
         Integer subjectCode = getNumericIntValue(row, 13, "Materia", rowNum);
@@ -52,8 +60,14 @@ public class ExcelRowMapper {
         };
     }
 
-    private LocalTime parseHHMM(int hhmm) {
-        return LocalTime.of(hhmm / 100, hhmm % 100);
+    private LocalTime parseHHMM(int hhmm, String columnName, int rowNum) {
+        int hours = hhmm / 100;
+        int minutes = hhmm % 100;
+        if (hhmm < 0 || hours > 23 || minutes > 59) {
+            throw new InvalidRowException(
+                "Column '" + columnName + "' must be a valid time in HHMM format, got " + hhmm + ", row " + rowNum);
+        }
+        return LocalTime.of(hours, minutes);
     }
 
     private Cell requireCell(Row row, int cellIndex, String columnName, int rowNum) {
@@ -70,21 +84,23 @@ public class ExcelRowMapper {
     }
 
     private Integer getNumericIntValue(Row row, int cellIndex, String columnName, int rowNum) {
-        Cell cell = requireCell(row, cellIndex, columnName, rowNum);
-        if (cell.getCellType() == CellType.FORMULA) {
-            return (int) cell.getNumericCellValue();
-        }
-        if (cell.getCellType() != CellType.NUMERIC) {
-            throw new InvalidRowException(
-                "Column '" + columnName + "' must be numeric, row " + rowNum);
-        }
-        return (int) cell.getNumericCellValue();
+        return toInt(requireCell(row, cellIndex, columnName, rowNum), columnName, rowNum);
     }
 
-    private Integer getOptionalNumericIntValue(Row row, int cellIndex) {
+    private Integer getOptionalNumericIntValue(Row row, int cellIndex, String columnName, int rowNum) {
         Cell cell = row.getCell(cellIndex);
         if (cell == null || cell.getCellType() == CellType.BLANK) {
             return null;
+        }
+        return toInt(cell, columnName, rowNum);
+    }
+
+    /** Una fórmula vale por el tipo de su resultado cacheado: si no es numérica, POI lanzaría IllegalStateException. */
+    private int toInt(Cell cell, String columnName, int rowNum) {
+        CellType type = cell.getCellType() == CellType.FORMULA ? cell.getCachedFormulaResultType() : cell.getCellType();
+        if (type != CellType.NUMERIC) {
+            throw new InvalidRowException(
+                "Column '" + columnName + "' must be numeric, row " + rowNum);
         }
         return (int) cell.getNumericCellValue();
     }

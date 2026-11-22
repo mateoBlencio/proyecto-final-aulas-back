@@ -1,0 +1,21 @@
+meta {
+  name: Activar plan de estudio
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/v1/study-plans/:id/activation
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: 1
+}
+
+docs {
+  PUT /v1/study-plans/{id}/activation. Rol: SUBSECRETARIA.
+  Reactiva un plan de estudio desactivado (idempotente). 204 si queda activo;
+  404 si el plan no existe.
+}

@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectCommissionDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadViewSyncer;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class CommissionSyncService implements SysacadViewSyncer {
 
     private final CommissionService commissionService;
     private final SysacadSyncStateService syncStateService;
+    private final SysacadProperties properties;
 
     @Override
     public SysacadView view() {
@@ -35,10 +37,10 @@ public class CommissionSyncService implements SysacadViewSyncer {
         ViewSyncRunner.run(syncStateService, SysacadView.COMISIONES, "Comisiones", log, () -> {
             Map<EnrollmentKey, SysacadSubjectCommissionDto> enrollments = Maps.byId(
                     catalog.findSubjectCommissions(), EnrollmentKey::of, CommissionSyncService::higherEnrollment);
-            List<CommissionSyncCommand> commands = catalog.findCommissions().stream()
+            List<CommissionSyncCommand> commands = ViewSyncRunner.requireRows(catalog.findCommissions(), SysacadView.COMISIONES).stream()
                     .map(row -> toCommand(row, enrollments))
                     .toList();
-            return commissionService.syncCommissions(commands);
+            return commissionService.syncCommissions(commands, properties.getSync().minValidRowsPercent());
         });
     }
 
@@ -55,15 +57,17 @@ public class CommissionSyncService implements SysacadViewSyncer {
 
     private static CommissionSyncCommand toCommand(SysacadCommissionDto row,
             Map<EnrollmentKey, SysacadSubjectCommissionDto> enrollments) {
-        SysacadSubjectCommissionDto enrollment = enrollments.get(new EnrollmentKey(row.courseCode(), row.subjectCode()));
+        SysacadSubjectCommissionDto enrollment = enrollments.get(new EnrollmentKey(
+                row.courseCode(), row.subjectCode(), row.specialtyCode(), row.studyPlanCode()));
         Integer enrolledCount = enrollment == null ? null : enrollment.enrolledCount();
         return new CommissionSyncCommand(row.courseCode(), row.specialtyCode(), row.studyPlanCode(),
                 row.subjectCode(), row.academicYear(), enrolledCount);
     }
 
-    private record EnrollmentKey(String courseCode, Integer subjectCode) {
+    private record EnrollmentKey(String courseCode, Integer subjectCode, Integer specialtyCode,
+            Integer studyPlanCode) {
         static EnrollmentKey of(SysacadSubjectCommissionDto dto) {
-            return new EnrollmentKey(dto.courseCode(), dto.subjectCode());
+            return new EnrollmentKey(dto.courseCode(), dto.subjectCode(), dto.specialtyCode(), dto.studyPlanCode());
         }
     }
 }

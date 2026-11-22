@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.academic;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
+import ar.edu.utn.frc.siga.academic.dto.SubjectCommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.StudyPlanResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -100,7 +102,8 @@ class AcademicFindByCodeIntegrationTest extends AbstractIntegrationTest {
         Commission commission = testData.comision("CUR-" + IntegrationTestData.nextSeq(), period);
         testData.materiaComision(subject, commission, 30);
 
-        List<SubjectCommissionResponseDto> result = subjectCommissionService.findBySubjectId(subject.getId(), false);
+        List<SubjectCommissionResponseDto> result = subjectCommissionService.findAll(
+                new SubjectCommissionFilter(subject.getId(), null), Pageable.unpaged(), false).getContent();
 
         assertThat(result).hasSize(1);
         SubjectCommissionResponseDto dto = result.getFirst();

@@ -13,7 +13,8 @@ public class InvalidRoomRequestTransitionException extends SigaAppException {
 
     public InvalidRoomRequestTransitionException(RoomRequestStatus current, RoomRequestStatus target) {
         super(HttpStatus.CONFLICT, "Invalid room request transition",
-                "No se puede pasar la solicitud de " + current + " a " + target + ".");
+                "No se puede pasar la solicitud de \"" + current.label() + "\" a \"" + target.label() + "\".");
+        withProperty("code", "INVALID_STATE");
         withProperty("currentStatus", current);
         withProperty("targetStatus", target);
     }

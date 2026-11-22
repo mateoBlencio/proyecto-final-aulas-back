@@ -1,0 +1,26 @@
+meta {
+  name: Tendencia de asignaciones
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/dashboard/allocation-trend
+  body: none
+  auth: inherit
+}
+
+docs {
+  GET /v1/dashboard/allocation-trend. Permiso: PERM_DASHBOARD_READ.
+  Serie mensual del campus con los snapshots vigentes de los meses cerrados, más el mes en
+  curso calculado en vivo (currentMonth, partial = true: el front lo dibuja punteado y no lo usa
+  en los deltas).
+
+  - closedMonths: meses con snapshot, para el selector de mes del informe.
+  - baselineMonth: primer snapshot. latestClosedMonth: el último. Ambos null sin snapshots.
+  - series: por mes, estado de las asignaciones (cantidades y %), clases sin aula, ocupación y
+    desglose por origen (MANUAL, AUTOMATIC, IMPORTED, SYSACAD). Los deltas los calcula el front.
+  Un usuario acotado recibe la suma de sus edificios y unallocatedClasses null.
+
+  Sin snapshots: 200 con series vacía, baselineMonth y latestClosedMonth null.
+}

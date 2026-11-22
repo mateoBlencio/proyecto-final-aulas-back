@@ -32,7 +32,7 @@ public class Allocation extends TimestampedEntity {
     @EqualsAndHashCode.Include
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "asignacion_aula_seq")
-    @SequenceGenerator(name = "asignacion_aula_seq", sequenceName = "asignacion_aula_id_asignacion_seq", allocationSize = 1)
+    @SequenceGenerator(name = "asignacion_aula_seq", sequenceName = "asignacion_aula_id_asignacion_seq", allocationSize = 50)
     @Column(name = "id_asignacion")
     private Long id;
 

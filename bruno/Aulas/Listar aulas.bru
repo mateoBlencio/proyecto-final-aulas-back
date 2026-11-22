@@ -1,0 +1,41 @@
+meta {
+  name: Listar aulas
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/classrooms?buildingId=3&size=20000
+  body: none
+  auth: inherit
+}
+
+params:query {
+  buildingId: 3
+  size: 20000
+  ~capacityMin: 60
+  ~page: 0
+  ~includeDeactivated: true
+  ~notInSysacad: true
+}
+
+docs {
+  GET /v1/classrooms. Permiso: PERM_CLASSROOM_READ.
+  Sin includeDeactivated solo devuelve aulas que se ofrecen: aula y edificio
+  activos. Un aula que SysAcad dejo de traer o inhabilito, o cuyo edificio dejo de traer, se sigue
+  ofreciendo. Con includeDeactivated=true devuelve todas.
+  notInSysacad=true devuelve solo las aulas que SysAcad dejo de traer (lo cargado a
+  mano nunca entra); se combina con el resto de los filtros y respeta el alcance por edificio.
+  Cada elemento trae unavailableReason: null si se puede ofrecer; DEACTIVATED si
+  tiene baja propia; PARENT_DEACTIVATED si lo oculta la baja de su edificio;
+  currentInSysacad=false avisa que SysAcad dejo de traer el aula y enabledInSysacad=false que la inhabilito; ninguno bloquea la oferta del aula.
+  Cada elemento trae pistas de UI calculadas con el alcance del usuario (el back
+  valida igual en cada endpoint):
+  - canUpdate: puede editar el aula; false si esta desactivada.
+  - canActivate: puede activar/desactivar el aula (solo alcance, vale tambien para
+    aulas desactivadas).
+  - canAllocate: puede asignar eventos al aula; false si unavailableReason != null.
+  Los permissionTargets (permisos por materia) traen ademas de name:
+  specialtyName, specialtyAbbreviation, specialtyCode y studyPlanCode (null si el
+  target no es SUBJECT o la materia ya no existe).
+}

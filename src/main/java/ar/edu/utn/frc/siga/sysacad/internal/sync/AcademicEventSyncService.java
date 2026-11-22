@@ -1,10 +1,15 @@
 package ar.edu.utn.frc.siga.sysacad.internal.sync;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
+import ar.edu.utn.frc.siga.audit.AuditOperations;
+import ar.edu.utn.frc.siga.common.exception.SyncAbortedException;
+import ar.edu.utn.frc.siga.common.util.Plurals;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
+import ar.edu.utn.frc.siga.allocation.service.OccurrenceBoardService;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.command.SyncRecurringEventCommand;
 import ar.edu.utn.frc.siga.events.service.command.UpsertRecurringEventResult;
@@ -13,7 +18,9 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadViewSyncer;
+import ar.edu.utn.frc.siga.sysacad.internal.config.SysacadProperties;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -34,6 +41,8 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
     private final SubjectCommissionService subjectCommissionService;
     private final AcademicEventService academicEventService;
     private final SysacadSyncStateService syncStateService;
+    private final SysacadProperties properties;
+    private final OccurrenceBoardService occurrenceBoardService;
 
     @Override
     public SysacadView view() {
@@ -41,6 +50,7 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
     }
 
     @Override
+    @AuditOperation(value = "Sincronización de eventos desde SysAcad", subject = "AcademicEvent")
     public void sync(SysacadCatalogReader catalog) {
         ViewSyncRunner.run(syncStateService, SysacadView.EVENTOS, "Eventos", log, () -> doSync(catalog));
     }
@@ -48,24 +58,33 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
     private int doSync(SysacadCatalogReader catalog) {
         SysacadCommissionResolver resolver = new SysacadCommissionResolver(commissionService, subjectCommissionService);
         List<SyncRecurringEventCommand> commands = new ArrayList<>();
+        Set<Long> unresolvedCommissionIds = new HashSet<>();
 
-        for (SysacadAcademicEventDto row : catalog.findAcademicEvents()) {
+        for (SysacadAcademicEventDto row : ViewSyncRunner.requireRows(catalog.findAcademicEvents(), SysacadView.EVENTOS)) {
             Optional<SysacadCommissionResolver.ResolvedLink> resolved =
-                    resolver.resolve(row.courseCode(), row.subjectCode());
+                    resolver.resolve(row.courseCode(), row.subjectCode(), row.specialtyCode(),
+                            row.studyPlanCode());
             if (resolved.isEmpty()) {
+                unresolvedCommissionIds.addAll(resolver.activeIdsByCourseCode(row.courseCode()));
                 continue;
             }
             CommissionResponseDto commission = resolved.get().commission();
             SubjectCommissionResponseDto link = resolved.get().link();
             if (row.durationMinutes() == null) {
-                log.warn("DURACION nula para curso={} materia={}: fila de evento salteada",
+                log.warn("Sin duración (HoraFin inválida o ausente y DURACION nula) para curso={} materia={}: "
+                                + "fila de evento salteada",
                         row.courseCode(), row.subjectCode());
+                unresolvedCommissionIds.add(commission.id());
                 continue;
             }
 
             int year = commission.academicPeriod().year();
-            for (TermType termType : SysacadCommissionResolver.termTypes(
-                    row.semester(), row.courseCode(), row.subjectCode())) {
+            List<TermType> termTypes = SysacadCommissionResolver.termTypes(
+                    row.semester(), row.courseCode(), row.subjectCode());
+            if (termTypes.isEmpty()) {
+                unresolvedCommissionIds.add(commission.id());
+            }
+            for (TermType termType : termTypes) {
                 commands.add(new SyncRecurringEventCommand(
                         link.subjectId(),
                         commission.id(),
@@ -78,10 +97,23 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
             }
         }
 
-        Set<Long> presentEventIds = academicEventService.syncRecurringEvents(commands).stream()
+        if (commands.isEmpty()) {
+            throw new SyncAbortedException("Ninguna fila de Horarios resolvió comisión y materia: se aborta el sync "
+                    + "de eventos sin dar de baja nada");
+        }
+        List<UpsertRecurringEventResult> results = academicEventService.syncRecurringEvents(commands);
+        occurrenceBoardService.invalidateCache();
+        Set<Long> presentEventIds = results.stream()
                 .map(UpsertRecurringEventResult::eventId)
                 .collect(Collectors.toSet());
+        long created = results.stream().filter(UpsertRecurringEventResult::created).count();
+        long updated = results.stream().filter(UpsertRecurringEventResult::updated).count();
+        int absent = academicEventService.markRecurringEventsAbsent(presentEventIds, unresolvedCommissionIds,
+                properties.getSync().minValidRowsPercent());
+        occurrenceBoardService.invalidateCache();
 
-        return presentEventIds.size() + academicEventService.markRecurringEventsAbsent(presentEventIds);
+        AuditOperations.describe("Sincronización de eventos desde SysAcad (" + Plurals.count(created, "alta", "altas")
+                + ", " + Plurals.count(updated, "cambio", "cambios") + ", " + Plurals.count(absent, "baja", "bajas") + ")");
+        return (int) (created + updated) + absent;
     }
 }

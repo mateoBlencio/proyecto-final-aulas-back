@@ -1,25 +1,43 @@
 package ar.edu.utn.frc.siga.allocation.controller;
 
 import ar.edu.utn.frc.siga.allocation.dto.request.AllocationBatchRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.ClassroomWithdrawalRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.request.DeallocationBatchRequestDto;
+import ar.edu.utn.frc.siga.allocation.dto.request.ReleaseBatchRequestDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationHistorySnapshotDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationImpactResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationResponseDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.AllocationSearchResultDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.ClassroomWithdrawalResultDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.DeallocatedOccurrenceDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.ReleasedOccurrenceDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.UniqueEventAllocationResponseDto;
 import ar.edu.utn.frc.siga.allocation.mapper.AllocationCommandMapper;
 import ar.edu.utn.frc.siga.allocation.mapper.EventAllocationComposer;
-import ar.edu.utn.frc.siga.common.dto.response.RevisionDto;
+import ar.edu.utn.frc.siga.audit.dto.response.RevisionDto;
 import ar.edu.utn.frc.siga.allocation.service.AllocationAuditHistoryService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationConflictService;
+import ar.edu.utn.frc.siga.allocation.service.ReleasedOccurrenceQueryService;
+import ar.edu.utn.frc.siga.allocation.dto.response.ReleasedOccurrenceItemDto;
 import ar.edu.utn.frc.siga.allocation.service.AllocationImpactService;
+import ar.edu.utn.frc.siga.allocation.service.AllocationSearchService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
 import ar.edu.utn.frc.siga.allocation.model.ConflictType;
+import ar.edu.utn.frc.siga.allocation.model.OccurrenceIssueType;
+import ar.edu.utn.frc.siga.allocation.dto.response.OccurrenceBoardEventDto;
+import ar.edu.utn.frc.siga.allocation.service.OccurrenceBoardService;
+import ar.edu.utn.frc.siga.allocation.service.command.ClassroomWithdrawalCommand;
+import ar.edu.utn.frc.siga.common.security.BuildingScope;
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
+import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -29,6 +47,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,6 +58,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import ar.edu.utn.frc.siga.events.model.ReleaseReason;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -47,8 +68,9 @@ import java.util.Set;
 @RestController
 @RequestMapping("${siga.api.base-path}/allocations")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Asignaciones", description = "Asignación manual de aulas para ocurrencias específicas")
-@PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+@PreAuthorize("hasAuthority('PERM_ALLOCATION_READ')")
 public class AllocationController {
 
     private final AllocationService allocationService;
@@ -58,16 +80,40 @@ public class AllocationController {
     private final AllocationCommandMapper commandMapper;
     private final EventAllocationComposer eventAllocationComposer;
     private final AcademicEventService academicEventService;
+    private final BuildingScopeResolver buildingScopeResolver;
+    private final ReleasedOccurrenceQueryService releasedOccurrenceQueryService;
+    private final AllocationSearchService allocationSearchService;
+    private final OccurrenceBoardService occurrenceBoardService;
 
     @GetMapping
     @Operation(summary = "Listar asignaciones por fecha",
-               description = "Devuelve todas las asignaciones del día indicado.")
+               description = "Devuelve todas las asignaciones del día indicado. Excluye las ocurrencias desde el día en que la materia, comisión, materia-comisión, plan o especialidad del evento se dio de baja.")
     public ResponseEntity<List<AllocationResponseDto>> findByDate(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         log.debug("GET /v1/allocations: date={}", date);
         List<AllocationResponseDto> allocations = allocationService.findByDate(date);
         log.info("Asignaciones listadas: date={}, count={}", date, allocations.size());
         return ResponseEntity.ok(allocations);
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "Buscar asignaciones en el período académico",
+               description = "Busca en el período académico activo que contiene 'date' (si hay más de uno, del menor "
+                       + "inicio al mayor fin). 'q' (mínimo 2 caracteres sin espacios de borde) se busca como "
+                       + "subcadena, sin mayúsculas ni tildes, en materia, código de comisión, número de aula y "
+                       + "especialidad. Solo ocurrencias asignadas y no liberadas. 'limit' (1 a 50, default 20) "
+                       + "corta eventos, no ocurrencias. Orden: eventos con fecha desde 'date' primero, por la más "
+                       + "cercana; después los ya terminados, por la última fecha descendente. Cada evento trae "
+                       + "sus ocurrencias coincidentes por fecha ascendente. Sin período que contenga 'date': lista vacía. "
+                       + "Excluye las ocurrencias desde el día en que la materia, comisión, materia-comisión, plan o especialidad del evento se dio de baja.")
+    public ResponseEntity<List<AllocationSearchResultDto>> search(
+            @RequestParam @Size(max = 100) String q,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(50) int limit) {
+        log.debug("GET /v1/allocations/search: qLength={}, date={}, limit={}", q.length(), date, limit);
+        List<AllocationSearchResultDto> results = allocationSearchService.search(q, date, limit);
+        log.info("Asignaciones buscadas: date={}, events={}", date, results.size());
+        return ResponseEntity.ok(results);
     }
 
     @GetMapping("/{id}")
@@ -84,12 +130,17 @@ public class AllocationController {
                        + "Para la vista sin aula ver GET /v1/events/unique.")
     public ResponseEntity<List<UniqueEventAllocationResponseDto>> findUniqueEvents() {
         log.debug("GET /v1/allocations/events/unique");
-        List<UniqueEventAllocationResponseDto> events = eventAllocationComposer.composeAll(academicEventService.findUniqueEvents());
+        BuildingScope scope = buildingScopeResolver.scopeFor(Permission.ALLOCATION_READ);
+        List<UniqueEventAllocationResponseDto> events = eventAllocationComposer.composeAll(academicEventService.findUniqueEvents())
+                .stream()
+                .filter(e -> e.classroom() == null || scope.allows(e.classroom().buildingId()))
+                .toList();
         log.info("Eventos únicos con aula listados: count={}", events.size());
         return ResponseEntity.ok(events);
     }
 
     @GetMapping("/history")
+    @PreAuthorize("hasAuthority('PERM_ALLOCATION_HISTORY_READ')")
     @Operation(summary = "Historial de asignaciones de un evento",
                description = "Devuelve las revisiones de auditoría de la(s) asignación(es) de todas las ocurrencias"
                        + " del evento. Devuelve 404 si el evento no existe y una lista vacía si existe pero nunca fue asignada.")
@@ -100,29 +151,82 @@ public class AllocationController {
     }
 
     @GetMapping("/conflicts")
+    @PreAuthorize("hasAuthority('PERM_CONFLICT_READ')")
     @Operation(summary = "Listar conflictos de asignación",
-               description = "Devuelve, mezclados y paginados, los conflictos pedidos en 'types' (los tres si se omite): "
-                       + "eventos sin aula, aulas con sobrecupo, superposiciones de horario-aula. Mismos defaults de "
-                       + "rango que antes: 'from' hoy, 'to' fin del período académico activo (o +6 meses). Excluye "
-                       + "ocurrencias ya pasadas salvo 'includePast=true'.")
+               description = "Devuelve, mezclados y paginados, los conflictos pedidos en 'types' (todos si se omite): "
+                       + "eventos sin aula (UNALLOCATED), aulas con sobrecupo (OVERCROWDED), superposiciones de "
+                       + "horario-aula (OVERLAP) y asignaciones en aulas que no habilitan la materia (NOT_PERMITTED). "
+                       + "Mismos defaults de rango que antes: 'from' hoy, 'to' fin del período académico activo "
+                       + "(o +6 meses). Excluye ocurrencias ya pasadas salvo 'includePast=true'. "
+                       + "Solo para UNALLOCATED: 'q' (contiene, sin mayúsculas ni tildes, sobre materia, código de "
+                       + "comisión y especialidad), 'dayOfWeek' (día que dicta el evento; en únicos, el día de su "
+                       + "fecha) y 'specialty' (nombre exacto de la especialidad) filtran antes de paginar. "
+                       + "'sort=campo,asc|desc' acepta subject, dayOfWeek, startTime, enrolled y commissionCode "
+                       + "(otra propiedad da 400); sin sort, orden por id del evento. "
+                       + "Excluye las ocurrencias desde el día en que la materia, comisión, materia-comisión, plan o especialidad del evento se dio de baja.")
     public ResponseEntity<Page<AllocationConflictDto>> findConflicts(
             @RequestParam(required = false) Set<ConflictType> types,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false, defaultValue = "false") boolean includePast,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) DayOfWeek dayOfWeek,
+            @RequestParam(required = false) String specialty,
             @PageableDefault(size = 20) Pageable pageable) {
-        log.debug("GET /v1/allocations/conflicts: types={}, from={}, to={}, includePast={}", types, from, to, includePast);
-        return ResponseEntity.ok(allocationConflictService.findConflicts(types, from, to, includePast, pageable));
+        log.debug("GET /v1/allocations/conflicts: types={}, from={}, to={}, includePast={}, q={}, dayOfWeek={}, specialty={}",
+                types, from, to, includePast, q, dayOfWeek, specialty);
+        return ResponseEntity.ok(allocationConflictService.findConflicts(
+                types, from, to, includePast, q, dayOfWeek, specialty, pageable));
+    }
+
+    @GetMapping("/occurrences-board")
+    @PreAuthorize("hasAuthority('PERM_CONFLICT_READ')")
+    @Operation(summary = "Listar el tablero de ocurrencias",
+               description = "Devuelve, paginados por evento, los eventos con sus fechas. Cada fecha trae sus aulas "
+                       + "('slots': ocurrencia principal y espejos, con estado, motivo de liberación, asignación y "
+                       + "aula anterior) y sus problemas en 'issues', cada uno con discriminador 'type': UNALLOCATED "
+                       + "(slots sin aula: NEEDS_ROOM o liberados por baja de aula, CLASSROOM_DEACTIVATED), OVERCROWDED (inscriptos contra la suma de capacidades de las "
+                       + "aulas de la fecha), OVERLAP (misma aula y fecha que otro evento, incluida la superposición "
+                       + "tolerada) y NOT_PERMITTED (el aula no habilita la materia). Rango: 'to' por defecto es el "
+                       + "fin del período académico activo (o 'from' + 6 meses); con 'onlyFuture=true' (default) "
+                       + "'from' por defecto es hoy y se excluyen las fechas ya empezadas; con 'onlyFuture=false' "
+                       + "'from' por defecto es el inicio del período activo más antiguo (o hoy) y cada fecha trae "
+                       + "'past'. 'to' anterior a 'from' da 400. 'issues' (lista separada por comas: UNALLOCATED, "
+                       + "OVERLAP, OVERCROWDED, NOT_PERMITTED, RELEASED) filtra fechas con OR: pasa la fecha que "
+                       + "tiene algún problema pedido, o algún slot liberado si se pidió RELEASED; omitido o vacío "
+                       + "no filtra y devuelve también las fechas sin problemas. 'summary' cuenta las fechas "
+                       + "visibles del evento sin aplicar 'issues'. 'q', 'dayOfWeek' y 'specialty' filtran eventos "
+                       + "igual que en /conflicts. Con alcance por edificio, se ocultan los slots con aula fuera del "
+                       + "alcance y sus problemas; los slots sin aula se ven siempre y los liberados siguen la regla "
+                       + "de /releases; una fecha sin slots visibles no aparece. Los espejos retirados por un pedido "
+                       + "de aula (MIRROR_RETIRED) no aparecen. 'sort=campo,asc|desc' acepta subject, dayOfWeek, "
+                       + "startTime, enrolled y commissionCode (otra propiedad da 400); sin sort, orden por id del "
+                       + "evento. Excluye las ocurrencias desde el día en que la materia, comisión, materia-comisión, plan o especialidad del evento se dio de baja.")
+    public ResponseEntity<Page<OccurrenceBoardEventDto>> findOccurrencesBoard(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "true") boolean onlyFuture,
+            @RequestParam(required = false) Set<OccurrenceIssueType> issues,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) DayOfWeek dayOfWeek,
+            @RequestParam(required = false) String specialty,
+            @PageableDefault(size = 20) Pageable pageable) {
+        log.debug("GET /v1/allocations/occurrences-board: from={}, to={}, onlyFuture={}, issues={}, q={}, dayOfWeek={}, specialty={}",
+                from, to, onlyFuture, issues, q, dayOfWeek, specialty);
+        return ResponseEntity.ok(occurrenceBoardService.findBoard(
+                from, to, onlyFuture, issues, q, dayOfWeek, specialty, pageable));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ALLOCATION_WRITE')")
     @Operation(summary = "Asignar aulas en lote",
                description = "Asigna aula a cada item del lote. Cada item apunta de una de tres formas: "
                        + "'occurrenceIds' (fechas puntuales), 'eventId' solo (todas las ocurrencias futuras "
                        + "del evento) o 'eventId' + 'from' [+ 'to'] (rango de fechas, ambos bordes inclusive). "
                        + "409 si alguna occurrence del lote ya tiene asignación, si algún aula no existe/no está "
-                       + "disponible, o si hay solapamiento de horario con otra asignación. Atómico.")
+                       + "disponible, o si hay solapamiento de horario con otra asignación. Asigna también las clases "
+                       + "liberadas por baja de aula (CLASSROOM_DEACTIVATED) y las saca de liberadas. 422 si algún evento "
+                       + "del lote está suspendido por la baja de su materia, comisión, materia-comisión, plan o especialidad. Atómico.")
     public ResponseEntity<List<AllocationResponseDto>> allocate(@Valid @RequestBody AllocationBatchRequestDto dto) {
         log.debug("POST /v1/allocations: items={}", dto.items().size());
         List<AllocationResponseDto> response = allocationService.allocate(commandMapper.toManualCommand(dto));
@@ -131,31 +235,37 @@ public class AllocationController {
     }
 
     @PutMapping
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ALLOCATION_WRITE')")
     @Operation(summary = "Reasignar aulas en lote",
-               description = "Cambia el aula de cada item del lote (upsert: crea la asignación si no existía). "
+               description = "Cambia el aula de cada item del lote. Solo mueve ocurrencias que ya tienen aula. "
                        + "Además de las formas puntual ('occurrenceIds') y evento completo ('eventId'), acepta "
                        + "mover un evento por rango de fechas: 'eventId' + 'from' + 'to' es un cambio TEMPORAL "
                        + "(las ocurrencias de afuera del rango conservan su aula, así que la clase 'vuelve' sola), "
                        + "y 'eventId' + 'from' sin 'to' es un cambio PERMANENTE desde esa fecha hasta que termine "
-                       + "el dictado. Ambos bordes son inclusive y 'from' no puede ser anterior a hoy (400). "
-                       + "409 si algún aula no existe/no está disponible, si hay solapamiento de horario con otra "
-                       + "asignación, o si una ocurrencia del rango ya ocurrió. Atómico: si una sola fecha del "
-                       + "rango falla, no se aplica ningún cambio.")
+                       + "el dictado. Ambos bordes son inclusive; si 'from' es anterior a hoy el cambio rige desde hoy, y si 'to' ya pasó es 400. "
+                       + "403 si el aula actual o la de destino es de un edificio fuera de su alcance. "
+                       + "409 si alguna ocurrencia del lote no tiene aula asignada (para asignar se usa POST), "
+                       + "si algún aula no existe/no está disponible, si hay solapamiento de horario con otra "
+                       + "asignación, o si una ocurrencia del rango ya ocurrió. En el 409 y en el 400 por "
+                       + "superposición dentro del margen, 'classroomIds' lista todas las aulas en conflicto y "
+                       + "'detail' explica el motivo. Atómico: si una sola fecha del "
+                       + "rango falla, no se aplica ningún cambio. 422 si algún evento del lote está suspendido por la baja de "
+                       + "su materia, comisión, materia-comisión, plan o especialidad.")
     public ResponseEntity<List<AllocationResponseDto>> reallocate(@Valid @RequestBody AllocationBatchRequestDto dto) {
         log.debug("PUT /v1/allocations: items={}", dto.items().size());
-        List<AllocationResponseDto> response = allocationService.reallocate(commandMapper.toManualCommand(dto));
+        List<AllocationResponseDto> response = allocationService.reallocateExisting(commandMapper.toManualCommand(dto));
         log.info("Reasignación en lote completa: allocated={}", response.size());
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/impact")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ALLOCATION_WRITE')")
     @Operation(summary = "Ver el impacto de un pedido sin aplicarlo",
                description = "Recibe el mismo body que POST/PUT y responde qué pasaría si se aplicara, sin "
                        + "escribir nada. Devuelve cuántas clases toca el pedido y los choques como DATO y no como error, "
                        + "cada uno con el evento que ocupa el aula y las aulas libres en esa fecha y franja para "
-                       + "poder destrabarlo. Siempre 200, incluso con conflictos. Sigue devolviendo 400 si el "
+                       + "poder destrabarlo (las aulas sugeridas se filtran por permiso: no se propone un aula que "
+                       + "no habilita la materia del evento). Siempre 200, incluso con conflictos. Sigue devolviendo 400 si el "
                        + "pedido está mal formado y 409 si pide un aula inexistente o una ocurrencia ya pasada: "
                        + "eso no es un resultado a mostrar, es un pedido que no se puede ni evaluar.")
     public ResponseEntity<AllocationImpactResponseDto> impact(@Valid @RequestBody AllocationBatchRequestDto dto) {
@@ -167,7 +277,7 @@ public class AllocationController {
     }
 
     @DeleteMapping
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ALLOCATION_WRITE')")
     @Operation(summary = "Desasignar aulas en lote",
                description = "Libera el aula de cada item del lote (borra la asignación). "
                        + "409 si alguna ocurrencia del lote ya pasó. Atómico.")
@@ -175,6 +285,87 @@ public class AllocationController {
         log.debug("DELETE /v1/allocations: items={}", dto.items().size());
         List<DeallocatedOccurrenceDto> response = allocationService.deallocate(commandMapper.toDeallocationCommand(dto));
         log.info("Desasignación en lote completa: freed={}", response.size());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/releases")
+    @PreAuthorize("hasAuthority('PERM_OCCURRENCE_RELEASE')")
+    @Operation(summary = "Liberar ocurrencias con motivo",
+               description = "Marca las ocurrencias del lote como ROOM_RELEASED con motivo (VIRTUAL_CLASS, "
+                       + "CANCELLED u OTHER, este último con nota obligatoria) y borra sus asignaciones. Cada item "
+                       + "apunta con 'occurrenceIds', 'eventId' (ocurrencias futuras del evento) o 'eventId' + "
+                       + "'from' [+ 'to']. Arrastra las ocurrencias espejo con el mismo motivo, salvo las ya retiradas "
+                       + "(MIRROR_RETIRED, por un pedido de aula o una baja de aula). 400 si falta el motivo, es "
+                       + "MIRROR_RETIRED o CLASSROOM_DEACTIVATED u OTHER sin nota; 403 sin alcance sobre el edificio del aula; "
+                       + "409 si alguna ocurrencia ya pasó. Atómico. 'mirrorScope' (opcional, default ALL): con "
+                       + "ONLY_SELECTED no se arrastran los espejos no seleccionados; una principal seleccionada pasa "
+                       + "al aula de uno de ellos (el de mayor capacidad), que queda MIRROR_RETIRED, y vuelve con "
+                       + "'movedToClassroomId'. 409 si ese espejo no tiene aula disponible: la respuesta lleva "
+                       + "'dates' y se puede reenviar con ALL.")
+    public ResponseEntity<List<ReleasedOccurrenceDto>> release(@Valid @RequestBody ReleaseBatchRequestDto dto) {
+        log.debug("POST /v1/allocations/releases: items={}, reason={}", dto.items().size(), dto.reason());
+        List<ReleasedOccurrenceDto> response = allocationService.release(commandMapper.toReleaseCommand(dto));
+        log.info("Liberación con motivo completa: released={}", response.size());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/classroom-withdrawals")
+    @PreAuthorize("hasAuthority('PERM_OCCURRENCE_RELEASE')")
+    @Operation(summary = "Retirar un aula de las clases futuras",
+               description = "Desde 'from' (default hoy) en adelante: la principal que está en el aula pasa al aula "
+                       + "de uno de sus espejos ('consolidated'), el espejo que está en el aula se retira "
+                       + "('mirrorsRetired') y la principal sin espejo con aula disponible no se toca "
+                       + "('withoutAlternative'). Las clases que ya empezaron no se tocan. 400 si 'from' es anterior "
+                       + "a hoy; 403 sin alcance sobre el aula o sobre las aulas destino; 404 si el aula no existe. "
+                       + "Atómico; repetirlo es seguro.")
+    public ResponseEntity<ClassroomWithdrawalResultDto> withdrawClassroom(
+            @Valid @RequestBody ClassroomWithdrawalRequestDto dto) {
+        log.debug("POST /v1/allocations/classroom-withdrawals: classroomId={}, from={}", dto.classroomId(), dto.from());
+        ClassroomWithdrawalResultDto response = allocationService.withdrawClassroom(
+                new ClassroomWithdrawalCommand(dto.classroomId(), dto.from(), dto.note()));
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/releases")
+    @PreAuthorize("hasAuthority('PERM_CONFLICT_READ')")
+    @Operation(summary = "Listar ocurrencias liberadas",
+               description = "Devuelve, paginadas, las ocurrencias en estado ROOM_RELEASED con su evento, motivo, "
+                       + "nota y aula anterior. Filtros opcionales: 'reason', rango 'from'/'to' (mismos defaults "
+                       + "que /conflicts: 'from' hoy, 'to' fin del período académico activo o +6 meses), "
+                       + "'q' (contiene, sin mayúsculas ni tildes, sobre materia, código de comisión y "
+                       + "especialidad), 'dayOfWeek' (día de la fecha de la ocurrencia) y 'specialty' (nombre "
+                       + "exacto). Una fila por evento, motivo, nota y aula anterior, con la lista 'dates' "
+                       + "(occurrenceId + fecha) de sus ocurrencias liberadas. 'sort=campo,asc|desc' acepta "
+                       + "subject, dayOfWeek, startTime, enrolled y commissionCode (otra propiedad da 400); sin "
+                       + "sort, orden por id del evento. Si el usuario tiene alcance "
+                       + "por edificio, solo ve las liberadas cuya aula anterior está en su alcance (las "
+                       + "que nunca tuvieron aula se ven siempre). "
+                       + "Excluye las ocurrencias desde el día en que la materia, comisión, materia-comisión, plan o especialidad del evento se dio de baja.")
+    public ResponseEntity<Page<ReleasedOccurrenceItemDto>> findReleased(
+            @RequestParam(required = false) ReleaseReason reason,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) DayOfWeek dayOfWeek,
+            @RequestParam(required = false) String specialty,
+            @PageableDefault(size = 20) Pageable pageable) {
+        log.debug("GET /v1/allocations/releases: reason={}, from={}, to={}, q={}, dayOfWeek={}, specialty={}",
+                reason, from, to, q, dayOfWeek, specialty);
+        return ResponseEntity.ok(releasedOccurrenceQueryService.findReleased(
+                reason, from, to, q, dayOfWeek, specialty, pageable));
+    }
+
+    @DeleteMapping("/releases")
+    @PreAuthorize("hasAuthority('PERM_OCCURRENCE_REQUEST_ROOM')")
+    @Operation(summary = "Revertir la liberación de ocurrencias",
+               description = "Devuelve a NEEDS_ROOM las ocurrencias liberadas del lote y sus espejos liberados "
+                       + "(los MIRROR_RETIRED no vuelven). Con el id de la principal alcanza. No asigna aula; cada "
+                       + "ocurrencia conserva su aula anterior. 403 si alguna aula anterior, incluida la de un "
+                       + "espejo, está fuera del alcance; 409 si alguna ocurrencia ya pasó. Atómico.")
+    public ResponseEntity<List<Long>> cancelRelease(@Valid @RequestBody DeallocationBatchRequestDto dto) {
+        log.debug("DELETE /v1/allocations/releases: items={}", dto.items().size());
+        List<Long> response = allocationService.cancelRelease(commandMapper.toDeallocationCommand(dto));
+        log.info("Liberación revertida: reverted={}", response.size());
         return ResponseEntity.ok(response);
     }
 }

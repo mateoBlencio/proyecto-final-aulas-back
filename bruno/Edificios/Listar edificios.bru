@@ -1,0 +1,30 @@
+meta {
+  name: Listar edificios
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/buildings?page=0&includeDeactivated=false
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 0
+  includeDeactivated: false
+  ~size: 20
+  ~name: central
+}
+
+docs {
+  Listado paginado. Filtro opcional: name (contiene, case-insensitive). La
+  respuesta es { content: [...], page: { size, number, totalElements, totalPages } }.
+  Sin includeDeactivated solo devuelve edificios activos (no depende de SysAcad).
+  unavailableReason: null o DEACTIVATED.
+  currentInSysacad=false avisa que SysAcad dejo de traer el edificio; es solo informativo.
+  Pistas de UI por edificio (el back valida igual en cada endpoint):
+  - canActivate: puede activar/desactivar edificios (permiso global).
+  - canCreateClassroom: puede crear aulas en el edificio segun su alcance; false
+    si el edificio esta desactivado.
+}

@@ -5,6 +5,8 @@ import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadUnavailableExceptio
 
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.ViewResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
@@ -19,6 +21,7 @@ import org.springframework.web.util.UriBuilder;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
+import java.util.function.Consumer;
 
 @Slf4j
 @Component
@@ -31,10 +34,17 @@ public class SysacadClient {
 
     private final RestClient restClient;
     private final int maxRetries;
+    private final Consumer<Duration> sleeper;
 
-    public SysacadClient(RestClient sysacadRestClient, SysacadProperties properties) {
-        this.restClient = sysacadRestClient;
-        this.maxRetries = properties.getMaxRetries();
+    @Autowired
+    public SysacadClient(@Qualifier("sysacadRestClient") RestClient sysacadRestClient, SysacadProperties properties) {
+        this(sysacadRestClient, properties.getMaxRetries(), SysacadClient::sleep);
+    }
+
+    SysacadClient(RestClient restClient, int maxRetries, Consumer<Duration> sleeper) {
+        this.restClient = restClient;
+        this.maxRetries = maxRetries;
+        this.sleeper = sleeper;
     }
 
     public <T> List<T> fetchRows(String view, ViewQuery query,
@@ -53,7 +63,7 @@ public class SysacadClient {
                 Duration backoff = backoffFor(e.getResponseHeaders(), attempt);
                 log.warn("SysAcad respondió {} en la vista {}; reintento {}/{} en {} ms",
                         e.getStatusCode().value(), view, attempt + 1, maxRetries, backoff.toMillis());
-                sleep(backoff);
+                sleeper.accept(backoff);
             } catch (ResourceAccessException e) {
                 throw new SysacadUnavailableException(
                         "No se pudo conectar con SysAcad para la vista " + view, e);
@@ -71,7 +81,7 @@ public class SysacadClient {
         return backoff.compareTo(MAX_BACKOFF) > 0 ? MAX_BACKOFF : backoff;
     }
 
-    private static URI buildUri(UriBuilder uriBuilder, String view, ViewQuery query) {
+    static URI buildUri(UriBuilder uriBuilder, String view, ViewQuery query) {
         uriBuilder.path(VIEW_PATH);
         query.filters().forEach(uriBuilder::queryParam);
         if (query.sort() != null) {
@@ -84,7 +94,7 @@ public class SysacadClient {
         return uriBuilder.build(view);
     }
 
-    private static Duration parseRetryAfter(HttpHeaders headers) {
+    static Duration parseRetryAfter(HttpHeaders headers) {
         if (headers == null) {
             return null;
         }
@@ -99,7 +109,7 @@ public class SysacadClient {
         }
     }
 
-    private static void sleep(Duration backoff) {
+    static void sleep(Duration backoff) {
         try {
             Thread.sleep(backoff);
         } catch (InterruptedException e) {

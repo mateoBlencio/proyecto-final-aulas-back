@@ -5,8 +5,8 @@ import ar.edu.utn.frc.siga.auth.dto.request.LoginRequest;
 import ar.edu.utn.frc.siga.auth.dto.request.RefreshTokenRequest;
 import ar.edu.utn.frc.siga.auth.dto.response.TokenResponse;
 import ar.edu.utn.frc.siga.auth.exception.InvalidCredentialsException;
+import ar.edu.utn.frc.siga.auth.exception.InvalidRefreshTokenException;
 import ar.edu.utn.frc.siga.auth.exception.LoginRateLimitExceededException;
-import ar.edu.utn.frc.siga.auth.model.Role;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import ar.edu.utn.frc.siga.auth.security.JwtService;
@@ -40,10 +40,10 @@ public class AuthServiceImpl implements AuthService {
     private final LoginRateLimiter loginRateLimiter;
     private final AuthDomainProperties authDomainProperties;
 
+    // Sin @Transactional: el hash BCrypt no debe retener una conexión; issue() abre su propia transacción
     @Override
-    @Transactional
     public TokenResponse login(LoginRequest request, HttpServletRequest httpRequest) {
-        String email = request.email();
+        String email = AuthDomainProperties.normalizeEmail(request.email());
         String ip = httpRequest.getRemoteAddr();
 
         if (!authDomainProperties.isAllowedEmail(email)) {
@@ -51,9 +51,10 @@ public class AuthServiceImpl implements AuthService {
             throw new InvalidCredentialsException();
         }
 
-        if (loginRateLimiter.isRateLimited(email, Instant.now())) {
+        Instant now = Instant.now();
+        if (loginRateLimiter.isRateLimited(email, ip, now)) {
             log.warn("Login rechazado por rate limit: email={}, ip={}", email, ip);
-            throw new LoginRateLimitExceededException();
+            throw new LoginRateLimitExceededException(loginRateLimiter.retryAfter(email, ip, now));
         }
 
         SecurityUser securityUser;
@@ -62,12 +63,12 @@ public class AuthServiceImpl implements AuthService {
                     new UsernamePasswordAuthenticationToken(email, request.password()));
             securityUser = (SecurityUser) authentication.getPrincipal();
         } catch (AuthenticationException e) {
-            loginRateLimiter.recordFailure(email, Instant.now());
+            loginRateLimiter.recordFailure(email, ip, Instant.now());
             log.warn("Login fallido: email={}, ip={}", email, ip);
             throw new InvalidCredentialsException();
         }
 
-        loginRateLimiter.recordSuccess(email);
+        loginRateLimiter.recordSuccess(email, ip);
         log.info("Login exitoso: email={}, ip={}", email, ip);
 
         User user = userRepository.findByEmailAndEnabledTrue(email)
@@ -76,8 +77,9 @@ public class AuthServiceImpl implements AuthService {
         return buildTokenResponse(user, refreshTokenService.issue(user));
     }
 
+    // noRollbackFor: this transaction wraps RefreshTokenService.refresh, so it must not roll back either
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = InvalidRefreshTokenException.class)
     public TokenResponse refresh(RefreshTokenRequest request) {
         RefreshResult result = refreshTokenService.refresh(request.refreshToken());
         log.info("Refresh exitoso: email={}", result.user().getEmail());
@@ -92,8 +94,10 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private TokenResponse buildTokenResponse(User user, IssuedRefreshToken refreshToken) {
-        Set<Role> roles = user.getRoles();
-        String accessToken = jwtService.generateAccessToken(user.getEmail(), roles);
+        String accessToken = jwtService.generateAccessToken(user.getEmail());
+        Set<String> roleNames = user.getRoleAssignments().stream()
+                .map(assignment -> assignment.getRole().name())
+                .collect(Collectors.toSet());
 
         return TokenResponse.builder()
                 .accessToken(accessToken)
@@ -101,7 +105,7 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(refreshToken.rawToken())
                 .refreshExpiresInSeconds(refreshToken.expiresInSeconds())
                 .email(user.getEmail())
-                .roles(roles.stream().map(Enum::name).collect(Collectors.toSet()))
+                .roles(roleNames)
                 .build();
     }
 }

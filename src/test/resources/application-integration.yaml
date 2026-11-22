@@ -18,11 +18,22 @@ spring:
     compose:
       enabled: false
 
+management:
+  health:
+    mail:
+      enabled: false
+
 cors:
   allowed-origins:
     - http://localhost:5173
 
 siga:
+  dashboard:
+    snapshot:
+      enabled: false
+  audit:
+    archive:
+      enabled: false
   solver:
     unimproved-seconds-limit: 1
   jwt:
@@ -31,3 +42,10 @@ siga:
   sysacad:
     enabled: false
     api-key: integration-test-unused
+  camera-count:
+    enabled: false
+  # Los contextos cacheados comparten el Postgres: con el intervalo por defecto (PT1M) el reintento de
+  # cualquiera de ellos puede reclamar filas que otro test está por reclamar. La corrida al arrancar
+  # el contexto sigue ocurriendo; el test que lo necesita mockea NotificationRetryScheduler.
+  notifications:
+    retry-interval: PT1H

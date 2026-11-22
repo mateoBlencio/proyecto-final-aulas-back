@@ -1,16 +1,17 @@
 package ar.edu.utn.frc.siga.academic.service;
 
+import ar.edu.utn.frc.siga.academic.dto.StudyPlanFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.StudyPlanResponseDto;
 import ar.edu.utn.frc.siga.common.service.ActivationService;
 
-import java.util.List;
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.modulith.NamedInterface;
 
 @NamedInterface("api")
 public interface StudyPlanService extends ActivationService<Long> {
 
-    List<StudyPlanResponseDto> findAll(boolean includeDeactivated);
+    Page<StudyPlanResponseDto> findAll(StudyPlanFilter filter, Pageable pageable, boolean includeDeactivated);
 
     StudyPlanResponseDto findById(Long id);
 

@@ -1,8 +1,12 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.academic.dto.SpecialtyFilter;
+import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SpecialtyMapper;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
+import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
+import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.academic.service.command.SpecialtySyncCommand;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,12 +16,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -26,15 +34,76 @@ import static org.mockito.Mockito.when;
 class SpecialtyServiceImplTest {
 
     @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+    @Mock
     private SpecialtyRepository specialtyRepository;
     @Mock
+    private SubjectCommissionRepository subjectCommissionRepository;
+    @Mock
+    private SubjectRepository subjectRepository;
+    @Mock
     private SpecialtyMapper specialtyMapper;
+    @Mock
+    private ar.edu.utn.frc.siga.academic.repository.CommissionCountSearch commissionCountSearch;
 
     private SpecialtyServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new SpecialtyServiceImpl(specialtyRepository, specialtyMapper);
+        service = new SpecialtyServiceImpl(eventPublisher, specialtyRepository, subjectCommissionRepository, subjectRepository,
+                commissionCountSearch, specialtyMapper);
+    }
+
+    @Test
+    @DisplayName("findAll: aplica la Specification del filtro y mapea la página")
+    void findAllAppliesSpecificationAndMapsPage() {
+        Specialty specialty = Specialty.builder().id(1L).specialtyCode(17).name("Sistemas").build();
+        SpecialtyResponseDto dto = new SpecialtyResponseDto(17, "Sistemas", null);
+        when(specialtyRepository.findAll(any(Specification.class), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(specialty)));
+        when(specialtyMapper.toDto(specialty)).thenReturn(dto);
+        when(subjectCommissionRepository.countCommissionsBySpecialtyIds(List.of(1L), "%", null, false))
+                .thenReturn(List.<Object[]>of(new Object[] {1L, 3L}));
+        when(subjectRepository.countSubjectsBySpecialtyIds(List.of(1L), null, "%", null, false))
+                .thenReturn(List.<Object[]>of(new Object[] {1L, 7L}));
+
+        var result = service.findAll(new SpecialtyFilter(17, null, null), PageRequest.of(0, 20), false);
+
+        assertThat(result.getContent()).containsExactly(SpecialtyResponseDto.withCounts(dto, 3, 7));
+        assertThat(result.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("findAll: una especialidad sin comisiones ni materias cuenta 0 y los patrones van en minúsculas")
+    void findAllDefaultsCountToZeroAndLowercasesCourseCode() {
+        Specialty specialty = Specialty.builder().id(1L).specialtyCode(17).name("Sistemas").build();
+        SpecialtyResponseDto dto = new SpecialtyResponseDto(17, "Sistemas", null);
+        when(specialtyRepository.findAll(any(Specification.class), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(specialty)));
+        when(specialtyMapper.toDto(specialty)).thenReturn(dto);
+        when(subjectCommissionRepository.countCommissionsBySpecialtyIds(List.of(1L), "%k10%", 5L, true))
+                .thenReturn(List.of());
+        when(subjectRepository.countSubjectsBySpecialtyIds(List.of(1L), 19, "%análisis%", 4L, true))
+                .thenReturn(List.of());
+
+        var result = service.findAll(new SpecialtyFilter(null, null, null, "K10", 5L, 19, "Análisis", 4L),
+                PageRequest.of(0, 20), true);
+
+        assertThat(result.getContent()).containsExactly(SpecialtyResponseDto.withCounts(dto, 0, 0));
+    }
+
+    @Test
+    @DisplayName("deactivate/activate: baja y alta manual guardan la entidad")
+    void deactivateAndActivateToggleSoftDelete() {
+        Specialty specialty = Specialty.builder().id(1L).specialtyCode(17).name("Sistemas").build();
+        when(specialtyRepository.findById(1L)).thenReturn(java.util.Optional.of(specialty));
+        when(specialtyRepository.softDelete(specialty)).thenCallRealMethod();
+        when(specialtyRepository.restore(specialty)).thenCallRealMethod();
+
+        service.deactivate(1L);
+        assertThat(specialty.isActive()).isFalse();
+        service.activate(1L);
+        assertThat(specialty.isActive()).isTrue();
     }
 
     @Test
@@ -59,6 +128,19 @@ class SpecialtyServiceImplTest {
     }
 
     @Test
+    @DisplayName("syncSpecialties: código repetido en la misma corrida inserta una sola vez")
+    void syncSpecialtiesInsertsDuplicatedCodeOnce() {
+        when(specialtyRepository.findAll()).thenReturn(List.of());
+        when(specialtyRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        SpecialtySyncCommand command = new SpecialtySyncCommand(5, "Sistemas", "Sist.");
+
+        int affected = service.syncSpecialties(List.of(command, command));
+
+        verify(specialtyRepository, times(1)).save(any(Specialty.class));
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("syncSpecialties: actualiza el nombre de la especialidad existente cuando cambió upstream")
     void syncSpecialtiesUpdatesRenamedSpecialty() {
         Specialty existing = sysacadSpecialty(5, "Sistemas", Hashes.sha256Hex("Sistemas", "Sist."));
@@ -69,6 +151,41 @@ class SpecialtyServiceImplTest {
         assertThat(existing.getName()).isEqualTo("Ing. Sistemas");
         assertThat(existing.getAbbreviation()).isEqualTo("Sist.");
         verify(specialtyRepository).save(existing);
+    }
+
+    @Test
+    @DisplayName("syncSpecialties: completa el nombre de la especialidad sin nombre pero no le quita la baja")
+    void syncSpecialtiesFillsNameButKeepsDeactivation() {
+        Specialty nameless = Specialty.builder().id(5L).specialtyCode(5).sysacadHash(null).build();
+        nameless.deactivate();
+        when(specialtyRepository.findAll()).thenReturn(List.of(nameless));
+
+        service.syncSpecialties(List.of(new SpecialtySyncCommand(5, "Ingeniería en Sistemas de Información", "ISI")));
+
+        assertThat(nameless.getName()).isEqualTo("Ingeniería en Sistemas de Información");
+        assertThat(nameless.isDeleted()).isTrue();
+    }
+
+    @Test
+    @DisplayName("syncSpecialties: pisa el stub con sysacad_hash nulo cuando llega la especialidad real")
+    void syncSpecialtiesOverwritesStubWithNullHash() {
+        Specialty stub = Specialty.builder()
+                .id(5L)
+                .specialtyCode(5)
+                .name("Especialidad 5")
+                .sysacadHash(null)
+                .build();
+        when(specialtyRepository.findAll()).thenReturn(List.of(stub));
+
+        int affected = service.syncSpecialties(
+                List.of(new SpecialtySyncCommand(5, "Ingeniería en Sistemas de Información", "Ing. Sist. Inf.")));
+
+        assertThat(stub.getName()).isEqualTo("Ingeniería en Sistemas de Información");
+        assertThat(stub.getAbbreviation()).isEqualTo("Ing. Sist. Inf.");
+        assertThat(stub.getSysacadHash())
+                .isEqualTo(Hashes.sha256Hex("Ingeniería en Sistemas de Información", "Ing. Sist. Inf."));
+        verify(specialtyRepository).save(stub);
+        assertThat(affected).isEqualTo(1);
     }
 
     @Test
@@ -126,5 +243,17 @@ class SpecialtyServiceImplTest {
                 .name(name)
                 .sysacadHash(hash)
                 .build();
+    }
+
+    @Test
+    @DisplayName("deactivate y activate publican CatalogAvailabilityChanged, una vez cada uno")
+    void deactivateAndActivatePublishCatalogAvailabilityChanged() {
+        when(specialtyRepository.findById(1L)).thenReturn(java.util.Optional.of(Specialty.builder().id(1L).specialtyCode(17).build()));
+        service.deactivate(1L);
+        verify(eventPublisher, org.mockito.Mockito.times(1))
+                .publishEvent(new ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged());
+        service.activate(1L);
+        verify(eventPublisher, org.mockito.Mockito.times(2))
+                .publishEvent(new ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged());
     }
 }

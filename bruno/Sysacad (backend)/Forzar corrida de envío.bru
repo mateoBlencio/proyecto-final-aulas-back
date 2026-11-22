@@ -1,0 +1,19 @@
+meta {
+  name: Forzar corrida de envío
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/v1/sysacad/write/run
+  body: none
+  auth: inherit
+}
+
+docs {
+  Ejecuta ahora una corrida del job de envío a SysAcad, con el modo de
+  escritura vigente (setting sysacad.write.mode), y devuelve el resultado, los
+  horarios a revisión, las clases sin aula y los errores. 409 si el modo está
+  en OFF o si hay un sync o una corrida de envío en curso. Requiere
+  PERM_SYSACAD_SYNC y siga.sysacad.enabled=true en el backend.
+}

@@ -2,28 +2,37 @@ package ar.edu.utn.frc.siga.events.service.impl;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.events.EventTestData;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceAuditRefDto;
 import ar.edu.utn.frc.siga.events.exception.OccurrenceAlreadyPastException;
 import ar.edu.utn.frc.siga.events.model.AcademicEvent;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
-import ar.edu.utn.frc.siga.events.model.OccurrenceVacated;
+import ar.edu.utn.frc.siga.events.model.ReleaseReason;
+import ar.edu.utn.frc.siga.events.service.command.OccurrenceRelease;
+import ar.edu.utn.frc.siga.common.exception.InvalidSelectionException;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.events.repository.SuspendedEventRepository;
 import ar.edu.utn.frc.siga.events.validator.EventScheduleValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.http.HttpStatus;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -38,13 +47,16 @@ class OccurrenceServiceImplTest {
     @Mock
     private EventScheduleValidator eventScheduleValidator;
     @Mock
-    private ApplicationEventPublisher eventPublisher;
+    private SuspendedEventRepository suspendedEventRepository;
+    @Mock
+    private EventLabels eventLabels;
 
     private OccurrenceServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new OccurrenceServiceImpl(occurrenceRepository, eventScheduleValidator, eventPublisher);
+        service = new OccurrenceServiceImpl(occurrenceRepository, eventScheduleValidator, suspendedEventRepository,
+                eventLabels);
     }
 
     private Occurrence occurrence(Long id, OccurrenceStatus status) {
@@ -54,61 +66,293 @@ class OccurrenceServiceImplTest {
     }
 
     @Test
-    @DisplayName("release: pasa a ROOM_RELEASED y publica OccurrenceVacated")
-    void releaseCambiaEstadoYPublicaEvento() {
-        Occurrence occurrence = occurrence(10L, OccurrenceStatus.NEEDS_ROOM);
-        when(occurrenceRepository.findById(10L)).thenReturn(Optional.of(occurrence));
+    @DisplayName("findAuditRefs arma fecha, evento y etiqueta con una consulta de proyección y una de etiquetas, sin cargar ocurrencias")
+    void findAuditRefs_mapsProjectionWithEventLabel() {
+        OccurrenceRepository.OccurrenceDate first = org.mockito.Mockito.mock(OccurrenceRepository.OccurrenceDate.class);
+        OccurrenceRepository.OccurrenceDate second = org.mockito.Mockito.mock(OccurrenceRepository.OccurrenceDate.class);
+        when(first.getId()).thenReturn(1L);
+        when(first.getDate()).thenReturn(LocalDate.of(2026, 3, 4));
+        when(first.getEventId()).thenReturn(10L);
+        when(second.getId()).thenReturn(2L);
+        when(second.getDate()).thenReturn(LocalDate.of(2026, 12, 31));
+        when(second.getEventId()).thenReturn(11L);
+        when(occurrenceRepository.findDatesByIdIn(List.of(1L, 2L, 3L))).thenReturn(List.of(first, second));
+        when(eventLabels.labelsOfEventIds(any())).thenReturn(java.util.Map.of(10L, "Álgebra (1K1)"));
 
-        service.release(10L);
+        java.util.Map<Long, OccurrenceAuditRefDto> refs = service.findAuditRefs(List.of(1L, 2L, 3L));
+
+        assertThat(refs).containsOnly(
+                java.util.Map.entry(1L, new OccurrenceAuditRefDto(1L, 10L, "Álgebra (1K1)", LocalDate.of(2026, 3, 4))),
+                java.util.Map.entry(2L, new OccurrenceAuditRefDto(2L, 11L, null, LocalDate.of(2026, 12, 31))));
+        verify(occurrenceRepository, never()).findAllById(any());
+        verify(eventLabels, org.mockito.Mockito.times(1)).labelsOfEventIds(any());
+    }
+
+
+
+    @Test
+    @DisplayName("requestRoom: limpia estado, motivo y nota, conserva el aula anterior y no publica eventos")
+    void requestRoomLimpiaMotivoYConservaAulaAnterior() {
+        Occurrence occurrence = occurrence(10L, OccurrenceStatus.ROOM_RELEASED);
+        occurrence.setReleaseReason(ReleaseReason.VIRTUAL_CLASS);
+        occurrence.setReleaseNote("cursado virtual");
+        occurrence.setPreviousClassroomId(7L);
+        when(occurrenceRepository.findAllById(java.util.Set.of(10L))).thenReturn(List.of(occurrence));
+
+        service.requestRoom(List.of(10L));
+
+        assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM);
+        assertThat(occurrence.getReleaseReason()).isNull();
+        assertThat(occurrence.getReleaseNote()).isNull();
+        assertThat(occurrence.getPreviousClassroomId()).isEqualTo(7L);
+    }
+
+    @Test
+    @DisplayName("release en lote: escribe estado, motivo, nota y el aula anterior de cada ocurrencia")
+    void releaseLoteEscribeMotivoNotaYAulaAnterior() {
+        Occurrence first = occurrence(10L, OccurrenceStatus.NEEDS_ROOM);
+        Occurrence second = occurrence(11L, OccurrenceStatus.NEEDS_ROOM);
+        when(occurrenceRepository.findAllById(java.util.Set.of(10L, 11L))).thenReturn(List.of(first, second));
+
+        service.release(List.of(new OccurrenceRelease(10L, 5L), new OccurrenceRelease(11L, 6L)),
+                ReleaseReason.VIRTUAL_CLASS, "cursado virtual");
+
+        assertThat(first.getStatus()).isEqualTo(OccurrenceStatus.ROOM_RELEASED);
+        assertThat(first.getReleaseReason()).isEqualTo(ReleaseReason.VIRTUAL_CLASS);
+        assertThat(first.getReleaseNote()).isEqualTo("cursado virtual");
+        assertThat(first.getPreviousClassroomId()).isEqualTo(5L);
+        assertThat(second.getStatus()).isEqualTo(OccurrenceStatus.ROOM_RELEASED);
+        assertThat(second.getPreviousClassroomId()).isEqualTo(6L);
+    }
+
+    @Test
+    @DisplayName("release en lote: un aula anterior nula no pisa la que la ocurrencia ya tenia guardada")
+    void releaseLoteConAulaAnteriorNulaConservaLaExistente() {
+        Occurrence occurrence = occurrence(10L, OccurrenceStatus.NEEDS_ROOM);
+        occurrence.setPreviousClassroomId(7L);
+        when(occurrenceRepository.findAllById(java.util.Set.of(10L))).thenReturn(List.of(occurrence));
+
+        service.release(List.of(new OccurrenceRelease(10L, null)), ReleaseReason.CANCELLED, null);
 
         assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.ROOM_RELEASED);
-        verify(eventPublisher).publishEvent(eq(new OccurrenceVacated(10L)));
+        assertThat(occurrence.getPreviousClassroomId()).isEqualTo(7L);
     }
 
+
     @Test
-    @DisplayName("release: ocurrencia pasada → propaga la excepción del validator y no publica el evento")
-    void releaseOcurrenciaPasadaNoPublica() {
+    @DisplayName("release en lote: motivo nulo -> 400 y no toca ninguna ocurrencia")
+    void releaseLoteMotivoNulo() {
         Occurrence occurrence = occurrence(10L, OccurrenceStatus.NEEDS_ROOM);
-        when(occurrenceRepository.findById(10L)).thenReturn(Optional.of(occurrence));
-        doThrow(new OccurrenceAlreadyPastException("ya ocurrió"))
-                .when(eventScheduleValidator).validateNotPast(occurrence);
 
-        assertThatThrownBy(() -> service.release(10L)).isInstanceOf(OccurrenceAlreadyPastException.class);
+        assertThatThrownBy(() -> service.release(List.of(new OccurrenceRelease(10L, null)), null, "nota"))
+                .isInstanceOfSatisfying(InvalidSelectionException.class,
+                        e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
 
-        verify(eventPublisher, never()).publishEvent(org.mockito.ArgumentMatchers.any());
         assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM);
+        verify(occurrenceRepository, never()).findAllById(any());
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"   "})
+    @DisplayName("release en lote: OTHER sin nota (nula, vacia o en blanco) -> 400")
+    void releaseLoteOtherSinNota(String note) {
+        assertThatThrownBy(() -> service.release(List.of(new OccurrenceRelease(10L, null)), ReleaseReason.OTHER, note))
+                .isInstanceOfSatisfying(InvalidSelectionException.class,
+                        e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST))
+                .hasMessage("El motivo Otro requiere una nota.");
+
+        verify(occurrenceRepository, never()).findAllById(any());
     }
 
     @Test
-    @DisplayName("release: ocurrencia inexistente → ResourceNotFoundException")
-    void releaseOcurrenciaInexistente() {
-        when(occurrenceRepository.findById(99L)).thenReturn(Optional.empty());
+    @DisplayName("release en lote: OTHER con nota se acepta")
+    void releaseLoteOtherConNota() {
+        Occurrence occurrence = occurrence(10L, OccurrenceStatus.NEEDS_ROOM);
+        when(occurrenceRepository.findAllById(java.util.Set.of(10L))).thenReturn(List.of(occurrence));
 
-        assertThatThrownBy(() -> service.release(99L)).isInstanceOf(ResourceNotFoundException.class);
+        service.release(List.of(new OccurrenceRelease(10L, null)), ReleaseReason.OTHER, "motivo libre");
+
+        assertThat(occurrence.getReleaseReason()).isEqualTo(ReleaseReason.OTHER);
+        assertThat(occurrence.getReleaseNote()).isEqualTo("motivo libre");
     }
 
     @Test
-    @DisplayName("requestRoom: vuelve a NEEDS_ROOM (no publica ningún evento)")
-    void requestRoomVuelveANeedsRoom() {
-        Occurrence occurrence = occurrence(10L, OccurrenceStatus.ROOM_RELEASED);
-        when(occurrenceRepository.findById(10L)).thenReturn(Optional.of(occurrence));
+    @DisplayName("release en lote: id inexistente -> 404 y las existentes quedan sin tocar")
+    void releaseLoteIdInexistente() {
+        Occurrence existing = occurrence(10L, OccurrenceStatus.NEEDS_ROOM);
+        when(occurrenceRepository.findAllById(java.util.Set.of(10L, 99L))).thenReturn(List.of(existing));
 
-        service.requestRoom(10L);
+        assertThatThrownBy(() -> service.release(
+                List.of(new OccurrenceRelease(10L, null), new OccurrenceRelease(99L, null)),
+                ReleaseReason.VIRTUAL_CLASS, null))
+                .isInstanceOfSatisfying(ResourceNotFoundException.class,
+                        e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
 
-        assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM);
-        verify(eventPublisher, never()).publishEvent(org.mockito.ArgumentMatchers.any());
+        assertThat(existing.getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM);
+    }
+
+    @Test
+    @DisplayName("release en lote: una ocurrencia pasada -> 409 y ninguna del lote cambia de estado")
+    void releaseLotePasadaRechazaTodoElLote() {
+        Occurrence future = occurrence(10L, OccurrenceStatus.NEEDS_ROOM);
+        Occurrence past = occurrence(11L, OccurrenceStatus.NEEDS_ROOM);
+        when(occurrenceRepository.findAllById(java.util.Set.of(10L, 11L))).thenReturn(List.of(future, past));
+        org.mockito.Mockito.lenient().doThrow(new OccurrenceAlreadyPastException("ya ocurrió"))
+                .when(eventScheduleValidator).validateNotPast(past);
+
+        assertThatThrownBy(() -> service.release(
+                List.of(new OccurrenceRelease(10L, 5L), new OccurrenceRelease(11L, 6L)),
+                ReleaseReason.CANCELLED, null))
+                .isInstanceOfSatisfying(OccurrenceAlreadyPastException.class,
+                        e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.CONFLICT));
+
+        assertThat(future.getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM);
+        assertThat(future.getReleaseReason()).isNull();
+        assertThat(future.getPreviousClassroomId()).isNull();
+        assertThat(past.getStatus()).isEqualTo(OccurrenceStatus.NEEDS_ROOM);
     }
 
     @Test
     @DisplayName("requestRoom: ocurrencia pasada → propaga la excepción del validator")
     void requestRoomOcurrenciaPasada() {
         Occurrence occurrence = occurrence(10L, OccurrenceStatus.ROOM_RELEASED);
-        when(occurrenceRepository.findById(10L)).thenReturn(Optional.of(occurrence));
+        when(occurrenceRepository.findAllById(java.util.Set.of(10L))).thenReturn(List.of(occurrence));
         doThrow(new OccurrenceAlreadyPastException("ya ocurrió"))
                 .when(eventScheduleValidator).validateNotPast(occurrence);
 
-        assertThatThrownBy(() -> service.requestRoom(10L)).isInstanceOf(OccurrenceAlreadyPastException.class);
+        assertThatThrownBy(() -> service.requestRoom(List.of(10L))).isInstanceOf(OccurrenceAlreadyPastException.class);
         assertThat(occurrence.getStatus()).isEqualTo(OccurrenceStatus.ROOM_RELEASED);
+    }
+
+    @Test
+    @DisplayName("createSimultaneous: crea count ocurrencias con roomSlot correlativo y mirrorOfOccurrenceId a la principal")
+    void createSimultaneousCreaOcurrenciasEnlazadas() {
+        Occurrence principal = occurrence(10L, OccurrenceStatus.NEEDS_ROOM);
+        when(occurrenceRepository.findById(10L)).thenReturn(Optional.of(principal));
+        when(occurrenceRepository.findByEvent_IdAndDate(1L, LocalDate.of(2026, 3, 2)))
+                .thenReturn(List.of(principal));
+        when(occurrenceRepository.saveAll(org.mockito.ArgumentMatchers.<List<Occurrence>>any()))
+                .thenAnswer(invocation -> {
+                    List<Occurrence> toSave = invocation.getArgument(0);
+                    List<Occurrence> saved = new java.util.ArrayList<>();
+                    long nextId = 100L;
+                    for (Occurrence o : toSave) {
+                        saved.add(Occurrence.builder()
+                                .id(nextId++)
+                                .event(o.getEvent())
+                                .date(o.getDate())
+                                .status(o.getStatus())
+                                .roomSlot(o.getRoomSlot())
+                                .mirrorOfOccurrenceId(o.getMirrorOfOccurrenceId())
+                                .build());
+                    }
+                    return saved;
+                });
+
+        List<Long> created = service.createSimultaneous(10L, 2);
+
+        assertThat(created).containsExactly(100L, 101L);
+        ArgumentCaptor<List<Occurrence>> captor = ArgumentCaptor.forClass(List.class);
+        verify(occurrenceRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).extracting(Occurrence::getRoomSlot).containsExactly(2, 3);
+        assertThat(captor.getValue()).extracting(Occurrence::getMirrorOfOccurrenceId).containsExactly(10L, 10L);
+        assertThat(captor.getValue()).extracting(Occurrence::getDate).containsExactly(
+                LocalDate.of(2026, 3, 2), LocalDate.of(2026, 3, 2));
+        assertThat(captor.getValue()).extracting(Occurrence::getStatus).containsExactly(
+                OccurrenceStatus.NEEDS_ROOM, OccurrenceStatus.NEEDS_ROOM);
+    }
+
+    @Test
+    @DisplayName("createSimultaneous: si ya hay ocurrencias simultáneas, sigue la numeración de roomSlot")
+    void createSimultaneousContinuaLaNumeracion() {
+        Occurrence principal = occurrence(10L, OccurrenceStatus.NEEDS_ROOM);
+        Occurrence existingMirror = Occurrence.builder()
+                .id(11L).event(principal.getEvent()).date(principal.getDate())
+                .status(OccurrenceStatus.NEEDS_ROOM).roomSlot(2).mirrorOfOccurrenceId(10L).build();
+        when(occurrenceRepository.findById(10L)).thenReturn(Optional.of(principal));
+        when(occurrenceRepository.findByEvent_IdAndDate(1L, LocalDate.of(2026, 3, 2)))
+                .thenReturn(List.of(principal, existingMirror));
+        when(occurrenceRepository.saveAll(org.mockito.ArgumentMatchers.<List<Occurrence>>any()))
+                .thenAnswer(invocation -> {
+                    List<Occurrence> toSave = invocation.getArgument(0);
+                    List<Occurrence> saved = new java.util.ArrayList<>();
+                    long nextId = 200L;
+                    for (Occurrence o : toSave) {
+                        saved.add(Occurrence.builder().id(nextId++).event(o.getEvent()).date(o.getDate())
+                                .status(o.getStatus()).roomSlot(o.getRoomSlot())
+                                .mirrorOfOccurrenceId(o.getMirrorOfOccurrenceId()).build());
+                    }
+                    return saved;
+                });
+
+        service.createSimultaneous(10L, 1);
+
+        ArgumentCaptor<List<Occurrence>> captor = ArgumentCaptor.forClass(List.class);
+        verify(occurrenceRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).extracting(Occurrence::getRoomSlot).containsExactly(3);
+    }
+
+    private Occurrence occurrenceOf(Long id, Long eventId, LocalDate date) {
+        AcademicEvent event = EventTestData.recurringEvent(eventId, DayOfWeek.MONDAY,
+                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 12, 31));
+        return EventTestData.occurrence(id, event, date, OccurrenceStatus.NEEDS_ROOM);
+    }
+
+    @Test
+    @DisplayName("findVisibleSlotsByEvents: excluye desde la fecha de baja del evento suspendido (inclusive) y conserva las anteriores")
+    void findVisibleSlotsByEventsExcluyeDesdeLaBaja() {
+        LocalDate baja = LocalDate.of(2026, 5, 11);
+        LocalDate from = LocalDate.of(2026, 3, 2);
+        when(occurrenceRepository.findByEvent_IdInAndDateGreaterThanEqual(java.util.Set.of(1L), from))
+                .thenReturn(List.of(occurrenceOf(10L, 1L, baja.minusWeeks(1)), occurrenceOf(11L, 1L, baja.minusDays(1)),
+                        occurrenceOf(12L, 1L, baja), occurrenceOf(13L, 1L, baja.plusDays(1)),
+                        occurrenceOf(14L, 1L, baja.plusWeeks(1))));
+        when(suspendedEventRepository.findAllSuspendedFrom()).thenReturn(java.util.Map.of(1L, baja));
+
+        var slots = service.findVisibleSlotsByEvents(java.util.Set.of(1L), from);
+
+        assertThat(slots).extracting(s -> s.occurrenceId()).containsExactly(10L, 11L);
+    }
+
+    @Test
+    @DisplayName("findVisibleSlotsByEvents: la baja de un evento no afecta a las ocurrencias de otro evento no suspendido")
+    void findVisibleSlotsByEventsConservaLosEventosNoSuspendidos() {
+        LocalDate baja = LocalDate.of(2026, 5, 11);
+        LocalDate from = LocalDate.of(2026, 3, 2);
+        when(occurrenceRepository.findByEvent_IdInAndDateGreaterThanEqual(java.util.Set.of(1L, 2L), from))
+                .thenReturn(List.of(occurrenceOf(10L, 1L, baja.plusWeeks(1)), occurrenceOf(20L, 2L, baja.plusWeeks(1))));
+        when(suspendedEventRepository.findAllSuspendedFrom()).thenReturn(java.util.Map.of(1L, baja));
+
+        var slots = service.findVisibleSlotsByEvents(java.util.Set.of(1L, 2L), from);
+
+        assertThat(slots).extracting(s -> s.occurrenceId()).containsExactly(20L);
+    }
+
+    @Test
+    @DisplayName("findVisibleSlotsByEvents: sin eventos suspendidos devuelve todas las ocurrencias desde 'from'")
+    void findVisibleSlotsByEventsSinSuspendidos() {
+        LocalDate from = LocalDate.of(2026, 3, 2);
+        when(occurrenceRepository.findByEvent_IdInAndDateGreaterThanEqual(java.util.Set.of(1L), from))
+                .thenReturn(List.of(occurrenceOf(10L, 1L, from), occurrenceOf(11L, 1L, from.plusWeeks(1))));
+        when(suspendedEventRepository.findAllSuspendedFrom()).thenReturn(java.util.Map.of());
+
+        var slots = service.findVisibleSlotsByEvents(java.util.Set.of(1L), from);
+
+        assertThat(slots).extracting(s -> s.occurrenceId()).containsExactly(10L, 11L);
+    }
+
+    @Test
+    @DisplayName("findSlotsByEvents con 'from' no filtra suspendidas: el filtro vive solo en findVisibleSlotsByEvents")
+    void findSlotsByEventsConFromNoFiltraSuspendidas() {
+        LocalDate from = LocalDate.of(2026, 3, 2);
+        when(occurrenceRepository.findByEvent_IdInAndDateGreaterThanEqual(java.util.Set.of(1L), from))
+                .thenReturn(List.of(occurrenceOf(10L, 1L, from.plusWeeks(10))));
+
+        var slots = service.findSlotsByEvents(java.util.Set.of(1L), from);
+
+        assertThat(slots).extracting(s -> s.occurrenceId()).containsExactly(10L);
+        verify(suspendedEventRepository, never()).findAllSuspendedFrom();
     }
 
     @Test

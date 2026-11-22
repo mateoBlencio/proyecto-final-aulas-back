@@ -1,0 +1,16 @@
+meta {
+  name: Aulas
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{sysacadUrl}}/api/data/views/Aulas
+  body: none
+  auth: none
+}
+
+docs {
+  Consulta directa a la vista Aulas de Sysacad. Los filtros van como query params por
+  nombre de columna; el orden con sort y direction (asc|desc).
+}

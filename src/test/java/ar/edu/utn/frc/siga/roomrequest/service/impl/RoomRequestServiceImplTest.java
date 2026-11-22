@@ -22,6 +22,9 @@ import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestRepository;
+import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl;
+import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl.Action;
+import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestLimitsValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,7 +41,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -61,12 +66,16 @@ class RoomRequestServiceImplTest {
     private RoomRequestComposer composer;
     @Mock
     private RoomRequestHandlers handlers;
+    @Mock
+    private RoomRequestAccessControl accessControl;
+    @Mock
+    private RoomRequestLimitsValidator limitsValidator;
 
     private RoomRequestServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new RoomRequestServiceImpl(repository, itemRepository, composer, handlers);
+        service = new RoomRequestServiceImpl(repository, itemRepository, composer, handlers, accessControl, limitsValidator);
     }
 
     @Test
@@ -87,7 +96,8 @@ class RoomRequestServiceImplTest {
         RoomRequestResponseDto result = service.create(dto);
 
         assertThat(result).isSameAs(response);
-        var order = inOrder(handler, repository, composer);
+        var order = inOrder(limitsValidator, handler, repository, composer);
+        order.verify(limitsValidator).validate(dto);
         order.verify(handler).validate(dto);
         order.verify(handler).assemble(dto);
         order.verify(repository).save(assembled);
@@ -110,64 +120,80 @@ class RoomRequestServiceImplTest {
     @Test
     @DisplayName("traduce el sort antes de consultar el repositorio y compone la página por batch")
     void translatesSortAndComposesPage() {
-        RoomRequestItemFilter filter = RoomRequestItemFilter.of(null, null, null, null, null, null, true);
+        RoomRequestItemFilter filter =
+                RoomRequestItemFilter.of(null, null, null, null, null, null, true, null, null, null, null);
         Pageable requested = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "startTime"));
 
         RoomRequestItem item = RoomRequestItem.builder().id(5L).build();
         RoomRequestItemRowDto row = new RoomRequestItemRowDto(
-                5L, null, null, null, null, null, null, null, null, null);
+                5L, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, List.of(Action.ASSIGN), false);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         when(itemRepository.findAll(ArgumentMatchers.<Specification<RoomRequestItem>>any(), pageableCaptor.capture()))
                 .thenAnswer(invocation -> new PageImpl<>(List.of(item), pageableCaptor.getValue(), 1));
-        when(composer.composeRows(List.of(item))).thenReturn(List.of(row));
+        RoomRequestAccessControl.Actor actor = new RoomRequestAccessControl.Actor(true, Set.of());
+        when(accessControl.resolveActor("subsecretaria@frc.utn.edu.ar")).thenReturn(actor);
+        when(accessControl.allowedActions(item, actor)).thenReturn(List.of(Action.ASSIGN));
+        Map<Long, List<Action>> expectedActions = Map.of(5L, List.of(Action.ASSIGN));
+        when(composer.composeRows(List.of(item), expectedActions)).thenReturn(List.of(row));
 
-        Page<RoomRequestItemRowDto> result = service.findItems(filter, requested);
+        Page<RoomRequestItemRowDto> result = service.findItems(filter, requested, "subsecretaria@frc.utn.edu.ar");
 
         assertThat(pageableCaptor.getValue().getSort().toList())
                 .extracting(Sort.Order::getProperty)
                 .containsExactly("startTime", "id");
         assertThat(result.getContent()).containsExactly(row);
         assertThat(result.getTotalElements()).isEqualTo(1);
+        verify(composer).composeRows(List.of(item), expectedActions);
+        verify(accessControl, times(1)).resolveActor("subsecretaria@frc.utn.edu.ar");
     }
 
     @Test
     @DisplayName("sort fuera de la whitelist: 400 antes de tocar el repositorio")
     void invalidSortNeverReachesRepository() {
-        RoomRequestItemFilter filter = RoomRequestItemFilter.of(null, null, null, null, null, null, true);
+        RoomRequestItemFilter filter =
+                RoomRequestItemFilter.of(null, null, null, null, null, null, true, null, null, null, null);
         Pageable requested = PageRequest.of(0, 20, Sort.by("teacherEmail"));
 
-        assertThatThrownBy(() -> service.findItems(filter, requested))
+        assertThatThrownBy(() -> service.findItems(filter, requested, "subsecretaria@frc.utn.edu.ar"))
                 .isInstanceOf(InvalidRoomRequestException.class);
 
         verifyNoInteractions(itemRepository, composer);
     }
 
     @Test
-    @DisplayName("countItemsByStatus: un conteo por cada estado del enum, en orden, sin tocar el composer")
+    @DisplayName("countItemsByStatus: una sola consulta agrupada; los estados sin filas salen en 0, en orden del enum")
     void countItemsByStatusReturnsOneEntryPerStatus() {
-        when(itemRepository.count(ArgumentMatchers.<Specification<RoomRequestItem>>any()))
-                .thenReturn(30L, 10L, 0L);
+        when(itemRepository.countByStatus(ArgumentMatchers.<Specification<RoomRequestItem>>any()))
+                .thenReturn(Map.of(RoomRequestStatus.NEW, 30L, RoomRequestStatus.RESOLVED, 2L));
 
-        List<RoomRequestItemStatusCountDto> result = service.countItemsByStatus(true);
+        List<RoomRequestItemStatusCountDto> result =
+                service.countItemsByStatus(true, null, null, "subsecretaria@frc.utn.edu.ar");
 
         assertThat(result).containsExactly(
-                new RoomRequestItemStatusCountDto(RoomRequestStatus.PENDING, 30L),
-                new RoomRequestItemStatusCountDto(RoomRequestStatus.PRE_APPROVED, 10L),
+                new RoomRequestItemStatusCountDto(RoomRequestStatus.NEW, 30L),
+                new RoomRequestItemStatusCountDto(RoomRequestStatus.DERIVED_TO_BUILDING, 0L),
+                new RoomRequestItemStatusCountDto(RoomRequestStatus.IN_EVALUATION, 0L),
+                new RoomRequestItemStatusCountDto(RoomRequestStatus.NOTIFIED, 0L),
+                new RoomRequestItemStatusCountDto(RoomRequestStatus.RESOLVED, 2L),
                 new RoomRequestItemStatusCountDto(RoomRequestStatus.CANCELLED, 0L));
-        verify(itemRepository, times(3)).count(ArgumentMatchers.<Specification<RoomRequestItem>>any());
+        verify(itemRepository, times(1)).countByStatus(ArgumentMatchers.<Specification<RoomRequestItem>>any());
         verifyNoInteractions(composer);
     }
 
     @Test
-    @DisplayName("findItemById: delega en el repositorio y en el composer")
+    @DisplayName("findItemById: delega en el repositorio y compone el detalle con las acciones permitidas")
     void findItemByIdDelegatesToRepositoryAndComposer() {
         RoomRequestItem item = RoomRequestItem.builder().id(5L).build();
-        RoomRequestItemDetailDto detail = new RoomRequestItemDetailDto(null, null);
+        RoomRequestItemDetailDto detail = new RoomRequestItemDetailDto(null, null, List.of(Action.CANCEL), List.of());
+        RoomRequestAccessControl.Actor actor = new RoomRequestAccessControl.Actor(true, Set.of());
         when(itemRepository.findWithRequestById(5L)).thenReturn(Optional.of(item));
-        when(composer.composeDetail(item)).thenReturn(detail);
+        when(accessControl.resolveActor("subsecretaria@frc.utn.edu.ar")).thenReturn(actor);
+        when(accessControl.allowedActions(item, actor)).thenReturn(List.of(Action.CANCEL));
+        when(composer.composeDetail(item, List.of(Action.CANCEL))).thenReturn(detail);
 
-        RoomRequestItemDetailDto result = service.findItemById(5L);
+        RoomRequestItemDetailDto result = service.findItemById(5L, "subsecretaria@frc.utn.edu.ar");
 
         assertThat(result).isSameAs(detail);
     }
@@ -177,7 +203,7 @@ class RoomRequestServiceImplTest {
     void findItemByIdNotFoundThrows() {
         when(itemRepository.findWithRequestById(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.findItemById(999L))
+        assertThatThrownBy(() -> service.findItemById(999L, "subsecretaria@frc.utn.edu.ar"))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verifyNoInteractions(composer);

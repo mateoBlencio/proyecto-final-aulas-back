@@ -1,0 +1,18 @@
+meta {
+  name: Vista previa de escritura
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/v1/sysacad/write/preview
+  body: none
+  auth: inherit
+}
+
+docs {
+  Calcula contra la base, sin llamar a SysAcad ni enviar nada, el aula de la
+  próxima clase de cada horario y la compara con el valor conocido. Lista los
+  horarios con decisión SEND, WAITING, NO_ROOM, NO_ROOM_AFTER_CANCEL o
+  NOT_SENDABLE, ordenados por la clase más cercana. Requiere PERM_SYSACAD_READ.
+}

@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.auth.security;
 
+import ar.edu.utn.frc.siga.auth.config.AuthDomainProperties;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +19,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(@NonNull String username) {
-        User user = userRepository.findByEmailAndEnabledTrue(username)
+        User user = userRepository.findByEmailAndEnabledTrue(AuthDomainProperties.normalizeEmail(username))
                 .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado: " + username));
 
         if (!Boolean.TRUE.equals(user.getEnabled())) {

@@ -30,8 +30,28 @@ public final class UniqueEvent extends AcademicEvent {
     private LocalDate date;
 
     @Setter
-    @Column(name = "descripcion")
+    @Column(name = "descripcion", length = 1000)
     private String description;
+
+    @Setter
+    @Column(name = "requiere_proyector", nullable = false)
+    private boolean requiresProjector;
+
+    @Setter
+    @Column(name = "requiere_computadoras", nullable = false)
+    private boolean requiresComputers;
+
+    @Setter
+    @Column(name = "cantidad_computadoras")
+    private Integer computerCount;
+
+    @Setter
+    @Column(name = "software_requerido")
+    private String requiredSoftware;
+
+    @Setter
+    @Column(name = "requiere_usuarios_examen")
+    private Boolean requiresExamUsers;
 
     @Setter
     @Enumerated(EnumType.STRING)

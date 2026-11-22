@@ -3,6 +3,11 @@ services:
     build: .
     profiles: ["dev"]
     restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       SPRING_PROFILES_ACTIVE: dev
       DB_HOST: ${DB_HOST_DEV}
@@ -13,19 +18,47 @@ services:
       DB_MIGRATION_USERNAME: ${DB_MIGRATION_USERNAME_DEV}
       DB_MIGRATION_PASSWORD: ${MIGRATION_USER_DEV_PASSWORD}
       JWT_SECRET: ${JWT_SECRET_DEV}
+      JWT_ISSUER: ${JWT_ISSUER:-siga}
+      JWT_AUDIENCE: ${JWT_AUDIENCE_DEV:-siga-api}
       JWT_ACCESS_EXPIRATION_MINUTES: ${JWT_ACCESS_EXPIRATION_MINUTES:-20}
       JWT_REFRESH_EXPIRATION_DAYS: ${JWT_REFRESH_EXPIRATION_DAYS:-30}
       JWT_REFRESH_GRACE_SECONDS: ${JWT_REFRESH_GRACE_SECONDS:-10}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS_DEV}
+      # OBLIGATORIO setear TRUSTED_PROXIES (IP de nginx) en el .env de dev y test; ver .env.example
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       SYSACAD_ENABLED: ${SYSACAD_ENABLED}
+      SYSACAD_WRITE_MODE: ${SYSACAD_WRITE_MODE_DEV:-OFF}
+      AUTOGESTION_MESSAGE_MODE: "OFF"
       SYSACAD_API_KEY: ${SYSACAD_API_KEY}
+      MAIL_HOST: ${MAIL_HOST_DEV}
+      MAIL_USERNAME: ${MAIL_USERNAME_DEV}
+      MAIL_PASSWORD: ${MAIL_PASSWORD_DEV}
+      MAIL_FROM: ${MAIL_FROM_DEV}
+      # Obligatorio con mails habilitados: si está vacío, el backend no arranca.
+      MAIL_REPLY_TO: ${MAIL_REPLY_TO}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=60
+      CONTEO_ENABLED: ${CONTEO_ENABLED}
+      CONTEO_URL: http://conteo-camara-dev:8000
+      CONTEO_API_KEY: ${CONTEO_API_KEY_DEV}
+      CONTEO_TIMEOUT_SEG: ${CONTEO_TIMEOUT_SEG:-90}
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+          cpus: "4"
     networks:
       - app-network
+      - conteo-dev-network
 
   backend-test:
     build: .
     profiles: ["test"]
     restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       SPRING_PROFILES_ACTIVE: test
       DB_HOST: ${DB_HOST_TEST}
@@ -36,15 +69,55 @@ services:
       DB_MIGRATION_USERNAME: ${DB_MIGRATION_USERNAME_TEST}
       DB_MIGRATION_PASSWORD: ${MIGRATION_USER_TEST_PASSWORD}
       JWT_SECRET: ${JWT_SECRET_TEST}
+      JWT_ISSUER: ${JWT_ISSUER:-siga}
+      JWT_AUDIENCE: ${JWT_AUDIENCE_TEST:-siga-api}
       JWT_ACCESS_EXPIRATION_MINUTES: ${JWT_ACCESS_EXPIRATION_MINUTES:-20}
       JWT_REFRESH_EXPIRATION_DAYS: ${JWT_REFRESH_EXPIRATION_DAYS:-30}
       JWT_REFRESH_GRACE_SECONDS: ${JWT_REFRESH_GRACE_SECONDS:-10}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS_TEST}
+      # OBLIGATORIO setear TRUSTED_PROXIES (IP de nginx) en el .env de dev y test; ver .env.example
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       SYSACAD_ENABLED: ${SYSACAD_ENABLED}
+      SYSACAD_WRITE_MODE: ${SYSACAD_WRITE_MODE_TEST:-OFF}
+      AUTOGESTION_MESSAGE_MODE: "OFF"
       SYSACAD_API_KEY: ${SYSACAD_API_KEY}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=60
+      CONTEO_ENABLED: ${CONTEO_ENABLED}
+      CONTEO_URL: http://conteo-camara-test:8000
+      CONTEO_API_KEY: ${CONTEO_API_KEY_TEST}
+      CONTEO_TIMEOUT_SEG: ${CONTEO_TIMEOUT_SEG:-90}
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+          cpus: "4"
+    networks:
+      - app-network
+      - conteo-test-network
+
+  mailhog-test:
+    image: mailhog/mailhog:v1.0.1
+    profiles: ["test"]
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    ports:
+      - "127.0.0.1:8026:8025"
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "1"
     networks:
       - app-network
 
 networks:
   app-network:
+    external: true
+  conteo-dev-network:
+    external: true
+  conteo-test-network:
     external: true

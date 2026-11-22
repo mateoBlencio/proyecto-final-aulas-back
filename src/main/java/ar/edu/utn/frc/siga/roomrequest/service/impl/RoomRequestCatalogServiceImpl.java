@@ -1,21 +1,30 @@
 package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
+import ar.edu.utn.frc.siga.academic.dto.SpecialtyFilter;
+import ar.edu.utn.frc.siga.academic.dto.SubjectCommissionFilter;
+import ar.edu.utn.frc.siga.academic.dto.SubjectFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectCommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.service.SpecialtyService;
 import ar.edu.utn.frc.siga.academic.service.SubjectCommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CommissionOptionDto;
+import ar.edu.utn.frc.siga.events.dto.response.ScheduleStatus;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CommissionScheduleDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassSlotDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestFormSettingsDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.SpecialtyOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.SubjectOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestCatalogMapper;
 import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestCatalogService;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
+import ar.edu.utn.frc.siga.common.security.SystemScope;
+import ar.edu.utn.frc.siga.settings.api.SettingsReader;
+import ar.edu.utn.frc.siga.settings.model.SettingKey;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,24 +42,30 @@ public class RoomRequestCatalogServiceImpl implements RoomRequestCatalogService 
     private final ClassroomService classroomService;
     private final ClassScheduleService classScheduleService;
     private final RoomRequestCatalogMapper mapper;
+    private final SettingsReader settingsReader;
 
     @Override
     @Transactional(readOnly = true)
-    public List<SpecialtyOptionDto> findSpecialties() {
-        return mapper.toSpecialtyOptions(specialtyService.findAll());
+    public List<SpecialtyOptionDto> findSpecialties(boolean onlyWithSubjects) {
+        return mapper.toSpecialtyOptions(
+                specialtyService.findAll(new SpecialtyFilter(null, null, onlyWithSubjects ? true : null),
+                        Pageable.unpaged(), false).getContent());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<SubjectOptionDto> findSubjectsBySpecialty(Integer specialtyCode) {
-        return mapper.toSubjectOptions(subjectService.findBySpecialtyCode(specialtyCode, false));
+        return mapper.toSubjectOptions(
+                subjectService.findAll(new SubjectFilter(null, null, specialtyCode, null),
+                        Pageable.unpaged(), false).getContent());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<CommissionOptionDto> findCommissionsBySubject(Long subjectId) {
         subjectService.findById(subjectId);
-        return subjectCommissionService.findBySubjectId(subjectId, false).stream()
+        return subjectCommissionService.findAll(new SubjectCommissionFilter(subjectId, null),
+                        Pageable.unpaged(), false).getContent().stream()
                 .map(SubjectCommissionResponseDto::commission)
                 .map(mapper::toOption)
                 .toList();
@@ -59,7 +74,9 @@ public class RoomRequestCatalogServiceImpl implements RoomRequestCatalogService 
     @Override
     @Transactional(readOnly = true)
     public List<ClassroomOptionDto> findClassrooms() {
-        return mapper.toClassroomOptions(classroomService.findAllAvailable());
+        return mapper.toClassroomOptions(SystemScope.call(classroomService::findAllAvailable)).stream()
+                .map(ClassroomOptionDto::withoutSysacad)
+                .toList();
     }
 
     @Override
@@ -72,7 +89,21 @@ public class RoomRequestCatalogServiceImpl implements RoomRequestCatalogService 
                 .map(slot -> new ClassSlotDto(slot.recurringEventId(), slot.dayOfWeek(),
                         slot.startTime(), slot.endTime()))
                 .toList();
+        ScheduleStatus status = slots.isEmpty() ? classScheduleService.scheduleStatus(subjectId, commissionId) : null;
         return new CommissionScheduleDto(slots,
-                classScheduleService.classDates(subjectId, commissionId, LocalDate.now()));
+                classScheduleService.classDates(subjectId, commissionId, LocalDate.now()),
+                classScheduleService.classDateSlots(subjectId, commissionId, LocalDate.now()),
+                status);
+    }
+
+    @Override
+    public RoomRequestFormSettingsDto findFormSettings() {
+        return new RoomRequestFormSettingsDto(
+                settingsReader.getTime(SettingKey.EVENTS_HOURS_START),
+                settingsReader.getTime(SettingKey.EVENTS_HOURS_END),
+                settingsReader.getInt(SettingKey.ROOM_REQUESTS_MAX_CLASSROOM_COUNT),
+                settingsReader.getInt(SettingKey.ROOM_REQUESTS_MAX_ESTIMATED),
+                settingsReader.getInt(SettingKey.ROOM_REQUESTS_MAX_COMPUTER_COUNT),
+                settingsReader.getInt(SettingKey.ROOM_REQUESTS_ALERT_DAYS_BEFORE_DATE));
     }
 }

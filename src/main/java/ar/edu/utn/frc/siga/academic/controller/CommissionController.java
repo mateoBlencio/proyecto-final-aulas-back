@@ -1,11 +1,17 @@
 package ar.edu.utn.frc.siga.academic.controller;
 
+import ar.edu.utn.frc.siga.academic.dto.CommissionFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
+import ar.edu.utn.frc.siga.common.search.FuzzySearch;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -16,26 +22,39 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 @Slf4j
 @RestController
 @RequestMapping("${siga.api.base-path}/commissions")
 @RequiredArgsConstructor
 @Tag(name = "Comisiones", description = "Consulta de comisiones")
-@PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+@PreAuthorize("hasAuthority('PERM_ACADEMIC_READ')")
 public class CommissionController {
 
     private final CommissionService commissionService;
 
     @GetMapping
     @Operation(summary = "Listar comisiones",
-               description = "Por defecto solo devuelve las activas; con includeDeactivated=true incluye "
-                       + "también las desactivadas.")
-    public ResponseEntity<List<CommissionResponseDto>> findAll(
-            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated) {
-        log.debug("GET /v1/commissions?includeDeactivated={}", includeDeactivated);
-        return ResponseEntity.ok(commissionService.findAll(includeDeactivated));
+               description = "Listado paginado con filtros opcionales por código de curso (contiene, "
+                       + "case-insensitive), período académico, código de especialidad y materia (solo comisiones "
+                       + "ofrecidas por alguna materia que cumpla). Con withoutSpecialty=true devuelve solo las comisiones que no "
+                       + "ofrece ninguna materia activa. Por defecto solo devuelve las activas; "
+                       + "con includeDeactivated=true incluye también las desactivadas. q: búsqueda de texto libre sobre código de curso, "
+                       + "nombre de sus especialidades, año y cuatrimestre del período.")
+    public ResponseEntity<Page<CommissionResponseDto>> findAll(
+            @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
+            @RequestParam(required = false) String courseCode,
+            @RequestParam(required = false) Long academicPeriodId,
+            @RequestParam(required = false) Integer specialtyCode,
+            @RequestParam(required = false) Long subjectId,
+            @RequestParam(required = false) Boolean withoutSpecialty,
+            @RequestParam(required = false, defaultValue = "false") boolean includeDeactivated,
+            @RequestParam(required = false) String q) {
+        log.debug("GET /v1/commissions?courseCode={}&academicPeriodId={}&specialtyCode={}&subjectId={}"
+                        + "&withoutSpecialty={}&includeDeactivated={}",
+                courseCode, academicPeriodId, specialtyCode, subjectId, withoutSpecialty, includeDeactivated);
+        CommissionFilter filter = new CommissionFilter(
+                courseCode, academicPeriodId, specialtyCode, subjectId, withoutSpecialty, q);
+        return ResponseEntity.ok(commissionService.findAll(filter, FuzzySearch.relevanceUnlessSorted(pageable, q, Sort.by(Sort.Direction.ASC, "id")), includeDeactivated));
     }
 
     @GetMapping("/{id}")
@@ -46,7 +65,7 @@ public class CommissionController {
     }
 
     @PutMapping("/{id}/activation")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ACADEMIC_ACTIVATE')")
     @Operation(summary = "Activar comisión",
                description = "Reactiva una comisión previamente desactivada (idempotente). "
                        + "204 si queda activa; 404 si la comisión no existe.")
@@ -58,7 +77,7 @@ public class CommissionController {
     }
 
     @DeleteMapping("/{id}/activation")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_ACADEMIC_ACTIVATE')")
     @Operation(summary = "Desactivar comisión",
                description = "Soft-delete idempotente. 204 si queda inactiva; 404 si la comisión no existe.")
     public ResponseEntity<Void> deactivate(@PathVariable Long id) {

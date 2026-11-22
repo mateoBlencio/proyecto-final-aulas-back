@@ -185,16 +185,22 @@ buildNumber.properties
 # Secrets
 .env
 
-# Mateo
-plans/
-AGENTS.md
-CLAUDE.md
-.mcp.json
+# Claude Code
+/plans/
+/AGENTS.md
+/CLAUDE.md
+.claude/settings.local.json
+.claude/plans/
+.claude/agent-memory-local/
+.claude/docs/
 
-# Claude
-.claude
+# graphify
+graphify-out/
+.graphifyignore
+.venv/
 
 # VSCode
 .vscode
 .codegraph
 CLAUDE.local.md
+.claude/*.graphify-bak

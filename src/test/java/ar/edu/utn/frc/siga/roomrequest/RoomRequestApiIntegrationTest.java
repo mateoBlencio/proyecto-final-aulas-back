@@ -67,7 +67,7 @@ class RoomRequestApiIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").exists())
-                .andExpect(jsonPath("$.items[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.items[0].status").value("NEW"))
                 .andExpect(jsonPath("$.items[0].durationMinutes").value(120));
     }
 
@@ -283,6 +283,30 @@ class RoomRequestApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("parcial en clase con fecha pasada: 400 antes de mirar el cursado")
+    void create_partialInClassWithPastDate_returnsBadRequest() throws Exception {
+        IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
+
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("date", LocalDate.now().minusDays(1).toString());
+        item.put("estimated", 40);
+        item.put("classroomCount", 1);
+        item.put("preferredClassroomIds", List.of());
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("type", "PARTIAL_EXAM_IN_CLASS");
+        body.put("requester", requester());
+        body.put("subjectId", academic.subjectId());
+        body.put("commissionId", academic.commissionId());
+        body.put("items", List.of(item));
+
+        anonymousMockMvc.perform(post("/v1/room-requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("catálogos sin autenticación: responden 200")
     void catalogs_withoutAuthentication_returnOk() throws Exception {
         IntegrationTestData.SubjectAndCommission academic = testData.materiaYComision();
@@ -305,6 +329,19 @@ class RoomRequestApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.slots").isArray())
                 .andExpect(jsonPath("$.dates").isArray());
+    }
+
+    @Test
+    @DisplayName("form-settings sin autenticación: ventana en HH:mm (sin segundos) y los cuatro valores numéricos")
+    void formSettings_withoutAuthentication_returnsHhMmAndNumbers() throws Exception {
+        anonymousMockMvc.perform(get("/v1/room-requests/catalog/form-settings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hoursStart").value(org.hamcrest.Matchers.matchesPattern("\\d{2}:\\d{2}")))
+                .andExpect(jsonPath("$.hoursEnd").value(org.hamcrest.Matchers.matchesPattern("\\d{2}:\\d{2}")))
+                .andExpect(jsonPath("$.maxClassroomCount").isNumber())
+                .andExpect(jsonPath("$.maxEstimated").isNumber())
+                .andExpect(jsonPath("$.maxComputerCount").isNumber())
+                .andExpect(jsonPath("$.alertDaysBeforeDate").isNumber());
     }
 
     @Test

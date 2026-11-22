@@ -1,7 +1,14 @@
 package ar.edu.utn.frc.siga.sysacad.internal.service.impl;
 
 import ar.edu.utn.frc.siga.common.util.Lazy;
+import ar.edu.utn.frc.siga.sysacad.api.SysacadAcademicEventDto;
+import ar.edu.utn.frc.siga.sysacad.api.SysacadAllocationDto;
+import ar.edu.utn.frc.siga.sysacad.api.SysacadCommissionDto;
+import ar.edu.utn.frc.siga.sysacad.api.SysacadHolidayDto;
+import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectCommissionDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectDto;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawCommission;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawHoliday;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSubject;
 import ar.edu.utn.frc.siga.sysacad.internal.mapper.SysacadCatalogMapper;
@@ -10,6 +17,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -32,6 +40,7 @@ class SysacadCatalogSnapshotTest {
                 Lazy.of(List::of),
                 Lazy.of(() -> schedules),
                 Lazy.of(() -> subjects),
+                Lazy.of(List::of),
                 mapper);
     }
 
@@ -82,6 +91,44 @@ class SysacadCatalogSnapshotTest {
                 List.of(scheduleRow(17, 94, 519, "C", 0), scheduleRow(17, 94, 519, "C", 2))).findSubjects();
 
         assertThat(subjects).containsExactly(new SysacadSubjectDto(17, 94, 519, "Análisis Matemático I", "2 Cuat."));
+    }
+
+    @Test
+    @DisplayName("findSubjects: sin MateriaDictado y HorarioCuatrimestre 0 en todas las filas es Anual (igual que en eventos)")
+    void findSubjectsSinDictadoConCeroEsAnual() {
+        List<SysacadSubjectDto> subjects = snapshot(
+                List.of(new RawSubject(17, 94, 519, "Análisis Matemático I")),
+                List.of(scheduleRow(17, 94, 519, null, 0), scheduleRow(17, 94, 519, null, 0))).findSubjects();
+
+        assertThat(subjects).containsExactly(new SysacadSubjectDto(17, 94, 519, "Análisis Matemático I", "Anual"));
+    }
+
+    @Test
+    @DisplayName("findSubjects: sin MateriaDictado, la mezcla {0,1} y {0,2} es Anual porque el 0 ya cubre ambos cuatrimestres")
+    void findSubjectsSinDictadoConCeroMasCuatrimestreEsAnual() {
+        List<SysacadSubjectDto> zeroAndFirst = snapshot(
+                List.of(new RawSubject(17, 94, 519, "Análisis Matemático I")),
+                List.of(scheduleRow(17, 94, 519, null, 0), scheduleRow(17, 94, 519, null, 1))).findSubjects();
+        List<SysacadSubjectDto> zeroAndSecond = snapshot(
+                List.of(new RawSubject(17, 94, 519, "Análisis Matemático I")),
+                List.of(scheduleRow(17, 94, 519, null, 0), scheduleRow(17, 94, 519, null, 2))).findSubjects();
+
+        assertThat(zeroAndFirst).extracting(SysacadSubjectDto::term).containsExactly("Anual");
+        assertThat(zeroAndSecond).extracting(SysacadSubjectDto::term).containsExactly("Anual");
+    }
+
+    @Test
+    @DisplayName("findSubjects: sin MateriaDictado y un solo cuatrimestre sin 0 toma ese cuatrimestre; los dos, null")
+    void findSubjectsSinDictadoSinCero() {
+        List<SysacadSubjectDto> single = snapshot(
+                List.of(new RawSubject(17, 94, 519, "Análisis Matemático I")),
+                List.of(scheduleRow(17, 94, 519, null, 2))).findSubjects();
+        List<SysacadSubjectDto> both = snapshot(
+                List.of(new RawSubject(17, 94, 519, "Análisis Matemático I")),
+                List.of(scheduleRow(17, 94, 519, null, 1), scheduleRow(17, 94, 519, null, 2))).findSubjects();
+
+        assertThat(single).extracting(SysacadSubjectDto::term).containsExactly("2 Cuat.");
+        assertThat(both).extracting(SysacadSubjectDto::term).containsExactly((String) null);
     }
 
     @Test
@@ -139,6 +186,7 @@ class SysacadCatalogSnapshotTest {
                     return List.of(scheduleRow(17, 94, 519, "A", 1));
                 }),
                 Lazy.of(() -> List.of(new RawSubject(17, 94, 519, "Análisis Matemático I"))),
+                Lazy.of(List::of),
                 mapper);
 
         snapshot.findSubjects();
@@ -147,5 +195,94 @@ class SysacadCatalogSnapshotTest {
         snapshot.findAllocations();
 
         assertThat(scheduleReads).hasValue(1);
+    }
+
+    @Test
+    @DisplayName("findHolidays: skips rows with an invalid date and keeps the valid ones")
+    void findHolidaysSkipsInvalidRows() {
+        SysacadCatalogSnapshot snapshot = new SysacadCatalogSnapshot(
+                Lazy.of(List::of),
+                Lazy.of(List::of),
+                Lazy.of(List::of),
+                Lazy.of(List::of),
+                Lazy.of(List::of),
+                Lazy.of(List::of),
+                Lazy.of(() -> List.of(
+                        new RawHoliday("20261208", "Inmaculada Concepción"),
+                        new RawHoliday("20261332", "Invalid"))),
+                mapper);
+
+        assertThat(snapshot.findHolidays())
+                .containsExactly(new SysacadHolidayDto(LocalDate.of(2026, 12, 8), "Inmaculada Concepción"));
+    }
+
+    private static RawSchedule scheduleWithCourse(String course) {
+        return new RawSchedule(course, 90, 805, 15, "Edif. Ing.Possetto",
+                2, 0, "A", "A",
+                "10:30", "12:45", "10:30-12:45", 135,
+                17, "Ingeniería en Sistemas de Información", 94, 519, "Sistemas de Representación", 30);
+    }
+
+    @Test
+    @DisplayName("findCommissions: las filas con código de curso inválido no aparecen y las demás se normalizan")
+    void findCommissionsFiltraCodigosInvalidos() {
+        SysacadCatalogSnapshot snapshot = new SysacadCatalogSnapshot(
+                Lazy.of(List::of), Lazy.of(List::of), Lazy.of(List::of),
+                Lazy.of(() -> List.of(
+                        new RawCommission("...", 17, 94, 519, 2026, 10),
+                        new RawCommission(null, 17, 94, 519, 2026, 10),
+                        new RawCommission("5D1.", 17, 94, 519, 2026, 10))),
+                Lazy.of(List::of), Lazy.of(List::of), Lazy.of(List::of), mapper);
+
+        assertThat(snapshot.findCommissions())
+                .containsExactly(new SysacadCommissionDto("5D1", 17, 94, 519, 2026, 10));
+    }
+
+    @Test
+    @DisplayName("findSubjectCommissions: las filas con código de curso inválido no aparecen y las demás se normalizan")
+    void findSubjectCommissionsFiltraCodigosInvalidos() {
+        List<SysacadSubjectCommissionDto> result = snapshot(
+                List.of(),
+                List.of(scheduleWithCourse("..."), scheduleWithCourse(null), scheduleWithCourse("5D1."))
+        ).findSubjectCommissions();
+
+        assertThat(result).containsExactly(new SysacadSubjectCommissionDto("5D1", 17, 94, 519, 30));
+    }
+
+    @Test
+    @DisplayName("findAcademicEvents y findAllocations: las filas con código de curso inválido no aparecen")
+    void findEventsYAllocationsFiltranCodigosInvalidos() {
+        SysacadCatalogSnapshot snapshot = snapshot(
+                List.of(),
+                List.of(scheduleWithCourse("..."), scheduleWithCourse(null), scheduleWithCourse("5D1.")));
+
+        assertThat(snapshot.findAcademicEvents()).extracting(SysacadAcademicEventDto::courseCode)
+                .containsExactly("5D1");
+        assertThat(snapshot.findAllocations()).extracting(SysacadAllocationDto::courseCode)
+                .containsExactly("5D1");
+    }
+
+    @Test
+    @DisplayName("findCommissions: avisa los códigos distintos que normalizan al mismo y conserva las filas")
+    void findCommissionsAvisaColisiones() {
+        Logger logger = (Logger) LoggerFactory.getLogger(SysacadCatalogMapper.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        List<SysacadCommissionDto> commissions;
+        try {
+            commissions = new SysacadCatalogSnapshot(
+                    Lazy.of(List::of), Lazy.of(List::of), Lazy.of(List::of),
+                    Lazy.of(() -> List.of(
+                            new RawCommission("1K1", 17, 94, 519, 2026, 10),
+                            new RawCommission("1 K1", 17, 94, 519, 2026, 10))),
+                    Lazy.of(List::of), Lazy.of(List::of), Lazy.of(List::of), mapper).findCommissions();
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        assertThat(commissions).hasSize(2);
+        assertThat(appender.list).extracting(ILoggingEvent::getFormattedMessage)
+                .containsExactly("Códigos de curso distintos normalizan a '1K1': [1 K1, 1K1]");
     }
 }

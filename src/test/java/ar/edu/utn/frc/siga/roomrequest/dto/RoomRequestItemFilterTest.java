@@ -19,7 +19,7 @@ class RoomRequestItemFilterTest {
     @DisplayName("includePast=false y dateFrom pasado: se pisa con hoy")
     void includePastFalsePastDateFromIsFlooredToToday() {
         RoomRequestItemFilter filter = RoomRequestItemFilter.of(
-                null, null, null, null, TODAY.minusDays(30), null, false);
+                null, null, null, null, TODAY.minusDays(30), null, false, null, null, null, null);
 
         assertThat(filter.dateFrom()).isEqualTo(TODAY);
     }
@@ -27,7 +27,7 @@ class RoomRequestItemFilterTest {
     @Test
     @DisplayName("includePast=false y dateFrom null: también cae en hoy")
     void includePastFalseNullDateFromDefaultsToToday() {
-        RoomRequestItemFilter filter = RoomRequestItemFilter.of(null, null, null, null, null, null, false);
+        RoomRequestItemFilter filter = RoomRequestItemFilter.of(null, null, null, null, null, null, false, null, null, null, null);
 
         assertThat(filter.dateFrom()).isEqualTo(TODAY);
     }
@@ -37,7 +37,7 @@ class RoomRequestItemFilterTest {
     void includePastFalseFutureDateFromIsKept() {
         LocalDate future = TODAY.plusDays(10);
 
-        RoomRequestItemFilter filter = RoomRequestItemFilter.of(null, null, null, null, future, null, false);
+        RoomRequestItemFilter filter = RoomRequestItemFilter.of(null, null, null, null, future, null, false, null, null, null, null);
 
         assertThat(filter.dateFrom()).isEqualTo(future);
     }
@@ -47,7 +47,7 @@ class RoomRequestItemFilterTest {
     void includePastTrueKeepsPastDateFrom() {
         LocalDate past = TODAY.minusDays(30);
 
-        RoomRequestItemFilter filter = RoomRequestItemFilter.of(null, null, null, null, past, null, true);
+        RoomRequestItemFilter filter = RoomRequestItemFilter.of(null, null, null, null, past, null, true, null, null, null, null);
 
         assertThat(filter.dateFrom()).isEqualTo(past);
     }
@@ -55,7 +55,7 @@ class RoomRequestItemFilterTest {
     @Test
     @DisplayName("includePast=true y dateFrom null: no hay piso, queda null")
     void includePastTrueNullDateFromStaysNull() {
-        RoomRequestItemFilter filter = RoomRequestItemFilter.of(null, null, null, null, null, null, true);
+        RoomRequestItemFilter filter = RoomRequestItemFilter.of(null, null, null, null, null, null, true, null, null, null, null);
 
         assertThat(filter.dateFrom()).isNull();
     }
@@ -64,14 +64,14 @@ class RoomRequestItemFilterTest {
     @DisplayName("dateTo anterior al dateFrom efectivo: InvalidDateRangeException")
     void dateToBeforeEffectiveDateFromThrows() {
         assertThatThrownBy(() -> RoomRequestItemFilter.of(
-                null, null, null, null, TODAY, TODAY.minusDays(1), false))
+                null, null, null, null, TODAY, TODAY.minusDays(1), false, null, null, null, null))
                 .isInstanceOf(InvalidDateRangeException.class);
     }
 
     @Test
     @DisplayName("dateTo igual al dateFrom efectivo: no rompe (rango de un solo día)")
     void dateToEqualToEffectiveDateFromDoesNotThrow() {
-        RoomRequestItemFilter filter = RoomRequestItemFilter.of(null, null, null, null, TODAY, TODAY, false);
+        RoomRequestItemFilter filter = RoomRequestItemFilter.of(null, null, null, null, TODAY, TODAY, false, null, null, null, null);
 
         assertThat(filter.dateTo()).isEqualTo(TODAY);
     }
@@ -81,7 +81,7 @@ class RoomRequestItemFilterTest {
     void dateToWithoutEffectiveDateFromDoesNotThrow() {
         LocalDate to = TODAY.plusDays(5);
 
-        RoomRequestItemFilter filter = RoomRequestItemFilter.of(null, null, null, null, null, to, true);
+        RoomRequestItemFilter filter = RoomRequestItemFilter.of(null, null, null, null, null, to, true, null, null, null, null);
 
         assertThat(filter.dateFrom()).isNull();
         assertThat(filter.dateTo()).isEqualTo(to);

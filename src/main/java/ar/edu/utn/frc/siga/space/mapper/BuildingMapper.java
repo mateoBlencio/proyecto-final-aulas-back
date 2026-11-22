@@ -6,9 +6,13 @@ import ar.edu.utn.frc.siga.space.model.Building;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-@Mapper(config = CentralMapperConfig.class)
+@Mapper(config = CentralMapperConfig.class, uses = SpaceActionFlags.class)
 public interface BuildingMapper {
 
     @Mapping(target = "active", expression = "java(building.isActive())")
+    @Mapping(target = "unavailableReason", expression = "java(building.unavailableReason())")
+    @Mapping(target = "currentInSysacad", expression = "java(building.isCurrentInSysacad())")
+    @Mapping(target = "canActivate", source = "id", qualifiedByName = "canActivateBuilding")
+    @Mapping(target = "canCreateClassroom", source = ".", qualifiedByName = "canCreateClassroom")
     BuildingResponseDto toDto(Building building);
 }

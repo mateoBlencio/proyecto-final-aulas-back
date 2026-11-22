@@ -42,6 +42,10 @@ public class SettingsCatalogProperties {
         return definitionFor(key).getMax();
     }
 
+    public List<String> options(SettingKey key) {
+        return definitionFor(key).getOptions();
+    }
+
     private Definition definitionFor(SettingKey key) {
         return definitions.stream()
                 .filter(definition -> key.getKey().equals(definition.getKey()))
@@ -57,5 +61,6 @@ public class SettingsCatalogProperties {
         private String defaultValue;
         private String min;
         private String max;
+        private List<String> options = List.of();
     }
 }

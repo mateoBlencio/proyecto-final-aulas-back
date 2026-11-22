@@ -1,0 +1,18 @@
+meta {
+  name: Estado del envío
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/v1/sysacad/write/status
+  body: none
+  auth: inherit
+}
+
+docs {
+  Modo de escritura, inicio, fin y resultado de la última corrida, última
+  lectura de la vista, caída desde, pausado hasta, último error y cantidad de
+  horarios en revisión y en espera. Sirve para detectar un job detenido.
+  Requiere PERM_SYSACAD_READ.
+}

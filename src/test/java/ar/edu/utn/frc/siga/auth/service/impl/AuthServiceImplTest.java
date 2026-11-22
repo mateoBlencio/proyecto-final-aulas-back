@@ -6,7 +6,6 @@ import ar.edu.utn.frc.siga.auth.dto.request.RefreshTokenRequest;
 import ar.edu.utn.frc.siga.auth.dto.response.TokenResponse;
 import ar.edu.utn.frc.siga.auth.exception.InvalidCredentialsException;
 import ar.edu.utn.frc.siga.auth.exception.LoginRateLimitExceededException;
-import ar.edu.utn.frc.siga.auth.model.Role;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import ar.edu.utn.frc.siga.auth.security.JwtService;
@@ -20,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -27,12 +27,14 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 
+import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -71,7 +73,7 @@ class AuthServiceImplTest {
     }
 
     private User user(String email) {
-        return User.builder().id(1L).email(email).roles(Set.of(Role.SUBSECRETARIA)).build();
+        return User.builder().id(1L).email(email).roleAssignments(List.of()).build();
     }
 
     @Test
@@ -79,14 +81,14 @@ class AuthServiceImplTest {
     void loginFeliz() {
         LoginRequest request = loginRequest("user@frc.utn.edu.ar");
         when(authDomainProperties.isAllowedEmail("user@frc.utn.edu.ar")).thenReturn(true);
-        when(loginRateLimiter.isRateLimited(any(), any())).thenReturn(false);
+        when(loginRateLimiter.isRateLimited(any(), any(), any())).thenReturn(false);
         SecurityUser securityUser = SecurityUser.fromUser(user("user@frc.utn.edu.ar"));
         Authentication authentication = new UsernamePasswordAuthenticationToken(securityUser, null);
         when(authenticationManager.authenticate(any())).thenReturn(authentication);
         User user = user("user@frc.utn.edu.ar");
         when(userRepository.findByEmailAndEnabledTrue("user@frc.utn.edu.ar")).thenReturn(Optional.of(user));
         when(refreshTokenService.issue(user)).thenReturn(new IssuedRefreshToken("raw-token", 3600));
-        when(jwtService.generateAccessToken(any(), any())).thenReturn("access-token");
+        when(jwtService.generateAccessToken(any())).thenReturn("access-token");
         when(jwtService.getAccessExpirationSeconds()).thenReturn(1200L);
 
         TokenResponse result = service.login(request, httpRequest);
@@ -94,8 +96,8 @@ class AuthServiceImplTest {
         assertThat(result.getAccessToken()).isEqualTo("access-token");
         assertThat(result.getRefreshToken()).isEqualTo("raw-token");
         assertThat(result.getEmail()).isEqualTo("user@frc.utn.edu.ar");
-        verify(loginRateLimiter).recordSuccess("user@frc.utn.edu.ar");
-        verify(loginRateLimiter, never()).recordFailure(any(), any());
+        verify(loginRateLimiter).recordSuccess(eq("user@frc.utn.edu.ar"), any());
+        verify(loginRateLimiter, never()).recordFailure(any(), any(), any());
     }
 
     @Test
@@ -106,7 +108,65 @@ class AuthServiceImplTest {
         assertThatThrownBy(() -> service.login(loginRequest("ajeno@gmail.com"), httpRequest))
                 .isInstanceOf(InvalidCredentialsException.class);
 
-        verify(loginRateLimiter, never()).isRateLimited(any(), any());
+        verify(loginRateLimiter, never()).isRateLimited(any(), any(), any());
+        verify(authenticationManager, never()).authenticate(any());
+    }
+
+    @Test
+    @DisplayName("login con AuthDomainProperties real: subdominio institucional pasa el filtro y autentica")
+    void loginSubdominioInstitucionalConDominioReal() {
+        AuthServiceImpl serviceConDominioReal = new AuthServiceImpl(authenticationManager, userRepository,
+                jwtService, refreshTokenService, loginRateLimiter, new AuthDomainProperties());
+        String email = "jperez@sistemas.frc.utn.edu.ar";
+        when(loginRateLimiter.isRateLimited(any(), any(), any())).thenReturn(false);
+        SecurityUser securityUser = SecurityUser.fromUser(user(email));
+        when(authenticationManager.authenticate(any()))
+                .thenReturn(new UsernamePasswordAuthenticationToken(securityUser, null));
+        User user = user(email);
+        when(userRepository.findByEmailAndEnabledTrue(email)).thenReturn(Optional.of(user));
+        when(refreshTokenService.issue(user)).thenReturn(new IssuedRefreshToken("raw-token", 3600));
+        when(jwtService.generateAccessToken(email)).thenReturn("access-token");
+
+        TokenResponse result = serviceConDominioReal.login(loginRequest(email), httpRequest);
+
+        assertThat(result.getEmail()).isEqualTo(email);
+        assertThat(result.getAccessToken()).isEqualTo("access-token");
+        verify(authenticationManager).authenticate(any());
+    }
+
+    @Test
+    @DisplayName("login: email con espacios y mayúsculas → valida, autentica, limita y busca con el email normalizado")
+    void loginNormalizaEmail() {
+        String normalized = "jperez@sistemas.frc.utn.edu.ar";
+        when(authDomainProperties.isAllowedEmail(normalized)).thenReturn(true);
+        when(loginRateLimiter.isRateLimited(eq(normalized), any(), any())).thenReturn(false);
+        SecurityUser securityUser = SecurityUser.fromUser(user(normalized));
+        when(authenticationManager.authenticate(any()))
+                .thenReturn(new UsernamePasswordAuthenticationToken(securityUser, null));
+        User user = user(normalized);
+        when(userRepository.findByEmailAndEnabledTrue(normalized)).thenReturn(Optional.of(user));
+        when(refreshTokenService.issue(user)).thenReturn(new IssuedRefreshToken("raw-token", 3600));
+
+        TokenResponse result = service.login(loginRequest("  JPerez@Sistemas.FRC.utn.edu.ar  "), httpRequest);
+
+        assertThat(result.getEmail()).isEqualTo(normalized);
+        ArgumentCaptor<Authentication> captor = ArgumentCaptor.forClass(Authentication.class);
+        verify(authenticationManager).authenticate(captor.capture());
+        assertThat(captor.getValue().getPrincipal()).isEqualTo(normalized);
+        verify(loginRateLimiter).recordSuccess(eq(normalized), any());
+    }
+
+    @Test
+    @DisplayName("login con AuthDomainProperties real: dominio externo → InvalidCredentialsException sin autenticar")
+    void loginDominioExternoConDominioReal() {
+        AuthServiceImpl serviceConDominioReal = new AuthServiceImpl(authenticationManager, userRepository,
+                jwtService, refreshTokenService, loginRateLimiter, new AuthDomainProperties());
+
+        assertThatThrownBy(() -> serviceConDominioReal.login(
+                loginRequest("jperez@sistemas.frc.utn.edu.ar.evil.com"), httpRequest))
+                .isInstanceOf(InvalidCredentialsException.class);
+
+        verify(loginRateLimiter, never()).isRateLimited(any(), any(), any());
         verify(authenticationManager, never()).authenticate(any());
     }
 
@@ -114,10 +174,12 @@ class AuthServiceImplTest {
     @DisplayName("login: rate limit excedido → LoginRateLimitExceededException, no autentica")
     void loginRateLimitExcedido() {
         when(authDomainProperties.isAllowedEmail(any())).thenReturn(true);
-        when(loginRateLimiter.isRateLimited(any(), any())).thenReturn(true);
+        when(loginRateLimiter.isRateLimited(any(), any(), any())).thenReturn(true);
+        when(loginRateLimiter.retryAfter(any(), any(), any())).thenReturn(Duration.ofSeconds(90));
 
         assertThatThrownBy(() -> service.login(loginRequest("user@frc.utn.edu.ar"), httpRequest))
-                .isInstanceOf(LoginRateLimitExceededException.class);
+                .isInstanceOfSatisfying(LoginRateLimitExceededException.class,
+                        ex -> assertThat(ex.getRetryAfterSeconds()).isEqualTo(90));
 
         verify(authenticationManager, never()).authenticate(any());
     }
@@ -126,21 +188,21 @@ class AuthServiceImplTest {
     @DisplayName("login: credenciales inválidas → InvalidCredentialsException y registra el fallo")
     void loginCredencialesInvalidas() {
         when(authDomainProperties.isAllowedEmail(any())).thenReturn(true);
-        when(loginRateLimiter.isRateLimited(any(), any())).thenReturn(false);
+        when(loginRateLimiter.isRateLimited(any(), any(), any())).thenReturn(false);
         when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("mal"));
 
         assertThatThrownBy(() -> service.login(loginRequest("user@frc.utn.edu.ar"), httpRequest))
                 .isInstanceOf(InvalidCredentialsException.class);
 
-        verify(loginRateLimiter).recordFailure(any(), any());
-        verify(loginRateLimiter, never()).recordSuccess(any());
+        verify(loginRateLimiter).recordFailure(any(), any(), any());
+        verify(loginRateLimiter, never()).recordSuccess(any(), any());
     }
 
     @Test
     @DisplayName("login: autenticación ok pero usuario deshabilitado/eliminado → InvalidCredentialsException")
     void loginUsuarioDeshabilitado() {
         when(authDomainProperties.isAllowedEmail(any())).thenReturn(true);
-        when(loginRateLimiter.isRateLimited(any(), any())).thenReturn(false);
+        when(loginRateLimiter.isRateLimited(any(), any(), any())).thenReturn(false);
         SecurityUser securityUser = SecurityUser.fromUser(user("user@frc.utn.edu.ar"));
         when(authenticationManager.authenticate(any()))
                 .thenReturn(new UsernamePasswordAuthenticationToken(securityUser, null));
@@ -156,7 +218,7 @@ class AuthServiceImplTest {
         User user = user("user@frc.utn.edu.ar");
         IssuedRefreshToken issued = new IssuedRefreshToken("nuevo-raw", 3600);
         when(refreshTokenService.refresh("viejo-raw")).thenReturn(new RefreshResult(user, issued));
-        when(jwtService.generateAccessToken(any(), any())).thenReturn("access-token");
+        when(jwtService.generateAccessToken(any())).thenReturn("access-token");
         when(jwtService.getAccessExpirationSeconds()).thenReturn(1200L);
 
         TokenResponse result = service.refresh(new RefreshTokenRequest("viejo-raw"));

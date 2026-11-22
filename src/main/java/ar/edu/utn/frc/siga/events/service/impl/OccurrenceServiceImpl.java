@@ -1,29 +1,46 @@
 package ar.edu.utn.frc.siga.events.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditLabels;
+import ar.edu.utn.frc.siga.audit.AuditOperation;
+import ar.edu.utn.frc.siga.audit.AuditOperations;
+import ar.edu.utn.frc.siga.common.util.Chunks;
+import ar.edu.utn.frc.siga.events.dto.response.OccurrenceAuditRefDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
-import ar.edu.utn.frc.siga.events.model.OccurrenceVacated;
+import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
+import ar.edu.utn.frc.siga.events.repository.SuspendedEventRepository;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
+import ar.edu.utn.frc.siga.events.service.command.OccurrenceRelease;
+import ar.edu.utn.frc.siga.common.exception.InvalidSelectionException;
+import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import ar.edu.utn.frc.siga.events.validator.EventScheduleValidator;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class OccurrenceServiceImpl implements OccurrenceService {
 
+    private static final int AUDIT_REFS_CHUNK_SIZE = 10_000;
+
     private final OccurrenceRepository occurrenceRepository;
     private final EventScheduleValidator eventScheduleValidator;
-    private final ApplicationEventPublisher eventPublisher;
+    private final SuspendedEventRepository suspendedEventRepository;
+    private final EventLabels eventLabels;
 
     @Override
     @Transactional(readOnly = true)
@@ -34,7 +51,22 @@ public class OccurrenceServiceImpl implements OccurrenceService {
     @Override
     @Transactional(readOnly = true)
     public List<OccurrenceSlotDto> findSlots(Collection<Long> occurrenceIds) {
-        return occurrenceRepository.findAllById(occurrenceIds).stream().map(OccurrenceServiceImpl::toSlot).toList();
+        return occurrenceRepository.findByIdIn(occurrenceIds).stream().map(OccurrenceServiceImpl::toSlot).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<Long, OccurrenceAuditRefDto> findAuditRefs(Collection<Long> occurrenceIds) {
+        List<OccurrenceRepository.OccurrenceDate> rows = Chunks.query(occurrenceIds, AUDIT_REFS_CHUNK_SIZE,
+                occurrenceRepository::findDatesByIdIn);
+        Map<Long, String> eventLabelsById = eventLabels.labelsOfEventIds(
+                rows.stream().map(OccurrenceRepository.OccurrenceDate::getEventId).collect(Collectors.toSet()));
+        Map<Long, OccurrenceAuditRefDto> refs = new HashMap<>();
+        for (OccurrenceRepository.OccurrenceDate row : rows) {
+            refs.put(row.getId(), new OccurrenceAuditRefDto(row.getId(), row.getEventId(),
+                    eventLabelsById.get(row.getEventId()), row.getDate()));
+        }
+        return refs;
     }
 
     @Override
@@ -44,6 +76,30 @@ public class OccurrenceServiceImpl implements OccurrenceService {
                 ? occurrenceRepository.findByEvent_Id(eventId)
                 : occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eventId, from);
         return occurrences.stream().map(OccurrenceServiceImpl::toSlot).toList();
+    }
+
+    @Override
+    @Transactional
+    @AuditOperation(value = "Alta de ocurrencias simultáneas", subject = "Occurrence")
+    public List<Long> createSimultaneous(Long occurrenceId, int count) {
+        Occurrence principal = Finder.orThrow(occurrenceRepository::findById, occurrenceId, "Occurrence");
+        int nextSlot = occurrenceRepository.findByEvent_IdAndDate(principal.getEvent().getId(), principal.getDate())
+                .stream()
+                .mapToInt(Occurrence::getRoomSlot)
+                .max()
+                .orElse(1) + 1;
+
+        List<Occurrence> created = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            created.add(Occurrence.builder()
+                    .event(principal.getEvent())
+                    .date(principal.getDate())
+                    .status(OccurrenceStatus.NEEDS_ROOM)
+                    .roomSlot(nextSlot + i)
+                    .mirrorOfOccurrenceId(principal.getId())
+                    .build());
+        }
+        return occurrenceRepository.saveAll(created).stream().map(Occurrence::getId).toList();
     }
 
     @Override
@@ -62,22 +118,59 @@ public class OccurrenceServiceImpl implements OccurrenceService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<OccurrenceSlotDto> findVisibleSlotsByEvents(Collection<Long> eventIds, LocalDate from) {
+        return visible(findSlotsByEvents(eventIds, from));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OccurrenceSlotDto> findNextSlotsByEvents(Collection<Long> eventIds, LocalDate from,
+            Collection<LocalDate> excludedDates, int limitPerEvent) {
+        if (eventIds.isEmpty()) {
+            return List.of();
+        }
+        List<Long> ids = occurrenceRepository.findNextIdsPerEvent(eventIds, from,
+                excludedDates.toArray(LocalDate[]::new), limitPerEvent);
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return occurrenceRepository.findByIdIn(ids).stream().map(OccurrenceServiceImpl::toSlot).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<OccurrenceSlotDto> findSlotsByStatusBetween(OccurrenceStatus status, LocalDate from, LocalDate to) {
-        return occurrenceRepository.findByStatusAndDateBetweenOrderByEvent_IdAscDateAsc(status, from, to).stream()
-                .map(OccurrenceServiceImpl::toSlot).toList();
+        return visible(occurrenceRepository.findByStatusAndDateBetweenOrderByEvent_IdAscDateAsc(status, from, to)
+                .stream().map(OccurrenceServiceImpl::toSlot).toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<OccurrenceSlotDto> findSlotsBetween(LocalDate from, LocalDate to) {
-        return occurrenceRepository.findByDateBetween(from, to).stream()
-                .map(OccurrenceServiceImpl::toSlot).toList();
+        return visible(occurrenceRepository.findByDateBetween(from, to).stream()
+                .map(OccurrenceServiceImpl::toSlot).toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<OccurrenceSlotDto> findSlotsByDate(LocalDate date) {
-        return occurrenceRepository.findByDate(date).stream().map(OccurrenceServiceImpl::toSlot).toList();
+        return visible(occurrenceRepository.findByDate(date).stream().map(OccurrenceServiceImpl::toSlot).toList());
+    }
+
+    private List<OccurrenceSlotDto> visible(List<OccurrenceSlotDto> slots) {
+        if (slots.isEmpty()) {
+            return slots;
+        }
+        Map<Long, LocalDate> suspendedFrom = suspendedEventRepository.findAllSuspendedFrom();
+        if (suspendedFrom.isEmpty()) {
+            return slots;
+        }
+        return slots.stream().filter(slot -> !isSuspended(slot, suspendedFrom)).toList();
+    }
+
+    private static boolean isSuspended(OccurrenceSlotDto slot, Map<Long, LocalDate> suspendedFrom) {
+        LocalDate from = suspendedFrom.get(slot.eventId());
+        return from != null && !slot.date().isBefore(from);
     }
 
     @Override
@@ -87,20 +180,64 @@ public class OccurrenceServiceImpl implements OccurrenceService {
     }
 
     @Override
-    @Transactional
-    public void release(Long occurrenceId) {
-        Occurrence occurrence = Finder.orThrow(occurrenceRepository::findById, occurrenceId, "Occurrence");
-        eventScheduleValidator.validateNotPast(occurrence);
-        occurrence.setStatus(OccurrenceStatus.ROOM_RELEASED);
-        eventPublisher.publishEvent(new OccurrenceVacated(occurrenceId));
+    @Transactional(readOnly = true)
+    public List<OccurrenceSlotDto> findMirrors(Collection<Long> principalOccurrenceIds) {
+        if (principalOccurrenceIds.isEmpty()) {
+            return List.of();
+        }
+        return occurrenceRepository.findByMirrorOfOccurrenceIdIn(principalOccurrenceIds).stream()
+                .map(OccurrenceServiceImpl::toSlot).toList();
     }
 
     @Override
     @Transactional
-    public void requestRoom(Long occurrenceId) {
-        Occurrence occurrence = Finder.orThrow(occurrenceRepository::findById, occurrenceId, "Occurrence");
-        eventScheduleValidator.validateNotPast(occurrence);
-        occurrence.setStatus(OccurrenceStatus.NEEDS_ROOM);
+    @AuditOperation(value = "Liberación de ocurrencias", subject = "Occurrence")
+    public void release(List<OccurrenceRelease> releases, ReleaseReason reason, String note) {
+        if (reason != null) {
+            AuditOperations.describe("Liberación de aulas (" + AuditLabels.constant(reason) + ")");
+        }
+        if (reason == null) {
+            throw new InvalidSelectionException("El motivo de liberación es obligatorio.");
+        }
+        if (reason == ReleaseReason.OTHER && (note == null || note.isBlank())) {
+            throw new InvalidSelectionException("El motivo Otro requiere una nota.");
+        }
+        Map<Long, Long> previousClassroomById = new HashMap<>();
+        releases.forEach(r -> previousClassroomById.put(r.occurrenceId(), r.previousClassroomId()));
+        List<Occurrence> occurrences = loadAll(previousClassroomById.keySet());
+        occurrences.forEach(eventScheduleValidator::validateNotPast);
+        for (Occurrence occurrence : occurrences) {
+            occurrence.setStatus(OccurrenceStatus.ROOM_RELEASED);
+            occurrence.setReleaseReason(reason);
+            occurrence.setReleaseNote(note);
+            Long previousClassroomId = previousClassroomById.get(occurrence.getId());
+            if (previousClassroomId != null) {
+                occurrence.setPreviousClassroomId(previousClassroomId);
+            }
+        }
+    }
+
+    @Override
+    @Transactional
+    @AuditOperation(value = "Pedido de aula para ocurrencias", subject = "Occurrence")
+    public void requestRoom(Collection<Long> occurrenceIds) {
+        List<Occurrence> occurrences = loadAll(new HashSet<>(occurrenceIds));
+        occurrences.forEach(eventScheduleValidator::validateNotPast);
+        for (Occurrence occurrence : occurrences) {
+            occurrence.setStatus(OccurrenceStatus.NEEDS_ROOM);
+            occurrence.setReleaseReason(null);
+            occurrence.setReleaseNote(null);
+        }
+    }
+
+    private List<Occurrence> loadAll(Set<Long> ids) {
+        List<Occurrence> occurrences = occurrenceRepository.findAllById(ids);
+        if (occurrences.size() != ids.size()) {
+            Set<Long> found = occurrences.stream().map(Occurrence::getId).collect(Collectors.toSet());
+            Long missing = ids.stream().filter(id -> !found.contains(id)).findFirst().orElseThrow();
+            throw ResourceNotFoundException.of("Occurrence", missing);
+        }
+        return occurrences;
     }
 
     private static OccurrenceSlotDto toSlot(Occurrence occurrence) {
@@ -111,6 +248,11 @@ public class OccurrenceServiceImpl implements OccurrenceService {
                 occurrence.startTime(),
                 occurrence.endTime(),
                 occurrence.getStatus(),
-                occurrence.getEvent().getEnrolled());
+                occurrence.getEvent().getEnrolled(),
+                occurrence.getRoomSlot(),
+                occurrence.getReleaseReason(),
+                occurrence.getReleaseNote(),
+                occurrence.getPreviousClassroomId(),
+                occurrence.getMirrorOfOccurrenceId());
     }
 }

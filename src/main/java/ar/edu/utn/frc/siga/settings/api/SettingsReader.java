@@ -15,4 +15,6 @@ public interface SettingsReader {
     boolean getBoolean(SettingKey key);
 
     LocalTime getTime(SettingKey key);
+
+    String getString(SettingKey key);
 }

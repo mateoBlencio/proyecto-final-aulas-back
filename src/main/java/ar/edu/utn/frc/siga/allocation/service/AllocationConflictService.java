@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.modulith.NamedInterface;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -13,6 +14,7 @@ import java.util.Set;
 @NamedInterface("api")
 public interface AllocationConflictService {
 
-    Page<AllocationConflictDto> findConflicts(Set<ConflictType> types, LocalDate from, LocalDate to, boolean includePast, Pageable pageable);
+    Page<AllocationConflictDto> findConflicts(Set<ConflictType> types, LocalDate from, LocalDate to, boolean includePast,
+                                           String q, DayOfWeek dayOfWeek, String specialty, Pageable pageable);
     List<Long> resolveAllUnallocatedEventIds();
 }

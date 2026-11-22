@@ -1,27 +1,40 @@
 package ar.edu.utn.frc.siga.roomrequest.handler;
 
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreatePartialExamOffScheduleDto;
+import ar.edu.utn.frc.siga.events.validator.EventScheduleValidator;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.FreeFormItemDto;
 import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
+import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
 import ar.edu.utn.frc.siga.roomrequest.validator.AcademicReferenceValidator;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassroomReferenceValidator;
 import ar.edu.utn.frc.siga.roomrequest.validator.ClassScheduleService;
 import ar.edu.utn.frc.siga.roomrequest.validator.ItemConsistency;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Component
 public class PartialExamOffScheduleHandler extends AbstractRoomRequestHandler {
 
+    private final RoomRequestItemRepository itemRepository;
+    private final EventScheduleValidator eventSchedule;
+
     public PartialExamOffScheduleHandler(AcademicReferenceValidator academicReference,
                                          ClassroomReferenceValidator classroomReference,
-                                         ClassScheduleService classSchedule) {
+                                         ClassScheduleService classSchedule,
+                                         RoomRequestItemRepository itemRepository,
+                                         EventScheduleValidator eventSchedule) {
         super(academicReference, classroomReference, classSchedule);
+        this.itemRepository = itemRepository;
+        this.eventSchedule = eventSchedule;
     }
 
     @Override
@@ -33,12 +46,11 @@ public class PartialExamOffScheduleHandler extends AbstractRoomRequestHandler {
     protected void validateItems(CreateRoomRequestDto dto) {
         List<FreeFormItemDto> items = ((CreatePartialExamOffScheduleDto) dto).items();
         for (FreeFormItemDto item : items) {
-            if (item.commissionId() == null) {
-                throw new InvalidRoomRequestException("Cada pedido de parcial fuera de horario requiere una comisión.");
-            }
             ItemConsistency.requireExamUsersConsistent(true, item);
+            eventSchedule.validateBusinessHours(item.startTime(), item.endTime());
+            ItemConsistency.requireExamAdvanceNotice(item.date(), item.startTime());
         }
-        ItemConsistency.requireDistinct(items.stream().map(FreeFormItemDto::commissionId).toList(), "una comisión");
+        ItemConsistency.requireNoCommissionOverlap(items);
     }
 
     @Override
@@ -46,9 +58,29 @@ public class PartialExamOffScheduleHandler extends AbstractRoomRequestHandler {
         academicReference.requireSubject(dto.subjectId());
         ((CreatePartialExamOffScheduleDto) dto).items().stream()
                 .map(FreeFormItemDto::commissionId)
+                .filter(Objects::nonNull)
                 .distinct()
                 .forEach(commissionId ->
                         academicReference.requireCommissionOfSubject(dto.subjectId(), commissionId));
+        requireNoOverlapWithExistingRequests(dto.subjectId(), ((CreatePartialExamOffScheduleDto) dto).items());
+    }
+
+    private void requireNoOverlapWithExistingRequests(Long subjectId, List<FreeFormItemDto> items) {
+        List<LocalDate> dates = items.stream().map(FreeFormItemDto::date).distinct().toList();
+        Map<LocalDate, List<RoomRequestItem>> existingByDate = itemRepository
+                .findActiveOffScheduleItemsByDateIn(dates).stream()
+                .collect(Collectors.groupingBy(RoomRequestItem::getDate));
+
+        for (FreeFormItemDto item : items) {
+            boolean overlaps = existingByDate.getOrDefault(item.date(), List.of()).stream()
+                    .anyMatch(existing -> ItemConsistency.commissionScheduleOverlap(
+                            subjectId, item.commissionId(), item.date(), item.startTime(), item.endTime(),
+                            existing.getRequest().getSubjectId(), existing.getCommissionId(), existing.getDate(),
+                            existing.getStartTime(), existing.endTime()) == ItemConsistency.Overlap.BLOCKING);
+            if (overlaps) {
+                throw new InvalidRoomRequestException(ItemConsistency.COMMISSION_OVERLAP_MESSAGE);
+            }
+        }
     }
 
     @Override

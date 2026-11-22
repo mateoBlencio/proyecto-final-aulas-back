@@ -2,15 +2,24 @@ package ar.edu.utn.frc.siga.ingest.validator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import ar.edu.utn.frc.siga.ingest.ExcelTestWorkbooks;
 import ar.edu.utn.frc.siga.ingest.exception.InvalidFileFormatException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.time.Year;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
@@ -105,6 +114,51 @@ class ExcelTemplateValidatorTest {
             .hasMessageContaining("column 1")
             .hasMessageContaining("expected 'Curso'")
             .hasMessageContaining("found 'CursoX'");
+    }
+
+    @Test
+    @DisplayName("ING-02: header numérico → InvalidFileFormatException (no IllegalStateException de POI) que nombra columna, esperado y encontrado")
+    void headerNumerico() {
+        MockMultipartFile file = ExcelTestWorkbooks.validTemplate().withValidDataRow()
+            .withNumericCell(5, 0, 123)
+            .toMultipartFile();
+
+        assertThatThrownBy(() -> validator.validate(file))
+            .isInstanceOf(InvalidFileFormatException.class)
+            .hasMessageContaining("column 1")
+            .hasMessageContaining("expected 'Curso'")
+            .hasMessageContaining("found '123'");
+    }
+
+    @Test
+    @DisplayName("ING-02: si la validación del template falla, el Workbook abierto se cierra")
+    void cierraElWorkbookCuandoFallaLaValidacion() throws IOException {
+        Workbook spied = spy(ExcelTestWorkbooks.validTemplate().withValidDataRow()
+            .withHeader(0, "CursoX").workbook());
+        MockMultipartFile file = ExcelTestWorkbooks.validTemplate().withValidDataRow().toMultipartFile();
+
+        try (MockedStatic<WorkbookFactory> factory = mockStatic(WorkbookFactory.class)) {
+            factory.when(() -> WorkbookFactory.create(any(InputStream.class))).thenReturn(spied);
+
+            assertThatThrownBy(() -> validator.validate(file)).isInstanceOf(InvalidFileFormatException.class);
+        }
+
+        verify(spied).close();
+    }
+
+    @Test
+    @DisplayName("ING-02: si la validación pasa, el Workbook se devuelve abierto para que lo cierre el llamador")
+    void noCierraElWorkbookCuandoLaValidacionPasa() throws IOException {
+        Workbook spied = spy(ExcelTestWorkbooks.validTemplate().withValidDataRow().workbook());
+        MockMultipartFile file = ExcelTestWorkbooks.validTemplate().withValidDataRow().toMultipartFile();
+
+        try (MockedStatic<WorkbookFactory> factory = mockStatic(WorkbookFactory.class)) {
+            factory.when(() -> WorkbookFactory.create(any(InputStream.class))).thenReturn(spied);
+
+            assertThat(validator.validate(file)).isSameAs(spied);
+        }
+
+        verify(spied, never()).close();
     }
 
     @Test

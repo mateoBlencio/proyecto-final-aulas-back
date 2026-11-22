@@ -1,19 +1,27 @@
 package ar.edu.utn.frc.siga.roomrequest.repository;
 
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface RoomRequestItemRepository
-        extends JpaRepository<RoomRequestItem, Long>, JpaSpecificationExecutor<RoomRequestItem> {
+        extends JpaRepository<RoomRequestItem, Long>, JpaSpecificationExecutor<RoomRequestItem>,
+                RoomRequestItemCountRepository {
 
     @Override
     @EntityGraph(attributePaths = "request")
@@ -21,4 +29,44 @@ public interface RoomRequestItemRepository
 
     @EntityGraph(attributePaths = {"request", "preferences"})
     Optional<RoomRequestItem> findWithRequestById(Long id);
+
+    @Query("select i from RoomRequestItem i join fetch i.request "
+            + "where i.request.type = ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE "
+            + "and i.date in :dates "
+            + "and i.status <> ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.CANCELLED")
+    List<RoomRequestItem> findActiveOffScheduleItemsByDateIn(@Param("dates") Collection<LocalDate> dates);
+
+    @Query("select i from RoomRequestItem i "
+            + "where i.status in (ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.NEW, "
+            + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.DERIVED_TO_BUILDING, "
+            + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.IN_EVALUATION, "
+            + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.NOTIFIED) "
+            + "and i.request.type <> ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType.REGULAR_ROOM_CHANGE "
+            + "and i.date < :today")
+    List<RoomRequestItem> findExpiredByDate(@Param("today") LocalDate today);
+
+    @Query("select i from RoomRequestItem i "
+            + "where i.status in (ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.NEW, "
+            + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.DERIVED_TO_BUILDING, "
+            + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.IN_EVALUATION, "
+            + "ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.NOTIFIED) "
+            + "and i.request.type = ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType.REGULAR_ROOM_CHANGE")
+    List<RoomRequestItem> findActiveRegularRoomChangeItems();
+
+    @Query("select i from RoomRequestItem i "
+            + "where i.status = ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus.NOTIFIED "
+            + "and i.acceptanceDeadline <= :now")
+    List<RoomRequestItem> findNotifiedWithDeadlineUntil(@Param("now") Instant now);
+
+    @Query("select distinct i from RoomRequestItem i join i.allocations a where a.occurrenceId in :ids")
+    List<RoomRequestItem> findByAllocationOccurrenceIdIn(@Param("ids") Collection<Long> ids);
+
+    @Query("""
+            select distinct i from RoomRequestItem i join fetch i.request
+            left join i.preferences p left join i.allocations a
+            where i.status in :statuses and (p.classroomId in :classroomIds or a.classroomId in :classroomIds)
+            order by i.id
+            """)
+    List<RoomRequestItem> findOpenRequestingClassrooms(@Param("statuses") Collection<RoomRequestStatus> statuses,
+                                                       @Param("classroomIds") Collection<Long> classroomIds);
 }

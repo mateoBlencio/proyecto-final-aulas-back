@@ -1,0 +1,17 @@
+meta {
+  name: Contar no vistos
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/building-activity/unseen-count
+  body: none
+  auth: inherit
+}
+
+docs {
+  GET /v1/building-activity/unseen-count. Permiso: PERM_BUILDING_ACTIVITY_READ.
+  Respuesta: { "count": n }. Movimientos del alcance del usuario con id mayor a su
+  última marca, sin contar los que hizo él.
+}

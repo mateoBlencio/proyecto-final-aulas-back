@@ -3,6 +3,7 @@ package ar.edu.utn.frc.siga.roomrequest.controller;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CommissionOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.CommissionScheduleDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestFormSettingsDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.SpecialtyOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.SubjectOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.service.RoomRequestCatalogService;
@@ -18,7 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/** Combos públicos del formulario; evita abrir los controllers internos de {@code academic}/{@code space} (cerrados por rol). */
 @Slf4j
 @RestController
 @RequestMapping("${siga.api.base-path}/room-requests/catalog")
@@ -31,10 +31,12 @@ public class RoomRequestCatalogController {
 
     @GetMapping("/specialties")
     @Operation(summary = "Listar especialidades",
-               description = "Primer combo del formulario. Devuelve código y nombre.")
-    public ResponseEntity<List<SpecialtyOptionDto>> findSpecialties() {
-        log.debug("GET /v1/room-requests/catalog/specialties");
-        return ResponseEntity.ok(catalogService.findSpecialties());
+               description = "Primer combo del formulario. Devuelve código y nombre. Con "
+                       + "onlyWithSubjects=true excluye las especialidades sin materias cargadas (en desuso).")
+    public ResponseEntity<List<SpecialtyOptionDto>> findSpecialties(
+            @RequestParam(defaultValue = "false") boolean onlyWithSubjects) {
+        log.debug("GET /v1/room-requests/catalog/specialties: onlyWithSubjects={}", onlyWithSubjects);
+        return ResponseEntity.ok(catalogService.findSpecialties(onlyWithSubjects));
     }
 
     @GetMapping("/subjects")
@@ -55,7 +57,7 @@ public class RoomRequestCatalogController {
 
     @GetMapping("/classrooms")
     @Operation(summary = "Listar aulas disponibles",
-               description = "Para elegir las aulas de preferencia. Devuelve solo identificación y edificio.")
+               description = "Para elegir las aulas de preferencia. Devuelve solo identificación y edificio, sin datos de SysAcad.")
     public ResponseEntity<List<ClassroomOptionDto>> findClassrooms() {
         log.debug("GET /v1/room-requests/catalog/classrooms");
         return ResponseEntity.ok(catalogService.findClassrooms());
@@ -64,12 +66,24 @@ public class RoomRequestCatalogController {
     @GetMapping("/commission-schedule")
     @Operation(summary = "Días y horarios de cursado de una comisión",
                description = "Slots de cursado (día + horario) y fechas de cursado futuras de la comisión, "
-                       + "para el calendario y los checkboxes de día del formulario. 404 si la comisión no "
+                       + "para el calendario y los checkboxes de día del formulario. emptyReason (null si hay slots) "
+                       + "dice por qué no hay: ENDED (la cursada terminó), DISABLED_IN_SYSACAD (SysAcad "
+                       + "deshabilitó los días) o NO_SCHEDULE (nunca tuvo días). 404 si la comisión no "
                        + "pertenece a la materia.")
     public ResponseEntity<CommissionScheduleDto> findCommissionSchedule(
             @RequestParam Long subjectId, @RequestParam Long commissionId) {
         log.debug("GET /v1/room-requests/catalog/commission-schedule: subjectId={}, commissionId={}",
                 subjectId, commissionId);
         return ResponseEntity.ok(catalogService.findCommissionSchedule(subjectId, commissionId));
+    }
+
+    @GetMapping("/form-settings")
+    @Operation(summary = "Valores configurables del formulario",
+               description = "Ventana horaria permitida (hoursStart, hoursEnd en HH:mm), topes de aulas, asistentes "
+                       + "y computadoras por pedido, y días de anticipación del aviso de pedido derivado sin aula. "
+                       + "Público: lo lee el formulario sin login y el auxiliar, que no tiene permiso de configuración.")
+    public ResponseEntity<RoomRequestFormSettingsDto> findFormSettings() {
+        log.debug("GET /v1/room-requests/catalog/form-settings");
+        return ResponseEntity.ok(catalogService.findFormSettings());
     }
 }

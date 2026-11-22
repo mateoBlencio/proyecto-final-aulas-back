@@ -1,0 +1,33 @@
+meta {
+  name: Listar aulas candidatas para un pedido
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/v1/room-requests/items/1/allowed-classrooms
+  body: none
+  auth: inherit
+}
+
+docs {
+  Aulas activas que cumplen los requisitos del pedido (computadoras, proyector),
+  con disponibilidad ya calculada contra su fecha y horario. Requiere
+  autenticación (hasAnyRole SUBSECRETARIA, AUXILIAR_AULICO). Sin query params:
+  todo sale de los datos del ítem.
+
+  Respuesta: array de { id, roomNumber, buildingId, buildingName, capacity,
+  available, computerCount, missingRequirements, current, enabledInSysacad }. enabledInSysacad=false avisa que SysAcad inhabilito el aula; el aula se ofrece igual. `current: true` marca el aula donde la
+  comisión cursa hoy la clase que el pedido quiere cambiar (cambio regular: aulas de las clases futuras del día;
+  cambio puntual y parcial en clase: aula de esa fecha; en los dos casos también las aulas adicionales si la
+  clase usa varias a la vez); siempre `false` en los demás tipos. Esas aulas salen `available: true` porque la
+  ocupación de la propia clase no cuenta. `computerCount` es el recurso "Cantidad de PC" del
+  aula (`null` si no lo tiene). En un pedido derivado solo salen las aulas
+  del edificio derivado, pida computadoras o no. `missingRequirements` viaja siempre
+  vacío en este endpoint (solo lo llena el alta directa). `available: false` = ocupada en esa fecha/horario, pero igual
+  aparece en la lista (no se filtra). `requiredSoftware` no filtra, ya viaja en
+  el detalle del ítem.
+
+  Lista vacía es una respuesta válida (200, no 404). 404 solo si el id del
+  ítem no existe.
+}

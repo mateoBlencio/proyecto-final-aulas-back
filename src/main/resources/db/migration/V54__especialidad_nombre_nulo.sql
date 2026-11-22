@@ -1,0 +1,1 @@
+ALTER TABLE especialidad ALTER COLUMN nombre DROP NOT NULL;

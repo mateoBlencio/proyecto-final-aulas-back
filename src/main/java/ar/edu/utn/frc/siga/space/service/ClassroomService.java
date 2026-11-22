@@ -4,8 +4,10 @@ import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomDetailsUpdateDto;
 import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomListItemDto;
+import ar.edu.utn.frc.siga.space.dto.response.DeactivationImpactDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
-import ar.edu.utn.frc.siga.common.service.ActivationService;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomSubjectPermissionDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomSysacadRefDto;
 import ar.edu.utn.frc.siga.space.service.command.ClassroomSyncCommand;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,10 +15,12 @@ import org.springframework.modulith.NamedInterface;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @NamedInterface("api")
-public interface ClassroomService extends ActivationService<Long> {
+public interface ClassroomService {
 
     String DEFAULT_CLASSROOM_TYPE = "Aula común";
 
@@ -28,6 +32,36 @@ public interface ClassroomService extends ActivationService<Long> {
 
     List<ClassroomResponseDto> findByIds(Collection<Long> ids);
 
+    /**
+     * Como {@link #findByIds}, pero incluye las aulas desactivadas (para referencias históricas). No aplica alcance
+     * por edificio; pensado para etiquetas de auditoría.
+     */
+    List<ClassroomResponseDto> findByIdsIncludingDeactivated(Collection<Long> ids);
+
+    /** Número, código de edificio de SysAcad y vigencia de cada aula, incluidas las desactivadas. Una sola consulta. */
+    List<ClassroomSysacadRefDto> findSysacadRefs(Collection<Long> ids);
+
+    /**
+     * Ids de aulas con un recurso ({@code resourceTypeName}, insensible a mayúsculas) cuya
+     * {@code cantidad} llega a {@code minQuantity}. Para un recurso {@code BOOLEAN} (p. ej.
+     * "Proyector") alcanza con pedir {@code minQuantity = 1}.
+     */
+    Set<Long> findIdsWithResourceAtLeast(String resourceTypeName, int minQuantity);
+
+    /**
+     * Cantidad del recurso ({@code resourceTypeName}, insensible a mayúsculas) por aula. Las aulas sin ese recurso
+     * no aparecen en el mapa.
+     */
+    Map<Long, Integer> findResourceAmounts(String resourceTypeName, Collection<Long> classroomIds);
+
+    /**
+     * Resuelve, para cada aula pedida, si habilita el uso por materia: {@code openToAll} cuando el
+     * modo de permiso es {@code ALL}, o el conjunto de materias habilitadas cuando es {@code SUBSET}
+     * ({@code NONE} devuelve conjunto vacío y {@code openToAll = false}). La semántica
+     * {@code ALL}/{@code NONE}/{@code SUBSET} vive acá; los consumidores solo consultan el resultado.
+     */
+    Map<Long, ClassroomSubjectPermissionDto> findSubjectPermissions(Collection<Long> classroomIds);
+
     Page<ClassroomListItemDto> findAll(ClassroomFilter filter, Pageable pageable, boolean includeDeactivated);
 
     ClassroomResponseDto update(Long id, ClassroomRequestDto dto);
@@ -36,6 +70,14 @@ public interface ClassroomService extends ActivationService<Long> {
 
     void delete(Long id);
 
+    void activate(Long id);
+
+    DeactivationImpactDto deactivate(Long id);
+
+    DeactivationImpactDto deactivationImpact(Long id);
+
+    List<ClassroomResponseDto> findDeactivatedInSiga();
+
     ClassroomResponseDto findByRoomNumberAndBuilding(Integer roomNumber, Long buildingId);
 
     Optional<ClassroomResponseDto> findByRoomNumberAndBuildingCode(Integer roomNumber, Integer buildingCode);
@@ -43,7 +85,9 @@ public interface ClassroomService extends ActivationService<Long> {
     /**
      * Sincroniza el lote de aulas provenientes de SysAcad: crea/actualiza por (edificio, número)
      * comparando hash (sin pisar el tipo de aula, local-owned) y marca como no vigentes las ausentes
-     * en la corrida. Devuelve la cantidad de filas afectadas.
+     * en la corrida. Devuelve la cantidad de filas afectadas. Aborta sin dar de baja si las filas válidas
+     * no alcanzan {@code minValidPercent}% de las vigentes (0 desactiva el umbral; cero filas válidas
+     * aborta siempre).
      */
-    int syncClassrooms(List<ClassroomSyncCommand> commands);
+    int syncClassrooms(List<ClassroomSyncCommand> commands, int minValidPercent);
 }

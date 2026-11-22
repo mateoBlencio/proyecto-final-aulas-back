@@ -1,0 +1,25 @@
+meta {
+  name: Listar eventos académicos
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/events?page=0&size=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 0
+  size: 20
+  ~subjectId: 1
+  ~commissionId: 2
+  ~type: RECURRING
+}
+
+docs {
+  Listado paginado. Filtros opcionales: subjectId, commissionId, type
+  (RECURRING / UNIQUE_EVENT). La respuesta es
+  { content: [...], page: { size, number, totalElements, totalPages } }.
+}

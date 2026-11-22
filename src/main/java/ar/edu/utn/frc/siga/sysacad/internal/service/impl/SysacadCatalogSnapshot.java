@@ -10,12 +10,14 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadBuildingDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadClassroomDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadCommissionDto;
+import ar.edu.utn.frc.siga.sysacad.api.SysacadHolidayDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSpecialtyDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectCommissionDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectDto;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawBuilding;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawClassroom;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawCommission;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawHoliday;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSpecialty;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSubject;
@@ -37,6 +39,7 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
     private final Lazy<List<RawCommission>> commissionsRaw;
     private final Lazy<List<RawSchedule>> schedulesRaw;
     private final Lazy<List<RawSubject>> subjectsRaw;
+    private final Lazy<List<RawHoliday>> holidaysRaw;
     private final SysacadCatalogMapper mapper;
 
     SysacadCatalogSnapshot(Lazy<List<RawBuilding>> buildingsRaw,
@@ -45,6 +48,7 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
             Lazy<List<RawCommission>> commissionsRaw,
             Lazy<List<RawSchedule>> schedulesRaw,
             Lazy<List<RawSubject>> subjectsRaw,
+            Lazy<List<RawHoliday>> holidaysRaw,
             SysacadCatalogMapper mapper) {
         this.buildingsRaw = buildingsRaw;
         this.classroomsRaw = classroomsRaw;
@@ -52,6 +56,7 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
         this.commissionsRaw = commissionsRaw;
         this.schedulesRaw = schedulesRaw;
         this.subjectsRaw = subjectsRaw;
+        this.holidaysRaw = holidaysRaw;
         this.mapper = mapper;
     }
 
@@ -80,12 +85,14 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
 
     @Override
     public List<SysacadSubjectCommissionDto> findSubjectCommissions() {
-        return schedulesRaw.get().stream().map(mapper::toSubjectCommission).toList();
+        return schedulesRaw.get().stream().map(mapper::toSubjectCommission).filter(Objects::nonNull).toList();
     }
 
     @Override
     public List<SysacadCommissionDto> findCommissions() {
-        return commissionsRaw.get().stream().map(mapper::toCommission).toList();
+        List<RawCommission> rows = commissionsRaw.get();
+        mapper.warnCourseCodeCollisions(rows.stream().map(RawCommission::curso).toList());
+        return rows.stream().map(mapper::toCommission).filter(Objects::nonNull).toList();
     }
 
     @Override
@@ -101,6 +108,14 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
         List<RawSchedule> rows = schedulesRaw.get();
         return rows.stream()
                 .map(mapper::toAllocation)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    @Override
+    public List<SysacadHolidayDto> findHolidays() {
+        return holidaysRaw.get().stream()
+                .map(mapper::toHoliday)
                 .filter(Objects::nonNull)
                 .toList();
     }
@@ -134,14 +149,32 @@ final class SysacadCatalogSnapshot implements SysacadCatalogReader {
             case "A" -> TermType.ANUAL.getLabel();
             case "1" -> TermType.PRIMER_CUATRIMESTRE.getLabel();
             case "2" -> TermType.SEGUNDO_CUATRIMESTRE.getLabel();
+            case "C" -> singleSemester(withoutZero(facts.commissionSemesters()));
             default -> semesterFromCommissions(facts.commissionSemesters());
         };
     }
 
+    /**
+     * Without MateriaDictado, HorarioCuatrimestre = 0 means annual and is treated like in events
+     * ({@code SysacadCommissionResolver.termTypes}: it covers both semesters). A 0 in any row makes the subject
+     * annual, even when the rest is 1 or 2 (the annual schedule already covers both). Without a 0, a single
+     * semester gives that semester; two different ones stay null.
+     */
     private static String semesterFromCommissions(Set<Integer> semesters) {
+        if (semesters.contains(0)) {
+            return TermType.ANUAL.getLabel();
+        }
+        return singleSemester(withoutZero(semesters));
+    }
+
+    private static Set<Integer> withoutZero(Set<Integer> semesters) {
         Set<Integer> cuatrimestrales = new HashSet<>(semesters);
         cuatrimestrales.remove(null);
         cuatrimestrales.remove(0);
+        return cuatrimestrales;
+    }
+
+    private static String singleSemester(Set<Integer> cuatrimestrales) {
         if (cuatrimestrales.size() == 1) {
             return TermType.fromSemester(cuatrimestrales.iterator().next()).map(TermType::getLabel).orElse(null);
         }

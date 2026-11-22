@@ -5,6 +5,12 @@ public record ClassroomFilter(
     Long buildingId,
     Long classroomTypeId,
     Integer capacityMin,
-    Integer capacityMax
+    Integer capacityMax,
+    boolean notInSysacad,
+    String q
 ) {
+    public ClassroomFilter(Integer roomNumber, Long buildingId, Long classroomTypeId, Integer capacityMin,
+            Integer capacityMax, boolean notInSysacad) {
+        this(roomNumber, buildingId, classroomTypeId, capacityMin, capacityMax, notInSysacad, null);
+    }
 }

@@ -1,14 +1,19 @@
 package ar.edu.utn.frc.siga.common.exception;
 
+import ar.edu.utn.frc.siga.auth.exception.LoginRateLimitExceededException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Path;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
+import org.springframework.data.core.PropertyPath;
+import org.springframework.data.core.PropertyReferenceException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -18,11 +23,13 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.Serial;
 import java.lang.reflect.Method;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -42,8 +49,18 @@ class GlobalExceptionHandlerTest {
         ProblemDetail problem = handler.handleAppException(ResourceNotFoundException.of("Subject", 5L));
 
         assertThat(problem.getStatus()).isEqualTo(404);
-        assertThat(problem.getTitle()).isEqualTo("Resource not found");
-        assertThat(problem.getDetail()).isEqualTo("Subject not found with id: 5");
+        assertThat(problem.getTitle()).isEqualTo("Recurso no encontrado");
+        assertThat(problem.getDetail()).isEqualTo("No existe la materia 5.");
+    }
+
+    @Test
+    @DisplayName("ResourceNotFoundException con entidad desconocida usa el fallback \"el recurso\"")
+    void resourceNotFoundExceptionUnknownEntityUsesFallback() {
+        ProblemDetail problem = handler.handleAppException(ResourceNotFoundException.of("EntidadNueva", 7L));
+
+        assertThat(problem.getStatus()).isEqualTo(404);
+        assertThat(problem.getTitle()).isEqualTo("Recurso no encontrado");
+        assertThat(problem.getDetail()).isEqualTo("No existe el recurso 7.");
     }
 
     @Test
@@ -156,11 +173,36 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("PropertyReferenceException se traduce a 400 'Propiedad de orden inválida' con la propiedad pedida")
+    void propertyReferenceExceptionMapsTo400() {
+        PropertyReferenceException ex = catchThrowableOfType(PropertyReferenceException.class,
+                () -> PropertyPath.from("nope", Sample.class));
+
+        ProblemDetail problem = handler.handleInvalidSortProperty(ex);
+
+        assertThat(problem.getStatus()).isEqualTo(400);
+        assertThat(problem.getTitle()).isEqualTo("Propiedad de orden inválida");
+        assertThat(problem.getDetail()).isEqualTo("No se puede ordenar por 'nope'.");
+    }
+
+    @Test
     @DisplayName("MaxUploadSizeExceededException se traduce a 413")
     void maxUploadSizeExceededExceptionMapsTo413() {
         ProblemDetail problem = handler.handleMaxUploadSize(new MaxUploadSizeExceededException(1024L));
 
         assertThat(problem.getStatus()).isEqualTo(413);
+    }
+
+    @Test
+    @DisplayName("OptimisticLockingFailureException se traduce a 409 sin filtrar el mensaje interno al cliente")
+    void optimisticLockingFailureExceptionMapsTo409() {
+        ProblemDetail problem = handler.handleOptimisticLock(
+                new org.springframework.dao.OptimisticLockingFailureException("Row was updated or deleted by another transaction"));
+
+        assertThat(problem.getStatus()).isEqualTo(409);
+        assertThat(problem.getTitle()).isEqualTo("Concurrent modification");
+        assertThat(problem.getDetail()).doesNotContain("Row was updated or deleted");
+        assertThat(problem.getProperties()).containsEntry("code", "CONCURRENT_MODIFICATION");
     }
 
     // ---------- catch-all ----------
@@ -199,6 +241,12 @@ class GlobalExceptionHandlerTest {
         // método de soporte para construir un MethodParameter real en los tests
     }
 
+    /** Tipo de soporte para provocar una PropertyReferenceException real al resolver una propiedad inexistente. */
+    @SuppressWarnings("unused")
+    private static final class Sample {
+        private String name;
+    }
+
     /** Subtipo de {@link SigaAppException} de uso exclusivo en tests, para probar la genericidad del handler. */
     private static final class TestSigaException extends SigaAppException {
         @Serial
@@ -213,5 +261,28 @@ class GlobalExceptionHandlerTest {
             super.withProperty(key, value);
             return this;
         }
+    }
+
+    @Test
+    @DisplayName("el 429 del login incluye el header Retry-After y la propiedad retryAfterSeconds")
+    void loginRateLimit_incluyeRetryAfter() {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        ProblemDetail problem = handler.handleAppException(
+                new LoginRateLimitExceededException(Duration.ofSeconds(125)), response);
+
+        assertThat(problem.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
+        assertThat(response.getHeader(HttpHeaders.RETRY_AFTER)).isEqualTo("125");
+        assertThat(requireNonNull(problem.getProperties()).get("retryAfterSeconds")).isEqualTo(125L);
+    }
+
+    @Test
+    @DisplayName("una excepción sin headers no agrega ninguno a la respuesta")
+    void excepcionSinHeaders() {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.handleAppException(ResourceNotFoundException.of("Subject", 5L), response);
+
+        assertThat(response.getHeaderNames()).isEmpty();
     }
 }

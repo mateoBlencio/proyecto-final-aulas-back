@@ -1,23 +1,36 @@
 package ar.edu.utn.frc.siga.sysacad.internal.mapper;
 
+import org.slf4j.LoggerFactory;
+import ch.qos.logback.core.read.ListAppender;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.classic.Logger;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadAcademicEventDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadAllocationDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadBuildingDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadClassroomDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadCommissionDto;
+import ar.edu.utn.frc.siga.sysacad.api.SysacadHolidayDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSpecialtyDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectCommissionDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectDto;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawBuilding;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawClassroom;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawCommission;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawHoliday;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSchedule;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSpecialty;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSubject;
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -36,7 +49,42 @@ class SysacadCatalogMapperTest {
     }
 
     @Test
-    @DisplayName("toClassroom: 'S' habilitada, cualquier otro valor no")
+    @DisplayName("toBuilding: reemplaza CR/LF y otros caracteres de control para que no forjen líneas de log")
+    void quitaCaracteresDeControl() {
+        SysacadBuildingDto building = mapper.toBuilding(new RawBuilding(2, "Edif.\r\nCentral\t"));
+
+        assertThat(building.name()).doesNotContain("\r").doesNotContain("\n").doesNotContain("\t")
+                .isEqualTo("Edif. Central");
+    }
+
+    @Test
+    @DisplayName("toBuilding: también reemplaza NEL, U+2028 y U+2029")
+    void quitaSeparadoresUnicodeDeLinea() {
+        SysacadBuildingDto building = mapper.toBuilding(new RawBuilding(2, "A\u0085B\u2028C\u2029D"));
+
+        assertThat(building.name()).isEqualTo("A B C D");
+    }
+
+    @Test
+    @DisplayName("toHoliday: la fecha inválida con CR/LF se loguea saneada, sin forjar líneas de log")
+    void feriadoConSaltosDeLineaSeLoguaSaneado() {
+        Logger logger = (Logger) LoggerFactory.getLogger(SysacadCatalogMapper.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            assertThat(mapper.toHoliday(new RawHoliday("2026\r\n1208\r\nFORGED", "x"))).isNull();
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        assertThat(appender.list).hasSize(1);
+        assertThat(appender.list.getFirst().getFormattedMessage()).doesNotContain("\r").doesNotContain("\n")
+                .contains("2026  1208  FORGED");
+    }
+
+    @Test
+    @DisplayName("toClassroom: solo 'N' es no habilitada")
     void traduceHabilitada() {
         assertThat(mapper.toClassroom(new RawClassroom(101, 2, "S", 40)))
                 .isEqualTo(new SysacadClassroomDto(101, 2, true, 40));
@@ -45,9 +93,12 @@ class SysacadCatalogMapperTest {
     }
 
     @Test
-    @DisplayName("toClassroom: habilitada nula se toma como no habilitada")
-    void habilitadaNulaEsFalse() {
-        assertThat(mapper.toClassroom(new RawClassroom(101, 2, null, 40)).isEnabled()).isFalse();
+    @DisplayName("toClassroom: habilitada nula, en blanco o con un valor raro se toma como habilitada")
+    void habilitadaDesconocidaEsTrue() {
+        assertThat(mapper.toClassroom(new RawClassroom(101, 2, null, 40)).isEnabled()).isTrue();
+        assertThat(mapper.toClassroom(new RawClassroom(101, 2, "  ", 40)).isEnabled()).isTrue();
+        assertThat(mapper.toClassroom(new RawClassroom(101, 2, "X", 40)).isEnabled()).isTrue();
+        assertThat(mapper.toClassroom(new RawClassroom(101, 2, " n ", 40)).isEnabled()).isFalse();
     }
 
     @Test
@@ -99,7 +150,7 @@ class SysacadCatalogMapperTest {
                 5, "Ingeniería en Sistemas de Información", 2008, 115, "Sistemas de Representación", 0));
 
         assertThat(allocation).isEqualTo(new SysacadAllocationDto(
-                "1H90SR", 115, DayOfWeek.TUESDAY, LocalTime.of(10, 30), 135, 0, 805, 15));
+                "1H90SR", 115, 5, 2008, DayOfWeek.TUESDAY, LocalTime.of(10, 30), 135, LocalTime.of(12, 45), 90, 0, 805, 15));
     }
 
     @Test
@@ -121,14 +172,49 @@ class SysacadCatalogMapperTest {
     }
 
     @Test
-    @DisplayName("toAllocation: DURACION inconsistente con HoraComienzo/HoraFin no se recalcula, se usa la columna tal cual")
-    void noRecalculaDuracionInconsistente() {
-        // HoraComienzo-HoraFin da 75 minutos, pero DURACION dice 135: se conserva 135 (no se recalcula, §2).
+    @DisplayName("toAllocation: DURACION distinta del rango HoraComienzo/HoraFin se conserva cruda y no loguea")
+    void toAllocationConservaDuracionCruda() {
         RawSchedule row = new RawSchedule("1H90SR", 90, 805, 15, "Edif. X", 2, 0, "A", "A",
-                "10:30", "11:45", "10:30-11:45", 135, 5, "Especialidad", 2008, 115, "Materia", 0);
+                "10:30", "12:45", "10:30-12:45", 120, 5, "Especialidad", 2008, 115, "Materia", 0);
+        Logger logger = (Logger) LoggerFactory.getLogger(SysacadCatalogMapper.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        SysacadAllocationDto allocation;
+        try {
+            allocation = mapper.toAllocation(row);
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        assertThat(allocation.durationMinutes()).isEqualTo(120);
+        assertThat(allocation.endTime()).isEqualTo(LocalTime.of(12, 45));
+        assertThat(appender.list).extracting(ILoggingEvent::getFormattedMessage)
+                .noneMatch(m -> m.contains("DURACION inconsistente"));
+    }
+
+    @Test
+    @DisplayName("toAllocation: mapea HoraFin a endTime y Comision a commissionNumber")
+    void mapeaHoraFinYComision() {
+        SysacadAllocationDto allocation = mapper.toAllocation(scheduleWithCourse("1H90SR"));
+
+        assertThat(allocation.endTime()).isEqualTo(LocalTime.of(12, 45));
+        assertThat(allocation.commissionNumber()).isEqualTo(90);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"  ", "no-es-hora", "25:00"})
+    @DisplayName("toAllocation: HoraFin inválida o vacía deja endTime en null sin descartar la fila")
+    void horaFinInvalidaNoDescartaLaFila(String horaFin) {
+        RawSchedule row = new RawSchedule("1H90SR", 90, 805, 15, "Edif. X", 2, 0, "A", "A",
+                "10:30", horaFin, "10:30-12:45", 135, 5, "Especialidad", 2008, 115, "Materia", 30);
 
         SysacadAllocationDto allocation = mapper.toAllocation(row);
 
+        assertThat(allocation).isNotNull();
+        assertThat(allocation.endTime()).isNull();
+        assertThat(allocation.startTime()).isEqualTo(LocalTime.of(10, 30));
         assertThat(allocation.durationMinutes()).isEqualTo(135);
     }
 
@@ -142,7 +228,7 @@ class SysacadCatalogMapperTest {
                 5, "Ingeniería en Sistemas de Información", 2008, 115, "Sistemas de Representación", 30));
 
         assertThat(event).isEqualTo(new SysacadAcademicEventDto(
-                "1H90SR", 115, DayOfWeek.TUESDAY, LocalTime.of(10, 30), 135, 0));
+                "1H90SR", 115, 5, 2008, DayOfWeek.TUESDAY, LocalTime.of(10, 30), 135, 0));
     }
 
     @Test
@@ -164,14 +250,66 @@ class SysacadCatalogMapperTest {
     }
 
     @Test
-    @DisplayName("toAcademicEvent(RawSchedule): DURACION rara (0/negativa) no se rechaza, se propaga tal cual")
+    @DisplayName("toAcademicEvent(RawSchedule): 10:30-12:45 con DURACION 135 da 135")
+    void duracionPorRangoCoincideConColumna() {
+        assertThat(mapper.toAcademicEvent(schedule("12:45", 135)).durationMinutes()).isEqualTo(135);
+    }
+
+    @Test
+    @DisplayName("toAcademicEvent(RawSchedule): 10:30-12:45 con DURACION 120 da 135 (fin menos comienzo) sin warn")
+    void duracionPorRangoGanaSobreColumna() {
+        List<ILoggingEvent> logs = new java.util.ArrayList<>();
+        SysacadAcademicEventDto event = capturingLogs(logs, () -> mapper.toAcademicEvent(schedule("12:45", 120)));
+
+        assertThat(event.durationMinutes()).isEqualTo(135);
+        assertThat(logs).isEmpty();
+    }
+
+    @Test
+    @DisplayName("toAcademicEvent(RawSchedule): HoraFin válida y DURACION nula da la duración del rango")
+    void duracionPorRangoSinColumna() {
+        assertThat(mapper.toAcademicEvent(schedule("12:45", null)).durationMinutes()).isEqualTo(135);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"  ", "no-es-hora", "25:00", "10:30", "09:00"})
+    @DisplayName("toAcademicEvent(RawSchedule): HoraFin ausente, inválida o no posterior a HoraComienzo cae a DURACION con warn")
+    void respaldoADuracionConWarn(String horaFin) {
+        List<ILoggingEvent> logs = new java.util.ArrayList<>();
+        SysacadAcademicEventDto event = capturingLogs(logs, () -> mapper.toAcademicEvent(schedule(horaFin, 120)));
+
+        assertThat(event.durationMinutes()).isEqualTo(120);
+        assertThat(logs).extracting(ILoggingEvent::getFormattedMessage)
+                .anyMatch(m -> m.contains("HoraFin ausente, inválida o no posterior a HoraComienzo")
+                        && m.contains("DURACION=120"));
+    }
+
+    @Test
+    @DisplayName("toAcademicEvent(RawSchedule): DURACION rara (negativa) con HoraFin anterior al comienzo se propaga tal cual")
     void propagaDuracionRaraDesdeScheduleSinRechazar() {
         RawSchedule row = new RawSchedule("1H90SR", 90, 805, 15, "Edif. X", 3, 0, "A", "A",
                 "18:00", "12:45", "10:30-12:45", -15, 5, "Especialidad", 2008, 115, "Materia", 30);
 
-        SysacadAcademicEventDto event = mapper.toAcademicEvent(row);
+        assertThat(mapper.toAcademicEvent(row).durationMinutes()).isEqualTo(-15);
+    }
 
-        assertThat(event.durationMinutes()).isEqualTo(-15);
+    private static RawSchedule schedule(String horaFin, Integer duracion) {
+        return new RawSchedule("1H90SR", 90, 805, 15, "Edif. X", 2, 0, "A", "A",
+                "10:30", horaFin, "10:30-12:45", duracion, 5, "Especialidad", 2008, 115, "Materia", 30);
+    }
+
+    private static <T> T capturingLogs(List<ILoggingEvent> sink, java.util.function.Supplier<T> action) {
+        Logger logger = (Logger) LoggerFactory.getLogger(SysacadCatalogMapper.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            return action.get();
+        } finally {
+            logger.detachAppender(appender);
+            sink.addAll(appender.list);
+        }
     }
 
     @Test
@@ -183,6 +321,206 @@ class SysacadCatalogMapperTest {
                 "10:30", "12:45", "10:30-12:45", 135,
                 5, "Ingeniería en Sistemas de Información", 2008, 115, "Sistemas de Representación", 30));
 
-        assertThat(subjectCommission).isEqualTo(new SysacadSubjectCommissionDto("1H90SR", 115, 30));
+        assertThat(subjectCommission).isEqualTo(new SysacadSubjectCommissionDto("1H90SR", 5, 2008, 115, 30));
+    }
+
+    @Test
+    @DisplayName("toHoliday: parses a yyyyMMdd date")
+    void parsesHolidayDate() {
+        assertThat(mapper.toHoliday(new RawHoliday("20261208", "Inmaculada Concepción")))
+                .isEqualTo(new SysacadHolidayDto(LocalDate.of(2026, 12, 8), "Inmaculada Concepción"));
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"20261332", "2026-12-08"})
+    @DisplayName("toHoliday: returns null for null, empty, out-of-range or wrongly formatted dates")
+    void invalidHolidayDateReturnsNull(String fecha) {
+        assertThat(mapper.toHoliday(new RawHoliday(fecha, "Anything"))).isNull();
+    }
+
+    @Test
+    @DisplayName("toHoliday: trims the description")
+    void trimsHolidayDescription() {
+        assertThat(mapper.toHoliday(new RawHoliday("20261208", "  Inmaculada Concepción   ")).description())
+                .isEqualTo("Inmaculada Concepción");
+    }
+
+    private static RawSchedule scheduleWithCourse(String course) {
+        return new RawSchedule(course, 90, 805, 15, "Edif. X", 2, 0, "A", "A",
+                "10:30", "12:45", "10:30-12:45", 135, 5, "Especialidad", 2008, 115, "Materia", 30);
+    }
+
+    @ParameterizedTest(name = "[{index}] \"{0}\" -> {1}")
+    @DisplayName("normalizeCourseCode: quita caracteres inválidos y pasa a mayúsculas")
+    @CsvSource(delimiter = '|', quoteCharacter = '\'', value = {
+            "5D1.|5D1",
+            "' 3k1 '|3K1",
+            "EIG-VW|EIG-VW",
+            "5d1|5D1",
+            "'5 D 1'|5D1",
+            "'3 K 1'|3K1",
+            "'1\tK\n1'|1K1",
+            "5D1/|5D1",
+            "-|-"})
+    void normalizaCodigoDeCurso(String raw, String expected) {
+        assertThat(SysacadCatalogMapper.normalizeCourseCode(raw)).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @DisplayName("normalizeCourseCode: vacío tras normalizar devuelve null")
+    @ValueSource(strings = {"...", "", "   ", "./ ."})
+    @NullSource
+    void codigoDeCursoVacioEsNull(String raw) {
+        assertThat(SysacadCatalogMapper.normalizeCourseCode(raw)).isNull();
+    }
+
+    @Test
+    @DisplayName("normalizeCourseCode: más de 255 caracteres devuelve null, 255 se conserva")
+    void codigoDeCursoDemasiadoLargoEsNull() {
+        assertThat(SysacadCatalogMapper.normalizeCourseCode("A".repeat(255))).hasSize(255);
+        assertThat(SysacadCatalogMapper.normalizeCourseCode("A".repeat(256))).isNull();
+    }
+
+    @Test
+    @DisplayName("toCommission: el curso inválido con CR/LF se loguea saneado y acotado, sin forjar líneas de log")
+    void cursoInvalidoSeLoguaSaneado() {
+        Logger logger = (Logger) LoggerFactory.getLogger(SysacadCatalogMapper.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            assertThat(mapper.toCommission(new RawCommission(".\r\n.\r\n" + "/".repeat(100), 17, 94, 519, 2026, 10)))
+                    .isNull();
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        assertThat(appender.list).hasSize(1);
+        String message = appender.list.getFirst().getFormattedMessage();
+        assertThat(message).doesNotContain("\r").doesNotContain("\n").contains("('.  .  ///").endsWith("materia=519: fila salteada");
+        assertThat(message).contains("...");
+    }
+
+    @Test
+    @DisplayName("warnCourseCodeCollisions: avisa una vez por código normalizado con orígenes distintos")
+    void avisaColisionDeCodigos() {
+        Logger logger = (Logger) LoggerFactory.getLogger(SysacadCatalogMapper.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            mapper.warnCourseCodeCollisions(java.util.List.of("1K1", "1 K1", "1K1", "2K1", "...", "5D1", "5D1."));
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        assertThat(appender.list).extracting(ILoggingEvent::getFormattedMessage).containsExactly(
+                "Códigos de curso distintos normalizan a '1K1': [1 K1, 1K1]",
+                "Códigos de curso distintos normalizan a '5D1': [5D1, 5D1.]");
+    }
+
+    @Test
+    @DisplayName("warnCourseCodeCollisions: sin colisiones no loguea")
+    void sinColisionNoLoguea() {
+        Logger logger = (Logger) LoggerFactory.getLogger(SysacadCatalogMapper.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            mapper.warnCourseCodeCollisions(java.util.List.of("1K1", "1K1", "2K1"));
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        assertThat(appender.list).isEmpty();
+    }
+
+    @Test
+    @DisplayName("toCommission: normaliza '5D1.' a '5D1' y ' 3k1 ' a '3K1'")
+    void toCommissionNormalizaCodigo() {
+        assertThat(mapper.toCommission(new RawCommission("5D1.", 17, 94, 519, 2026, 10)).courseCode())
+                .isEqualTo("5D1");
+        assertThat(mapper.toCommission(new RawCommission(" 3k1 ", 17, 94, 519, 2026, 10)).courseCode())
+                .isEqualTo("3K1");
+        assertThat(mapper.toCommission(new RawCommission("EIG-VW", 17, 94, 519, 2026, 10)).courseCode())
+                .isEqualTo("EIG-VW");
+    }
+
+    @Test
+    @DisplayName("toCommission: curso '...' o null devuelve null (fila salteada)")
+    void toCommissionSaltea() {
+        assertThat(mapper.toCommission(new RawCommission("...", 17, 94, 519, 2026, 10))).isNull();
+        assertThat(mapper.toCommission(new RawCommission(null, 17, 94, 519, 2026, 10))).isNull();
+    }
+
+    @Test
+    @DisplayName("toSubjectCommission: normaliza el curso y saltea '...' o null")
+    void toSubjectCommissionNormalizaYSaltea() {
+        assertThat(mapper.toSubjectCommission(scheduleWithCourse("5D1.")).courseCode()).isEqualTo("5D1");
+        assertThat(mapper.toSubjectCommission(scheduleWithCourse(" 3k1 ")).courseCode()).isEqualTo("3K1");
+        assertThat(mapper.toSubjectCommission(scheduleWithCourse("EIG-VW")).courseCode()).isEqualTo("EIG-VW");
+        assertThat(mapper.toSubjectCommission(scheduleWithCourse("..."))).isNull();
+        assertThat(mapper.toSubjectCommission(scheduleWithCourse(null))).isNull();
+    }
+
+    @Test
+    @DisplayName("toAcademicEvent: normaliza el curso y saltea '...' o null")
+    void toAcademicEventNormalizaYSaltea() {
+        assertThat(mapper.toAcademicEvent(scheduleWithCourse("5D1.")).courseCode()).isEqualTo("5D1");
+        assertThat(mapper.toAcademicEvent(scheduleWithCourse(" 3k1 ")).courseCode()).isEqualTo("3K1");
+        assertThat(mapper.toAcademicEvent(scheduleWithCourse("EIG-VW")).courseCode()).isEqualTo("EIG-VW");
+        assertThat(mapper.toAcademicEvent(scheduleWithCourse("..."))).isNull();
+        assertThat(mapper.toAcademicEvent(scheduleWithCourse(null))).isNull();
+    }
+
+    @Test
+    @DisplayName("toAllocation: normaliza el curso y saltea '...' o null")
+    void toAllocationNormalizaYSaltea() {
+        assertThat(mapper.toAllocation(scheduleWithCourse("5D1.")).courseCode()).isEqualTo("5D1");
+        assertThat(mapper.toAllocation(scheduleWithCourse(" 3k1 ")).courseCode()).isEqualTo("3K1");
+        assertThat(mapper.toAllocation(scheduleWithCourse("EIG-VW")).courseCode()).isEqualTo("EIG-VW");
+        assertThat(mapper.toAllocation(scheduleWithCourse("..."))).isNull();
+        assertThat(mapper.toAllocation(scheduleWithCourse(null))).isNull();
+    }
+
+    @ParameterizedTest(name = "[{index}] \"{0}\" -> \"{1}\"")
+    @DisplayName("cleanText: recorta bordes y colapsa espacios, tabs y saltos internos")
+    @CsvSource(delimiter = '|', quoteCharacter = '\'', value = {
+            "'Edif.  Central'|Edif. Central",
+            "'Edif.\t\tCentral'|Edif. Central",
+            "'Edif. \t Central'|Edif. Central",
+            "'  Edif. Central  '|Edif. Central",
+            "'\tEdif. Central\t'|Edif. Central",
+            "'Edif.\nCentral'|Edif. Central",
+            "Edif. Central|Edif. Central"})
+    void limpiaTexto(String raw, String expected) {
+        assertThat(SysacadCatalogMapper.cleanText(raw)).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("cleanText: null queda null y solo espacios queda vacío")
+    void limpiaTextoNuloYVacio() {
+        assertThat(SysacadCatalogMapper.cleanText(null)).isNull();
+        assertThat(SysacadCatalogMapper.cleanText("  \t ")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("cleanText: no toca la puntuación ('Ing. Sist. Inf.' queda intacto)")
+    void limpiaTextoConservaPuntuacion() {
+        assertThat(SysacadCatalogMapper.cleanText("Ing. Sist. Inf.")).isEqualTo("Ing. Sist. Inf.");
+    }
+
+    @Test
+    @DisplayName("toBuilding, toSpecialty y toSubject: colapsan espacios internos repetidos")
+    void colapsaEspaciosEnTextosMapeados() {
+        assertThat(mapper.toBuilding(new RawBuilding(2, "Edif.   Central  ")).name()).isEqualTo("Edif. Central");
+
+        SysacadSpecialtyDto specialty = mapper.toSpecialty(new RawSpecialty(5, " Ing.  en   Sistemas ", "Ing.  Sist. Inf."));
+        assertThat(specialty.name()).isEqualTo("Ing. en Sistemas");
+        assertThat(specialty.abbreviation()).isEqualTo("Ing. Sist. Inf.");
+
+        assertThat(mapper.toSubject(new RawSubject(17, 94, 519, " Análisis\t Matemático   I "), null).name())
+                .isEqualTo("Análisis Matemático I");
     }
 }

@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.events.controller;
 
+import ar.edu.utn.frc.siga.events.dto.AcademicEventFilter;
 import ar.edu.utn.frc.siga.events.dto.request.CreateRecurringEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.CreateUniqueEventRequestDto;
 import ar.edu.utn.frc.siga.events.dto.request.UpdateUniqueEventRequestDto;
@@ -7,15 +8,20 @@ import ar.edu.utn.frc.siga.events.dto.response.AcademicEventResponseDto;
 import ar.edu.utn.frc.siga.events.dto.response.EventHistorySnapshotDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceHistorySnapshotDto;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceResponseDto;
-import ar.edu.utn.frc.siga.common.dto.response.RevisionDto;
+import ar.edu.utn.frc.siga.audit.dto.response.RevisionDto;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.EventAuditHistoryService;
+import ar.edu.utn.frc.siga.events.model.EventType;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,6 +31,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -41,18 +48,24 @@ public class AcademicEventController {
     private final OccurrenceService occurrenceService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @PreAuthorize("hasAuthority('PERM_EVENT_READ')")
     @Operation(summary = "Listar eventos académicos",
-               description = "Devuelve todos los eventos académicos registrados.")
-    public ResponseEntity<List<AcademicEventResponseDto>> findAll() {
-        log.debug("GET /v1/events");
-        List<AcademicEventResponseDto> events = academicEventService.findAll();
-        log.info("Eventos listados: count={}", events.size());
+               description = "Listado paginado con filtros opcionales por materia, comisión y tipo "
+                       + "(RECURRING / UNIQUE_EVENT).")
+    public ResponseEntity<Page<AcademicEventResponseDto>> findAll(
+            @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable,
+            @RequestParam(required = false) Long subjectId,
+            @RequestParam(required = false) Long commissionId,
+            @RequestParam(required = false) EventType type) {
+        log.debug("GET /v1/events?subjectId={}&commissionId={}&type={}", subjectId, commissionId, type);
+        Page<AcademicEventResponseDto> events = academicEventService.findAll(
+                new AcademicEventFilter(subjectId, commissionId, type), pageable);
+        log.info("Eventos listados: total={}", events.getTotalElements());
         return ResponseEntity.ok(events);
     }
 
     @GetMapping("/{id:\\d+}")
-    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @PreAuthorize("hasAuthority('PERM_EVENT_READ')")
     @Operation(summary = "Obtener evento académico por ID",
                description = "Devuelve los datos de un evento académico existente.")
     public ResponseEntity<AcademicEventResponseDto> findById(@PathVariable Long id) {
@@ -61,7 +74,7 @@ public class AcademicEventController {
     }
 
     @GetMapping("/{id}/occurrences")
-    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @PreAuthorize("hasAuthority('PERM_EVENT_READ')")
     @Operation(summary = "Listar ocurrencias de un evento",
                description = "Devuelve todas las ocurrencias generadas para un evento académico.")
     public ResponseEntity<List<OccurrenceResponseDto>> findOccurrences(@PathVariable Long id) {
@@ -72,7 +85,7 @@ public class AcademicEventController {
     }
 
     @GetMapping("/{id}/history")
-    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @PreAuthorize("hasAuthority('PERM_EVENT_READ')")
     @Operation(summary = "Historial de auditoría de un evento",
                description = "Devuelve las revisiones de auditoría (Envers) del evento en orden ascendente: "
                        + "cambios de horario, inscriptos, comisión, alta y baja; con usuario y fecha de cada cambio. "
@@ -83,7 +96,7 @@ public class AcademicEventController {
     }
 
     @GetMapping("/occurrences/{occurrenceId}/history")
-    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @PreAuthorize("hasAuthority('PERM_EVENT_READ')")
     @Operation(summary = "Historial de auditoría de una ocurrencia",
                description = "Devuelve las revisiones de auditoría (Envers) de la ocurrencia en orden ascendente: "
                        + "cambios de estado (cuándo se canceló/suspendió y quién). El snapshot es null en revisiones DELETED.")
@@ -94,7 +107,7 @@ public class AcademicEventController {
     }
 
     @PostMapping("/recurring")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_EVENT_MANAGE')")
     @Operation(summary = "Crear evento recurrente",
                description = "Crea un evento recurrente semanal y genera todas sus ocurrencias.")
     public ResponseEntity<AcademicEventResponseDto> createRecurring(
@@ -106,7 +119,7 @@ public class AcademicEventController {
     }
 
     @GetMapping("/unique")
-    @PreAuthorize("hasAnyRole('SUBSECRETARIA','AUXILIAR_AULICO')")
+    @PreAuthorize("hasAuthority('PERM_EVENT_READ')")
     @Operation(summary = "Listar eventos únicos",
                description = "Devuelve todos los eventos únicos (parciales, trabajos prácticos, mesas especiales, etc.), "
                        + "sin datos de aula. Para la vista con aula/estado/sobrecupo ver GET /v1/allocations/events/unique.")
@@ -118,7 +131,7 @@ public class AcademicEventController {
     }
 
     @PostMapping("/unique")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_EVENT_MANAGE')")
     @Operation(summary = "Crear evento único",
                description = "Crea un evento que ocurre una única vez y genera su única ocurrencia, sin asignarle "
                        + "aula: la ocurrencia queda en NEEDS_ROOM. Para asignarle un aula, llamar por separado a "
@@ -132,7 +145,7 @@ public class AcademicEventController {
     }
 
     @PutMapping("/unique/{id}")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
+    @PreAuthorize("hasAuthority('PERM_EVENT_MANAGE')")
     @Operation(summary = "Modificar un evento único",
                description = "Actualiza fecha, horario, cantidad de alumnos y descripción de un evento único "
                        + "existente, sin tocar su aula asignada. Para reasignar el aula, llamar por separado a "
@@ -143,29 +156,5 @@ public class AcademicEventController {
         AcademicEventResponseDto response = academicEventService.updateUniqueEvent(id, dto);
         log.info("Evento único actualizado vía controller: id={}", id);
         return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/occurrences/{occurrenceId}/release")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
-    @Operation(summary = "Liberar el aula de una ocurrencia",
-               description = "Marca la ocurrencia como ROOM_RELEASED (libera el aula a propósito, "
-                       + "reasignable en cualquier momento). Rechaza ocurrencias ya pasadas.")
-    public ResponseEntity<Void> release(@PathVariable Long occurrenceId) {
-        log.debug("POST /v1/events/occurrences/{}/release", occurrenceId);
-        occurrenceService.release(occurrenceId);
-        log.info("Ocurrencia liberada: occurrenceId={}", occurrenceId);
-        return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/occurrences/{occurrenceId}/request-room")
-    @PreAuthorize("hasRole('SUBSECRETARIA')")
-    @Operation(summary = "Volver a pedir aula para una ocurrencia",
-               description = "Vuelve a marcar la ocurrencia como necesitada de aula (NEEDS_ROOM). No implica "
-                       + "que se reactive nada: la ocurrencia nunca dejó de dictarse. Rechaza ocurrencias ya pasadas.")
-    public ResponseEntity<Void> requestRoom(@PathVariable Long occurrenceId) {
-        log.debug("POST /v1/events/occurrences/{}/request-room", occurrenceId);
-        occurrenceService.requestRoom(occurrenceId);
-        log.info("Ocurrencia vuelta a marcar como NEEDS_ROOM: occurrenceId={}", occurrenceId);
-        return ResponseEntity.noContent().build();
     }
 }

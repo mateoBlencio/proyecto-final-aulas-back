@@ -10,11 +10,15 @@ import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.UniqueEventKind;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.modulith.NamedInterface;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 @Component
+@NamedInterface("api")
 @RequiredArgsConstructor
 public class EventScheduleValidator {
 
@@ -26,7 +30,9 @@ public class EventScheduleValidator {
             throw new InvalidEventScheduleException(
                     "La hora de fin (" + end + ") debe ser posterior a la hora de inicio (" + start + ").");
         }
-        if (start.isBefore(scheduleSettings.getStart()) || end.isAfter(scheduleSettings.getEnd())) {
+        LocalTime windowEnd = scheduleSettings.getEnd();
+        boolean endOfDay = LocalTime.MIDNIGHT.equals(windowEnd);
+        if (start.isBefore(scheduleSettings.getStart()) || (!endOfDay && end.isAfter(windowEnd))) {
             throw new InvalidEventScheduleException("El horario " + start + "-" + end
                     + " está fuera de la ventana permitida (" + scheduleSettings.getStart()
                     + "-" + scheduleSettings.getEnd() + ").");
@@ -34,7 +40,8 @@ public class EventScheduleValidator {
     }
 
     public void validateAcademicReference(UniqueEventKind eventType, Long subjectId, Long commissionId) {
-        boolean subjectRequired = eventType != UniqueEventKind.OTRO || commissionId != null;
+        boolean subjectOptional = eventType == UniqueEventKind.OTRO || eventType == UniqueEventKind.CONFERENCIA;
+        boolean subjectRequired = !subjectOptional || commissionId != null;
         if (subjectRequired && subjectId == null) {
             throw new MissingAcademicReferenceException(
                     "subjectId es obligatorio para eventType=" + eventType
@@ -55,9 +62,12 @@ public class EventScheduleValidator {
     }
 
     public void validateNotPast(Occurrence occurrence) {
-        if (occurrence.isPast()) {
-            throw new OccurrenceAlreadyPastException(
-                    "La ocurrencia del " + occurrence.getDate() + " ya ocurrió.");
+        validateNotPast(occurrence.getDate(), occurrence.startTime());
+    }
+
+    public void validateNotPast(LocalDate date, LocalTime start) {
+        if (LocalDateTime.now().isAfter(date.atTime(start))) {
+            throw new OccurrenceAlreadyPastException("La ocurrencia del " + date + " ya ocurrió.");
         }
     }
 }

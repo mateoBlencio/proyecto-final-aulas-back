@@ -7,5 +7,6 @@ public enum SettingType {
     INT,
     LONG,
     BOOLEAN,
-    TIME
+    TIME,
+    ENUM
 }

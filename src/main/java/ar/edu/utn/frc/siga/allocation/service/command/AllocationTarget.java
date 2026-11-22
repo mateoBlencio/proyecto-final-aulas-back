@@ -15,7 +15,7 @@ public sealed interface AllocationTarget {
     record Event(Long eventId) implements AllocationTarget {}
 
     // A diferencia de Event, este target ignora el clamp de AllocationServiceImpl: trae sus
-    // propias fechas y son ellas las que mandan. Por eso tampoco lleva @NamedInterface: solo lo
-    // construye el mapper de este módulo.
+    // propias fechas y son ellas las que mandan.
+    @NamedInterface("api")
     record EventRange(Long eventId, LocalDate from, LocalDate to) implements AllocationTarget {}
 }

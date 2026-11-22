@@ -1,0 +1,31 @@
+meta {
+  name: Listar comisiones
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/commissions?page=0&size=20&includeDeactivated=false
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 0
+  size: 20
+  ~courseCode: K10
+  ~academicPeriodId: 1
+  includeDeactivated: false
+}
+
+docs {
+  Listado paginado. Filtros opcionales: courseCode (contiene, case-insensitive),
+  academicPeriodId. La respuesta es
+  { content: [...], page: { size, number, totalElements, totalPages } }.
+  Sin includeDeactivated oculta las comisiones dadas de baja, las de un periodo
+  dado de baja. Una comision que SysAcad dejo de traer se lista igual.
+  unavailableReason: null, DEACTIVATED o PARENT_DEACTIVATED (periodo).
+  currentInSysacad=false avisa que SysAcad dejo de traer la comision; es solo informativo.
+  "yearLevel" es el año de cursada: primer dígito de courseCode (1-9), o null si
+  el código no empieza con 1-9 (ej. TEST, EXAMEN, 0D0).
+}

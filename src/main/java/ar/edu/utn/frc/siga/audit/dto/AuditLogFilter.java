@@ -1,0 +1,16 @@
+package ar.edu.utn.frc.siga.audit.dto;
+
+import ar.edu.utn.frc.siga.audit.model.ActorType;
+import ar.edu.utn.frc.siga.audit.model.RevisionKind;
+
+import java.time.LocalDate;
+
+public record AuditLogFilter(
+        LocalDate from,
+        LocalDate to,
+        String user,
+        String entityType,
+        RevisionKind kind,
+        ActorType actor,
+        String q) {
+}

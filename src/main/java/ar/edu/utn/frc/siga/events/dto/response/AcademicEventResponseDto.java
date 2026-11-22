@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.events.dto.response;
 
+import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.events.model.EventType;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -19,4 +20,5 @@ public sealed interface AcademicEventResponseDto permits RecurringEventResponseD
     Integer enrolled();
     LocalTime startTime();
     long durationMinutes();
+    SubjectResponseDto subject();
 }

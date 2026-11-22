@@ -23,7 +23,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("${siga.api.base-path}/sysacad/sync")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('SUBSECRETARIA')")
 @ConditionalOnProperty(prefix = "siga.sysacad", name = "enabled", havingValue = "true")
 @Tag(name = "Sincronización con SysAcad", description = "Disparo manual y estado del sync de catálogos")
 public class SysacadSyncController {
@@ -32,13 +31,16 @@ public class SysacadSyncController {
     private final SysacadSyncStateService syncStateService;
 
     @PostMapping
+    @PreAuthorize("hasAuthority('PERM_SYSACAD_SYNC')")
     @Operation(summary = "Resincronizar todas las vistas de SysAcad",
-               description = "Dispara el resync de las 7 vistas de SysAcad (Edificios, Aulas, Especialidades, "
-                       + "Materias, Comisiones, Eventos y Asignaciones) en el orden de FK. Espera a que termine "
+               description = "Dispara el resync de las 8 vistas de SysAcad (Edificios, Aulas, Especialidades, "
+                       + "Materias, Comisiones, Eventos, Asignaciones y Feriados) en el orden de FK. Espera a que termine "
                        + "(incluyendo reintentos ante errores transitorios) y devuelve el estado resultante, con "
-                       + "el error de cada vista si lo hubo. Responde 200 si las 7 vistas sincronizaron bien, "
+                       + "el error de cada vista si lo hubo. Responde 200 si las 8 vistas sincronizaron bien, "
                        + "207 si al menos una falló por datos, 503 si no se pudo establecer conexión con SysAcad "
-                       + "(red/VPN caída). Si ya hay un resync en curso, el disparo se ignora y devuelve 200 con "
+                       + "(red/VPN caída). Si una vista falla, las que dependen de ella se saltean y quedan con "
+                       + "lastError DEPENDENCY_FAILED. lastError es un código más un mensaje propio, sin el detalle "
+                       + "interno. Conviene dispararlo justo después de un deploy que migre aulas (V41). Si ya hay un resync en curso, el disparo se ignora y devuelve 200 con "
                        + "el estado previo.")
     public ResponseEntity<List<SysacadSyncStateDto>> resyncAll() {
         log.info("POST /v1/sysacad/sync: resync manual de todas las vistas");
@@ -55,6 +57,7 @@ public class SysacadSyncController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('PERM_SYSACAD_READ')")
     @Operation(summary = "Consultar el estado del sync",
                description = "Devuelve, por vista, el último sync exitoso, las filas afectadas y el último error.")
     public ResponseEntity<List<SysacadSyncStateDto>> findState() {

@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.siga.events.dto.request;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
@@ -19,4 +20,10 @@ public record CreateRecurringEventRequestDto(
         LocalDate endDate,
         @NotNull Long subjectId,
         @NotNull Long commissionId
-) {}
+) {
+
+    @AssertTrue(message = "La fecha de fin no puede ser anterior a la de inicio")
+    private boolean isEndDateValid() {
+        return endDate == null || startDate == null || !endDate.isBefore(startDate);
+    }
+}

@@ -1,0 +1,16 @@
+meta {
+  name: Comisiones
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{sysacadUrl}}/api/data/views/Comisiones
+  body: none
+  auth: none
+}
+
+docs {
+  Consulta directa a la vista Comisiones de Sysacad. Los filtros van como query params por
+  nombre de columna; el orden con sort y direction (asc|desc).
+}

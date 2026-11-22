@@ -4,7 +4,6 @@ import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRegularRoomChangeDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.CreateRoomRequestItemDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.request.ScheduledItemDto;
-import ar.edu.utn.frc.siga.roomrequest.exception.InvalidRoomRequestException;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import ar.edu.utn.frc.siga.roomrequest.validator.AcademicReferenceValidator;
@@ -34,29 +33,25 @@ public class RegularRoomChangeHandler extends AbstractRoomRequestHandler {
     protected void validateItems(CreateRoomRequestDto dto) {
         List<ScheduledItemDto> items = ((CreateRegularRoomChangeDto) dto).items();
         for (ScheduledItemDto item : items) {
-            if (item.dayOfWeek() == null) {
-                throw new InvalidRoomRequestException("Cada pedido de cambio de aula regular requiere un día de dictado.");
-            }
-            if (item.date() != null) {
-                throw new InvalidRoomRequestException("El cambio de aula regular no se ata a una fecha.");
-            }
-            if (item.estimated() != null) {
-                throw new InvalidRoomRequestException("El cambio de aula no lleva cantidad estimada de asistentes.");
-            }
+            ItemConsistency.requireDayOfWeekOnly(item, "cambio de aula regular");
+            ItemConsistency.requireNoEstimated(item);
             ItemConsistency.requireExamUsersConsistent(false, item);
         }
-        ItemConsistency.requireDistinct(items.stream().map(ScheduledItemDto::dayOfWeek).toList(), "un día de dictado");
     }
 
     @Override
     protected void validateReferences(CreateRoomRequestDto dto) {
         academicReference.requireSubject(dto.subjectId());
         academicReference.requireCommissionOfSubject(dto.subjectId(), dto.commissionId());
+        ItemConsistency.requireDistinct(((CreateRegularRoomChangeDto) dto).items().stream()
+                .map(item -> classSchedule.requireClassDay(dto.subjectId(), dto.commissionId(),
+                        item.dayOfWeek(), item.startTime()).recurringEventId())
+                .toList(), "una clase");
     }
 
     @Override
     protected RoomRequestItem buildItem(CreateRoomRequestItemDto item, CreateRoomRequestDto dto) {
-        ClassSlot slot = classSchedule.requireClassDay(dto.subjectId(), dto.commissionId(), item.dayOfWeek());
+        ClassSlot slot = classSchedule.requireClassDay(dto.subjectId(), dto.commissionId(), item.dayOfWeek(), item.startTime());
         return baseItem(item)
                 .commissionId(dto.commissionId())
                 .dayOfWeek(item.dayOfWeek())

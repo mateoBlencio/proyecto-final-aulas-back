@@ -1,9 +1,12 @@
 package ar.edu.utn.frc.siga.common.exception;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.AccessDeniedException;
@@ -25,7 +28,12 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(SigaAppException.class)
-    public ProblemDetail handleAppException(SigaAppException ex) {
+    public ProblemDetail handleAppException(SigaAppException ex, HttpServletResponse response) {
+        ex.getHeaders().forEach(response::setHeader);
+        return handleAppException(ex);
+    }
+
+    ProblemDetail handleAppException(SigaAppException ex) {
         log.warn("{}: {}", ex.getTitle(), ex.getMessage());
         ProblemDetail problem = ProblemDetails.of(ex.getStatus(), ex.getTitle(), ex.getMessage());
         ex.getProperties().forEach(problem::setProperty);
@@ -76,6 +84,13 @@ public class GlobalExceptionHandler {
                 "El parámetro '" + ex.getName() + "' debe ser de tipo " + expectedType + ".");
     }
 
+    @ExceptionHandler(PropertyReferenceException.class)
+    public ProblemDetail handleInvalidSortProperty(PropertyReferenceException ex) {
+        log.warn("Propiedad de orden inválida: {}", ex.getMessage());
+        return ProblemDetails.of(HttpStatus.BAD_REQUEST, "Propiedad de orden inválida",
+                "No se puede ordenar por '" + ex.getPropertyName() + "'.");
+    }
+
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ProblemDetail handleMaxUploadSize(MaxUploadSizeExceededException ex) {
         log.warn("Archivo demasiado grande: {}", ex.getMessage());
@@ -86,6 +101,15 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public void handleAccessDenied(AccessDeniedException ex) throws AccessDeniedException {
         throw ex;
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLock(OptimisticLockingFailureException ex) {
+        log.warn("Conflicto de concurrencia: {}", ex.getMessage());
+        ProblemDetail problem = ProblemDetails.of(HttpStatus.CONFLICT, "Concurrent modification",
+                "El recurso fue modificado por otra operación mientras tanto. Volvé a intentar con los datos actualizados.");
+        problem.setProperty("code", "CONCURRENT_MODIFICATION");
+        return problem;
     }
 
     @ExceptionHandler(Exception.class)

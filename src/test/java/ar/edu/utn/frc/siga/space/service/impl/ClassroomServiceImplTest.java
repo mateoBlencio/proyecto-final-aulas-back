@@ -1,6 +1,10 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.exception.SyncAbortedException;
+import ar.edu.utn.frc.siga.common.security.BuildingScope;
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
+import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.SpaceTestData;
 import ar.edu.utn.frc.siga.space.dto.ClassroomFilter;
@@ -8,13 +12,22 @@ import ar.edu.utn.frc.siga.space.dto.request.ClassroomRequestDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomListItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
 import ar.edu.utn.frc.siga.space.exception.SpaceDomainException;
+import ar.edu.utn.frc.siga.space.exception.SysacadManagedClassroomException;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomListComposer;
 import ar.edu.utn.frc.siga.space.mapper.ClassroomMapper;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomSubjectPermissionDto;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
+import ar.edu.utn.frc.siga.space.model.ClassroomPermission;
+import ar.edu.utn.frc.siga.space.model.ClassroomResource;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
+import ar.edu.utn.frc.siga.space.model.ResourceType;
+import ar.edu.utn.frc.siga.space.model.PermissionMode;
+import ar.edu.utn.frc.siga.space.model.PermissionTargetKind;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
+import ar.edu.utn.frc.siga.space.repository.ClassroomPermissionRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
+import ar.edu.utn.frc.siga.space.repository.ClassroomResourceRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomTypeRepository;
 import ar.edu.utn.frc.siga.space.service.ClassroomTypeService;
 import ar.edu.utn.frc.siga.space.service.command.ClassroomSyncCommand;
@@ -31,16 +44,26 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static ar.edu.utn.frc.siga.space.service.ClassroomService.DEFAULT_CLASSROOM_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -63,14 +86,26 @@ class ClassroomServiceImplTest {
     private ClassroomListComposer classroomListComposer;
     @Mock
     private ClassroomFeatureWriter classroomFeatureWriter;
+    @Mock
+    private BuildingScopeResolver buildingScopeResolver;
+    @Mock
+    private ClassroomPermissionRepository classroomPermissionRepository;
+    @Mock
+    private ClassroomResourceRepository classroomResourceRepository;
+    @Mock
+    private ClassroomDeactivationCoordinator deactivationCoordinator;
 
     private ClassroomServiceImpl service;
 
     @BeforeEach
     void setUp() {
+        ScopedClassroomFinder scopedClassroom =
+                new ScopedClassroomFinder(classroomRepository, buildingScopeResolver);
         service = new ClassroomServiceImpl(
                 classroomRepository, buildingRepository, classroomTypeService, classroomTypeRepository,
-                classroomMapper, classroomListComposer, classroomFeatureWriter);
+                classroomMapper, classroomListComposer, classroomFeatureWriter, buildingScopeResolver,
+                scopedClassroom, classroomPermissionRepository, classroomResourceRepository, deactivationCoordinator);
+        lenient().when(buildingScopeResolver.scopeFor(any())).thenReturn(BuildingScope.unrestricted());
     }
 
 
@@ -82,7 +117,7 @@ class ClassroomServiceImplTest {
         ClassroomRequestDto dto = SpaceTestData.classroomRequestDto();
         when(buildingRepository.findActiveById(1L)).thenReturn(Optional.of(building));
         when(classroomTypeService.findById(1L)).thenReturn(type);
-        when(classroomRepository.findByRoomNumberAndDeletedAtIsNull(101)).thenReturn(Optional.of(SpaceTestData.classroom().build()));
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, building)).thenReturn(Optional.of(SpaceTestData.classroom().build()));
 
         assertThatThrownBy(() -> service.create(dto))
                 .isInstanceOf(SpaceDomainException.class)
@@ -98,7 +133,7 @@ class ClassroomServiceImplTest {
         ClassroomRequestDto dto = SpaceTestData.classroomRequestDto(101, 0, 1L, 1L);
         when(buildingRepository.findActiveById(1L)).thenReturn(Optional.of(building));
         when(classroomTypeService.findById(1L)).thenReturn(type);
-        when(classroomRepository.findByRoomNumberAndDeletedAtIsNull(101)).thenReturn(Optional.empty());
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, building)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.create(dto))
                 .isInstanceOf(SpaceDomainException.class)
@@ -114,7 +149,7 @@ class ClassroomServiceImplTest {
 
         assertThatThrownBy(() -> service.create(dto))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Building not found with id: 1");
+                .hasMessage("No existe el edificio 1.");
         verify(classroomTypeService, never()).findById(any());
     }
 
@@ -126,7 +161,7 @@ class ClassroomServiceImplTest {
 
         assertThatThrownBy(() -> service.create(dto))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Building not found with id: 1");
+                .hasMessage("No existe el edificio 1.");
     }
 
     @Test
@@ -137,10 +172,10 @@ class ClassroomServiceImplTest {
         ClassroomRequestDto dto = SpaceTestData.classroomRequestDto();
         Classroom mapped = Classroom.builder().roomNumber(101).capacity(40).build();
         Classroom saved = SpaceTestData.classroom().build();
-        ClassroomResponseDto responseDto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
+        ClassroomResponseDto responseDto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal", null, true);
         when(buildingRepository.findActiveById(1L)).thenReturn(Optional.of(building));
         when(classroomTypeService.findById(1L)).thenReturn(type);
-        when(classroomRepository.findByRoomNumberAndDeletedAtIsNull(101)).thenReturn(Optional.empty());
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, building)).thenReturn(Optional.empty());
         when(classroomMapper.toEntity(dto)).thenReturn(mapped);
         when(classroomRepository.save(mapped)).thenReturn(saved);
         when(classroomMapper.toDto(saved)).thenReturn(responseDto);
@@ -155,12 +190,45 @@ class ClassroomServiceImplTest {
         assertThat(toSave.getClassroomType()).isEqualTo(type);
     }
 
+    @Test
+    @DisplayName("create: el mismo número en otro edificio no bloquea la creación")
+    void createWithRoomNumberUsedInAnotherBuildingDoesNotThrow() {
+        Building building = SpaceTestData.building().build();
+        ClassroomType type = SpaceTestData.classroomType().build();
+        ClassroomRequestDto dto = SpaceTestData.classroomRequestDto();
+        Classroom mapped = Classroom.builder().roomNumber(101).capacity(40).build();
+        Classroom saved = SpaceTestData.classroom().build();
+        when(buildingRepository.findActiveById(1L)).thenReturn(Optional.of(building));
+        when(classroomTypeService.findById(1L)).thenReturn(type);
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, building)).thenReturn(Optional.empty());
+        when(classroomMapper.toEntity(dto)).thenReturn(mapped);
+        when(classroomRepository.save(mapped)).thenReturn(saved);
+
+        service.create(dto);
+
+        verify(classroomRepository).save(mapped);
+    }
+
+    @Test
+    @DisplayName("create: sin alcance sobre el edificio → AccessDeniedException, no guarda")
+    void createWithoutBuildingScopeThrowsAccessDenied() {
+        Building building = SpaceTestData.building().build();
+        ClassroomRequestDto dto = SpaceTestData.classroomRequestDto();
+        when(buildingRepository.findActiveById(1L)).thenReturn(Optional.of(building));
+        doThrow(new AccessDeniedException("sin acceso"))
+                .when(buildingScopeResolver).requireAccess(Permission.CLASSROOM_CREATE, 1L);
+
+        assertThatThrownBy(() -> service.create(dto)).isInstanceOf(AccessDeniedException.class);
+
+        verify(classroomRepository, never()).save(any());
+    }
+
 
     @Test
     @DisplayName("findById: devuelve el DTO mapeado cuando el aula existe")
     void findByIdReturnsMappedDto() {
         Classroom classroom = SpaceTestData.classroom().build();
-        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
+        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal", null, true);
         when(classroomRepository.findActiveById(1L)).thenReturn(Optional.of(classroom));
         when(classroomMapper.toDto(classroom)).thenReturn(dto);
 
@@ -174,7 +242,7 @@ class ClassroomServiceImplTest {
 
         assertThatThrownBy(() -> service.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Classroom not found with id: 99");
+                .hasMessage("No existe el aula 99.");
     }
 
 
@@ -182,8 +250,9 @@ class ClassroomServiceImplTest {
     @DisplayName("findAllAvailable: mapea las aulas activas devueltas por el repositorio")
     void findAllAvailableMapsRepositoryResult() {
         Classroom classroom = SpaceTestData.classroom().build();
-        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
-        when(classroomRepository.findAllActive()).thenReturn(List.of(classroom));
+        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal", null, true);
+        when(classroomRepository.findAll(ArgumentMatchers.<Specification<Classroom>>any()))
+                .thenReturn(List.of(classroom));
         when(classroomMapper.toDto(classroom)).thenReturn(dto);
 
         assertThat(service.findAllAvailable()).containsExactly(dto);
@@ -193,7 +262,7 @@ class ClassroomServiceImplTest {
     @DisplayName("findByIds: mapea las aulas encontradas, incluso eliminadas (no filtra)")
     void findByIdsMapsAllFound() {
         Classroom classroom = SpaceTestData.classroom().build();
-        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
+        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal", null, true);
         when(classroomRepository.findAllById(List.of(1L, 99L))).thenReturn(List.of(classroom));
         when(classroomMapper.toDto(classroom)).thenReturn(dto);
 
@@ -201,14 +270,30 @@ class ClassroomServiceImplTest {
     }
 
     @Test
+    @DisplayName("findByIds excluye las aulas desactivadas y findByIdsIncludingDeactivated las incluye")
+    void findByIds_excludesDeactivated_butIncludingDeactivatedKeepsThem() {
+        Classroom active = SpaceTestData.classroom().id(1L).build();
+        Classroom deactivated = SpaceTestData.classroom().id(2L).build();
+        deactivated.deactivate();
+        ClassroomResponseDto activeDto = new ClassroomResponseDto(1L, 101, 40, 1L, "Central", 1L, "Normal", null, true);
+        ClassroomResponseDto deactivatedDto = new ClassroomResponseDto(2L, 102, 40, 1L, "Central", 1L, "Normal", null, true);
+        when(classroomRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(active, deactivated));
+        when(classroomMapper.toDto(active)).thenReturn(activeDto);
+        lenient().when(classroomMapper.toDto(deactivated)).thenReturn(deactivatedDto);
+
+        assertThat(service.findByIds(List.of(1L, 2L))).containsExactly(activeDto);
+        assertThat(service.findByIdsIncludingDeactivated(List.of(1L, 2L))).containsExactly(activeDto, deactivatedDto);
+    }
+
+    @Test
     @DisplayName("findAll: aplica filtro vía specification y delega el armado del listado en el composer")
     void findAllMapsPagedResult() {
-        ClassroomFilter filter = new ClassroomFilter(101, null, null, null, null);
+        ClassroomFilter filter = new ClassroomFilter(101, null, null, null, null, false);
         Pageable pageable = PageRequest.of(0, 10);
         Classroom classroom = SpaceTestData.classroom().build();
         Page<Classroom> page = new PageImpl<>(List.of(classroom), pageable, 1);
         ClassroomListItemDto item = new ClassroomListItemDto(1L, 101, 1L, "Edificio Central", 1L, "Normal", 40,
-                List.of(), null, true, null, "Todas", List.of());
+                List.of(), null, true, null, "Todas", List.of(), null, true, true, false, false, false);
         Page<ClassroomListItemDto> composed = new PageImpl<>(List.of(item), pageable, 1);
         when(classroomRepository.findAll(ArgumentMatchers.<Specification<Classroom>>any(), any(Pageable.class)))
                 .thenReturn(page);
@@ -221,24 +306,77 @@ class ClassroomServiceImplTest {
 
 
     @Test
-    @DisplayName("update: si roomNumber pasa a coincidir con otra aula, no valida duplicado (solo create lo hace)")
-    void updateDoesNotValidateDuplicateRoomNumber() {
-        Classroom existing = SpaceTestData.classroom().build();
+    @DisplayName("update: si el número lo usa otra aula activa del mismo edificio, lanza y no guarda")
+    void updateWithRoomNumberUsedByAnotherClassroomThrows() {
+        Classroom existing = SpaceTestData.classroom().id(1L).build();
+        Classroom other = SpaceTestData.classroom().id(2L).roomNumber(102).build();
         Building building = SpaceTestData.building().build();
-        ClassroomType type = SpaceTestData.classroomType().build();
-        ClassroomRequestDto dto = SpaceTestData.classroomRequestDto();
-        Classroom saved = SpaceTestData.classroom().build();
-        ClassroomResponseDto responseDto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
+        ClassroomRequestDto dto = SpaceTestData.classroomRequestDto(102, 40, 1L, 1L);
         when(classroomRepository.findActiveById(1L)).thenReturn(Optional.of(existing));
         when(buildingRepository.findActiveById(1L)).thenReturn(Optional.of(building));
-        when(classroomTypeService.findById(1L)).thenReturn(type);
-        when(classroomRepository.save(existing)).thenReturn(saved);
-        when(classroomMapper.toDto(saved)).thenReturn(responseDto);
+        when(classroomTypeService.findById(1L)).thenReturn(SpaceTestData.classroomType().build());
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(102, building))
+                .thenReturn(Optional.of(other));
 
-        ClassroomResponseDto result = service.update(1L, dto);
+        assertThatThrownBy(() -> service.update(1L, dto))
+                .isInstanceOf(SpaceDomainException.class)
+                .hasMessage("Ya existe un aula con el número 102 en el edificio.");
+        verify(classroomRepository, never()).save(any());
+    }
 
-        assertThat(result).isEqualTo(responseDto);
-        verify(classroomRepository, never()).findByRoomNumberAndDeletedAtIsNull(any());
+    @Test
+    @DisplayName("update: si cambia de edificio y el número choca en el destino, lanza y no guarda")
+    void updateMovingToBuildingWhereRoomNumberIsTakenThrows() {
+        Classroom existing = SpaceTestData.classroom().id(1L).build();
+        Building target = SpaceTestData.building().id(2L).build();
+        Classroom other = SpaceTestData.classroom().id(7L).building(target).build();
+        ClassroomRequestDto dto = SpaceTestData.classroomRequestDto(101, 40, 1L, 2L);
+        when(classroomRepository.findActiveById(1L)).thenReturn(Optional.of(existing));
+        when(buildingRepository.findActiveById(2L)).thenReturn(Optional.of(target));
+        when(classroomTypeService.findById(1L)).thenReturn(SpaceTestData.classroomType().build());
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, target))
+                .thenReturn(Optional.of(other));
+
+        assertThatThrownBy(() -> service.update(1L, dto)).isInstanceOf(SpaceDomainException.class);
+        verify(classroomRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update: conservar su propio número y edificio (el repo la devuelve a ella misma) no lanza")
+    void updateKeepingOwnRoomNumberDoesNotThrow() {
+        Classroom existing = SpaceTestData.classroom().id(1L).build();
+        Building building = SpaceTestData.building().build();
+        ClassroomRequestDto dto = SpaceTestData.classroomRequestDto();
+        ClassroomResponseDto responseDto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal", null, true);
+        when(classroomRepository.findActiveById(1L)).thenReturn(Optional.of(existing));
+        when(buildingRepository.findActiveById(1L)).thenReturn(Optional.of(building));
+        when(classroomTypeService.findById(1L)).thenReturn(SpaceTestData.classroomType().build());
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, building))
+                .thenReturn(Optional.of(existing));
+        when(classroomRepository.save(existing)).thenReturn(existing);
+        when(classroomMapper.toDto(existing)).thenReturn(responseDto);
+
+        assertThat(service.update(1L, dto)).isEqualTo(responseDto);
+        verify(classroomRepository).save(existing);
+    }
+
+    @Test
+    @DisplayName("update: con un número libre en el edificio guarda")
+    void updateWithFreeRoomNumberSaves() {
+        Classroom existing = SpaceTestData.classroom().id(1L).build();
+        Building building = SpaceTestData.building().build();
+        ClassroomRequestDto dto = SpaceTestData.classroomRequestDto(205, 40, 1L, 1L);
+        ClassroomResponseDto responseDto = new ClassroomResponseDto(1L, 205, 40, 1L, "Edificio Central", 1L, "Normal", null, true);
+        when(classroomRepository.findActiveById(1L)).thenReturn(Optional.of(existing));
+        when(buildingRepository.findActiveById(1L)).thenReturn(Optional.of(building));
+        when(classroomTypeService.findById(1L)).thenReturn(SpaceTestData.classroomType().build());
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(205, building))
+                .thenReturn(Optional.empty());
+        when(classroomRepository.save(existing)).thenReturn(existing);
+        when(classroomMapper.toDto(existing)).thenReturn(responseDto);
+
+        assertThat(service.update(1L, dto)).isEqualTo(responseDto);
+        verify(classroomRepository).save(existing);
     }
 
     @Test
@@ -265,7 +403,7 @@ class ClassroomServiceImplTest {
 
         assertThatThrownBy(() -> service.update(1L, dto))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Classroom not found with id: 1");
+                .hasMessage("No existe el aula 1.");
     }
 
     @Test
@@ -278,7 +416,121 @@ class ClassroomServiceImplTest {
 
         assertThatThrownBy(() -> service.update(1L, dto))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Building not found with id: 1");
+                .hasMessage("No existe el edificio 1.");
+    }
+
+    @Test
+    @DisplayName("update: sin alcance sobre el edificio del aula → 404 (el fetch acotado no la ve), no guarda")
+    void updateWithoutBuildingScopeThrowsNotFound() {
+        Classroom existing = SpaceTestData.classroom().build();
+        ClassroomRequestDto dto = SpaceTestData.classroomRequestDto();
+        when(classroomRepository.findActiveById(1L)).thenReturn(Optional.of(existing));
+        when(buildingScopeResolver.scopeFor(Permission.CLASSROOM_UPDATE))
+                .thenReturn(BuildingScope.of(Set.of(2L)));
+
+        assertThatThrownBy(() -> service.update(1L, dto)).isInstanceOf(ResourceNotFoundException.class);
+
+        verify(classroomRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update: aula sincronizada con otra capacidad lanza 409 y no guarda")
+    void updateSysacadClassroomWithDifferentCapacityThrowsConflict() {
+        Classroom existing = SpaceTestData.classroom().id(1L).sysacadHash("hash").build();
+        ClassroomRequestDto dto = SpaceTestData.classroomRequestDto(101, 41, 1L, 1L);
+        when(classroomRepository.findActiveById(1L)).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> service.update(1L, dto))
+                .isInstanceOfSatisfying(SysacadManagedClassroomException.class, e -> {
+                    assertThat(e.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(e.getTitle()).isEqualTo("Aula sincronizada con SysAcad");
+                    assertThat(e.getMessage())
+                            .isEqualTo("El aula 1 viene de SysAcad: no se puede modificar la capacidad.");
+                });
+        verify(classroomRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update: aula sincronizada con otro número lanza 409 y lista solo el número")
+    void updateSysacadClassroomWithDifferentRoomNumberThrowsConflict() {
+        Classroom existing = SpaceTestData.classroom().id(1L).sysacadHash("hash").build();
+        ClassroomRequestDto dto = SpaceTestData.classroomRequestDto(102, 40, 1L, 1L);
+        when(classroomRepository.findActiveById(1L)).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> service.update(1L, dto))
+                .isInstanceOf(SysacadManagedClassroomException.class)
+                .hasMessage("El aula 1 viene de SysAcad: no se puede modificar el número.");
+        verify(classroomRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update: aula sincronizada con otro edificio lanza 409 y lista solo el edificio")
+    void updateSysacadClassroomWithDifferentBuildingThrowsConflict() {
+        Classroom existing = SpaceTestData.classroom().id(1L).sysacadHash("hash").build();
+        ClassroomRequestDto dto = SpaceTestData.classroomRequestDto(101, 40, 1L, 2L);
+        when(classroomRepository.findActiveById(1L)).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> service.update(1L, dto))
+                .isInstanceOf(SysacadManagedClassroomException.class)
+                .hasMessage("El aula 1 viene de SysAcad: no se puede modificar el edificio.");
+        verify(classroomRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update: aula sincronizada con número, edificio y capacidad distintos lista los tres campos")
+    void updateSysacadClassroomWithSeveralChangesListsAllFields() {
+        Classroom existing = SpaceTestData.classroom().id(1L).sysacadHash("hash").build();
+        ClassroomRequestDto dto = SpaceTestData.classroomRequestDto(205, 80, 1L, 2L);
+        when(classroomRepository.findActiveById(1L)).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> service.update(1L, dto))
+                .isInstanceOf(SysacadManagedClassroomException.class)
+                .hasMessage("El aula 1 viene de SysAcad: no se puede modificar "
+                        + "el número, el edificio, la capacidad.");
+        verify(classroomRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update: aula sincronizada con los mismos número, edificio y capacidad guarda el cambio de tipo")
+    void updateSysacadClassroomWithSameFieldsAndOtherTypeSaves() {
+        Classroom existing = SpaceTestData.classroom().id(1L).sysacadHash("hash").build();
+        Building building = SpaceTestData.building().build();
+        ClassroomType laboratory = SpaceTestData.classroomType().id(2L).description("Laboratorio").build();
+        ClassroomRequestDto dto = SpaceTestData.classroomRequestDto(101, 40, 2L, 1L);
+        ClassroomResponseDto responseDto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 2L, "Laboratorio", null, true);
+        when(classroomRepository.findActiveById(1L)).thenReturn(Optional.of(existing));
+        when(buildingRepository.findActiveById(1L)).thenReturn(Optional.of(building));
+        when(classroomTypeService.findById(2L)).thenReturn(laboratory);
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, building))
+                .thenReturn(Optional.of(existing));
+        when(classroomRepository.save(existing)).thenReturn(existing);
+        when(classroomMapper.toDto(existing)).thenReturn(responseDto);
+
+        assertThat(service.update(1L, dto)).isEqualTo(responseDto);
+
+        assertThat(existing.getClassroomType()).isSameAs(laboratory);
+        verify(classroomRepository).save(existing);
+    }
+
+    @Test
+    @DisplayName("update: aula manual (sin hash) cambia número, edificio y capacidad sin lanzar")
+    void updateManualClassroomChangesRoomNumberBuildingAndCapacity() {
+        Classroom existing = SpaceTestData.classroom().id(1L).build();
+        Building target = SpaceTestData.building().id(2L).build();
+        ClassroomRequestDto dto = SpaceTestData.classroomRequestDto(205, 80, 1L, 2L);
+        ClassroomResponseDto responseDto = new ClassroomResponseDto(1L, 205, 80, 2L, "Edificio Central", 1L, "Normal", null, true);
+        when(classroomRepository.findActiveById(1L)).thenReturn(Optional.of(existing));
+        when(buildingRepository.findActiveById(2L)).thenReturn(Optional.of(target));
+        when(classroomTypeService.findById(1L)).thenReturn(SpaceTestData.classroomType().build());
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(205, target))
+                .thenReturn(Optional.empty());
+        when(classroomRepository.save(existing)).thenReturn(existing);
+        when(classroomMapper.toDto(existing)).thenReturn(responseDto);
+
+        assertThat(service.update(1L, dto)).isEqualTo(responseDto);
+
+        assertThat(existing.getBuilding()).isSameAs(target);
+        verify(classroomRepository).save(existing);
     }
 
 
@@ -300,7 +552,74 @@ class ClassroomServiceImplTest {
 
         assertThatThrownBy(() -> service.delete(1L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Classroom not found with id: 1");
+                .hasMessage("No existe el aula 1.");
+    }
+
+    @Test
+    @DisplayName("delete: sin alcance sobre el edificio del aula → 404 (el fetch acotado no la ve), no borra")
+    void deleteWithoutBuildingScopeThrowsNotFound() {
+        Classroom existing = SpaceTestData.classroom().build();
+        when(classroomRepository.findActiveById(1L)).thenReturn(Optional.of(existing));
+        when(buildingScopeResolver.scopeFor(Permission.CLASSROOM_DELETE))
+                .thenReturn(BuildingScope.of(Set.of(2L)));
+
+        assertThatThrownBy(() -> service.delete(1L)).isInstanceOf(ResourceNotFoundException.class);
+
+        verify(classroomRepository, never()).softDelete(any());
+    }
+
+    @Test
+    @DisplayName("activate: sin alcance sobre el edificio del aula → 404 (el fetch acotado no la ve), no reactiva")
+    void activateWithoutBuildingScopeThrowsNotFound() {
+        Classroom existing = SpaceTestData.classroom().build();
+        when(classroomRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(buildingScopeResolver.scopeFor(Permission.CLASSROOM_ACTIVATE))
+                .thenReturn(BuildingScope.of(Set.of(2L)));
+
+        assertThatThrownBy(() -> service.activate(1L)).isInstanceOf(ResourceNotFoundException.class);
+
+        verify(classroomRepository, never()).restore(any());
+    }
+
+    @Test
+    @DisplayName("activate: si otra aula activa usa el número en el edificio, lanza y no restaura")
+    void activateWithRoomNumberTakenThrows() {
+        Classroom deleted = SpaceTestData.classroom().id(1L).build();
+        Classroom other = SpaceTestData.classroom().id(2L).build();
+        when(classroomRepository.findById(1L)).thenReturn(Optional.of(deleted));
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, deleted.getBuilding()))
+                .thenReturn(Optional.of(other));
+
+        assertThatThrownBy(() -> service.activate(1L))
+                .isInstanceOf(SpaceDomainException.class)
+                .hasMessage("Ya existe un aula con el número 101 en el edificio.");
+        verify(classroomRepository, never()).restore(any());
+    }
+
+    @Test
+    @DisplayName("activate: sin choque de número restaura el aula")
+    void activateWithFreeRoomNumberRestores() {
+        Classroom deleted = SpaceTestData.classroom().id(1L).build();
+        when(classroomRepository.findById(1L)).thenReturn(Optional.of(deleted));
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, deleted.getBuilding()))
+                .thenReturn(Optional.empty());
+
+        service.activate(1L);
+
+        verify(classroomRepository).restore(deleted);
+    }
+
+    @Test
+    @DisplayName("activate: sobre un aula ya activa que el repo devuelve como ella misma no lanza")
+    void activateAlreadyActiveClassroomDoesNotConflictWithItself() {
+        Classroom active = SpaceTestData.classroom().id(1L).build();
+        when(classroomRepository.findById(1L)).thenReturn(Optional.of(active));
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, active.getBuilding()))
+                .thenReturn(Optional.of(active));
+
+        service.activate(1L);
+
+        verify(classroomRepository).restore(active);
     }
 
 
@@ -309,8 +628,8 @@ class ClassroomServiceImplTest {
     void findByRoomNumberAndBuildingReturnsMappedDto() {
         Building building = SpaceTestData.building().build();
         Classroom existing = SpaceTestData.classroom().build();
-        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
-        when(buildingRepository.findById(1L)).thenReturn(Optional.of(building));
+        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal", null, true);
+        when(buildingRepository.findActiveById(1L)).thenReturn(Optional.of(building));
         when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, building)).thenReturn(Optional.of(existing));
         when(classroomMapper.toDto(existing)).thenReturn(dto);
 
@@ -321,18 +640,12 @@ class ClassroomServiceImplTest {
     }
 
     @Test
-    @DisplayName("findByRoomNumberAndBuilding: no exige edificio activo")
-    void findByRoomNumberAndBuildingDoesNotRequireActiveBuilding() {
-        Building inactive = SpaceTestData.deactivated(SpaceTestData.building().build());
-        Classroom existing = SpaceTestData.classroom().build();
-        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
-        when(buildingRepository.findById(1L)).thenReturn(Optional.of(inactive));
-        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, inactive)).thenReturn(Optional.of(existing));
-        when(classroomMapper.toDto(existing)).thenReturn(dto);
+    @DisplayName("findByRoomNumberAndBuilding: si el edificio está inactivo, lanza ResourceNotFoundException")
+    void findByRoomNumberAndBuildingWithInactiveBuildingThrowsResourceNotFound() {
+        when(buildingRepository.findActiveById(1L)).thenReturn(Optional.empty());
 
-        ClassroomResponseDto result = service.findByRoomNumberAndBuilding(101, 1L);
-
-        assertThat(result).isEqualTo(dto);
+        assertThatThrownBy(() -> service.findByRoomNumberAndBuilding(101, 1L))
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
@@ -340,8 +653,8 @@ class ClassroomServiceImplTest {
     void findByRoomNumberAndBuildingFallsBackToRoomNumberOnly() {
         Building informedBuilding = SpaceTestData.building().id(2L).name("Edif. Ing.Inchaurrondo").build();
         Classroom actual = SpaceTestData.classroom().build();
-        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
-        when(buildingRepository.findById(2L)).thenReturn(Optional.of(informedBuilding));
+        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal", null, true);
+        when(buildingRepository.findActiveById(2L)).thenReturn(Optional.of(informedBuilding));
         when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, informedBuilding)).thenReturn(Optional.empty());
         when(classroomRepository.findAllByRoomNumberAndDeletedAtIsNull(101)).thenReturn(List.of(actual));
         when(classroomMapper.toDto(actual)).thenReturn(dto);
@@ -352,40 +665,96 @@ class ClassroomServiceImplTest {
     }
 
     @Test
+    @DisplayName("findByRoomNumberAndBuilding: si el aula existe en un edificio dado de baja en SIGA, no hace fallback al aula de otro edificio")
+    void findByRoomNumberAndBuildingWithUnavailableClassroomDoesNotFallBack() {
+        Building informedBuilding = SpaceTestData.building().id(2L).name("Edif. Ing.Inchaurrondo")
+                .sysacadHash("hash").sysacadEnabled(false).build();
+        informedBuilding.deactivate();
+        Classroom inDeactivatedBuilding = SpaceTestData.classroom().building(informedBuilding).build();
+        when(buildingRepository.findActiveById(2L)).thenReturn(Optional.of(informedBuilding));
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, informedBuilding)).thenReturn(Optional.of(inDeactivatedBuilding));
+
+        assertThatThrownBy(() -> service.findByRoomNumberAndBuilding(101, 2L))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(classroomRepository, never()).findAllByRoomNumberAndDeletedAtIsNull(any());
+    }
+
+    @Test
+    @DisplayName("findByRoomNumberAndBuilding: un aula de un edificio ausente de SysAcad (activo en SIGA) se devuelve sin fallback")
+    void findByRoomNumberAndBuildingReturnsClassroomOfBuildingAbsentFromSysacad() {
+        Building informedBuilding = SpaceTestData.building().id(2L).name("Edif. Ing.Inchaurrondo")
+                .sysacadHash("hash").sysacadEnabled(false).build();
+        Classroom inAbsentBuilding = SpaceTestData.classroom().building(informedBuilding).build();
+        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 2L, "Edif. Ing.Inchaurrondo", 1L, "Normal", null, true);
+        when(buildingRepository.findActiveById(2L)).thenReturn(Optional.of(informedBuilding));
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, informedBuilding)).thenReturn(Optional.of(inAbsentBuilding));
+        when(classroomMapper.toDto(inAbsentBuilding)).thenReturn(dto);
+
+        assertThat(service.findByRoomNumberAndBuilding(101, 2L)).isEqualTo(dto);
+        verify(classroomRepository, never()).findAllByRoomNumberAndDeletedAtIsNull(any());
+    }
+
+    @Test
+    @DisplayName("findByRoomNumberAndBuilding: un aula no vigente en SysAcad del edificio informado se devuelve")
+    void findByRoomNumberAndBuildingReturnsClassroomNotCurrentInSysacad() {
+        Building informedBuilding = SpaceTestData.building().id(2L).name("Edif. Ing.Inchaurrondo").build();
+        Classroom notCurrent = SpaceTestData.classroom().building(informedBuilding).sysacadHash("hash").sysacadEnabled(true).sysacadCurrent(false).build();
+        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 2L, "Edif. Ing.Inchaurrondo", 1L, "Normal", null, false);
+        when(buildingRepository.findActiveById(2L)).thenReturn(Optional.of(informedBuilding));
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, informedBuilding)).thenReturn(Optional.of(notCurrent));
+        when(classroomMapper.toDto(notCurrent)).thenReturn(dto);
+
+        assertThat(service.findByRoomNumberAndBuilding(101, 2L)).isEqualTo(dto);
+    }
+
+    @Test
+    @DisplayName("findByRoomNumberAndBuildingCode: un aula no vigente en SysAcad de un edificio vigente se devuelve")
+    void findByRoomNumberAndBuildingCodeReturnsClassroomNotCurrentInSysacad() {
+        Building building = SpaceTestData.building().buildingCode(7).build();
+        Classroom notCurrent = SpaceTestData.classroom().building(building).sysacadHash("hash").sysacadEnabled(true).sysacadCurrent(false).build();
+        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal", null, false);
+        when(buildingRepository.findByBuildingCode(7)).thenReturn(Optional.of(building));
+        when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, building)).thenReturn(Optional.of(notCurrent));
+        when(classroomMapper.toDto(notCurrent)).thenReturn(dto);
+
+        assertThat(service.findByRoomNumberAndBuildingCode(101, 7)).contains(dto);
+    }
+
+    @Test
     @DisplayName("findByRoomNumberAndBuilding: si el número es ambiguo (más de un aula en catálogo), no adivina y lanza ResourceNotFoundException")
     void findByRoomNumberAndBuildingWithAmbiguousRoomNumberThrowsResourceNotFound() {
         Building informedBuilding = SpaceTestData.building().id(2L).name("Otro edificio").build();
         Classroom other1 = SpaceTestData.classroom().id(10L).build();
         Classroom other2 = SpaceTestData.classroom().id(11L).build();
-        when(buildingRepository.findById(2L)).thenReturn(Optional.of(informedBuilding));
+        when(buildingRepository.findActiveById(2L)).thenReturn(Optional.of(informedBuilding));
         when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(999, informedBuilding)).thenReturn(Optional.empty());
         when(classroomRepository.findAllByRoomNumberAndDeletedAtIsNull(999)).thenReturn(List.of(other1, other2));
 
         assertThatThrownBy(() -> service.findByRoomNumberAndBuilding(999, 2L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Classroom not found with id: 999");
+                .hasMessage("No existe el aula 999.");
     }
 
     @Test
     @DisplayName("findByRoomNumberAndBuilding: si el aula no existe en el edificio, lanza ResourceNotFoundException")
     void findByRoomNumberAndBuildingWithMissingClassroomThrowsResourceNotFound() {
         Building building = SpaceTestData.building().build();
-        when(buildingRepository.findById(1L)).thenReturn(Optional.of(building));
+        when(buildingRepository.findActiveById(1L)).thenReturn(Optional.of(building));
         when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, building)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findByRoomNumberAndBuilding(101, 1L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Classroom not found with id: 101");
+                .hasMessage("No existe el aula 101.");
     }
 
     @Test
     @DisplayName("findByRoomNumberAndBuilding: si el edificio no existe, lanza ResourceNotFoundException")
     void findByRoomNumberAndBuildingWithMissingBuildingThrowsResourceNotFound() {
-        when(buildingRepository.findById(1L)).thenReturn(Optional.empty());
+        when(buildingRepository.findActiveById(1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findByRoomNumberAndBuilding(101, 1L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Building not found with id: 1");
+                .hasMessage("No existe el edificio 1.");
     }
 
     @Test
@@ -393,7 +762,7 @@ class ClassroomServiceImplTest {
     void findByRoomNumberAndBuildingCodeReturnsMappedDto() {
         Building building = SpaceTestData.building().buildingCode(28).build();
         Classroom existing = SpaceTestData.classroom().build();
-        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal");
+        ClassroomResponseDto dto = new ClassroomResponseDto(1L, 101, 40, 1L, "Edificio Central", 1L, "Normal", null, true);
         when(buildingRepository.findByBuildingCode(28)).thenReturn(Optional.of(building));
         when(classroomRepository.findByRoomNumberAndBuildingAndDeletedAtIsNull(101, building)).thenReturn(Optional.of(existing));
         when(classroomMapper.toDto(existing)).thenReturn(dto);
@@ -435,7 +804,7 @@ class ClassroomServiceImplTest {
         when(classroomTypeRepository.findByDescriptionIgnoreCaseAndDeletedAtIsNull(DEFAULT_CLASSROOM_TYPE)).thenReturn(Optional.of(defaultType));
         when(classroomRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)));
+        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)), 0);
 
         ArgumentCaptor<Classroom> saved = ArgumentCaptor.forClass(Classroom.class);
         verify(classroomRepository).save(saved.capture());
@@ -456,14 +825,14 @@ class ClassroomServiceImplTest {
         when(classroomRepository.findAll()).thenReturn(List.of());
         when(classroomTypeRepository.findByDescriptionIgnoreCaseAndDeletedAtIsNull(DEFAULT_CLASSROOM_TYPE)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70))))
+        assertThatThrownBy(() -> service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)), 0))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(DEFAULT_CLASSROOM_TYPE);
         verify(classroomRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("syncClassrooms: actualiza capacidad y habilitada_sysacad sin pisar el tipo de aula local")
+    @DisplayName("syncClassrooms: actualiza capacidad y raw_habilitada sin pisar el tipo de aula local")
     void syncClassroomsUpdatesOnlySysacadOwnedFields() {
         ClassroomType type = SpaceTestData.classroomType().build();
         Classroom existing = syncClassroom(101, 40, true, Hashes.sha256Hex(40, true));
@@ -471,10 +840,11 @@ class ClassroomServiceImplTest {
         when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
         when(classroomRepository.findAll()).thenReturn(List.of(existing));
 
-        service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, false, 70)));
+        service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, false, 70)), 0);
 
         assertThat(existing.getCapacity()).isEqualTo(70);
         assertThat(existing.getSysacadEnabled()).isFalse();
+        assertThat(existing.getSysacadCurrent()).isTrue();
         assertThat(existing.getClassroomType()).isSameAs(type);
         verify(classroomRepository).save(existing);
     }
@@ -486,10 +856,30 @@ class ClassroomServiceImplTest {
         when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
         when(classroomRepository.findAll()).thenReturn(List.of(existing));
 
-        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)));
+        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)), 0);
 
         verify(classroomRepository, never()).save(any());
         assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("syncClassrooms: una fila sin capacidad o con capacidad negativa se ignora y el resto se sincroniza")
+    void syncClassroomsIgnoresRowsWithoutValidCapacity() {
+        ClassroomType defaultType = SpaceTestData.classroomType().description(DEFAULT_CLASSROOM_TYPE).build();
+        when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
+        when(classroomRepository.findAll()).thenReturn(List.of());
+        when(classroomTypeRepository.findByDescriptionIgnoreCaseAndDeletedAtIsNull(DEFAULT_CLASSROOM_TYPE)).thenReturn(Optional.of(defaultType));
+        when(classroomRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        int affected = service.syncClassrooms(List.of(
+                new ClassroomSyncCommand(101, 2, true, null),
+                new ClassroomSyncCommand(102, 2, true, -5),
+                new ClassroomSyncCommand(103, 2, true, 40)), 0);
+
+        ArgumentCaptor<Classroom> saved = ArgumentCaptor.forClass(Classroom.class);
+        verify(classroomRepository).save(saved.capture());
+        assertThat(saved.getValue().getRoomNumber()).isEqualTo(103);
+        assertThat(affected).isEqualTo(1);
     }
 
     @Test
@@ -498,36 +888,290 @@ class ClassroomServiceImplTest {
         when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
         when(classroomRepository.findAll()).thenReturn(List.of());
 
-        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 99, true, 70)));
+        assertThatThrownBy(() -> service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 99, true, 70)), 0))
+                .isInstanceOf(SyncAbortedException.class);
 
         verify(classroomRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("syncClassrooms: un aula que Sysacad lista con capacidad inválida no se escribe ni pasa a no vigente")
+    void syncClassroomsDoesNotMarkAbsentWhenListedWithInvalidCapacity() {
+        Classroom badData = syncClassroom(101, 70, true, Hashes.sha256Hex(70, true));
+        Classroom ok = syncClassroom(102, 70, true, Hashes.sha256Hex(70, true));
+        when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
+        when(classroomRepository.findAll()).thenReturn(List.of(badData, ok));
+
+        int affected = service.syncClassrooms(List.of(
+                new ClassroomSyncCommand(101, 2, true, null), new ClassroomSyncCommand(102, 2, true, 70)), 0);
+
+        assertThat(badData.getSysacadCurrent()).isTrue();
+        assertThat(badData.getCapacity()).isEqualTo(70);
         assertThat(affected).isZero();
+        verify(classroomRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("syncClassrooms: las aulas manuales (sin hash) no cuentan en el denominador del umbral")
+    void syncClassroomsThresholdIgnoresManualClassrooms() {
+        Classroom synced = syncClassroom(101, 70, true, Hashes.sha256Hex(70, true));
+        Classroom manual1 = syncClassroom(201, 30, true, null);
+        Classroom manual2 = syncClassroom(202, 30, true, null);
+        Classroom manual3 = syncClassroom(203, 30, true, null);
+        when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
+        when(classroomRepository.findAll()).thenReturn(List.of(synced, manual1, manual2, manual3));
+
+        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)), 100);
+
+        assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("syncClassrooms: por debajo del umbral de filas válidas aborta y no da de baja nada")
+    void syncClassroomsAbortsBelowThreshold() {
+        Classroom kept = syncClassroom(101, 70, true, Hashes.sha256Hex(70, true));
+        Classroom other = syncClassroom(102, 70, true, Hashes.sha256Hex(70, true));
+        Classroom another = syncClassroom(103, 70, true, Hashes.sha256Hex(70, true));
+        when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
+        when(classroomRepository.findAll()).thenReturn(List.of(kept, other, another));
+
+        assertThatThrownBy(() -> service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)), 50))
+                .isInstanceOf(SyncAbortedException.class);
+
+        assertThat(List.of(other, another)).allMatch(c -> Boolean.TRUE.equals(c.getSysacadEnabled()));
+        verify(classroomRepository, never()).save(any());
     }
 
     @Test
     @DisplayName("syncClassrooms: el aula ausente upstream queda no vigente en SysAcad, sin borrarse")
     void syncClassroomsMarksAbsentClassroomAsNotCurrent() {
         Classroom absent = syncClassroom(101, 70, true, Hashes.sha256Hex(70, true));
+        Classroom present = syncClassroom(102, 70, true, Hashes.sha256Hex(70, true));
         when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
-        when(classroomRepository.findAll()).thenReturn(List.of(absent));
+        when(classroomRepository.findAll()).thenReturn(List.of(absent, present));
 
-        service.syncClassrooms(List.of());
+        service.syncClassrooms(List.of(new ClassroomSyncCommand(102, 2, true, 70)), 0);
 
-        assertThat(absent.getSysacadEnabled()).isFalse();
+        assertThat(absent.getSysacadCurrent()).isFalse();
+        assertThat(absent.getSysacadEnabled()).as("la ausencia no toca el flag S/N de Sysacad").isTrue();
+        assertThat(absent.isAvailable()).as("ausente no excluye el aula").isTrue();
         verify(classroomRepository).save(absent);
     }
 
     @Test
-    @DisplayName("syncClassrooms: no vuelve a guardar un aula ausente que ya estaba deshabilitada")
-    void syncClassroomsSkipsAlreadyDisabledAbsentClassroom() {
-        Classroom alreadyDisabled = syncClassroom(101, 70, false, Hashes.sha256Hex(70, false));
+    @DisplayName("syncClassrooms: no vuelve a guardar un aula ausente que ya estaba marcada no vigente")
+    void syncClassroomsSkipsAlreadyAbsentClassroom() {
+        Classroom alreadyAbsent = syncClassroom(101, 70, true, Hashes.sha256Hex(70, true));
+        alreadyAbsent.setSysacadCurrent(false);
+        Classroom present = syncClassroom(102, 70, true, Hashes.sha256Hex(70, true));
         when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
-        when(classroomRepository.findAll()).thenReturn(List.of(alreadyDisabled));
+        when(classroomRepository.findAll()).thenReturn(List.of(alreadyAbsent, present));
 
-        int affected = service.syncClassrooms(List.of());
+        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(102, 2, true, 70)), 0);
 
         verify(classroomRepository, never()).save(any());
         assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("syncClassrooms: con borrada y activa del mismo (edificio, número) actualiza ambas sin crear filas")
+    void syncClassroomsUpdatesBothDeletedAndActiveRowsOfSameKey() {
+        Instant old = Instant.parse("2020-01-01T00:00:00Z");
+        Classroom deleted = syncClassroom(101, 40, true, Hashes.sha256Hex(40, true));
+        deleted.setId(11L);
+        deleted.deactivate();
+        deleted.setSyncedAt(old);
+        Classroom active = syncClassroom(101, 50, true, Hashes.sha256Hex(50, true));
+        active.setId(12L);
+        active.setSyncedAt(old);
+        when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
+        when(classroomRepository.findAll()).thenReturn(List.of(deleted, active));
+
+        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)), 0);
+
+        assertThat(affected).isEqualTo(2);
+        for (Classroom row : List.of(deleted, active)) {
+            assertThat(row.getCapacity()).isEqualTo(70);
+            assertThat(row.getSysacadEnabled()).isTrue();
+            assertThat(row.getSysacadHash()).isEqualTo(Hashes.sha256Hex(70, true));
+            assertThat(row.getSyncedAt()).isAfter(old);
+        }
+        assertThat(deleted.isDeleted()).isTrue();
+        verify(classroomRepository).save(deleted);
+        verify(classroomRepository).save(active);
+        verify(classroomRepository, times(2)).save(any());
+    }
+
+    @Test
+    @DisplayName("syncClassrooms: con borrada y activa, si la activa ya está al día solo actualiza la borrada")
+    void syncClassroomsUpdatesOnlyStaleRowOfPair() {
+        Classroom deleted = syncClassroom(101, 40, true, Hashes.sha256Hex(40, true));
+        deleted.setId(13L);
+        deleted.deactivate();
+        Classroom active = syncClassroom(101, 70, true, Hashes.sha256Hex(70, true));
+        active.setId(14L);
+        when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
+        when(classroomRepository.findAll()).thenReturn(List.of(deleted, active));
+
+        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)), 0);
+
+        assertThat(affected).isEqualTo(1);
+        assertThat(deleted.getCapacity()).isEqualTo(70);
+        verify(classroomRepository).save(deleted);
+        verify(classroomRepository, never()).save(same(active));
+    }
+
+    @Test
+    @DisplayName("syncClassrooms: si solo existe la borrada la actualiza, no crea otra y sigue borrada")
+    void syncClassroomsUpdatesLoneDeletedRowWithoutCreating() {
+        Classroom deleted = syncClassroom(101, 40, true, Hashes.sha256Hex(40, true));
+        deleted.setId(15L);
+        deleted.deactivate();
+        when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
+        when(classroomRepository.findAll()).thenReturn(List.of(deleted));
+
+        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)), 0);
+
+        assertThat(affected).isEqualTo(1);
+        assertThat(deleted.getCapacity()).isEqualTo(70);
+        assertThat(deleted.isDeleted()).isTrue();
+        verify(classroomRepository).save(deleted);
+        verify(classroomRepository, times(1)).save(any());
+        verifyNoInteractions(classroomTypeRepository);
+    }
+
+    @Test
+    @DisplayName("syncClassrooms: key ausente en SysAcad marca no vigentes a borrada y activa; las ya no vigentes no cuentan")
+    void syncClassroomsMarksAbsentDeletedAndActiveRows() {
+        Instant old = Instant.parse("2020-01-01T00:00:00Z");
+        Classroom deleted = syncClassroom(101, 70, true, Hashes.sha256Hex(70, true));
+        deleted.setId(16L);
+        deleted.deactivate();
+        deleted.setSyncedAt(old);
+        Classroom active = syncClassroom(101, 70, true, Hashes.sha256Hex(70, true));
+        active.setId(17L);
+        active.setSyncedAt(old);
+        Classroom alreadyAbsent = syncClassroom(102, 70, true, Hashes.sha256Hex(70, true));
+        alreadyAbsent.setId(18L);
+        alreadyAbsent.deactivate();
+        alreadyAbsent.setSysacadCurrent(false);
+        alreadyAbsent.setSyncedAt(old);
+        Classroom present = syncClassroom(103, 70, true, Hashes.sha256Hex(70, true));
+        present.setId(19L);
+        when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
+        when(classroomRepository.findAll()).thenReturn(List.of(deleted, active, alreadyAbsent, present));
+
+        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(103, 2, true, 70)), 0);
+
+        assertThat(affected).isEqualTo(2);
+        assertThat(deleted.getSysacadCurrent()).isFalse();
+        assertThat(active.getSysacadCurrent()).isFalse();
+        assertThat(deleted.getSyncedAt()).isAfter(old);
+        assertThat(active.getSyncedAt()).isAfter(old);
+        assertThat(alreadyAbsent.getSyncedAt()).isEqualTo(old);
+        verify(classroomRepository, never()).save(same(alreadyAbsent));
+        verify(classroomRepository, never()).save(same(present));
+    }
+
+    @Test
+    @DisplayName("syncClassrooms: key sin filas crea una sola")
+    void syncClassroomsCreatesSingleRowForUnknownKey() {
+        ClassroomType defaultType = SpaceTestData.classroomType().description(DEFAULT_CLASSROOM_TYPE).build();
+        when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
+        when(classroomRepository.findAll()).thenReturn(List.of());
+        when(classroomTypeRepository.findByDescriptionIgnoreCaseAndDeletedAtIsNull(DEFAULT_CLASSROOM_TYPE))
+                .thenReturn(Optional.of(defaultType));
+        when(classroomRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)), 0);
+
+        assertThat(affected).isEqualTo(1);
+        verify(classroomRepository, times(1)).save(any());
+    }
+
+    @Test
+    @DisplayName("syncClassrooms: un aula con habilitada = N ya sincronizada no se reescribe en cada corrida")
+    void syncClassroomsDoesNotRewriteDisabledClassroom() {
+        Classroom disabled = syncClassroom(101, 70, false, Hashes.sha256Hex(70, false));
+        when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
+        when(classroomRepository.findAll()).thenReturn(List.of(disabled));
+
+        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, false, 70)), 0);
+
+        verify(classroomRepository, never()).save(any());
+        assertThat(affected).isZero();
+        assertThat(disabled.getSysacadEnabled()).isFalse();
+    }
+
+    @Test
+    @DisplayName("syncClassrooms: un aula ausente que reaparece vuelve a vigente")
+    void syncClassroomsRestoresCurrentFlagWhenClassroomReappears() {
+        Classroom absent = syncClassroom(101, 70, true, Hashes.sha256Hex(70, true));
+        absent.setSysacadCurrent(false);
+        when(buildingRepository.findAll()).thenReturn(List.of(SYNC_BUILDING));
+        when(classroomRepository.findAll()).thenReturn(List.of(absent));
+
+        int affected = service.syncClassrooms(List.of(new ClassroomSyncCommand(101, 2, true, 70)), 0);
+
+        assertThat(absent.getSysacadCurrent()).isTrue();
+        assertThat(affected).isEqualTo(1);
+        verify(classroomRepository).save(absent);
+    }
+
+    @Test
+    @DisplayName("findSubjectPermissions: ALL abre a todas, SUBSET expone las materias, NONE queda vacío")
+    void findSubjectPermissionsResuelveModo() {
+        Classroom all = SpaceTestData.classroom().id(1L).permissionMode(PermissionMode.ALL).build();
+        Classroom subset = SpaceTestData.classroom().id(2L).permissionMode(PermissionMode.SUBSET).build();
+        Classroom none = SpaceTestData.classroom().id(3L).permissionMode(PermissionMode.NONE).build();
+        ClassroomPermission subsetPermission = ClassroomPermission.builder()
+                .classroom(subset).targetKind(PermissionTargetKind.SUBJECT).targetId(77L).build();
+        when(classroomPermissionRepository.findByClassroomIdInAndDeletedAtIsNull(any()))
+                .thenReturn(List.of(subsetPermission));
+        when(classroomRepository.findAllById(any())).thenReturn(List.of(all, subset, none));
+
+        Map<Long, ClassroomSubjectPermissionDto> result =
+                service.findSubjectPermissions(List.of(1L, 2L, 3L));
+
+        assertThat(result.get(1L).openToAll()).isTrue();
+        assertThat(result.get(2L).openToAll()).isFalse();
+        assertThat(result.get(2L).allowedSubjectIds()).containsExactly(77L);
+        assertThat(result.get(2L).permits(77L)).isTrue();
+        assertThat(result.get(3L).openToAll()).isFalse();
+        assertThat(result.get(3L).allowedSubjectIds()).isEmpty();
+        assertThat(result.get(3L).permits(77L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("findSubjectPermissions: lista vacía no consulta la base")
+    void findSubjectPermissionsVacio() {
+        assertThat(service.findSubjectPermissions(List.of())).isEmpty();
+        verify(classroomRepository, never()).findAllById(any());
+    }
+
+    @Test
+    @DisplayName("findResourceAmounts: suma por aula solo el recurso pedido, sin importar mayúsculas, y descarta tipos dados de baja")
+    void findResourceAmountsFiltersByActiveResourceName() {
+        ResourceType pcs = ResourceType.builder().id(1L).name("Cantidad de PC").build();
+        ResourceType retiredPcs = ResourceType.builder().id(2L).name("Cantidad de PC").build();
+        retiredPcs.deactivate(java.time.Instant.now());
+        ResourceType projector = ResourceType.builder().id(3L).name("Proyector").build();
+        Classroom lab1 = Classroom.builder().id(1L).build();
+        Classroom lab2 = Classroom.builder().id(2L).build();
+        when(classroomResourceRepository.findByClassroomIdInAndDeletedAtIsNull(List.of(1L, 2L, 3L))).thenReturn(List.of(
+                ClassroomResource.builder().classroom(lab1).resourceType(pcs).quantity(35).build(),
+                ClassroomResource.builder().classroom(lab1).resourceType(projector).quantity(1).build(),
+                ClassroomResource.builder().classroom(lab2).resourceType(retiredPcs).quantity(99).build(),
+                ClassroomResource.builder().classroom(lab2).resourceType(pcs).quantity(null).build()));
+
+        assertThat(service.findResourceAmounts("cantidad de pc", List.of(1L, 2L, 3L))).containsExactly(Map.entry(1L, 35));
+    }
+
+    @Test
+    @DisplayName("findResourceAmounts: sin ids no consulta el repositorio")
+    void findResourceAmountsWithoutIdsReturnsEmpty() {
+        assertThat(service.findResourceAmounts("Cantidad de PC", List.of())).isEmpty();
+        verifyNoInteractions(classroomResourceRepository);
     }
 
     private static Classroom syncClassroom(Integer roomNumber, Integer capacity, Boolean sysacadEnabled, String hash) {

@@ -1,0 +1,16 @@
+meta {
+  name: Exámenes, aulas, turno y totales de inscriptos
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{sysacadUrl}}/api/data/views/ExamenesAulasTurnoTotalesInscriptos
+  body: none
+  auth: none
+}
+
+docs {
+  Consulta directa a la vista ExamenesAulasTurnoTotalesInscriptos de Sysacad. Los filtros van como query params por
+  nombre de columna; el orden con sort y direction (asc|desc).
+}

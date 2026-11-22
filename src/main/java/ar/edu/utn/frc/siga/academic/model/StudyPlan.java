@@ -1,6 +1,10 @@
 package ar.edu.utn.frc.siga.academic.model;
 
+import org.hibernate.envers.Audited;
+import org.hibernate.envers.AuditOverride;
+import org.hibernate.envers.NotAudited;
 import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
+import ar.edu.utn.frc.siga.common.model.UnavailableReason;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -20,6 +24,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
+@Audited
+@AuditOverride(forClass = SoftDeletableEntity.class)
 @Table(name = "plan_estudio",
        uniqueConstraints = @UniqueConstraint(columnNames = {"codigo_plan", "id_especialidad"}))
 @Getter
@@ -41,13 +47,26 @@ public class StudyPlan extends SoftDeletableEntity {
     @JoinColumn(name = "id_especialidad", nullable = false)
     private Specialty specialty;
 
+    @NotAudited
     @Column(name = "sincronizado_en")
     private Instant syncedAt;
 
-    @Column(name = "hash_sysacad", length = 64)
+    @NotAudited
+    @Column(name = "hash_raw", length = 64)
     private String sysacadHash;
 
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
+
+    public UnavailableReason unavailableReason() {
+        if (!isActive()) {
+            return UnavailableReason.DEACTIVATED;
+        }
+        return specialty.isActive() ? null : UnavailableReason.PARENT_DEACTIVATED;
+    }
+
+    public boolean isAvailable() {
+        return unavailableReason() == null;
+    }
 }

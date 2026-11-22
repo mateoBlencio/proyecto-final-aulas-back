@@ -1,0 +1,58 @@
+meta {
+  name: Reasignar aula
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{baseUrl}}/v1/allocations
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "items": [
+      { "occurrenceIds": [1], "classroomId": 2 }
+    ],
+    "observation": "Cambio de aula por conflicto de capacidad"
+  }
+}
+
+docs {
+  Reasigna aula en lote (source = MANUAL). Solo mueve ocurrencias que ya tienen
+  aula: 409 si alguna no la tiene. Para asignar ocurrencias sin aula ver
+  POST /v1/allocations.
+
+  Cada item de "items" es EITHER "occurrenceIds" (lista explícita de ids de
+  ocurrencia) OR "eventId" (todas las ocurrencias aplicables del evento desde
+  la primera fecha aún modificable en adelante), nunca ambos ni ninguno.
+  "classroomId" es obligatorio en todos los items. Este ejemplo usa un solo
+  item con una sola ocurrencia; ver 07-reasignar-lote.bru y
+  05-reasignar-aula-de-evento.bru para ejemplos de lote múltiple y de item
+  por eventId.
+
+  Valida que el aula nueva no esté ocupada por OTRA asignación en la misma
+  fecha/franja de la ocurrencia (la ocupación actual de esta misma asignación
+  no cuenta como conflicto: reasignar al mismo aula que ya tenía es válido).
+  Todo el lote se valida ANTES de escribir nada. Si hay solapamiento que
+  supera el margen de allocation.maxOverlapMinutes (ver /v1/settings, default
+  40 minutos) → 409 con:
+  {
+    "classroomIds": [2],   // todas las aulas en conflicto, sin repetir
+    "detail": "El aula 920 se superpone 35 min con otro evento el 21/10.",
+    "conflicts": [
+      { "occurrenceId", "date", "startTime", "endTime", "classroomId",
+        "conflictingEventId", "conflictingAllocationId", "overlapMinutes" }
+    ]
+  }
+
+  Si el solapamiento entra dentro del margen y falta "observation" (o viene
+  vacía) → 400 "Observation required" con:
+  { "classroomIds": [2], "detail": "El aula 920 se superpone 30 min ... indicá un motivo para confirmar.",
+    "overlaps": [ { "occurrenceId", ..., "overlapMinutes" } ] }
+
+  Respuesta 200: List<AllocationResponseDto> con el/los item(s) resultantes.
+
+  422 "Evento suspendido" si el evento del lote tiene la materia, comisión, materia-comisión, plan o especialidad dada de baja.
+}

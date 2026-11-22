@@ -1,0 +1,41 @@
+meta {
+  name: Retomar pedido derivado
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/v1/room-requests/items/1/take-over
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "reason": "El auxiliar está de licencia y el docente necesita respuesta"
+  }
+}
+
+docs {
+  POST /v1/room-requests/items/{id}/take-over. Rol: SUBSECRETARIA.
+
+  Subsecretaría saca un pedido derivado de la cola del edificio sin cambiarle el
+  estado, las aulas ni el plazo. Sirve cuando el auxiliar ya asignó, notificó o
+  resolvió y no responde.
+
+  Estados permitidos: `IN_EVALUATION`, `NOTIFIED` y `RESOLVED` con fechas futuras.
+  `DERIVED_TO_BUILDING` se sigue devolviendo con `/return`. `reason` es obligatorio
+  (400 sin él).
+
+  Copia el edificio derivado a `returnedFromBuildingId` y guarda `returnedReason`;
+  limpia `derivedBuildingId` y `derivedAt`. Después el pedido es de Subsecretaría
+  y el auxiliar deja de verlo. Un `NOTIFIED` conserva el plazo y se acepta solo al
+  vencer.
+
+  Manda un mail a los auxiliares del edificio con el motivo.
+
+  Errores: 403 si el actor no es Subsecretaría o el pedido no está derivado ni en
+  un estado permitido; 400 sin motivo o en un `RESOLVED` sin fechas futuras.
+
+  Respuesta: 200 con el pedido actualizado (mismo `status`, `derivedBuilding` en null).
+}

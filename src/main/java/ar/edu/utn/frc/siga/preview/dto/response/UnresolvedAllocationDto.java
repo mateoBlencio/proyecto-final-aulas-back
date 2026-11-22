@@ -7,6 +7,7 @@ import java.util.List;
 
 public record UnresolvedAllocationDto(
         AcademicEventResponseDto event,
+        int roomSlot,
         List<LocalDate> dates,
         List<MoveConflictDto> conflicts
 ) {

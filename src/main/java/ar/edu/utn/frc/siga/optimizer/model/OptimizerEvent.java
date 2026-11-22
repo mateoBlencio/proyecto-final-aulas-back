@@ -10,5 +10,32 @@ import java.util.Set;
 @NamedInterface("api")
 public record OptimizerEvent(String planningId, String commissionKey, int enrolled,
                           LocalTime startTime, LocalTime endTime,
-                          Set<LocalDate> occurrenceDates) implements TimeSpan {
+                          Set<LocalDate> occurrenceDates, Set<Long> subjectIds, String groupKey,
+                          boolean needsProjector, int computersNeeded, Long priorRoomId) implements TimeSpan {
+
+    public OptimizerEvent(String planningId, String commissionKey, int enrolled,
+                          LocalTime startTime, LocalTime endTime,
+                          Set<LocalDate> occurrenceDates, Set<Long> subjectIds, String groupKey,
+                          boolean needsProjector, int computersNeeded) {
+        this(planningId, commissionKey, enrolled, startTime, endTime, occurrenceDates, subjectIds, groupKey,
+                needsProjector, computersNeeded, null);
+    }
+
+    public OptimizerEvent(String planningId, String commissionKey, int enrolled,
+                          LocalTime startTime, LocalTime endTime,
+                          Set<LocalDate> occurrenceDates, Set<Long> subjectIds, String groupKey) {
+        this(planningId, commissionKey, enrolled, startTime, endTime, occurrenceDates, subjectIds, groupKey,
+                false, 0);
+    }
+
+    public OptimizerEvent(String planningId, String commissionKey, int enrolled,
+                          LocalTime startTime, LocalTime endTime, Set<LocalDate> occurrenceDates) {
+        this(planningId, commissionKey, enrolled, startTime, endTime, occurrenceDates, Set.of(), null);
+    }
+
+    public OptimizerEvent(String planningId, String commissionKey, int enrolled,
+                          LocalTime startTime, LocalTime endTime,
+                          Set<LocalDate> occurrenceDates, Set<Long> subjectIds) {
+        this(planningId, commissionKey, enrolled, startTime, endTime, occurrenceDates, subjectIds, null);
+    }
 }

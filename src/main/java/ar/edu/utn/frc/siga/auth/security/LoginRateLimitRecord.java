@@ -14,9 +14,21 @@ class LoginRateLimitRecord {
         return failures.size() >= maxAttempts;
     }
 
-    synchronized void recordFailure(Instant now, Duration window) {
+    synchronized Duration retryAfter(Instant now, Duration window, int maxAttempts) {
+        prune(now, window);
+        int excess = failures.size() - maxAttempts;
+        if (excess < 0) {
+            return Duration.ZERO;
+        }
+        Instant blockingFailure = failures.stream().skip(excess).findFirst().orElse(now);
+        return Duration.between(now, blockingFailure.plus(window));
+    }
+
+    /** Returns the number of failures inside the window, including this one. */
+    synchronized int recordFailure(Instant now, Duration window) {
         prune(now, window);
         failures.addLast(now);
+        return failures.size();
     }
 
     synchronized void reset() {

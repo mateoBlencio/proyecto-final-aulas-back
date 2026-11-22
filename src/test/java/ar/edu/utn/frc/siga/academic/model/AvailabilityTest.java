@@ -1,0 +1,245 @@
+package ar.edu.utn.frc.siga.academic.model;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import ar.edu.utn.frc.siga.common.model.UnavailableReason;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+@DisplayName("isAvailable: la baja de un padre oculta al hijo sin modificarlo")
+class AvailabilityTest {
+
+    private static Specialty specialty(boolean active) {
+        Specialty specialty = Specialty.builder().id(1L).sysacadHash("h").build();
+        if (!active) {
+            specialty.deactivate();
+        }
+        return specialty;
+    }
+
+    @Test
+    @DisplayName("Specialty: un stub sin hash y activo está disponible y fuera de SysAcad; dado de baja a mano da DEACTIVATED")
+    void specialtyStubIsAvailableButNotInSysacad() {
+        Specialty stub = Specialty.builder().id(1L).build();
+        assertThat(stub.unavailableReason()).isNull();
+        assertThat(stub.isAvailable()).isTrue();
+        assertThat(stub.isCurrentInSysacad()).isFalse();
+        stub.deactivate();
+        assertThat(stub.unavailableReason()).isEqualTo(UnavailableReason.DEACTIVATED);
+    }
+
+    @Test
+    @DisplayName("Specialty.isCurrentInSysacad: con hash es true")
+    void specialtyWithHashIsCurrentInSysacad() {
+        assertThat(specialty(true).isCurrentInSysacad()).isTrue();
+    }
+
+    private static StudyPlan plan(boolean active) {
+        return plan(specialty(true), active);
+    }
+
+    private static StudyPlan plan(Specialty specialty, boolean active) {
+        StudyPlan plan = StudyPlan.builder().id(1L).specialty(specialty).build();
+        if (!active) {
+            plan.deactivate();
+        }
+        return plan;
+    }
+
+    private static AcademicPeriod period(boolean active) {
+        AcademicPeriod period = AcademicPeriod.builder().id(1L).build();
+        if (!active) {
+            period.deactivate();
+        }
+        return period;
+    }
+
+    private static Subject subject(StudyPlan plan, boolean active) {
+        Subject subject = Subject.builder().id(1L).studyPlan(plan).build();
+        if (!active) {
+            subject.deactivate();
+        }
+        return subject;
+    }
+
+    private static Commission commission(AcademicPeriod period, boolean active) {
+        Commission commission = Commission.builder().id(1L).academicPeriod(period).build();
+        if (!active) {
+            commission.deactivate();
+        }
+        return commission;
+    }
+
+    @Test
+    @DisplayName("Subject: disponible solo si ella y su plan están activos")
+    void subject() {
+        assertThat(subject(plan(true), true).isAvailable()).isTrue();
+        assertThat(subject(plan(false), true).isAvailable()).isFalse();
+        assertThat(subject(plan(true), false).isAvailable()).isFalse();
+        assertThat(subject(plan(false), true).isActive()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Commission: disponible solo si ella y su período están activos")
+    void commission() {
+        assertThat(commission(period(true), true).isAvailable()).isTrue();
+        assertThat(commission(period(false), true).isAvailable()).isFalse();
+        assertThat(commission(period(true), false).isAvailable()).isFalse();
+        assertThat(commission(period(false), true).isActive()).isTrue();
+    }
+
+    @Test
+    @DisplayName("SubjectCommission: disponible solo si el vínculo, la materia y la comisión están disponibles")
+    void subjectCommission() {
+        Subject okSubject = subject(plan(true), true);
+        Commission okCommission = commission(period(true), true);
+
+        assertThat(link(okSubject, okCommission, true).isAvailable()).isTrue();
+        assertThat(link(okSubject, okCommission, false).isAvailable()).isFalse();
+        assertThat(link(subject(plan(false), true), okCommission, true).isAvailable()).isFalse();
+        assertThat(link(subject(plan(true), false), okCommission, true).isAvailable()).isFalse();
+        assertThat(link(okSubject, commission(period(false), true), true).isAvailable()).isFalse();
+        assertThat(link(okSubject, commission(period(true), false), true).isAvailable()).isFalse();
+    }
+
+    private static Commission commission(AcademicPeriod period, boolean active, boolean enabled, String hash) {
+        Commission commission = Commission.builder().id(1L).academicPeriod(period)
+                .sysacadEnabled(enabled).sysacadHash(hash).build();
+        if (!active) {
+            commission.deactivate();
+        }
+        return commission;
+    }
+
+    @Test
+    @DisplayName("Subject.unavailableReason: null si está disponible")
+    void subjectReasonIsNullWhenAvailable() {
+        assertThat(subject(plan(true), true).unavailableReason()).isNull();
+    }
+
+    @Test
+    @DisplayName("Subject.unavailableReason: baja propia es DEACTIVATED")
+    void subjectReasonDeactivated() {
+        assertThat(subject(plan(true), false).unavailableReason()).isEqualTo(UnavailableReason.DEACTIVATED);
+    }
+
+    @Test
+    @DisplayName("Subject.unavailableReason: plan dado de baja es PARENT_DEACTIVATED")
+    void subjectReasonParentDeactivated() {
+        assertThat(subject(plan(false), true).unavailableReason()).isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
+    }
+
+    @Test
+    @DisplayName("Subject.unavailableReason: baja propia y baja del plan a la vez, gana DEACTIVATED")
+    void subjectOwnDeactivationWinsOverParent() {
+        assertThat(subject(plan(false), false).unavailableReason()).isEqualTo(UnavailableReason.DEACTIVATED);
+    }
+
+    @Test
+    @DisplayName("Commission.unavailableReason: null si está activa, su período activo y vigente")
+    void commissionReasonIsNullWhenAvailable() {
+        assertThat(commission(period(true), true, true, "h").unavailableReason()).isNull();
+    }
+
+    @Test
+    @DisplayName("Commission.unavailableReason: baja propia es DEACTIVATED")
+    void commissionReasonDeactivated() {
+        assertThat(commission(period(true), false, true, "h").unavailableReason())
+                .isEqualTo(UnavailableReason.DEACTIVATED);
+    }
+
+    @Test
+    @DisplayName("Commission.unavailableReason: período dado de baja es PARENT_DEACTIVATED")
+    void commissionReasonParentDeactivated() {
+        assertThat(commission(period(false), true, true, "h").unavailableReason())
+                .isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
+    }
+
+    @Test
+    @DisplayName("Commission: con hash y flag apagado sigue disponible y se informa fuera de SysAcad")
+    void commissionNotInSysacadStaysAvailable() {
+        Commission commission = commission(period(true), true, false, "h");
+
+        assertThat(commission.unavailableReason()).isNull();
+        assertThat(commission.isAvailable()).isTrue();
+        assertThat(commission.isCurrentInSysacad()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Commission: una comisión manual (hash nulo, flag apagado) sigue disponible")
+    void manualCommissionStaysAvailable() {
+        Commission commission = commission(period(true), true, false, null);
+
+        assertThat(commission.unavailableReason()).isNull();
+        assertThat(commission.isAvailable()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Commission.unavailableReason: baja propia y baja del período a la vez, gana DEACTIVATED")
+    void commissionOwnDeactivationWinsOverParent() {
+        assertThat(commission(period(false), false, true, "h").unavailableReason())
+                .isEqualTo(UnavailableReason.DEACTIVATED);
+    }
+
+    @Test
+    @DisplayName("Commission.unavailableReason: fuera de SysAcad con el período dado de baja da PARENT_DEACTIVATED")
+    void commissionParentDeactivationWithNotInSysacad() {
+        assertThat(commission(period(false), true, false, "h").unavailableReason())
+                .isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
+    }
+
+    @Test
+    @DisplayName("Commission.unavailableReason: fuera de SysAcad con baja propia da DEACTIVATED")
+    void commissionOwnDeactivationWithNotInSysacad() {
+        assertThat(commission(period(true), false, false, "h").unavailableReason())
+                .isEqualTo(UnavailableReason.DEACTIVATED);
+    }
+
+    @Test
+    @DisplayName("Specialty: la baja manual da DEACTIVATED y no tiene padre")
+    void specialty() {
+        assertThat(specialty(true).unavailableReason()).isNull();
+        assertThat(specialty(false).unavailableReason()).isEqualTo(UnavailableReason.DEACTIVATED);
+    }
+
+    @Test
+    @DisplayName("StudyPlan: la baja de la especialidad da PARENT_DEACTIVATED; la propia gana")
+    void studyPlan() {
+        assertThat(plan(specialty(true), true).unavailableReason()).isNull();
+        assertThat(plan(specialty(false), true).unavailableReason()).isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
+        assertThat(plan(specialty(false), false).unavailableReason()).isEqualTo(UnavailableReason.DEACTIVATED);
+        assertThat(plan(specialty(false), true).isActive()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Subject: la baja de la especialidad llega a la materia como PARENT_DEACTIVATED")
+    void subjectUnderDeactivatedSpecialty() {
+        Subject subject = subject(plan(specialty(false), true), true);
+        assertThat(subject.unavailableReason()).isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
+        assertThat(subject.isActive()).isTrue();
+    }
+
+    @Test
+    @DisplayName("SubjectCommission: razón propia, de la materia o de la comisión")
+    void subjectCommissionReason() {
+        Subject subject = subject(plan(true), true);
+        Commission commission = commission(period(true), true);
+        assertThat(link(subject, commission, true).unavailableReason()).isNull();
+        assertThat(link(subject, commission, false).unavailableReason()).isEqualTo(UnavailableReason.DEACTIVATED);
+        assertThat(link(subject(plan(true), false), commission, true).unavailableReason())
+                .isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
+        assertThat(link(subject, commission(period(false), true), true).unavailableReason())
+                .isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
+        assertThat(link(subject, commission(period(true), true, false, "h"), true).unavailableReason()).isNull();
+        assertThat(link(subject, commission(period(true), false, false, "h"), true).unavailableReason())
+                .isEqualTo(UnavailableReason.PARENT_DEACTIVATED);
+    }
+
+    private static SubjectCommission link(Subject subject, Commission commission, boolean active) {
+        SubjectCommission link = SubjectCommission.builder().subject(subject).commission(commission).build();
+        if (!active) {
+            link.deactivate();
+        }
+        return link;
+    }
+}

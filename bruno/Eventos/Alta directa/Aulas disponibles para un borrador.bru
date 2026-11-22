@@ -1,0 +1,38 @@
+meta {
+  name: Aulas disponibles para un borrador
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/events/direct/available-classrooms
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "type": "CONFERENCE",
+    "date": "2026-11-20",
+    "startTime": "10:00:00",
+    "endTime": "12:00:00",
+    "estimated": 80,
+    "classroomCount": 2,
+    "requiresProjector": true,
+    "requiresComputers": false,
+    "description": "Charla de ingeniería en el SUM"
+  }
+}
+
+docs {
+  POST /v1/events/direct/available-classrooms. Permiso: PERM_EVENT_DIRECT_CREATE (AUXILIAR_AULICO).
+
+  Devuelve todas las aulas activas del alcance del usuario, las que cumplen los requisitos
+  del borrador primero. `available=false` marca las ocupadas en esa fecha y horario (`available`
+  sigue significando libre). `missingRequirements` lista lo que el aula no cumple
+  (`PROJECTOR`, `COMPUTERS`); vacío si cumple todo. Asignar un aula que no cumple exige el
+  `reason` del alta, que ya es obligatorio. No persiste nada.
+
+  Respuesta: array de { id, roomNumber, buildingId, buildingName, capacity, available,
+  computerCount, missingRequirements }.
+}

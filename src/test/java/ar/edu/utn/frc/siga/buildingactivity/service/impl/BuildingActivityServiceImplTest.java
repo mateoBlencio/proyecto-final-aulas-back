@@ -1,0 +1,581 @@
+package ar.edu.utn.frc.siga.buildingactivity.service.impl;
+
+import ar.edu.utn.frc.siga.allocation.model.AllocationSource;
+import ar.edu.utn.frc.siga.buildingactivity.dto.response.BuildingActivityDto;
+import ar.edu.utn.frc.siga.buildingactivity.model.BuildingActivity;
+import ar.edu.utn.frc.siga.buildingactivity.model.BuildingActivitySeen;
+import ar.edu.utn.frc.siga.buildingactivity.model.BuildingActivityType;
+import ar.edu.utn.frc.siga.buildingactivity.model.RoomRequestItemRef;
+import ar.edu.utn.frc.siga.buildingactivity.repository.BuildingActivityRepository;
+import ar.edu.utn.frc.siga.buildingactivity.repository.BuildingActivitySeenRepository;
+import ar.edu.utn.frc.siga.common.exception.InvalidSortPropertyException;
+import ar.edu.utn.frc.siga.common.security.BuildingScope;
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
+import ar.edu.utn.frc.siga.common.security.Permission;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Root;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
+import org.mockito.InOrder;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor.SpecificationFluentQuery;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.test.util.ReflectionTestUtils;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+@DisplayName("BuildingActivityServiceImpl")
+@SuppressWarnings({"unchecked", "rawtypes"})
+class BuildingActivityServiceImplTest {
+
+    private static final String ME = "aux@utn.edu.ar";
+    private static final String LINES = "[{\"occurrenceId\":10,\"eventLabel\":\"Fisica I\",\"date\":\"2026-10-20\","
+            + "\"startTime\":\"08:00:00\",\"endTime\":\"09:30:00\",\"fromClassroom\":null,"
+            + "\"toClassroom\":{\"id\":5,\"roomNumber\":101,\"buildingId\":1,\"buildingName\":\"Central\"}}]";
+
+    @Mock
+    private BuildingActivityRepository repository;
+    @Mock
+    private BuildingActivitySeenRepository seenRepository;
+    @Mock
+    private BuildingScopeResolver buildingScopeResolver;
+
+    private final ObjectMapper objectMapper = JsonMapper.builder().build();
+
+    private BuildingActivityServiceImpl service;
+    private BuildingActivitySeen watermarkStub;
+
+    @BeforeEach
+    void setUp() {
+        service = new BuildingActivityServiceImpl(repository, seenRepository, buildingScopeResolver, objectMapper);
+    }
+
+    @Test
+    @DisplayName("markSeen: un id por encima del maximo en alcance se acota a ese maximo")
+    void markSeenCapsLastSeenIdAtTheMaxIdInScope() {
+        stubScope(BuildingScope.unrestricted());
+        stubMaxIdInScope(activity(42L, "otro@utn.edu.ar"));
+
+        service.markSeen(ME, 10_000L);
+
+        verify(seenRepository).advance(ME, 42L);
+    }
+
+    @Test
+    @DisplayName("markSeen: un id menor al maximo en alcance se usa tal cual")
+    void markSeenKeepsLastSeenIdWhenBelowTheMax() {
+        stubScope(BuildingScope.unrestricted());
+        stubMaxIdInScope(activity(42L, "otro@utn.edu.ar"));
+
+        service.markSeen(ME, 30L);
+
+        verify(seenRepository).advance(ME, 30L);
+    }
+
+    @Test
+    @DisplayName("markSeen: un id igual al maximo en alcance se usa tal cual")
+    void markSeenKeepsLastSeenIdWhenEqualToTheMax() {
+        stubScope(BuildingScope.unrestricted());
+        stubMaxIdInScope(activity(42L, "otro@utn.edu.ar"));
+
+        service.markSeen(ME, 42L);
+
+        verify(seenRepository).advance(ME, 42L);
+    }
+
+    @Test
+    @DisplayName("markSeen: sin actividad en alcance no avanza la marca de agua")
+    void markSeenWithoutActivityInScopeDoesNotAdvance() {
+        stubScope(BuildingScope.unrestricted());
+        stubMaxIdInScope(null);
+
+        service.markSeen(ME, 10_000L);
+
+        verify(seenRepository, never()).advance(any(), any());
+    }
+
+    @Test
+    @DisplayName("markSeen: busca el maximo ordenando por id desc dentro del alcance del usuario")
+    void markSeenLooksUpTheMaxIdByIdDescWithinScope() {
+        stubScope(BuildingScope.of(Set.of(1L, 2L)));
+        SpecificationFluentQuery<BuildingActivity> fluent = stubMaxIdInScope(activity(42L, "otro@utn.edu.ar"));
+
+        service.markSeen(ME, 10_000L);
+
+        verify(fluent).sortBy(Sort.by(Sort.Direction.DESC, "id"));
+        ArgumentCaptor<Specification<BuildingActivity>> captor = ArgumentCaptor.forClass(Specification.class);
+        verify(repository).findBy(captor.capture(), any(Function.class));
+        Fixture fixture = evaluate(captor.getValue());
+        verify(fixture.path("buildingId")).in(Set.of(1L, 2L));
+    }
+
+    @Test
+    @DisplayName("find: seen es true si el id esta bajo la marca de agua o si el actor es el propio usuario")
+    void findMarksSeenByWatermarkOrOwnActor() {
+        stubScope(BuildingScope.unrestricted());
+        stubWatermark(5L);
+        when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(
+                        activity(7L, "otro@utn.edu.ar"),
+                        activity(6L, "otro@utn.edu.ar"),
+                        activity(5L, "otro@utn.edu.ar"),
+                        activity(8L, ME))));
+
+        Page<BuildingActivityDto> page = service.find(ME, null, null, null, null, null, null, null, PageRequest.of(0, 20));
+
+        assertThat(page.getContent()).extracting(BuildingActivityDto::id, BuildingActivityDto::seen)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(7L, false),
+                        org.assertj.core.groups.Tuple.tuple(6L, false),
+                        org.assertj.core.groups.Tuple.tuple(5L, true),
+                        org.assertj.core.groups.Tuple.tuple(8L, true));
+    }
+
+    @Test
+    @DisplayName("find: sin marca de agua guardada lo ajeno figura como no visto; deserializa las lineas del jsonb")
+    void findWithoutWatermarkTreatsOthersAsUnseenAndParsesLines() {
+        stubScope(BuildingScope.unrestricted());
+        when(seenRepository.findById(ME)).thenReturn(Optional.empty());
+        when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(activity(1L, "otro@utn.edu.ar"))));
+
+        BuildingActivityDto dto = service.find(ME, null, null, null, null, null, null, null, PageRequest.of(0, 20)).getContent().getFirst();
+
+        assertThat(dto.seen()).isFalse();
+        assertThat(dto.building()).isEqualTo(new BuildingActivityDto.BuildingRef(1L, "Central"));
+        assertThat(dto.lines()).singleElement().satisfies(line -> {
+            assertThat(line.occurrenceId()).isEqualTo(10L);
+            assertThat(line.date()).isEqualTo(LocalDate.of(2026, 10, 20));
+            assertThat(line.fromClassroom()).isNull();
+            assertThat(line.toClassroom().roomNumber()).isEqualTo(101);
+        });
+    }
+
+    @Test
+    @DisplayName("find: limita el tamano de pagina a 100 y no delega el sort al repositorio")
+    void findCapsPageSizeAndLeavesSortToSpecification() {
+        stubScope(BuildingScope.unrestricted());
+        stubWatermark(0L);
+        when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
+                .thenReturn(Page.empty());
+
+        service.find(ME, null, null, null, null, null, null, null, PageRequest.of(2, 500, Sort.by("buildingName")));
+
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(repository).findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), captor.capture());
+        assertThat(captor.getValue().getPageNumber()).isEqualTo(2);
+        assertThat(captor.getValue().getPageSize()).isEqualTo(100);
+        assertThat(captor.getValue().getSort().isSorted()).isFalse();
+    }
+
+    @Test
+    @DisplayName("find: sin sort ordena por occurredAt desc con desempate por id desc")
+    void findDefaultsToOccurredAtDescThenIdDesc() {
+        Fixture fixture = evaluateFind(PageRequest.of(0, 20), null, null, null);
+
+        InOrder order = inOrder(fixture.cb());
+        order.verify(fixture.cb()).desc(fixture.path("occurredAt"));
+        order.verify(fixture.cb()).desc(fixture.path("id"));
+    }
+
+    @Test
+    @DisplayName("find: sort por buildingName asc y por actor desc respetan la direccion y desempatan por id desc")
+    void findHonorsRequestedSort() {
+        Fixture fixture = evaluateFind(PageRequest.of(0, 20, Sort.by(Sort.Order.asc("buildingName"),
+                Sort.Order.desc("actor"))), null, null, null);
+
+        InOrder order = inOrder(fixture.cb());
+        order.verify(fixture.cb()).asc(fixture.path("buildingName"));
+        order.verify(fixture.cb()).desc(fixture.path("actor"));
+        order.verify(fixture.cb()).desc(fixture.path("id"));
+    }
+
+    @Test
+    @DisplayName("find: sort por lineCount ordena por la cantidad de elementos del jsonb")
+    void findSortsByLineCountWithJsonbArrayLength() {
+        Fixture fixture = evaluateFind(PageRequest.of(0, 20, Sort.by("lineCount")), null, null, null);
+
+        verify(fixture.cb()).function("jsonb_array_length", Integer.class, fixture.path("lines"));
+    }
+
+    @Test
+    @DisplayName("find: en la query de conteo no agrega order by")
+    void findDoesNotOrderCountQuery() {
+        stubScope(BuildingScope.unrestricted());
+        stubWatermark(0L);
+        when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
+                .thenReturn(Page.empty());
+        service.find(ME, null, null, null, null, null, null, null, PageRequest.of(0, 20));
+        CriteriaQuery countQuery = mock(CriteriaQuery.class);
+        when(countQuery.getResultType()).thenReturn(Long.class);
+
+        capturedFindSpec().toPredicate(mock(Root.class), countQuery, mock(CriteriaBuilder.class));
+
+        verify(countQuery, never()).orderBy(ArgumentMatchers.<List<jakarta.persistence.criteria.Order>>any());
+    }
+
+    @Test
+    @DisplayName("find: un campo de sort no permitido da InvalidSortPropertyException y no consulta el repositorio")
+    void findWithInvalidSortThrows() {
+        assertThatThrownBy(() -> service.find(ME, null, null, null, null, null, null, null,
+                PageRequest.of(0, 20, Sort.by("lines"))))
+                .isInstanceOf(InvalidSortPropertyException.class)
+                .hasMessageContaining("lines")
+                .hasMessageContaining("occurredAt, buildingName, actor, lineCount");
+
+        verifyNoInteractions(repository, seenRepository);
+    }
+
+    @Test
+    @DisplayName("find: source filtra por origen")
+    void findFiltersBySource() {
+        Fixture fixture = evaluateFind(PageRequest.of(0, 20), AllocationSource.AUTOMATIC, null, null);
+
+        verify(fixture.cb()).equal(fixture.path("source"), AllocationSource.AUTOMATIC);
+    }
+
+    @Test
+    @DisplayName("find: type filtra por tipo de actividad y sin type no agrega el predicado")
+    void findFiltersByType() {
+        Fixture withType = evaluateFind(PageRequest.of(0, 20), null, BuildingActivityType.ROOM_REQUEST_TAKEN_OVER, null, null);
+
+        verify(withType.cb()).equal(withType.path("type"), BuildingActivityType.ROOM_REQUEST_TAKEN_OVER);
+    }
+
+    @Test
+    @DisplayName("find: sin type no filtra por tipo")
+    void findWithoutTypeDoesNotFilter() {
+        Fixture fixture = evaluateFind(PageRequest.of(0, 20), null, null, null);
+
+        Path typePath = fixture.path("type");
+        verify(fixture.cb(), never()).equal(eq(typePath), ArgumentMatchers.<Object>any());
+    }
+
+    @Test
+    @DisplayName("find: una entrada de retomado expone type y roomRequestItem deserializado del jsonb")
+    void findMapsRoomRequestItem() {
+        stubScope(BuildingScope.unrestricted());
+        when(seenRepository.findById(ME)).thenReturn(Optional.empty());
+        BuildingActivity takeOver = BuildingActivity.builder().id(2L).type(BuildingActivityType.ROOM_REQUEST_TAKEN_OVER)
+                .buildingId(1L).buildingName("Central").operationId("op-2").actor("sub@utn.edu.ar")
+                .source(AllocationSource.MANUAL).reason("motivo").occurredAt(Instant.parse("2026-10-17T12:00:00Z"))
+                .lines("[]").roomRequestItem("{\"id\":42,\"status\":\"NOTIFIED\",\"teacherName\":\"Ada Lovelace\"}")
+                .build();
+        BuildingActivity allocation = activity(1L, "otro@utn.edu.ar");
+        when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(takeOver, allocation)));
+
+        List<BuildingActivityDto> content = service.find(ME, null, null, null, null, null, null, null,
+                PageRequest.of(0, 20)).getContent();
+
+        assertThat(content.get(0).type()).isEqualTo(BuildingActivityType.ROOM_REQUEST_TAKEN_OVER);
+        assertThat(content.get(0).lines()).isEmpty();
+        assertThat(content.get(0).roomRequestItem()).isEqualTo(new RoomRequestItemRef(42L, "NOTIFIED", "Ada Lovelace"));
+        assertThat(content.get(1).type()).isEqualTo(BuildingActivityType.ALLOCATION_CHANGE);
+        assertThat(content.get(1).roomRequestItem()).isNull();
+    }
+
+    @Test
+    @DisplayName("find: seen=true es id <= marca de agua o actor propio; seen=false es la negacion")
+    void findFiltersBySeen() {
+        stubWatermark(5L);
+        Fixture seen = evaluateFind(PageRequest.of(0, 20), null, true, null);
+
+        verify(seen.cb()).lessThanOrEqualTo(seen.path("id"), 5L);
+        verify(seen.cb()).equal(seen.path("actor"), ME);
+        verify(seen.cb(), never()).not(any());
+    }
+
+    @Test
+    @DisplayName("find: seen=false niega la condicion de visto")
+    void findFiltersByUnseen() {
+        stubWatermark(5L);
+        Fixture unseen = evaluateFind(PageRequest.of(0, 20), null, false, null);
+
+        verify(unseen.cb()).not(any());
+    }
+
+    @Test
+    @DisplayName("find: actor busca parcial en minusculas y escapa los comodines")
+    void findFiltersByActorEscapingWildcards() {
+        Fixture fixture = evaluateFind(PageRequest.of(0, 20), null, null, " Ana_%@UTN ");
+
+        verify(fixture.cb()).like(ArgumentMatchers.<Expression<String>>any(), ArgumentMatchers.eq("%ana\\_\\%@utn%"), ArgumentMatchers.eq('\\'));
+    }
+
+    @Test
+    @DisplayName("find: actor en blanco se ignora")
+    void findIgnoresBlankActor() {
+        Fixture fixture = evaluateFind(PageRequest.of(0, 20), null, null, "  ");
+
+        verify(fixture.cb(), never()).like(ArgumentMatchers.<Expression<String>>any(), any(String.class), any(Character.class));
+    }
+
+    @Test
+    @DisplayName("find: buildingId fuera de alcance propaga el AccessDeniedException y no consulta el repositorio")
+    void findWithBuildingOutOfScopePropagatesAccessDenied() {
+        org.mockito.Mockito.doThrow(new AccessDeniedException("sin acceso"))
+                .when(buildingScopeResolver).requireAccess(Permission.BUILDING_ACTIVITY_READ, 9L);
+
+        assertThatThrownBy(() -> service.find(ME, 9L, null, null, null, null, null, null, PageRequest.of(0, 20)))
+                .isInstanceOf(AccessDeniedException.class);
+
+        verifyNoInteractions(repository, seenRepository);
+    }
+
+    @Test
+    @DisplayName("find: buildingId dentro de alcance valida el acceso y filtra por ese edificio")
+    void findWithBuildingInScopeFiltersByBuilding() {
+        stubScope(BuildingScope.unrestricted());
+        stubWatermark(0L);
+        when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
+                .thenReturn(Page.empty());
+
+        service.find(ME, 3L, null, null, null, null, null, null, PageRequest.of(0, 20));
+
+        verify(buildingScopeResolver).requireAccess(Permission.BUILDING_ACTIVITY_READ, 3L);
+        Fixture fixture = evaluate(capturedFindSpec());
+        verify(fixture.cb()).equal(fixture.path("buildingId"), 3L);
+    }
+
+    @Test
+    @DisplayName("find: from incluye el dia completo desde 00:00 de Buenos Aires y to excluye el 00:00 del dia siguiente")
+    void findDateRangeUsesLocalDayBoundaries() {
+        stubScope(BuildingScope.unrestricted());
+        stubWatermark(0L);
+        when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
+                .thenReturn(Page.empty());
+
+        service.find(ME, null, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), null, null, null, null, PageRequest.of(0, 20));
+
+        Fixture fixture = evaluate(capturedFindSpec());
+        verify(fixture.cb()).greaterThanOrEqualTo(fixture.path("occurredAt"), Instant.parse("2026-10-01T03:00:00Z"));
+        verify(fixture.cb()).lessThan(fixture.path("occurredAt"), Instant.parse("2026-11-01T03:00:00Z"));
+    }
+
+    @Test
+    @DisplayName("find: con from=2026-03-10 una actividad de 2026-03-10T02:00Z (23:00 del 9 local) queda excluida")
+    void findFromExcludesAnActivityOfThePreviousLocalDay() {
+        Instant lowerBound = capturedLowerBound(LocalDate.of(2026, 3, 10), null);
+
+        assertThat(lowerBound).isEqualTo(Instant.parse("2026-03-10T03:00:00Z"));
+        assertThat(Instant.parse("2026-03-10T02:00:00Z")).isBefore(lowerBound);
+        assertThat(Instant.parse("2026-03-10T03:00:00Z")).isAfterOrEqualTo(lowerBound);
+    }
+
+    @Test
+    @DisplayName("find: con to=2026-03-09 una actividad de 2026-03-10T02:00Z (23:00 del 9 local) queda incluida")
+    void findToIncludesAnActivityOfTheSameLocalDay() {
+        Instant upperBound = capturedUpperBound(LocalDate.of(2026, 3, 9));
+
+        assertThat(upperBound).isEqualTo(Instant.parse("2026-03-10T03:00:00Z"));
+        assertThat(Instant.parse("2026-03-10T02:00:00Z")).isBefore(upperBound);
+        assertThat(Instant.parse("2026-03-10T03:00:00Z")).isAfterOrEqualTo(upperBound);
+    }
+
+    @Test
+    @DisplayName("countUnseen: cuenta ids por encima de la marca de agua excluyendo al propio actor")
+    void countUnseenFiltersByWatermarkAndExcludesOwnActor() {
+        stubScope(BuildingScope.unrestricted());
+        stubWatermark(5L);
+        when(repository.count(ArgumentMatchers.<Specification<BuildingActivity>>any())).thenReturn(3L);
+
+        long count = service.countUnseen(ME);
+
+        assertThat(count).isEqualTo(3L);
+        ArgumentCaptor<Specification<BuildingActivity>> captor = ArgumentCaptor.forClass(Specification.class);
+        verify(repository).count(captor.capture());
+        Fixture fixture = evaluate(captor.getValue());
+        verify(fixture.cb()).greaterThan(fixture.path("id"), 5L);
+        verify(fixture.cb()).notEqual(fixture.path("actor"), ME);
+    }
+
+    @Test
+    @DisplayName("countUnseen: sin marca de agua guardada usa 0 como piso")
+    void countUnseenWithoutWatermarkStartsFromZero() {
+        stubScope(BuildingScope.unrestricted());
+        when(seenRepository.findById(ME)).thenReturn(Optional.empty());
+        when(repository.count(ArgumentMatchers.<Specification<BuildingActivity>>any())).thenReturn(0L);
+
+        service.countUnseen(ME);
+
+        ArgumentCaptor<Specification<BuildingActivity>> captor = ArgumentCaptor.forClass(Specification.class);
+        verify(repository).count(captor.capture());
+        Fixture fixture = evaluate(captor.getValue());
+        verify(fixture.cb()).greaterThan(fixture.path("id"), 0L);
+    }
+
+    @Test
+    @DisplayName("countUnseen: el alcance restringe a los edificios del usuario")
+    void countUnseenRestrictsToUserBuildings() {
+        stubScope(BuildingScope.of(Set.of(1L, 2L)));
+        stubWatermark(0L);
+        when(repository.count(ArgumentMatchers.<Specification<BuildingActivity>>any())).thenReturn(0L);
+
+        service.countUnseen(ME);
+
+        ArgumentCaptor<Specification<BuildingActivity>> captor = ArgumentCaptor.forClass(Specification.class);
+        verify(repository).count(captor.capture());
+        Fixture fixture = evaluate(captor.getValue());
+        verify(fixture.path("buildingId")).in(Set.of(1L, 2L));
+    }
+
+    @Test
+    @DisplayName("countUnseen: sin edificios en alcance la specification no matchea nada")
+    void countUnseenWithDeniedScopeMatchesNothing() {
+        stubScope(BuildingScope.denied());
+        stubWatermark(0L);
+        when(repository.count(ArgumentMatchers.<Specification<BuildingActivity>>any())).thenReturn(0L);
+
+        service.countUnseen(ME);
+
+        ArgumentCaptor<Specification<BuildingActivity>> captor = ArgumentCaptor.forClass(Specification.class);
+        verify(repository).count(captor.capture());
+        Fixture fixture = evaluate(captor.getValue());
+        verify(fixture.cb()).disjunction();
+        verify(fixture.cb(), never()).conjunction();
+    }
+
+    private void stubScope(BuildingScope scope) {
+        when(buildingScopeResolver.scopeFor(Permission.BUILDING_ACTIVITY_READ)).thenReturn(scope);
+    }
+
+    /** El repositorio ejecuta la funcion del test contra una consulta fluida que devuelve {@code latest} (o nada). */
+    private SpecificationFluentQuery<BuildingActivity> stubMaxIdInScope(BuildingActivity latest) {
+        SpecificationFluentQuery<BuildingActivity> fluent = mock(SpecificationFluentQuery.class);
+        when(fluent.sortBy(any(Sort.class))).thenReturn(fluent);
+        when(fluent.first()).thenReturn(Optional.ofNullable(latest));
+        when(repository.findBy(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Function.class)))
+                .thenAnswer(inv -> ((Function) inv.getArgument(1)).apply(fluent));
+        return fluent;
+    }
+
+    private Instant capturedLowerBound(LocalDate from, LocalDate to) {
+        Fixture fixture = findWithDates(from, to);
+        ArgumentCaptor<Instant> captor = ArgumentCaptor.forClass(Instant.class);
+        verify(fixture.cb()).greaterThanOrEqualTo(eq(fixture.path("occurredAt")), captor.capture());
+        return captor.getValue();
+    }
+
+    private Instant capturedUpperBound(LocalDate to) {
+        Fixture fixture = findWithDates(null, to);
+        ArgumentCaptor<Instant> captor = ArgumentCaptor.forClass(Instant.class);
+        verify(fixture.cb()).lessThan(eq(fixture.path("occurredAt")), captor.capture());
+        return captor.getValue();
+    }
+
+    private Fixture findWithDates(LocalDate from, LocalDate to) {
+        stubScope(BuildingScope.unrestricted());
+        stubWatermark(0L);
+        when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
+                .thenReturn(Page.empty());
+        service.find(ME, null, from, to, null, null, null, null, PageRequest.of(0, 20));
+        return evaluate(capturedFindSpec());
+    }
+
+    private void stubWatermark(long watermark) {
+        watermarkStub = new BuildingActivitySeenStub(watermark);
+        lenient().when(seenRepository.findById(ME)).thenReturn(Optional.of(watermarkStub));
+    }
+
+    private Fixture evaluateFind(Pageable pageable, AllocationSource source, Boolean seen, String actor) {
+        return evaluateFind(pageable, source, null, seen, actor);
+    }
+
+    private Fixture evaluateFind(Pageable pageable, AllocationSource source, BuildingActivityType type, Boolean seen,
+                                 String actor) {
+        stubScope(BuildingScope.unrestricted());
+        lenient().when(seenRepository.findById(ME)).thenReturn(Optional.ofNullable(watermarkStub));
+        when(repository.findAll(ArgumentMatchers.<Specification<BuildingActivity>>any(), any(Pageable.class)))
+                .thenReturn(Page.empty());
+        service.find(ME, null, null, null, source, type, seen, actor, pageable);
+        return evaluate(capturedFindSpec());
+    }
+
+    private Specification<BuildingActivity> capturedFindSpec() {
+        ArgumentCaptor<Specification<BuildingActivity>> captor = ArgumentCaptor.forClass(Specification.class);
+        verify(repository).findAll(captor.capture(), any(Pageable.class));
+        return captor.getValue();
+    }
+
+    private Fixture evaluate(Specification<BuildingActivity> spec) {
+        Fixture fixture = new Fixture();
+        spec.toPredicate(fixture.root, mock(CriteriaQuery.class), fixture.cb);
+        return fixture;
+    }
+
+    private BuildingActivity activity(Long id, String actor) {
+        return BuildingActivity.builder()
+                .id(id)
+                .type(BuildingActivityType.ALLOCATION_CHANGE)
+                .buildingId(1L)
+                .buildingName("Central")
+                .operationId("op-" + id)
+                .actor(actor)
+                .source(AllocationSource.MANUAL)
+                .reason("obra")
+                .occurredAt(Instant.parse("2026-10-17T12:00:00Z"))
+                .lines(LINES)
+                .build();
+    }
+
+    private static final class BuildingActivitySeenStub extends BuildingActivitySeen {
+
+        private BuildingActivitySeenStub(long watermark) {
+            ReflectionTestUtils.setField(this, "lastSeenActivityId", watermark);
+        }
+    }
+
+    private static final class Fixture {
+
+        private final Root root = mock(Root.class);
+        private final CriteriaBuilder cb = mock(CriteriaBuilder.class);
+        private final java.util.Map<String, Path> paths = new java.util.HashMap<>();
+
+        private Fixture() {
+            when(root.get(any(String.class))).thenAnswer(inv -> paths.computeIfAbsent(inv.getArgument(0), k -> mock(Path.class)));
+        }
+
+        private CriteriaBuilder cb() {
+            return cb;
+        }
+
+        private Path path(String name) {
+            return paths.computeIfAbsent(name, k -> mock(Path.class));
+        }
+    }
+}

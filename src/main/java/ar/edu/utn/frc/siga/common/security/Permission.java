@@ -1,0 +1,63 @@
+package ar.edu.utn.frc.siga.common.security;
+
+public enum Permission {
+
+    BUILDING_READ(ScopeType.BUILDING),
+    BUILDING_ACTIVATE(ScopeType.GLOBAL),
+    CLASSROOM_READ(ScopeType.BUILDING),
+    CLASSROOM_CREATE(ScopeType.BUILDING),
+    CLASSROOM_UPDATE(ScopeType.BUILDING),
+    CLASSROOM_DELETE(ScopeType.BUILDING),
+    CLASSROOM_ACTIVATE(ScopeType.BUILDING),
+    CLASSROOM_TYPE_READ(ScopeType.GLOBAL),
+    CLASSROOM_TYPE_MANAGE(ScopeType.GLOBAL),
+    RESOURCE_TYPE_READ(ScopeType.GLOBAL),
+    RESOURCE_TYPE_MANAGE(ScopeType.GLOBAL),
+
+    ACADEMIC_READ(ScopeType.GLOBAL),
+    ACADEMIC_ACTIVATE(ScopeType.GLOBAL),
+    ACADEMIC_PERIOD_UPDATE(ScopeType.GLOBAL),
+
+    EVENT_READ(ScopeType.GLOBAL),
+    EVENT_MANAGE(ScopeType.GLOBAL),
+    EVENT_DIRECT_CREATE(ScopeType.BUILDING),
+    OCCURRENCE_RELEASE(ScopeType.BUILDING),
+    OCCURRENCE_REQUEST_ROOM(ScopeType.BUILDING),
+
+    ALLOCATION_READ(ScopeType.BUILDING),
+    ALLOCATION_WRITE(ScopeType.BUILDING),
+    CONFLICT_READ(ScopeType.BUILDING),
+    ALLOCATION_HISTORY_READ(ScopeType.BUILDING),
+
+    BUILDING_ACTIVITY_READ(ScopeType.BUILDING),
+
+    PREVIEW_RUN(ScopeType.BUILDING),
+
+    DASHBOARD_READ(ScopeType.BUILDING),
+    DASHBOARD_SNAPSHOT_REGENERATE(ScopeType.GLOBAL),
+
+    ROOM_REQUEST_READ(ScopeType.GLOBAL),
+    ROOM_REQUEST_WRITE(ScopeType.GLOBAL),
+
+    CAMERA_COUNT_RUN(ScopeType.GLOBAL),
+
+    SETTINGS_READ(ScopeType.GLOBAL),
+    SETTINGS_WRITE(ScopeType.GLOBAL),
+    INGEST_RUN(ScopeType.GLOBAL),
+    SYSACAD_READ(ScopeType.GLOBAL),
+    SYSACAD_SYNC(ScopeType.GLOBAL),
+    AUDIT_READ(ScopeType.GLOBAL),
+    USER_READ(ScopeType.GLOBAL),
+    USER_MANAGE(ScopeType.GLOBAL),
+    ROLE_ASSIGN(ScopeType.GLOBAL);
+
+    private final ScopeType scopeType;
+
+    Permission(ScopeType scopeType) {
+        this.scopeType = scopeType;
+    }
+
+    public ScopeType scopeType() {
+        return scopeType;
+    }
+}

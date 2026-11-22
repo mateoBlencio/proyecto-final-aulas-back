@@ -30,7 +30,7 @@ public class SubjectSyncService implements SysacadViewSyncer {
     @Override
     public void sync(SysacadCatalogReader catalog) {
         ViewSyncRunner.run(syncStateService, SysacadView.MATERIAS, "Materias", log, () -> {
-            List<SubjectSyncCommand> commands = catalog.findSubjects().stream()
+            List<SubjectSyncCommand> commands = ViewSyncRunner.requireRows(catalog.findSubjects(), SysacadView.MATERIAS).stream()
                     .map(SubjectSyncService::toCommand)
                     .toList();
             return subjectService.syncSubjects(commands);

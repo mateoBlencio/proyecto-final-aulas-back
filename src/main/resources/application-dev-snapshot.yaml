@@ -1,0 +1,45 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/mydatabase
+    username: myuser
+    password: secret
+  docker:
+    compose:
+      enabled: true
+      file: compose-snapshot.yaml
+  flyway:
+    enabled: true
+    # The dev dump carries the V23 row (daily dashboard tables) in flyway_schema_history, a
+    # migration that was reverted in code. Without this Flyway refuses to start with
+    # "applied migration not resolved locally". Remove once dev ran `flyway repair`.
+    ignore-migration-patterns: "*:missing"
+
+springdoc:
+  swagger-ui:
+    enabled: true
+  api-docs:
+    enabled: true
+
+management:
+  endpoint:
+    health:
+      show-details: always
+
+cors:
+  allowed-origins: http://localhost:5173,http://127.0.0.1:5173
+
+siga:
+  jwt:
+    # Random per run unless JWT_SECRET is set (tokens do not survive restarts); no secret is versioned
+    secret: ${JWT_SECRET:${random.uuid}${random.uuid}}
+  sysacad:
+    enabled: false
+    api-key: dev-local-unused
+  camera-count:
+    enabled: false
+
+logging:
+  level:
+    ar.edu.utn.frc.siga: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: WARN

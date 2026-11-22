@@ -1,0 +1,6 @@
+package ar.edu.utn.frc.siga.common.model;
+
+public enum UnavailableReason {
+    DEACTIVATED,
+    PARENT_DEACTIVATED
+}

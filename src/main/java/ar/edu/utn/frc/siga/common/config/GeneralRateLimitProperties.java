@@ -9,7 +9,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "siga.ratelimit.general")
 public class GeneralRateLimitProperties {
 
-    private long capacity = 100;
+    private long capacity = 600;
 
     private long refillPeriodSeconds = 60;
 }

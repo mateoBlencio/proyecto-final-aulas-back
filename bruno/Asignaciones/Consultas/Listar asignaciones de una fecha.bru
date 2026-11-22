@@ -1,0 +1,24 @@
+meta {
+  name: Listar asignaciones de una fecha
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/allocations?date=2026-09-14
+  body: none
+  auth: inherit
+}
+
+params:query {
+  date: 2026-09-14
+}
+
+docs {
+  Cada asignación trae "group": roomCount y capacity cubren todas las aulas de la
+  comisión en esa fecha (capacity es null si alguna aula no tiene capacidad);
+  "siblings" lista las demás aulas del grupo, sin las de edificios que el usuario
+  no ve. Con una sola aula: roomCount 1 y siblings vacío.
+
+  Excluye las ocurrencias desde el día en que la materia, comisión, materia-comisión, plan o especialidad del evento se dio de baja.
+}

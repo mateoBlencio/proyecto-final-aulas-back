@@ -12,5 +12,5 @@ public class OptimizerProperties {
 
     private String parallelSolverCount = "AUTO";
 
-    private EnvironmentMode environmentMode = EnvironmentMode.PHASE_ASSERT;
+    private EnvironmentMode environmentMode = EnvironmentMode.NO_ASSERT;
 }

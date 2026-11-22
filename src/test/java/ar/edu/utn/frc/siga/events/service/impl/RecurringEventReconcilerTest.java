@@ -1,0 +1,166 @@
+package ar.edu.utn.frc.siga.events.service.impl;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import ar.edu.utn.frc.siga.common.service.OccurrenceAllocationQuery;
+import ar.edu.utn.frc.siga.common.service.OccurrenceRequestReferenceQuery;
+import ar.edu.utn.frc.siga.events.model.Occurrence;
+import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.model.OccurrenceWindow;
+import ar.edu.utn.frc.siga.events.model.RecurringEvent;
+import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
+import java.time.DayOfWeek;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.List;
+import java.util.Set;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+@ExtendWith(MockitoExtension.class)
+@DisplayName("RecurringEventReconciler.reconcileFuture")
+class RecurringEventReconcilerTest {
+
+    @Mock
+    private OccurrenceRepository occurrenceRepository;
+    @Mock
+    private OccurrenceAllocationQuery occurrenceAllocationQuery;
+    @Mock
+    private OccurrenceRequestReferenceQuery occurrenceRequestReferenceQuery;
+
+    @InjectMocks
+    private RecurringEventReconciler reconciler;
+
+    @Test
+    @DisplayName("crea las fechas deseadas que faltan y borra las sobrantes futuras no asignadas; conserva las asignadas")
+    void reconcilesFutureOccurrences() {
+        LocalDate nextMonday = LocalDate.now().with(java.time.temporal.TemporalAdjusters.next(DayOfWeek.MONDAY));
+        RecurringEvent event = event(nextMonday, nextMonday.plusWeeks(3));
+
+        LocalDate surplusAllocated = nextMonday.plusWeeks(10);
+        LocalDate surplusFree = nextMonday.plusWeeks(11);
+        Occurrence keep = occurrence(1L, event, nextMonday);
+        Occurrence allocatedSurplus = occurrence(2L, event, surplusAllocated);
+        Occurrence freeSurplus = occurrence(3L, event, surplusFree);
+        when(occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eq(event.getId()), any()))
+                .thenReturn(List.of(keep, allocatedSurplus, freeSurplus));
+        when(occurrenceAllocationQuery.allocatedAmong(any())).thenReturn(Set.of(2L));
+
+        reconciler.reconcileFuture(event, new OccurrenceWindow(nextMonday, nextMonday.plusWeeks(3), null, null));
+
+        ArgumentCaptor<List<Occurrence>> deleted = ArgumentCaptor.forClass(List.class);
+        verify(occurrenceRepository).deleteAll(deleted.capture());
+        assertThat(deleted.getValue()).extracting(Occurrence::getId).containsExactly(3L);
+
+        ArgumentCaptor<List<Occurrence>> created = ArgumentCaptor.forClass(List.class);
+        verify(occurrenceRepository).saveAll(created.capture());
+        assertThat(created.getValue()).extracting(Occurrence::getDate)
+                .containsExactlyInAnyOrder(nextMonday.plusWeeks(1), nextMonday.plusWeeks(2), nextMonday.plusWeeks(3));
+    }
+
+    @Test
+    @DisplayName("retireFuture: borra las ocurrencias futuras no asignadas y conserva las asignadas")
+    void retiresFutureUnallocatedOccurrences() {
+        LocalDate nextMonday = LocalDate.now().with(java.time.temporal.TemporalAdjusters.next(DayOfWeek.MONDAY));
+        RecurringEvent event = event(nextMonday, nextMonday.plusWeeks(2));
+        Occurrence allocated = occurrence(1L, event, nextMonday);
+        Occurrence free = occurrence(2L, event, nextMonday.plusWeeks(1));
+        when(occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eq(event.getId()), any()))
+                .thenReturn(List.of(allocated, free));
+        when(occurrenceAllocationQuery.allocatedAmong(any())).thenReturn(Set.of(1L));
+
+        reconciler.retireFuture(event);
+
+        ArgumentCaptor<List<Occurrence>> deleted = ArgumentCaptor.forClass(List.class);
+        verify(occurrenceRepository).deleteAll(deleted.capture());
+        assertThat(deleted.getValue()).extracting(Occurrence::getId).containsExactly(2L);
+    }
+
+    @Test
+    @DisplayName("regresión: conserva la sobrante sin aula que un pedido de aula todavía referencia (la FK impide borrarla)")
+    void keepsSurplusReferencedByRoomRequest() {
+        LocalDate nextMonday = LocalDate.now().with(java.time.temporal.TemporalAdjusters.next(DayOfWeek.MONDAY));
+        RecurringEvent event = event(nextMonday, nextMonday);
+        Occurrence referenced = occurrence(1L, event, nextMonday.plusWeeks(1));
+        Occurrence free = occurrence(2L, event, nextMonday.plusWeeks(2));
+        when(occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eq(event.getId()), any()))
+                .thenReturn(List.of(referenced, free));
+        when(occurrenceRequestReferenceQuery.referencedAmong(any())).thenReturn(Set.of(1L));
+
+        reconciler.reconcileFuture(event, new OccurrenceWindow(nextMonday, nextMonday, null, null));
+
+        ArgumentCaptor<List<Occurrence>> deleted = ArgumentCaptor.forClass(List.class);
+        verify(occurrenceRepository).deleteAll(deleted.capture());
+        assertThat(deleted.getValue()).extracting(Occurrence::getId).containsExactly(2L);
+    }
+
+    @Test
+    @DisplayName("retireFuture: conserva la ocurrencia sin aula que un pedido de aula todavía referencia")
+    void retireKeepsOccurrenceReferencedByRoomRequest() {
+        LocalDate nextMonday = LocalDate.now().with(java.time.temporal.TemporalAdjusters.next(DayOfWeek.MONDAY));
+        RecurringEvent event = event(nextMonday, nextMonday.plusWeeks(1));
+        Occurrence referenced = occurrence(1L, event, nextMonday);
+        Occurrence free = occurrence(2L, event, nextMonday.plusWeeks(1));
+        when(occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eq(event.getId()), any()))
+                .thenReturn(List.of(referenced, free));
+        when(occurrenceRequestReferenceQuery.referencedAmong(any())).thenReturn(Set.of(1L));
+
+        reconciler.retireFuture(event);
+
+        ArgumentCaptor<List<Occurrence>> deleted = ArgumentCaptor.forClass(List.class);
+        verify(occurrenceRepository).deleteAll(deleted.capture());
+        assertThat(deleted.getValue()).extracting(Occurrence::getId).containsExactly(2L);
+    }
+
+    @Test
+    @DisplayName("regresión: fecha con ocurrencias simultáneas (mismo evento y fecha, distinto roomSlot) "
+            + "no se duplica si sigue deseada, y se borra completa si deja de estarlo")
+    void toleratesSimultaneousOccurrencesOnSameDate() {
+        LocalDate nextMonday = LocalDate.now().with(java.time.temporal.TemporalAdjusters.next(DayOfWeek.MONDAY));
+        RecurringEvent event = event(nextMonday, nextMonday);
+
+        LocalDate droppedDate = nextMonday.plusWeeks(5);
+        Occurrence keptPrincipal = occurrence(1L, event, nextMonday);
+        Occurrence keptMirror = Occurrence.builder()
+                .id(2L).event(event).date(nextMonday).status(OccurrenceStatus.NEEDS_ROOM)
+                .roomSlot(2).mirrorOfOccurrenceId(1L).build();
+        Occurrence droppedPrincipal = occurrence(3L, event, droppedDate);
+        Occurrence droppedMirror = Occurrence.builder()
+                .id(4L).event(event).date(droppedDate).status(OccurrenceStatus.NEEDS_ROOM)
+                .roomSlot(2).mirrorOfOccurrenceId(3L).build();
+        when(occurrenceRepository.findByEvent_IdAndDateGreaterThanEqual(eq(event.getId()), any()))
+                .thenReturn(List.of(keptPrincipal, keptMirror, droppedPrincipal, droppedMirror));
+        when(occurrenceAllocationQuery.allocatedAmong(any())).thenReturn(Set.of());
+
+        reconciler.reconcileFuture(event, new OccurrenceWindow(nextMonday, nextMonday, null, null));
+
+        ArgumentCaptor<List<Occurrence>> deleted = ArgumentCaptor.forClass(List.class);
+        verify(occurrenceRepository).deleteAll(deleted.capture());
+        assertThat(deleted.getValue()).extracting(Occurrence::getId).containsExactlyInAnyOrder(3L, 4L);
+
+        ArgumentCaptor<List<Occurrence>> created = ArgumentCaptor.forClass(List.class);
+        verify(occurrenceRepository).saveAll(created.capture());
+        assertThat(created.getValue()).isEmpty();
+    }
+
+    private RecurringEvent event(LocalDate startDate, LocalDate endDate) {
+        return RecurringEvent.builder()
+                .id(7L).enrolled(30).startTime(LocalTime.of(8, 0)).duration(Duration.ofMinutes(90))
+                .dayOfWeek(DayOfWeek.MONDAY).startDate(startDate).endDate(endDate)
+                .subjectId(1L).commissionId(1L).build();
+    }
+
+    private Occurrence occurrence(Long id, RecurringEvent event, LocalDate date) {
+        return Occurrence.builder().id(id).event(event).date(date).status(OccurrenceStatus.NEEDS_ROOM).build();
+    }
+}

@@ -19,20 +19,28 @@ class OptimizerConstraintsTest {
             "Minimizar sobreocupacion",
             "Minimizar subocupacion",
             "Preferir misma aula por comision",
-            "Preferir mismo edificio por comision");
+            "Preferir mismo edificio por comision",
+            "Preferir mismo edificio por evento",
+            "Permiso no satisfecho",
+            "Preferir aula con proyector",
+            "Preferir aula con computadoras",
+            "Aula previa respetada");
 
     private static final Set<SettingKey> EXPECTED_WEIGHT_KEYS = Set.of(
             SettingKey.OPTIMIZER_WEIGHT_OVERCROWDING,
             SettingKey.OPTIMIZER_WEIGHT_UNUSED_CAPACITY,
             SettingKey.OPTIMIZER_WEIGHT_SAME_COMMISSION_DIFF_ROOM,
-            SettingKey.OPTIMIZER_WEIGHT_SAME_COMMISSION_DIFF_BUILDING);
+            SettingKey.OPTIMIZER_WEIGHT_SAME_COMMISSION_DIFF_BUILDING,
+            SettingKey.OPTIMIZER_WEIGHT_SAME_EVENT_DIFF_BUILDING,
+            SettingKey.OPTIMIZER_WEIGHT_MISSING_PROJECTOR,
+            SettingKey.OPTIMIZER_WEIGHT_MISSING_COMPUTER);
 
     @Test
-    @DisplayName("discovers exactly the six constraints via ServiceLoader")
+    @DisplayName("discovers exactly the eleven constraints via ServiceLoader")
     void discoversAllConstraints() {
         List<OptimizerConstraint> constraints = OptimizerConstraints.all();
 
-        assertThat(constraints).hasSize(6);
+        assertThat(constraints).hasSize(11);
     }
 
     @Test
@@ -46,13 +54,13 @@ class OptimizerConstraintsTest {
     }
 
     @Test
-    @DisplayName("exactly the four soft constraints declare a weight key")
+    @DisplayName("exactly the seven soft constraints declare a weight key")
     void weightKeysMatchExpected() {
         List<OptimizerConstraint> withWeight = OptimizerConstraints.all().stream()
                 .filter(c -> c.weightKey().isPresent())
                 .toList();
 
-        assertThat(withWeight).hasSize(4);
+        assertThat(withWeight).hasSize(7);
 
         Set<SettingKey> weightKeys = withWeight.stream()
                 .map(c -> c.weightKey().orElseThrow())
@@ -65,6 +73,7 @@ class OptimizerConstraintsTest {
         Set<String> namesWithoutWeight = withoutWeight.stream()
                 .map(OptimizerConstraint::name)
                 .collect(Collectors.toSet());
-        assertThat(namesWithoutWeight).isEqualTo(Set.of("Sin solapamiento", "Asignar todo lo posible"));
+        assertThat(namesWithoutWeight).isEqualTo(
+                Set.of("Sin solapamiento", "Asignar todo lo posible", "Permiso no satisfecho", "Aula previa respetada"));
     }
 }

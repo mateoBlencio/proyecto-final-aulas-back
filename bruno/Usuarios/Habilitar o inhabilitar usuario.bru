@@ -1,0 +1,23 @@
+meta {
+  name: Habilitar o inhabilitar usuario
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/v1/users/1/enabled
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "enabled": false
+  }
+}
+
+docs {
+  PATCH /v1/users/{id}/enabled. Permiso: PERM_USER_MANAGE.
+  Al inhabilitar responde 400 si el usuario es el que hace la petición o si es
+  la única SUBSECRETARIA habilitada.
+}

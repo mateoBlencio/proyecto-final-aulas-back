@@ -1,0 +1,19 @@
+meta {
+  name: Estado del servicio de conteo
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/camera-counts/health
+  body: none
+  auth: inherit
+}
+
+docs {
+  Devuelve ready, estimator y version del servicio de conteo. ready=false
+  mientras el servicio carga el modelo (hasta 2 minutos después de un
+  reinicio). Responde 503 si el servicio no responde o si el backend corre con
+  siga.camera-count.enabled=false. Requiere PERM_CAMERA_COUNT_RUN
+  (SUBSECRETARIA o AUXILIAR_AULICO, sin importar el edificio).
+}

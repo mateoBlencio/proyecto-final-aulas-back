@@ -26,14 +26,16 @@ class AcademicFindOrCreateIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private AcademicPeriodRepository academicPeriodRepository;
 
-    private static int nextCode() {
-        return SEQ.incrementAndGet();
+    // Años propios de este test: IntegrationTestData.materiaYComision() crea períodos en 2100-2599 y les
+    // pisa las fechas, así que un año compartido hace fallar tanto el "created=true" como las fechas.
+    private static int nextYear() {
+        return 2700 + (SEQ.incrementAndGet() % 200);
     }
 
     @Test
     @DisplayName("periodo academico unico por (year, term): segunda llamada reusa sin duplicar")
     void findOrCreate_academicPeriod_reusesByYearAndTerm() {
-        int year = 2100 + (nextCode() % 500);
+        int year = nextYear();
         long before = academicPeriodRepository.count();
 
         FindOrCreateResult<AcademicPeriodResponseDto> first =
@@ -49,9 +51,9 @@ class AcademicFindOrCreateIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("fechas de TermType persistidas: ANUAL 1-mar a 30-nov, 1er cuat. 1-mar a 31-jul, 2do cuat. 1-ago a 30-nov")
     void findOrCreate_academicPeriod_persistsTermTypeDates() {
-        int yearAnual = 2100 + (nextCode() % 500);
-        int yearPrimero = 2100 + (nextCode() % 500);
-        int yearSegundo = 2100 + (nextCode() % 500);
+        int yearAnual = nextYear();
+        int yearPrimero = nextYear();
+        int yearSegundo = nextYear();
 
         AcademicPeriodResponseDto anual = academicPeriodService.findOrCreate(yearAnual, TermType.ANUAL).value();
         AcademicPeriodResponseDto primero =

@@ -2,7 +2,9 @@ package ar.edu.utn.frc.siga.allocation.service.impl;
 
 import ar.edu.utn.frc.siga.academic.dto.response.AcademicPeriodResponseDto;
 import ar.edu.utn.frc.siga.academic.service.AcademicPeriodService;
+import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.AllocationConflictDto;
+import ar.edu.utn.frc.siga.allocation.dto.response.NotPermittedConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OverlapConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.OvercrowdedConflictDto;
 import ar.edu.utn.frc.siga.allocation.dto.response.UnallocatedConflictDto;
@@ -12,21 +14,27 @@ import ar.edu.utn.frc.siga.allocation.model.ConflictType;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.allocation.validator.OccupiedSlot;
 import ar.edu.utn.frc.siga.common.exception.InvalidDateRangeException;
+import ar.edu.utn.frc.siga.common.security.BuildingScope;
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
+import ar.edu.utn.frc.siga.common.security.Permission;
 import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.model.EventType;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
+import ar.edu.utn.frc.siga.space.dto.response.ClassroomSubjectPermissionDto;
 import ar.edu.utn.frc.siga.space.service.ClassroomService;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
@@ -36,13 +44,17 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -64,32 +76,37 @@ class AllocationConflictServiceImplTest {
     private OccurrenceService occurrenceService;
     @Mock
     private AllocationRepository allocationRepository;
+    @Mock
+    private BuildingScopeResolver buildingScopeResolver;
 
-    @InjectMocks
     private AllocationConflictServiceImpl service;
 
     @BeforeEach
     void setUp() {
+        service = new AllocationConflictServiceImpl(classroomService, academicEventService,
+                new ConflictDateRange(academicPeriodService), occupancyReader, occurrenceService,
+                allocationRepository, buildingScopeResolver);
         lenient().when(occupancyReader.loadAllocated(any(), any())).thenReturn(List.of());
         lenient().when(academicEventService.findByIds(any())).thenReturn(List.of());
         lenient().when(academicPeriodService.findActive()).thenReturn(List.of());
-        lenient().when(classroomService.findByIds(any())).thenReturn(List.of());
+        lenient().when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of());
         lenient().when(occurrenceService.findSlotsByStatusBetween(any(), any(), any())).thenReturn(List.of());
         lenient().when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of());
+        lenient().when(buildingScopeResolver.scopeFor(any())).thenReturn(BuildingScope.unrestricted());
     }
 
     @Test
-    @DisplayName("types vacío devuelve los tres tipos de conflicto")
-    void typesVacioDevuelveLosTresTipos() {
+    @DisplayName("types vacío evalúa todos los tipos de conflicto")
+    void typesVacioEvaluaTodosLosTipos() {
         LocalDate from = futureDate(0);
         LocalDate to = futureDate(30);
         RecurringEventResponseDto event = recurringEvent(1L, 40, LocalTime.of(8, 0));
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         Allocation allocation = allocation(100L, 10L, 5);
         mockOccupancy(List.of(slot), List.of(allocation), List.of(event));
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, 30)));
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 30)));
 
-        List<AllocationConflictDto> result = service.findConflicts(Set.of(), from, to, false, PAGEABLE).getContent();
+        List<AllocationConflictDto> result = service.findConflicts(Set.of(), from, to, false, null, null, null, PAGEABLE).getContent();
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst()).isInstanceOf(OvercrowdedConflictDto.class);
@@ -104,10 +121,10 @@ class AllocationConflictServiceImplTest {
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         Allocation allocation = allocation(100L, 10L, 5);
         mockOccupancy(List.of(slot), List.of(allocation), List.of(event));
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, 30)));
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 30)));
 
         List<AllocationConflictDto> result =
-                service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, PAGEABLE).getContent();
+                service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, null, null, null, PAGEABLE).getContent();
 
         assertThat(result).hasSize(1);
         OvercrowdedConflictDto overcrowded = (OvercrowdedConflictDto) result.getFirst();
@@ -126,9 +143,9 @@ class AllocationConflictServiceImplTest {
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         Allocation allocation = allocation(100L, 10L, 5);
         mockOccupancy(List.of(slot), List.of(allocation), List.of(event));
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, null)));
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, null)));
 
-        assertThat(service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, PAGEABLE)).isEmpty();
+        assertThat(service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, null, null, null, PAGEABLE)).isEmpty();
     }
 
     @Test
@@ -140,9 +157,9 @@ class AllocationConflictServiceImplTest {
         OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
         Allocation allocation = allocation(100L, 10L, 5);
         mockOccupancy(List.of(slot), List.of(allocation), List.of(event));
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, 30)));
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 30)));
 
-        assertThat(service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, PAGEABLE)).isEmpty();
+        assertThat(service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, null, null, null, PAGEABLE)).isEmpty();
     }
 
     @Test
@@ -158,10 +175,10 @@ class AllocationConflictServiceImplTest {
         Allocation allocA = allocation(100L, 10L, 5);
         Allocation allocB = allocation(101L, 11L, 5);
         mockOccupancy(List.of(slotA, slotB), List.of(allocA, allocB), List.of(eventA, eventB));
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, 100)));
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 100)));
 
         List<AllocationConflictDto> result =
-                service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, PAGEABLE).getContent();
+                service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, null, null, null, PAGEABLE).getContent();
 
         assertThat(result).hasSize(1);
         OverlapConflictDto overlap = (OverlapConflictDto) result.getFirst();
@@ -184,9 +201,9 @@ class AllocationConflictServiceImplTest {
         Allocation allocA = allocation(100L, 10L, 5);
         Allocation allocB = allocation(101L, 11L, 6);
         mockOccupancy(List.of(slotA, slotB), List.of(allocA, allocB), List.of(eventA, eventB));
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, 100), classroom(6L, 100)));
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 100), classroom(6L, 100)));
 
-        assertThat(service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, PAGEABLE)).isEmpty();
+        assertThat(service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, null, null, null, PAGEABLE)).isEmpty();
     }
 
     @Test
@@ -202,9 +219,9 @@ class AllocationConflictServiceImplTest {
         Allocation allocA = allocation(100L, 10L, 5);
         Allocation allocB = allocation(101L, 11L, 5);
         mockOccupancy(List.of(slotA, slotB), List.of(allocA, allocB), List.of(eventA, eventB));
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, 100)));
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 100)));
 
-        assertThat(service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, PAGEABLE)).isEmpty();
+        assertThat(service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, null, null, null, PAGEABLE)).isEmpty();
     }
 
     @Test
@@ -227,13 +244,53 @@ class AllocationConflictServiceImplTest {
         Allocation allocB2 = allocation(103L, 13L, 5);
         mockOccupancy(List.of(slotA1, slotB1, slotA2, slotB2),
                 List.of(allocA1, allocB1, allocA2, allocB2), List.of(eventA, eventB));
-        when(classroomService.findByIds(any())).thenReturn(List.of(classroom(5L, 100)));
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 100)));
 
         List<AllocationConflictDto> result =
-                service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, PAGEABLE).getContent();
+                service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, null, null, null, PAGEABLE).getContent();
 
         assertThat(result).hasSize(1);
         assertThat(((OverlapConflictDto) result.getFirst()).dates()).containsExactly(date1, date2);
+    }
+
+    @Test
+    @DisplayName("Detecta aula no permitida: la materia del evento no está habilitada en el aula asignada")
+    void detectaAulaNoPermitida() {
+        LocalDate from = futureDate(0);
+        LocalDate to = futureDate(30);
+        SubjectResponseDto subject = new SubjectResponseDto(7L, 700, "Análisis", "1C", null, true, null);
+        RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0), subject);
+        OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
+        mockOccupancy(List.of(slot), List.of(allocation(100L, 10L, 5)), List.of(event));
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 100)));
+        when(classroomService.findSubjectPermissions(any())).thenReturn(Map.of(
+                5L, new ClassroomSubjectPermissionDto(5L, false, Set.of(99L))));
+
+        List<AllocationConflictDto> result =
+                service.findConflicts(Set.of(ConflictType.NOT_PERMITTED), from, to, false, null, null, null, PAGEABLE).getContent();
+
+        assertThat(result).hasSize(1);
+        NotPermittedConflictDto conflict = (NotPermittedConflictDto) result.getFirst();
+        assertThat(conflict.event().id()).isEqualTo(1L);
+        assertThat(conflict.classroom().id()).isEqualTo(5L);
+        assertThat(conflict.subjectId()).isEqualTo(7L);
+        assertThat(conflict.dates()).containsExactly(futureDate(2));
+    }
+
+    @Test
+    @DisplayName("No reporta aula no permitida cuando el aula habilita la materia (SUBSET con match) o es ALL")
+    void noReportaAulaPermitida() {
+        LocalDate from = futureDate(0);
+        LocalDate to = futureDate(30);
+        SubjectResponseDto subject = new SubjectResponseDto(7L, 700, "Análisis", "1C", null, true, null);
+        RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0), subject);
+        OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
+        mockOccupancy(List.of(slot), List.of(allocation(100L, 10L, 5)), List.of(event));
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(classroom(5L, 100)));
+        when(classroomService.findSubjectPermissions(any())).thenReturn(Map.of(
+                5L, new ClassroomSubjectPermissionDto(5L, false, Set.of(7L))));
+
+        assertThat(service.findConflicts(Set.of(ConflictType.NOT_PERMITTED), from, to, false, null, null, null, PAGEABLE)).isEmpty();
     }
 
     @Test
@@ -249,7 +306,7 @@ class AllocationConflictServiceImplTest {
         when(academicEventService.findByIds(any())).thenReturn(List.of(event));
 
         List<AllocationConflictDto> result =
-                service.findConflicts(Set.of(ConflictType.UNALLOCATED), from, to, false, PAGEABLE).getContent();
+                service.findConflicts(Set.of(ConflictType.UNALLOCATED), from, to, false, null, null, null, PAGEABLE).getContent();
 
         assertThat(result).hasSize(1);
         assertThat(((UnallocatedConflictDto) result.getFirst()).event().id()).isEqualTo(1L);
@@ -266,7 +323,121 @@ class AllocationConflictServiceImplTest {
                 .thenReturn(List.of(slot));
         when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of(allocation(100L, 10L, 5)));
 
-        assertThat(service.findConflicts(Set.of(ConflictType.UNALLOCATED), from, to, false, PAGEABLE)).isEmpty();
+        assertThat(service.findConflicts(Set.of(ConflictType.UNALLOCATED), from, to, false, null, null, null, PAGEABLE)).isEmpty();
+    }
+
+    private void stubReleased(OccurrenceSlotDto... slots) {
+        when(occurrenceService.findSlotsByStatusBetween(eq(OccurrenceStatus.ROOM_RELEASED), any(), any()))
+                .thenReturn(List.of(slots));
+    }
+
+    private List<AllocationConflictDto> unallocated(LocalDate from, LocalDate to, boolean includePast) {
+        return service.findConflicts(Set.of(ConflictType.UNALLOCATED), from, to, includePast, null, null, null,
+                PAGEABLE).getContent();
+    }
+
+    @Test
+    @DisplayName("Una ocurrencia ROOM_RELEASED por CLASSROOM_DEACTIVATED sin asignación cuenta como sin aula")
+    void detectaSinAulaLiberadaPorBajaDeAula() {
+        RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0));
+        stubReleased(releasedSlot(10L, event, futureDate(2), ReleaseReason.CLASSROOM_DEACTIVATED));
+        when(academicEventService.findByIds(any())).thenReturn(List.of(event));
+
+        List<AllocationConflictDto> result = unallocated(futureDate(0), futureDate(30), false);
+
+        assertThat(result).hasSize(1);
+        assertThat(((UnallocatedConflictDto) result.getFirst()).event().id()).isEqualTo(1L);
+    }
+
+    @ParameterizedTest(name = "liberada con {0}")
+    @EnumSource(value = ReleaseReason.class, mode = EnumSource.Mode.EXCLUDE, names = "CLASSROOM_DEACTIVATED")
+    @DisplayName("Una ocurrencia ROOM_RELEASED por cualquier motivo distinto de CLASSROOM_DEACTIVATED no cuenta como sin aula")
+    void noDetectaSinAulaLiberadaPorOtroMotivo(ReleaseReason reason) {
+        RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0));
+        stubReleased(releasedSlot(10L, event, futureDate(2), reason));
+        lenient().when(academicEventService.findByIds(any())).thenReturn(List.of(event));
+
+        assertThat(unallocated(futureDate(0), futureDate(30), false)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Una ocurrencia liberada por CLASSROOM_DEACTIVATED que ya tiene asignación no cuenta como sin aula")
+    void noDetectaSinAulaLiberadaPorBajaSiTieneAsignacion() {
+        RecurringEventResponseDto stillReleased = recurringEvent(1L, 10, LocalTime.of(8, 0));
+        RecurringEventResponseDto reassigned = recurringEvent(2L, 10, LocalTime.of(8, 0));
+        stubReleased(releasedSlot(10L, stillReleased, futureDate(2), ReleaseReason.CLASSROOM_DEACTIVATED),
+                releasedSlot(11L, reassigned, futureDate(3), ReleaseReason.CLASSROOM_DEACTIVATED));
+        when(allocationRepository.findByOccurrenceIdIn(any())).thenAnswer(inv -> {
+            java.util.Collection<Long> ids = inv.getArgument(0);
+            return Stream.of(allocation(100L, 11L, 5)).filter(a -> ids.contains(a.getOccurrenceId())).toList();
+        });
+        when(academicEventService.findByIds(any())).thenReturn(List.of(stillReleased));
+
+        List<AllocationConflictDto> result = unallocated(futureDate(0), futureDate(30), false);
+
+        assertThat(result).hasSize(1);
+        assertThat(((UnallocatedConflictDto) result.getFirst()).event().id()).isEqualTo(1L);
+        ArgumentCaptor<Set<Long>> eventIds = ArgumentCaptor.forClass(Set.class);
+        verify(academicEventService).findByIds(eventIds.capture());
+        assertThat(eventIds.getValue()).containsExactly(1L);
+    }
+
+    @Test
+    @DisplayName("Las NEEDS_ROOM y las liberadas por baja de aula se suman en un mismo listado sin repetir eventos")
+    void sumaNeedsRoomYLiberadasPorBajaDeAula() {
+        RecurringEventResponseDto onlyNeedsRoom = recurringEvent(1L, 10, LocalTime.of(8, 0));
+        RecurringEventResponseDto both = recurringEvent(2L, 10, LocalTime.of(8, 0));
+        RecurringEventResponseDto onlyReleased = recurringEvent(3L, 10, LocalTime.of(8, 0));
+        when(occurrenceService.findSlotsByStatusBetween(eq(OccurrenceStatus.NEEDS_ROOM), any(), any()))
+                .thenReturn(List.of(occurrenceSlot(10L, onlyNeedsRoom, futureDate(2)),
+                        occurrenceSlot(11L, both, futureDate(2))));
+        stubReleased(releasedSlot(12L, both, futureDate(3), ReleaseReason.CLASSROOM_DEACTIVATED),
+                releasedSlot(13L, onlyReleased, futureDate(3), ReleaseReason.CLASSROOM_DEACTIVATED));
+        when(academicEventService.findByIds(any())).thenReturn(List.of(onlyNeedsRoom, both, onlyReleased));
+
+        List<AllocationConflictDto> result = unallocated(futureDate(0), futureDate(30), false);
+
+        assertThat(result).extracting(c -> ((UnallocatedConflictDto) c).event().id())
+                .containsExactlyInAnyOrder(1L, 2L, 3L);
+    }
+
+    @Test
+    @DisplayName("includePast=false descarta la liberada por baja de aula que ya empezó; con true la incluye")
+    void respetaIncludePastEnLiberadasPorBajaDeAula() {
+        RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0));
+        stubReleased(releasedSlot(10L, event, futureDate(-2), ReleaseReason.CLASSROOM_DEACTIVATED));
+        when(academicEventService.findByIds(any())).thenReturn(List.of(event));
+
+        List<AllocationConflictDto> withoutPast = unallocated(futureDate(-10), futureDate(30), false);
+        List<AllocationConflictDto> withPast = unallocated(futureDate(-10), futureDate(30), true);
+
+        assertThat(withoutPast).isEmpty();
+        assertThat(withPast).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("resolveAllUnallocatedEventIds incluye los eventos con clases liberadas por baja de aula")
+    void resolveAllUnallocatedEventIdsIncluyeLiberadasPorBaja() {
+        RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0));
+        stubReleased(releasedSlot(10L, event, futureDate(2), ReleaseReason.CLASSROOM_DEACTIVATED));
+
+        assertThat(service.resolveAllUnallocatedEventIds()).containsExactly(1L);
+    }
+
+    @Test
+    @DisplayName("Sin types lee la ocupación una sola vez para los tres tipos que la usan")
+    void withoutTypesReadsOccupancyOnce() {
+        service.findConflicts(null, futureDate(0), futureDate(30), false, null, null, null, PAGEABLE);
+
+        verify(occupancyReader, times(1)).loadAllocated(any(), any());
+    }
+
+    @Test
+    @DisplayName("Solo UNALLOCATED no lee la ocupación")
+    void onlyUnallocatedDoesNotReadOccupancy() {
+        service.findConflicts(Set.of(ConflictType.UNALLOCATED), futureDate(0), futureDate(30), false, null, null, null, PAGEABLE);
+
+        verify(occupancyReader, never()).loadAllocated(any(), any());
     }
 
     @Test
@@ -276,7 +447,7 @@ class AllocationConflictServiceImplTest {
         when(academicPeriodService.findActive()).thenReturn(List.of(
                 new AcademicPeriodResponseDto(2026, 2, LocalDate.now().minusDays(10), endDate)));
 
-        service.findConflicts(Set.of(ConflictType.OVERCROWDED), null, null, false, PAGEABLE);
+        service.findConflicts(Set.of(ConflictType.OVERCROWDED), null, null, false, null, null, null, PAGEABLE);
 
         ArgumentCaptor<LocalDate> toCaptor = ArgumentCaptor.forClass(LocalDate.class);
         verify(occupancyReader).loadAllocated(any(), toCaptor.capture());
@@ -288,7 +459,7 @@ class AllocationConflictServiceImplTest {
     void usaFallbackSeisMesesSinPeriodoActivo() {
         LocalDate from = LocalDate.of(2026, 8, 1);
 
-        service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, null, false, PAGEABLE);
+        service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, null, false, null, null, null, PAGEABLE);
 
         ArgumentCaptor<LocalDate> toCaptor = ArgumentCaptor.forClass(LocalDate.class);
         verify(occupancyReader).loadAllocated(eq(from), toCaptor.capture());
@@ -301,8 +472,63 @@ class AllocationConflictServiceImplTest {
         LocalDate from = LocalDate.of(2026, 8, 10);
         LocalDate to = LocalDate.of(2026, 8, 1);
 
-        assertThatThrownBy(() -> service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, PAGEABLE))
+        assertThatThrownBy(() -> service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, null, null, null, PAGEABLE))
                 .isInstanceOf(InvalidDateRangeException.class);
+    }
+
+    @Test
+    @DisplayName("Filtra sobrecupo cuyo aula está fuera del alcance de CONFLICT_READ")
+    void filtraSobrecupoFueraDeAlcance() {
+        LocalDate from = futureDate(0);
+        LocalDate to = futureDate(30);
+        RecurringEventResponseDto event = recurringEvent(1L, 40, LocalTime.of(8, 0));
+        OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
+        Allocation allocation = allocation(100L, 10L, 5);
+        mockOccupancy(List.of(slot), List.of(allocation), List.of(event));
+        ClassroomResponseDto outOfScope = new ClassroomResponseDto(5L, 5, 30, 9L, "Edificio Ajeno", 1L, "Tipo", null, true);
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(outOfScope));
+        when(buildingScopeResolver.scopeFor(Permission.CONFLICT_READ)).thenReturn(BuildingScope.of(Set.of(1L)));
+
+        assertThat(service.findConflicts(Set.of(ConflictType.OVERCROWDED), from, to, false, null, null, null, PAGEABLE)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Filtra superposición cuyo aula está fuera del alcance de CONFLICT_READ")
+    void filtraSolapeFueraDeAlcance() {
+        LocalDate from = futureDate(0);
+        LocalDate to = futureDate(30);
+        LocalDate date = futureDate(2);
+        RecurringEventResponseDto eventA = recurringEvent(1L, 10, LocalTime.of(8, 0));
+        RecurringEventResponseDto eventB = recurringEvent(2L, 10, LocalTime.of(8, 30));
+        OccurrenceSlotDto slotA = occurrenceSlot(10L, eventA, date);
+        OccurrenceSlotDto slotB = occurrenceSlot(11L, eventB, date);
+        Allocation allocA = allocation(100L, 10L, 5);
+        Allocation allocB = allocation(101L, 11L, 5);
+        mockOccupancy(List.of(slotA, slotB), List.of(allocA, allocB), List.of(eventA, eventB));
+        ClassroomResponseDto outOfScope = new ClassroomResponseDto(5L, 5, 100, 9L, "Edificio Ajeno", 1L, "Tipo", null, true);
+        when(classroomService.findByIdsIncludingDeactivated(any())).thenReturn(List.of(outOfScope));
+        when(buildingScopeResolver.scopeFor(Permission.CONFLICT_READ)).thenReturn(BuildingScope.of(Set.of(1L)));
+
+        assertThat(service.findConflicts(Set.of(ConflictType.OVERLAP), from, to, false, null, null, null, PAGEABLE)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Nunca filtra eventos sin aula por alcance: no hay edificio contra el cual chequear")
+    void nuncaFiltraSinAulaPorAlcance() {
+        LocalDate from = futureDate(0);
+        LocalDate to = futureDate(30);
+        RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0));
+        OccurrenceSlotDto slot = occurrenceSlot(10L, event, futureDate(2));
+        when(occurrenceService.findSlotsByStatusBetween(eq(OccurrenceStatus.NEEDS_ROOM), any(), any()))
+                .thenReturn(List.of(slot));
+        when(allocationRepository.findByOccurrenceIdIn(any())).thenReturn(List.of());
+        when(academicEventService.findByIds(any())).thenReturn(List.of(event));
+        when(buildingScopeResolver.scopeFor(Permission.CONFLICT_READ)).thenReturn(BuildingScope.of(Set.of(999L)));
+
+        List<AllocationConflictDto> result =
+                service.findConflicts(Set.of(ConflictType.UNALLOCATED), from, to, false, null, null, null, PAGEABLE).getContent();
+
+        assertThat(result).hasSize(1);
     }
 
     @Test
@@ -317,6 +543,113 @@ class AllocationConflictServiceImplTest {
         List<Long> ids = service.resolveAllUnallocatedEventIds();
 
         assertThat(ids).containsExactly(1L);
+    }
+
+    @Test
+    @DisplayName("Un grupo de dos aulas genera un solo conflicto con la capacidad sumada")
+    void unSoloConflictoPorGrupoConCapacidadSumada() {
+        RecurringEventResponseDto event = recurringEvent(1L, 129, LocalTime.of(8, 0));
+        OccurrenceSlotDto slotA = occurrenceSlot(10L, event, futureDate(2));
+        OccurrenceSlotDto slotB = occurrenceSlot(11L, event, futureDate(2));
+        mockOccupancy(List.of(slotA, slotB), List.of(allocation(100L, 10L, 5), allocation(101L, 11L, 6)), List.of(event));
+        when(classroomService.findByIdsIncludingDeactivated(any()))
+                .thenReturn(List.of(classroom(5L, 70), classroom(6L, 25)));
+
+        List<AllocationConflictDto> result =
+                service.findConflicts(Set.of(ConflictType.OVERCROWDED), futureDate(0), futureDate(30), false, null, null, null, PAGEABLE).getContent();
+
+        assertThat(result).hasSize(1);
+        OvercrowdedConflictDto conflict = (OvercrowdedConflictDto) result.getFirst();
+        assertThat(conflict.capacity()).isEqualTo(95);
+        assertThat(conflict.overcrowdedBy()).isEqualTo(34);
+        assertThat(conflict.classrooms()).extracting(ClassroomResponseDto::id).containsExactly(5L, 6L);
+        assertThat(conflict.classroom().id()).isEqualTo(5L);
+        assertThat(conflict.dates()).containsExactly(futureDate(2));
+    }
+
+    @Test
+    @DisplayName("Un grupo cuyas aulas suman capacidad suficiente no genera conflicto")
+    void grupoConCapacidadSumadaSuficienteNoGeneraConflicto() {
+        RecurringEventResponseDto event = recurringEvent(1L, 95, LocalTime.of(8, 0));
+        OccurrenceSlotDto slotA = occurrenceSlot(10L, event, futureDate(2));
+        OccurrenceSlotDto slotB = occurrenceSlot(11L, event, futureDate(2));
+        mockOccupancy(List.of(slotA, slotB), List.of(allocation(100L, 10L, 5), allocation(101L, 11L, 6)), List.of(event));
+        when(classroomService.findByIdsIncludingDeactivated(any()))
+                .thenReturn(List.of(classroom(5L, 70), classroom(6L, 25)));
+
+        assertThat(service.findConflicts(Set.of(ConflictType.OVERCROWDED), futureDate(0), futureDate(30), false, null, null, null, PAGEABLE)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Se saltea el grupo si alguna de sus aulas no tiene capacidad")
+    void saltaGrupoConAulaSinCapacidad() {
+        RecurringEventResponseDto event = recurringEvent(1L, 500, LocalTime.of(8, 0));
+        OccurrenceSlotDto slotA = occurrenceSlot(10L, event, futureDate(2));
+        OccurrenceSlotDto slotB = occurrenceSlot(11L, event, futureDate(2));
+        mockOccupancy(List.of(slotA, slotB), List.of(allocation(100L, 10L, 5), allocation(101L, 11L, 6)), List.of(event));
+        when(classroomService.findByIdsIncludingDeactivated(any()))
+                .thenReturn(List.of(classroom(5L, 70), classroom(6L, null)));
+
+        assertThat(service.findConflicts(Set.of(ConflictType.OVERCROWDED), futureDate(0), futureDate(30), false, null, null, null, PAGEABLE)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("El mismo evento en dos fechas con distinta cantidad de aulas genera dos conflictos")
+    void mismoEventoConDistintoConjuntoDeAulasGeneraDosConflictos() {
+        RecurringEventResponseDto event = recurringEvent(1L, 120, LocalTime.of(8, 0));
+        OccurrenceSlotDto day1Room1 = occurrenceSlot(10L, event, futureDate(2));
+        OccurrenceSlotDto day2Room1 = occurrenceSlot(11L, event, futureDate(9));
+        OccurrenceSlotDto day2Room2 = occurrenceSlot(12L, event, futureDate(9));
+        mockOccupancy(List.of(day1Room1, day2Room1, day2Room2),
+                List.of(allocation(100L, 10L, 5), allocation(101L, 11L, 5), allocation(102L, 12L, 6)), List.of(event));
+        when(classroomService.findByIdsIncludingDeactivated(any()))
+                .thenReturn(List.of(classroom(5L, 70), classroom(6L, 25)));
+
+        List<AllocationConflictDto> result =
+                service.findConflicts(Set.of(ConflictType.OVERCROWDED), futureDate(0), futureDate(30), false, null, null, null, PAGEABLE).getContent();
+
+        assertThat(result).hasSize(2).allSatisfy(c -> assertThat(c).isInstanceOf(OvercrowdedConflictDto.class));
+        List<OvercrowdedConflictDto> conflicts = result.stream().map(OvercrowdedConflictDto.class::cast).toList();
+        assertThat(conflicts).extracting(OvercrowdedConflictDto::capacity).containsExactlyInAnyOrder(70, 95);
+        assertThat(conflicts).filteredOn(c -> c.capacity() == 70).singleElement()
+                .satisfies(c -> assertThat(c.dates()).containsExactly(futureDate(2)));
+        assertThat(conflicts).filteredOn(c -> c.capacity() == 95).singleElement()
+                .satisfies(c -> assertThat(c.dates()).containsExactly(futureDate(9)));
+    }
+
+    @Test
+    @DisplayName("Usuario acotado a un edificio ve el conflicto del grupo con solo sus aulas en classrooms")
+    void usuarioAcotadoVeSoloSusAulasDelGrupo() {
+        RecurringEventResponseDto event = recurringEvent(1L, 129, LocalTime.of(8, 0));
+        OccurrenceSlotDto slotA = occurrenceSlot(10L, event, futureDate(2));
+        OccurrenceSlotDto slotB = occurrenceSlot(11L, event, futureDate(2));
+        mockOccupancy(List.of(slotA, slotB), List.of(allocation(100L, 10L, 5), allocation(101L, 11L, 6)), List.of(event));
+        when(classroomService.findByIdsIncludingDeactivated(any()))
+                .thenReturn(List.of(classroomIn(5L, 70, 1L), classroomIn(6L, 25, 2L)));
+        when(buildingScopeResolver.scopeFor(Permission.CONFLICT_READ)).thenReturn(BuildingScope.of(Set.of(2L)));
+
+        List<AllocationConflictDto> result =
+                service.findConflicts(Set.of(ConflictType.OVERCROWDED), futureDate(0), futureDate(30), false, null, null, null, PAGEABLE).getContent();
+
+        assertThat(result).hasSize(1);
+        OvercrowdedConflictDto conflict = (OvercrowdedConflictDto) result.getFirst();
+        assertThat(conflict.classrooms()).extracting(ClassroomResponseDto::id).containsExactly(6L);
+        assertThat(conflict.classroom().id()).isEqualTo(6L);
+        assertThat(conflict.capacity()).isEqualTo(95);
+    }
+
+    @Test
+    @DisplayName("Usuario que no ve ninguna aula del grupo no ve el conflicto")
+    void usuarioSinAulasDelGrupoNoVeElConflicto() {
+        RecurringEventResponseDto event = recurringEvent(1L, 129, LocalTime.of(8, 0));
+        OccurrenceSlotDto slotA = occurrenceSlot(10L, event, futureDate(2));
+        OccurrenceSlotDto slotB = occurrenceSlot(11L, event, futureDate(2));
+        mockOccupancy(List.of(slotA, slotB), List.of(allocation(100L, 10L, 5), allocation(101L, 11L, 6)), List.of(event));
+        when(classroomService.findByIdsIncludingDeactivated(any()))
+                .thenReturn(List.of(classroomIn(5L, 70, 1L), classroomIn(6L, 25, 2L)));
+        when(buildingScopeResolver.scopeFor(Permission.CONFLICT_READ)).thenReturn(BuildingScope.of(Set.of(999L)));
+
+        assertThat(service.findConflicts(Set.of(ConflictType.OVERCROWDED), futureDate(0), futureDate(30), false, null, null, null, PAGEABLE)).isEmpty();
     }
 
     private void mockOccupancy(List<OccurrenceSlotDto> slots, List<Allocation> allocations,
@@ -335,13 +668,24 @@ class AllocationConflictServiceImplTest {
     }
 
     private RecurringEventResponseDto recurringEvent(long id, Integer enrolled, LocalTime startTime) {
+        return recurringEvent(id, enrolled, startTime, null);
+    }
+
+    private RecurringEventResponseDto recurringEvent(long id, Integer enrolled, LocalTime startTime,
+            SubjectResponseDto subject) {
         return new RecurringEventResponseDto(id, EventType.RECURRING, enrolled, startTime, 60,
-                DayOfWeek.MONDAY, LocalDate.of(2026, 1, 1), null, null, null);
+                DayOfWeek.MONDAY, LocalDate.of(2026, 1, 1), null, subject, null);
     }
 
     private OccurrenceSlotDto occurrenceSlot(long id, RecurringEventResponseDto event, LocalDate date) {
         return new OccurrenceSlotDto(id, event.id(), date, event.startTime(), event.endTime(),
-                OccurrenceStatus.NEEDS_ROOM, event.enrolled());
+                OccurrenceStatus.NEEDS_ROOM, event.enrolled(), 1, null, null, null, null);
+    }
+
+    private OccurrenceSlotDto releasedSlot(long id, RecurringEventResponseDto event, LocalDate date,
+            ReleaseReason reason) {
+        return new OccurrenceSlotDto(id, event.id(), date, event.startTime(), event.endTime(),
+                OccurrenceStatus.ROOM_RELEASED, event.enrolled(), 1, reason, null, null, null);
     }
 
     private Allocation allocation(long id, Long occurrenceId, long classroomId) {
@@ -354,6 +698,10 @@ class AllocationConflictServiceImplTest {
     }
 
     private ClassroomResponseDto classroom(Long id, Integer capacity) {
-        return new ClassroomResponseDto(id, id.intValue(), capacity, 1L, "Edificio 1", 1L, "Tipo");
+        return new ClassroomResponseDto(id, id.intValue(), capacity, 1L, "Edificio 1", 1L, "Tipo", null, true);
+    }
+
+    private ClassroomResponseDto classroomIn(Long id, Integer capacity, Long buildingId) {
+        return new ClassroomResponseDto(id, id.intValue(), capacity, buildingId, "Edificio " + buildingId, 1L, "Tipo", null, true);
     }
 }

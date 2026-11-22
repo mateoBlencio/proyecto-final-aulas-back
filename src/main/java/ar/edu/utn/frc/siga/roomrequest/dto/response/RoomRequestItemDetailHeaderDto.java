@@ -14,5 +14,6 @@ public record RoomRequestItemDetailHeaderDto(
         String teacherEmail,
         String teacherPhone,
         SubjectResponseDto subject,
-        Instant createdAt
+        Instant createdAt,
+        int itemCount
 ) {}

@@ -10,5 +10,6 @@ public record AllocationImpactResponseDto(
         int movableClasses,
         int blockedClasses,
         List<ImpactOccurrenceDto> occurrences,
-        List<ImpactConflictDto> conflicts) {
+        List<ImpactConflictDto> conflicts,
+        List<OccurrenceConflictDto> toleratedOverlaps) {
 }

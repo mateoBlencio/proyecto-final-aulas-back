@@ -1,10 +1,10 @@
 package ar.edu.utn.frc.siga.academic;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
@@ -13,17 +13,15 @@ import ar.edu.utn.frc.siga.academic.model.Commission;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
 import ar.edu.utn.frc.siga.academic.model.StudyPlan;
 import ar.edu.utn.frc.siga.academic.model.Subject;
-import ar.edu.utn.frc.siga.academic.model.SubjectCommissionId;
+import ar.edu.utn.frc.siga.academic.model.SubjectCommission;
 import ar.edu.utn.frc.siga.academic.model.TermType;
 import ar.edu.utn.frc.siga.academic.repository.AcademicPeriodRepository;
 import ar.edu.utn.frc.siga.academic.repository.CommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.StudyPlanRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
 import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
-import ar.edu.utn.frc.siga.auth.model.Role;
-import ar.edu.utn.frc.siga.auth.security.JwtService;
+import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
-import java.util.Set;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,8 +29,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.context.WebApplicationContext;
 
 @Import(IntegrationTestData.class)
 @DisplayName("Academic – endpoints de activación (integración)")
@@ -40,12 +36,6 @@ class AcademicActivationApiIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private IntegrationTestData testData;
-
-    @Autowired
-    private WebApplicationContext webApplicationContext;
-
-    @Autowired
-    private JwtService jwtService;
 
     @Autowired
     private SubjectRepository subjectRepository;
@@ -66,12 +56,7 @@ class AcademicActivationApiIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUpAuxiliarMockMvc() {
-        String token = jwtService.generateAccessToken(
-                "auxiliar@frc.utn.edu.ar", Set.of(Role.AUXILIAR_AULICO));
-        auxiliarMockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
-                .apply(springSecurity())
-                .defaultRequest(get("/").header("Authorization", "Bearer " + token))
-                .build();
+        auxiliarMockMvc = mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar");
     }
 
     @Test
@@ -84,7 +69,8 @@ class AcademicActivationApiIntegrationTest extends AbstractIntegrationTest {
         assertActivationLifecycle(
                 "/v1/subjects/" + id + "/activation",
                 "/v1/subjects/999999999/activation",
-                () -> subjectRepository.findActiveById(id).isPresent());
+                () -> subjectRepository.findActiveById(id).isPresent(),
+                "/v1/subjects?code=" + subject.getCode() + "&includeDeactivated=true");
     }
 
     @Test
@@ -92,10 +78,15 @@ class AcademicActivationApiIntegrationTest extends AbstractIntegrationTest {
     void studyPlan_activationLifecycle() throws Exception {
         StudyPlan plan = testData.planDeEstudio((int) IntegrationTestData.nextSeq(), newSpecialty());
         long id = plan.getId();
+
+        mockMvc.perform(get("/v1/study-plans").param("planCode", String.valueOf(plan.getPlanCode())))
+                .andExpect(jsonPath("$.content[0].id").value(id));
+
         assertActivationLifecycle(
                 "/v1/study-plans/" + id + "/activation",
                 "/v1/study-plans/999999999/activation",
-                () -> studyPlanRepository.findActiveById(id).isPresent());
+                () -> studyPlanRepository.findActiveById(id).isPresent(),
+                "/v1/study-plans?planCode=" + plan.getPlanCode() + "&includeDeactivated=true");
     }
 
     @Test
@@ -115,6 +106,12 @@ class AcademicActivationApiIntegrationTest extends AbstractIntegrationTest {
     void academicPeriod_activationLifecycle() throws Exception {
         AcademicPeriod period = testData.periodoAcademico(newYear(), TermType.ANUAL);
         long id = period.getId();
+
+        mockMvc.perform(get("/v1/academic-periods")
+                        .param("year", String.valueOf(period.getYear()))
+                        .param("semester", String.valueOf(period.getSemester())))
+                .andExpect(jsonPath("$.content[0].id").value(id));
+
         assertActivationLifecycle(
                 "/v1/academic-periods/" + id + "/activation",
                 "/v1/academic-periods/999999999/activation",
@@ -125,11 +122,14 @@ class AcademicActivationApiIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("SubjectCommission: PUT/DELETE /v1/subject-commissions/{sid}/{cid}/activation (204, idempotente, 404, 403)")
     void subjectCommission_activationLifecycle() throws Exception {
         IntegrationTestData.SubjectAndCommission link = testData.materiaYComision();
-        SubjectCommissionId key = new SubjectCommissionId(link.subjectId(), link.commissionId());
         assertActivationLifecycle(
                 "/v1/subject-commissions/" + link.subjectId() + "/" + link.commissionId() + "/activation",
                 "/v1/subject-commissions/999999999/999999999/activation",
-                () -> subjectCommissionRepository.findActiveById(key).isPresent());
+                () -> subjectCommissionRepository
+                        .findBySubject_IdAndCommission_Id(link.subjectId(), link.commissionId())
+                        .filter(SubjectCommission::isActive).isPresent(),
+                "/v1/subject-commissions?subjectId=" + link.subjectId() + "&commissionId=" + link.commissionId()
+                        + "&includeDeactivated=true");
     }
 
     private Specialty newSpecialty() {
@@ -142,15 +142,31 @@ class AcademicActivationApiIntegrationTest extends AbstractIntegrationTest {
 
     private void assertActivationLifecycle(String activationPath, String missingPath, BooleanSupplier active)
             throws Exception {
+        assertActivationLifecycle(activationPath, missingPath, active, null);
+    }
+
+    /**
+     * {@code listPath} es opcional: si no es null, verifica además que el listado (con
+     * {@code includeDeactivated=true}) refleje {@code enabled=false} tras el DELETE y
+     * {@code enabled=true} tras el PUT.
+     */
+    private void assertActivationLifecycle(String activationPath, String missingPath, BooleanSupplier active,
+            String listPath) throws Exception {
         assertThat(active.getAsBoolean()).isTrue();
 
         mockMvc.perform(delete(activationPath)).andExpect(status().isNoContent());
         assertThat(active.getAsBoolean()).isFalse();
+        if (listPath != null) {
+            mockMvc.perform(get(listPath)).andExpect(jsonPath("$.content[0].enabled").value(false));
+        }
         mockMvc.perform(delete(activationPath)).andExpect(status().isNoContent());
         assertThat(active.getAsBoolean()).isFalse();
 
         mockMvc.perform(put(activationPath)).andExpect(status().isNoContent());
         assertThat(active.getAsBoolean()).isTrue();
+        if (listPath != null) {
+            mockMvc.perform(get(listPath)).andExpect(jsonPath("$.content[0].enabled").value(true));
+        }
         mockMvc.perform(put(activationPath)).andExpect(status().isNoContent());
         assertThat(active.getAsBoolean()).isTrue();
 

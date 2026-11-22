@@ -62,6 +62,13 @@ class AllocationImpactApiIntegrationTest extends AbstractIntegrationTest {
                 .findFirst().orElseThrow();
     }
 
+    /** Evento de una sola ocurrencia con la hora de arranque corrida (para armar solapes parciales). */
+    private Long seedEventAt(IntegrationTestData.SubjectAndCommission sc, LocalDate date, LocalTime start) {
+        var dto = new CreateRecurringEventRequestDto(30, start, DURATION, date.getDayOfWeek(), date, date,
+                sc.subjectId(), sc.commissionId());
+        return academicEventService.createRecurringEvent(dto).id();
+    }
+
     private static AllocationBatchRequestDto byRange(Long eventId, LocalDate from, LocalDate to, Long classroomId) {
         return new AllocationBatchRequestDto(
                 List.of(new AllocationItemRequestDto(null, eventId, from, to, classroomId)), null);
@@ -232,14 +239,54 @@ class AllocationImpactApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("Un rango que arranca en el pasado sigue siendo 400, no un impacto vacío")
-    void impactDesdeElPasadoEs400() throws Exception {
+    @DisplayName("Solape de 30 minutos (dentro del margen): tolerado, no cuenta como bloqueado")
+    void impactSolape30MinutosEsTolerado() throws Exception {
+        var sc = testData.materiaYComision();
+        Classroom aula = testData.aula(testData.edificio());
+        LocalDate date = LocalDate.now().plusDays(7);
+
+        Long firstEventId = seedEventAt(sc, date, START); // 08:00-09:30
+        allocate(byOccurrence(occurrenceOn(firstEventId, date).getId(), aula.getId()));
+
+        Long secondEventId = seedEventAt(testData.materiaYComision(), date, LocalTime.of(9, 0)); // 09:00-10:30, solape 30
+
+        impact(byOccurrence(occurrenceOn(secondEventId, date).getId(), aula.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.blockedClasses").value(0))
+                .andExpect(jsonPath("$.movableClasses").value(1))
+                .andExpect(jsonPath("$.toleratedOverlaps.length()").value(1))
+                .andExpect(jsonPath("$.toleratedOverlaps[0].overlapMinutes").value(30));
+    }
+
+    @Test
+    @DisplayName("Solape de 90 minutos (supera el margen): sigue en conflicts y bloqueado")
+    void impactSolape90MinutosSigueBloqueado() throws Exception {
+        var sc = testData.materiaYComision();
+        Classroom aula = testData.aula(testData.edificio());
+        LocalDate date = LocalDate.now().plusDays(7);
+
+        Long firstEventId = seedEventAt(sc, date, START); // 08:00-09:30
+        allocate(byOccurrence(occurrenceOn(firstEventId, date).getId(), aula.getId()));
+
+        Long secondEventId = seedEventAt(testData.materiaYComision(), date, START); // mismo horario, solape 90
+
+        impact(byOccurrence(occurrenceOn(secondEventId, date).getId(), aula.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.blockedClasses").value(1))
+                .andExpect(jsonPath("$.conflicts.length()").value(1))
+                .andExpect(jsonPath("$.toleratedOverlaps").isEmpty());
+    }
+
+    @Test
+    @DisplayName("Un rango que arranca en el pasado se recorta a hoy y calcula el impacto de las clases futuras")
+    void impactDesdeElPasadoSeRecortaAHoy() throws Exception {
         var sc = testData.materiaYComision();
         Classroom destino = testData.aula(testData.edificio());
         LocalDate start = LocalDate.now().plusDays(7);
         Long eventId = seedWeeklyEvent(sc, start, 2);
 
         impact(byRange(eventId, LocalDate.now().minusDays(1), start.plusWeeks(1), destino.getId()))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.movableClasses").value(2));
     }
 }

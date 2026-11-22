@@ -1,0 +1,32 @@
+meta {
+  name: Obtener cadena de una operación
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/v1/audit/operations/:operationId/chain
+  body: none
+  auth: inherit
+}
+
+params:path {
+  operationId: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Cadena de causa y efecto de una operación: las operaciones (type=OPERATION)
+  que contienen a operationId, su raíz y sus descendientes (hasta 10 niveles y
+  200 operaciones), ordenadas por revisión ascendente (la causa primero).
+  Requiere PERM_AUDIT_READ. Sin filtros ni paginación.
+
+  Respuesta: { entries: [...], truncated: boolean }. truncated es true si la
+  cadena está incompleta: se cortó a las 200 operaciones, o el recorrido llegó
+  a los 10 niveles sin alcanzar la raíz real (la que no tiene padre) o las
+  hojas. Si el operationId no existe: entries [] y truncated false.
+
+  Cada entrada trae parentOperationId con la operación que la causó. Hoy la
+  única relación es: liberar una ocurrencia (operación padre) genera la
+  liberación del aula (operación hija, actorType SYSTEM porque corre en el
+  hilo del listener).
+}

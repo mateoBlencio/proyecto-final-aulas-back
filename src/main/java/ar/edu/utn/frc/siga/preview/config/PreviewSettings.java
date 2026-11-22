@@ -5,4 +5,6 @@ public interface PreviewSettings {
     int getDefaultTimeLimitSeconds();
 
     long getTtlMinutes();
+
+    int getSuggestionTimeLimitSeconds();
 }

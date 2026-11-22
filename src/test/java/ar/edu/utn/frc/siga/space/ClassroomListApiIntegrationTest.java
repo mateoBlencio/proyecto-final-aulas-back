@@ -1,13 +1,11 @@
 package ar.edu.utn.frc.siga.space;
 
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
-import ar.edu.utn.frc.siga.auth.model.Role;
-import ar.edu.utn.frc.siga.auth.security.JwtService;
+import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
@@ -15,15 +13,12 @@ import ar.edu.utn.frc.siga.space.model.PermissionMode;
 import ar.edu.utn.frc.siga.space.model.ResourceValueKind;
 import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
-import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.context.WebApplicationContext;
 
 @Import(IntegrationTestData.class)
 @DisplayName("Classroom listado con características (integración)")
@@ -35,21 +30,11 @@ class ClassroomListApiIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private ClassroomRepository classroomRepository;
 
-    @Autowired
-    private WebApplicationContext webApplicationContext;
-
-    @Autowired
-    private JwtService jwtService;
-
     private MockMvc auxiliarMockMvc;
 
     @BeforeEach
     void setUpAuxiliar() {
-        String token = jwtService.generateAccessToken("auxiliar@frc.utn.edu.ar", Set.of(Role.AUXILIAR_AULICO));
-        auxiliarMockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
-                .apply(springSecurity())
-                .defaultRequest(get("/").header("Authorization", "Bearer " + token))
-                .build();
+        auxiliarMockMvc = mockMvcAsAuxiliar("auxiliar@frc.utn.edu.ar");
     }
 
     @Test
@@ -114,7 +99,11 @@ class ClassroomListApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.content[0].permissionMode").value("SUBSET"))
                 .andExpect(jsonPath("$.content[0].allowedDisplay").value("Materia-IT"))
                 .andExpect(jsonPath("$.content[0].permissionTargets[0].targetId").value(sc.subjectId().intValue()))
-                .andExpect(jsonPath("$.content[0].permissionTargets[0].name").value("Materia-IT"));
+                .andExpect(jsonPath("$.content[0].permissionTargets[0].name").value("Materia-IT"))
+                .andExpect(jsonPath("$.content[0].permissionTargets[0].specialtyName")
+                        .value(org.hamcrest.Matchers.startsWith("Especialidad-")))
+                .andExpect(jsonPath("$.content[0].permissionTargets[0].specialtyCode").isNumber())
+                .andExpect(jsonPath("$.content[0].permissionTargets[0].studyPlanCode").isNumber());
     }
 
     @Test
@@ -129,5 +118,32 @@ class ClassroomListApiIntegrationTest extends AbstractIntegrationTest {
     void list_auxiliarRole_allowed() throws Exception {
         auxiliarMockMvc.perform(get("/v1/classrooms"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("q busca sin acentos y con errores de tipeo en observaciones y recursos, combinado con otros filtros")
+    void list_q_matchesObservationsAndResourcesTolerantly() throws Exception {
+        Building building = testData.edificio();
+        ClassroomType tipo = testData.tipoAulaPorDefecto();
+        Classroom conProyector = testData.aula(building, tipo, 50);
+        conProyector.setObservations("Ventilación deficiente");
+        classroomRepository.save(conProyector);
+        testData.recursoDeAula(conProyector, testData.tipoRecurso("Proyector", ResourceValueKind.BOOLEAN), 1);
+        Classroom otra = testData.aula(building, tipo, 40);
+
+        mockMvc.perform(get("/v1/classrooms").param("buildingId", String.valueOf(building.getId()))
+                        .param("q", "ventilacion"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(conProyector.getId().intValue()));
+        mockMvc.perform(get("/v1/classrooms").param("buildingId", String.valueOf(building.getId()))
+                        .param("q", "proyctor ventilacion"))
+                .andExpect(jsonPath("$.page.totalElements").value(1));
+        mockMvc.perform(get("/v1/classrooms").param("buildingId", String.valueOf(building.getId()))
+                        .param("q", "proyector").param("capacityMax", "45"))
+                .andExpect(jsonPath("$.page.totalElements").value(0));
+        mockMvc.perform(get("/v1/classrooms").param("buildingId", String.valueOf(building.getId()))
+                        .param("q", "  "))
+                .andExpect(jsonPath("$.page.totalElements").value(2));
     }
 }

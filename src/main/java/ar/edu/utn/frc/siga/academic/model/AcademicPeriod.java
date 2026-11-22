@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.siga.academic.model;
 
+import org.hibernate.envers.Audited;
+import org.hibernate.envers.AuditOverride;
 import ar.edu.utn.frc.siga.common.model.SoftDeletableEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -16,6 +18,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
+@Audited
+@AuditOverride(forClass = SoftDeletableEntity.class)
 @Table(name = "periodo_academico",
        uniqueConstraints = @UniqueConstraint(columnNames = {"anio", "cuatrimestre"}))
 @Getter
@@ -41,4 +45,10 @@ public class AcademicPeriod extends SoftDeletableEntity {
 
     @Column(name = "fecha_fin")
     private LocalDate endDate;
+
+    @Column(name = "fecha_inicio_receso")
+    private LocalDate recessStart;
+
+    @Column(name = "fecha_fin_receso")
+    private LocalDate recessEnd;
 }

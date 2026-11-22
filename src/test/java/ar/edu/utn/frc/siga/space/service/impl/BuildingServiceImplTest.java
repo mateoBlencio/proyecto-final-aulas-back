@@ -1,13 +1,19 @@
 package ar.edu.utn.frc.siga.space.service.impl;
 
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.security.BuildingScope;
+import ar.edu.utn.frc.siga.common.security.BuildingScopeResolver;
+import ar.edu.utn.frc.siga.common.security.Permission;
+import ar.edu.utn.frc.siga.common.exception.SyncAbortedException;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.space.SpaceTestData;
+import ar.edu.utn.frc.siga.space.dto.BuildingFilter;
 import ar.edu.utn.frc.siga.space.dto.request.BuildingActiveBatchItemDto;
 import ar.edu.utn.frc.siga.space.dto.response.BuildingResponseDto;
 import ar.edu.utn.frc.siga.space.mapper.BuildingMapper;
 import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.repository.BuildingRepository;
+import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
 import ar.edu.utn.frc.siga.space.service.command.BuildingSyncCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,14 +22,20 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -35,48 +47,68 @@ class BuildingServiceImplTest {
     private BuildingRepository buildingRepository;
     @Mock
     private BuildingMapper buildingMapper;
+    @Mock
+    private BuildingScopeResolver buildingScopeResolver;
+    @Mock
+    private ClassroomRepository classroomRepository;
+    @Mock
+    private ClassroomDeactivationCoordinator deactivationCoordinator;
 
     private BuildingServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new BuildingServiceImpl(buildingRepository, buildingMapper);
+        service = new BuildingServiceImpl(buildingRepository, buildingMapper, buildingScopeResolver,
+                classroomRepository, deactivationCoordinator);
+        lenient().when(buildingScopeResolver.scopeFor(Permission.BUILDING_READ)).thenReturn(BuildingScope.unrestricted());
     }
 
     @Test
-    @DisplayName("findAll: sin includeDeactivated, devuelve solo los edificios activos")
-    void findAllReturnsOnlyActiveBuildingsMapped() {
+    @DisplayName("findAll: devuelve la página de edificios mapeados según el Specification")
+    void findAllReturnsMappedPage() {
         Building active = SpaceTestData.building().id(1L).build();
-        BuildingResponseDto dto = new BuildingResponseDto(1L, "Edificio Central", true);
-        when(buildingRepository.findAllActive()).thenReturn(List.of(active));
+        BuildingResponseDto dto = new BuildingResponseDto(1L, "Edificio Central", true, null);
+        when(buildingRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(active)));
         when(buildingMapper.toDto(active)).thenReturn(dto);
 
-        List<BuildingResponseDto> result = service.findAll(false);
-
-        assertThat(result).containsExactly(dto);
+        assertThat(service.findAll(new BuildingFilter(null), Pageable.unpaged(), false).getContent())
+                .containsExactly(dto);
     }
 
     @Test
-    @DisplayName("findAll: con includeDeactivated=true, devuelve todos los edificios")
-    void findAllReturnsAllBuildingsWhenIncludeDeactivatedRequested() {
+    @DisplayName("findAll: con includeDeactivated=true, no restringe por deletedAt")
+    void findAllWithIncludeDeactivatedMapsEveryStatus() {
         Building active = SpaceTestData.building().id(1L).build();
         Building inactive = SpaceTestData.deactivated(SpaceTestData.building().id(2L).build());
-        BuildingResponseDto activeDto = new BuildingResponseDto(1L, "Edificio Central", true);
-        BuildingResponseDto inactiveDto = new BuildingResponseDto(2L, "Edificio Anexo", false);
-        when(buildingRepository.findAll()).thenReturn(List.of(active, inactive));
+        BuildingResponseDto activeDto = new BuildingResponseDto(1L, "Edificio Central", true, null);
+        BuildingResponseDto inactiveDto = new BuildingResponseDto(2L, "Edificio Anexo", false, null);
+        when(buildingRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(active, inactive)));
         when(buildingMapper.toDto(active)).thenReturn(activeDto);
         when(buildingMapper.toDto(inactive)).thenReturn(inactiveDto);
 
-        List<BuildingResponseDto> result = service.findAll(true);
+        assertThat(service.findAll(new BuildingFilter(null), Pageable.unpaged(), true).getContent())
+                .containsExactly(activeDto, inactiveDto);
+    }
 
-        assertThat(result).containsExactly(activeDto, inactiveDto);
+    @Test
+    @DisplayName("findAll: resuelve el alcance de BUILDING_READ para acotar el listado")
+    void findAllConsultsBuildingReadScope() {
+        when(buildingScopeResolver.scopeFor(Permission.BUILDING_READ)).thenReturn(BuildingScope.of(Set.of(5L)));
+        when(buildingRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        service.findAll(new BuildingFilter(null), Pageable.unpaged(), false);
+
+        verify(buildingScopeResolver).scopeFor(Permission.BUILDING_READ);
     }
 
     @Test
     @DisplayName("findById: devuelve el DTO mapeado cuando el edificio existe")
     void findByIdReturnsMappedDto() {
         Building existing = SpaceTestData.building().id(1L).build();
-        BuildingResponseDto dto = new BuildingResponseDto(1L, "Edificio Central", true);
+        BuildingResponseDto dto = new BuildingResponseDto(1L, "Edificio Central", true, null);
         when(buildingRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(buildingMapper.toDto(existing)).thenReturn(dto);
 
@@ -90,14 +122,14 @@ class BuildingServiceImplTest {
 
         assertThatThrownBy(() -> service.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Building not found with id: 99");
+                .hasMessage("No existe el edificio 99.");
     }
 
     @Test
     @DisplayName("findByName: devuelve el DTO mapeado cuando el edificio existe")
     void findByNameReturnsMappedDto() {
         Building existing = SpaceTestData.building().name("Edificio Central").build();
-        BuildingResponseDto dto = new BuildingResponseDto(1L, "Edificio Central", true);
+        BuildingResponseDto dto = new BuildingResponseDto(1L, "Edificio Central", true, null);
         when(buildingRepository.findByName("Edificio Central")).thenReturn(Optional.of(existing));
         when(buildingMapper.toDto(existing)).thenReturn(dto);
 
@@ -111,14 +143,14 @@ class BuildingServiceImplTest {
 
         assertThatThrownBy(() -> service.findByName("Edificio Nuevo"))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Building not found with id: Edificio Nuevo");
+                .hasMessage("No existe el edificio Edificio Nuevo.");
     }
 
     @Test
     @DisplayName("setActive: desactiva el edificio marcando deletedAt")
     void setActiveDeactivatesBuilding() {
         Building building = SpaceTestData.building().id(1L).build();
-        BuildingResponseDto dto = new BuildingResponseDto(1L, "Edificio Central", false);
+        BuildingResponseDto dto = new BuildingResponseDto(1L, "Edificio Central", false, null);
         when(buildingRepository.findById(1L)).thenReturn(Optional.of(building));
         when(buildingRepository.save(building)).thenReturn(building);
         when(buildingMapper.toDto(building)).thenReturn(dto);
@@ -136,7 +168,7 @@ class BuildingServiceImplTest {
 
         assertThatThrownBy(() -> service.setActive(99L, true))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Building not found with id: 99");
+                .hasMessage("No existe el edificio 99.");
     }
 
     @Test
@@ -144,8 +176,8 @@ class BuildingServiceImplTest {
     void setActiveBatchAppliesEachItem() {
         Building building1 = SpaceTestData.building().id(1L).build();
         Building building2 = SpaceTestData.building().id(2L).build();
-        BuildingResponseDto dto1 = new BuildingResponseDto(1L, "Edificio Central", false);
-        BuildingResponseDto dto2 = new BuildingResponseDto(2L, "Edificio Anexo", false);
+        BuildingResponseDto dto1 = new BuildingResponseDto(1L, "Edificio Central", false, null);
+        BuildingResponseDto dto2 = new BuildingResponseDto(2L, "Edificio Anexo", false, null);
         when(buildingRepository.findById(1L)).thenReturn(Optional.of(building1));
         when(buildingRepository.findById(2L)).thenReturn(Optional.of(building2));
         when(buildingRepository.save(building1)).thenReturn(building1);
@@ -169,7 +201,78 @@ class BuildingServiceImplTest {
 
         assertThatThrownBy(() -> service.setActiveBatch(List.of(new BuildingActiveBatchItemDto(99L, true))))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Building not found with id: 99");
+                .hasMessage("No existe el edificio 99.");
+    }
+
+    @Test
+    @DisplayName("syncBuildings: sin ninguna fila válida aborta y no da de baja nada")
+    void syncBuildingsAbortsWithoutValidRows() {
+        Building current = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));
+        when(buildingRepository.findAll()).thenReturn(List.of(current));
+
+        assertThatThrownBy(() -> service.syncBuildings(List.of(new BuildingSyncCommand(null, "Sin código"),
+                new BuildingSyncCommand(5, " ")), 0))
+                .isInstanceOf(SyncAbortedException.class);
+
+        assertThat(current.getSysacadEnabled()).isTrue();
+        verify(buildingRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("syncBuildings: por debajo del umbral de filas válidas aborta y no da de baja nada")
+    void syncBuildingsAbortsBelowThreshold() {
+        Building one = sysacadBuilding(1, "Uno", Hashes.sha256Hex("Uno"));
+        Building two = sysacadBuilding(2, "Dos", Hashes.sha256Hex("Dos"));
+        Building three = sysacadBuilding(3, "Tres", Hashes.sha256Hex("Tres"));
+        Building four = sysacadBuilding(4, "Cuatro", Hashes.sha256Hex("Cuatro"));
+        when(buildingRepository.findAll()).thenReturn(List.of(one, two, three, four));
+
+        assertThatThrownBy(() -> service.syncBuildings(List.of(new BuildingSyncCommand(1, "Uno")), 50))
+                .isInstanceOf(SyncAbortedException.class);
+
+        assertThat(List.of(two, three, four)).allMatch(b -> Boolean.TRUE.equals(b.getSysacadEnabled()));
+        verify(buildingRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("syncBuildings: en el umbral exacto da de baja lo ausente")
+    void syncBuildingsAtThresholdMarksAbsent() {
+        Building one = sysacadBuilding(1, "Uno", Hashes.sha256Hex("Uno"));
+        Building two = sysacadBuilding(2, "Dos", Hashes.sha256Hex("Dos"));
+        when(buildingRepository.findAll()).thenReturn(List.of(one, two));
+
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(1, "Uno")), 50);
+
+        assertThat(two.getSysacadEnabled()).isFalse();
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("syncBuildings: los edificios manuales (sin hash) no cuentan en el denominador del umbral")
+    void syncBuildingsThresholdIgnoresManualBuildings() {
+        Building synced = sysacadBuilding(1, "Uno", Hashes.sha256Hex("Uno"));
+        Building manual1 = SpaceTestData.building().id(20L).buildingCode(20).sysacadHash(null).build();
+        Building manual2 = SpaceTestData.building().id(21L).buildingCode(21).sysacadHash(null).build();
+        Building manual3 = SpaceTestData.building().id(22L).buildingCode(22).sysacadHash(null).build();
+        when(buildingRepository.findAll()).thenReturn(List.of(synced, manual1, manual2, manual3));
+
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(1, "Uno")), 100);
+
+        assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("syncBuildings: un edificio que Sysacad lista con nombre vacío no se da de baja por ausente")
+    void syncBuildingsDoesNotMarkAbsentWhenRowListedWithBlankName() {
+        Building blankNamed = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));
+        Building ok = sysacadBuilding(1, "Uno", Hashes.sha256Hex("Uno"));
+        when(buildingRepository.findAll()).thenReturn(List.of(blankNamed, ok));
+
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(9, " "), new BuildingSyncCommand(1, "Uno")), 0);
+
+        assertThat(blankNamed.getSysacadEnabled()).isTrue();
+        assertThat(affected).isZero();
+        verify(buildingRepository, never()).save(any());
     }
 
     @Test
@@ -178,7 +281,7 @@ class BuildingServiceImplTest {
         when(buildingRepository.findAll()).thenReturn(List.of());
         when(buildingRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(4, "Edif.Malvinas")));
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(4, "Edif.Malvinas")), 0);
 
         ArgumentCaptor<Building> saved = ArgumentCaptor.forClass(Building.class);
         verify(buildingRepository).save(saved.capture());
@@ -191,12 +294,27 @@ class BuildingServiceImplTest {
     }
 
     @Test
+    @DisplayName("syncBuildings: dos filas con el mismo código y distinto nombre: gana la primera y cuenta una sola escritura")
+    void syncBuildingsFirstRowWinsWhenCodeRepeats() {
+        when(buildingRepository.findAll()).thenReturn(List.of());
+        when(buildingRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        int affected = service.syncBuildings(List.of(
+                new BuildingSyncCommand(1, "Edif. Central"), new BuildingSyncCommand(1, "Edif. Central (otro)")), 0);
+
+        ArgumentCaptor<Building> saved = ArgumentCaptor.forClass(Building.class);
+        verify(buildingRepository, times(1)).save(saved.capture());
+        assertThat(saved.getValue().getName()).isEqualTo("Edif. Central");
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("syncBuildings: actualiza el nombre del edificio existente cuando cambió upstream")
     void syncBuildingsUpdatesRenamedBuilding() {
         Building existing = sysacadBuilding(4, "Malvinas viejo", Hashes.sha256Hex("Malvinas viejo"));
         when(buildingRepository.findAll()).thenReturn(List.of(existing));
 
-        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(4, "Edif.Malvinas")));
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(4, "Edif.Malvinas")), 0);
 
         assertThat(existing.getName()).isEqualTo("Edif.Malvinas");
         assertThat(existing.getSysacadHash()).isEqualTo(Hashes.sha256Hex("Edif.Malvinas"));
@@ -210,35 +328,163 @@ class BuildingServiceImplTest {
         Building existing = sysacadBuilding(4, "Edif.Malvinas", Hashes.sha256Hex("Edif.Malvinas"));
         when(buildingRepository.findAll()).thenReturn(List.of(existing));
 
-        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(4, "Edif.Malvinas")));
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(4, "Edif.Malvinas")), 0);
 
         verify(buildingRepository, never()).save(any());
         assertThat(affected).isZero();
     }
 
     @Test
-    @DisplayName("syncBuildings: el edificio ausente upstream queda no vigente y con deletedAt, sin borrarse")
+    @DisplayName("syncBuildings: no reactiva un edificio dado de baja que sigue en SysAcad con el mismo nombre")
+    void syncBuildingsKeepsDeactivatedBuildingWithSameHash() {
+        Building deactivated = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));
+        deactivated.deactivate();
+        when(buildingRepository.findAll()).thenReturn(List.of(deactivated));
+
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(9, "Almafuerte")), 0);
+
+        assertThat(deactivated.getDeletedAt()).isNotNull();
+        verify(buildingRepository, never()).save(any());
+        assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("syncBuildings: actualiza el nombre de un edificio dado de baja sin reactivarlo")
+    void syncBuildingsRenamesDeactivatedBuildingWithoutReactivating() {
+        Building deactivated = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));
+        deactivated.deactivate();
+        when(buildingRepository.findAll()).thenReturn(List.of(deactivated));
+
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(9, "Almafuerte Sede")), 0);
+
+        assertThat(deactivated.getName()).isEqualTo("Almafuerte Sede");
+        assertThat(deactivated.getDeletedAt()).isNotNull();
+        verify(buildingRepository).save(deactivated);
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("syncBuildings: el edificio ausente upstream queda no vigente sin tocar deletedAt")
     void syncBuildingsMarksAbsentBuildingAsNotCurrent() {
         Building absent = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));
-        when(buildingRepository.findAll()).thenReturn(List.of(absent));
+        when(buildingRepository.findAll()).thenReturn(List.of(absent, presentBuilding()));
 
-        int affected = service.syncBuildings(List.of());
+        int affected = service.syncBuildings(List.of(PRESENT_COMMAND), 0);
 
-        assertThat(absent.getDeletedAt()).isNotNull();
+        assertThat(absent.getSysacadEnabled()).isFalse();
+        assertThat(absent.getDeletedAt()).isNull();
         verify(buildingRepository).save(absent);
         assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("syncBuildings: un edificio no vigente que reaparece en SysAcad vuelve a vigente")
+    void syncBuildingsRestoresCurrentFlagWhenBuildingReappears() {
+        Building notCurrent = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));
+        notCurrent.setSysacadEnabled(false);
+        when(buildingRepository.findAll()).thenReturn(List.of(notCurrent));
+
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(9, "Almafuerte")), 0);
+
+        assertThat(notCurrent.getSysacadEnabled()).isTrue();
+        assertThat(notCurrent.getDeletedAt()).isNull();
+        verify(buildingRepository).save(notCurrent);
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("syncBuildings: un edificio inhabilitado y ausente upstream queda no vigente y sigue inhabilitado")
+    void syncBuildingsKeepsDeactivatedBuildingDeactivatedWhenAbsent() {
+        Building deactivated = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));
+        deactivated.deactivate();
+        when(buildingRepository.findAll()).thenReturn(List.of(deactivated, presentBuilding()));
+
+        int affected = service.syncBuildings(List.of(PRESENT_COMMAND), 0);
+
+        assertThat(deactivated.getSysacadEnabled()).isFalse();
+        assertThat(deactivated.getDeletedAt()).isNotNull();
+        verify(buildingRepository).save(deactivated);
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("syncBuildings: un edificio inhabilitado y no vigente que reaparece vuelve a vigente y sigue inhabilitado")
+    void syncBuildingsRestoresCurrentFlagOfDeactivatedBuildingWithoutReactivating() {
+        Building deactivated = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));
+        deactivated.deactivate();
+        deactivated.setSysacadEnabled(false);
+        when(buildingRepository.findAll()).thenReturn(List.of(deactivated));
+
+        int affected = service.syncBuildings(List.of(new BuildingSyncCommand(9, "Almafuerte")), 0);
+
+        assertThat(deactivated.getSysacadEnabled()).isTrue();
+        assertThat(deactivated.getDeletedAt()).isNotNull();
+        verify(buildingRepository).save(deactivated);
+        assertThat(affected).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("syncBuildings: un edificio ya no vigente que sigue ausente no se escribe y no cuenta como afectado")
+    void syncBuildingsIgnoresAbsentBuildingAlreadyNotCurrent() {
+        Building notCurrent = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));
+        notCurrent.setSysacadEnabled(false);
+        Building notCurrentDeactivated = sysacadBuilding(10, "Centro", Hashes.sha256Hex("Centro"));
+        notCurrentDeactivated.setSysacadEnabled(false);
+        notCurrentDeactivated.deactivate();
+        when(buildingRepository.findAll()).thenReturn(List.of(notCurrent, notCurrentDeactivated, presentBuilding()));
+
+        int affected = service.syncBuildings(List.of(PRESENT_COMMAND), 0);
+
+        verify(buildingRepository, never()).save(any());
+        assertThat(affected).isZero();
+    }
+
+    @Test
+    @DisplayName("syncBuildings: repetir la misma entrada no escribe de nuevo ni cuenta filas afectadas")
+    void syncBuildingsIsIdempotentForAbsentBuilding() {
+        Building absent = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));
+        when(buildingRepository.findAll()).thenReturn(List.of(absent, presentBuilding()));
+
+        int first = service.syncBuildings(List.of(PRESENT_COMMAND), 0);
+        int second = service.syncBuildings(List.of(PRESENT_COMMAND), 0);
+
+        assertThat(first).isEqualTo(1);
+        assertThat(second).isZero();
+        verify(buildingRepository, times(1)).save(absent);
+    }
+
+    @Test
+    @DisplayName("syncBuildings: repetir la reaparición de un edificio no vigente no escribe la segunda vez")
+    void syncBuildingsIsIdempotentForReappearingBuilding() {
+        Building notCurrent = sysacadBuilding(9, "Almafuerte", Hashes.sha256Hex("Almafuerte"));
+        notCurrent.setSysacadEnabled(false);
+        when(buildingRepository.findAll()).thenReturn(List.of(notCurrent));
+        List<BuildingSyncCommand> input = List.of(new BuildingSyncCommand(9, "Almafuerte"));
+
+        int first = service.syncBuildings(input, 0);
+        int second = service.syncBuildings(input, 0);
+
+        assertThat(first).isEqualTo(1);
+        assertThat(second).isZero();
+        verify(buildingRepository, times(1)).save(notCurrent);
     }
 
     @Test
     @DisplayName("syncBuildings: no toca los edificios sin código SysAcad (creados localmente)")
     void syncBuildingsLeavesBuildingsWithoutSysacadCodeUntouched() {
         Building local = SpaceTestData.building().id(7L).buildingCode(null).build();
-        when(buildingRepository.findAll()).thenReturn(List.of(local));
+        when(buildingRepository.findAll()).thenReturn(List.of(local, presentBuilding()));
 
-        service.syncBuildings(List.of());
+        service.syncBuildings(List.of(PRESENT_COMMAND), 0);
 
         assertThat(local.getDeletedAt()).isNull();
         verify(buildingRepository, never()).save(any());
+    }
+
+    private static final BuildingSyncCommand PRESENT_COMMAND = new BuildingSyncCommand(1, "Presente");
+
+    private static Building presentBuilding() {
+        return sysacadBuilding(1, "Presente", Hashes.sha256Hex("Presente"));
     }
 
     private static Building sysacadBuilding(Integer code, String name, String hash) {

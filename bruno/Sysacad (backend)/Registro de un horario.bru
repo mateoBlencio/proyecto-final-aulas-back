@@ -1,0 +1,22 @@
+meta {
+  name: Registro de un horario
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/v1/sysacad/schedules/1/log
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 0
+  size: 20
+}
+
+docs {
+  Registro paginado del horario, del más nuevo al más viejo: intenciones de
+  envío, confirmaciones, fallos con la respuesta de SysAcad (recortada a 2000
+  caracteres), cambios directos y resoluciones. Requiere PERM_SYSACAD_READ.
+}

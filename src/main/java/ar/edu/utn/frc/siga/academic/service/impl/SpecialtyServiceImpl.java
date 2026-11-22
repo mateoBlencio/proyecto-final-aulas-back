@@ -1,20 +1,35 @@
 package ar.edu.utn.frc.siga.academic.service.impl;
 
+import ar.edu.utn.frc.siga.audit.AuditOperation;
+import ar.edu.utn.frc.siga.academic.dto.SpecialtyFilter;
 import ar.edu.utn.frc.siga.academic.dto.response.SpecialtyResponseDto;
 import ar.edu.utn.frc.siga.academic.mapper.SpecialtyMapper;
+import ar.edu.utn.frc.siga.academic.event.CatalogAvailabilityChanged;
 import ar.edu.utn.frc.siga.academic.model.Specialty;
+import ar.edu.utn.frc.siga.academic.repository.CommissionCountSearch;
 import ar.edu.utn.frc.siga.academic.repository.SpecialtyRepository;
+import ar.edu.utn.frc.siga.academic.repository.SubjectCommissionRepository;
+import ar.edu.utn.frc.siga.academic.repository.SubjectRepository;
 import ar.edu.utn.frc.siga.academic.service.SpecialtyService;
 import ar.edu.utn.frc.siga.academic.service.command.SpecialtySyncCommand;
+import ar.edu.utn.frc.siga.academic.specification.SpecialtySpecification;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
+import ar.edu.utn.frc.siga.common.repository.SoftDeleteSpecifications;
+import ar.edu.utn.frc.siga.common.search.FuzzySearch;
+import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,14 +39,69 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class SpecialtyServiceImpl implements SpecialtyService {
 
+    private final ApplicationEventPublisher eventPublisher;
     private final SpecialtyRepository specialtyRepository;
+    private final SubjectCommissionRepository subjectCommissionRepository;
+    private final SubjectRepository subjectRepository;
+    private final CommissionCountSearch commissionCountSearch;
     private final SpecialtyMapper specialtyMapper;
 
     @Override
-    public List<SpecialtyResponseDto> findAll() {
-        return specialtyRepository.findAll().stream()
-                .map(specialtyMapper::toDto)
-                .toList();
+    public Page<SpecialtyResponseDto> findAll(SpecialtyFilter filter, Pageable pageable, boolean includeDeactivated) {
+        Page<Specialty> page = specialtyRepository.findAll(
+                SpecialtySpecification.withFilter(filter, includeDeactivated)
+                        .and(SoftDeleteSpecifications.activeUnless(includeDeactivated)),
+                pageable);
+        Map<Long, Integer> commissions = commissionCounts(page.getContent(), filter, includeDeactivated);
+        Map<Long, Integer> subjects = subjectCounts(page.getContent(), filter, includeDeactivated);
+        return page.map(specialty -> SpecialtyResponseDto.withCounts(specialtyMapper.toDto(specialty),
+                commissions.getOrDefault(specialty.getId(), 0), subjects.getOrDefault(specialty.getId(), 0)));
+    }
+
+    // One grouped query per count for the whole page, so the list never costs one count per specialty.
+    private Map<Long, Integer> subjectCounts(List<Specialty> specialties, SpecialtyFilter filter,
+            boolean includeDeactivated) {
+        if (specialties.isEmpty()) {
+            return Map.of();
+        }
+        String pattern = filter.subjectName() == null ? "%" : "%" + filter.subjectName().toLowerCase() + "%";
+        return subjectRepository.countSubjectsBySpecialtyIds(
+                        specialties.stream().map(Specialty::getId).toList(), filter.subjectCode(), pattern,
+                        filter.studyPlanId(), includeDeactivated).stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> ((Long) row[1]).intValue()));
+    }
+
+    private Map<Long, Integer> commissionCounts(List<Specialty> specialties, SpecialtyFilter filter,
+            boolean includeDeactivated) {
+        if (specialties.isEmpty()) {
+            return Map.of();
+        }
+        String pattern = filter.commissionCourseCode() == null ? "%"
+                : "%" + filter.commissionCourseCode().toLowerCase() + "%";
+        List<Long> ids = specialties.stream().map(Specialty::getId).toList();
+        List<Object[]> rows = FuzzySearch.tokens(filter.q()).isEmpty()
+                ? subjectCommissionRepository.countCommissionsBySpecialtyIds(ids, pattern,
+                        filter.commissionAcademicPeriodId(), includeDeactivated)
+                : commissionCountSearch.countBySpecialtyIds(ids, pattern, filter.commissionAcademicPeriodId(),
+                        filter.q(), includeDeactivated);
+        return rows.stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> ((Long) row[1]).intValue()));
+    }
+
+    @Override
+    @Transactional
+    @AuditOperation(value = "Reactivación de especialidad", subject = "Specialty")
+    public void activate(Long id) {
+        specialtyRepository.restore(Finder.orThrow(specialtyRepository::findById, id, "Specialty"));
+        eventPublisher.publishEvent(new CatalogAvailabilityChanged());
+    }
+
+    @Override
+    @Transactional
+    @AuditOperation(value = "Baja de especialidad", subject = "Specialty")
+    public void deactivate(Long id) {
+        specialtyRepository.softDelete(Finder.orThrow(specialtyRepository::findById, id, "Specialty"));
+        eventPublisher.publishEvent(new CatalogAvailabilityChanged());
     }
 
     @Override
@@ -46,14 +116,15 @@ public class SpecialtyServiceImpl implements SpecialtyService {
                 .orElseThrow(() -> ResourceNotFoundException.of("Specialty", specialtyCode)));
     }
 
-    // `especialidad` no tiene flag de vigencia: SysAcad es la única fuente y no hay
-    // registro local a preservar, así que el sync es un upsert simple por código.
+    // El sync es un upsert simple por código y nunca reactiva: la baja manual es de la facultad.
     @Override
     @Transactional
+    @AuditOperation(value = "Sincronización de especialidades desde SysAcad", subject = "Specialty")
     public int syncSpecialties(List<SpecialtySyncCommand> commands) {
         Instant syncedAt = Instant.now();
         Map<Integer, Specialty> existing = specialtyRepository.findAll().stream()
                 .collect(Collectors.toMap(Specialty::getSpecialtyCode, Function.identity()));
+        Set<Integer> seen = new HashSet<>();
         int affected = 0;
 
         for (SpecialtySyncCommand command : commands) {
@@ -61,17 +132,21 @@ public class SpecialtyServiceImpl implements SpecialtyService {
                 log.warn("Especialidad de SysAcad ignorada por clave vacía: nombre={}", command.name());
                 continue;
             }
+            if (!seen.add(command.specialtyCode())) {
+                log.warn("Especialidad repetida en la misma corrida de SysAcad: especialidad={}",
+                        command.specialtyCode());
+            }
             String hash = Hashes.sha256Hex(command.name(), command.abbreviation());
             Specialty specialty = existing.get(command.specialtyCode());
 
             if (specialty == null) {
-                specialtyRepository.save(Specialty.builder()
+                existing.put(command.specialtyCode(), specialtyRepository.save(Specialty.builder()
                         .specialtyCode(command.specialtyCode())
                         .name(command.name())
                         .abbreviation(command.abbreviation())
                         .syncedAt(syncedAt)
                         .sysacadHash(hash)
-                        .build());
+                        .build()));
                 affected++;
                 continue;
             }

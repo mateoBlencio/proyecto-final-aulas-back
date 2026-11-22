@@ -2,84 +2,113 @@ package ar.edu.utn.frc.siga.roomrequest.mapper;
 
 import ar.edu.utn.frc.siga.academic.dto.response.CommissionResponseDto;
 import ar.edu.utn.frc.siga.academic.dto.response.SubjectResponseDto;
-import ar.edu.utn.frc.siga.academic.service.CommissionService;
-import ar.edu.utn.frc.siga.academic.service.SubjectService;
-import ar.edu.utn.frc.siga.common.util.Maps;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.AssignedClassroomDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.BuildingOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.OverlappingItemDto;
+import ar.edu.utn.frc.siga.roomrequest.dto.response.ReleasedDateDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailHeaderDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemRowDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestResponseDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestRowHeaderDto;
+import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestCatalogsResolver.ActiveCommissionsKey;
+import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestCatalogsResolver.Catalogs;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomPreference;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
-import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
-import ar.edu.utn.frc.siga.space.service.ClassroomService;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItemAllocation;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
+import ar.edu.utn.frc.siga.roomrequest.repository.RoomRequestItemRepository;
+import ar.edu.utn.frc.siga.roomrequest.validator.ItemConsistency;
+import ar.edu.utn.frc.siga.roomrequest.validator.RoomRequestAccessControl.Action;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
+/** Arma los DTOs de respuesta de roomrequest a partir del catálogo cross-módulo que resuelve {@link RoomRequestCatalogsResolver}. */
 @Component
 @RequiredArgsConstructor
 public class RoomRequestComposer {
 
     private final RoomRequestMapper mapper;
-    private final RoomRequestCatalogMapper catalogMapper;
-    private final SubjectService subjectService;
-    private final CommissionService commissionService;
-    private final ClassroomService classroomService;
-
-    private record Catalogs(
-            Map<Long, SubjectResponseDto> subjectsById,
-            Map<Long, CommissionResponseDto> commissionsById,
-            Map<Long, ClassroomOptionDto> classroomsById) {
-    }
+    private final RoomRequestCatalogsResolver catalogsResolver;
+    private final RoomRequestItemRepository itemRepository;
 
     public RoomRequestResponseDto compose(RoomRequest request) {
-        return compose(List.of(request)).getFirst();
+        return compose(List.of(request), false).getFirst();
     }
 
     public List<RoomRequestResponseDto> compose(Collection<RoomRequest> requests) {
+        return compose(requests, true);
+    }
+
+    private List<RoomRequestResponseDto> compose(Collection<RoomRequest> requests, boolean includeSysacad) {
         Set<Long> subjectIds = new LinkedHashSet<>();
         Set<Long> commissionIds = new LinkedHashSet<>();
         Set<Long> classroomIds = new LinkedHashSet<>();
+        Set<Long> buildingIds = new LinkedHashSet<>();
+        Set<ActiveCommissionsKey> activeCommissionsKeys = new LinkedHashSet<>();
+        List<RoomRequestItem> items = new ArrayList<>();
 
         for (RoomRequest request : requests) {
             collectSubjectId(request, subjectIds);
             collectCommissionIds(request.getItems(), commissionIds);
-            collectClassroomIds(request.getItems(), classroomIds);
+            collectPreferredClassroomIds(request.getItems(), classroomIds);
+            collectAssignedClassroomIds(request.getItems(), classroomIds);
+            collectBuildingIds(request.getItems(), buildingIds);
+            collectActiveCommissionsKeys(request.getItems(), activeCommissionsKeys);
+            items.addAll(request.getItems());
         }
 
-        Catalogs catalogs = resolveCatalogs(subjectIds, commissionIds, classroomIds);
+        Catalogs resolved = catalogsResolver.resolve(subjectIds, commissionIds, classroomIds, buildingIds, activeCommissionsKeys);
+        Catalogs catalogs = includeSysacad ? resolved : resolved.withoutSysacad();
+        Map<Long, Integer> enrolledByEventId = catalogsResolver.resolveEnrolledByEventId(collectSourceRecurringEventIds(items));
+        Map<Long, List<ClassroomOptionDto>> currentClassroomsByItemId = withoutSysacadUnless(
+                includeSysacad, catalogsResolver.resolveCurrentClassroomsByItemId(items));
+
+        Map<Long, List<ReleasedDateDto>> releasedDatesByItemId = catalogsResolver.resolveReleasedTargetDatesByItemId(items);
 
         List<RoomRequestResponseDto> result = new ArrayList<>(requests.size());
         for (RoomRequest request : requests) {
-            result.add(mapper.toDto(request, resolveSubject(request, catalogs), composeItems(request.getItems(), catalogs)));
+            result.add(mapper.toDto(request, resolveSubject(request, catalogs),
+                    composeItems(request.getItems(), catalogs, enrolledByEventId, currentClassroomsByItemId,
+                            releasedDatesByItemId)));
         }
         return result;
     }
 
     /** La fila es el ítem, no la solicitud: la cabecera se resuelve una sola vez por {@code request.id} aunque varios ítems compartan página. */
-    public List<RoomRequestItemRowDto> composeRows(Collection<RoomRequestItem> items) {
+    public List<RoomRequestItemRowDto> composeRows(Collection<RoomRequestItem> items,
+            Map<Long, List<Action>> allowedActionsByItemId) {
         Set<Long> subjectIds = new LinkedHashSet<>();
         Set<Long> commissionIds = new LinkedHashSet<>();
+        Set<Long> buildingIds = new LinkedHashSet<>();
 
         for (RoomRequestItem item : items) {
             collectSubjectId(item.getRequest(), subjectIds);
         }
         collectCommissionIds(items, commissionIds);
+        collectBuildingIds(items, buildingIds);
+        Set<ActiveCommissionsKey> activeCommissionsKeys = new LinkedHashSet<>();
+        collectActiveCommissionsKeys(items, activeCommissionsKeys);
 
-        Catalogs catalogs = resolveCatalogs(subjectIds, commissionIds, Set.of());
+        Catalogs catalogs = catalogsResolver.resolve(subjectIds, commissionIds, Set.of(), buildingIds, activeCommissionsKeys);
+        Map<Long, Integer> assignedCountByItemId = catalogsResolver.resolveAssignedClassroomCounts(items);
+        Map<Long, List<RoomRequestItem>> overlapsByItemId = findOtherSubjectOverlaps(items);
 
         Map<Long, RoomRequestRowHeaderDto> headersByRequestId = new LinkedHashMap<>();
         List<RoomRequestItemRowDto> result = new ArrayList<>(items.size());
@@ -87,39 +116,110 @@ public class RoomRequestComposer {
             RoomRequest request = item.getRequest();
             RoomRequestRowHeaderDto header = headersByRequestId.computeIfAbsent(request.getId(),
                     id -> mapper.toRowHeaderDto(request, resolveSubject(request, catalogs)));
+            BuildingOptionDto derivedBuilding = resolveBuilding(item.getDerivedBuildingId(), catalogs);
 
-            result.add(mapper.toRowDto(item, header, resolveCommission(item, catalogs)));
+            result.add(mapper.toRowDto(item, header, resolveCommissions(item, catalogs),
+                    derivedBuilding != null ? derivedBuilding.name() : null,
+                    assignedCountByItemId.getOrDefault(item.getId(), 0),
+                    allowedActionsByItemId.getOrDefault(item.getId(), List.of()),
+                    overlapsByItemId.containsKey(item.getId())));
         }
         return result;
     }
 
+    public RoomRequestItemResponseDto composeItem(RoomRequestItem item) {
+        Set<Long> commissionIds = new LinkedHashSet<>();
+        Set<Long> classroomIds = new LinkedHashSet<>();
+        Set<Long> buildingIds = new LinkedHashSet<>();
+        Set<ActiveCommissionsKey> activeCommissionsKeys = new LinkedHashSet<>();
+
+        collectCommissionIds(List.of(item), commissionIds);
+        collectPreferredClassroomIds(List.of(item), classroomIds);
+        collectAssignedClassroomIds(List.of(item), classroomIds);
+        collectBuildingIds(List.of(item), buildingIds);
+        collectActiveCommissionsKeys(List.of(item), activeCommissionsKeys);
+
+        Catalogs catalogs = catalogsResolver.resolve(Set.of(), commissionIds, classroomIds, buildingIds, activeCommissionsKeys);
+        Map<Long, Integer> enrolledByEventId = catalogsResolver.resolveEnrolledByEventId(collectSourceRecurringEventIds(List.of(item)));
+        Map<Long, List<ClassroomOptionDto>> currentClassroomsByItemId = catalogsResolver.resolveCurrentClassroomsByItemId(List.of(item));
+        return composeItems(List.of(item), catalogs, enrolledByEventId, currentClassroomsByItemId,
+                catalogsResolver.resolveReleasedTargetDatesByItemId(List.of(item))).getFirst();
+    }
+
     public RoomRequestItemDetailDto composeDetail(RoomRequestItem item) {
+        return composeDetail(item, List.of());
+    }
+
+    public RoomRequestItemDetailDto composeDetail(RoomRequestItem item, List<Action> allowedActions) {
         Set<Long> subjectIds = new LinkedHashSet<>();
         Set<Long> commissionIds = new LinkedHashSet<>();
         Set<Long> classroomIds = new LinkedHashSet<>();
+        Set<Long> buildingIds = new LinkedHashSet<>();
+        Set<ActiveCommissionsKey> activeCommissionsKeys = new LinkedHashSet<>();
 
         RoomRequest request = item.getRequest();
+        List<RoomRequestItem> overlapping = findOtherSubjectOverlaps(List.of(item)).getOrDefault(item.getId(), List.of());
         collectSubjectId(request, subjectIds);
+        overlapping.forEach(other -> collectSubjectId(other.getRequest(), subjectIds));
         collectCommissionIds(List.of(item), commissionIds);
-        collectClassroomIds(List.of(item), classroomIds);
+        collectCommissionIds(overlapping, commissionIds);
+        collectPreferredClassroomIds(List.of(item), classroomIds);
+        collectAssignedClassroomIds(List.of(item), classroomIds);
+        collectBuildingIds(List.of(item), buildingIds);
+        collectActiveCommissionsKeys(List.of(item), activeCommissionsKeys);
 
-        Catalogs catalogs = resolveCatalogs(subjectIds, commissionIds, classroomIds);
+        Catalogs catalogs = catalogsResolver.resolve(subjectIds, commissionIds, classroomIds, buildingIds, activeCommissionsKeys);
+        Map<Long, Integer> enrolledByEventId = catalogsResolver.resolveEnrolledByEventId(collectSourceRecurringEventIds(List.of(item)));
+        Map<Long, List<ClassroomOptionDto>> currentClassroomsByItemId = catalogsResolver.resolveCurrentClassroomsByItemId(List.of(item));
 
         RoomRequestItemDetailHeaderDto header = mapper.toDetailHeaderDto(request, resolveSubject(request, catalogs));
-        RoomRequestItemResponseDto itemDto = composeItems(List.of(item), catalogs).getFirst();
+        RoomRequestItemResponseDto itemDto =
+                composeItems(List.of(item), catalogs, enrolledByEventId, currentClassroomsByItemId,
+                catalogsResolver.resolveReleasedTargetDatesByItemId(List.of(item))).getFirst();
 
-        return new RoomRequestItemDetailDto(header, itemDto);
+        return new RoomRequestItemDetailDto(header, itemDto, allowedActions, toOverlappingDtos(overlapping, catalogs));
     }
 
-    private Catalogs resolveCatalogs(Set<Long> subjectIds, Set<Long> commissionIds, Set<Long> classroomIds) {
-        Map<Long, SubjectResponseDto> subjectsById =
-                Maps.byId(subjectService.findByIds(subjectIds), SubjectResponseDto::id);
-        Map<Long, CommissionResponseDto> commissionsById =
-                Maps.byId(commissionService.findByIds(commissionIds), CommissionResponseDto::id);
-        Map<Long, ClassroomOptionDto> classroomsById =
-                Maps.byId(catalogMapper.toClassroomOptions(classroomService.findByIds(classroomIds)),
-                        ClassroomOptionDto::id);
-        return new Catalogs(subjectsById, commissionsById, classroomsById);
+    /** Por ítem activo de parcial fuera de horario: los pedidos activos de otra materia que se pisan con él. Un solo query por lote. */
+    private Map<Long, List<RoomRequestItem>> findOtherSubjectOverlaps(Collection<RoomRequestItem> items) {
+        List<RoomRequestItem> candidates = items.stream()
+                .filter(item -> item.getRequest().getType() == RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE
+                        && item.getDate() != null && item.getStatus() != RoomRequestStatus.CANCELLED)
+                .toList();
+        if (candidates.isEmpty()) {
+            return Map.of();
+        }
+        Map<LocalDate, List<RoomRequestItem>> existingByDate = itemRepository
+                .findActiveOffScheduleItemsByDateIn(candidates.stream().map(RoomRequestItem::getDate).distinct().toList())
+                .stream()
+                .collect(Collectors.groupingBy(RoomRequestItem::getDate));
+
+        Map<Long, List<RoomRequestItem>> result = new LinkedHashMap<>();
+        for (RoomRequestItem item : candidates) {
+            List<RoomRequestItem> overlapping = existingByDate.getOrDefault(item.getDate(), List.of()).stream()
+                    .filter(other -> !other.getId().equals(item.getId()))
+                    .filter(other -> ItemConsistency.commissionScheduleOverlap(
+                            item.getRequest().getSubjectId(), item.getCommissionId(), item.getDate(),
+                            item.getStartTime(), item.endTime(),
+                            other.getRequest().getSubjectId(), other.getCommissionId(), other.getDate(),
+                            other.getStartTime(), other.endTime()) == ItemConsistency.Overlap.WARNING)
+                    .toList();
+            if (!overlapping.isEmpty()) {
+                result.put(item.getId(), overlapping);
+            }
+        }
+        return result;
+    }
+
+    private List<OverlappingItemDto> toOverlappingDtos(List<RoomRequestItem> overlapping, Catalogs catalogs) {
+        return overlapping.stream().map(other -> {
+            SubjectResponseDto subject = resolveSubject(other.getRequest(), catalogs);
+            CommissionResponseDto commission = other.getCommissionId() != null
+                    ? catalogs.commissionsById().get(other.getCommissionId()) : null;
+            return new OverlappingItemDto(other.getId(), subject != null ? subject.name() : null,
+                    commission != null ? commission.courseCode() : null,
+                    other.getDate(), other.getStartTime(), other.endTime());
+        }).toList();
     }
 
     private void collectSubjectId(RoomRequest request, Set<Long> subjectIds) {
@@ -136,27 +236,131 @@ public class RoomRequestComposer {
         }
     }
 
-    private void collectClassroomIds(Collection<RoomRequestItem> items, Set<Long> classroomIds) {
+    private void collectActiveCommissionsKeys(Collection<RoomRequestItem> items, Set<ActiveCommissionsKey> keys) {
+        for (RoomRequestItem item : items) {
+            if (item.getCommissionId() == null
+                    && item.getRequest().getType() == RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE
+                    && item.getDate() != null) {
+                keys.add(new ActiveCommissionsKey(item.getRequest().getSubjectId(), item.getDate()));
+            }
+        }
+    }
+
+    private void collectPreferredClassroomIds(Collection<RoomRequestItem> items, Set<Long> classroomIds) {
         for (RoomRequestItem item : items) {
             item.getPreferences().stream().map(RoomPreference::getClassroomId).forEach(classroomIds::add);
         }
     }
 
-    private List<RoomRequestItemResponseDto> composeItems(Collection<RoomRequestItem> items, Catalogs catalogs) {
+    private void collectAssignedClassroomIds(Collection<RoomRequestItem> items, Set<Long> classroomIds) {
+        for (RoomRequestItem item : items) {
+            item.getAllocations().stream().map(RoomRequestItemAllocation::getClassroomId).forEach(classroomIds::add);
+            if (item.getPreviousClassroomId() != null) {
+                classroomIds.add(item.getPreviousClassroomId());
+            }
+        }
+    }
+
+    private void collectBuildingIds(Collection<RoomRequestItem> items, Set<Long> buildingIds) {
+        for (RoomRequestItem item : items) {
+            if (item.getDerivedBuildingId() != null) {
+                buildingIds.add(item.getDerivedBuildingId());
+            }
+            if (item.getReturnedFromBuildingId() != null) {
+                buildingIds.add(item.getReturnedFromBuildingId());
+            }
+        }
+    }
+
+    private Set<Long> collectSourceRecurringEventIds(Collection<RoomRequestItem> items) {
+        Set<Long> eventIds = new LinkedHashSet<>();
+        for (RoomRequestItem item : items) {
+            if (item.getSourceRecurringEventId() != null) {
+                eventIds.add(item.getSourceRecurringEventId());
+            }
+        }
+        return eventIds;
+    }
+
+    private List<RoomRequestItemResponseDto> composeItems(Collection<RoomRequestItem> items, Catalogs catalogs,
+            Map<Long, Integer> enrolledByEventId, Map<Long, List<ClassroomOptionDto>> currentClassroomsByItemId,
+            Map<Long, List<ReleasedDateDto>> releasedDatesByItemId) {
+        Map<Long, Set<Long>> futureOccurrenceIdsByItemId = catalogsResolver.resolveFutureOccurrenceIdsByItemId(items);
         List<RoomRequestItemResponseDto> result = new ArrayList<>(items.size());
         for (RoomRequestItem item : items) {
-            result.add(mapper.toDto(item, resolveCommission(item, catalogs),
-                    resolvePreferredClassrooms(item, catalogs)));
+            Integer enrolled = item.getSourceRecurringEventId() != null
+                    ? enrolledByEventId.get(item.getSourceRecurringEventId()) : null;
+            result.add(mapper.toDto(item, resolveCommissions(item, catalogs),
+                    resolvePreferredClassrooms(item, catalogs),
+                    currentClassroomsByItemId.get(item.getId()),
+                    resolveAssignedClassrooms(item, catalogs, futureOccurrenceIdsByItemId.get(item.getId())),
+                    resolvePreviousClassroom(item, catalogs),
+                    resolveBuilding(item.getDerivedBuildingId(), catalogs),
+                    resolveBuilding(item.getReturnedFromBuildingId(), catalogs),
+                    enrolled,
+                    releasedDatesByItemId.getOrDefault(item.getId(), List.of())));
         }
         return result;
+    }
+
+    private BuildingOptionDto resolveBuilding(Long buildingId, Catalogs catalogs) {
+        return buildingId != null ? catalogs.buildingsById().get(buildingId) : null;
+    }
+
+    /** Una fila por posición (1..classroomCount), no por ocurrencia: un REGULAR_ROOM_CHANGE repite la misma aula en varias filas.
+     *  Con {@code futureOccurrenceIds} solo cuentan las clases futuras: las pasadas conservan el aula de antes de reasignar. */
+    private List<AssignedClassroomDto> resolveAssignedClassrooms(RoomRequestItem item, Catalogs catalogs,
+                                                                 Set<Long> futureOccurrenceIds) {
+        List<RoomRequestItemAllocation> current = futureOccurrenceIds == null ? item.getAllocations()
+                : item.getAllocations().stream()
+                        .filter(allocation -> futureOccurrenceIds.contains(allocation.getOccurrenceId())).toList();
+        if (current.isEmpty()) {
+            current = item.getAllocations();
+        }
+        return current.stream()
+                .collect(Collectors.toMap(RoomRequestItemAllocation::getPosition,
+                        RoomRequestItemAllocation::getClassroomId, (first, ignored) -> first))
+                .entrySet().stream()
+                .sorted(Comparator.comparing(Map.Entry::getKey))
+                .map(entry -> catalogs.assignedClassroomsById().get(entry.getValue()))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private AssignedClassroomDto resolvePreviousClassroom(RoomRequestItem item, Catalogs catalogs) {
+        return item.getPreviousClassroomId() != null
+                ? catalogs.assignedClassroomsById().get(item.getPreviousClassroomId())
+                : null;
     }
 
     private SubjectResponseDto resolveSubject(RoomRequest request, Catalogs catalogs) {
         return request.getSubjectId() != null ? catalogs.subjectsById().get(request.getSubjectId()) : null;
     }
 
-    private CommissionResponseDto resolveCommission(RoomRequestItem item, Catalogs catalogs) {
-        return item.getCommissionId() != null ? catalogs.commissionsById().get(item.getCommissionId()) : null;
+    private List<CommissionResponseDto> resolveCommissions(RoomRequestItem item, Catalogs catalogs) {
+        if (item.getCommissionId() != null) {
+            CommissionResponseDto commission = catalogs.commissionsById().get(item.getCommissionId());
+            return commission != null ? List.of(commission) : List.of();
+        }
+        if (item.getRequest().getType() != RoomRequestType.PARTIAL_EXAM_OFF_SCHEDULE || item.getDate() == null) {
+            return List.of();
+        }
+        ActiveCommissionsKey key = new ActiveCommissionsKey(item.getRequest().getSubjectId(), item.getDate());
+        return catalogs.activeCommissionIdsByKey().getOrDefault(key, List.of()).stream()
+                .map(catalogs.commissionsById()::get)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private static Map<Long, List<ClassroomOptionDto>> withoutSysacadUnless(
+            boolean includeSysacad, Map<Long, List<ClassroomOptionDto>> optionsByItemId) {
+        if (includeSysacad) {
+            return optionsByItemId;
+        }
+        Map<Long, List<ClassroomOptionDto>> result = new LinkedHashMap<>();
+        optionsByItemId.forEach((itemId, options) ->
+                result.put(itemId, options.stream().map(ClassroomOptionDto::withoutSysacad).toList()));
+        return result;
     }
 
     private List<ClassroomOptionDto> resolvePreferredClassrooms(RoomRequestItem item, Catalogs catalogs) {

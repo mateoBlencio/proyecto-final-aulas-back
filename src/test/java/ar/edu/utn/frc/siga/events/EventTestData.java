@@ -72,14 +72,14 @@ public final class EventTestData {
     }
 
     public static OccurrenceSlotDto occurrenceSlot(Long id, AcademicEvent event, LocalDate date, OccurrenceStatus status) {
-        return new OccurrenceSlotDto(id, event.getId(), date, event.getStartTime(), event.endTime(), status, event.getEnrolled());
+        return new OccurrenceSlotDto(id, event.getId(), date, event.getStartTime(), event.endTime(), status, event.getEnrolled(), 1, null, null, null, null);
     }
 
     public static SubjectResponseDto subjectResponseDto(Long id) {
-        return new SubjectResponseDto(id, 100, "Materia de prueba", "anual", null);
+        return new SubjectResponseDto(id, 100, "Materia de prueba", "anual", null, true, null);
     }
 
     public static CommissionResponseDto commissionResponseDto(Long id) {
-        return new CommissionResponseDto(id, "K1234", null);
+        return new CommissionResponseDto(id, "K1234", null, null);
     }
 }
