@@ -161,7 +161,7 @@ public class UserServiceImpl implements UserService {
         List<User> administrators = userRepository.findEnabledByRole(SystemRole.ADMINISTRADOR);
         if (administrators.size() == 1 && administrators.getFirst().getId().equals(target.getId())) {
             log.warn("Inhabilitación rechazada: último administrador habilitado, id={}", target.getId());
-            throw new UserDomainException("The last enabled ADMINISTRADOR cannot be disabled");
+            throw new UserDomainException("No se puede inhabilitar al último Administrador habilitado.");
         }
     }
 

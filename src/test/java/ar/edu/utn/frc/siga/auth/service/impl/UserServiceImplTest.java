@@ -332,7 +332,7 @@ class UserServiceImplTest {
 
         assertThatThrownBy(() -> service.setEnabled(7L, false, CREATOR_EMAIL))
                 .isInstanceOf(UserDomainException.class)
-                .hasMessage("The last enabled ADMINISTRADOR cannot be disabled");
+                .hasMessage("No se puede inhabilitar al último Administrador habilitado.");
 
         assertThat(user.getEnabled()).isTrue();
         verify(userRepository, never()).save(any());

@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -8,16 +9,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
+import ar.edu.utn.frc.siga.auth.exception.UserDomainException;
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
+import ar.edu.utn.frc.siga.auth.service.UserService;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.ObjectMapper;
@@ -31,6 +37,10 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
     private UserRepository userRepository;
     @Autowired
     private ObjectMapper objectMapper;
+    @Autowired
+    private UserService userService;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private static String uniqueEmail() {
         return "user" + SEQ.incrementAndGet() + "." + System.nanoTime() + "@frc.utn.edu.ar";
@@ -393,5 +403,27 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createBody(uniqueEmail(), "clave-segura-2026")))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("inhabilitar al único Administrador habilitado responde 400 con el mensaje en español y no lo inhabilita")
+    void setEnabled_disablingTheLastEnabledAdministrator_isRejectedWithSpanishMessage() {
+        List<User> administrators = userRepository.findEnabledByRole(SystemRole.ADMINISTRADOR);
+        User fixture = administrators.stream()
+                .filter(user -> user.getEmail().equals("integration-test@frc.utn.edu.ar"))
+                .findFirst().orElseThrow();
+        List<Long> others = administrators.stream().map(User::getId).filter(id -> !id.equals(fixture.getId())).toList();
+        others.forEach(id -> jdbcTemplate.update("update usuario set habilitado = false where id_usuario = ?", id));
+        try {
+            assertThatThrownBy(() -> asFixtureUser(() -> userService.setEnabled(
+                    fixture.getId(), false, "otro.actor@frc.utn.edu.ar")))
+                    .isInstanceOfSatisfying(UserDomainException.class, e -> {
+                        assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                        assertThat(e.getMessage()).isEqualTo("No se puede inhabilitar al último Administrador habilitado.");
+                    });
+            assertThat(userRepository.findById(fixture.getId()).orElseThrow().getEnabled()).isTrue();
+        } finally {
+            others.forEach(id -> jdbcTemplate.update("update usuario set habilitado = true where id_usuario = ?", id));
+        }
     }
 }
