@@ -246,6 +246,13 @@ siga:
     max-attempts-per-ip: 200
     alert-threshold-per-email: 50
     window-minutes: 15
+  password-reset:
+    frontend-base-url: ${FRONTEND_BASE_URL}
+    token-ttl-minutes: 30
+    max-requests-per-email-per-ip: 3
+    max-requests-per-ip: 20
+    max-reset-attempts-per-ip: 10
+    window-minutes: 60
   ratelimit:
     general:
       capacity: 600

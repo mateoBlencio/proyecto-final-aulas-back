@@ -28,6 +28,8 @@ cors:
     - http://localhost:5173
 
 siga:
+  password-reset:
+    frontend-base-url: http://localhost:5173
   dashboard:
     snapshot:
       enabled: false

@@ -37,4 +37,12 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             value = "UPDATE notificacion SET proximo_intento = :nextAttemptAt WHERE id_notificacion IN (:ids)",
             nativeQuery = true)
     void postponeNextAttempt(@Param("ids") List<Long> ids, @Param("nextAttemptAt") Instant nextAttemptAt);
+
+    @Modifying
+    @Query(
+            value = "UPDATE notificacion SET estado = 'DISCARDED', cuerpo = '[contenido omitido]', "
+                    + "ultimo_error = 'vencida antes de enviarse' "
+                    + "WHERE plantilla = :template AND estado = 'PENDING' AND creado_en < :cutoff",
+            nativeQuery = true)
+    int discardExpiredPending(@Param("template") String template, @Param("cutoff") Instant cutoff);
 }

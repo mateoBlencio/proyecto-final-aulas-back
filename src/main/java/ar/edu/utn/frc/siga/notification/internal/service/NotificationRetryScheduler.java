@@ -16,6 +16,9 @@ class NotificationRetryScheduler {
 
     @Scheduled(fixedDelayString = "${siga.notifications.retry-interval}")
     void run() {
-        SystemScope.run(() -> claimer.claimDue(BATCH_SIZE).forEach(dispatcher::dispatch));
+        SystemScope.run(() -> {
+            claimer.discardExpiredSensitive();
+            claimer.claimDue(BATCH_SIZE).forEach(dispatcher::dispatch);
+        });
     }
 }
