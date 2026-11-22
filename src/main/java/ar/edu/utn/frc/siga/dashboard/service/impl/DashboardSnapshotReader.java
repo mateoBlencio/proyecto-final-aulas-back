@@ -91,8 +91,9 @@ public class DashboardSnapshotReader {
         List<Row> buildingRows = rows.stream()
                 .filter(row -> row.snapshot().getBuildingId() != null)
                 .filter(row -> scope.allows(row.snapshot().getBuildingId()))
-                .sorted(Comparator.comparing(row -> row.payload().buildingCode(),
-                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .sorted(Comparator.comparing((Row row) -> row.payload().buildingCode(),
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(row -> row.snapshot().getBuildingId()))
                 .toList();
         List<ReportBuildingResponseDto> buildings = buildingRows.stream().map(this::reportBuilding).toList();
 

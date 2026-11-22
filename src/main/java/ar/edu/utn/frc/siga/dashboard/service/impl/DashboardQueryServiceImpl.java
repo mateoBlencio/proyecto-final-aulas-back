@@ -144,7 +144,8 @@ public class DashboardQueryServiceImpl implements DashboardQueryService {
                 Stream.concat(a.availability().excludedDays().stream(), b.availability().excludedDays().stream())
                         .toList());
         return new PeriodMetrics(byBuilding, addScopes(a.campus(), b.campus()), buildings.values().stream()
-                        .sorted(Comparator.comparing(BuildingRoomsRow::code, Comparator.nullsLast(Comparator.naturalOrder())))
+                        .sorted(Comparator.comparing(BuildingRoomsRow::code, Comparator.nullsLast(Comparator.<Integer>naturalOrder()))
+                                .thenComparing(BuildingRoomsRow::buildingId))
                         .toList(),
                 List.of(), unallocated, availability, a.parameters());
     }
