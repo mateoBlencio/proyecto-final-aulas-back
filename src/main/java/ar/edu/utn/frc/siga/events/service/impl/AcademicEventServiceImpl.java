@@ -38,6 +38,9 @@ import ar.edu.utn.frc.siga.common.util.DateRanges;
 import ar.edu.utn.frc.siga.common.util.Finder;
 import ar.edu.utn.frc.siga.common.util.Hashes;
 import ar.edu.utn.frc.siga.common.util.SyncGuard;
+import ar.edu.utn.frc.siga.common.service.OccurrenceAllocationQuery;
+import ar.edu.utn.frc.siga.common.service.OccurrenceRequestReferenceQuery;
+import ar.edu.utn.frc.siga.events.exception.UniqueEventInUseException;
 import ar.edu.utn.frc.siga.common.util.Maps;
 import ar.edu.utn.frc.siga.common.util.RecurringEventKey;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
@@ -85,6 +88,8 @@ public class AcademicEventServiceImpl implements AcademicEventService {
     private final EventScheduleValidator eventScheduleValidator;
     private final RecurringEventReconciler recurringEventReconciler;
     private final ApplicationEventPublisher eventPublisher;
+    private final OccurrenceAllocationQuery occurrenceAllocationQuery;
+    private final OccurrenceRequestReferenceQuery occurrenceRequestReferenceQuery;
 
     @Override
     @Transactional(readOnly = true)
@@ -632,6 +637,24 @@ public class AcademicEventServiceImpl implements AcademicEventService {
 
         log.info("Evento único actualizado: id={}", id);
         return composer.compose(event);
+    }
+
+    @Override
+    @Transactional
+    @AuditOperation(value = "Baja de evento único", subject = "AcademicEvent")
+    public void deleteUniqueEvent(Long eventId) {
+        UniqueEvent event = Finder.orThrow(uniqueEventRepository::findById, eventId, "UniqueEvent");
+        List<Occurrence> occurrences = occurrenceRepository.findByEvent_Id(eventId);
+        List<Long> occurrenceIds = occurrences.stream().map(Occurrence::getId).toList();
+        if (!occurrenceAllocationQuery.allocatedAmong(occurrenceIds).isEmpty()
+                || !occurrenceRequestReferenceQuery.referencedAmong(occurrenceIds).isEmpty()) {
+            throw new UniqueEventInUseException(eventId);
+        }
+
+        occurrenceRepository.deleteAll(occurrences);
+        uniqueEventRepository.delete(event);
+
+        log.info("Evento único borrado: id={}, ocurrencias={}", eventId, occurrences.size());
     }
 
 }

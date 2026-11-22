@@ -1,6 +1,9 @@
 package ar.edu.utn.frc.siga.events.service.impl;
 
 import ar.edu.utn.frc.siga.common.exception.SyncAbortedException;
+import ar.edu.utn.frc.siga.common.service.OccurrenceAllocationQuery;
+import ar.edu.utn.frc.siga.common.service.OccurrenceRequestReferenceQuery;
+import ar.edu.utn.frc.siga.events.exception.UniqueEventInUseException;
 import ar.edu.utn.frc.siga.academic.service.CommissionService;
 import ar.edu.utn.frc.siga.academic.service.SubjectService;
 import ar.edu.utn.frc.siga.events.EventTestData;
@@ -106,6 +109,10 @@ class AcademicEventServiceImplTest {
     private RecurringEventReconciler recurringEventReconciler;
     @Mock
     private ApplicationEventPublisher eventPublisher;
+    @Mock
+    private OccurrenceAllocationQuery occurrenceAllocationQuery;
+    @Mock
+    private OccurrenceRequestReferenceQuery occurrenceRequestReferenceQuery;
 
     private AcademicEventServiceImpl service;
 
@@ -113,7 +120,7 @@ class AcademicEventServiceImplTest {
     void setUp() {
         service = new AcademicEventServiceImpl(eventRepository, recurringEventRepository, uniqueEventRepository,
                 occurrenceRepository, suspendedEventRepository, composer, occurrenceMapper, subjectService, commissionService, eventScheduleValidator,
-                recurringEventReconciler, eventPublisher);
+                recurringEventReconciler, eventPublisher, occurrenceAllocationQuery, occurrenceRequestReferenceQuery);
     }
 
 
@@ -1387,5 +1394,79 @@ class AcademicEventServiceImplTest {
         return new UpdateUniqueEventRequestDto(
                 UniqueEventKind.PARCIAL, 1L, 1L, LocalDate.of(2026, 3, 15),
                 LocalTime.of(11, 0), 90, 25, "descripcion actualizada", null, null, null, null, null, null);
+    }
+
+    // ---------- deleteUniqueEvent ----------
+
+    @Test
+    @DisplayName("deleteUniqueEvent: evento inexistente → 404, sin consultar asignaciones ni borrar")
+    void deleteUniqueEventInexistente() {
+        when(uniqueEventRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.deleteUniqueEvent(99L))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(occurrenceAllocationQuery, occurrenceRequestReferenceQuery);
+        verify(occurrenceRepository, never()).deleteAll(any());
+        verify(uniqueEventRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("deleteUniqueEvent: una ocurrencia espejo con aula asignada → 409 UniqueEventInUseException, no borra nada")
+    void deleteUniqueEventConOcurrenciaAsignada() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence principal = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.NEEDS_ROOM);
+        Occurrence mirror = Occurrence.builder()
+                .id(11L).event(event).date(event.getDate()).status(OccurrenceStatus.NEEDS_ROOM)
+                .roomSlot(2).mirrorOfOccurrenceId(10L).build();
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(principal, mirror));
+        when(occurrenceAllocationQuery.allocatedAmong(List.of(10L, 11L))).thenReturn(Set.of(11L));
+        lenient().when(occurrenceRequestReferenceQuery.referencedAmong(any())).thenReturn(Set.of());
+
+        assertThatThrownBy(() -> service.deleteUniqueEvent(3L))
+                .isInstanceOfSatisfying(UniqueEventInUseException.class,
+                        e -> assertThat(e.getStatus()).isEqualTo(org.springframework.http.HttpStatus.CONFLICT));
+
+        verify(occurrenceRepository, never()).deleteAll(any());
+        verify(uniqueEventRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("deleteUniqueEvent: una ocurrencia sin aula pero referenciada por un pedido → 409, no borra nada")
+    void deleteUniqueEventConOcurrenciaReferenciadaPorPedido() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence principal = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.NEEDS_ROOM);
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(List.of(principal));
+        when(occurrenceAllocationQuery.allocatedAmong(List.of(10L))).thenReturn(Set.of());
+        when(occurrenceRequestReferenceQuery.referencedAmong(List.of(10L))).thenReturn(Set.of(10L));
+
+        assertThatThrownBy(() -> service.deleteUniqueEvent(3L))
+                .isInstanceOf(UniqueEventInUseException.class);
+
+        verify(occurrenceRepository, never()).deleteAll(any());
+        verify(uniqueEventRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("deleteUniqueEvent: sin asignaciones ni pedidos borra todas las ocurrencias (principal y espejo) y el evento")
+    void deleteUniqueEventFeliz() {
+        UniqueEvent event = EventTestData.uniqueEvent(3L, LocalDate.of(2026, 3, 10), LocalTime.of(10, 0), Duration.ofMinutes(60));
+        Occurrence principal = EventTestData.occurrence(10L, event, event.getDate(), OccurrenceStatus.NEEDS_ROOM);
+        Occurrence mirror = Occurrence.builder()
+                .id(11L).event(event).date(event.getDate()).status(OccurrenceStatus.ROOM_RELEASED)
+                .roomSlot(2).mirrorOfOccurrenceId(10L).build();
+        List<Occurrence> occurrences = List.of(principal, mirror);
+        when(uniqueEventRepository.findById(3L)).thenReturn(Optional.of(event));
+        when(occurrenceRepository.findByEvent_Id(3L)).thenReturn(occurrences);
+        when(occurrenceAllocationQuery.allocatedAmong(List.of(10L, 11L))).thenReturn(Set.of());
+        when(occurrenceRequestReferenceQuery.referencedAmong(List.of(10L, 11L))).thenReturn(Set.of());
+
+        service.deleteUniqueEvent(3L);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(occurrenceRepository, uniqueEventRepository);
+        order.verify(occurrenceRepository).deleteAll(occurrences);
+        order.verify(uniqueEventRepository).delete(event);
     }
 }

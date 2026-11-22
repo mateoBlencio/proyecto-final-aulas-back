@@ -107,4 +107,11 @@ public interface AcademicEventService {
     List<AcademicEventResponseDto> findUniqueEvents();
 
     AcademicEventResponseDto updateUniqueEvent(Long id, UpdateUniqueEventRequestDto dto);
+
+    /**
+     * Borra un evento único con todas sus ocurrencias (la principal y los espejos, vigentes o retirados).
+     * Falla con 404 si no existe y con 409 si alguna ocurrencia todavía tiene asignación de aula o un pedido
+     * de aula que la referencie: el llamador tiene que liberarlas antes.
+     */
+    void deleteUniqueEvent(Long eventId);
 }

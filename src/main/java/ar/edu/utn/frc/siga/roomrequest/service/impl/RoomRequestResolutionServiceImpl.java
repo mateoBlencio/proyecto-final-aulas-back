@@ -2,12 +2,12 @@ package ar.edu.utn.frc.siga.roomrequest.service.impl;
 
 import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.allocation.service.AllocationService;
+import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationCommand;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationItem;
 import ar.edu.utn.frc.siga.allocation.service.command.AllocationTarget;
 import ar.edu.utn.frc.siga.allocation.service.command.DeallocationCommand;
-import ar.edu.utn.frc.siga.auth.dto.response.UserResponseDto;
 import ar.edu.utn.frc.siga.auth.model.SystemRole;
 import ar.edu.utn.frc.siga.auth.service.UserService;
 import ar.edu.utn.frc.siga.common.exception.ResourceNotFoundException;
@@ -29,7 +29,6 @@ import ar.edu.utn.frc.siga.roomrequest.exception.PartialAssignmentReasonRequired
 import ar.edu.utn.frc.siga.roomrequest.exception.RoomRequestAlreadyNotifiedException;
 import ar.edu.utn.frc.siga.roomrequest.exception.RoomRequestOriginalOccupiedException;
 import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestComposer;
-import ar.edu.utn.frc.siga.roomrequest.mapper.RoomRequestNotificationModel;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItem;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestItemAllocation;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
@@ -70,10 +69,10 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
     private final RoomRequestAccessControl accessControl;
     private final AllocationService allocationService;
     private final OccurrenceService occurrenceService;
+    private final AcademicEventService academicEventService;
     private final BuildingService buildingService;
     private final UserService userService;
     private final NotificationSender notificationSender;
-    private final RoomRequestNotificationModel notificationModel;
     private final RoomRequestComposer composer;
     private final RoomRequestOccurrenceResolver occurrenceResolver;
     private final RoomRequestCandidateResolver candidateResolver;
@@ -206,6 +205,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
         String observation = "Solicitud de aula cancelada: " + reason;
         List<Long> deallocatedIds;
+        Long uniqueEventId = null;
         if (RoomRequestOriginalRestorer.hasOriginalClassroom(item.getRequest().getType())) {
             occurrenceResolver.releaseOldMirrors(item);
             RoomRequestOriginalRestorer.Restoration restoration = originalRestorer.restore(item, observation, true);
@@ -215,15 +215,24 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
             item.moveToOriginal(restoration.restored());
             deallocatedIds = restoration.toDeallocate();
         } else {
-            occurrenceResolver.releaseOldMirrors(item);
-            deallocatedIds = occurrenceResolver.onlyFuture(item, item.getAllocations().stream()
+            List<Long> principalIds = item.getAllocations().stream()
                     .filter(allocation -> allocation.getPosition() == 1)
                     .map(RoomRequestItemAllocation::getOccurrenceId)
-                    .toList());
+                    .toList();
+            // Estos tipos crearon su propio evento único al asignarse: se borra junto con el pedido.
+            uniqueEventId = principalIds.isEmpty() ? null : occurrenceService.findSlot(principalIds.getFirst()).eventId();
+            occurrenceResolver.releaseOldMirrors(item);
+            deallocatedIds = occurrenceResolver.onlyFuture(item, principalIds);
         }
         if (!deallocatedIds.isEmpty()) {
             allocationService.deallocate(new DeallocationCommand(
                     List.of(new AllocationTarget.Occurrences(deallocatedIds)), observation));
+        }
+        if (uniqueEventId != null) {
+            // solicitud_item_asignacion tiene FK a ocurrencia: sus filas se borran antes que el evento.
+            item.getAllocations().clear();
+            itemRepository.flush();
+            academicEventService.deleteUniqueEvent(uniqueEventId);
         }
 
         item.decide(RoomRequestStatus.CANCELLED, actor, reason, Instant.now());
@@ -383,20 +392,11 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         Instant now = Instant.now();
         item.notifyTeacher(actor, now, deadlineCalculator.calculate(now, eventStart(item)));
 
-        RoomRequestItemDetailDto detail = composer.composeDetail(item);
-        try {
-            notificationSender.send(new NotificationRequest(
-                    NotificationTemplate.ROOM_REQUEST_RESOLVED,
-                    List.of(new NotificationRecipient(detail.request().teacherName(), detail.request().teacherEmail())),
-                    notificationModel.build(detail),
-                    "room-request-item:" + itemId + ":NOTIFIED:" + item.getNotificationRound(),
-                    replyToFor(item)));
-        } catch (RuntimeException e) {
-            log.error("No se pudo encolar la notificación de pedido resuelto: itemId={}", itemId, e);
-        }
+        // El mail sale después del commit (RoomRequestNotifiedMailListener): un fallo al enviarlo no revierte el estado.
+        eventPublisher.publishEvent(new RoomRequestItemNotified(itemId, item.getNotificationRound()));
 
         log.info("Pedido de aula notificado: itemId={}, ronda={}", itemId, item.getNotificationRound());
-        return detail.item();
+        return composer.composeItem(item);
     }
 
     @Override
@@ -460,15 +460,6 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         log.info("Pedido de aula reabierto: itemId={}, desde={}", itemId, previous);
         RoomRequestItemResponseDto response = composer.composeItem(item);
         return reversion == null ? response : RoomRequestItemResponseDto.withReversion(response, reversion);
-    }
-
-    private List<String> replyToFor(RoomRequestItem item) {
-        if (item.getDerivedBuildingId() == null) {
-            return List.of();
-        }
-        return userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, item.getDerivedBuildingId()).stream()
-                .map(UserResponseDto::email)
-                .toList();
     }
 
     private void authorizeRead(Long itemId, String actor) {
