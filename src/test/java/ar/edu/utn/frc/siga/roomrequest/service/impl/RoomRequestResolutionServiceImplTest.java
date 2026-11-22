@@ -890,11 +890,12 @@ class RoomRequestResolutionServiceImplTest {
     }
 
     @Test
-    @DisplayName("reopen: NOTIFIED vuelve a IN_EVALUATION, guarda el motivo y limpia la aceptación pero conserva notifiedAt")
+    @DisplayName("reopen: NOTIFIED vuelve a IN_EVALUATION, guarda el motivo en reopenReason, deja decisionReason y limpia la aceptación pero conserva notifiedAt")
     void reopen_desdeNotificado() {
         Instant notifiedAt = Instant.now().minusSeconds(3600);
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NOTIFIED)
                 .request(requestOfType(RoomRequestType.FINAL_EXAM)).notifiedAt(notifiedAt).notificationRound(1)
+                .decisionReason("No había más aulas libres")
                 .acceptanceDeadline(Instant.now().plusSeconds(3600)).build();
         when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
         when(composer.composeItem(item)).thenReturn(mockResponse());
@@ -902,7 +903,8 @@ class RoomRequestResolutionServiceImplTest {
         service.reopen(1L, "la 204 queda lejos", "subsecretaria@frc.utn.edu.ar");
 
         assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.IN_EVALUATION);
-        assertThat(item.getDecisionReason()).isEqualTo("la 204 queda lejos");
+        assertThat(item.getReopenReason()).isEqualTo("la 204 queda lejos");
+        assertThat(item.getDecisionReason()).isEqualTo("No había más aulas libres");
         assertThat(item.getNotifiedAt()).isEqualTo(notifiedAt);
         assertThat(item.getNotificationRound()).isEqualTo(1);
         assertThat(item.getAcceptanceDeadline()).isNull();
@@ -1179,6 +1181,49 @@ class RoomRequestResolutionServiceImplTest {
         assertThat(item.getPreviousClassroomId()).isNull();
     }
 
+    @ParameterizedTest
+    @EnumSource(value = RoomRequestType.class, names = {"ONE_TIME_ROOM_CHANGE", "REGULAR_ROOM_CHANGE", "PARTIAL_EXAM_IN_CLASS"})
+    @DisplayName("assign: al reasignar un tipo con aula original no relee el original y conserva el de las filas")
+    void assign_reasignarNoCapturaElOriginal(RoomRequestType type) {
+        RoomRequestItemAllocation row = RoomRequestItemAllocation.builder().occurrenceId(9000L).classroomId(104L)
+                .position(1).originalCaptured(true).originalClassroomId(77L)
+                .originalSource(AllocationSource.SYSACAD).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.IN_EVALUATION)
+                .request(requestOfType(type)).classroomCount(1).previousClassroomId(77L)
+                .allocations(new java.util.ArrayList<>(List.of(row))).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findByIds(List.of(105L))).thenReturn(List.of(classroom(105L, 1L, "A")));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 1, true)).thenReturn(List.of(List.of(9000L)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(105L), null, "sub@frc.utn.edu.ar");
+
+        verify(originalRestorer, never()).captureOriginals(any());
+        verify(allocationService).reallocate(any());
+        assertThat(item.getPreviousClassroomId()).isEqualTo(77L);
+        assertThat(row.getClassroomId()).isEqualTo(105L);
+        assertThat(row.getOriginalClassroomId()).isEqualTo(77L);
+        assertThat(row.getOriginalSource()).isEqualTo(AllocationSource.SYSACAD);
+    }
+
+    @Test
+    @DisplayName("assign: la primera asignación de un cambio de aula sí captura el original")
+    void assign_primeraAsignacionCapturaElOriginal() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(RoomRequestType.ONE_TIME_ROOM_CHANGE)).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findByIds(List.of(104L))).thenReturn(List.of(classroom(104L, 1L, "A")));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 1, false)).thenReturn(List.of(List.of(9000L)));
+        when(originalRestorer.captureOriginals(List.of(9000L)))
+                .thenReturn(Map.of(9000L, new RoomRequestItemAllocation.Original(77L, AllocationSource.SYSACAD)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(104L), null, "sub@frc.utn.edu.ar");
+
+        verify(originalRestorer).captureOriginals(List.of(9000L));
+        assertThat(item.getPreviousClassroomId()).isEqualTo(77L);
+    }
+
     private static RoomRequestOriginalRestorer.Restoration restoration(List<Long> restored,
             List<OccurrenceConflictDto> occupied, List<Long> deactivated, List<Long> withoutOriginal) {
         return new RoomRequestOriginalRestorer.Restoration(restored, occupied, deactivated, withoutOriginal,
@@ -1212,7 +1257,7 @@ class RoomRequestResolutionServiceImplTest {
     // manejo de reason, y cómo se arma el AllocationCommand a partir de lo que el resolver devuelve.
 
     @Test
-    @DisplayName("assign: RESOLVED (ya notificado) se rechaza antes de validar la forma o el rol")
+    @DisplayName("assign: RESOLVED (ya notificado) se rechaza tras autorizar la lectura y antes de validar la forma o la acción")
     void assign_yaNotificadoSeRechaza() {
         RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.RESOLVED)
                 .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(2).build();
@@ -1220,7 +1265,9 @@ class RoomRequestResolutionServiceImplTest {
 
         assertThatThrownBy(() -> service.assign(1L, List.of(104L), null, "subsecretaria@frc.utn.edu.ar"))
                 .isInstanceOf(RoomRequestAlreadyNotifiedException.class);
-        verifyNoInteractions(transitionValidator, accessControl, allocationService, occurrenceResolver, composer);
+        verify(accessControl).authorizeRead(item, "subsecretaria@frc.utn.edu.ar");
+        verify(accessControl, never()).authorize(any(), any(), any());
+        verifyNoInteractions(transitionValidator, allocationService, occurrenceResolver, composer);
     }
 
     @Test
@@ -1232,7 +1279,118 @@ class RoomRequestResolutionServiceImplTest {
 
         assertThatThrownBy(() -> service.assign(1L, List.of(104L), null, "subsecretaria@frc.utn.edu.ar"))
                 .isInstanceOf(RoomRequestAlreadyNotifiedException.class);
-        verifyNoInteractions(transitionValidator, accessControl, allocationService, occurrenceResolver, composer);
+        verify(accessControl).authorizeRead(item, "subsecretaria@frc.utn.edu.ar");
+        verify(accessControl, never()).authorize(any(), any(), any());
+        verifyNoInteractions(transitionValidator, allocationService, occurrenceResolver, composer);
+    }
+
+    // ---------- RR-04: un auxiliar ajeno recibe 403 antes que el 409 de estado ----------
+
+    private void ajenoNoLee(RoomRequestItem item) {
+        doThrow(new RoomRequestForbiddenException("READ", "ver")).when(accessControl).authorizeRead(item, AUXILIAR);
+    }
+
+    @Test
+    @DisplayName("assign de un auxiliar ajeno sobre un ítem NOTIFIED: 403, no el 409 de ya notificado")
+    void assign_auxiliarAjenoSobreNotificadoRecibe403() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NOTIFIED)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        ajenoNoLee(item);
+
+        assertThatThrownBy(() -> service.assign(1L, List.of(104L), null, AUXILIAR))
+                .isInstanceOf(RoomRequestForbiddenException.class);
+        verifyNoInteractions(transitionValidator, allocationService, occurrenceResolver, composer);
+    }
+
+    @Test
+    @DisplayName("assignAutomatic de un auxiliar ajeno sobre un ítem RESOLVED: 403, no el 409 de ya notificado")
+    void assignAutomatic_auxiliarAjenoSobreResueltoRecibe403() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.RESOLVED)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        ajenoNoLee(item);
+
+        assertThatThrownBy(() -> service.assignAutomatic(1L, List.of(104L), "motivo", AUXILIAR))
+                .isInstanceOf(RoomRequestForbiddenException.class);
+        verifyNoInteractions(transitionValidator, allocationService, occurrenceResolver, composer);
+    }
+
+    @Test
+    @DisplayName("cancel de un auxiliar ajeno sobre un ítem RESOLVED: 403, no el 409 de ya notificado")
+    void cancel_auxiliarAjenoSobreResueltoRecibe403() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.RESOLVED)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        ajenoNoLee(item);
+
+        assertThatThrownBy(() -> service.cancel(1L, "motivo", AUXILIAR))
+                .isInstanceOf(RoomRequestForbiddenException.class);
+        verifyNoInteractions(transitionValidator, allocationService, composer);
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.RESOLVED);
+    }
+
+    @Test
+    @DisplayName("cancel de un auxiliar ajeno sobre un ítem en un estado sin transición a CANCELLED: 403, no el rechazo de transición")
+    void cancel_auxiliarAjenoRecibe403AntesQueLaTransicion() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.CANCELLED).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        ajenoNoLee(item);
+
+        assertThatThrownBy(() -> service.cancel(1L, "motivo", AUXILIAR))
+                .isInstanceOf(RoomRequestForbiddenException.class);
+        verifyNoInteractions(transitionValidator, allocationService, composer);
+    }
+
+    @Test
+    @DisplayName("derive de un auxiliar ajeno: 403 antes de validar la transición y de tocar el edificio")
+    void derive_auxiliarAjenoRecibe403AntesQueLaTransicion() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NOTIFIED).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        ajenoNoLee(item);
+
+        assertThatThrownBy(() -> service.derive(1L, 1L, AUXILIAR))
+                .isInstanceOf(RoomRequestForbiddenException.class);
+        verifyNoInteractions(transitionValidator, buildingService, userService, composer);
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.NOTIFIED);
+    }
+
+    @Test
+    @DisplayName("returnItem de un auxiliar ajeno: 403 antes de validar la transición")
+    void return_auxiliarAjenoRecibe403AntesQueLaTransicion() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NOTIFIED)
+                .derivedBuildingId(2L).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        ajenoNoLee(item);
+
+        assertThatThrownBy(() -> service.returnItem(1L, "motivo", AUXILIAR))
+                .isInstanceOf(RoomRequestForbiddenException.class);
+        verifyNoInteractions(transitionValidator, composer);
+        assertThat(item.getDerivedBuildingId()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("cancel del dueño sobre un ítem RESOLVED: sigue el 409 informativo de ya notificado")
+    void cancel_duenoSobreResueltoSigueRecibiendo409() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.RESOLVED)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).derivedBuildingId(1L).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> service.cancel(1L, "motivo", AUXILIAR))
+                .isInstanceOf(RoomRequestAlreadyNotifiedException.class);
+        verify(accessControl).authorizeRead(item, AUXILIAR);
+    }
+
+    @Test
+    @DisplayName("assign del dueño sobre un ítem NOTIFIED: sigue el 409 informativo de ya notificado")
+    void assign_duenoSobreNotificadoSigueRecibiendo409() {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NOTIFIED)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM)).classroomCount(1).derivedBuildingId(1L).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> service.assign(1L, List.of(104L), null, AUXILIAR))
+                .isInstanceOf(RoomRequestAlreadyNotifiedException.class);
+        verify(accessControl).authorizeRead(item, AUXILIAR);
     }
 
     @Test
@@ -1736,7 +1894,7 @@ class RoomRequestResolutionServiceImplTest {
 
     private static RoomRequestItemResponseDto mockResponse() {
         return new RoomRequestItemResponseDto(1L, 1, RoomRequestStatus.CANCELLED, "subsecretaria@frc.utn.edu.ar",
-                null, "motivo", List.of(), null, null, null, null, null, null, null, 1, false, false, null,
+                null, "motivo", null, List.of(), null, null, null, null, null, null, null, 1, false, false, null,
                 false, null, null, List.of(), null, List.of(), null, null, null, null, null, null, null, null, null, List.of(), null);
     }
 

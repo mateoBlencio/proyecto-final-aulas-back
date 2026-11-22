@@ -200,7 +200,7 @@ class RoomRequestNotifiedMailListenerTest {
         RoomRequestItemDetailHeaderDto header = new RoomRequestItemDetailHeaderDto(1L, RoomRequestType.FINAL_EXAM,
                 AcademicScope.GRADO, "Ada Lovelace", "ada@frc.utn.edu.ar", "351-1234567", null, null, 1);
         RoomRequestItemResponseDto response = new RoomRequestItemResponseDto(1L, 1, RoomRequestStatus.NOTIFIED,
-                "subsecretaria@frc.utn.edu.ar", null, null, List.of(), null, null, null, null, null, null, null, 1,
+                "subsecretaria@frc.utn.edu.ar", null, null, null, List.of(), null, null, null, null, null, null, null, 1,
                 false, false, null, false, null, null, List.of(), null, List.of(), null, null, null, null, null, null,
                 null, null, null, List.of(), null);
         return new RoomRequestItemDetailDto(header, response, List.of(), List.of());

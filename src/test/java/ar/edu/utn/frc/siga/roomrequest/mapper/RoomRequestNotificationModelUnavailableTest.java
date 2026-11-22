@@ -81,7 +81,7 @@ class RoomRequestNotificationModelUnavailableTest {
         RoomRequestItemDetailHeaderDto header = new RoomRequestItemDetailHeaderDto(
                 1L, RoomRequestType.PARTIAL_EXAM_IN_CLASS, null, "Ada Lovelace", "ada@frc.utn.edu.ar", null, null, null, 1);
         RoomRequestItemResponseDto item = new RoomRequestItemResponseDto(
-                10L, 1, null, null, null, null, List.of(), LocalDate.of(2026, 10, 14), null,
+                10L, 1, null, null, null, null, null, List.of(),LocalDate.of(2026, 10, 14), null,
                 LocalTime.of(18, 0), LocalTime.of(22, 0), null, null, null, 1, null, null, null, null, null, null,
                 preferred, null, assigned, null, null, null, null, null, null, null, null, null, List.of(), null);
         return new RoomRequestItemDetailDto(header, item, List.of(), List.of());

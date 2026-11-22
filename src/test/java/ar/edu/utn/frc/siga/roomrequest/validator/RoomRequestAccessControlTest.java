@@ -48,16 +48,22 @@ class RoomRequestAccessControlTest {
     private void asAuxiliar(Long... buildingIds) {
         lenient().when(userService.hasRole(AUXILIAR_EMAIL, SystemRole.SUBSECRETARIA)).thenReturn(false);
         lenient().when(userService.hasRole(AUXILIAR_EMAIL, SystemRole.AUXILIAR_AULICO)).thenReturn(true);
-        lenient().when(userService.hasGlobalRole(AUXILIAR_EMAIL, SystemRole.AUXILIAR_AULICO)).thenReturn(false);
         lenient().when(userService.findBuildingIdsForRole(AUXILIAR_EMAIL, SystemRole.AUXILIAR_AULICO))
                 .thenReturn(Set.of(buildingIds));
         accessControl = new RoomRequestAccessControl(userService);
     }
 
+    /** Auxiliar con alcance GLOBAL: tiene el rol pero ningún edificio puntual, así que su alcance queda vacío. */
     private void asAuxiliarGlobal() {
-        lenient().when(userService.hasRole(AUXILIAR_EMAIL, SystemRole.SUBSECRETARIA)).thenReturn(false);
+        asAuxiliar();
+    }
+
+    /** Usuario con SUBSECRETARIA y además auxiliar del edificio indicado. */
+    private void asSubsecretariaYAuxiliar(Long... buildingIds) {
+        lenient().when(userService.hasRole(AUXILIAR_EMAIL, SystemRole.SUBSECRETARIA)).thenReturn(true);
         lenient().when(userService.hasRole(AUXILIAR_EMAIL, SystemRole.AUXILIAR_AULICO)).thenReturn(true);
-        lenient().when(userService.hasGlobalRole(AUXILIAR_EMAIL, SystemRole.AUXILIAR_AULICO)).thenReturn(true);
+        lenient().when(userService.findBuildingIdsForRole(AUXILIAR_EMAIL, SystemRole.AUXILIAR_AULICO))
+                .thenReturn(Set.of(buildingIds));
         accessControl = new RoomRequestAccessControl(userService);
     }
 
@@ -280,12 +286,44 @@ class RoomRequestAccessControlTest {
     }
 
     @Test
-    @DisplayName("auxiliar con alcance GLOBAL: opera cualquier edificio derivado, como si fuera el dueño")
-    void auxiliarConAlcanceGlobal() {
+    @DisplayName("auxiliar con alcance GLOBAL: no opera ningún ítem derivado, tenga el estado que tenga")
+    void auxiliarConAlcanceGlobalNoOperaNada() {
         asAuxiliarGlobal();
-        RoomRequestItem item = item(RoomRequestStatus.DERIVED_TO_BUILDING, OTRO_BUILDING);
+        RoomRequestAccessControl.Actor actor = accessControl.resolveActor(AUXILIAR_EMAIL);
 
-        assertAllowed(item, AUXILIAR_EMAIL, Action.ASSIGN, Action.RETURN, Action.CANCEL);
+        for (RoomRequestStatus status : RoomRequestStatus.values()) {
+            RoomRequestItem item = item(status, OTRO_BUILDING);
+            for (Action action : Action.values()) {
+                assertThat(accessControl.allows(item, actor, action))
+                        .as("%s en %s", action, status)
+                        .isFalse();
+            }
+        }
+        assertThat(actor.subsecretaria()).isFalse();
+        assertThat(actor.auxiliarBuildingIds()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("auxiliar con alcance BUILDING sigue operando su edificio y no el ajeno")
+    void auxiliarConAlcanceBuildingOperaSuEdificio() {
+        asAuxiliar(SU_BUILDING);
+        RoomRequestAccessControl.Actor actor = accessControl.resolveActor(AUXILIAR_EMAIL);
+
+        assertThat(accessControl.allows(item(RoomRequestStatus.DERIVED_TO_BUILDING, SU_BUILDING), actor, Action.ASSIGN))
+                .isTrue();
+        assertThat(accessControl.allows(item(RoomRequestStatus.DERIVED_TO_BUILDING, OTRO_BUILDING), actor, Action.ASSIGN))
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("resolveActor de un usuario con SUBSECRETARIA y auxiliar de un edificio: actor de subsecretaría sin edificios")
+    void resolveActorSubsecretariaGanaSobreAuxiliar() {
+        asSubsecretariaYAuxiliar(SU_BUILDING);
+
+        RoomRequestAccessControl.Actor actor = accessControl.resolveActor(AUXILIAR_EMAIL);
+
+        assertThat(actor.subsecretaria()).isTrue();
+        assertThat(actor.auxiliarBuildingIds()).isEmpty();
     }
 
     @Test
@@ -328,10 +366,37 @@ class RoomRequestAccessControlTest {
     }
 
     @Test
-    @DisplayName("readScope de auxiliar con alcance GLOBAL: sin recorte, ve todo")
+    @DisplayName("readScope de auxiliar con alcance GLOBAL: recorte vacío, no ve nada")
     void readScopeAuxiliarGlobal() {
         asAuxiliarGlobal();
+        assertThat(accessControl.readScope(AUXILIAR_EMAIL)).contains(Set.of());
+    }
+
+    @Test
+    @DisplayName("readScope de un usuario con SUBSECRETARIA y auxiliar de un edificio: sin recorte")
+    void readScopeSubsecretariaYAuxiliar() {
+        asSubsecretariaYAuxiliar(SU_BUILDING);
         assertThat(accessControl.readScope(AUXILIAR_EMAIL)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("authorizeRead: usuario con SUBSECRETARIA y auxiliar del edificio 1 lee un ítem derivado al 2")
+    void authorizeReadSubsecretariaYAuxiliarLeeEdificioAjeno() {
+        asSubsecretariaYAuxiliar(SU_BUILDING);
+
+        assertThatCode(() -> accessControl.authorizeRead(
+                item(RoomRequestStatus.DERIVED_TO_BUILDING, OTRO_BUILDING), AUXILIAR_EMAIL))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("authorizeRead: auxiliar con alcance GLOBAL no lee un ítem derivado")
+    void authorizeReadAuxiliarGlobalNoLee() {
+        asAuxiliarGlobal();
+
+        assertThatThrownBy(() -> accessControl.authorizeRead(
+                item(RoomRequestStatus.DERIVED_TO_BUILDING, OTRO_BUILDING), AUXILIAR_EMAIL))
+                .isInstanceOf(RoomRequestForbiddenException.class);
     }
 
     @Test

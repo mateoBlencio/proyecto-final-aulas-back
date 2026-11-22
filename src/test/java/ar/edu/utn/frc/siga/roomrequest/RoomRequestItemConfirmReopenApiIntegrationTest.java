@@ -108,7 +108,7 @@ class RoomRequestItemConfirmReopenApiIntegrationTest extends AbstractIntegration
     }
 
     @Test
-    @DisplayName("reopen: NOTIFIED vuelve a IN_EVALUATION con el motivo, sin plazo ni aceptación")
+    @DisplayName("reopen: NOTIFIED vuelve a IN_EVALUATION con el motivo en reopenReason, decisionReason intacto, sin plazo ni aceptación")
     void reopen_desdeNotificado() throws Exception {
         RoomRequestItem item = seed(RoomRequestStatus.NOTIFIED, LocalDate.now().plusDays(10));
 
@@ -117,7 +117,8 @@ class RoomRequestItemConfirmReopenApiIntegrationTest extends AbstractIntegration
                         .content("{\"reason\":\"La 204 queda lejos\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("IN_EVALUATION"))
-                .andExpect(jsonPath("$.decisionReason").value("La 204 queda lejos"))
+                .andExpect(jsonPath("$.reopenReason").value("La 204 queda lejos"))
+                .andExpect(jsonPath("$.decisionReason").value("motivo de prueba"))
                 .andExpect(jsonPath("$.acceptanceDeadline").doesNotExist())
                 .andExpect(jsonPath("$.acceptedAt").doesNotExist());
     }

@@ -35,20 +35,17 @@ public class RoomRequestAccessControl {
     private final UserService userService;
 
     /** Roles del usuario relevantes para las acciones sobre ítems; se resuelve una vez y se evalúa por ítem. */
-    public record Actor(boolean subsecretaria, boolean globalAuxiliar, Set<Long> auxiliarBuildingIds) {
+    public record Actor(boolean subsecretaria, Set<Long> auxiliarBuildingIds) {
         boolean ownsBuilding(Long buildingId) {
-            return globalAuxiliar || (buildingId != null && auxiliarBuildingIds.contains(buildingId));
+            return buildingId != null && auxiliarBuildingIds.contains(buildingId);
         }
     }
 
     public Actor resolveActor(String actorEmail) {
         if (userService.hasRole(actorEmail, SystemRole.SUBSECRETARIA)) {
-            return new Actor(true, false, Set.of());
+            return new Actor(true, Set.of());
         }
-        if (userService.hasGlobalRole(actorEmail, SystemRole.AUXILIAR_AULICO)) {
-            return new Actor(false, true, Set.of());
-        }
-        return new Actor(false, false, userService.findBuildingIdsForRole(actorEmail, SystemRole.AUXILIAR_AULICO));
+        return new Actor(false, userService.findBuildingIdsForRole(actorEmail, SystemRole.AUXILIAR_AULICO));
     }
 
     public boolean allows(RoomRequestItem item, Actor actor, Action action) {
@@ -82,8 +79,8 @@ public class RoomRequestAccessControl {
     }
 
     public Optional<Set<Long>> readScope(String actorEmail) {
-        if (!userService.hasRole(actorEmail, SystemRole.AUXILIAR_AULICO)
-                || userService.hasGlobalRole(actorEmail, SystemRole.AUXILIAR_AULICO)) {
+        if (userService.hasRole(actorEmail, SystemRole.SUBSECRETARIA)
+                || !userService.hasRole(actorEmail, SystemRole.AUXILIAR_AULICO)) {
             return Optional.empty();
         }
         return Optional.of(userService.findBuildingIdsForRole(actorEmail, SystemRole.AUXILIAR_AULICO));

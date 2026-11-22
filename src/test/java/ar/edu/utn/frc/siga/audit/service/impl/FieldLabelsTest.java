@@ -80,6 +80,13 @@ class FieldLabelsTest {
     }
 
     @Test
+    @DisplayName("property: reopenReason tiene su etiqueta propia, distinta de la de decisionReason")
+    void property_reopenReasonHasOwnLabel() {
+        assertThat(FieldLabels.property("reopenReason")).isEqualTo("Motivo de reapertura");
+        assertThat(FieldLabels.property("decisionReason")).isEqualTo("Motivo de la decisión");
+    }
+
+    @Test
     @DisplayName("una constante fuera del mapa cae en el humanize en vez de fallar")
     void constant_unknown_fallsBackToHumanize() {
         assertThat(FieldLabels.constant("SOME_NEW_VALUE")).isEqualTo("Some new value");

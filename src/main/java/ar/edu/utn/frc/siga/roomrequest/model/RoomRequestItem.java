@@ -81,6 +81,10 @@ public class RoomRequestItem extends TimestampedEntity {
     @Column(name = "motivo_decision")
     private String decisionReason;
 
+    /** Motivo de la última reapertura. Va aparte de {@link #decisionReason}, que guarda el motivo de resolución parcial del assign. */
+    @Column(name = "motivo_reapertura")
+    private String reopenReason;
+
     @Column(name = "id_comision")
     private Long commissionId;
 
@@ -241,9 +245,12 @@ public class RoomRequestItem extends TimestampedEntity {
         this.acceptanceDeadline = null;
     }
 
-    /** Conserva notifiedAt y la ronda: el front reconoce un pedido reabierto por IN_EVALUATION con notifiedAt. */
+    /** Conserva notifiedAt, la ronda y decisionReason: el front reconoce un pedido reabierto por IN_EVALUATION con notifiedAt, y el mail del próximo notify sigue mostrando el motivo de la asignación parcial. */
     public void reopen(String reason, String decidedBy, Instant reopenedAt) {
-        decide(RoomRequestStatus.IN_EVALUATION, decidedBy, reason, reopenedAt);
+        this.status = RoomRequestStatus.IN_EVALUATION;
+        this.decidedBy = decidedBy;
+        this.decidedAt = truncateToMicros(reopenedAt);
+        this.reopenReason = reason;
         this.acceptanceDeadline = null;
         this.acceptedAt = null;
         this.acceptedBy = null;

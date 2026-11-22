@@ -216,17 +216,15 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("hasRole, hasGlobalRole y findBuildingIdsForRole consultan el repositorio con el email normalizado")
+    @DisplayName("hasRole y findBuildingIdsForRole consultan el repositorio con el email normalizado")
     void roleQueriesNormalizeEmail() {
         String normalized = "jperez@sistemas.frc.utn.edu.ar";
         String raw = " JPerez@Sistemas.FRC.utn.edu.ar ";
         when(userRepository.existsEnabledRoleForUser(normalized, SystemRole.AUXILIAR_AULICO)).thenReturn(true);
-        when(userRepository.existsEnabledGlobalRoleForUser(normalized, SystemRole.SUBSECRETARIA)).thenReturn(true);
         when(userRepository.findBuildingIdsForUserAndRole(normalized, SystemRole.AUXILIAR_AULICO))
                 .thenReturn(Set.of(3L));
 
         assertThat(service.hasRole(raw, SystemRole.AUXILIAR_AULICO)).isTrue();
-        assertThat(service.hasGlobalRole(raw, SystemRole.SUBSECRETARIA)).isTrue();
         assertThat(service.findBuildingIdsForRole(raw, SystemRole.AUXILIAR_AULICO)).containsExactly(3L);
     }
 

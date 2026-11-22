@@ -132,7 +132,7 @@ class RoomRequestServiceImplTest {
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         when(itemRepository.findAll(ArgumentMatchers.<Specification<RoomRequestItem>>any(), pageableCaptor.capture()))
                 .thenAnswer(invocation -> new PageImpl<>(List.of(item), pageableCaptor.getValue(), 1));
-        RoomRequestAccessControl.Actor actor = new RoomRequestAccessControl.Actor(true, false, Set.of());
+        RoomRequestAccessControl.Actor actor = new RoomRequestAccessControl.Actor(true, Set.of());
         when(accessControl.resolveActor("subsecretaria@frc.utn.edu.ar")).thenReturn(actor);
         when(accessControl.allowedActions(item, actor)).thenReturn(List.of(Action.ASSIGN));
         Map<Long, List<Action>> expectedActions = Map.of(5L, List.of(Action.ASSIGN));
@@ -187,7 +187,7 @@ class RoomRequestServiceImplTest {
     void findItemByIdDelegatesToRepositoryAndComposer() {
         RoomRequestItem item = RoomRequestItem.builder().id(5L).build();
         RoomRequestItemDetailDto detail = new RoomRequestItemDetailDto(null, null, List.of(Action.CANCEL), List.of());
-        RoomRequestAccessControl.Actor actor = new RoomRequestAccessControl.Actor(true, false, Set.of());
+        RoomRequestAccessControl.Actor actor = new RoomRequestAccessControl.Actor(true, Set.of());
         when(itemRepository.findWithRequestById(5L)).thenReturn(Optional.of(item));
         when(accessControl.resolveActor("subsecretaria@frc.utn.edu.ar")).thenReturn(actor);
         when(accessControl.allowedActions(item, actor)).thenReturn(List.of(Action.CANCEL));

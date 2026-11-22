@@ -152,11 +152,6 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public boolean hasGlobalRole(String email, SystemRole role) {
-        return userRepository.existsEnabledGlobalRoleForUser(AuthDomainProperties.normalizeEmail(email), role);
-    }
-
-    @Override
     public Set<Long> findBuildingIdsForRole(String email, SystemRole role) {
         return userRepository.findBuildingIdsForUserAndRole(AuthDomainProperties.normalizeEmail(email), role);
     }

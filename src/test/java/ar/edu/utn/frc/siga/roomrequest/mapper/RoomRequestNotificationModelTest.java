@@ -9,6 +9,7 @@ import ar.edu.utn.frc.siga.roomrequest.dto.response.ClassroomOptionDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemDetailHeaderDto;
 import ar.edu.utn.frc.siga.roomrequest.dto.response.RoomRequestItemResponseDto;
+import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestStatus;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequestType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -375,6 +376,25 @@ class RoomRequestNotificationModelTest {
     }
 
     @Test
+    @DisplayName("motivoMenosAulas de un reabierto con menos aulas muestra el motivo de la asignación parcial, no el de la reapertura")
+    void motivoMenosAulasDeUnReabiertoUsaDecisionReason() {
+        String decisionReason = "No había tres aulas contiguas libres en ese horario.";
+        String reopenReason = "El docente pidió revisar la propuesta.";
+        RoomRequestItemDetailHeaderDto header = new RoomRequestItemDetailHeaderDto(
+                1L, RoomRequestType.FINAL_EXAM, null, "Ada Lovelace", "ada@frc.utn.edu.ar", null, null, null, 1);
+        RoomRequestItemResponseDto item = new RoomRequestItemResponseDto(
+                17L, 1, RoomRequestStatus.IN_EVALUATION, "sub@frc.utn.edu.ar", null, decisionReason, reopenReason,
+                List.of(), null, null, null, null, null, null, null, 3, null, null, null, null, null, null,
+                List.of(), null, List.of(AULA_A, AULA_B), null, null, null, null, null, null, null, null, null,
+                List.of(), null);
+
+        Map<String, Object> result = model.build(new RoomRequestItemDetailDto(header, item, List.of(), List.of()));
+
+        assertThat(result).containsEntry("motivoMenosAulas", "Solicitó 3 aulas y le proponemos 2: " + decisionReason);
+        assertThat(textsOf(result)).noneMatch(texto -> texto.contains(reopenReason));
+    }
+
+    @Test
     @DisplayName("aulaAnterior ausente si el pedido no tiene aula anterior registrada (previo a la migración V10)")
     void aulaAnteriorAusenteSiNoHayAulaAnteriorRegistrada() {
         SubjectResponseDto subject = new SubjectResponseDto(55L, 205, "Bases de Datos I", "ANUAL", null, true, null);
@@ -464,7 +484,7 @@ class RoomRequestNotificationModelTest {
         RoomRequestItemDetailHeaderDto header = new RoomRequestItemDetailHeaderDto(
                 1L, type, null, "Ada Lovelace", "ada@frc.utn.edu.ar", null, subject, null, 1);
         RoomRequestItemResponseDto item = new RoomRequestItemResponseDto(
-                12L, 1, null, null, null, "No había más aulas libres en ese horario.",
+                12L, 1, null, null, null, "No había más aulas libres en ese horario.", null,
                 List.of(new CommissionResponseDto(101L, "3K1", null, null)), LocalDate.of(2026, 11, 20),
                 DayOfWeek.FRIDAY, LocalTime.of(18, 0), LocalTime.of(22, 0),
                 null, null, null, 3, null, null, null, null, null, "Necesita proyector",
@@ -497,7 +517,7 @@ class RoomRequestNotificationModelTest {
         RoomRequestItemDetailHeaderDto header = new RoomRequestItemDetailHeaderDto(
                 1L, type, null, "Ada Lovelace", "ada@frc.utn.edu.ar", null, subject, null, 1);
         RoomRequestItemResponseDto item = new RoomRequestItemResponseDto(
-                itemId, 1, null, null, null, decisionReason, commissions, date, dayOfWeek, startTime, endTime,
+                itemId, 1, null, null, null, decisionReason, null, commissions, date, dayOfWeek, startTime, endTime,
                 null, null, null, classroomCount, null, null, null, null, null, observations,
                 List.of(), null, assignedClassrooms, previousClassroom, null, acceptanceDeadline, null, null, null, null, null, null, List.of(), null);
         return new RoomRequestItemDetailDto(header, item, List.of(), List.of());

@@ -103,6 +103,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
         RoomRequestItem item = itemRepository.findWithRequestById(itemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
+        accessControl.authorizeRead(item, actor);
         if (item.getStatus() == RoomRequestStatus.NOTIFIED || item.getStatus() == RoomRequestStatus.RESOLVED) {
             throw new RoomRequestAlreadyNotifiedException(itemId);
         }
@@ -149,7 +150,9 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
         RoomRequestType type = item.getRequest().getType();
         Map<Long, RoomRequestItemAllocation.Original> originalByOccurrence = Map.of();
-        if (RoomRequestOriginalRestorer.hasOriginalClassroom(type)) {
+        if (RoomRequestOriginalRestorer.hasOriginalClassroom(type) && !reassigning) {
+            // Solo en la primera asignación: al reasignar, las filas del ítem ya guardan el original y el aula
+            // actual de la ocurrencia es la que asignó este pedido.
             // Se lee antes del reallocate: el upsert pisa el origen (SYSACAD pasa a MANUAL).
             originalByOccurrence = originalRestorer.captureOriginals(occurrencesBySlot.getFirst());
             RoomRequestItemAllocation.Original first = originalByOccurrence.get(occurrencesBySlot.get(0).getFirst());
@@ -197,6 +200,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
         RoomRequestItem item = itemRepository.findWithRequestById(itemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
+        accessControl.authorizeRead(item, actor);
         if (item.getStatus() == RoomRequestStatus.RESOLVED) {
             throw new RoomRequestAlreadyNotifiedException(itemId);
         }
@@ -263,6 +267,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
         RoomRequestItem item = itemRepository.findWithRequestById(itemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
+        accessControl.authorizeRead(item, actor);
         transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.DERIVED_TO_BUILDING);
         accessControl.authorize(item, actor, Action.DERIVE);
 
@@ -292,6 +297,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
         RoomRequestItem item = itemRepository.findWithRequestById(itemId)
                 .orElseThrow(() -> ResourceNotFoundException.of("RoomRequestItem", itemId));
+        accessControl.authorizeRead(item, actor);
         transitionValidator.validateTransition(item.getStatus(), RoomRequestStatus.NEW);
         accessControl.authorize(item, actor, Action.RETURN);
 

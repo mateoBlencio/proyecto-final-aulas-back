@@ -55,7 +55,7 @@ class RoomRequestItemTest {
     }
 
     @Test
-    @DisplayName("reopen: conserva notifiedAt y la ronda; limpia plazo y aceptación; guarda el motivo")
+    @DisplayName("reopen: conserva notifiedAt y la ronda; limpia plazo y aceptación; guarda el motivo en reopenReason")
     void reopenLimpiaAceptacion() {
         RoomRequestItem item = RoomRequestItem.builder().status(RoomRequestStatus.IN_EVALUATION).build();
         Instant notifiedAt = Instant.parse("2027-03-10T12:00:00Z");
@@ -63,16 +63,63 @@ class RoomRequestItemTest {
         item.accept("SISTEMA", notifiedAt.plusSeconds(7200));
         assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.RESOLVED);
         assertThat(item.getAcceptanceDeadline()).isNull();
+        item.markReopenedFromNotified(java.time.LocalDate.of(2027, 3, 9));
+        assertThat(item.getReopenedFromNotifiedOn()).isNotNull();
 
         item.reopen("proyector roto", "sub@frc.utn.edu.ar", notifiedAt.plusSeconds(9000));
 
         assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.IN_EVALUATION);
-        assertThat(item.getDecisionReason()).isEqualTo("proyector roto");
+        assertThat(item.getReopenReason()).isEqualTo("proyector roto");
+        assertThat(item.getDecidedBy()).isEqualTo("sub@frc.utn.edu.ar");
+        assertThat(item.getDecidedAt()).isEqualTo(notifiedAt.plusSeconds(9000));
         assertThat(item.getNotifiedAt()).isEqualTo(notifiedAt);
         assertThat(item.getNotificationRound()).isEqualTo(1);
         assertThat(item.getAcceptedAt()).isNull();
         assertThat(item.getAcceptedBy()).isNull();
         assertThat(item.getAcceptanceDeadline()).isNull();
+        assertThat(item.getReopenedFromNotifiedOn()).isNull();
+    }
+
+    @Test
+    @DisplayName("reopen desde NOTIFIED con plazo vigente: limpia acceptanceDeadline")
+    void reopenDesdeNotificadoLimpiaPlazo() {
+        RoomRequestItem item = RoomRequestItem.builder().status(RoomRequestStatus.IN_EVALUATION).build();
+        Instant now = Instant.parse("2027-03-10T12:00:00Z");
+        item.notifyTeacher("sub@frc.utn.edu.ar", now, now.plusSeconds(3600));
+        assertThat(item.getAcceptanceDeadline()).isNotNull();
+
+        item.reopen("motivo", "sub@frc.utn.edu.ar", now.plusSeconds(60));
+
+        assertThat(item.getAcceptanceDeadline()).isNull();
+        assertThat(item.getStatus()).isEqualTo(RoomRequestStatus.IN_EVALUATION);
+    }
+
+    @Test
+    @DisplayName("reopen: deja decisionReason intacto, el motivo de la asignación parcial no se pisa")
+    void reopenNoPisaDecisionReason() {
+        RoomRequestItem item = RoomRequestItem.builder().status(RoomRequestStatus.IN_EVALUATION).build();
+        Instant now = Instant.parse("2027-03-10T12:00:00Z");
+        item.decide(RoomRequestStatus.IN_EVALUATION, "sub@frc.utn.edu.ar", "No había más aulas libres", now);
+        item.notifyTeacher("sub@frc.utn.edu.ar", now, now.plusSeconds(3600));
+
+        item.reopen("el docente pidió otra aula", "sub@frc.utn.edu.ar", now.plusSeconds(600));
+
+        assertThat(item.getDecisionReason()).isEqualTo("No había más aulas libres");
+        assertThat(item.getReopenReason()).isEqualTo("el docente pidió otra aula");
+    }
+
+    @Test
+    @DisplayName("reopen sobre un ítem reabierto antes: reopenReason queda con el último motivo")
+    void reopenSegundaVezPisaReopenReason() {
+        RoomRequestItem item = RoomRequestItem.builder().status(RoomRequestStatus.IN_EVALUATION).build();
+        Instant now = Instant.parse("2027-03-10T12:00:00Z");
+        item.notifyTeacher("sub@frc.utn.edu.ar", now, now.plusSeconds(3600));
+        item.reopen("primer motivo", "sub@frc.utn.edu.ar", now.plusSeconds(60));
+        item.notifyTeacher("sub@frc.utn.edu.ar", now.plusSeconds(120), now.plusSeconds(3720));
+
+        item.reopen("segundo motivo", "sub@frc.utn.edu.ar", now.plusSeconds(180));
+
+        assertThat(item.getReopenReason()).isEqualTo("segundo motivo");
     }
 
     @Test
