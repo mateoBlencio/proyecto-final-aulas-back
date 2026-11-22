@@ -669,7 +669,7 @@ class RoomRequestResolutionServiceImplTest {
         assertThat(item.getAcceptanceDeadline()).isEqualTo(deadline);
         assertThat(item.getNotificationRound()).isEqualTo(1);
 
-        assertThat(publishedNotified()).containsExactly(new RoomRequestItemNotified(1L, 1));
+        assertThat(publishedNotified()).containsExactly(new RoomRequestItemNotified(1L, 1, "subsecretaria@frc.utn.edu.ar"));
     }
 
     @Test
@@ -687,7 +687,28 @@ class RoomRequestResolutionServiceImplTest {
         service.notify(1L, "auxiliar@frc.utn.edu.ar");
 
         verifyNoInteractions(notificationSender, userService);
-        assertThat(publishedNotified()).containsExactly(new RoomRequestItemNotified(1L, 1));
+        assertThat(publishedNotified()).containsExactly(new RoomRequestItemNotified(1L, 1, "auxiliar@frc.utn.edu.ar"));
+    }
+
+    @Test
+    @DisplayName("notify: el evento del mail lleva el actor tal como lo recibió notify (va en copia del mail)")
+    void notify_elEventoLlevaElActor() {
+        RoomRequestItemAllocation allocation = RoomRequestItemAllocation.builder()
+                .occurrenceId(500L).classroomId(101L).position(1).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.IN_EVALUATION)
+                .request(requestOfType(RoomRequestType.FINAL_EXAM))
+                .allocations(new java.util.ArrayList<>(List.of(allocation))).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+        when(deadlineCalculator.calculate(any(), any())).thenReturn(Instant.parse("2027-03-10T15:00:00Z"));
+
+        service.notify(1L, "Auxiliar.Aulico@frc.utn.edu.ar");
+
+        assertThat(publishedNotified()).singleElement().satisfies(event -> {
+            assertThat(event.actor()).isEqualTo("Auxiliar.Aulico@frc.utn.edu.ar");
+            assertThat(event.itemId()).isEqualTo(1L);
+            assertThat(event.round()).isEqualTo(1);
+        });
     }
 
     @Test
@@ -804,7 +825,7 @@ class RoomRequestResolutionServiceImplTest {
 
         service.notify(1L, "subsecretaria@frc.utn.edu.ar");
 
-        assertThat(publishedNotified()).containsExactly(new RoomRequestItemNotified(1L, 2));
+        assertThat(publishedNotified()).containsExactly(new RoomRequestItemNotified(1L, 2, "subsecretaria@frc.utn.edu.ar"));
         assertThat(item.getNotificationRound()).isEqualTo(2);
     }
 

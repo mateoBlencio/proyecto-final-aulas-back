@@ -407,7 +407,7 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
         item.notifyTeacher(actor, now, deadlineCalculator.calculate(now, eventStart(item)));
 
         // El mail sale después del commit (RoomRequestNotifiedMailListener): un fallo al enviarlo no revierte el estado.
-        eventPublisher.publishEvent(new RoomRequestItemNotified(itemId, item.getNotificationRound()));
+        eventPublisher.publishEvent(new RoomRequestItemNotified(itemId, item.getNotificationRound(), actor));
 
         log.info("Pedido de aula notificado: itemId={}, ronda={}", itemId, item.getNotificationRound());
         return composer.composeItem(item);

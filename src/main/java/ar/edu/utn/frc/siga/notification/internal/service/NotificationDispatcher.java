@@ -48,7 +48,8 @@ class NotificationDispatcher {
         try {
             sender.get().send(
                     new RenderedNotification(notification.getSubject(), notification.getBody(),
-                            splitReplyTo(notification.getReplyTo())),
+                            splitAddresses(notification.getReplyTo()), splitAddresses(notification.getCc()),
+                            splitAddresses(notification.getBcc())),
                     new NotificationRecipient(notification.getRecipientName(), notification.getRecipient()));
             notification.markSent(Instant.now());
         } catch (RuntimeException e) {
@@ -59,8 +60,8 @@ class NotificationDispatcher {
         }
     }
 
-    private static List<String> splitReplyTo(String replyTo) {
-        return replyTo == null || replyTo.isBlank() ? List.of() : List.of(replyTo.split(","));
+    private static List<String> splitAddresses(String addresses) {
+        return addresses == null || addresses.isBlank() ? List.of() : List.of(addresses.split(","));
     }
 
     static Duration backoffFor(int attempt) {

@@ -74,7 +74,17 @@ class RoomRequestNotifiedMailListener {
                 List.of(new NotificationRecipient(detail.request().teacherName(), detail.request().teacherEmail())),
                 notificationModel.build(detail),
                 "room-request-item:" + event.itemId() + ":NOTIFIED:" + event.round(),
-                replyToFor(item)));
+                replyToFor(item),
+                List.of(event.actor()),
+                subsecretariaBccExcluding(event.actor())));
+    }
+
+    /** Todas las subsecretarias habilitadas menos el actor, que ya va en copia. */
+    private List<String> subsecretariaBccExcluding(String actor) {
+        return userService.findByRole(SystemRole.SUBSECRETARIA).stream()
+                .map(UserResponseDto::email)
+                .filter(email -> !email.equalsIgnoreCase(actor))
+                .toList();
     }
 
     private List<String> replyToFor(RoomRequestItem item) {

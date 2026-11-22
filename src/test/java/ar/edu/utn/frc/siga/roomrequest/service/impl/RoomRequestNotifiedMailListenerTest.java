@@ -78,7 +78,7 @@ class RoomRequestNotifiedMailListenerTest {
         when(composer.composeDetail(item)).thenReturn(detail);
         when(notificationModel.build(detail)).thenReturn(model);
 
-        listener.on(new RoomRequestItemNotified(1L, 3));
+        listener.on(new RoomRequestItemNotified(1L, 3, "subsecretaria@frc.utn.edu.ar"));
 
         NotificationRequest request = sentRequest();
         assertThat(request.template()).isEqualTo(NotificationTemplate.ROOM_REQUEST_RESOLVED);
@@ -94,10 +94,90 @@ class RoomRequestNotifiedMailListenerTest {
         stubItem(item);
         when(composer.composeDetail(item)).thenReturn(detail());
 
-        listener.on(new RoomRequestItemNotified(1L, 1));
+        listener.on(new RoomRequestItemNotified(1L, 1, "subsecretaria@frc.utn.edu.ar"));
 
         assertThat(sentRequest().replyTo()).isEmpty();
-        verifyNoInteractions(userService);
+        verify(userService, never()).findByRoleForBuilding(any(), any());
+    }
+
+    @Test
+    @DisplayName("actor auxiliar: CC = el actor y CCO = todas las subsecretarias habilitadas")
+    void actorAuxiliar_ccElActorYCcoTodasLasSubsecretarias() {
+        RoomRequestItem item = item(null);
+        stubItem(item);
+        when(composer.composeDetail(item)).thenReturn(detail());
+        when(userService.findByRole(SystemRole.SUBSECRETARIA)).thenReturn(List.of(
+                user(1L, "subsecretaria1@frc.utn.edu.ar"), user(2L, "subsecretaria2@frc.utn.edu.ar")));
+
+        listener.on(new RoomRequestItemNotified(1L, 1, "auxiliar@frc.utn.edu.ar"));
+
+        NotificationRequest request = sentRequest();
+        assertThat(request.cc()).containsExactly("auxiliar@frc.utn.edu.ar");
+        assertThat(request.bcc()).containsExactly("subsecretaria1@frc.utn.edu.ar", "subsecretaria2@frc.utn.edu.ar");
+    }
+
+    @Test
+    @DisplayName("actor subsecretaria: CC = el actor y CCO = las demás, sin el actor aunque el email difiera en mayúsculas")
+    void actorSubsecretaria_ccoSinElActorSinDistinguirMayusculas() {
+        RoomRequestItem item = item(null);
+        stubItem(item);
+        when(composer.composeDetail(item)).thenReturn(detail());
+        when(userService.findByRole(SystemRole.SUBSECRETARIA)).thenReturn(List.of(
+                user(1L, "subsecretaria@frc.utn.edu.ar"), user(2L, "otra@frc.utn.edu.ar")));
+
+        listener.on(new RoomRequestItemNotified(1L, 1, "Subsecretaria@FRC.utn.edu.ar"));
+
+        NotificationRequest request = sentRequest();
+        assertThat(request.cc()).containsExactly("Subsecretaria@FRC.utn.edu.ar");
+        assertThat(request.bcc()).containsExactly("otra@frc.utn.edu.ar");
+    }
+
+    @Test
+    @DisplayName("sin subsecretarias habilitadas: CCO vacío y el actor sigue en CC")
+    void sinSubsecretariasHabilitadas_ccoVacio() {
+        RoomRequestItem item = item(null);
+        stubItem(item);
+        when(composer.composeDetail(item)).thenReturn(detail());
+        when(userService.findByRole(SystemRole.SUBSECRETARIA)).thenReturn(List.of());
+
+        listener.on(new RoomRequestItemNotified(1L, 1, "auxiliar@frc.utn.edu.ar"));
+
+        NotificationRequest request = sentRequest();
+        assertThat(request.cc()).containsExactly("auxiliar@frc.utn.edu.ar");
+        assertThat(request.bcc()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("la única subsecretaria habilitada es el actor: CCO vacío")
+    void unicaSubsecretariaEsElActor_ccoVacio() {
+        RoomRequestItem item = item(null);
+        stubItem(item);
+        when(composer.composeDetail(item)).thenReturn(detail());
+        when(userService.findByRole(SystemRole.SUBSECRETARIA))
+                .thenReturn(List.of(user(1L, "subsecretaria@frc.utn.edu.ar")));
+
+        listener.on(new RoomRequestItemNotified(1L, 1, "subsecretaria@frc.utn.edu.ar"));
+
+        assertThat(sentRequest().bcc()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("con edificio derivado: el replyTo sigue siendo solo los auxiliares del edificio, sin las copias")
+    void conEdificioDerivado_replyToNoSeMezclaConLasCopias() {
+        RoomRequestItem item = item(7L);
+        stubItem(item);
+        when(composer.composeDetail(item)).thenReturn(detail());
+        when(userService.findByRoleForBuilding(SystemRole.AUXILIAR_AULICO, 7L))
+                .thenReturn(List.of(user(1L, "auxiliar@frc.utn.edu.ar")));
+        when(userService.findByRole(SystemRole.SUBSECRETARIA))
+                .thenReturn(List.of(user(2L, "subsecretaria@frc.utn.edu.ar")));
+
+        listener.on(new RoomRequestItemNotified(1L, 1, "auxiliar@frc.utn.edu.ar"));
+
+        NotificationRequest request = sentRequest();
+        assertThat(request.replyTo()).containsExactly("auxiliar@frc.utn.edu.ar");
+        assertThat(request.cc()).containsExactly("auxiliar@frc.utn.edu.ar");
+        assertThat(request.bcc()).containsExactly("subsecretaria@frc.utn.edu.ar");
     }
 
     @Test
@@ -110,7 +190,7 @@ class RoomRequestNotifiedMailListenerTest {
                 new UserResponseDto(1L, "auxiliar@frc.utn.edu.ar", "Auxiliar", "Aulico", List.of()),
                 new UserResponseDto(2L, "otro@frc.utn.edu.ar", "Otro", "Auxiliar", List.of())));
 
-        listener.on(new RoomRequestItemNotified(1L, 1));
+        listener.on(new RoomRequestItemNotified(1L, 1, "subsecretaria@frc.utn.edu.ar"));
 
         assertThat(sentRequest().replyTo()).containsExactly("auxiliar@frc.utn.edu.ar", "otro@frc.utn.edu.ar");
     }
@@ -122,7 +202,7 @@ class RoomRequestNotifiedMailListenerTest {
         stubItem(item);
         when(composer.composeDetail(item)).thenReturn(detail());
 
-        listener.on(new RoomRequestItemNotified(1L, 1));
+        listener.on(new RoomRequestItemNotified(1L, 1, "subsecretaria@frc.utn.edu.ar"));
 
         ArgumentCaptor<TransactionDefinition> definition = ArgumentCaptor.forClass(TransactionDefinition.class);
         verify(transactionManager).getTransaction(definition.capture());
@@ -139,7 +219,7 @@ class RoomRequestNotifiedMailListenerTest {
         when(composer.composeDetail(item)).thenReturn(detail());
         doThrow(new IllegalStateException("smtp caído")).when(notificationSender).send(any());
 
-        assertThatCode(() -> listener.on(new RoomRequestItemNotified(1L, 1))).doesNotThrowAnyException();
+        assertThatCode(() -> listener.on(new RoomRequestItemNotified(1L, 1, "subsecretaria@frc.utn.edu.ar"))).doesNotThrowAnyException();
 
         verify(transactionManager).rollback(any());
         verify(transactionManager, never()).commit(any());
@@ -153,7 +233,7 @@ class RoomRequestNotifiedMailListenerTest {
         when(composer.composeDetail(item)).thenReturn(detail());
         when(notificationModel.build(any())).thenThrow(new IllegalStateException("plantilla rota"));
 
-        assertThatCode(() -> listener.on(new RoomRequestItemNotified(1L, 1))).doesNotThrowAnyException();
+        assertThatCode(() -> listener.on(new RoomRequestItemNotified(1L, 1, "subsecretaria@frc.utn.edu.ar"))).doesNotThrowAnyException();
 
         verifyNoInteractions(notificationSender);
     }
@@ -163,7 +243,7 @@ class RoomRequestNotifiedMailListenerTest {
     void itemInexistente_noEnvia() {
         when(itemRepository.findWithRequestById(99L)).thenReturn(Optional.empty());
 
-        assertThatCode(() -> listener.on(new RoomRequestItemNotified(99L, 1))).doesNotThrowAnyException();
+        assertThatCode(() -> listener.on(new RoomRequestItemNotified(99L, 1, "subsecretaria@frc.utn.edu.ar"))).doesNotThrowAnyException();
 
         verifyNoInteractions(notificationSender, composer, notificationModel, userService);
     }
@@ -181,6 +261,10 @@ class RoomRequestNotifiedMailListenerTest {
         ArgumentCaptor<NotificationRequest> captor = ArgumentCaptor.forClass(NotificationRequest.class);
         verify(notificationSender).send(captor.capture());
         return captor.getValue();
+    }
+
+    private static UserResponseDto user(Long id, String email) {
+        return new UserResponseDto(id, email, "Nombre", "Apellido", List.of());
     }
 
     private static RoomRequestItem item(Long derivedBuildingId) {

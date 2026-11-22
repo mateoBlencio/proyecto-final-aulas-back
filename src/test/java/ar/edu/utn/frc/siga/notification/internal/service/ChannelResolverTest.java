@@ -23,11 +23,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -126,6 +128,133 @@ class ChannelResolverTest {
         properties.getEmail().setReplyTo("");
 
         assertThat(queueWith(List.of()).getReplyTo()).isNull();
+    }
+
+    @Test
+    void storesCcAndBccJoinedByCommaOnTheQueuedNotification() {
+        Notification saved = queueOne(copies(List.of("aux1@frc.utn.edu.ar", "aux2@frc.utn.edu.ar"),
+                List.of("sub1@frc.utn.edu.ar", "sub2@frc.utn.edu.ar")));
+
+        assertThat(saved.getCc()).isEqualTo("aux1@frc.utn.edu.ar,aux2@frc.utn.edu.ar");
+        assertThat(saved.getBcc()).isEqualTo("sub1@frc.utn.edu.ar,sub2@frc.utn.edu.ar");
+    }
+
+    @Test
+    void removesFromBccWhatIsAlreadyInCcRegardlessOfCase() {
+        Notification saved = queueOne(copies(List.of("Subsecretaria@frc.utn.edu.ar"),
+                List.of("subsecretaria@FRC.utn.edu.ar", "otra@frc.utn.edu.ar")));
+
+        assertThat(saved.getCc()).isEqualTo("Subsecretaria@frc.utn.edu.ar");
+        assertThat(saved.getBcc()).isEqualTo("otra@frc.utn.edu.ar");
+    }
+
+    @Test
+    void leavesBccNullWhenEveryBccAddressIsAlreadyInCc() {
+        Notification saved = queueOne(copies(List.of("sub@frc.utn.edu.ar"), List.of("SUB@frc.utn.edu.ar")));
+
+        assertThat(saved.getCc()).isEqualTo("sub@frc.utn.edu.ar");
+        assertThat(saved.getBcc()).isNull();
+    }
+
+    @Test
+    void deduplicatesTrimsAndSkipsBlankOrNullCopyAddresses() {
+        Notification saved = queueOne(copies(
+                Arrays.asList(" aux@frc.utn.edu.ar ", "AUX@frc.utn.edu.ar", null, "  "),
+                Arrays.asList("sub@frc.utn.edu.ar", " Sub@frc.utn.edu.ar", "", null)));
+
+        assertThat(saved.getCc()).isEqualTo("aux@frc.utn.edu.ar");
+        assertThat(saved.getBcc()).isEqualTo("sub@frc.utn.edu.ar");
+    }
+
+    @Test
+    void leavesCcAndBccNullWhenTheListsAreNull() {
+        Notification saved = queueOne(copies(null, null));
+
+        assertThat(saved.getCc()).isNull();
+        assertThat(saved.getBcc()).isNull();
+    }
+
+    @Test
+    void leavesCcAndBccNullWhenTheListsAreEmpty() {
+        Notification saved = queueOne(copies(List.of(), List.of()));
+
+        assertThat(saved.getCc()).isNull();
+        assertThat(saved.getBcc()).isNull();
+    }
+
+    @Test
+    void doesNotMixTheReplyToIntoTheCopies() {
+        properties.getEmail().setReplyTo("secacad-gestionaulas@frc.utn.edu.ar");
+
+        Notification saved = queueOne(new NotificationRequest(request.template(), request.recipients(),
+                request.model(), request.idempotencyKey(), List.of("aux@frc.utn.edu.ar"),
+                List.of("cc@frc.utn.edu.ar"), List.of("cco@frc.utn.edu.ar")));
+
+        assertThat(saved.getReplyTo()).isEqualTo("aux@frc.utn.edu.ar,secacad-gestionaulas@frc.utn.edu.ar");
+        assertThat(saved.getCc()).isEqualTo("cc@frc.utn.edu.ar");
+        assertThat(saved.getBcc()).isEqualTo("cco@frc.utn.edu.ar");
+    }
+
+    @Test
+    void savesOneRowPerRecipientWithTheSameCopies() {
+        NotificationRequest twoRecipients = new NotificationRequest(request.template(),
+                List.of(new NotificationRecipient("Ana", "ana@frc.utn.edu.ar"),
+                        new NotificationRecipient("Beto", "beto@frc.utn.edu.ar")),
+                request.model(), request.idempotencyKey(), List.of(),
+                List.of("aux@frc.utn.edu.ar"), List.of("sub@frc.utn.edu.ar"));
+
+        List<Notification> saved = queue(twoRecipients);
+
+        assertThat(saved).extracting(Notification::getRecipient)
+                .containsExactly("ana@frc.utn.edu.ar", "beto@frc.utn.edu.ar");
+        assertThat(saved).extracting(Notification::getCc).containsOnly("aux@frc.utn.edu.ar");
+        assertThat(saved).extracting(Notification::getBcc).containsOnly("sub@frc.utn.edu.ar");
+    }
+
+    @Test
+    void theFourAndFiveArgumentConstructorsLeaveTheCopiesEmptyAndSaveNullColumns() {
+        NotificationRequest fourArgs = new NotificationRequest(request.template(), request.recipients(),
+                request.model(), request.idempotencyKey());
+        NotificationRequest fiveArgs = new NotificationRequest(request.template(), request.recipients(),
+                request.model(), request.idempotencyKey(), List.of("aux@frc.utn.edu.ar"));
+
+        assertThat(fourArgs.cc()).isEmpty();
+        assertThat(fourArgs.bcc()).isEmpty();
+        assertThat(fiveArgs.replyTo()).containsExactly("aux@frc.utn.edu.ar");
+        assertThat(fiveArgs.cc()).isEmpty();
+        assertThat(fiveArgs.bcc()).isEmpty();
+        Notification savedFromFive = queueOne(fiveArgs);
+        assertThat(savedFromFive.getCc()).isNull();
+        assertThat(savedFromFive.getBcc()).isNull();
+        assertThat(savedFromFive.getReplyTo()).isEqualTo("aux@frc.utn.edu.ar");
+    }
+
+    private NotificationRequest copies(List<String> cc, List<String> bcc) {
+        return new NotificationRequest(request.template(), request.recipients(), request.model(),
+                request.idempotencyKey(), List.of(), cc, bcc);
+    }
+
+    private Notification queueOne(NotificationRequest toSend) {
+        List<Notification> saved = queue(toSend);
+        assertThat(saved).hasSize(1);
+        return saved.getFirst();
+    }
+
+    private List<Notification> queue(NotificationRequest toSend) {
+        when(settingsReader.getBoolean(SettingKey.NOTIFICATIONS_ENABLED)).thenReturn(true);
+        when(settingsReader.getBoolean(SettingKey.NOTIFICATIONS_CHANNEL_EMAIL_ENABLED)).thenReturn(true);
+        when(renderer.render(any(), any())).thenReturn(new RenderedNotification("Aula asignada", "<p>cuerpo</p>", List.of()));
+        when(repository.save(any(Notification.class))).thenAnswer(inv -> inv.getArgument(0));
+        ChannelSender email = org.mockito.Mockito.mock(ChannelSender.class);
+        when(email.channel()).thenReturn(NotificationChannel.EMAIL);
+        NotificationSenderImpl sender = new NotificationSenderImpl(
+                settingsReader, new ChannelRegistry(List.of(email)), renderer, repository, eventPublisher, properties);
+
+        sender.send(toSend);
+
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(repository, atLeastOnce()).save(captor.capture());
+        return captor.getAllValues();
     }
 
     private Notification queueWith(List<String> replyTo) {

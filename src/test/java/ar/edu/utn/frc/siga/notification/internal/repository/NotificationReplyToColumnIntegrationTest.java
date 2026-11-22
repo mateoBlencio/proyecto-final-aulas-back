@@ -13,7 +13,7 @@ import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DisplayName("responder_a guarda listas largas de Reply-To (V64, integración)")
+@DisplayName("columnas responder_a (V64), cc y cco (V75) de notificacion (integración)")
 class NotificationReplyToColumnIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -48,5 +48,57 @@ class NotificationReplyToColumnIntegrationTest extends AbstractIntegrationTest {
                 "SELECT data_type FROM information_schema.columns "
                         + "WHERE table_name = 'notificacion' AND column_name = 'responder_a'", String.class))
                 .isEqualTo("text");
+    }
+
+    @Test
+    @DisplayName("cc y cco se guardan y se releen completos, ambas columnas son text (V75)")
+    void persistsAndReadsBackCcAndCco() {
+        String cc = "auxiliar@frc.utn.edu.ar";
+        String cco = IntStream.rangeClosed(1, 44)
+                .mapToObj(i -> "subsecretaria-%02d@frc.utn.edu.ar".formatted(i))
+                .collect(Collectors.joining(","));
+
+        Long id = repository.save(notification("copias", cc, cco)).getId();
+
+        assertThat(repository.findById(id)).get()
+                .satisfies(saved -> {
+                    assertThat(saved.getCc()).isEqualTo(cc);
+                    assertThat(saved.getBcc()).isEqualTo(cco);
+                });
+        assertThat(jdbcTemplate.queryForMap("SELECT cc, cco FROM notificacion WHERE id_notificacion = ?", id))
+                .containsEntry("cc", cc)
+                .containsEntry("cco", cco);
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT data_type FROM information_schema.columns "
+                        + "WHERE table_name = 'notificacion' AND column_name IN ('cc', 'cco')", String.class))
+                .containsExactly("text", "text");
+    }
+
+    @Test
+    @DisplayName("una fila sin copias deja cc y cco en null")
+    void aRowWithoutCopiesLeavesBothColumnsNull() {
+        Long id = repository.save(notification("sin-copias", null, null)).getId();
+
+        assertThat(repository.findById(id)).get().satisfies(saved -> {
+            assertThat(saved.getCc()).isNull();
+            assertThat(saved.getBcc()).isNull();
+        });
+        assertThat(jdbcTemplate.queryForMap("SELECT cc, cco FROM notificacion WHERE id_notificacion = ?", id))
+                .containsEntry("cc", null)
+                .containsEntry("cco", null);
+    }
+
+    private static Notification notification(String keyPrefix, String cc, String cco) {
+        return Notification.builder()
+                .template("ROOM_REQUEST_RESOLVED")
+                .channel(NotificationChannel.EMAIL)
+                .recipient("docente.copias." + System.nanoTime() + "@frc.utn.edu.ar")
+                .recipientName("Docente")
+                .subject("Propuesta de aula")
+                .body("<p>cuerpo</p>")
+                .cc(cc)
+                .bcc(cco)
+                .idempotencyKey(keyPrefix + ":" + System.nanoTime())
+                .build();
     }
 }

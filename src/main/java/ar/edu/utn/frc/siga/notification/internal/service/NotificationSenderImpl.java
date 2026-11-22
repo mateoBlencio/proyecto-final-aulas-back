@@ -89,12 +89,31 @@ class NotificationSenderImpl implements NotificationSender {
      *  siempre recibe la respuesta, también cuando el llamador manda las suyas (auxiliares de un edificio). */
     private String resolveReplyTo(NotificationRequest request) {
         Map<String, String> addresses = new LinkedHashMap<>();
-        List<String> requested = request.replyTo() == null ? List.of() : request.replyTo();
-        for (String address : requested) {
-            addAddress(addresses, address);
-        }
+        addAll(addresses, request.replyTo());
         addAddress(addresses, properties.getEmail().getReplyTo());
         return addresses.isEmpty() ? null : String.join(",", addresses.values());
+    }
+
+    private static String resolveCc(NotificationRequest request) {
+        Map<String, String> addresses = new LinkedHashMap<>();
+        addAll(addresses, request.cc());
+        return addresses.isEmpty() ? null : String.join(",", addresses.values());
+    }
+
+    /** La copia oculta sin las direcciones que ya van en copia: nadie recibe el mail dos veces. */
+    private static String resolveBcc(NotificationRequest request) {
+        Map<String, String> addresses = new LinkedHashMap<>();
+        addAll(addresses, request.bcc());
+        Map<String, String> cc = new LinkedHashMap<>();
+        addAll(cc, request.cc());
+        addresses.keySet().removeAll(cc.keySet());
+        return addresses.isEmpty() ? null : String.join(",", addresses.values());
+    }
+
+    private static void addAll(Map<String, String> addresses, List<String> requested) {
+        if (requested != null) {
+            requested.forEach(address -> addAddress(addresses, address));
+        }
     }
 
     private static void addAddress(Map<String, String> addresses, String address) {
@@ -117,6 +136,8 @@ class NotificationSenderImpl implements NotificationSender {
                 .subject(rendered.subject())
                 .body(rendered.body())
                 .replyTo(replyTo)
+                .cc(resolveCc(request))
+                .bcc(resolveBcc(request))
                 .idempotencyKey(request.idempotencyKey())
                 .nextAttemptAt(Instant.now())
                 .build();
