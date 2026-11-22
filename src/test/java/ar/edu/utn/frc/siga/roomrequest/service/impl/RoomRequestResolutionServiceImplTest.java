@@ -1183,8 +1183,8 @@ class RoomRequestResolutionServiceImplTest {
 
     @ParameterizedTest
     @EnumSource(value = RoomRequestType.class, names = {"ONE_TIME_ROOM_CHANGE", "REGULAR_ROOM_CHANGE", "PARTIAL_EXAM_IN_CLASS"})
-    @DisplayName("assign: al reasignar un tipo con aula original no relee el original y conserva el de las filas")
-    void assign_reasignarNoCapturaElOriginal(RoomRequestType type) {
+    @DisplayName("assign: al reasignar con todas las ocurrencias con fila no relee el original y conserva el de las filas")
+    void assign_reasignarConTodasConFilaNoCapturaElOriginal(RoomRequestType type) {
         RoomRequestItemAllocation row = RoomRequestItemAllocation.builder().occurrenceId(9000L).classroomId(104L)
                 .position(1).originalCaptured(true).originalClassroomId(77L)
                 .originalSource(AllocationSource.SYSACAD).build();
@@ -1222,6 +1222,168 @@ class RoomRequestResolutionServiceImplTest {
 
         verify(originalRestorer).captureOriginals(List.of(9000L));
         assertThat(item.getPreviousClassroomId()).isEqualTo(77L);
+    }
+
+    private static RoomRequestItemAllocation principalRow(long occurrenceId, long classroomId, Long originalClassroomId) {
+        return RoomRequestItemAllocation.builder().occurrenceId(occurrenceId).classroomId(classroomId)
+                .position(1).originalCaptured(true).originalClassroomId(originalClassroomId)
+                .originalSource(originalClassroomId == null ? null : AllocationSource.SYSACAD).build();
+    }
+
+    private static RoomRequestItemAllocation rowOf(RoomRequestItem item, long occurrenceId) {
+        return item.getAllocations().stream().filter(a -> a.getOccurrenceId() == occurrenceId).findFirst().orElseThrow();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = RoomRequestType.class, names = {"ONE_TIME_ROOM_CHANGE", "REGULAR_ROOM_CHANGE", "PARTIAL_EXAM_IN_CLASS"})
+    @DisplayName("assign: primera asignación captura todas las ocurrencias principales, sin las de los espejos")
+    void assign_primeraAsignacionCapturaTodasLasPrincipales(RoomRequestType type) {
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(type)).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findByIds(List.of(104L))).thenReturn(List.of(classroom(104L, 1L, "A")));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 1, false))
+                .thenReturn(List.of(List.of(9000L, 9001L, 9002L)));
+        when(originalRestorer.captureOriginals(List.of(9000L, 9001L, 9002L))).thenReturn(Map.of(
+                9000L, new RoomRequestItemAllocation.Original(70L, AllocationSource.SYSACAD),
+                9001L, new RoomRequestItemAllocation.Original(71L, AllocationSource.MANUAL),
+                9002L, new RoomRequestItemAllocation.Original(72L, AllocationSource.SYSACAD)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(104L), null, "sub@frc.utn.edu.ar");
+
+        verify(originalRestorer).captureOriginals(List.of(9000L, 9001L, 9002L));
+        assertThat(rowOf(item, 9000L).getOriginalClassroomId()).isEqualTo(70L);
+        assertThat(rowOf(item, 9001L).getOriginalClassroomId()).isEqualTo(71L);
+        assertThat(rowOf(item, 9001L).getOriginalSource()).isEqualTo(AllocationSource.MANUAL);
+        assertThat(rowOf(item, 9002L).getOriginalClassroomId()).isEqualTo(72L);
+        assertThat(item.getPreviousClassroomId()).isEqualTo(70L);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = RoomRequestType.class, names = {"ONE_TIME_ROOM_CHANGE", "REGULAR_ROOM_CHANGE", "PARTIAL_EXAM_IN_CLASS"})
+    @DisplayName("assign: al reasignar captura solo la ocurrencia nueva sin fila; las que tienen fila conservan su original")
+    void assign_reasignarCapturaSoloLaOcurrenciaNuevaSinFila(RoomRequestType type) {
+        RoomRequestItemAllocation rowA = principalRow(9000L, 104L, 70L);
+        RoomRequestItemAllocation rowB = principalRow(9001L, 104L, 71L);
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.IN_EVALUATION)
+                .request(requestOfType(type)).classroomCount(1).previousClassroomId(70L)
+                .allocations(new java.util.ArrayList<>(List.of(rowA, rowB))).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findByIds(List.of(105L))).thenReturn(List.of(classroom(105L, 1L, "A")));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 1, true))
+                .thenReturn(List.of(List.of(9000L, 9001L, 9002L)));
+        when(originalRestorer.captureOriginals(List.of(9002L)))
+                .thenReturn(Map.of(9002L, new RoomRequestItemAllocation.Original(72L, AllocationSource.SYSACAD)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(105L), null, "sub@frc.utn.edu.ar");
+
+        InOrder order = inOrder(originalRestorer, allocationService);
+        order.verify(originalRestorer).captureOriginals(List.of(9002L));
+        order.verify(allocationService).reallocate(any());
+        verify(originalRestorer, org.mockito.Mockito.times(1)).captureOriginals(any());
+        RoomRequestItemAllocation rowC = rowOf(item, 9002L);
+        assertThat(rowC.getClassroomId()).isEqualTo(105L);
+        assertThat(rowC.getOriginalClassroomId()).isEqualTo(72L);
+        assertThat(rowC.getOriginalSource()).isEqualTo(AllocationSource.SYSACAD);
+        assertThat(rowC.isOriginalCaptured()).isTrue();
+        assertThat(rowA.getClassroomId()).isEqualTo(105L);
+        assertThat(rowA.getOriginalClassroomId()).isEqualTo(70L);
+        assertThat(rowB.getClassroomId()).isEqualTo(105L);
+        assertThat(rowB.getOriginalClassroomId()).isEqualTo(71L);
+        assertThat(item.getPreviousClassroomId()).isEqualTo(70L);
+    }
+
+    @Test
+    @DisplayName("assign: al reasignar, una ocurrencia nueva que no tenía aula queda con original nulo y no falla")
+    void assign_reasignarOcurrenciaNuevaSinAulaPreviaQuedaConOriginalNulo() {
+        RoomRequestItemAllocation rowA = principalRow(9000L, 104L, 70L);
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.IN_EVALUATION)
+                .request(requestOfType(RoomRequestType.REGULAR_ROOM_CHANGE)).classroomCount(1).previousClassroomId(70L)
+                .allocations(new java.util.ArrayList<>(List.of(rowA))).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findByIds(List.of(105L))).thenReturn(List.of(classroom(105L, 1L, "A")));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 1, true))
+                .thenReturn(List.of(List.of(9000L, 9002L)));
+        when(originalRestorer.captureOriginals(List.of(9002L))).thenReturn(Map.of());
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(105L), null, "sub@frc.utn.edu.ar");
+
+        verify(originalRestorer).captureOriginals(List.of(9002L));
+        RoomRequestItemAllocation rowC = rowOf(item, 9002L);
+        assertThat(rowC.getClassroomId()).isEqualTo(105L);
+        assertThat(rowC.getOriginalClassroomId()).isNull();
+        assertThat(rowC.getOriginalSource()).isNull();
+        assertThat(rowC.isOriginalCaptured()).isTrue();
+        assertThat(rowA.getOriginalClassroomId()).isEqualTo(70L);
+        assertThat(item.getPreviousClassroomId()).isEqualTo(70L);
+    }
+
+    @Test
+    @DisplayName("assign: reasignar con mirrors captura solo la posición 1 y solo los ids sin fila")
+    void assign_reasignarConMirrorsCapturaSoloPosicionUnoSinFila() {
+        RoomRequestItemAllocation principal = principalRow(9000L, 104L, 70L);
+        RoomRequestItemAllocation mirror = RoomRequestItemAllocation.builder().occurrenceId(9100L).classroomId(106L)
+                .position(2).build();
+        RoomRequestItem item = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.IN_EVALUATION)
+                .request(requestOfType(RoomRequestType.REGULAR_ROOM_CHANGE)).classroomCount(2).previousClassroomId(70L)
+                .allocations(new java.util.ArrayList<>(List.of(principal, mirror))).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(item));
+        when(classroomService.findByIds(List.of(105L, 107L)))
+                .thenReturn(List.of(classroom(105L, 1L, "A"), classroom(107L, 1L, "B")));
+        when(occurrenceResolver.releaseOldMirrors(item)).thenReturn(List.of(9100L));
+        when(occurrenceResolver.resolveOccurrencesBySlot(item, 2, true))
+                .thenReturn(List.of(List.of(9000L, 9002L), List.of(9200L, 9202L)));
+        when(originalRestorer.captureOriginals(List.of(9002L)))
+                .thenReturn(Map.of(9002L, new RoomRequestItemAllocation.Original(72L, AllocationSource.SYSACAD)));
+        when(composer.composeItem(item)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(105L, 107L), null, "sub@frc.utn.edu.ar");
+
+        verify(originalRestorer).captureOriginals(List.of(9002L));
+        verify(originalRestorer, org.mockito.Mockito.times(1)).captureOriginals(any());
+        assertThat(principal.getOriginalClassroomId()).isEqualTo(70L);
+        assertThat(rowOf(item, 9002L).getOriginalClassroomId()).isEqualTo(72L);
+        assertThat(rowOf(item, 9200L).getPosition()).isEqualTo(2);
+        assertThat(rowOf(item, 9200L).isOriginalCaptured()).isFalse();
+        assertThat(rowOf(item, 9200L).getOriginalClassroomId()).isNull();
+        assertThat(rowOf(item, 9202L).isOriginalCaptured()).isFalse();
+        assertThat(item.getAllocations()).extracting(RoomRequestItemAllocation::getOccurrenceId)
+                .doesNotContain(9100L);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = RoomRequestType.class,
+            names = {"FINAL_EXAM", "CONFERENCE", "OTHER", "PARTIAL_EXAM_OFF_SCHEDULE"})
+    @DisplayName("assign: los tipos sin aula original nunca llaman a captureOriginals, ni en la primera asignación ni al reasignar")
+    void assign_tiposSinAulaOriginalNuncaCapturan(RoomRequestType type) {
+        RoomRequestItem first = RoomRequestItem.builder().id(1L).status(RoomRequestStatus.NEW)
+                .request(requestOfType(type)).classroomCount(1).build();
+        when(itemRepository.findWithRequestById(1L)).thenReturn(Optional.of(first));
+        when(classroomService.findByIds(List.of(104L))).thenReturn(List.of(classroom(104L, 1L, "A")));
+        when(occurrenceResolver.resolveOccurrencesBySlot(first, 1, false)).thenReturn(List.of(List.of(9000L)));
+        when(composer.composeItem(first)).thenReturn(mockResponse());
+
+        service.assign(1L, List.of(104L), null, "sub@frc.utn.edu.ar");
+
+        RoomRequestItemAllocation previous = RoomRequestItemAllocation.builder().occurrenceId(9000L).classroomId(104L)
+                .position(1).build();
+        RoomRequestItem reassigned = RoomRequestItem.builder().id(2L).status(RoomRequestStatus.IN_EVALUATION)
+                .request(requestOfType(type)).classroomCount(1)
+                .allocations(new java.util.ArrayList<>(List.of(previous))).build();
+        when(itemRepository.findWithRequestById(2L)).thenReturn(Optional.of(reassigned));
+        when(classroomService.findByIds(List.of(105L))).thenReturn(List.of(classroom(105L, 1L, "A")));
+        when(occurrenceResolver.resolveOccurrencesBySlot(reassigned, 1, true))
+                .thenReturn(List.of(List.of(9000L, 9001L)));
+        when(composer.composeItem(reassigned)).thenReturn(mockResponse());
+
+        service.assign(2L, List.of(105L), null, "sub@frc.utn.edu.ar");
+
+        verifyNoInteractions(originalRestorer);
+        assertThat(first.getPreviousClassroomId()).isNull();
+        assertThat(reassigned.getPreviousClassroomId()).isNull();
     }
 
     private static RoomRequestOriginalRestorer.Restoration restoration(List<Long> restored,

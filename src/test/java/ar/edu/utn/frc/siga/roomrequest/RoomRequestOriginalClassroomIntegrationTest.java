@@ -8,6 +8,7 @@ import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.events.model.Occurrence;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
 import ar.edu.utn.frc.siga.events.model.ReleaseReason;
+import ar.edu.utn.frc.siga.events.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
 import ar.edu.utn.frc.siga.roomrequest.model.AcademicScope;
 import ar.edu.utn.frc.siga.roomrequest.model.RoomRequest;
@@ -67,6 +68,8 @@ class RoomRequestOriginalClassroomIntegrationTest extends AbstractIntegrationTes
     private OccurrenceRepository occurrenceRepository;
     @Autowired
     private AllocationRepository allocationRepository;
+    @Autowired
+    private AcademicEventRepository eventRepository;
     @Autowired
     private RoomRequestExpiryService expiryService;
     @Autowired
@@ -180,6 +183,11 @@ class RoomRequestOriginalClassroomIntegrationTest extends AbstractIntegrationTes
     private List<Long> rowClassrooms(RoomRequestItem item) {
         return jdbc.queryForList("select id_aula from solicitud_item_asignacion where id_item = ? and orden = 1 "
                 + "order by id_ocurrencia", Long.class, item.getId());
+    }
+
+    private Long originalOf(RoomRequestItem item, Occurrence occurrence) {
+        return jdbc.queryForObject("select id_aula_original from solicitud_item_asignacion "
+                + "where id_item = ? and id_ocurrencia = ?", Long.class, item.getId(), occurrence.getId());
     }
 
     private void deactivate(Classroom classroom) {
@@ -421,6 +429,37 @@ class RoomRequestOriginalClassroomIntegrationTest extends AbstractIntegrationTes
 
         assertThat(classroomOf(series.at(0))).isEqualTo(a.getId());
         assertThat(classroomOf(series.at(1))).isNull();
+    }
+
+    @Test
+    @DisplayName("reasignar un cambio regular al que le apareció una fecha entre dos asignaciones: la nueva guarda el aula que tenía y las otras conservan su original")
+    void assign_reasignarConFechaNuevaGuardaElAulaQueTenia() throws Exception {
+        Classroom a = room();
+        Classroom b = room();
+        Classroom c = room();
+        Classroom d = room();
+        Series series = futureSeries(2);
+        allocateAll(series, a, AllocationSource.MANUAL);
+        RoomRequestItem item = regularItem(series);
+        assign(item, b);
+        Occurrence added = occurrenceRepository.save(Occurrence.builder()
+                .event(eventRepository.findById(series.eventId()).orElseThrow())
+                .date(series.at(1).getDate().plusWeeks(1)).status(OccurrenceStatus.NEEDS_ROOM).build());
+        allocate(added, d, AllocationSource.MANUAL);
+
+        assign(item, c);
+
+        series.occurrences().forEach(o -> assertThat(classroomOf(o)).isEqualTo(c.getId()));
+        assertThat(classroomOf(added)).isEqualTo(c.getId());
+        assertThat(originalOf(item, series.at(0))).isEqualTo(a.getId());
+        assertThat(originalOf(item, series.at(1))).isEqualTo(a.getId());
+        assertThat(originalOf(item, added)).isEqualTo(d.getId());
+
+        cancel(item).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
+
+        assertThat(classroomOf(series.at(0))).isEqualTo(a.getId());
+        assertThat(classroomOf(series.at(1))).isEqualTo(a.getId());
+        assertThat(classroomOf(added)).isEqualTo(d.getId());
     }
 
     @Test

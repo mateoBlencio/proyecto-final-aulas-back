@@ -56,8 +56,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -150,11 +152,17 @@ public class RoomRequestResolutionServiceImpl implements RoomRequestResolutionSe
 
         RoomRequestType type = item.getRequest().getType();
         Map<Long, RoomRequestItemAllocation.Original> originalByOccurrence = Map.of();
-        if (RoomRequestOriginalRestorer.hasOriginalClassroom(type) && !reassigning) {
-            // Solo en la primera asignación: al reasignar, las filas del ítem ya guardan el original y el aula
-            // actual de la ocurrencia es la que asignó este pedido.
+        if (RoomRequestOriginalRestorer.hasOriginalClassroom(type)) {
+            // Solo las ocurrencias sin fila previa: las que ya tienen fila guardan su original y su aula
+            // actual es la que asignó este pedido. Pueden aparecer ocurrencias nuevas entre dos asignaciones
+            // (recálculo por cambio de período).
             // Se lee antes del reallocate: el upsert pisa el origen (SYSACAD pasa a MANUAL).
-            originalByOccurrence = originalRestorer.captureOriginals(occurrencesBySlot.getFirst());
+            Set<Long> withRow = item.getAllocations().stream()
+                    .map(RoomRequestItemAllocation::getOccurrenceId).collect(Collectors.toSet());
+            List<Long> withoutRow = occurrencesBySlot.getFirst().stream().filter(id -> !withRow.contains(id)).toList();
+            if (!withoutRow.isEmpty()) {
+                originalByOccurrence = originalRestorer.captureOriginals(withoutRow);
+            }
             RoomRequestItemAllocation.Original first = originalByOccurrence.get(occurrencesBySlot.get(0).getFirst());
             if (first != null) {
                 item.rememberPreviousClassroom(first.classroomId());
