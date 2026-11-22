@@ -49,6 +49,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -99,6 +100,7 @@ class OccurrenceBoardServiceImplTest {
     private final List<ClassroomResponseDto> classrooms = new ArrayList<>();
     private final List<AcademicEventResponseDto> events = new ArrayList<>();
     private Map<Long, ClassroomSubjectPermissionDto> permissions = Map.of();
+    private final Map<Long, LocalDate> suspendedFrom = new HashMap<>();
 
     @BeforeEach
     void setUp() {
@@ -115,6 +117,9 @@ class OccurrenceBoardServiceImplTest {
                 !o.date().isBefore(inv.getArgument(0)) && !o.date().isAfter(inv.getArgument(1))));
         lenient().when(occurrenceService.findSlotsByEvents(any(), any())).thenAnswer(inv -> slotsWhere(o ->
                 inv.<Collection<Long>>getArgument(0).contains(o.eventId()) && !o.date().isBefore(inv.getArgument(1))));
+        lenient().when(occurrenceService.findVisibleSlotsByEvents(any(), any())).thenAnswer(inv -> slotsWhere(o ->
+                inv.<Collection<Long>>getArgument(0).contains(o.eventId()) && !o.date().isBefore(inv.getArgument(1))
+                        && !isSuspended(o)));
         lenient().when(occurrenceService.findSlots(any())).thenAnswer(inv -> slotsWhere(o ->
                 inv.<Collection<Long>>getArgument(0).contains(o.occurrenceId())));
         lenient().when(allocationRepository.findByOccurrenceIdIn(any())).thenAnswer(inv -> allocations.stream()
@@ -135,6 +140,11 @@ class OccurrenceBoardServiceImplTest {
 
     private List<OccurrenceSlotDto> slotsWhere(Predicate<OccurrenceSlotDto> condition) {
         return slots.stream().filter(condition).toList();
+    }
+
+    private boolean isSuspended(OccurrenceSlotDto slot) {
+        LocalDate from = suspendedFrom.get(slot.eventId());
+        return from != null && !slot.date().isBefore(from);
     }
 
     private List<Long> unallocatedEventIdsBetween(LocalDate from, LocalDate to) {
@@ -1049,8 +1059,50 @@ class OccurrenceBoardServiceImplTest {
         board(UNALLOCATED_ONLY);
 
         verify(allocationRepository).findEventIdsWithUnallocatedOccurrencesBetween(TODAY, TO);
-        verify(occurrenceService).findSlotsByEvents(Set.of(1L), TODAY);
+        verify(occurrenceService).findVisibleSlotsByEvents(Set.of(1L), TODAY);
+        verify(occurrenceService, never()).findSlotsByEvents(any(), any());
         verify(occurrenceService, never()).findSlotsBetween(any(), any());
+    }
+
+    @Test
+    @DisplayName("vía rápida: un evento suspendido cuya baja ya rige no se muestra aunque tenga fechas sin aula")
+    void fastPathHidesSuspendedEvent() {
+        event(1, 20);
+        needsRoom(10, 1, DATE, 1);
+        needsRoom(11, 1, DATE.plusDays(7), 1);
+        suspendedFrom.put(1L, DATE);
+
+        List<OccurrenceBoardEventDto> result = board(UNALLOCATED_ONLY);
+
+        verify(allocationRepository).findEventIdsWithUnallocatedOccurrencesBetween(TODAY, TO);
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("vía rápida: un evento no suspendido con fechas sin aula se muestra")
+    void fastPathShowsNonSuspendedEvent() {
+        event(1, 20);
+        needsRoom(10, 1, DATE, 1);
+        needsRoom(11, 1, DATE.plusDays(7), 1);
+
+        OccurrenceBoardEventDto result = single(board(UNALLOCATED_ONLY));
+
+        assertThat(datesOf(result)).containsExactly(DATE, DATE.plusDays(7));
+    }
+
+    @Test
+    @DisplayName("vía rápida: con la baja a mitad del rango solo salen las fechas sin aula anteriores a la baja, y la fecha de la baja ya no")
+    void fastPathKeepsOnlyDatesBeforeSuspension() {
+        event(1, 20);
+        needsRoom(10, 1, DATE, 1);
+        needsRoom(11, 1, DATE.plusDays(7), 1);
+        needsRoom(12, 1, DATE.plusDays(14), 1);
+        suspendedFrom.put(1L, DATE.plusDays(7));
+
+        OccurrenceBoardEventDto result = single(board(UNALLOCATED_ONLY));
+
+        assertThat(datesOf(result)).containsExactly(DATE);
+        assertThat(result.summary().total()).isEqualTo(1);
     }
 
     static Stream<Arguments> filtersOutsideFastPath() {
@@ -1072,6 +1124,7 @@ class OccurrenceBoardServiceImplTest {
         verify(occurrenceService).findSlotsBetween(TODAY, TO);
         verify(allocationRepository, never()).findEventIdsWithUnallocatedOccurrencesBetween(any(), any());
         verify(occurrenceService, never()).findSlotsByEvents(any(), any());
+        verify(occurrenceService, never()).findVisibleSlotsByEvents(any(), any());
     }
 
     private record BoardQuery(LocalDate from, LocalDate to, boolean onlyFuture, Set<OccurrenceIssueType> issues,

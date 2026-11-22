@@ -7,6 +7,8 @@ import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import ar.edu.utn.frc.siga.auth.security.JwtService;
 import ar.edu.utn.frc.siga.common.security.ScopeType;
+import ar.edu.utn.frc.siga.events.model.RecurringEvent;
+import ar.edu.utn.frc.siga.events.repository.AcademicEventRepository;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.events.repository.OccurrenceRepository;
@@ -58,6 +60,8 @@ class OccurrenceBoardApiIntegrationTest extends AbstractIntegrationTest {
     private OccurrenceService occurrenceService;
     @Autowired
     private OccurrenceRepository occurrenceRepository;
+    @Autowired
+    private AcademicEventRepository eventRepository;
     @Autowired
     private AllocationRepository allocationRepository;
     @Autowired
@@ -510,6 +514,33 @@ class OccurrenceBoardApiIntegrationTest extends AbstractIntegrationTest {
         suspendSubject(sc.subjectId());
 
         assertThat(eventNode(board(w), seeded.eventId())).isNull();
+    }
+
+    @Test
+    @DisplayName("issues=UNALLOCATED: un evento suspendido con clases sin aula a ambos lados de la baja muestra solo las anteriores")
+    void suspendedEventWithUnallocatedDatesShowsOnlyThoseBeforeTheBaja() throws Exception {
+        LocalDate today = LocalDate.now();
+        var sc = testData.materiaYComision();
+        RecurringEvent event = eventRepository.save(RecurringEvent.builder()
+                .enrolled(20).startTime(START).duration(java.time.Duration.ofMinutes(DURATION))
+                .dayOfWeek(today.getDayOfWeek()).startDate(today.minusWeeks(1)).endDate(today.plusWeeks(2))
+                .subjectId(sc.subjectId()).commissionId(sc.commissionId()).build());
+        occurrenceRepository.saveAll(event.toOccurrences());
+        Window w = new Window(today.minusWeeks(1), today.plusWeeks(2));
+        JsonNode before = eventNode(board(w, "issues", "UNALLOCATED", "onlyFuture", "false"), event.getId());
+        assertThat(datesOf(before)).containsExactly(today.minusWeeks(1).toString(), today.toString(),
+                today.plusWeeks(1).toString(), today.plusWeeks(2).toString());
+
+        suspendSubject(sc.subjectId());
+
+        JsonNode after = eventNode(board(w, "issues", "UNALLOCATED", "onlyFuture", "false"), event.getId());
+        assertThat(datesOf(after)).containsExactly(today.minusWeeks(1).toString());
+    }
+
+    private static List<String> datesOf(JsonNode event) {
+        List<String> dates = new ArrayList<>();
+        event.get("occurrences").forEach(d -> dates.add(d.get("date").asText()));
+        return dates;
     }
 
     @Test

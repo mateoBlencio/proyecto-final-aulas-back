@@ -11,6 +11,7 @@ import ar.edu.utn.frc.siga.allocation.dto.response.UnallocatedConflictDto;
 import ar.edu.utn.frc.siga.allocation.model.Allocation;
 import ar.edu.utn.frc.siga.allocation.repository.AllocationRepository;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.allocation.service.AllocationConflictService;
@@ -219,8 +220,11 @@ public class AllocationConflictServiceImpl implements AllocationConflictService 
     }
 
     private Set<Long> unallocatedEventIds(Range range, boolean includePast) {
-        List<OccurrenceSlotDto> occurrences =
-                occurrenceService.findSlotsByStatusBetween(OccurrenceStatus.NEEDS_ROOM, range.from(), range.to());
+        List<OccurrenceSlotDto> occurrences = new ArrayList<>(
+                occurrenceService.findSlotsByStatusBetween(OccurrenceStatus.NEEDS_ROOM, range.from(), range.to()));
+        occurrenceService.findSlotsByStatusBetween(OccurrenceStatus.ROOM_RELEASED, range.from(), range.to()).stream()
+                .filter(o -> o.releaseReason() == ReleaseReason.CLASSROOM_DEACTIVATED)
+                .forEach(occurrences::add);
         Set<Long> occurrenceIds = occurrences.stream().map(OccurrenceSlotDto::occurrenceId).collect(Collectors.toSet());
         Set<Long> allocatedOccurrenceIds = allocationRepository.findByOccurrenceIdIn(occurrenceIds).stream()
                 .map(Allocation::getOccurrenceId).collect(Collectors.toSet());

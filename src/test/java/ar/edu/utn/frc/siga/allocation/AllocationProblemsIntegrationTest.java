@@ -32,6 +32,7 @@ import java.time.LocalTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -133,6 +134,24 @@ class AllocationProblemsIntegrationTest extends AbstractIntegrationTest {
         JsonNode content = conflictsContent("UNALLOCATED", from, to);
 
         assertThat(content).anySatisfy(node -> assertThat(node.get("event").get("id").asLong()).isEqualTo(unallocatedEventId));
+    }
+
+    @Test
+    @DisplayName("types=UNALLOCATED lista las clases liberadas por la baja de su aula; antes de la baja, con aula, no aparecen")
+    void unallocatedConflicts_includeClassesReleasedByClassroomDeactivation() throws Exception {
+        LocalDate from = LocalDate.now().plusDays(60);
+        LocalDate to = LocalDate.now().plusDays(70);
+        Classroom room = testData.aula(testData.edificio(), testData.tipoAulaPorDefecto(), 100);
+        Occurrence occurrence = seedOccurrence(testData.materiaYComision(), from.plusDays(1), 30);
+        Long eventId = occurrence.getEvent().getId();
+        allocateOk(occurrence.getId(), room.getId());
+        assertThat(conflictsContent("UNALLOCATED", from, to))
+                .noneSatisfy(node -> assertThat(node.get("event").get("id").asLong()).isEqualTo(eventId));
+
+        mockMvc.perform(delete("/v1/classrooms/{id}/activation", room.getId())).andExpect(status().isOk());
+
+        assertThat(conflictsContent("UNALLOCATED", from, to))
+                .anySatisfy(node -> assertThat(node.get("event").get("id").asLong()).isEqualTo(eventId));
     }
 
     @Test

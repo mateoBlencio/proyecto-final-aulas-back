@@ -24,10 +24,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AllocationComposer")
@@ -133,13 +137,78 @@ class AllocationComposerTest {
         assertThat(group.siblings()).isEmpty();
     }
 
+    @Test
+    @DisplayName("composeAll: con 3 fechas y 2 eventos hace una sola consulta por eventos desde la fecha mínima y nunca consulta por fecha")
+    void unaSolaConsultaPorEventosDesdeLaFechaMinima() {
+        LocalDate first = DATE;
+        LocalDate second = DATE.plusDays(7);
+        LocalDate third = DATE.plusDays(14);
+        stubSlots(slot(10L, 1L, second, OccurrenceStatus.NEEDS_ROOM), slot(11L, 1L, third, OccurrenceStatus.NEEDS_ROOM),
+                slot(12L, 2L, first, OccurrenceStatus.NEEDS_ROOM));
+        Allocation onSecond = allocation(100L, 10L, 5L);
+        Allocation onThird = allocation(101L, 11L, 5L);
+        Allocation onFirst = allocation(102L, 12L, 6L);
+        stubGroup(List.of(onSecond, onThird, onFirst), classroom(5L, 70, 1L, "Central"),
+                classroom(6L, 25, 1L, "Central"));
+
+        List<AllocationResponseDto> result = composer.composeAll(List.of(onSecond, onThird, onFirst));
+
+        assertThat(result).hasSize(3).allSatisfy(r -> assertThat(r.group().roomCount()).isEqualTo(1));
+        verify(occurrenceService, times(1)).findVisibleSlotsByEvents(Set.of(1L, 2L), first);
+        verify(occurrenceService, never()).findSlotsByDate(any());
+    }
+
+    @Test
+    @DisplayName("compose: el grupo incluye las hermanas del mismo evento y fecha que no vinieron en el lote")
+    void incluyeHermanasNoPedidas() {
+        stubSlots(slot(10L, 1L, DATE, OccurrenceStatus.NEEDS_ROOM), slot(11L, 1L, DATE, OccurrenceStatus.NEEDS_ROOM),
+                slot(12L, 1L, DATE, OccurrenceStatus.NEEDS_ROOM));
+        Allocation own = allocation(100L, 10L, 5L);
+        Allocation siblingA = allocation(101L, 11L, 6L);
+        Allocation siblingB = allocation(102L, 12L, 7L);
+        stubGroup(List.of(own, siblingA, siblingB), classroom(5L, 70, 1L, "Central"),
+                classroom(6L, 25, 1L, "Central"), classroom(7L, 10, 1L, "Central"));
+
+        AllocationGroupDto group = composer.compose(own).group();
+
+        assertThat(group.roomCount()).isEqualTo(3);
+        assertThat(group.capacity()).isEqualTo(105);
+        assertThat(group.siblings()).extracting(AllocationSiblingDto::allocationId).containsExactly(101L, 102L);
+        verify(occurrenceService).findSlots(Set.of(10L));
+    }
+
+    @Test
+    @DisplayName("composeAll: una fecha del mismo evento entre dos fechas pedidas no entra en ningún grupo")
+    void fechaIntermediaNoPedidaNoEntraEnNingunGrupo() {
+        LocalDate middle = DATE.plusDays(7);
+        LocalDate last = DATE.plusDays(14);
+        stubSlots(slot(10L, 1L, DATE, OccurrenceStatus.NEEDS_ROOM), slot(11L, 1L, middle, OccurrenceStatus.NEEDS_ROOM),
+                slot(12L, 1L, last, OccurrenceStatus.NEEDS_ROOM));
+        Allocation onFirst = allocation(100L, 10L, 5L);
+        Allocation onMiddle = allocation(101L, 11L, 6L);
+        Allocation onLast = allocation(102L, 12L, 7L);
+        stubGroup(List.of(onFirst, onMiddle, onLast), classroom(5L, 70, 1L, "Central"),
+                classroom(6L, 25, 1L, "Central"), classroom(7L, 10, 1L, "Central"));
+
+        List<AllocationResponseDto> result = composer.composeAll(List.of(onFirst, onLast));
+
+        assertThat(result).extracting(r -> r.group().roomCount()).containsExactly(1, 1);
+        assertThat(result).allSatisfy(r -> assertThat(r.group().siblings()).isEmpty());
+        verify(allocationRepository).findByOccurrenceIdIn(Set.of(10L, 12L));
+    }
+
     private void stubSlots(OccurrenceSlotDto... slots) {
         List<OccurrenceSlotDto> all = List.of(slots);
         lenient().when(occurrenceService.findSlots(any())).thenAnswer(inv -> {
             java.util.Collection<Long> ids = inv.getArgument(0);
             return all.stream().filter(s -> ids.contains(s.occurrenceId())).toList();
         });
-        lenient().when(occurrenceService.findSlotsByDate(any())).thenReturn(all);
+        lenient().when(occurrenceService.findVisibleSlotsByEvents(any(), any())).thenAnswer(inv -> {
+            java.util.Collection<Long> eventIds = inv.getArgument(0);
+            LocalDate from = inv.getArgument(1);
+            return all.stream()
+                    .filter(s -> eventIds.contains(s.eventId()) && !s.date().isBefore(from)).toList();
+        });
     }
 
     private void stubGroup(List<Allocation> allocations, ClassroomResponseDto... classrooms) {

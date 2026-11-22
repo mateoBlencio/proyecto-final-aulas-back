@@ -86,12 +86,12 @@ public class AllocationComposer {
         Map<Long, GroupKey> keyByOccurrenceId = new LinkedHashMap<>();
         slotByOccurrenceId.values().forEach(slot -> keyByOccurrenceId.put(slot.occurrenceId(),
                 new GroupKey(slot.eventId(), slot.date())));
-        for (LocalDate date : keys.stream().map(GroupKey::date).collect(Collectors.toSet())) {
-            for (OccurrenceSlotDto slot : occurrenceService.findSlotsByDate(date)) {
-                GroupKey key = new GroupKey(slot.eventId(), slot.date());
-                if (keys.contains(key) && slot.status() != OccurrenceStatus.ROOM_RELEASED) {
-                    keyByOccurrenceId.putIfAbsent(slot.occurrenceId(), key);
-                }
+        Set<Long> eventIds = keys.stream().map(GroupKey::eventId).collect(Collectors.toSet());
+        LocalDate minDate = keys.stream().map(GroupKey::date).min(LocalDate::compareTo).orElseThrow();
+        for (OccurrenceSlotDto slot : occurrenceService.findVisibleSlotsByEvents(eventIds, minDate)) {
+            GroupKey key = new GroupKey(slot.eventId(), slot.date());
+            if (keys.contains(key) && slot.status() != OccurrenceStatus.ROOM_RELEASED) {
+                keyByOccurrenceId.putIfAbsent(slot.occurrenceId(), key);
             }
         }
 

@@ -21,6 +21,7 @@ import ar.edu.utn.frc.siga.events.dto.response.OccurrenceSlotDto;
 import ar.edu.utn.frc.siga.events.dto.response.RecurringEventResponseDto;
 import ar.edu.utn.frc.siga.events.model.EventType;
 import ar.edu.utn.frc.siga.events.model.OccurrenceStatus;
+import ar.edu.utn.frc.siga.events.model.ReleaseReason;
 import ar.edu.utn.frc.siga.events.service.AcademicEventService;
 import ar.edu.utn.frc.siga.events.service.OccurrenceService;
 import ar.edu.utn.frc.siga.space.dto.response.ClassroomResponseDto;
@@ -31,6 +32,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -43,6 +46,7 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -322,6 +326,104 @@ class AllocationConflictServiceImplTest {
         assertThat(service.findConflicts(Set.of(ConflictType.UNALLOCATED), from, to, false, null, null, null, PAGEABLE)).isEmpty();
     }
 
+    private void stubReleased(OccurrenceSlotDto... slots) {
+        when(occurrenceService.findSlotsByStatusBetween(eq(OccurrenceStatus.ROOM_RELEASED), any(), any()))
+                .thenReturn(List.of(slots));
+    }
+
+    private List<AllocationConflictDto> unallocated(LocalDate from, LocalDate to, boolean includePast) {
+        return service.findConflicts(Set.of(ConflictType.UNALLOCATED), from, to, includePast, null, null, null,
+                PAGEABLE).getContent();
+    }
+
+    @Test
+    @DisplayName("Una ocurrencia ROOM_RELEASED por CLASSROOM_DEACTIVATED sin asignación cuenta como sin aula")
+    void detectaSinAulaLiberadaPorBajaDeAula() {
+        RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0));
+        stubReleased(releasedSlot(10L, event, futureDate(2), ReleaseReason.CLASSROOM_DEACTIVATED));
+        when(academicEventService.findByIds(any())).thenReturn(List.of(event));
+
+        List<AllocationConflictDto> result = unallocated(futureDate(0), futureDate(30), false);
+
+        assertThat(result).hasSize(1);
+        assertThat(((UnallocatedConflictDto) result.getFirst()).event().id()).isEqualTo(1L);
+    }
+
+    @ParameterizedTest(name = "liberada con {0}")
+    @EnumSource(value = ReleaseReason.class, mode = EnumSource.Mode.EXCLUDE, names = "CLASSROOM_DEACTIVATED")
+    @DisplayName("Una ocurrencia ROOM_RELEASED por cualquier motivo distinto de CLASSROOM_DEACTIVATED no cuenta como sin aula")
+    void noDetectaSinAulaLiberadaPorOtroMotivo(ReleaseReason reason) {
+        RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0));
+        stubReleased(releasedSlot(10L, event, futureDate(2), reason));
+        lenient().when(academicEventService.findByIds(any())).thenReturn(List.of(event));
+
+        assertThat(unallocated(futureDate(0), futureDate(30), false)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Una ocurrencia liberada por CLASSROOM_DEACTIVATED que ya tiene asignación no cuenta como sin aula")
+    void noDetectaSinAulaLiberadaPorBajaSiTieneAsignacion() {
+        RecurringEventResponseDto stillReleased = recurringEvent(1L, 10, LocalTime.of(8, 0));
+        RecurringEventResponseDto reassigned = recurringEvent(2L, 10, LocalTime.of(8, 0));
+        stubReleased(releasedSlot(10L, stillReleased, futureDate(2), ReleaseReason.CLASSROOM_DEACTIVATED),
+                releasedSlot(11L, reassigned, futureDate(3), ReleaseReason.CLASSROOM_DEACTIVATED));
+        when(allocationRepository.findByOccurrenceIdIn(any())).thenAnswer(inv -> {
+            java.util.Collection<Long> ids = inv.getArgument(0);
+            return Stream.of(allocation(100L, 11L, 5)).filter(a -> ids.contains(a.getOccurrenceId())).toList();
+        });
+        when(academicEventService.findByIds(any())).thenReturn(List.of(stillReleased));
+
+        List<AllocationConflictDto> result = unallocated(futureDate(0), futureDate(30), false);
+
+        assertThat(result).hasSize(1);
+        assertThat(((UnallocatedConflictDto) result.getFirst()).event().id()).isEqualTo(1L);
+        ArgumentCaptor<Set<Long>> eventIds = ArgumentCaptor.forClass(Set.class);
+        verify(academicEventService).findByIds(eventIds.capture());
+        assertThat(eventIds.getValue()).containsExactly(1L);
+    }
+
+    @Test
+    @DisplayName("Las NEEDS_ROOM y las liberadas por baja de aula se suman en un mismo listado sin repetir eventos")
+    void sumaNeedsRoomYLiberadasPorBajaDeAula() {
+        RecurringEventResponseDto onlyNeedsRoom = recurringEvent(1L, 10, LocalTime.of(8, 0));
+        RecurringEventResponseDto both = recurringEvent(2L, 10, LocalTime.of(8, 0));
+        RecurringEventResponseDto onlyReleased = recurringEvent(3L, 10, LocalTime.of(8, 0));
+        when(occurrenceService.findSlotsByStatusBetween(eq(OccurrenceStatus.NEEDS_ROOM), any(), any()))
+                .thenReturn(List.of(occurrenceSlot(10L, onlyNeedsRoom, futureDate(2)),
+                        occurrenceSlot(11L, both, futureDate(2))));
+        stubReleased(releasedSlot(12L, both, futureDate(3), ReleaseReason.CLASSROOM_DEACTIVATED),
+                releasedSlot(13L, onlyReleased, futureDate(3), ReleaseReason.CLASSROOM_DEACTIVATED));
+        when(academicEventService.findByIds(any())).thenReturn(List.of(onlyNeedsRoom, both, onlyReleased));
+
+        List<AllocationConflictDto> result = unallocated(futureDate(0), futureDate(30), false);
+
+        assertThat(result).extracting(c -> ((UnallocatedConflictDto) c).event().id())
+                .containsExactlyInAnyOrder(1L, 2L, 3L);
+    }
+
+    @Test
+    @DisplayName("includePast=false descarta la liberada por baja de aula que ya empezó; con true la incluye")
+    void respetaIncludePastEnLiberadasPorBajaDeAula() {
+        RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0));
+        stubReleased(releasedSlot(10L, event, futureDate(-2), ReleaseReason.CLASSROOM_DEACTIVATED));
+        when(academicEventService.findByIds(any())).thenReturn(List.of(event));
+
+        List<AllocationConflictDto> withoutPast = unallocated(futureDate(-10), futureDate(30), false);
+        List<AllocationConflictDto> withPast = unallocated(futureDate(-10), futureDate(30), true);
+
+        assertThat(withoutPast).isEmpty();
+        assertThat(withPast).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("resolveAllUnallocatedEventIds incluye los eventos con clases liberadas por baja de aula")
+    void resolveAllUnallocatedEventIdsIncluyeLiberadasPorBaja() {
+        RecurringEventResponseDto event = recurringEvent(1L, 10, LocalTime.of(8, 0));
+        stubReleased(releasedSlot(10L, event, futureDate(2), ReleaseReason.CLASSROOM_DEACTIVATED));
+
+        assertThat(service.resolveAllUnallocatedEventIds()).containsExactly(1L);
+    }
+
     @Test
     @DisplayName("Sin types lee la ocupación una sola vez para los tres tipos que la usan")
     void withoutTypesReadsOccupancyOnce() {
@@ -578,6 +680,12 @@ class AllocationConflictServiceImplTest {
     private OccurrenceSlotDto occurrenceSlot(long id, RecurringEventResponseDto event, LocalDate date) {
         return new OccurrenceSlotDto(id, event.id(), date, event.startTime(), event.endTime(),
                 OccurrenceStatus.NEEDS_ROOM, event.enrolled(), 1, null, null, null, null);
+    }
+
+    private OccurrenceSlotDto releasedSlot(long id, RecurringEventResponseDto event, LocalDate date,
+            ReleaseReason reason) {
+        return new OccurrenceSlotDto(id, event.id(), date, event.startTime(), event.endTime(),
+                OccurrenceStatus.ROOM_RELEASED, event.enrolled(), 1, reason, null, null, null);
     }
 
     private Allocation allocation(long id, Long occurrenceId, long classroomId) {

@@ -118,6 +118,12 @@ public class OccurrenceServiceImpl implements OccurrenceService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<OccurrenceSlotDto> findVisibleSlotsByEvents(Collection<Long> eventIds, LocalDate from) {
+        return visible(findSlotsByEvents(eventIds, from));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<OccurrenceSlotDto> findNextSlotsByEvents(Collection<Long> eventIds, LocalDate from,
             Collection<LocalDate> excludedDates, int limitPerEvent) {
         if (eventIds.isEmpty()) {

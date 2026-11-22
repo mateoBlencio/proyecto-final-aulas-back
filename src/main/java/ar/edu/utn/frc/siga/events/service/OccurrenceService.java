@@ -36,6 +36,9 @@ public interface OccurrenceService {
 
     List<OccurrenceSlotDto> findSlotsByEvents(Collection<Long> eventIds);
 
+    /** Como {@code findSlotsByEvents(eventIds, from)} pero excluye las ocurrencias suspendidas. */
+    List<OccurrenceSlotDto> findVisibleSlotsByEvents(Collection<Long> eventIds, LocalDate from);
+
     /** Sin espejos y sin orden garantizado. */
     List<OccurrenceSlotDto> findNextSlotsByEvents(Collection<Long> eventIds, LocalDate from,
             Collection<LocalDate> excludedDates, int limitPerEvent);
