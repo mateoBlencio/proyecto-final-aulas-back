@@ -34,4 +34,8 @@ public class Holiday {
     @NotAudited
     @Column(name = "sincronizado_en", nullable = false)
     private Instant syncedAt;
+
+    /** Baja lógica: SysAcad dejó de listar este feriado futuro. Null mientras esté vigente. */
+    @Column(name = "eliminado_en")
+    private Instant deletedAt;
 }

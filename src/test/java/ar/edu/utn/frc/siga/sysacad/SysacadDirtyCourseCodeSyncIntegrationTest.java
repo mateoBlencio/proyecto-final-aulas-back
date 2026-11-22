@@ -13,6 +13,7 @@ import ar.edu.utn.frc.siga.events.model.RecurringEvent;
 import ar.edu.utn.frc.siga.events.repository.RecurringEventRepository;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawCommission;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSchedule;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSpecialty;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSubject;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.BuildingViewFetcher;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.ClassroomViewFetcher;
@@ -83,6 +84,9 @@ class SysacadDirtyCourseCodeSyncIntegrationTest extends AbstractIntegrationTest 
     @Test
     @DisplayName("la misma comisión como '5D1' y '5D1.' termina en una comisión, un vínculo y un evento")
     void sameCommissionWithDirtyCodeIsNotDuplicated() {
+        // Una vista de especialidades vacía aborta ESPECIALIDADES y saltea MATERIAS y las vistas que dependen de ella.
+        Mockito.when(specialtyFetcher.fetch())
+                .thenReturn(List.of(new RawSpecialty(SPECIALTY, "Especialidad Test", "Esp. Test")));
         Mockito.when(subjectFetcher.fetch())
                 .thenReturn(List.of(new RawSubject(SPECIALTY, STUDY_PLAN, SUBJECT, "Materia Test")));
         Mockito.when(commissionFetcher.fetch()).thenReturn(List.of(

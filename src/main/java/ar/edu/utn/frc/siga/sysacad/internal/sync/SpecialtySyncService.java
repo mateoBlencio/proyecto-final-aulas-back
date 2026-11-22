@@ -30,7 +30,7 @@ public class SpecialtySyncService implements SysacadViewSyncer {
     @Override
     public void sync(SysacadCatalogReader catalog) {
         ViewSyncRunner.run(syncStateService, SysacadView.ESPECIALIDADES, "Especialidades", log, () -> {
-            List<SpecialtySyncCommand> commands = catalog.findSpecialties().stream()
+            List<SpecialtySyncCommand> commands = ViewSyncRunner.requireRows(catalog.findSpecialties(), SysacadView.ESPECIALIDADES).stream()
                     .map(SpecialtySyncService::toCommand)
                     .toList();
             return specialtyService.syncSpecialties(commands);

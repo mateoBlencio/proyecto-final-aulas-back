@@ -33,7 +33,7 @@ public class HolidayServiceImpl implements HolidayService {
 
     @Override
     public List<HolidayResponseDto> findBetween(LocalDate from, LocalDate to) {
-        return holidayRepository.findByDateBetweenOrderByDateAsc(from, to).stream()
+        return holidayRepository.findByDateBetweenAndDeletedAtIsNullOrderByDateAsc(from, to).stream()
                 .map(h -> new HolidayResponseDto(h.getDate(), h.getDescription()))
                 .toList();
     }
@@ -73,6 +73,13 @@ public class HolidayServiceImpl implements HolidayService {
                 holidayRepository.save(Holiday.builder()
                         .date(date).description(entry.getValue()).syncedAt(syncedAt).build());
                 affected++;
+            } else if (current.getDeletedAt() != null) {
+                log.info("Feriado dado de baja que vuelve a figurar en SysAcad: {}", date);
+                current.setDeletedAt(null);
+                current.setDescription(entry.getValue());
+                current.setSyncedAt(syncedAt);
+                holidayRepository.save(current);
+                affected++;
             } else if (!date.isBefore(today) && !Objects.equals(current.getDescription(), entry.getValue())) {
                 current.setDescription(entry.getValue());
                 current.setSyncedAt(syncedAt);
@@ -82,9 +89,11 @@ public class HolidayServiceImpl implements HolidayService {
         }
 
         for (Holiday holiday : existing.values()) {
-            if (!holiday.getDate().isBefore(today) && !incoming.containsKey(holiday.getDate())) {
-                log.info("Feriado futuro eliminado por no figurar en SysAcad: {}", holiday.getDate());
-                holidayRepository.delete(holiday);
+            if (holiday.getDeletedAt() == null && !holiday.getDate().isBefore(today)
+                    && !incoming.containsKey(holiday.getDate())) {
+                log.info("Feriado futuro dado de baja por no figurar en SysAcad: {}", holiday.getDate());
+                holiday.setDeletedAt(syncedAt);
+                holidayRepository.save(holiday);
                 affected++;
             }
         }

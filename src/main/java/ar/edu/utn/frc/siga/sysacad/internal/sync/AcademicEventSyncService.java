@@ -65,7 +65,7 @@ public class AcademicEventSyncService implements SysacadViewSyncer {
                     resolver.resolve(row.courseCode(), row.subjectCode(), row.specialtyCode(),
                             row.studyPlanCode());
             if (resolved.isEmpty()) {
-                unresolvedCommissionIds.addAll(commissionService.findActiveIdsByCourseCode(row.courseCode()));
+                unresolvedCommissionIds.addAll(resolver.activeIdsByCourseCode(row.courseCode()));
                 continue;
             }
             CommissionResponseDto commission = resolved.get().commission();

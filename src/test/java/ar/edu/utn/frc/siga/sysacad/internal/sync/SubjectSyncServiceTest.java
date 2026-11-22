@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.sysacad.api.SysacadCatalogReader;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSubjectDto;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadSyncStateService;
 import ar.edu.utn.frc.siga.sysacad.api.SysacadView;
+import ar.edu.utn.frc.siga.sysacad.internal.exception.SysacadEmptyViewException;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,9 +18,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -62,6 +67,18 @@ class SubjectSyncServiceTest {
         assertThat(captor.getValue()).containsExactly(
                 new SubjectSyncCommand(17, 94, 519, "Análisis Matemático I", "C"));
         verify(syncStateService).recordSuccess(SysacadView.MATERIAS, 1);
+    }
+
+    @Test
+    @DisplayName("sync: con la vista vacía no llama al servicio de dominio y registra el fallo")
+    void syncWithEmptyViewSkipsDomainServiceAndRecordsFailure() {
+        when(catalogReader.findSubjects()).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.sync(catalogReader)).isInstanceOf(SysacadEmptyViewException.class);
+
+        verify(subjectService, never()).syncSubjects(anyList());
+        verify(syncStateService).recordFailure(eq(SysacadView.MATERIAS), anyString());
+        verify(syncStateService, never()).recordSuccess(any(), anyInt());
     }
 
     @Test

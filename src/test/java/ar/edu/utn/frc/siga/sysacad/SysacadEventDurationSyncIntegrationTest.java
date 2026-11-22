@@ -12,6 +12,7 @@ import ar.edu.utn.frc.siga.events.model.RecurringEvent;
 import ar.edu.utn.frc.siga.events.repository.RecurringEventRepository;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawCommission;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSchedule;
+import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSpecialty;
 import ar.edu.utn.frc.siga.sysacad.internal.client.dto.RawSubject;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.BuildingViewFetcher;
 import ar.edu.utn.frc.siga.sysacad.internal.client.view.ClassroomViewFetcher;
@@ -95,6 +96,9 @@ class SysacadEventDurationSyncIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("un evento con 120 min sin editar pasa a 135 cuando la vista trae 10:30-12:45, sin duplicar el evento ni las ocurrencias")
     void eventWithColumnDurationIsCorrectedToRangeDuration() {
+        // Una vista de especialidades vacía aborta ESPECIALIDADES y saltea MATERIAS y las vistas que dependen de ella.
+        Mockito.when(specialtyFetcher.fetch())
+                .thenReturn(List.of(new RawSpecialty(SPECIALTY, "Especialidad Test", "Esp. Test")));
         Mockito.when(subjectFetcher.fetch())
                 .thenReturn(List.of(new RawSubject(SPECIALTY, STUDY_PLAN, SUBJECT, "Materia Test")));
         Mockito.when(commissionFetcher.fetch())
