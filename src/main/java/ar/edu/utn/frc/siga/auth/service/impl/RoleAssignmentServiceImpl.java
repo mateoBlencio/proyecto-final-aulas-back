@@ -4,6 +4,7 @@ import ar.edu.utn.frc.siga.audit.AuditLabels;
 import ar.edu.utn.frc.siga.audit.AuditOperation;
 import ar.edu.utn.frc.siga.auth.dto.request.AssignRoleRequestDto;
 import ar.edu.utn.frc.siga.auth.dto.response.RoleAssignmentDto;
+import ar.edu.utn.frc.siga.auth.exception.RoleConflictException;
 import ar.edu.utn.frc.siga.auth.exception.RoleDomainException;
 import ar.edu.utn.frc.siga.auth.mapper.RoleAssignmentComposer;
 import ar.edu.utn.frc.siga.auth.model.RoleAssignment;
@@ -41,10 +42,12 @@ public class RoleAssignmentServiceImpl implements RoleAssignmentService {
         log.debug("Asignando rol: userId={}, role={}, scopeType={}, scopeId={}",
                 userId, dto.role(), dto.scopeType(), dto.scopeId());
 
-        User user = findUser(userId);
+        User user = findUserForUpdate(userId);
         validateRoleScope(dto.role(), dto.scopeType());
         validateScope(dto.scopeType(), dto.scopeId());
-        validateNotDuplicate(userId, dto);
+        List<RoleAssignment> existing = roleAssignmentRepository.findAllByUserId(userId);
+        validateNotDuplicate(existing, dto);
+        validateExclusivity(existing, dto.role());
 
         RoleAssignment assignment = RoleAssignment.builder()
                 .user(user)
@@ -102,8 +105,18 @@ public class RoleAssignmentServiceImpl implements RoleAssignmentService {
         }
     }
 
-    private void validateNotDuplicate(Long userId, AssignRoleRequestDto dto) {
-        List<RoleAssignment> existing = roleAssignmentRepository.findAllByUserId(userId);
+    private void validateExclusivity(List<RoleAssignment> existing, SystemRole role) {
+        if (role == SystemRole.ADMINISTRADOR && !existing.isEmpty()) {
+            throw new RoleConflictException("El usuario ya tiene otros roles: un Administrador no puede tener "
+                    + "Auxiliar áulico ni Consulta. Revocá primero esas asignaciones.");
+        }
+        if (role != SystemRole.ADMINISTRADOR
+                && existing.stream().anyMatch(assignment -> assignment.getRole() == SystemRole.ADMINISTRADOR)) {
+            throw new RoleConflictException("El usuario es Administrador: no admite otros roles.");
+        }
+    }
+
+    private void validateNotDuplicate(List<RoleAssignment> existing, AssignRoleRequestDto dto) {
         boolean duplicate = existing.stream().anyMatch(assignment ->
                 assignment.getRole() == dto.role()
                         && assignment.getScopeType() == dto.scopeType()
@@ -113,8 +126,8 @@ public class RoleAssignmentServiceImpl implements RoleAssignmentService {
         }
     }
 
-    private User findUser(Long id) {
-        return userRepository.findById(id)
+    private User findUserForUpdate(Long id) {
+        return userRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> {
                     log.warn("Usuario no encontrado: id={}", id);
                     return ResourceNotFoundException.of("User", id);
