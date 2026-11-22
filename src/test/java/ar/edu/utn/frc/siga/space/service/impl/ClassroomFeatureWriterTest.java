@@ -192,4 +192,54 @@ class ClassroomFeatureWriterTest {
         verify(classroomPermissionRepository).softDelete(drop);
         verify(classroomPermissionRepository, never()).save(any());
     }
+
+    @Test
+    @DisplayName("applyPermissions: SUBSET con el mismo target repetido y sin permiso previo guarda una sola fila")
+    void applyPermissionsSubsetDuplicateTargetSavesOnce() {
+        when(classroomPermissionRepository.findByClassroomId(1L)).thenReturn(List.of());
+
+        writer.applyPermissions(classroom, PermissionMode.SUBSET, List.of(
+                new ClassroomPermissionTargetRequestDto(PermissionTargetKind.SUBJECT, 5L),
+                new ClassroomPermissionTargetRequestDto(PermissionTargetKind.SUBJECT, 5L)));
+
+        ArgumentCaptor<ClassroomPermission> captor = ArgumentCaptor.forClass(ClassroomPermission.class);
+        verify(classroomPermissionRepository, times(1)).save(captor.capture());
+        assertThat(captor.getValue().getTargetKind()).isEqualTo(PermissionTargetKind.SUBJECT);
+        assertThat(captor.getValue().getTargetId()).isEqualTo(5L);
+        assertThat(captor.getValue().getClassroom()).isSameAs(classroom);
+    }
+
+    @Test
+    @DisplayName("applyPermissions: SUBSET con target repetido que existía dado de baja restaura una sola vez")
+    void applyPermissionsSubsetDuplicateTargetRestoresOnce() {
+        ClassroomPermission deleted = ClassroomPermission.builder()
+                .classroom(classroom).targetKind(PermissionTargetKind.SUBJECT).targetId(5L).build();
+        deleted.deactivate();
+        when(classroomPermissionRepository.findByClassroomId(1L)).thenReturn(List.of(deleted));
+
+        writer.applyPermissions(classroom, PermissionMode.SUBSET, List.of(
+                new ClassroomPermissionTargetRequestDto(PermissionTargetKind.SUBJECT, 5L),
+                new ClassroomPermissionTargetRequestDto(PermissionTargetKind.SUBJECT, 5L)));
+
+        verify(classroomPermissionRepository, times(1)).restore(deleted);
+        verify(classroomPermissionRepository, never()).save(any());
+        verify(classroomPermissionRepository, never()).softDelete(any());
+    }
+
+    @Test
+    @DisplayName("applyPermissions: SUBSET con targets distintos guarda todos")
+    void applyPermissionsSubsetDistinctTargetsSavesAll() {
+        when(classroomPermissionRepository.findByClassroomId(1L)).thenReturn(List.of());
+
+        writer.applyPermissions(classroom, PermissionMode.SUBSET, List.of(
+                new ClassroomPermissionTargetRequestDto(PermissionTargetKind.SUBJECT, 5L),
+                new ClassroomPermissionTargetRequestDto(PermissionTargetKind.SUBJECT, 6L),
+                new ClassroomPermissionTargetRequestDto(PermissionTargetKind.SUBJECT, 7L)));
+
+        ArgumentCaptor<ClassroomPermission> captor = ArgumentCaptor.forClass(ClassroomPermission.class);
+        verify(classroomPermissionRepository, times(3)).save(captor.capture());
+        assertThat(captor.getAllValues())
+                .extracting(ClassroomPermission::getTargetId)
+                .containsExactlyInAnyOrder(5L, 6L, 7L);
+    }
 }

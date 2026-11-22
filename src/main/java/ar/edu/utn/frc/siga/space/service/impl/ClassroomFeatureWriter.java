@@ -78,7 +78,9 @@ public class ClassroomFeatureWriter {
         Set<String> keep = new HashSet<>();
         for (ClassroomPermissionTargetRequestDto request : desired) {
             String key = key(request.targetKind().name(), request.targetId());
-            keep.add(key);
+            if (!keep.add(key)) {
+                continue;
+            }
             ClassroomPermission permission = existing.get(key);
             if (permission == null) {
                 classroomPermissionRepository.save(ClassroomPermission.builder()

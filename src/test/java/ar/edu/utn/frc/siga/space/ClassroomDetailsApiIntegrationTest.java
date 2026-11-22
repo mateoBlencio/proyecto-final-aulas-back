@@ -13,6 +13,7 @@ import ar.edu.utn.frc.siga.space.model.Building;
 import ar.edu.utn.frc.siga.space.model.Classroom;
 import ar.edu.utn.frc.siga.space.model.ClassroomType;
 import ar.edu.utn.frc.siga.space.model.ResourceValueKind;
+import ar.edu.utn.frc.siga.space.repository.ClassroomPermissionRepository;
 import ar.edu.utn.frc.siga.space.repository.ClassroomRepository;
 import ar.edu.utn.frc.siga.testsupport.IntegrationTestData;
 import org.junit.jupiter.api.DisplayName;
@@ -30,6 +31,9 @@ class ClassroomDetailsApiIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private ClassroomRepository classroomRepository;
+
+    @Autowired
+    private ClassroomPermissionRepository classroomPermissionRepository;
 
     @Test
     @DisplayName("PUT /details actualiza tipo, observaciones, recursos y permitido sin tocar número ni capacidad")
@@ -90,6 +94,39 @@ class ClassroomDetailsApiIntegrationTest extends AbstractIntegrationTest {
 
         Classroom reloaded = classroomRepository.findById(classroom.getId()).orElseThrow();
         assertThat(reloaded.getPermissionMode()).isEqualTo(ar.edu.utn.frc.siga.space.model.PermissionMode.NONE);
+    }
+
+    @Test
+    @DisplayName("PUT /details con permissionTargets duplicados responde 200 y deja una sola fila en aula_permiso")
+    void updateDetails_duplicatedPermissionTargets_persistsSingleRow() throws Exception {
+        Building building = testData.edificio();
+        ClassroomType normal = testData.tipoAulaPorDefecto();
+        Classroom classroom = testData.aula(building, normal, 30);
+        long subjectId = testData.materiaYComision().subjectId();
+
+        String body = """
+                {
+                  "classroomTypeId": %d,
+                  "permissionMode": "SUBSET",
+                  "permissionTargets": [
+                    {"targetKind": "SUBJECT", "targetId": %d},
+                    {"targetKind": "SUBJECT", "targetId": %d}
+                  ]
+                }
+                """.formatted(normal.getId(), subjectId, subjectId);
+
+        mockMvc.perform(put("/v1/classrooms/" + classroom.getId() + "/details")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.permissionMode").value("SUBSET"))
+                .andExpect(jsonPath("$.permissionTargets.length()").value(1));
+
+        assertThat(classroomPermissionRepository.findByClassroomId(classroom.getId()))
+                .singleElement()
+                .satisfies(permission -> {
+                    assertThat(permission.getTargetId()).isEqualTo(subjectId);
+                    assertThat(permission.isActive()).isTrue();
+                });
     }
 
     @Test
