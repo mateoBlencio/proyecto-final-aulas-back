@@ -6,6 +6,7 @@ import ar.edu.utn.frc.siga.auth.model.RefreshToken;
 import ar.edu.utn.frc.siga.auth.model.RevocationReason;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.RefreshTokenRepository;
+import ar.edu.utn.frc.siga.auth.repository.UserRepository;
 import ar.edu.utn.frc.siga.auth.security.OpaqueTokens;
 import ar.edu.utn.frc.siga.auth.service.RefreshTokenService;
 import java.time.Duration;
@@ -24,6 +25,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtProperties jwtProperties;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional
@@ -74,6 +76,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     }
 
     private RefreshResult rotate(RefreshToken token, User user) {
+        lockUser(user.getId());
         IssuedRefreshToken child = doIssue(user);
         RefreshToken childEntity = refreshTokenRepository.findByTokenHash(OpaqueTokens.hash(child.rawToken()))
                 .orElseThrow(() -> new IllegalStateException("El refresh token recién emitido no se encontró"));
@@ -98,6 +101,13 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         // Trade-off: within refresh-grace-seconds a reused rotated token still yields a new token, so a thief
         // replaying a stolen token in that window is not detected; accepted to tolerate network retries.
         if (token.getRevocationReason() == RevocationReason.ROTATION && withinGrace) {
+            lockUser(token.getUser().getId());
+            boolean stillRotated = refreshTokenRepository.findRevocationReason(token.getTokenHash())
+                    .filter(reason -> reason == RevocationReason.ROTATION)
+                    .isPresent();
+            if (!stillRotated) {
+                throw new InvalidRefreshTokenException();
+            }
             log.info("Refresh token reutilizado dentro de la ventana de gracia, tratado como reintento de red");
             return new RefreshResult(token.getUser(), doIssue(token.getUser()));
         }
@@ -109,6 +119,10 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         }
 
         throw new InvalidRefreshTokenException();
+    }
+
+    private void lockUser(Long userId) {
+        userRepository.findByIdForUpdate(userId);
     }
 
     @Override
@@ -123,6 +137,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Override
     @Transactional
     public void revokeAllByUserId(Long userId) {
+        lockUser(userId);
         refreshTokenRepository.revokeAllByUserId(userId, Instant.now());
     }
 

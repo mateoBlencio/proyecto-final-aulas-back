@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.siga.auth.repository;
 
 import ar.edu.utn.frc.siga.auth.model.RefreshToken;
+import ar.edu.utn.frc.siga.auth.model.RevocationReason;
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,6 +12,9 @@ import org.springframework.data.repository.query.Param;
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
 
     Optional<RefreshToken> findByTokenHash(String tokenHash);
+
+    @Query("select r.revocationReason from RefreshToken r where r.tokenHash = :tokenHash")
+    Optional<RevocationReason> findRevocationReason(@Param("tokenHash") String tokenHash);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update RefreshToken r set r.revoked = true, r.revokedAt = :revokedAt, "

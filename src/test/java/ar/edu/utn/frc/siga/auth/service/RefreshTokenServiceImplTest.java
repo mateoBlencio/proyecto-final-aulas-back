@@ -39,7 +39,7 @@ class RefreshTokenServiceImplTest {
         jwtProperties.setRefreshExpirationDays(30);
         jwtProperties.setRefreshGraceSeconds(10);
 
-        refreshTokenService = new RefreshTokenServiceImpl(refreshTokenRepository, jwtProperties);
+        refreshTokenService = new RefreshTokenServiceImpl(refreshTokenRepository, jwtProperties, userRepository);
 
         user = userRepository.save(User.builder()
                 .email("rotacion.test@frc.utn.edu.ar")
