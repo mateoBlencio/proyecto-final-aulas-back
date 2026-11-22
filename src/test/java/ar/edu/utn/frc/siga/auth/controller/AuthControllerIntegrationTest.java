@@ -6,9 +6,14 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import ar.edu.utn.frc.siga.notification.api.NotificationChannel;
+import ar.edu.utn.frc.siga.notification.api.NotificationRequest;
+import ar.edu.utn.frc.siga.notification.api.NotificationSender;
+import ar.edu.utn.frc.siga.notification.api.NotificationTemplate;
 import ar.edu.utn.frc.siga.notification.api.NotificationRecipient;
 import ar.edu.utn.frc.siga.notification.internal.channel.ChannelSender;
 import ar.edu.utn.frc.siga.notification.internal.render.RenderedNotification;
@@ -30,6 +35,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -39,6 +45,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("integration")
@@ -63,6 +71,9 @@ class AuthControllerIntegrationTest {
 
     @Autowired
     private FakeChannelSender fakeChannelSender;
+
+    @MockitoSpyBean
+    private NotificationSender notificationSender;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private RestTemplate restTemplate;
@@ -379,6 +390,99 @@ class AuthControllerIntegrationTest {
             assertThat(row).containsEntry("estado", "SENT").containsEntry("cuerpo", "[contenido omitido]")
                     .containsEntry("cc", null).containsEntry("cco", null);
         });
+    }
+
+    @Test
+    void forgotPassword_shouldRespond202BeforeTheResetLinkWorkFinishes_andStillSendTheEmail() throws Exception {
+        String email = createUser("recupero.async");
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            NotificationRequest request = invocation.getArgument(0);
+            if (request.template() == NotificationTemplate.PASSWORD_RESET) {
+                entered.countDown();
+                release.await(10, TimeUnit.SECONDS);
+            }
+            return invocation.callRealMethod();
+        }).when(notificationSender).send(any());
+
+        try {
+            long start = System.nanoTime();
+            ResponseEntity<String> response = forgotPassword(email);
+            Duration elapsed = Duration.ofNanos(System.nanoTime() - start);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+            assertThat(elapsed).isLessThan(Duration.ofSeconds(5));
+            assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(fakeChannelSender.sentTo(email)).isEmpty();
+        } finally {
+            release.countDown();
+        }
+
+        await().atMost(Duration.ofSeconds(10))
+                .untilAsserted(() -> assertThat(fakeChannelSender.sentTo(email)).hasSize(1));
+    }
+
+    @Test
+    void refresh_shouldReturn401WithOldRotatedToken_afterResetPassword_evenWithinGraceWindow() throws Exception {
+        String email = createUser("recupero.rotado");
+        String first = (String) parseMap(login(email, PASSWORD)).get("refreshToken");
+        ResponseEntity<String> rotated = refresh(first);
+        assertThat(rotated.getStatusCode()).isEqualTo(HttpStatus.OK);
+        String second = (String) parseMap(rotated).get("refreshToken");
+
+        assertThat(forgotPassword(email).getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        String token = awaitResetToken(email);
+        assertThat(resetPassword(token, NEW_PASSWORD).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+        assertThat(refresh(first).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(refresh(second).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void refresh_shouldReturn401WithOldRotatedToken_afterOwnPasswordChange_evenWithinGraceWindow() throws Exception {
+        String email = createUser("cambio.rotado");
+        Map<String, Object> session = parseMap(login(email, PASSWORD));
+        String first = (String) session.get("refreshToken");
+        assertThat(refresh(first).getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        ResponseEntity<String> changed = changePassword((String) session.get("accessToken"), PASSWORD, NEW_PASSWORD);
+
+        assertThat(changed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(refresh(first).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void resetPassword_shouldReturn400WithoutErrors_whenTheLinkWasIssuedBeforeAnOwnPasswordChange() throws Exception {
+        String email = createUser("recupero.previo");
+        String accessToken = (String) parseMap(login(email, PASSWORD)).get("accessToken");
+        assertThat(forgotPassword(email).getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        String token = awaitResetToken(email);
+
+        assertThat(changePassword(accessToken, PASSWORD, NEW_PASSWORD).getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        ResponseEntity<String> reset = resetPassword(token, "Otra-Clave-Distinta-5528");
+        assertThat(reset.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(parseMap(reset)).doesNotContainKey("errors");
+        assertThat(login(email, NEW_PASSWORD).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM token_recuperacion_clave t JOIN usuario u ON u.id_usuario = t.id_usuario "
+                        + "WHERE u.correo = ?", Integer.class, email)).isZero();
+    }
+
+    private ResponseEntity<String> refresh(String refreshToken) {
+        return postJson("/auth/refresh", """
+                {"refreshToken":"%s"}
+                """.formatted(refreshToken));
+    }
+
+    private ResponseEntity<String> changePassword(String accessToken, String current, String next) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(accessToken);
+        return restTemplate.exchange(baseUrl + "/v1/users/me/password", HttpMethod.POST, new HttpEntity<>("""
+                {"currentPassword":"%s","newPassword":"%s"}
+                """.formatted(current, next), headers), String.class);
     }
 
     private ResponseEntity<String> forgotPassword(String email) {

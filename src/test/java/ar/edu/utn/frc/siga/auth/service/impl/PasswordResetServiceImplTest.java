@@ -26,6 +26,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
@@ -65,6 +66,8 @@ class PasswordResetServiceImplTest {
     @Mock
     private NotificationSender notificationSender;
     @Mock
+    private ApplicationEventPublisher eventPublisher;
+    @Mock
     private PlatformTransactionManager transactionManager;
     @Mock
     private TransactionStatus transactionStatus;
@@ -77,58 +80,76 @@ class PasswordResetServiceImplTest {
         properties.setFrontendBaseUrl("https://siga.frc.utn.edu.ar");
         lenient().when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
         service = new PasswordResetServiceImpl(tokenRepository, userRepository, refreshTokenService, rateLimiter,
-                properties, new AuthDomainProperties(), new PasswordPolicy(), passwordEncoder, notificationSender,
+                properties, new AuthDomainProperties(), new PasswordPolicy(), passwordEncoder, notificationSender, eventPublisher,
                 transactionManager);
     }
 
     @Test
-    @DisplayName("correo inexistente: consulta el límite y no guarda token ni manda nada")
+    @DisplayName("requestReset: consulta el límite y publica el evento con el correo normalizado, sin tocar usuarios")
+    void requestResetChecksTheLimitAndPublishesTheNormalizedEmail() {
+        service.requestReset("  Ana.Gomez@FRC.utn.edu.ar ", IP);
+
+        InOrder order = inOrder(rateLimiter, eventPublisher);
+        order.verify(rateLimiter).checkForgot(EMAIL, IP);
+        order.verify(eventPublisher).publishEvent(new PasswordResetRequested(EMAIL));
+        verifyNoInteractions(userRepository, tokenRepository, notificationSender);
+    }
+
+    @Test
+    @DisplayName("requestReset publica el evento aunque el correo sea inexistente o de dominio ajeno")
+    void requestResetPublishesForUnknownAndForeignEmails() {
+        service.requestReset("nadie@frc.utn.edu.ar", IP);
+        service.requestReset("ana@gmail.com", IP);
+
+        verify(eventPublisher).publishEvent(new PasswordResetRequested("nadie@frc.utn.edu.ar"));
+        verify(eventPublisher).publishEvent(new PasswordResetRequested("ana@gmail.com"));
+        verifyNoInteractions(userRepository, tokenRepository, notificationSender);
+    }
+
+    @Test
+    @DisplayName("el límite excedido corta antes de publicar el evento")
+    void rateLimitBlocksBeforePublishing() {
+        doThrow(new TooManyRequestsException(Duration.ofMinutes(5))).when(rateLimiter).checkForgot(EMAIL, IP);
+
+        assertThatThrownBy(() -> service.requestReset(EMAIL, IP)).isInstanceOf(TooManyRequestsException.class);
+
+        verifyNoInteractions(eventPublisher, userRepository, notificationSender);
+    }
+
+    @Test
+    @DisplayName("issueResetLink con correo inexistente: no guarda token ni manda nada")
     void unknownEmailDoesNothing() {
         when(userRepository.findByEmailAndEnabledTrue("nadie@frc.utn.edu.ar")).thenReturn(Optional.empty());
 
-        service.requestReset("nadie@frc.utn.edu.ar", IP);
+        service.issueResetLink("nadie@frc.utn.edu.ar");
 
-        verify(rateLimiter).checkForgot("nadie@frc.utn.edu.ar", IP);
         verifyNoInteractions(notificationSender);
         verify(tokenRepository, never()).saveAndFlush(any());
         verify(tokenRepository, never()).deleteByUserId(anyLong());
     }
 
     @Test
-    @DisplayName("correo inhabilitado: el repositorio no lo devuelve, no guarda token ni manda nada")
+    @DisplayName("issueResetLink con correo inhabilitado: el repositorio no lo devuelve, no guarda token ni manda nada")
     void disabledUserDoesNothing() {
         when(userRepository.findByEmailAndEnabledTrue(EMAIL)).thenReturn(Optional.empty());
 
-        service.requestReset(EMAIL, IP);
+        service.issueResetLink(EMAIL);
 
-        verify(rateLimiter).checkForgot(EMAIL, IP);
         verifyNoInteractions(notificationSender);
         verify(tokenRepository, never()).saveAndFlush(any());
     }
 
     @Test
-    @DisplayName("correo de dominio ajeno: consulta el límite y ni siquiera busca al usuario")
+    @DisplayName("issueResetLink con correo de dominio ajeno: ni siquiera busca al usuario")
     void foreignDomainDoesNothing() {
-        service.requestReset("ana@gmail.com", IP);
-
-        verify(rateLimiter).checkForgot("ana@gmail.com", IP);
-        verifyNoInteractions(userRepository, notificationSender);
-        verify(tokenRepository, never()).saveAndFlush(any());
-    }
-
-    @Test
-    @DisplayName("el límite excedido corta antes de buscar al usuario")
-    void rateLimitBlocksBeforeLookup() {
-        doThrow(new TooManyRequestsException(Duration.ofMinutes(5))).when(rateLimiter).checkForgot(EMAIL, IP);
-
-        assertThatThrownBy(() -> service.requestReset(EMAIL, IP)).isInstanceOf(TooManyRequestsException.class);
+        service.issueResetLink("ana@gmail.com");
 
         verifyNoInteractions(userRepository, notificationSender);
         verify(tokenRepository, never()).saveAndFlush(any());
     }
 
     @Test
-    @DisplayName("correo válido: normaliza, borra los tokens previos, guarda el hash y manda el enlace con #token=")
+    @DisplayName("issueResetLink con correo válido: borra los tokens previos, guarda el hash y manda el enlace con #token=")
     void validEmailStoresHashDeletesPreviousAndSendsLink() {
         User user = user(7L, true);
         when(userRepository.findByEmailAndEnabledTrue(EMAIL)).thenReturn(Optional.of(user));
@@ -139,9 +160,8 @@ class PasswordResetServiceImplTest {
         });
         Instant before = Instant.now();
 
-        service.requestReset("  Ana.Gomez@FRC.utn.edu.ar ", IP);
+        service.issueResetLink(EMAIL);
 
-        verify(rateLimiter).checkForgot(EMAIL, IP);
         InOrder order = inOrder(tokenRepository);
         order.verify(tokenRepository).deleteByUserId(7L);
         ArgumentCaptor<PasswordResetToken> saved = ArgumentCaptor.forClass(PasswordResetToken.class);

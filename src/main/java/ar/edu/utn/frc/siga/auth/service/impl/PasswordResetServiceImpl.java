@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -44,6 +45,7 @@ public class PasswordResetServiceImpl implements PasswordResetService {
     private final PasswordPolicy passwordPolicy;
     private final PasswordEncoder passwordEncoder;
     private final NotificationSender notificationSender;
+    private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
 
     public PasswordResetServiceImpl(PasswordResetTokenRepository tokenRepository, UserRepository userRepository,
@@ -51,6 +53,7 @@ public class PasswordResetServiceImpl implements PasswordResetService {
                                     PasswordResetProperties properties, AuthDomainProperties authDomainProperties,
                                     PasswordPolicy passwordPolicy, PasswordEncoder passwordEncoder,
                                     NotificationSender notificationSender,
+                                    ApplicationEventPublisher eventPublisher,
                                     PlatformTransactionManager transactionManager) {
         this.tokenRepository = tokenRepository;
         this.userRepository = userRepository;
@@ -61,15 +64,20 @@ public class PasswordResetServiceImpl implements PasswordResetService {
         this.passwordPolicy = passwordPolicy;
         this.passwordEncoder = passwordEncoder;
         this.notificationSender = notificationSender;
+        this.eventPublisher = eventPublisher;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     @Override
-    @Transactional
     public void requestReset(String email, String ip) {
         String normalized = AuthDomainProperties.normalizeEmail(email);
         rateLimiter.checkForgot(normalized, ip);
+        eventPublisher.publishEvent(new PasswordResetRequested(normalized));
+    }
 
+    @Override
+    @Transactional
+    public void issueResetLink(String normalized) {
         Optional<User> user = authDomainProperties.isAllowedEmail(normalized)
                 ? userRepository.findByEmailAndEnabledTrue(normalized)
                 : Optional.empty();
