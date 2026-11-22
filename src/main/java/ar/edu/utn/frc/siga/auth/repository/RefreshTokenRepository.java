@@ -22,9 +22,10 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
                             @Param("revokedAt") Instant revokedAt);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("update RefreshToken r set r.revoked = true, r.revokedAt = :revokedAt, "
+    @Query("update RefreshToken r set r.revoked = true, r.revokedAt = coalesce(r.revokedAt, :revokedAt), "
             + "r.revocationReason = ar.edu.utn.frc.siga.auth.model.RevocationReason.CASCADE "
-            + "where r.user.id = :userId and r.revoked = false")
+            + "where r.user.id = :userId and (r.revoked = false "
+            + "or r.revocationReason = ar.edu.utn.frc.siga.auth.model.RevocationReason.ROTATION)")
     int revokeAllByUserId(@Param("userId") Long userId, @Param("revokedAt") Instant revokedAt);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

@@ -6,9 +6,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import ar.edu.utn.frc.siga.AbstractIntegrationTest;
 import ar.edu.utn.frc.siga.auth.dto.request.RefreshTokenRequest;
 import ar.edu.utn.frc.siga.auth.exception.InvalidRefreshTokenException;
+import ar.edu.utn.frc.siga.auth.model.RefreshToken;
+import ar.edu.utn.frc.siga.auth.model.RevocationReason;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.RefreshTokenRepository;
 import ar.edu.utn.frc.siga.auth.repository.UserRepository;
+import ar.edu.utn.frc.siga.auth.security.OpaqueTokens;
+import java.time.Instant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -84,5 +88,40 @@ class RefreshTokenReuseIntegrationTest extends AbstractIntegrationTest {
         Integer active = jdbc.queryForObject(
                 "select count(*) from refresh_token where id_usuario = ? and not revocado", Integer.class, user.getId());
         assertThat(active).isZero();
+    }
+
+    @Test
+    void revokeAllByUserId_marksRotatedTokensAsCascadeKeepingTheirOriginalRevokedAt() {
+        String first = refreshTokenService.issue(user).rawToken();
+        String second = authService.refresh(new RefreshTokenRequest(first)).getRefreshToken();
+        Instant rotatedAt = refreshTokenRepository.findByTokenHash(OpaqueTokens.hash(first)).orElseThrow().getRevokedAt();
+
+        refreshTokenService.revokeAllByUserId(user.getId());
+
+        RefreshToken rotated = refreshTokenRepository.findByTokenHash(OpaqueTokens.hash(first)).orElseThrow();
+        RefreshToken active = refreshTokenRepository.findByTokenHash(OpaqueTokens.hash(second)).orElseThrow();
+        assertThat(rotated.getRevocationReason()).isEqualTo(RevocationReason.CASCADE);
+        assertThat(rotated.getRevokedAt()).isEqualTo(rotatedAt);
+        assertThat(active.getRevocationReason()).isEqualTo(RevocationReason.CASCADE);
+        assertThat(active.getRevokedAt()).isAfter(rotatedAt);
+    }
+
+    @Test
+    void refresh_rotatedTokenWithinGraceWindow_isRejectedAfterRevokeAll() {
+        String first = refreshTokenService.issue(user).rawToken();
+        authService.refresh(new RefreshTokenRequest(first));
+
+        refreshTokenService.revokeAllByUserId(user.getId());
+
+        assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest(first)))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+    }
+
+    @Test
+    void refresh_rotatedTokenWithinGraceWindow_isAcceptedWithoutRevokeAll() {
+        String first = refreshTokenService.issue(user).rawToken();
+        authService.refresh(new RefreshTokenRequest(first));
+
+        assertThat(authService.refresh(new RefreshTokenRequest(first)).getRefreshToken()).isNotBlank();
     }
 }

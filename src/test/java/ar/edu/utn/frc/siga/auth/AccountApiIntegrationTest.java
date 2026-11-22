@@ -312,4 +312,52 @@ class AccountApiIntegrationTest extends AbstractIntegrationTest {
                                 """.formatted(oldRefresh)))
                 .andExpect(status().isUnauthorized());
     }
+
+    private String refreshBody(String refreshToken) {
+        return """
+                {"refreshToken": "%s"}
+                """.formatted(refreshToken);
+    }
+
+    private String rotate(String refreshToken) throws Exception {
+        MvcResult result = anonymous().perform(post("/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(refreshBody(refreshToken)))
+                .andExpect(status().isOk())
+                .andReturn();
+        return body(result).get("refreshToken").asString();
+    }
+
+    @Test
+    @DisplayName("POST /me/password: un refresh token ya rotado da 401 aunque se reintente dentro de la ventana de gracia")
+    void password_success_revokesRotatedRefreshTokenEvenWithinGrace() throws Exception {
+        String email = uniqueEmail("grace");
+        User user = createUser(email, SystemRole.CONSULTA, ScopeType.GLOBAL, null);
+        String first = authService.startSession(user).getRefreshToken();
+        rotate(first);
+
+        asUser(email).perform(fromIp(post("/v1/users/me/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(passwordBody(PASSWORD, NEW_PASSWORD)), uniqueIp()))
+                .andExpect(status().isOk());
+
+        anonymous().perform(post("/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(refreshBody(first)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("refresh: sin revocación total, reintentar con el token rotado dentro de la ventana de gracia sigue dando 200")
+    void refresh_retryWithRotatedTokenWithinGrace_returns200() throws Exception {
+        String email = uniqueEmail("retry");
+        User user = createUser(email, SystemRole.CONSULTA, ScopeType.GLOBAL, null);
+        String first = authService.startSession(user).getRefreshToken();
+        rotate(first);
+
+        anonymous().perform(post("/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(refreshBody(first)))
+                .andExpect(status().isOk());
+    }
 }
