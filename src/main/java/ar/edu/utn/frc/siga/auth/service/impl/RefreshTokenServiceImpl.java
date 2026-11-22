@@ -6,14 +6,10 @@ import ar.edu.utn.frc.siga.auth.model.RefreshToken;
 import ar.edu.utn.frc.siga.auth.model.RevocationReason;
 import ar.edu.utn.frc.siga.auth.model.User;
 import ar.edu.utn.frc.siga.auth.repository.RefreshTokenRepository;
+import ar.edu.utn.frc.siga.auth.security.OpaqueTokens;
 import ar.edu.utn.frc.siga.auth.service.RefreshTokenService;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,13 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class RefreshTokenServiceImpl implements RefreshTokenService {
 
-    private static final int RAW_TOKEN_BYTES = 32;
     private static final Duration PURGE_RETENTION = Duration.ofDays(30);
 
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtProperties jwtProperties;
-
-    private final SecureRandom secureRandom = new SecureRandom();
 
     @Override
     @Transactional
@@ -39,13 +32,13 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     }
 
     private IssuedRefreshToken doIssue(User user) {
-        String rawToken = generateRawToken();
+        String rawToken = OpaqueTokens.generate();
         long expirationSeconds = Duration.ofDays(jwtProperties.getRefreshExpirationDays()).toSeconds();
         Instant now = Instant.now();
 
         RefreshToken token = RefreshToken.builder()
                 .user(user)
-                .tokenHash(hash(rawToken))
+                .tokenHash(OpaqueTokens.hash(rawToken))
                 .revoked(false)
                 .expiresAt(now.plusSeconds(expirationSeconds))
                 .build();
@@ -59,7 +52,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Override
     @Transactional(noRollbackFor = InvalidRefreshTokenException.class)
     public RefreshResult refresh(String rawToken) {
-        String tokenHash = hash(rawToken);
+        String tokenHash = OpaqueTokens.hash(rawToken);
         RefreshToken token = refreshTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(InvalidRefreshTokenException::new);
 
@@ -82,7 +75,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
     private RefreshResult rotate(RefreshToken token, User user) {
         IssuedRefreshToken child = doIssue(user);
-        RefreshToken childEntity = refreshTokenRepository.findByTokenHash(hash(child.rawToken()))
+        RefreshToken childEntity = refreshTokenRepository.findByTokenHash(OpaqueTokens.hash(child.rawToken()))
                 .orElseThrow(() -> new IllegalStateException("El refresh token recién emitido no se encontró"));
 
         int updated = refreshTokenRepository.consumeByTokenHash(token.getTokenHash(), childEntity, Instant.now());
@@ -121,7 +114,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Override
     @Transactional
     public void revoke(String rawToken) {
-        String tokenHash = hash(rawToken);
+        String tokenHash = OpaqueTokens.hash(rawToken);
         refreshTokenRepository.findByTokenHash(tokenHash).ifPresent(token ->
                 log.info("Refresh token revocado por logout: usuarioId={}", token.getUser().getId()));
         refreshTokenRepository.revokeByTokenHash(tokenHash, Instant.now());
@@ -137,21 +130,5 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Transactional
     public int purgeExpired() {
         return refreshTokenRepository.deleteExpiredBefore(Instant.now().minus(PURGE_RETENTION));
-    }
-
-    private String generateRawToken() {
-        byte[] bytes = new byte[RAW_TOKEN_BYTES];
-        secureRandom.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    }
-
-    private String hash(String rawToken) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hashed = digest.digest(rawToken.getBytes(StandardCharsets.UTF_8));
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(hashed);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 no disponible en la JVM", e);
-        }
     }
 }

@@ -45,7 +45,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
     private long createUser(String email) throws Exception {
         MvcResult result = mockMvc.perform(post("/v1/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createBody(email, "supersegura")))
+                        .content(createBody(email, "clave-segura-2026")))
                 .andExpect(status().isCreated())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
@@ -60,7 +60,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
 
         MvcResult result = mockMvc.perform(post("/v1/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createBody(email, "supersegura")))
+                        .content(createBody(email, "clave-segura-2026")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.email").value(email))
                 .andExpect(jsonPath("$.firstName").value("Nombre"))
@@ -73,7 +73,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
         long id = objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
         User saved = userRepository.findById(id).orElseThrow();
         assertThat(saved.getEnabled()).isTrue();
-        assertThat(saved.getPasswordHash()).isNotEqualTo("supersegura");
+        assertThat(saved.getPasswordHash()).isNotEqualTo("clave-segura-2026");
     }
 
     @Test
@@ -84,7 +84,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(post("/v1/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createBody(email, "supersegura")))
+                        .content(createBody(email, "clave-segura-2026")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("User domain error"));
     }
@@ -96,7 +96,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(post("/v1/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createBody(email, "supersegura")))
+                        .content(createBody(email, "clave-segura-2026")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.email").value(email));
     }
@@ -110,7 +110,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
 
         MvcResult result = mockMvc.perform(post("/v1/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createBody(mixed, "supersegura")))
+                        .content(createBody(mixed, "clave-segura-2026")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.email").value(lower))
                 .andReturn();
@@ -127,7 +127,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(post("/v1/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createBody(lower.toUpperCase(java.util.Locale.ROOT), "supersegura")))
+                        .content(createBody(lower.toUpperCase(java.util.Locale.ROOT), "clave-segura-2026")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("User domain error"));
 
@@ -145,7 +145,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(post("/v1/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createBody("  " + email + "  ", "supersegura")))
+                        .content(createBody("  " + email + "  ", "clave-segura-2026")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.email").exists());
 
@@ -163,7 +163,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
     void create_nonInstitutionalDomain_returns400() throws Exception {
         mockMvc.perform(post("/v1/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createBody("ajeno" + System.nanoTime() + "@gmail.com", "supersegura")))
+                        .content(createBody("ajeno" + System.nanoTime() + "@gmail.com", "clave-segura-2026")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("User domain error"));
     }
@@ -186,7 +186,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/v1/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"%s","password":"supersegura","firstName":"Nombre","lastName":"Apellido",
+                                {"email":"%s","password":"clave-segura-2026","firstName":"Nombre","lastName":"Apellido",
                                  "initialRole":{"role":"AUXILIAR_AULICO","scopeType":"GLOBAL","scopeId":null}}
                                 """.formatted(email)))
                 .andExpect(status().isBadRequest());
@@ -303,29 +303,53 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
 
     // ---- límites del alta (SEC-03) ----
 
+    private static String passwordOfLength(int length) {
+        return "clave-segura-2026-".repeat(5).substring(0, length);
+    }
+
+    private static String twoByteChars(int count) {
+        return java.util.stream.IntStream.range(0, count)
+                .mapToObj(i -> new String(Character.toChars(0xC0 + i)))
+                .collect(java.util.stream.Collectors.joining());
+    }
+
     @ParameterizedTest(name = "password de {0} caracteres -> {1}")
-    @CsvSource({"7, 400", "8, 201", "72, 201", "73, 400"})
-    @DisplayName("POST /v1/users valida el largo de la contraseña entre 8 y 72 caracteres")
+    @CsvSource({"11, 400", "12, 201", "72, 201", "73, 400"})
+    @DisplayName("POST /v1/users valida el largo de la contraseña entre 12 y 72 caracteres")
     void create_passwordLength(int length, int expectedStatus) throws Exception {
         mockMvc.perform(post("/v1/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createBody(uniqueEmail(), "p".repeat(length))))
+                        .content(createBody(uniqueEmail(), passwordOfLength(length))))
                 .andExpect(status().is(expectedStatus));
     }
 
     @Test
-    @DisplayName("POST /v1/users con contraseña de 36 caracteres de 2 bytes (72 bytes) responde 201 y con 40 (80 bytes) 400")
+    @DisplayName("POST /v1/users con 36 caracteres distintos de 2 bytes (72 bytes) responde 201 y con 40 (80 bytes) 400 con errors.password")
     void create_passwordByteLimit() throws Exception {
         mockMvc.perform(post("/v1/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createBody(uniqueEmail(), "é".repeat(36))))
+                        .content(createBody(uniqueEmail(), twoByteChars(36))))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(post("/v1/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createBody(uniqueEmail(), "é".repeat(40))))
+                        .content(createBody(uniqueEmail(), twoByteChars(40))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("User domain error"));
+                .andExpect(jsonPath("$.errors.password").isArray());
+    }
+
+    @Test
+    @DisplayName("POST /v1/users con contraseña común responde 400 con errors.password y no crea el usuario")
+    void create_commonPassword_returns400WithPasswordError() throws Exception {
+        String email = uniqueEmail();
+
+        mockMvc.perform(post("/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(email, "iloveyousomuch")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.password[0]").value("La contraseña es demasiado común."));
+
+        assertThat(userRepository.existsByEmail(email)).isFalse();
     }
 
     @Test
@@ -334,7 +358,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/v1/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"%s","password":"supersegura","firstName":"%s","lastName":"Apellido"}
+                                {"email":"%s","password":"clave-segura-2026","firstName":"%s","lastName":"Apellido"}
                                 """.formatted(uniqueEmail(), "n".repeat(101))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.firstName").exists());
@@ -348,7 +372,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(post("/v1/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createBody(email, "supersegura")))
+                        .content(createBody(email, "clave-segura-2026")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.email").exists());
     }
@@ -367,7 +391,7 @@ class UserApiIntegrationTest extends AbstractIntegrationTest {
         mockMvcAsAuxiliar("aux." + System.nanoTime() + "@frc.utn.edu.ar")
                 .perform(post("/v1/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createBody(uniqueEmail(), "supersegura")))
+                        .content(createBody(uniqueEmail(), "clave-segura-2026")))
                 .andExpect(status().isForbidden());
     }
 }
